@@ -96,8 +96,8 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.2.2")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.2")  // 2.9+ tarik savedstate 1.4 (minSdk 23)
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.2")
     implementation("androidx.activity:activity-ktx:1.9.0")  // 1.11+ butuh minSdk 23
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
