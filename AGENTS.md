@@ -165,14 +165,18 @@ buka remote web dari browser, tes tambah URL, dan buka Galeri.
 
 ## Peta jalan: targetSdk 35 (Android 15/16)
 
-**Belum dikerjakan — hanya rencana.** Aplikasi tetap `targetSdk 34` + `minSdk 21`
-sekarang; pembaruan ini tidak wajib karena APK disebar via GitHub (bukan Play
-Store). Tujuan: perangkat Android 15/16 tetap berfungsi penuh saat nanti naik
-target.
+**Sebagian dikerjakan.** `compileSdk 35` sudah aktif (membuka update material
+1.14 / recyclerview 1.4); `targetSdk` sengaja tetap 34 karena perilaku Android
+15 (FGS boot, edge-to-edge) baru aktif saat targetSdk naik. APK disebar via
+GitHub (bukan Play Store), jadi targetSdk 35 tidak wajib — tujuan akhirnya
+perangkat Android 15/16 tetap berfungsi penuh.
 
-- **Fase 1 — sekarang**: lint + unit test aktif (pengaman API 21), dependensi
-  di-update bertahap via CI. `versionName`/`versionCode` tetap diatur CI.
-- **Fase 2 — saat siap**: naikkan `compileSdk`/`targetSdk` ke 35.
+- **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
+  di-update bertahap via CI, toolchain Gradle 8.14.4 + Kotlin 2.x.
+  `versionName`/`versionCode` tetap diatur CI.
+- **Fase 2a — selesai**: `compileSdk 35` (targetSdk tetap 34, tanpa perubahan
+  perilaku runtime Android 15).
+- **Fase 2b — saat siap**: naikkan `targetSdk` ke 35.
   - **FGS dari `BOOT_COMPLETED`**: saat targetSdk 35, service `dataSync` tidak
     boleh lagi start langsung dari receiver boot — migrasi ke `WorkManager`
     (periode) atau `JobScheduler` untuk download lanjut + server auto-start.
@@ -183,5 +187,5 @@ target.
 - **Fase 3 — setelah hijau**: uji manual di perangkat Android 15/16 (auto-start
   boot, download background, server remote, galeri) sebelum dirilis via push ke
   `main`.
-- **Pantangan**: jangan naikkan `minSdk` (tetap 21) dan jangan gabung perubahan
-  ini dengan PR fitur lain.
+- **Pantangan**: jangan naikkan `minSdk` (tetap 21), jangan naikkan `targetSdk`
+  sebelum Fase 2b selesai, dan jangan gabung perubahan ini dengan PR fitur lain.
