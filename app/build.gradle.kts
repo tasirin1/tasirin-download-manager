@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -55,10 +57,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         viewBinding = true
     }
@@ -73,6 +71,13 @@ android {
         // - OldTargetApi: targetSdk 35 dijadwalkan via peta jalan (AGENTS.md), bukan bug.
         // - GradleDependency: update dependensi dikelola Dependabot (PR lewat CI).
         disable += setOf("OldTargetApi", "GradleDependency")
+    }
+}
+
+kotlin {
+    // DSL baru (KGP 2.x): menggantikan kotlinOptions yang dihapus di Kotlin 2.4+.
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
