@@ -18,7 +18,7 @@ jobs:
       VT_API_KEY: ${{ secrets.VT_API_KEY }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -30,7 +30,7 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Set up Gradle (cache + verifikasi wrapper)
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Bump versionCode otomatis per build
         run: |
@@ -76,14 +76,14 @@ jobs:
           fi
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload release APK
         if: env.KEYSTORE_BASE64 != ''
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: app-release
           path: app/build/outputs/apk/release/app-release.apk
