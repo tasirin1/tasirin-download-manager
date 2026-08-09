@@ -8,7 +8,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di `README.md
 ```
 .
 ├── .github/workflows/build.yml       # CI: bump versionCode → build APK → release
-├── app/build.gradle.kts              # minSdk 21 / targetSdk 34, compileSdk 35, desugaring, R8
+├── app/build.gradle.kts              # minSdk 21 / targetSdk 34, compileSdk 36, desugaring, R8
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
 │   ├── assets/
@@ -109,7 +109,7 @@ diperbarui.
 - **Dependabot** → PR update dependensi (Gradle/Actions) lewat alur PR biasa
   (build + lint + test, tanpa release) — review lalu merge. Yang di-ignore
   (perlu upgrade toolchain manual): major AGP & Kotlin, `material` (minSdk 23),
-  `androidx.core` (compileSdk 37).
+  `androidx.core` (compileSdk 37), `gradle-wrapper` (AGP 8.x maks. Gradle 9.5).
 - **Manual**: GitHub → Actions → *Build APK* → *Run workflow*
   (atau `gh workflow run build.yml -R tasirin1/tasirin-download-manager`).
 - **Jangan edit release manual** — selalu lewat workflow.
@@ -167,18 +167,18 @@ buka remote web dari browser, tes tambah URL, dan buka Galeri.
 
 ## Peta jalan: targetSdk 35 (Android 15/16)
 
-**Sebagian dikerjakan.** `compileSdk 35` sudah aktif (membuka update seperti
-recyclerview 1.4; material tetap 1.12 karena versi baru menuntut minSdk 23);
-`targetSdk` sengaja tetap 34 karena perilaku Android
+**Sebagian dikerjakan.** `compileSdk 36` sudah aktif (membuka update seperti
+recyclerview 1.4, lifecycle 2.11, activity 1.13; material tetap 1.12 karena
+versi baru menuntut minSdk 23); `targetSdk` sengaja tetap 34 karena perilaku Android
 15 (FGS boot, edge-to-edge) baru aktif saat targetSdk naik. APK disebar via
 GitHub (bukan Play Store), jadi targetSdk 35 tidak wajib — tujuan akhirnya
 perangkat Android 15/16 tetap berfungsi penuh.
 
 - **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
-  di-update bertahap via CI, toolchain Gradle 9.6.1 + Kotlin 2.4.10,
+  di-update bertahap via CI, toolchain Gradle 9.5.1 + AGP 8.13.2 + Kotlin 2.4.10,
   core library desugaring aktif. `versionName`/`versionCode` tetap diatur CI.
-- **Fase 2a — selesai**: `compileSdk 35` (targetSdk tetap 34, tanpa perubahan
-  perilaku runtime Android 15).
+- **Fase 2a — selesai**: `compileSdk 36` (targetSdk tetap 34, tanpa perubahan
+  perilaku runtime Android 15/16).
 - **Fase 2b — saat siap**: naikkan `targetSdk` ke 35.
   - **FGS dari `BOOT_COMPLETED`**: saat targetSdk 35, service `dataSync` tidak
     boleh lagi start langsung dari receiver boot — migrasi ke `WorkManager`

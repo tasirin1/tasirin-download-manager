@@ -7,9 +7,9 @@ plugins {
 
 android {
     namespace = "com.tasirin.httpdownloadmanager"
-    // compileSdk 35: unblocks material 1.14 / recyclerview 1.4. targetSdk tetap 34
-    // (perubahan perilaku Android 15 baru aktif saat targetSdk 35 — lihat AGENTS.md).
-    compileSdk = 35
+    // compileSdk 36 (Android 16): unblocks lifecycle 2.11 / activity 1.13. targetSdk tetap 34
+    // (perubahan perilaku runtime baru aktif saat targetSdk naik — lihat AGENTS.md).
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.tasirin.httpdownloadmanager"
