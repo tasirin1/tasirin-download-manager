@@ -440,16 +440,19 @@ class FileSaver(context: Context) {
     fun uniqueMediaStoreName(
         fileName: String,
         relativePath: String?,
-        collection: Uri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        collection: Uri? = null
     ): String {
         if (Build.VERSION.SDK_INT < 29) return fileName
+        // Default di-resolve di sini (setelah guard API 29), bukan di parameter,
+        // supaya aman di Android 5 (MediaStore.Downloads baru ada API 29).
+        val col = collection ?: MediaStore.Downloads.EXTERNAL_CONTENT_URI
         return runCatching {
             val resolver = appContext.contentResolver
             val existing = mutableSetOf<String>()
             val selection = relativePath?.let { "${MediaStore.Downloads.RELATIVE_PATH}=?" }
             val args = relativePath?.let { arrayOf(it.trim('/') + "/") }
             resolver.query(
-                collection,
+                col,
                 arrayOf(MediaStore.Downloads.DISPLAY_NAME),
                 selection,
                 args,

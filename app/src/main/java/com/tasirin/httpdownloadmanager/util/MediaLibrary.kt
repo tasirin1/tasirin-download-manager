@@ -28,7 +28,7 @@ object MediaLibrary {
         return when (root.trim('/').substringBefore('/').lowercase()) {
             "pictures", "dcim" -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
             "movies" -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            else -> MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            else -> downloadsCollection()
         }
     }
 
@@ -39,13 +39,19 @@ object MediaLibrary {
         return when {
             root == "pictures" || root == "dcim" ->
                 if (mime.startsWith("image/")) MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                else MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                else downloadsCollection()
             root == "movies" ->
                 if (mime.startsWith("video/")) MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-                else MediaStore.Downloads.EXTERNAL_CONTENT_URI
-            else -> MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                else downloadsCollection()
+            else -> downloadsCollection()
         }
     }
+
+    /** Koleksi Downloads (API 29+); fallback aman "Files" untuk Android 5-9.
+     *  Pemanggil sudah guard API 29, jadi fallback tidak pernah terpakai. */
+    private fun downloadsCollection(): Uri =
+        if (Build.VERSION.SDK_INT >= 29) MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        else MediaStore.Files.getContentUri("external")
 
     data class MediaEntry(
         val name: String,
