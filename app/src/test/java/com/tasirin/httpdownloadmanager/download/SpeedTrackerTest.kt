@@ -15,14 +15,15 @@ class SpeedTrackerTest {
     }
 
     @Test
-    fun `kecepatan instan dan ETA`() {
+    fun `EMA - sample setelah idle dihitung 20 persen dari kecepatan instan`() {
         var now = 0L
         val tracker = SpeedTracker { now }
         tracker.sample("1", bytes = 0, total = 1000)
         now = 1000 // 1 detik kemudian
         val (speed, eta) = tracker.sample("1", bytes = 500, total = 1000)
-        assertEquals(500L, speed)
-        assertEquals(1L, eta) // sisa 500 byte / 500 B/s = 1 detik
+        // EMA = 0*0.8 + 500*0.2 = 100 B/s (perilaku lama, sengaja dipertahankan)
+        assertEquals(100L, speed)
+        assertEquals(5L, eta) // sisa 500 byte / 100 B/s = 5 detik
     }
 
     @Test
@@ -34,8 +35,8 @@ class SpeedTrackerTest {
         tracker.sample("1", bytes = 1_000, total = 10_000) // 1000 B/s
         now = 2000
         val (speed, _) = tracker.sample("1", bytes = 9_000, total = 10_000) // lonjakan 8000 B/s
-        // EMA = 1000*0.8 + 8000*0.2 = 2400
-        assertEquals(2400L, speed)
+        // EMA berjalan: 0 -> 200 (1000*0.2) -> 1760 (200*0.8 + 8000*0.2)
+        assertEquals(1760L, speed)
     }
 
     @Test
