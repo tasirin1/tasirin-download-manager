@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager.util
 
+import androidx.annotation.RequiresApi
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -48,7 +49,11 @@ object Crypto {
         }.getOrDefault("")
     }
 
+    /** AES AndroidKeyStore hanya tersedia API 23+; pemanggil (encrypt/decrypt)
+     *  sudah menangani fallback untuk Android 5.0-5.1. */
+    @RequiresApi(Build.VERSION_CODES.M)
     private fun key(): SecretKey {
+        check(Build.VERSION.SDK_INT >= 23) { "AES AndroidKeyStore butuh API 23+" }
         cachedKey?.let { return it }
         synchronized(KEY_LOCK) {
             cachedKey?.let { return it }
