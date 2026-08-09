@@ -1,5 +1,8 @@
 package com.tasirin.httpdownloadmanager.util
 
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
@@ -7,6 +10,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 
 data class UpdateInfo(
@@ -22,6 +26,10 @@ object Updater {
         "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest"
     private const val MAX_REDIRECTS = 5
     private const val UA = "TasirinDownloadManager"
+    /** SHA-256 fingerprint sertifikat release resmi (alias `tasirin`), huruf kecil tanpa titik dua.
+     *  Didapat dari `keytool -list -v` keystore rilis; APK dengan tanda tangan lain ditolak. */
+    private const val RELEASE_CERT_SHA256 =
+        "c2785a618082683755eeae867e0a2e01f450b1fd448859d1ec21cf854c5713d1"
 
     fun checkLatest(context: Context): UpdateInfo? = runCatching {
         val body = get(context, LATEST_API) ?: return null
@@ -109,6 +117,51 @@ object Updater {
         context.startActivity(intent)
         true
     }.getOrDefault(false)
+
+    /** Pastikan APK ditandatangani sertifikat release resmi sebelum dipasang.
+     *  API 28+ memakai GET_SIGNING_CERTIFICATES (v2/v3), Android 5-8 memakai
+     *  GET_SIGNATURES — dua-duanya mengembalikan byte DER sertifikat. */
+    fun isSignatureValid(context: Context, file: File): Boolean = runCatching {
+        val flags = if (Build.VERSION.SDK_INT >= 28) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        var info = context.packageManager.getPackageArchiveInfo(file.absolutePath, flags)
+        var certs = signingCerts(info)
+        if (certs.isEmpty() && Build.VERSION.SDK_INT >= 28) {
+            // Fallback: APK bertanda tangan v1 saja tidak selalu mengisi signingInfo.
+            info = context.packageManager.getPackageArchiveInfo(
+                file.absolutePath, PackageManager.GET_SIGNATURES
+            )
+            certs = signingCerts(info)
+        }
+        certs.any { cert ->
+            val digest = MessageDigest.getInstance("SHA-256").digest(cert)
+            hex(digest).equals(RELEASE_CERT_SHA256, ignoreCase = true)
+        }
+    }.getOrDefault(false)
+
+    private fun signingCerts(info: PackageInfo?): List<ByteArray> {
+        if (info == null) return emptyList()
+        if (Build.VERSION.SDK_INT >= 28) {
+            info.signingInfo?.let { si ->
+                val signers = si.apkContentsSigners
+                if (!signers.isNullOrEmpty()) return signers.map { it.toByteArray() }
+            }
+        }
+        return info.signatures?.map { it.toByteArray() } ?: emptyList()
+    }
+
+    private fun hex(bytes: ByteArray): String {
+        val sb = StringBuilder(bytes.size * 2)
+        for (b in bytes) {
+            val v = b.toInt() and 0xFF
+            sb.append(Character.forDigit(v ushr 4, 16))
+            sb.append(Character.forDigit(v and 0x0F, 16))
+        }
+        return sb.toString()
+    }
 
     private fun get(context: Context, url: String): String? = runCatching {
         val conn = URL(url).openConnection() as HttpURLConnection
