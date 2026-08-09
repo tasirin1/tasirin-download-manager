@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="Autofill"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -102,9 +104,9 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_input_tv"
                 android:hint="@string/settings_pin_hint"
-                android:inputType="text"
                 android:maxLength="10"
-                android:password="true"
+                android:inputType="textPassword"
+                tools:ignore="TextFields"
                 android:nextFocusDown="@id/check_pin_enforced"
                 android:nextFocusUp="@id/check_server_autostart" />
 

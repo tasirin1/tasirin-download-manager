@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!--
+  =====================================================================
+  Tasirin Download Manager — Remote Web (satu file: HTML + CSS + JS)
+  Dipakai langsung oleh HttpControlServer dari assets; UI utama pemakaian
+  harian. Jaga mobile-first & ramah D-pad TV; jangan tambah library berat.
+  =====================================================================
+-->
 <html lang="id">
 <head>
 <meta charset="utf-8">
@@ -6,6 +13,7 @@
 <title>Tasirin Download Manager Remote</title>
 <meta name="theme-color" content="#4353e6">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%234353e6'/%3E%3Cpath d='M12 5v8.6l3.2-3.2 1.4 1.4L12 17.4l-4.6-4.6 1.4-1.4L12 13.6V5z' fill='%23fff'/%3E%3C/svg%3E">
+<!-- ===== SEKSI: CSS (tema, komponen, halaman) ===== -->
 <style>
   :root {
     --bg: #f4f6fb;
@@ -337,6 +345,7 @@
 </style>
 </head>
 <body>
+<!-- ===== SEKSI: HTML (status, form tambah, daftar download, galeri, file manager, player) ===== -->
 <div class="topbar">
   <div class="topbar-in">
     <div class="brand"><span>Tasirin Download Manager<small>Remote Control</small></span></div>
@@ -566,6 +575,7 @@
 </div>
 
 <script>
+<!-- ===== SEKSI: JAVASCRIPT ===== -->
 const API = '';
 // Buang query string yang nyangkut (mis. ?path=... dari bookmark lama) supaya
 // tidak ikut menempel di request API dan mengotori log server.
@@ -576,6 +586,7 @@ const connBanner = document.getElementById('connBanner');
 const connBannerText = document.getElementById('connBannerText');
 const connReloadBtn = document.getElementById('connReloadBtn');
 let connReloadTarget = '';
+// SEKSI: Koneksi, banner, tema
 function showConnBanner(msg, target) {
   connBannerText.textContent = msg;
   connReloadTarget = target || '';
@@ -684,6 +695,7 @@ function renderStatus(st) {
     );
   }
 }
+// SEKSI: Status & polling status
 async function refreshStatus() {
   const el = document.getElementById('deviceStatus');
   if (!el) return;
@@ -789,6 +801,7 @@ function mmShowToast(text) {
   mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, 700);
 }
 
+// SEKSI: Player video ala YouTube (seekbar, gesture, auto-next)
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
   mmOverlayTitle.classList.remove('hide');
@@ -887,6 +900,7 @@ document.addEventListener('webkitfullscreenchange', function () {
   if (!document.webkitFullscreenElement) mmUnlockOrientation();
 });
 
+// SEKSI: Galeri media (thumbnail 16:9, filter, load bertahap)
 async function loadGallery(reset) {
   if (galleryLoading) return;
   galleryLoading = true;
@@ -1053,6 +1067,7 @@ fsBtn.addEventListener('click', function () {
 
 const DOWNLOADS_VIEW = ['deviceStatus', 'downloadsToolbar', 'filtersSticky', 'addSheet', 'status', 'list'];
 
+// SEKSI: Routing & sticky header
 function currentRoute() {
   const h = location.hash;
   if (h === '#/gallery') return 'gallery';
@@ -1174,6 +1189,7 @@ function renderFsCrumbs(p) {
   });
 }
 
+// SEKSI: File manager (jelajah, breadcrumb, batch, ZIP)
 async function loadFsLocations() {
   try {
     const res = await fetch(API + '/api/fs?path=');
@@ -1576,6 +1592,7 @@ const UPLOAD_CHUNK = 2 * 1024 * 1024;
 
 let fsUploading = false;
 
+// SEKSI: Upload chunk 2 MB (retry, drag & drop, duplikat)
 function uploadFiles(files, path, statusEl, progressBox, progressText, progressPct, progressBar, done) {
   fsUploading = true;
   const jobs = Array.from(files).map(function (f) {
@@ -2933,7 +2950,7 @@ function connectEvents() {
     }
   };
 }
-// ===== Polling pengaman adaptif + reconnect SSE =====
+// SEKSI: SSE (EventSource) + polling adaptif + reconnect
 // SSE (bila hidup) adalah sumber utama realtime; polling hanya pengaman saat
 // stream diam/terblokir (mis. buffering proxy WISP). Interval naik-turun:
 // cepat saat ada transfer aktif, lambat saat idle. Bila SSE "terlihat" terbuka

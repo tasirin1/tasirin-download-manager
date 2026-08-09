@@ -1,4 +1,7 @@
-<resources>
+<!-- tools:ignore="Typos": kata Bahasa Indonesia & nama user (tasirin1) tidak
+     cocok dengan kamus ejaan bahasa Inggris bawaan lint. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="Typos">
     <string name="app_name">Tasirin Download Manager</string>
 
     <string name="add_download">Tambah Download</string>
@@ -209,8 +212,14 @@
 
     <string name="notification_channel">Progress download</string>
     <string name="notification_title">Tasirin Download Manager</string>
-    <string name="notification_active_files">Mendownload %d file&#8230;</string>
-    <string name="notification_done">%d download selesai</string>
+    <plurals name="notification_active_files">
+        <item quantity="one">Mendownload %d file&#8230;</item>
+        <item quantity="other">Mendownload %d file&#8230;</item>
+    </plurals>
+    <plurals name="notification_done">
+        <item quantity="one">%d download selesai</item>
+        <item quantity="other">%d download selesai</item>
+    </plurals>
 
     <string-array name="sort_options">
         <item>Tanggal (terbaru)</item>
@@ -267,14 +276,23 @@
     <string name="remote_log_empty">(Belum ada aktivitas — buka halaman remote di browser lalu coba upload)</string>
     <string name="remote_log_copied">Log disalin ke clipboard</string>
     <string name="remote_log_search_hint">Cari di log…</string>
-    <string name="remote_log_lines">%1$d baris</string>
+    <plurals name="remote_log_lines">
+        <item quantity="one">%1$d baris</item>
+        <item quantity="other">%1$d baris</item>
+    </plurals>
     <string name="settings_section_gallery">Galeri</string>
     <string name="settings_gallery_image_label">Folder galeri foto (opsional)</string>
     <string name="settings_gallery_video_label">Folder galeri video (opsional)</string>
     <string name="settings_gallery_folder_hint">Path folder, contoh: /storage/emulated/0/DCIM/Camera</string>
-    <string name="settings_gallery_hint">Kosongkan untuk scan semua storage. Format: f:path atau m:RelativePath — path /sdcard/... otomatis dikenali sebagai /storage/emulated/0/...</string>
+    <string name="settings_gallery_hint">Kosongkan untuk scan semua storage. Format: f:path atau m:RelativePath — path /sdcard/… otomatis dikenali sebagai /storage/emulated/0/…</string>
     <string name="settings_section_cleanup">Pembersihan</string>
     <string name="cleanup_button">Bersihkan file sampah</string>
-    <string name="cleanup_done">Bersih: %1$d file (%2$s) dihapus</string>
+    <plurals name="cleanup_done">
+        <item quantity="one">Bersih: %1$d file (%2$s) dihapus</item>
+        <item quantity="other">Bersih: %1$d file (%2$s) dihapus</item>
+    </plurals>
     <string name="cleanup_empty">Tidak ada file sampah yang ditemukan</string>
+    <string name="about_version_build">%1$s (build %2$d)\n\n%3$s</string>
+    <string name="label_value">%1$s: %2$s</string>
+    <string name="gallery_thumb_desc">Pratinjau media</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
@@ -366,6 +367,7 @@ private class GalleryAdapter(
     private val items = mutableListOf<MediaLibrary.MediaEntry>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    @SuppressLint("NotifyDataSetChanged") // Daftar galeri diganti utuh per scan; diff halus menyusul.
     fun submit(list: List<MediaLibrary.MediaEntry>) {
         items.clear()
         items.addAll(list)
@@ -374,7 +376,10 @@ private class GalleryAdapter(
 
     private fun formatDate(ms: Long): String {
         if (ms <= 0) return ""
-        return DATE_FMT.format(java.util.Date(ms))
+        // Dibuat per-panggilan agar mengikuti locale saat berubah (tidak disimpan statis).
+        return java.text.SimpleDateFormat(
+            "dd MMM yyyy", java.util.Locale.getDefault()
+        ).format(java.util.Date(ms))
     }
 
     class Holder(val binding: ItemGalleryBinding) : RecyclerView.ViewHolder(binding.root) {
@@ -418,8 +423,4 @@ private class GalleryAdapter(
         }
     }
 
-    private companion object {
-        // SimpleDateFormat tidak thread-safe, tapi binding selalu di main thread.
-        val DATE_FMT = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
-    }
 }

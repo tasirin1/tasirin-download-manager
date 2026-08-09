@@ -540,12 +540,7 @@ class DownloadEngine(private val context: Context) {
         val smallFirst = StoragePrefs.isSmallFirstEnabled(context)
         val pending = _items.value
             .filter { it.state == DownloadState.PENDING }
-            .sortedWith(
-                compareByDescending<DownloadItem> { it.priority }
-                    .thenBy {
-                        if (smallFirst && it.totalBytes > 0) it.totalBytes else Long.MAX_VALUE
-                    }
-            )
+            .sortedWith(downloadQueueOrder(smallFirst))
         var active = jobs.values.count { it.isActive }
         if (active < max && pending.isNotEmpty()) {
             ensureServiceRunning()
@@ -1461,44 +1456,5 @@ private class GlobalRateLimiter(private val limitKbps: Int) {
 
     companion object {
         private const val GLOBAL_WINDOW_MS = 10_000L
-    }
-}
-
-private class SpeedTracker {
-    private val lastBytes = HashMap<String, Long>()
-    private val lastTime = HashMap<String, Long>()
-    private val emaSpeed = HashMap<String, Double>()
-
-    @Synchronized
-    fun sample(id: String, bytes: Long, total: Long): Pair<Long, Long> {
-        val now = System.currentTimeMillis()
-        val prevB = lastBytes[id] ?: bytes
-        val prevT = lastTime[id] ?: now
-        lastBytes[id] = bytes
-        lastTime[id] = now
-        val instant = if (now > prevT) ((bytes - prevB) * 1000L) / (now - prevT) else 0L
-        // EMA: kecepatan rata-rata bergerak supaya ETA tidak melompat-lompat
-        // akibat lonjakan kecepatan sesaat.
-        val smoothed = if (instant > 0L) {
-            val prev = emaSpeed[id] ?: instant.toDouble()
-            prev * (1.0 - EMA_ALPHA) + instant * EMA_ALPHA
-        } else {
-            emaSpeed[id] ?: 0.0
-        }
-        emaSpeed[id] = smoothed
-        val speed = smoothed.toLong()
-        val eta = if (speed > 0 && total > bytes) (total - bytes) / speed else 0L
-        return speed to eta
-    }
-
-    @Synchronized
-    fun reset(id: String) {
-        lastBytes.remove(id)
-        lastTime.remove(id)
-        emaSpeed.remove(id)
-    }
-
-    private companion object {
-        const val EMA_ALPHA = 0.2
     }
 }

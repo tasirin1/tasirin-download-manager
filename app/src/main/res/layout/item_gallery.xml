@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:focusable="true"
     android:padding="4dp">
 
     <FrameLayout
+        tools:ignore="UselessParent"
         android:layout_width="match_parent"
         android:layout_height="130dp"
         android:background="#EEEEEE">
@@ -14,6 +16,7 @@
             android:id="@+id/image_thumb"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:contentDescription="@string/gallery_thumb_desc"
             android:scaleType="centerCrop" />
 
         <TextView
@@ -36,7 +39,7 @@
             android:paddingHorizontal="6dp"
             android:paddingVertical="3dp"
             android:textColor="#FFFFFF"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/text_name"

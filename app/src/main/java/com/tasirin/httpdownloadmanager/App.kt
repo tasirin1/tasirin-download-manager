@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager
 
 import android.app.Application
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -71,6 +72,7 @@ class App : Application() {
         }
     }
 
+    @SuppressLint("StaticFieldLeak")
     companion object {
         const val CRASH_LOG_FILE = "crash.log"
         lateinit var engine: DownloadEngine

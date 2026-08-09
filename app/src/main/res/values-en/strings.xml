@@ -1,4 +1,5 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="Typos">
     <string name="app_name">Tasirin Download Manager</string>
 
     <string name="add_download">Add Download</string>
@@ -209,8 +210,14 @@
 
     <string name="notification_channel">Download progress</string>
     <string name="notification_title">Tasirin Download Manager</string>
-    <string name="notification_active_files">Downloading %d file(s)&#8230;</string>
-    <string name="notification_done">%d download(s) completed</string>
+    <plurals name="notification_active_files">
+        <item quantity="one">Downloading %d file&#8230;</item>
+        <item quantity="other">Downloading %d files&#8230;</item>
+    </plurals>
+    <plurals name="notification_done">
+        <item quantity="one">%d download completed</item>
+        <item quantity="other">%d downloads completed</item>
+    </plurals>
 
     <string-array name="sort_options">
         <item>Date (newest)</item>
@@ -267,14 +274,23 @@
     <string name="remote_log_empty">(No activity yet — open the remote page in a browser and try an upload)</string>
     <string name="remote_log_copied">Log copied to clipboard</string>
     <string name="remote_log_search_hint">Search in log…</string>
-    <string name="remote_log_lines">%1$d lines</string>
+    <plurals name="remote_log_lines">
+        <item quantity="one">%1$d line</item>
+        <item quantity="other">%1$d lines</item>
+    </plurals>
     <string name="settings_section_gallery">Gallery</string>
     <string name="settings_gallery_image_label">Photo gallery folder (optional)</string>
     <string name="settings_gallery_video_label">Video gallery folder (optional)</string>
     <string name="settings_gallery_folder_hint">Folder path, e.g. /storage/emulated/0/DCIM/Camera</string>
-    <string name="settings_gallery_hint">Leave empty to scan all storage. Format: f:path or m:RelativePath — /sdcard/... paths are recognized as /storage/emulated/0/...</string>
+    <string name="settings_gallery_hint">Leave empty to scan all storage. Format: f:path or m:RelativePath — /sdcard/… paths are recognized as /storage/emulated/0/…</string>
     <string name="settings_section_cleanup">Cleanup</string>
     <string name="cleanup_button">Clean up junk files</string>
-    <string name="cleanup_done">Cleaned: %1$d file (%2$s) removed</string>
+    <plurals name="cleanup_done">
+        <item quantity="one">Cleaned: %1$d file (%2$s) removed</item>
+        <item quantity="other">Cleaned: %1$d files (%2$s) removed</item>
+    </plurals>
     <string name="cleanup_empty">No junk files found</string>
+    <string name="about_version_build">%1$s (build %2$d)\n\n%3$s</string>
+    <string name="label_value">%1$s: %2$s</string>
+    <string name="gallery_thumb_desc">Media preview</string>
 </resources>

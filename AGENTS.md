@@ -106,6 +106,8 @@ diperbarui.
   (dihapus & dibuat ulang, `--latest`) berisi APK
   `tasirin-download-manager-v1.0-<code>.apk`.
 - **Pull request** → build saja (verifikasi), **tidak** publish release.
+- **Dependabot** → PR update dependensi (Gradle/Actions) lewat alur PR biasa
+  (build + lint + test, tanpa release) — review lalu merge.
 - **Manual**: GitHub → Actions → *Build APK* → *Run workflow*
   (atau `gh workflow run build.yml -R tasirin1/tasirin-download-manager`).
 - **Jangan edit release manual** — selalu lewat workflow.
@@ -117,7 +119,10 @@ diperbarui.
 3. `assembleDebug` (artifact `app-debug`).
 4. **Lint + unit test**: `lintDebug` (abortOnError) + `testDebugUnitTest`.
 5. `assembleRelease` **hanya bila `KEYSTORE_BASE64` terisi** (artifact `app-release`).
-6. Publish release `v1.0` dengan APK signed (fallback debug bila tanpa secrets).
+6. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
+7. Publish release `v1.0` dengan APK signed (fallback debug bila tanpa secrets).
+8. **VirusTotal scan** (opsional, hanya bila `VT_API_KEY` terisi) — tautan laporan
+   muncul di log build.
 
 ## Secrets yang dibutuhkan (Settings → Secrets and variables → Actions)
 
@@ -127,6 +132,7 @@ diperbarui.
 | `KEYSTORE_PASSWORD`  | Password keystore                   |
 | `KEY_ALIAS`          | Alias kunci signing                 |
 | `KEY_PASSWORD`       | Password kunci alias                |
+| `VT_API_KEY`         | (Opsional) API key VirusTotal — scan APK rilis, tanpa ini step dilewati |
 
 Keystore yang sama dipakai juga oleh repo **Tasirin Vaultwarden Host** — simpan
 satu salinan aman (jangan di commit, jangan hanya di satu perangkat).

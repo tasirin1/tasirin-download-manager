@@ -1,6 +1,8 @@
 package com.tasirin.httpdownloadmanager.util
 
+import android.annotation.SuppressLint
 import android.content.Context
+import com.tasirin.httpdownloadmanager.R
 import java.security.KeyStore
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
@@ -19,7 +21,7 @@ import javax.net.ssl.X509TrustManager
  */
 object TlsCompat {
 
-    private val EXTRA_ROOTS = listOf("isrg_root_x1", "digicert_global_root_g2")
+    private val EXTRA_ROOTS = listOf(R.raw.isrg_root_x1, R.raw.digicert_global_root_g2)
 
     @Volatile
     private var sslContext: SSLContext? = null
@@ -38,6 +40,7 @@ object TlsCompat {
         }
     }
 
+    @SuppressLint("CustomX509TrustManager") // Sengaja: gabung trust anchor sistem + root lama (Android 6-7).
     private fun build(context: Context): SSLContext? = runCatching {
         val systemTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         systemTmf.init(null as KeyStore?)
@@ -47,16 +50,13 @@ object TlsCompat {
         val cf = CertificateFactory.getInstance("X.509")
         val ks = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
         var loaded = 0
-        for (name in EXTRA_ROOTS) {
+        for (resId in EXTRA_ROOTS) {
             runCatching {
-                val id = context.resources.getIdentifier(name, "raw", context.packageName)
-                if (id != 0) {
-                    val cert = context.resources.openRawResource(id).use {
-                        cf.generateCertificate(it) as X509Certificate
-                    }
-                    ks.setCertificateEntry(name, cert)
-                    loaded++
+                val cert = context.resources.openRawResource(resId).use {
+                    cf.generateCertificate(it) as X509Certificate
                 }
+                ks.setCertificateEntry("root-$resId", cert)
+                loaded++
             }
         }
         if (loaded == 0) return@runCatching null

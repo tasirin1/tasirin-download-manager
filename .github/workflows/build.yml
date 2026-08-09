@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      VT_API_KEY: ${{ secrets.VT_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -57,6 +58,23 @@ jobs:
             -PkeyAlias="$KEY_ALIAS" \
             -PkeyPassword="$KEY_PASSWORD"
 
+      - name: Cek ukuran APK (jaga APK tetap kecil)
+        if: always()
+        run: |
+          RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
+          DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
+          if [ -f "$RELEASE_APK" ]; then
+            APK="$RELEASE_APK"; LIMIT=3670016; LABEL="release"
+          else
+            APK="$DEBUG_APK"; LIMIT=10485760; LABEL="debug (tanpa minify)"
+          fi
+          SIZE=$(stat -c %s "$APK")
+          echo "Ukuran APK $LABEL (${APK##*/}): $SIZE bytes"
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "::error::APK $LABEL terlalu besar: $SIZE > $LIMIT bytes"
+            exit 1
+          fi
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v6
         with:
@@ -88,3 +106,15 @@ jobs:
             --title "Tasirin Download Manager v${VER} (build ${CODE})" \
             --notes "APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box. Beri izin Penyimpanan saat diminta." \
             --latest
+
+      - name: VirusTotal scan (jika API key tersedia)
+        if: github.event_name != 'pull_request' && env.VT_API_KEY != ''
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          [ -f app/build/outputs/apk/release/app-release.apk ] && APK="app/build/outputs/apk/release/app-release.apk"
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          RESP=$(curl -s --max-time 120 -H "x-apikey: $VT_API_KEY" \
+            --form "file=@$APK" https://www.virustotal.com/api/v3/files)
+          ID=$(echo "$RESP" | jq -r '.data.id // empty')
+          echo "VirusTotal analysis id: $ID"
+          echo "VirusTotal report: https://www.virustotal.com/gui/file/$SHA"
