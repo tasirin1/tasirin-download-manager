@@ -11,6 +11,13 @@ updates:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
+    ignore:
+      # Major AGP/Kotlin perlu upgrade Gradle dulu; tangani manual bertahap,
+      # bukan PR otomatis yang gagal CI (AGENTS.md aturan #12).
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin.android"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

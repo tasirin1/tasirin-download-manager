@@ -1,6 +1,6 @@
 plugins {
     // Update dependensi bertahap (item 9): AGP 8.5.2 -> 8.7.3, Kotlin 1.9.24 -> 1.9.25.
-    // Kotlin 2.x & AGP terbaru menyusul di PR terpisah, selalu diverifikasi CI.
+    // AGP naik bertahap lewat CI (major 9.x di-ignore Dependabot, ditangani manual).
     id("com.android.application") version "8.7.3" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.25" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.21" apply false
 }
