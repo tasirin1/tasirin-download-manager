@@ -87,7 +87,7 @@ kotlin {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.core:core-splashscreen:1.2.0")
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
