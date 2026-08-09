@@ -57,6 +57,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Kotlin 2.4 me-resolve forEach ke default method Java (Iterable#forEach, API 24).
+        // Desugaring membuatnya aman di minSdk 21 (Android 5+) tanpa mengubah kode.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -97,5 +100,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.2")
     implementation("androidx.activity:activity-ktx:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation("junit:junit:4.13.2")
 }
