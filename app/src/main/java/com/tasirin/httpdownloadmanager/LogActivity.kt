@@ -131,9 +131,9 @@ class LogActivity : AppCompatActivity() {
     private fun refreshLog() {
         val text = App.httpServer.snapshotLog()
             .ifEmpty { getString(R.string.remote_log_empty) }
-        binding.logCount.text = getString(
-            R.string.remote_log_lines,
-            text.lines().count { it.isNotBlank() }
+        val lines = text.lines().count { it.isNotBlank() }
+        binding.logCount.text = resources.getQuantityString(
+            R.plurals.remote_log_lines, lines, lines
         )
         // Kunci render = isi log + kata kunci: teks sama tapi kata kunci
         // berubah tetap harus di-highlight ulang.

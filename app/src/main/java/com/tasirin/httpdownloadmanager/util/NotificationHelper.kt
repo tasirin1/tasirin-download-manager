@@ -74,7 +74,11 @@ object NotificationHelper {
         if (active.isNotEmpty()) {
             val totalBytes = active.sumOf { it.totalBytes }
             val downloadedBytes = active.sumOf { it.bytesDownloaded }
-            builder.setContentText(context.getString(R.string.notification_active_files, active.size))
+            builder.setContentText(
+                context.resources.getQuantityString(
+                    R.plurals.notification_active_files, active.size, active.size
+                )
+            )
             if (totalBytes > 0) {
                 builder.setProgress(100, (downloadedBytes * 100 / totalBytes).toInt(), false)
             } else {
@@ -85,7 +89,11 @@ object NotificationHelper {
                 .setProgress(0, 0, false)
         } else {
             val completed = items.count { it.state == DownloadState.COMPLETED }
-            builder.setContentText(context.getString(R.string.notification_done, completed))
+            builder.setContentText(
+                context.resources.getQuantityString(
+                    R.plurals.notification_done, completed, completed
+                )
+            )
                 .setProgress(0, 0, false)
         }
         return builder.build()

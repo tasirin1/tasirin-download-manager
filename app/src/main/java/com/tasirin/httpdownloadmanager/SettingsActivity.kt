@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -71,7 +72,9 @@ class SettingsActivity : AppCompatActivity() {
         binding.btnCleanup.setOnClickListener {
             val (files, bytes) = cleanupJunkFiles()
             binding.cleanupResult.text = if (files > 0) {
-                getString(R.string.cleanup_done, files, Formats.bytes(bytes))
+                resources.getQuantityString(
+                    R.plurals.cleanup_done, files, files, Formats.bytes(bytes)
+                )
             } else {
                 getString(R.string.cleanup_empty)
             }
@@ -213,7 +216,11 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun renderToggle(btn: Button, on: Boolean, label: String) {
-        btn.text = "$label: " + getString(if (on) R.string.toggle_on else R.string.toggle_off)
+        btn.text = getString(
+            R.string.label_value,
+            label,
+            getString(if (on) R.string.toggle_on else R.string.toggle_off)
+        )
     }
 
     private fun renderChecks() {
@@ -286,7 +293,9 @@ class SettingsActivity : AppCompatActivity() {
             renderChecks()
         }
         binding.inputPin.setText(StoragePrefs.getServerPin(this).orEmpty())
-        binding.inputPort.setText(StoragePrefs.serverPort(this).toString())
+        binding.inputPort.setText(
+            String.format(java.util.Locale.US, "%d", StoragePrefs.serverPort(this))
+        )
         renderChecks()
     }
 
@@ -565,6 +574,7 @@ class SettingsActivity : AppCompatActivity() {
         }.start()
     }
 
+    @SuppressLint("InflateParams") // Inflate dialog progres dengan root null adalah pola standar.
     private fun downloadUpdate(info: UpdateInfo) {
         val view = layoutInflater.inflate(R.layout.dialog_update_progress, null)
         val bar = view.findViewById<ProgressBar>(R.id.update_progress_bar)
@@ -662,6 +672,7 @@ class SettingsActivity : AppCompatActivity() {
         }.getOrDefault("/storage/emulated/0/Download")
     }
 
+    @SuppressLint("BatteryLife") // Penjelasan izin baterai jelas bagi pengguna TV box/HP.
     private fun requestBatteryExemption() {
         if (Build.VERSION.SDK_INT < 23) return
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager

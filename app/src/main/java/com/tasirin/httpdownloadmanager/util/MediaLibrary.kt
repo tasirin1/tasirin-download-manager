@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager.util
 
+import android.annotation.SuppressLint
 import android.content.ContentUris
 import android.content.Context
 import android.database.ContentObserver
@@ -332,6 +333,7 @@ object MediaLibrary {
      *  Kosong = semua storage. */
     /** Resolve konfigurasi folder galeri ("f:/path" atau path polos) menjadi
      *  File tujuan di filesystem; null untuk format "m:RelativePath". */
+    @SuppressLint("SdCardPath") // Normalisasi /sdcard sengaja: nama lama yang dipakai pengguna.
     private fun galleryDir(config: String): File? {
         val raw = config.trim().removePrefix("f:").trim()
         if (raw.isEmpty()) return null

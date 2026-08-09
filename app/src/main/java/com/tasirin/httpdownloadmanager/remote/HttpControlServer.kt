@@ -951,7 +951,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             val uri = Uri.parse(item.contentUri)
             val resolver = context.contentResolver
             val stream = resolver.openInputStream(uri) ?: return notFound()
-            val len = resolver.openAssetFileDescriptor(uri, "r")?.length ?: -1L
+            val len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
             input = stream
             total = len
         } else {
@@ -1154,7 +1154,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
                 if (!isMediaUriAllowed(uri)) return notFound()
                 val resolver = context.contentResolver
                 val stream = resolver.openInputStream(uri) ?: return notFound()
-                val len = resolver.openAssetFileDescriptor(uri, "r")?.length ?: -1L
+                val len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
                 input = stream
                 total = len
                 name = DocumentFile.fromSingleUri(context, uri)?.name ?: "media"
@@ -1956,7 +1956,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             val uri = Uri.parse(item.contentUri)
             val resolver = context.contentResolver
             val stream = resolver.openInputStream(uri) ?: return notFound()
-            total = resolver.openAssetFileDescriptor(uri, "r")?.length ?: -1L
+            total = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
             input = stream
         } else {
             return notFound()

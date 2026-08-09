@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.app.Dialog
 import android.content.Context
@@ -150,6 +151,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
+    @SuppressLint("SetTextI18n") // Isi dialog crash = pesan + stack trace dinamis, bukan teks terjemahan.
     private fun showPreviousCrashIfAny() {
         runCatching {
             val file = File(filesDir, App.CRASH_LOG_FILE)
@@ -251,6 +253,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         showAddDialog(url)
     }
 
+    @SuppressLint("InflateParams") // Inflate dialog dengan root null adalah pola standar.
     private fun showAddDialog(prefillUrl: String? = null) {
         val view = layoutInflater.inflate(R.layout.dialog_add_download, null)
         val urlInput = view.findViewById<EditText>(R.id.input_url)
@@ -538,6 +541,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
+    @SuppressLint("InflateParams")
     private fun showAboutDialog() {
         val info = runCatching {
             packageManager.getPackageInfo(packageName, 0)
@@ -546,9 +550,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val build = info?.versionCode ?: 0
         // Dialog khusus TV: judul & isi rata kiri, scroll agar muat di layar/remote.
         val view = layoutInflater.inflate(R.layout.dialog_about, null)
-        view.findViewById<TextView>(R.id.about_body).text =
-            getString(R.string.about_version, version) + " (build $build)\n\n" +
-                getString(R.string.about_profile)
+        view.findViewById<TextView>(R.id.about_body).text = getString(
+            R.string.about_version_build,
+            getString(R.string.about_version, version),
+            build,
+            getString(R.string.about_profile)
+        )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
@@ -681,6 +688,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
 
+    @SuppressLint("BatteryLife") // Penjelasan izin baterai jelas bagi pengguna TV box/HP.
     private fun requestBatteryExemption() {
         if (Build.VERSION.SDK_INT < 23) return
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -701,6 +709,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
+    @SuppressLint("InflateParams")
     private fun showLimitPriorityDialog(item: DownloadItem) {
         val view = layoutInflater.inflate(R.layout.dialog_limit_priority, null)
         val itemSpeed = item.speedLimitKbps
@@ -873,7 +882,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val tv = findViewById<TextView>(R.id.sort_button) ?: return
         val options = resources.getStringArray(R.array.sort_options)
         val label = options.getOrElse(sortMode) { options[0] }
-        tv.text = getString(R.string.sort_by) + ": " + label
+                tv.text = getString(R.string.label_value, getString(R.string.sort_by), label)
     }
 
     /** Ekspor log error (crash + error server) ke file .txt di folder Download. */

@@ -15,6 +15,7 @@
         android:layout_height="wrap_content"
         android:hint="@string/url_hint_multi"
         android:inputType="textUri|textMultiLine"
+        android:autofillHints="url"
         android:minLines="2"
         android:maxLines="4" />
 
@@ -91,7 +92,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:hint="@string/name_hint_optional" />
+        android:hint="@string/name_hint_optional"
+        android:autofillHints="name" />
 
     <EditText
         android:focusable="true"
@@ -101,7 +103,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:hint="@string/username_hint_optional" />
+        android:hint="@string/username_hint_optional"
+        android:autofillHints="username" />
 
     <EditText
         android:focusable="true"
@@ -112,7 +115,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:hint="@string/password_hint_optional"
-        android:inputType="textPassword" />
+        android:inputType="textPassword"
+        android:autofillHints="password" />
 
     <EditText
         android:focusable="true"
@@ -124,6 +128,7 @@
         android:layout_marginTop="8dp"
         android:hint="@string/headers_hint_optional"
         android:inputType="textMultiLine"
+        android:importantForAutofill="no"
         android:minLines="2"
         android:maxLines="4" />
 
@@ -133,6 +138,8 @@
         android:minHeight="48dp"
         android:id="@+id/input_checksum"
         android:layout_width="match_parent"
+        android:inputType="text"
+        android:importantForAutofill="no"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:hint="@string/checksum_hint_optional" />

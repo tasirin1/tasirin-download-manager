@@ -69,6 +69,10 @@ android {
         // Cetak daftar warning lengkap ke stdout supaya terlihat di log CI.
         textReport = true
         textOutput = File("stdout")
+        // Sengaja dinonaktifkan:
+        // - OldTargetApi: targetSdk 35 dijadwalkan via peta jalan (AGENTS.md), bukan bug.
+        // - GradleDependency: update dependensi dikelola Dependabot (PR lewat CI).
+        disable += setOf("OldTargetApi", "GradleDependency")
     }
 }
 
