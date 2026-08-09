@@ -18,6 +18,8 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "org.jetbrains.kotlin.android"
         update-types: ["version-update:semver-major"]
+      # Semua material > 1.12 menuntut minSdk 23; proyek wajib minSdk 21 (Android 5+).
+      - dependency-name: "com.google.android.material:material"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
