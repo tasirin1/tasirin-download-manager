@@ -167,6 +167,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
+    @SuppressLint("SetTextI18n")
     private fun showFatalError(t: Throwable) {
         App.appendCrash(this, "onCreate", t)
         val stack = Log.getStackTraceString(t)
