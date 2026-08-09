@@ -66,6 +66,9 @@ android {
     lint {
         // Pengaman kompatibilitas API 21: kegagalan lint (mis. NewApi) menggagalkan build.
         abortOnError = true
+        // Cetak daftar warning lengkap ke stdout supaya terlihat di log CI.
+        textReport = true
+        textOutput = File("stdout")
     }
 }
 
