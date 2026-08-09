@@ -40,6 +40,9 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
+      - name: Lint & unit test
+        run: ./gradlew lintDebug testDebugUnitTest
+
       - name: Build release APK (jika secret signing tersedia)
         if: env.KEYSTORE_BASE64 != ''
         env:
