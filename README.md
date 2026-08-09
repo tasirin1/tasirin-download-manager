@@ -249,6 +249,8 @@ mengelola repository ini dengan benar.
 │           ├── StoragePrefs.kt       # Semua kunci SharedPreferences ("storage_settings")
 │           ├── MimeTypes.kt, Crypto.kt, Formats.kt, FileNames.kt,
 │           ├── NotificationHelper.kt, TlsCompat.kt            # Pendukung
+├── app/src/test/                     # Unit test JVM (junit4): Formats, FileNames,
+│                                     # MimeTypes, DownloadItem — jalan di CI
 └── gradle wrapper                    # build via ./gradlew (CI saja untuk rilis)
 ```
 
@@ -304,6 +306,11 @@ diperbarui.
 9. **Jangan commit keystore** (`*.jks`, `keystore.b64` sudah di-`.gitignore`).
 10. **PR**: workflow ikut build (tanpa release) — gunakan untuk mengecek
     compile/CI sebelum merge ke `main`.
+11. **Lint & unit test wajib hijau** sebelum merge — `lintDebug` (abortOnError
+    aktif) mengawal API >21 jangan sampai lolos, `testDebugUnitTest` menjaga
+    logika murni (`Formats`, `FileNames`, `MimeTypes`, `DownloadItem`).
+12. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
+    versi sekaligus; tiap langkah lewat CI dulu.
 
 ## Cara memicu build & release
 
@@ -320,8 +327,9 @@ diperbarui.
 1. Checkout → JDK 17 → Android SDK → Gradle (cache + verifikasi wrapper).
 2. **Bump versionCode**: `100000 + run_number` ditulis ke `app/build.gradle.kts`.
 3. `assembleDebug` (artifact `app-debug`).
-4. `assembleRelease` **hanya bila `KEYSTORE_BASE64` terisi** (artifact `app-release`).
-5. Publish release `v1.0` dengan APK signed (fallback debug bila tanpa secrets).
+4. **Lint + unit test**: `lintDebug` (abortOnError) + `testDebugUnitTest`.
+5. `assembleRelease` **hanya bila `KEYSTORE_BASE64` terisi** (artifact `app-release`).
+6. Publish release `v1.0` dengan APK signed (fallback debug bila tanpa secrets).
 
 ## Secrets yang dibutuhkan (Settings → Secrets and variables → Actions)
 
@@ -360,6 +368,29 @@ gh release view v1.0 --json assets -q '.assets[].name'
 Pastikan conclusion `success` dan release punya asset APK dengan nama
 `tasirin-download-manager-v1.0-<code>.apk`. Verifikasi manual: pasang APK di HP,
 buka remote web dari browser, tes tambah URL, dan buka Galeri.
+
+## Peta jalan: targetSdk 35 (Android 15/16)
+
+**Belum dikerjakan — hanya rencana.** Aplikasi tetap `targetSdk 34` + `minSdk 21`
+sekarang; pembaruan ini tidak wajib karena APK disebar via GitHub (bukan Play
+Store). Tujuan: perangkat Android 15/16 tetap berfungsi penuh saat nanti naik
+target.
+
+- **Fase 1 — sekarang**: lint + unit test aktif (pengaman API 21), dependensi
+  di-update bertahap via CI. `versionName`/`versionCode` tetap diatur CI.
+- **Fase 2 — saat siap**: naikkan `compileSdk`/`targetSdk` ke 35.
+  - **FGS dari `BOOT_COMPLETED`**: saat targetSdk 35, service `dataSync` tidak
+    boleh lagi start langsung dari receiver boot — migrasi ke `WorkManager`
+    (periode) atau `JobScheduler` untuk download lanjut + server auto-start.
+  - **Edge-to-edge dipaksakan**: layout perlu menangani `systemBars` insets
+    (Android 15 mewajibkan), revisi `MainActivity`/`SettingsActivity`/`LogActivity`.
+  - **Izin notifikasi & storage**: alur yang ada (runtime request + special
+    access) tetap berlaku — verifikasi ulang di Android 15.
+- **Fase 3 — setelah hijau**: uji manual di perangkat Android 15/16 (auto-start
+  boot, download background, server remote, galeri) sebelum dirilis via push ke
+  `main`.
+- **Pantangan**: jangan naikkan `minSdk` (tetap 21) dan jangan gabung perubahan
+  ini dengan PR fitur lain.
 
 ## Lisensi
 

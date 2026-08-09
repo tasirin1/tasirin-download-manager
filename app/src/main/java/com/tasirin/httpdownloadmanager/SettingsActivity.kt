@@ -593,6 +593,10 @@ class SettingsActivity : AppCompatActivity() {
                 runCatching { if (dialog.isShowing) dialog.dismiss() }
                 binding.updateStatus.text = when {
                     file == null -> getString(R.string.update_download_failed)
+                    !Updater.isSignatureValid(this, file) -> {
+                        file.delete()
+                        getString(R.string.update_signature_failed)
+                    }
                     Updater.install(this, file) -> getString(R.string.update_ready)
                     else -> getString(R.string.update_install_failed)
                 }

@@ -45,6 +45,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
 class DownloadEngine(private val context: Context) {
@@ -67,7 +68,8 @@ class DownloadEngine(private val context: Context) {
     private var saveJob: Job? = null
     // URL yang pernah gagal di sesi ini: cadangan yang sama tidak dicoba
     // berulang-ulang (hemat waktu saat ISP/proxy menolak beberapa host).
-    private val failedUrls = ConcurrentHashMap.newKeySet<String>()
+    // newKeySet() baru ada API 24; pakai setFromMap agar aman di Android 5 (API 21).
+    private val failedUrls = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
 
     private val connectTimeoutMs: Int
         get() = StoragePrefs.getConnectTimeoutSec(context) * 1000

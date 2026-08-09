@@ -25,6 +25,7 @@
     <string name="update_progress_detail">%1$s / %2$s</string>
     <string name="update_progress_unknown">%1$s downloaded</string>
     <string name="update_download_failed">Failed to download update</string>
+    <string name="update_signature_failed">Update rejected — APK signature does not match the official release key</string>
     <string name="update_install_failed">Cannot open installer — enable &quot;Install unknown apps&quot; and try again</string>
     <string name="update_ready">Update ready to install</string>
     <string name="invalid_url">URL must not be empty</string>
