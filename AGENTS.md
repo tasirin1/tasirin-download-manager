@@ -108,8 +108,9 @@ diperbarui.
 - **Pull request** → build saja (verifikasi), **tidak** publish release.
 - **Dependabot** → PR update dependensi (Gradle/Actions) lewat alur PR biasa
   (build + lint + test, tanpa release) — review lalu merge. Yang di-ignore
-  (perlu upgrade toolchain manual): major AGP & Kotlin, `material` (minSdk 23),
-  `androidx.core` (compileSdk 37), `gradle-wrapper` (AGP 8.x maks. Gradle 9.5).
+  (perlu upgrade toolchain manual): major AGP & Kotlin, `material`, `activity`,
+  `lifecycle` (minSdk 23), `androidx.core` (compileSdk 37), `gradle-wrapper`
+  (AGP 8.x maks. Gradle 9.5).
 - **Manual**: GitHub → Actions → *Build APK* → *Run workflow*
   (atau `gh workflow run build.yml -R tasirin1/tasirin-download-manager`).
 - **Jangan edit release manual** — selalu lewat workflow.
