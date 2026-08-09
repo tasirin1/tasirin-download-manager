@@ -90,9 +90,10 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
     @Volatile private var batteryCache: Pair<Long, Pair<Int, Boolean>>? = null
     private var cachedHtml: String? = null
     private val appVersion: String by lazy {
+        // SDK 35 menandai versionName nullable — paksa non-null supaya by lazy aman.
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrDefault("?")
+        }.getOrNull() ?: "?"
     }
     private val appBuild: Int by lazy {
         runCatching {
