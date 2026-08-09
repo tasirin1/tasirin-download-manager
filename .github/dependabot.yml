@@ -23,6 +23,9 @@ updates:
       # androidx.core 1.17+ menuntut compileSdk 36/37; proyek di compileSdk 35.
       # Buka lagi manual setelah upgrade AGP + compileSdk siap.
       - dependency-name: "androidx.core:core"
+      # Gradle > 9.5 tidak kompatibel AGP 8.x (API internal dihapus di 9.6).
+      # Buka lagi manual saat beralih ke AGP 9.x.
+      - dependency-name: "gradle-wrapper"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
