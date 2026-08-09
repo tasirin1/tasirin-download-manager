@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DownloadItemTest {
@@ -30,7 +31,7 @@ class DownloadItemTest {
     fun `nilai default tidak mengubah perilaku`() {
         val item = item(bytesDownloaded = 0, totalBytes = 0)
         assertEquals(DownloadState.DOWNLOADING, item.state)
-        assertEquals("", item.error)
+        assertNull(item.error)
         assertEquals(false, item.nameIsCustom)
         assertEquals(0, item.priority)
         assertEquals(0, item.speedLimitKbps)
