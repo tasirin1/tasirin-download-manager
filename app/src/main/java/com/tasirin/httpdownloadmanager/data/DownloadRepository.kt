@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.data
 
 import android.content.Context
+import androidx.core.content.edit
 import com.tasirin.httpdownloadmanager.util.Crypto
 import java.util.Collections
 
@@ -28,7 +29,9 @@ class DownloadRepository(context: Context) {
     /** Simpan progres kompak (id -> bytes/total) tanpa enkripsi & tanpa detail
      *  segmen; dipanggil berkala selama download aktif. */
     fun saveProgress(items: List<DownloadItem>) {
-        prefs.edit().putString(KEY_PROGRESS, DownloadItemCodec.encodeProgress(items)).apply()
+        prefs.edit {
+            putString(KEY_PROGRESS, DownloadItemCodec.encodeProgress(items))
+        }
     }
 
     fun save(items: List<DownloadItem>) {
@@ -38,10 +41,10 @@ class DownloadRepository(context: Context) {
         }
         // Snapshot penuh sudah memuat progres terbaru -> hapus progres ringan
         // supaya tidak menimpa data yang lebih lama saat load berikutnya.
-        prefs.edit()
-            .putString(KEY_ITEMS, DownloadItemCodec.encode(encItems))
-            .remove(KEY_PROGRESS)
-            .apply()
+        prefs.edit {
+            putString(KEY_ITEMS, DownloadItemCodec.encode(encItems))
+            remove(KEY_PROGRESS)
+        }
     }
 
     private fun encryptedCreds(item: DownloadItem): Pair<String, String> {
