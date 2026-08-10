@@ -15,11 +15,14 @@ import com.tasirin.httpdownloadmanager.MainActivity
 import com.tasirin.httpdownloadmanager.R
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
+import com.tasirin.httpdownloadmanager.download.DownloadService
 
 object NotificationHelper {
 
     const val CHANNEL_ID = "downloads"
     const val NOTIFICATION_ID = 1001
+    const val ACTION_PAUSE_ALL = "com.tasirin.httpdownloadmanager.PAUSE_ALL"
+    const val ACTION_RESUME_ALL = "com.tasirin.httpdownloadmanager.RESUME_ALL"
 
     fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= 26) {
@@ -70,6 +73,36 @@ object NotificationHelper {
             .setOngoing(active.isNotEmpty() || serverActive)
             .setOnlyAlertOnce(true)
             .setContentIntent(pending)
+
+        val hasResumable = items.any {
+            it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED
+        }
+        if (active.isNotEmpty()) {
+            val pauseIntent = Intent(context, DownloadService::class.java)
+                .setAction(ACTION_PAUSE_ALL)
+            val pausePending = PendingIntent.getService(
+                context, 1, pauseIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(
+                R.drawable.ic_pause,
+                context.getString(R.string.pause_all),
+                pausePending
+            )
+        }
+        if (hasResumable) {
+            val resumeIntent = Intent(context, DownloadService::class.java)
+                .setAction(ACTION_RESUME_ALL)
+            val resumePending = PendingIntent.getService(
+                context, 2, resumeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(
+                R.drawable.ic_play,
+                context.getString(R.string.resume_all),
+                resumePending
+            )
+        }
 
         if (active.isNotEmpty()) {
             val totalBytes = active.sumOf { it.totalBytes }
