@@ -11,7 +11,13 @@ class PinUtilTest {
     @Test
     fun normalizePinHash_kosong_returnsNull() {
         assertNull(StoragePrefs.normalizePinHash(""))
-        assertNull(StoragePrefs.normalizePinHash("   "))
+    }
+
+    @Test
+    fun normalizePinHash_spasi_dihashBukanNull() {
+        // normalisasi murni tidak trim (trim dilakukan getServerPin sebelum
+        // memanggilnya): string spasi tetap menjadi hash.
+        assertEquals(sha256Hex("  "), StoragePrefs.normalizePinHash("  "))
     }
 
     @Test
