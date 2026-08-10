@@ -78,6 +78,19 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `decode - entry null di tengah tidak menghapus daftar`() {
+        val raw = """
+            [{"id":"1","url":"https://a/x","fileName":"x","state":"COMPLETED","bytesDownloaded":1,"totalBytes":1},
+             null,
+             {"id":"3","url":"https://a/z","fileName":"z","state":"COMPLETED","bytesDownloaded":3,"totalBytes":3}]
+        """.trimIndent()
+        val decoded = DownloadItemCodec.decode(raw)
+        assertEquals(2, decoded.size)
+        assertEquals("1", decoded[0].id)
+        assertEquals("3", decoded[1].id)
+    }
+
+    @Test
     fun `decode - state aktif dikonversi ke PAUSED saat restart`() {
         val item = DownloadItem(
             id = "1", url = "https://a/x", fileName = "x",
