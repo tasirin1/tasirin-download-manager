@@ -48,6 +48,7 @@ import com.tasirin.httpdownloadmanager.ui.DownloadAdapter
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
+import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -588,14 +589,57 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }.getOrNull()
         val version = info?.versionName ?: "1.0"
         val build = info?.versionCode ?: 0
-        // Dialog khusus TV: judul & isi rata kiri, scroll agar muat di layar/remote.
         val view = layoutInflater.inflate(R.layout.dialog_about, null)
-        view.findViewById<TextView>(R.id.about_body).text = getString(
-            R.string.about_version_build,
-            getString(R.string.about_version, version),
-            build,
-            getString(R.string.about_profile)
+        view.findViewById<TextView>(R.id.about_version).text =
+            getString(R.string.about_version, version)
+        // Baris info terstruktur: ikon + teks (sumber: arrays about_icons/about_rows).
+        val rows = view.findViewById<LinearLayout>(R.id.about_rows)
+        val icons = resources.getStringArray(R.array.about_icons)
+        val texts = resources.getStringArray(R.array.about_rows)
+        for (i in icons.indices) {
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.gravity = android.view.Gravity.CENTER_VERTICAL
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            if (i > 0) lp.topMargin = dp(6)
+            val icon = TextView(this)
+            icon.text = icons[i]
+            icon.textSize = 16f
+            icon.setPadding(0, 0, dp(10), 0)
+
+            val txt = TextView(this)
+            txt.text = texts[i]
+            txt.textSize = 13.5f
+            txt.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+            row.addView(icon)
+            row.addView(txt, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            rows.addView(row, lp)
+        }
+        val targetSdk = runCatching {
+            packageManager.getApplicationInfo(packageName, 0).targetSdkVersion
+        }.getOrDefault(36)
+        view.findViewById<TextView>(R.id.about_footer).text = getString(
+            R.string.about_tech,
+            21, // minSdk dijaga 21 (aturan AGENTS.md: jangan naikkan)
+            targetSdk,
+            build
         )
+        view.findViewById<Button>(R.id.btn_about_github).setOnClickListener {
+            runCatching {
+                startActivity(
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://github.com/tasirin1/tasirin-download-manager")
+                    )
+                )
+            }
+        }
+        view.findViewById<Button>(R.id.btn_about_update).setOnClickListener {
+            checkUpdateFromAbout()
+        }
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
@@ -608,6 +652,29 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         dialog.window?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
         dialog.show()
         view.findViewById<Button>(R.id.btn_about_ok).setOnClickListener { dialog.dismiss() }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    /** Cek versi terbaru dari GitHub (tanpa unduh/pasang — itu ada di Pengaturan). */
+    private fun checkUpdateFromAbout() {
+        lifecycleScope.launch {
+            val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@MainActivity) }
+            val current = runCatching {
+                packageManager.getPackageInfo(packageName, 0).versionCode
+            }.getOrDefault(0)
+            val msg = when {
+                info == null -> getString(R.string.update_failed)
+                info.versionCode > current ->
+                    getString(R.string.update_available, info.versionName, info.versionCode)
+                else -> getString(R.string.update_latest)
+            }
+            MaterialAlertDialogBuilder(this@MainActivity)
+                .setTitle(R.string.update_check)
+                .setMessage(msg)
+                .setPositiveButton(R.string.ok, null)
+                .show()
+        }
     }
 
     override fun onAction(item: DownloadItem, action: DownloadAdapter.Action) {

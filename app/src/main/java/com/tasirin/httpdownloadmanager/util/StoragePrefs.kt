@@ -34,6 +34,21 @@ object StoragePrefs {
     private const val KEY_READ_TIMEOUT_SEC = "read_timeout_sec"
     private const val KEY_GALLERY_IMAGE_FOLDER = "gallery_image_folder"
     private const val KEY_GALLERY_VIDEO_FOLDER = "gallery_video_folder"
+    private const val KEY_COLLAPSED_SECTIONS = "collapsed_sections"
+
+    /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
+    fun isSectionCollapsed(context: Context, key: String): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
+            ?.contains(key) == true
+
+    fun setSectionCollapsed(context: Context, key: String, collapsed: Boolean) {
+        val set = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())!!.toMutableSet()
+        if (collapsed) set.add(key) else set.remove(key)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putStringSet(KEY_COLLAPSED_SECTIONS, set).apply()
+    }
 
     fun getFolderUri(context: Context): Uri? {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

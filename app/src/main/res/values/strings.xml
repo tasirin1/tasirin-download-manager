@@ -91,6 +91,17 @@
     <string name="server_status_detail_off">Nyalakan lewat Pengaturan</string>
     <string name="server_not_running_hint">Server belum aktif. Nyalakan dari Pengaturan.</string>
     <string name="open_remote_failed">Gagal membuka remote web</string>
+    <string name="copy_address">Salin Alamat</string>
+    <string name="address_copied">Alamat remote disalin ke clipboard</string>
+    <string name="settings_hint_pin">PIN wajib saat membuka remote web dari browser</string>
+    <string name="settings_hint_fs">Izinkan file manager remote membaca seluruh penyimpanan (Android 11+)</string>
+    <string name="settings_hint_auto_sort">File dipindah otomatis ke folder kategori setelah selesai</string>
+    <string name="settings_hint_battery">Matikan optimasi baterai agar download &amp; server tetap jalan di latar belakang</string>
+    <string name="settings_nav_other">Lainnya</string>
+    <string name="about_github">Buka GitHub</string>
+    <string name="about_check_update">Cek Pembaruan</string>
+    <string name="about_tech">minSdk %1$d · targetSdk %2$d · build %3$d</string>
+    <string name="about_releases_hint">Buka halaman rilis GitHub untuk versi terbaru</string>
     <string name="stat_total">Total</string>
     <string name="stat_active">Aktif</string>
     <string name="stat_done">Selesai</string>
@@ -101,20 +112,6 @@
     <string name="log_export_failed">Gagal mengekspor log</string>
     <string name="about_title">Tentang Tasirin Download Manager</string>
     <string name="about_version">Versi %1$s</string>
-    <string name="about_profile">&#128100; Pembuat: Julius Rudi Tasirin
-&#128241; Dibuat pakai: Samsung A05 (RAM 4 GB, ROM 64 GB)
-&#129302; Dikoding oleh: AnyClaw AI — berbekal kemampuan prompt AI yang baik
-&#129504; Didukung: pemahaman mendalam tentang IT
-&#128492; Bahasa: Indonesia yang lengkap (aplikasi &amp; remote web)
-&#128250; Untuk: Android — HP, STB &amp; TV box (uji coba di B860H V2 + TV Sharp Aquos)
-&#127760; VPN: Indonesia
-&#9881;&#65039; Build &amp; sumber kode: GitHub
-&#9749; Berbekal: segelas kopi + gabut waktu luang
-&#128481; Jaringan: router WiFi Tenda N318 (WISP)
-&#128049; Teman setia saat stres &amp; cari bug: si kucing
-&#128293; Berawal dari: rasa bosan &amp; rasa penasaran yang kuat
-&#128218; Kemauan belajar: nggak ada habisnya
-&#128025; GitHub: tasirin1</string>
     <string name="ok">OK</string>
     <string name="checksum_hint_optional">Checksum opsional (md5:/sha1:/sha256:) — contoh md5:abcdef&#8230;</string>
     <string name="shortcut_add_download">Tambah Download</string>
@@ -149,8 +146,6 @@
     <string name="server_switch">Server</string>
     <string name="server_start">Nyalakan server</string>
     <string name="server_stop">Matikan server</string>
-    <string name="toggle_on">Nyala</string>
-    <string name="toggle_off">Mati</string>
     <string name="settings_segments">Segmen paralel per download</string>
 
     <string name="previous_crash_title">Log error dari peluncuran sebelumnya</string>
@@ -301,7 +296,6 @@
         <item quantity="other">Bersih: %1$d file (%2$s) dihapus</item>
     </plurals>
     <string name="cleanup_empty">Tidak ada file sampah yang ditemukan</string>
-    <string name="about_version_build">%1$s (build %2$d)\n\n%3$s</string>
     <string name="label_value">%1$s: %2$s</string>
     <string name="gallery_thumb_desc">Pratinjau media</string>
 </resources>
