@@ -67,7 +67,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:drawablePadding="12dp"
-            android:drawableTop="@drawable/ic_image_outline"
+            app:drawableTopCompat="@drawable/ic_image_outline"
             android:gravity="center"
             android:padding="24dp"
             android:text="@string/gallery_empty"
