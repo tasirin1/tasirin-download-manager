@@ -19,6 +19,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.core.graphics.scale
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -343,7 +344,7 @@ class GalleryActivity : AppCompatActivity() {
             val scale = max.toDouble() / maxOf(src.width, src.height)
             val w = (src.width * scale).toInt().coerceAtLeast(1)
             val h = (src.height * scale).toInt().coerceAtLeast(1)
-            val out = Bitmap.createScaledBitmap(src, w, h, true)
+            val out = src.scale(w, h, true)
             if (out !== src) src.recycle()
             return out
         }

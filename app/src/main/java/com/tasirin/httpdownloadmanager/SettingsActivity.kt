@@ -29,6 +29,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.button.MaterialButton
@@ -135,11 +136,11 @@ class SettingsActivity : AppCompatActivity() {
             val content = findViewById<View>(spec.contentId)
             val chevron = findViewById<ImageView>(spec.chevronId)
             val collapsed = StoragePrefs.isSectionCollapsed(this, spec.key)
-            content.visibility = if (collapsed) View.GONE else View.VISIBLE
+            content.isVisible = !collapsed
             chevron.rotation = if (collapsed) 0f else 180f
             findViewById<View>(spec.headerId).setOnClickListener {
-                val nowCollapsed = content.visibility == View.VISIBLE
-                content.visibility = if (nowCollapsed) View.GONE else View.VISIBLE
+                val nowCollapsed = content.isVisible
+                content.isVisible = !nowCollapsed
                 chevron.animate().rotation(if (nowCollapsed) 0f else 180f).setDuration(150).start()
                 StoragePrefs.setSectionCollapsed(this, spec.key, nowCollapsed)
             }

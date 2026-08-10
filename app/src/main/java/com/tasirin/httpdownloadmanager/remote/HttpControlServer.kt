@@ -13,6 +13,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.BatteryManager
 import android.annotation.SuppressLint
+import androidx.core.graphics.scale
 import androidx.core.net.toUri
 import android.os.Build
 import android.os.Environment
@@ -1086,7 +1087,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val scale = max.toDouble() / maxOf(src.width, src.height)
         val w = (src.width * scale).toInt().coerceAtLeast(1)
         val h = (src.height * scale).toInt().coerceAtLeast(1)
-        val out = Bitmap.createScaledBitmap(src, w, h, true)
+        val out = src.scale(w, h, true)
         if (out !== src) src.recycle()
         return out
     }
