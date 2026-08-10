@@ -28,7 +28,7 @@
             android:contentDescription="@string/gallery_play_desc"
             android:padding="11dp"
             android:src="@drawable/ic_play"
-            android:tint="@android:color/white"
+            app:tint="@android:color/white"
             android:visibility="gone"
             tools:ignore="ContentDescription" />
 
