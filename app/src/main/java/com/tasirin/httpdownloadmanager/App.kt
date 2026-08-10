@@ -8,15 +8,11 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
-import android.util.Log
 import com.tasirin.httpdownloadmanager.download.DownloadEngine
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
+import com.tasirin.httpdownloadmanager.util.CrashLog
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class App : Application() {
     override fun onCreate() {
@@ -100,18 +96,7 @@ class App : Application() {
         }
 
         fun appendCrash(context: android.content.Context, tag: String, t: Throwable) {
-            runCatching {
-                val file = File(context.filesDir, CRASH_LOG_FILE)
-                val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-                val text = buildString {
-                    appendLine("=== $stamp [$tag] ===")
-                    appendLine(Log.getStackTraceString(t))
-                    appendLine()
-                }
-                val existing = if (file.exists()) file.readText() else ""
-                val merged = (existing + text).takeLast(100_000)
-                file.writeText(merged)
-            }
+            CrashLog.append(context, tag, t)
         }
     }
 }

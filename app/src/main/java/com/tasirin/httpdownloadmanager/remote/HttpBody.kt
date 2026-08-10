@@ -1,0 +1,73 @@
+package com.tasirin.httpdownloadmanager.remote
+
+import fi.iki.elonen.NanoHTTPD
+import java.io.IOException
+import java.io.OutputStream
+import java.net.URLDecoder
+
+private const val MAX_BODY_SIZE = 4L * 1024 * 1024
+private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024
+
+/** Baca form POST (x-www-form-urlencoded) dari body sesi NanoHTTPD,
+ *  gabung dengan parameter query. Dibatasi 4 MB. */
+internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
+    val map = mutableMapOf<String, String>()
+    session.parms.forEach { (k, v) -> map[k] = v }
+    val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
+        .coerceIn(0L, MAX_BODY_SIZE).toInt()
+    if (length > 0) {
+        val bytes = ByteArray(length)
+        var offset = 0
+        while (offset < length) {
+            val read = session.inputStream.read(bytes, offset, length - offset)
+            if (read == -1) break
+            offset += read
+        }
+        val body = String(bytes, 0, offset, Charsets.UTF_8)
+        body.split("&").forEach { pair ->
+            val idx = pair.indexOf('=')
+            if (idx > 0) {
+                val key = URLDecoder.decode(pair.substring(0, idx), "UTF-8")
+                val value = URLDecoder.decode(pair.substring(idx + 1), "UTF-8")
+                map[key] = value
+            }
+        }
+    }
+    return map
+}
+
+/** Habiskan body sesi tanpa memprosesnya (untuk request yang body-nya
+ *  sengaja diabaikan) supaya koneksi bisa dipakai ulang. */
+internal fun drainBody(session: NanoHTTPD.IHTTPSession) {
+    val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
+        .coerceAtMost(MAX_UPLOAD_BYTES)
+    if (length <= 0) return
+    val buffer = ByteArray(64 * 1024)
+    var remaining = length
+    while (remaining > 0) {
+        val chunk = minOf(buffer.size.toLong(), remaining).toInt()
+        val read = session.inputStream.read(buffer, 0, chunk)
+        if (read == -1) break
+        remaining -= read
+    }
+}
+
+/** Salin body upload ke OutputStream tanpa menutup session.inputStream
+ *  (NanoHTTPD menutupnya sendiri setelah serve() selesai). */
+internal fun copyUploadBody(session: NanoHTTPD.IHTTPSession, length: Long, out: OutputStream) {
+    val input = session.inputStream
+    val buffer = ByteArray(64 * 1024)
+    var remaining = length
+    while (remaining > 0) {
+        val chunk = minOf(buffer.size.toLong(), remaining).toInt()
+        val read = input.read(buffer, 0, chunk)
+        if (read == -1) break
+        out.write(buffer, 0, read)
+        remaining -= read
+    }
+    if (remaining > 0) {
+        throw IOException(
+            "Koneksi terputus: hanya ${length - remaining} dari $length byte diterima"
+        )
+    }
+}
