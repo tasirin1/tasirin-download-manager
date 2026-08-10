@@ -68,7 +68,13 @@ class DownloadService : Service() {
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            NotificationHelper.ACTION_PAUSE_ALL -> App.engine.pauseAll()
+            NotificationHelper.ACTION_RESUME_ALL -> App.engine.resumeAll()
+        }
+        return START_STICKY
+    }
 
     private fun startForegroundCompat() {
         val notification = NotificationHelper.foregroundNotification(this)

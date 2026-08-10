@@ -22,4 +22,15 @@ class HexTest {
         assertEquals(bytes.size * 2, first.length)
         assertEquals("7461736972696e2d68747470646d", first)
     }
+
+    @Test
+    fun `sha256Hex - nilai dasar dan konsisten`() {
+        // Vektor standar NIST: sha256("abc") = ba7816bf...
+        assertEquals(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            sha256Hex("abc")
+        )
+        assertEquals(64, sha256Hex("tasirin").length)
+        assertEquals(sha256Hex("1234"), sha256Hex("1234"))
+    }
 }

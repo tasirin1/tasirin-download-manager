@@ -103,7 +103,6 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.2.0")
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
-    implementation("com.google.zxing:core:3.5.4")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
@@ -111,6 +110,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation("junit:junit:4.13.2")
+    // zxing hanya untuk verifikasi decode QR di unit test — tidak ikut ke APK
+    // (encoder QR asli ada di util/QrEncoder.kt).
+    testImplementation("com.google.zxing:core:3.5.4")
     // org.json asli untuk unit test JVM (android.jar hanya stub). Test-only:
     // tidak ikut ke APK.
     testImplementation("org.json:json:20240303")

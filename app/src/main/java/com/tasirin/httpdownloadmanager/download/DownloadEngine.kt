@@ -19,6 +19,7 @@ import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
+import com.tasirin.httpdownloadmanager.util.readBounded
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1367,21 +1368,6 @@ class DownloadEngine(appContext: Context) {
         saveJob?.cancel()
         saveJob = null
         repository.save(_items.value)
-    }
-
-    /** Baca stream paling banyak [max] byte lalu tutup; aman untuk probe
-     *  URL yang tidak dikenal (hindari OOM dari body raksasa). */
-    private fun readBounded(input: java.io.InputStream, max: Int): String {
-        val buf = ByteArray(16 * 1024)
-        val out = java.io.ByteArrayOutputStream(max)
-        var remaining = max
-        while (remaining > 0) {
-            val n = input.read(buf, 0, minOf(buf.size, remaining))
-            if (n < 0) break
-            out.write(buf, 0, n)
-            remaining -= n
-        }
-        return String(out.toByteArray(), Charsets.UTF_8)
     }
 
     private fun guessFileName(url: String): String {

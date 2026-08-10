@@ -1,6 +1,5 @@
 package com.tasirin.httpdownloadmanager
 
-import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
@@ -25,6 +24,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivityGalleryBinding
@@ -49,6 +49,9 @@ class GalleryActivity : AppCompatActivity() {
     private lateinit var binding: ActivityGalleryBinding
     private var fullList: List<MediaLibrary.MediaEntry> = emptyList()
     private var filter = GalleryFilter.ALL
+    private var loadedCount = GALLERY_PAGE
+    private var loadingMore = false
+    private var partialProgress: Map<String, Int> = emptyMap()
     private val adapter = GalleryAdapter(
         loader = { e -> loadThumb(this, e, THUMB_SIZE) },
         onClick = { e -> openEntry(e) },
@@ -68,19 +71,28 @@ class GalleryActivity : AppCompatActivity() {
 
         binding.recycler.layoutManager = GridLayoutManager(this, SPAN_COUNT)
         binding.recycler.adapter = adapter
+        binding.recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                val lm = recyclerView.layoutManager as? GridLayoutManager ?: return
+                if (lm.findLastVisibleItemPosition() >= adapter.itemCount - 6) {
+                    loadMore()
+                }
+            }
+        })
 
         setupFilters()
 
         lifecycleScope.launch {
             binding.progress.visibility = View.VISIBLE
-            fullList = withContext(Dispatchers.IO) {
-                val partials = App.engine.items.value
+            partialProgress = App.engine.items.value
                     .filter { it.state != DownloadState.COMPLETED }
                     .associate { it.fileName to it.progressPercent }
-                MediaLibrary.scan(this@GalleryActivity, partials)
+            fullList = withContext(Dispatchers.IO) {
+                MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount)
             }
             binding.progress.visibility = View.GONE
             applyFilterUi()
+            loadMore() // halaman awal kurang dari satu layar -> isi otomatis
         }
     }
 
@@ -95,6 +107,7 @@ class GalleryActivity : AppCompatActivity() {
                 filter = f
                 updateFilterColors()
                 applyFilterUi()
+                loadMore()
             }
         }
         updateFilterColors()
@@ -120,14 +133,43 @@ class GalleryActivity : AppCompatActivity() {
     }
 
     private fun applyFilterUi() {
-        val filtered = when (filter) {
-            GalleryFilter.ALL -> fullList
-            GalleryFilter.IMAGE -> fullList.filter { !it.isVideo }
-            GalleryFilter.VIDEO -> fullList.filter { it.isVideo }
-        }
+        val filtered = filter(fullList)
         adapter.submit(filtered)
         binding.emptyView.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
     }
+
+    private fun canLoadMore(): Boolean =
+        fullList.size >= loadedCount && loadedCount < MediaLibrary.GALLERY_MAX_ENTRIES
+
+    /** Naikkan batas scan bertahap (halaman per halaman) dan perbarui daftar
+     *  lewat DiffUtil — galeri besar tidak pernah di-hold penuh di memori. */
+    private fun loadMore() {
+        if (loadingMore || !canLoadMore()) return
+        loadingMore = true
+        lifecycleScope.launch {
+            try {
+                while (canLoadMore() && filter(fullList).size < GALLERY_MIN_FILL) {
+                    val next = minOf(loadedCount + GALLERY_PAGE, MediaLibrary.GALLERY_MAX_ENTRIES)
+                    val had = fullList.size
+                    fullList = withContext(Dispatchers.IO) {
+                        MediaLibrary.scan(this@GalleryActivity, partialProgress, next)
+                    }
+                    loadedCount = next
+                    if (fullList.size <= had) break
+                }
+            } finally {
+                loadingMore = false
+            }
+            applyFilterUi()
+        }
+    }
+
+    private fun filter(list: List<MediaLibrary.MediaEntry>): List<MediaLibrary.MediaEntry> =
+        when (filter) {
+            GalleryFilter.ALL -> list
+            GalleryFilter.IMAGE -> list.filter { !it.isVideo }
+            GalleryFilter.VIDEO -> list.filter { it.isVideo }
+        }
 
     private fun confirmDelete(e: MediaLibrary.MediaEntry) {
         MaterialAlertDialogBuilder(this)
@@ -201,6 +243,8 @@ class GalleryActivity : AppCompatActivity() {
         private const val SPAN_COUNT = 3
         private const val THUMB_SIZE = 256
         private const val MAX_THUMB_CACHE_KB = 24 * 1024
+        private const val GALLERY_PAGE = 300
+        private const val GALLERY_MIN_FILL = 24
 
         @Volatile
         private var thumbCache: LruCache<String, Bitmap>? = null
@@ -372,11 +416,18 @@ private class GalleryAdapter(
     private val items = mutableListOf<MediaLibrary.MediaEntry>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    @SuppressLint("NotifyDataSetChanged") // Daftar galeri diganti utuh per scan; diff halus menyusul.
     fun submit(list: List<MediaLibrary.MediaEntry>) {
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = items.size
+            override fun getNewListSize(): Int = list.size
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                items[oldItemPosition].token == list[newItemPosition].token
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                items[oldItemPosition] == list[newItemPosition]
+        }, false)
         items.clear()
         items.addAll(list)
-        notifyDataSetChanged()
+        diff.dispatchUpdatesTo(this)
     }
 
     private fun formatDate(ms: Long): String {

@@ -19,11 +19,12 @@ import java.io.File
 object MediaLibrary {
 
     private const val SCAN_TTL_MS = 15_000L
-    private const val GALLERY_MAX_ENTRIES = 3000
+    /** Batas absolut entry yang di-hold di memori (galeri + remote web). */
+    const val GALLERY_MAX_ENTRIES = 3000
     private const val THUMB_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
     @Volatile
-    private var scanCache: Pair<Long, List<MediaEntry>>? = null
+    private var scanCache: Triple<Long, List<MediaEntry>, Int>? = null
     private var observerRegistered = false
 
     /** Koleksi MediaStore untuk root folder media (dipakai saat browsing). */
@@ -94,9 +95,15 @@ object MediaLibrary {
         )
     }.getOrNull()
 
-    /** Scan dengan cache 5 detik + auto-invalidasi saat MediaStore berubah. */
-    fun scan(context: Context, partialProgress: Map<String, Int> = emptyMap()): List<MediaEntry> {
-        val base = scanCached(context)
+    /** Scan dengan cache 15 detik + auto-invalidasi saat MediaStore berubah.
+     *  [maxEntries] membatasi berapa entry di-hold di memori; galeri mulai dari
+     *  halaman kecil lalu menaikkan limit saat pengguna scroll (load-more). */
+    fun scan(
+        context: Context,
+        partialProgress: Map<String, Int> = emptyMap(),
+        maxEntries: Int = GALLERY_MAX_ENTRIES
+    ): List<MediaEntry> {
+        val base = scanCached(context, maxEntries)
         if (partialProgress.isEmpty()) return base
         return base.map { entry ->
             if (entry.isPartial) {
@@ -122,14 +129,15 @@ object MediaLibrary {
         }
     }
 
-    private fun scanCached(context: Context): List<MediaEntry> {
+    private fun scanCached(context: Context, maxEntries: Int): List<MediaEntry> {
         ensureObserver(context)
         val now = System.currentTimeMillis()
-        scanCache?.let { (ts, list) ->
-            if (now - ts < SCAN_TTL_MS) return list
+        val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
+        scanCache?.let { (ts, list, cachedLimit) ->
+            if (now - ts < SCAN_TTL_MS && cachedLimit >= limit) return list.take(limit)
         }
-        val list = scanUncached(context)
-        scanCache = now to list
+        val list = scanUncached(context, limit)
+        scanCache = Triple(now, list, limit)
         return list
     }
 
@@ -163,7 +171,7 @@ object MediaLibrary {
         }
     }
 
-    private fun scanUncached(context: Context): List<MediaEntry> {
+    private fun scanUncached(context: Context, maxEntries: Int): List<MediaEntry> {
         val list = mutableListOf<MediaEntry>()
 
         fun addFile(f: File, isPartial: Boolean = false) {
@@ -330,7 +338,7 @@ object MediaLibrary {
         return list
             .distinctBy { it.filePath ?: it.contentUri ?: it.token }
             .sortedByDescending { it.modified }
-            .take(GALLERY_MAX_ENTRIES)
+            .take(maxEntries)
     }
 
     /** Hapus thumbnail disk yang sudah lama tak terpakai (> 7 hari). Dipanggil

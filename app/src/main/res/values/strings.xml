@@ -101,6 +101,7 @@
     <string name="about_check_update">Cek Pembaruan</string>
     <string name="about_tech">minSdk %1$d · targetSdk %2$d · build %3$d</string>
     <string name="stat_total">Total</string>
+    <string name="stat_number">%d</string>
     <string name="stat_active">Aktif</string>
     <string name="stat_done">Selesai</string>
     <string name="stat_failed">Gagal</string>
