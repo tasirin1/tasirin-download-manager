@@ -53,7 +53,6 @@ object Crypto {
      *  sudah menangani fallback untuk Android 5.0-5.1. */
     @RequiresApi(Build.VERSION_CODES.M)
     private fun key(): SecretKey {
-        check(Build.VERSION.SDK_INT >= 23) { "AES AndroidKeyStore butuh API 23+" }
         cachedKey?.let { return it }
         synchronized(KEY_LOCK) {
             cachedKey?.let { return it }

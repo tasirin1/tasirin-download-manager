@@ -15,7 +15,6 @@
     <string name="cancel">Batal</string>
     <string name="save">Simpan</string>
 
-    <string name="settings_section_update">Pembaruan</string>
     <string name="update_check">Periksa Pembaruan</string>
     <string name="update_checking">Memeriksa pembaruan&#8230;</string>
     <string name="update_failed">Gagal memeriksa pembaruan — cek koneksi internet</string>
@@ -101,7 +100,6 @@
     <string name="about_github">Buka GitHub</string>
     <string name="about_check_update">Cek Pembaruan</string>
     <string name="about_tech">minSdk %1$d · targetSdk %2$d · build %3$d</string>
-    <string name="about_releases_hint">Buka halaman rilis GitHub untuk versi terbaru</string>
     <string name="stat_total">Total</string>
     <string name="stat_active">Aktif</string>
     <string name="stat_done">Selesai</string>
@@ -290,7 +288,6 @@
     <string name="settings_gallery_video_label">Folder galeri video (opsional)</string>
     <string name="settings_gallery_folder_hint">Path folder, contoh: /storage/emulated/0/DCIM/Camera</string>
     <string name="settings_gallery_hint">Kosongkan untuk scan semua storage. Format: f:path atau m:RelativePath — path /sdcard/… otomatis dikenali sebagai /storage/emulated/0/…</string>
-    <string name="settings_section_cleanup">Pembersihan</string>
     <string name="cleanup_button">Bersihkan file sampah</string>
     <plurals name="cleanup_done">
         <item quantity="one">Bersih: %1$d file (%2$s) dihapus</item>

@@ -10,7 +10,6 @@
     <color name="card_bg">#FFFFFF</color>
     <color name="line">#E3E8F2</color>
     <color name="chip_pressed">#E8EAF6</color>
-    <color name="progress_track">#E0E0E0</color>
     <color name="gallery_thumb_bg">#EEEEEE</color>
     <color name="gallery_ext_text">#999999</color>
     <color name="gallery_overlay">#66000000</color>
