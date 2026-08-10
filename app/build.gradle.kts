@@ -23,6 +23,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        // Hanya bahasa id/in (Indonesia) + en yang ikut di APK; locale library
+        // lain (ar, de, fr, es, ...) dibuang dari resources.arsc — hemat ukuran.
+        resConfigs += listOf("en", "in", "id")
     }
 
     signingConfigs {
@@ -98,7 +101,6 @@ dependencies {
     implementation("com.google.zxing:core:3.5.4")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.2.2")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.2")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.2")

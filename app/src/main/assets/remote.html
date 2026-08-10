@@ -1,11 +1,6 @@
 <!DOCTYPE html>
-<!--
-  =====================================================================
-  Tasirin Download Manager — Remote Web (satu file: HTML + CSS + JS)
-  Dipakai langsung oleh HttpControlServer dari assets; UI utama pemakaian
-  harian. Jaga mobile-first & ramah D-pad TV; jangan tambah library berat.
-  =====================================================================
--->
+
+<!-- Remote web Tasirin (HTML+CSS+JS satu file, di-minify; versi readable ada di history git). -->
 <html lang="id">
 <head>
 <meta charset="utf-8">
@@ -13,7 +8,7 @@
 <title>Tasirin Download Manager Remote</title>
 <meta name="theme-color" content="#4353e6">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%234353e6'/%3E%3Cpath d='M12 5v8.6l3.2-3.2 1.4 1.4L12 17.4l-4.6-4.6 1.4-1.4L12 13.6V5z' fill='%23fff'/%3E%3C/svg%3E">
-<!-- ===== SEKSI: CSS (tema, komponen, halaman) ===== -->
+
 <style>
   :root {
     --bg: #f4f6fb;
@@ -345,7 +340,7 @@
 </style>
 </head>
 <body>
-<!-- ===== SEKSI: HTML (status, form tambah, daftar download, galeri, file manager, player) ===== -->
+
 <div class="topbar">
   <div class="topbar-in">
     <div class="brand"><span>Tasirin Download Manager<small>Remote Control</small></span></div>
@@ -575,10 +570,9 @@
 </div>
 
 <script>
-<!-- ===== SEKSI: JAVASCRIPT ===== -->
+
 const API = '';
-// Buang query string yang nyangkut (mis. ?path=... dari bookmark lama) supaya
-// tidak ikut menempel di request API dan mengotori log server.
+
 if (location.search) {
   try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
 }
@@ -586,7 +580,7 @@ const connBanner = document.getElementById('connBanner');
 const connBannerText = document.getElementById('connBannerText');
 const connReloadBtn = document.getElementById('connReloadBtn');
 let connReloadTarget = '';
-// SEKSI: Koneksi, banner, tema
+
 function showConnBanner(msg, target) {
   connBannerText.textContent = msg;
   connReloadTarget = target || '';
@@ -695,7 +689,7 @@ function renderStatus(st) {
     );
   }
 }
-// SEKSI: Status & polling status
+
 async function refreshStatus() {
   const el = document.getElementById('deviceStatus');
   if (!el) return;
@@ -801,7 +795,6 @@ function mmShowToast(text) {
   mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, 700);
 }
 
-// SEKSI: Player video ala YouTube (seekbar, gesture, auto-next)
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
   mmOverlayTitle.classList.remove('hide');
@@ -900,7 +893,6 @@ document.addEventListener('webkitfullscreenchange', function () {
   if (!document.webkitFullscreenElement) mmUnlockOrientation();
 });
 
-// SEKSI: Galeri media (thumbnail 16:9, filter, load bertahap)
 async function loadGallery(reset) {
   if (galleryLoading) return;
   galleryLoading = true;
@@ -1038,7 +1030,6 @@ window.addEventListener('scroll', function () {
   }
 });
 
-// File manager
 let fsPath = '';
 let fsItems = [];
 let fsSelectMode = false;
@@ -1067,7 +1058,6 @@ fsBtn.addEventListener('click', function () {
 
 const DOWNLOADS_VIEW = ['deviceStatus', 'downloadsToolbar', 'filtersSticky', 'addSheet', 'status', 'list'];
 
-// SEKSI: Routing & sticky header
 function currentRoute() {
   const h = location.hash;
   if (h === '#/gallery') return 'gallery';
@@ -1189,7 +1179,6 @@ function renderFsCrumbs(p) {
   });
 }
 
-// SEKSI: File manager (jelajah, breadcrumb, batch, ZIP)
 async function loadFsLocations() {
   try {
     const res = await fetch(API + '/api/fs?path=');
@@ -1592,7 +1581,6 @@ const UPLOAD_CHUNK = 2 * 1024 * 1024;
 
 let fsUploading = false;
 
-// SEKSI: Upload chunk 2 MB (retry, drag & drop, duplikat)
 function uploadFiles(files, path, statusEl, progressBox, progressText, progressPct, progressBar, done) {
   fsUploading = true;
   const jobs = Array.from(files).map(function (f) {
@@ -1641,12 +1629,11 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         '&id=' + encodeURIComponent(id) +
         '&chunk=' + chunkIdx + '&chunks=' + chunks +
         '&offset=' + start);
-      // Timeout longgar (2 menit/potongan): koneksi yang macet tidak boleh
-      // menggantung upload tanpa pesan apa pun.
+
       xhr.timeout = 120000;
       xhr.upload.onprogress = function (e) {
         if (!e.lengthComputable) return;
-        // Progres potongan tidak boleh mundur saat retry/ulang kirim.
+
         if (e.loaded < chunkBest) return;
         chunkBest = e.loaded;
         if (lastTime === 0) { lastTime = Date.now(); lastBytes = e.loaded; }
@@ -1677,7 +1664,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
           } catch (e) {}
         }
         if (pending) {
-          // Data sudah diterima server, file sedang difinalisasi di latar.
+
           pollFinalize();
         } else if (ok) {
           chunkIdx++;
@@ -1758,8 +1745,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         setTimeout(function () { uploadOne(job, attempt + 1); }, 800);
         return;
       }
-      // Respons sukses bisa hilang di jaringan walau server sudah menyimpan.
-      // Tanyakan dulu ke server sebelum menyatakan gagal.
+
       const verify = new XMLHttpRequest();
       verify.open('GET', API + '/api/upload_verify?id=' + encodeURIComponent(id));
       verify.timeout = 5000;
@@ -1823,7 +1809,6 @@ window.addEventListener('beforeunload', function (e) {
   return '';
 });
 
-// Auto-lock: minta PIN lagi setelah 10 menit tanpa aktivitas
 (function () {
   const LOCK_MS = 10 * 60 * 1000;
   let timer = null;
@@ -1873,8 +1858,7 @@ function startFsUpload(jobs) {
       btn.disabled = false;
       fsUploadFile.value = '';
       fsUploadDir.value = '';
-      // loadFs() menghapus teks status; tampilkan hasilnya SESUDAH refresh
-      // supaya pesan "Selesai"/"Gagal" tidak langsung hilang.
+
       loadFs();
       if (ok) {
         fsMsg('Selesai: ' + jobs.length + ' file diunggah');
@@ -1917,7 +1901,6 @@ document.addEventListener('click', function (e) {
   }
 });
 
-// D-pad/remote TV box: Enter/Space menjalankan baris yang difokus.
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const t = e.target;
@@ -1928,7 +1911,6 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-// Cari & hapus file duplikat (nama + ukuran sama) di folder saat ini.
 const fsDupesModal = document.getElementById('fsDupesModal');
 const fsDupesBody = document.getElementById('fsDupesBody');
 const fsDupesDeleteBtn = document.getElementById('fsDupesDelete');
@@ -2173,7 +2155,6 @@ function renderRelated(current) {
   }
 }
 
-// ---- Player ala YouTube ----
 mmPlayBtn.innerHTML = ICONS.play;
 mmMuteBtn.innerHTML = ICONS.sound;
 mmFsBtn.innerHTML = ICONS.fs;
@@ -2243,7 +2224,6 @@ mmAutoBtn.addEventListener('click', function () {
 });
 mmUpdateAutoBtn();
 
-// Tooltip waktu saat scrub/hover (ala YouTube)
 mmSeekWrap.addEventListener('mousemove', function (e) {
   if (mmType !== 'video') return;
   const rect = mmSeekWrap.getBoundingClientRect();
@@ -2258,7 +2238,6 @@ mmSeekWrap.addEventListener('mouseleave', function () {
   mmSeekTip.classList.add('hidden');
 });
 
-// Pintasan keyboard ala YouTube (saat pemutar video terbuka)
 document.addEventListener('keydown', function (e) {
   if (mmType !== 'video' || mediaModal.classList.contains('hidden')) return;
   const tag = (e.target && e.target.tagName) || '';
@@ -2342,7 +2321,7 @@ mmPlayer.addEventListener('click', function (e) {
   if (dt < 350 && Math.abs(e.clientX - prevX) < 80) {
     clearTimeout(mmTapTimer);
     if (e.pointerType === 'mouse') {
-      // Desktop: klik dua kali = layar penuh (ala YouTube)
+
       mmFsBtn.click();
       return;
     }
@@ -2378,7 +2357,6 @@ mmPlayer.addEventListener('click', function (e) {
 mmPlayer.addEventListener('mousemove', mmShowCtrl);
 mmPlayer.addEventListener('touchstart', function () { mmShowCtrl(); }, { passive: true });
 
-// Gesture ala YouTube: kiri = kecerahan, kanan = volume
 function mmCurBrightness() {
   const m = mmPlayer.style.filter.match(/brightness\(([\d.]+)\)/);
   return m ? parseFloat(m[1]) : 1;
@@ -2591,8 +2569,6 @@ function renderSpeedTotal(items) {
   el.innerHTML = '&#9889; ' + fmtSpeed(total) + ' <span class="st-sub">' + active + ' aktif</span>';
 }
 
-// Toolbar aksi massal hanya tampil saat ada item yang relevan,
-// supaya halaman tidak penuh tombol yang tidak terpakai.
 function updateToolbar(items) {
   let active = 0;
   let pausedOrFailed = 0;
@@ -2616,8 +2592,7 @@ function updateToolbar(items) {
 let lastStructSig = '';
 let lastIdListSig = '';
 let lastRowSig = {};
-// Signature struktural: hanya berubah saat daftar/status item berubah.
-// Perubahan progres/kecepatan ditangani updateRows (tanpa render ulang penuh).
+
 function structSig(items) {
   return items.map(function (it) {
     return it.id + '|' + it.state + '|' + (it.error ? '|e' : '') + '|' + it.fileName + '|' + it.addedAt;
@@ -2669,8 +2644,6 @@ function rowSubHtml(it) {
     '</div>';
 }
 
-// Update ringan: hanya progres/kecepatan/ETA yang berubah -> tidak render ulang
-// seluruh daftar, dan baris yang tidak berubah di-skip (hemat DOM di HP lemah).
 function updateRows(items) {
   const list = document.getElementById('list');
   if (!list.querySelector('li[data-id]')) {
@@ -2700,8 +2673,7 @@ function rebuildList(items) {
   const idsChanged = idListSig !== lastIdListSig;
   const firstRender = lastIdListSig === '';
   lastIdListSig = idListSig;
-  // Default urutan: paling baru di atas (addedAt DESC). Item yang sedang
-  // aktif (DOWNLOADING/PENDING) tetap di-pin paling atas biar gampang dipantau.
+
   items = items.slice().sort(function (a, b) {
     const actA = a.state === 'DOWNLOADING' || a.state === 'PENDING' ? 0 : 1;
     const actB = b.state === 'DOWNLOADING' || b.state === 'PENDING' ? 0 : 1;
