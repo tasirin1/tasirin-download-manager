@@ -11,6 +11,7 @@ import android.os.Build
 import android.util.Log
 import com.tasirin.httpdownloadmanager.download.DownloadEngine
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
+import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import java.io.File
 import java.text.SimpleDateFormat
@@ -24,6 +25,9 @@ class App : Application() {
         httpServer = HttpControlServer(this)
         engine = DownloadEngine(this)
         runCatching { engine.cleanupOrphans() }
+        // Bersihkan thumbnail disk lama di latar belakang (RAM tidak terpengaruh,
+        // tapi disk cache tidak menumpuk tanpa menunggu server remote menyala).
+        Thread { MediaLibrary.cleanupOldThumbs(this) }.start()
         // Server dinyalakan langsung dari Application supaya tetap jalan
         // walau halaman utama gagal terbuka (mis. crash di Activity).
         if (StoragePrefs.isServerBackgroundEnabled(this) &&

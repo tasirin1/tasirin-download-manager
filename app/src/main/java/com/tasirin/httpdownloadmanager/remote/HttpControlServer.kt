@@ -17,6 +17,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import com.tasirin.httpdownloadmanager.App
+import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
@@ -195,8 +196,8 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             if (thumbs.isDirectory) {
                 val files = thumbs.listFiles()?.filter { it.isFile }
                     ?.sortedByDescending { it.lastModified() } ?: return
-                val keep = 400
-                val maxAge = 30L * 24 * 60 * 60 * 1000
+                val keep = 300
+                val maxAge = 7L * 24 * 60 * 60 * 1000
                 files.forEachIndexed { i, f ->
                     if (i >= keep || now - f.lastModified() > maxAge) f.delete()
                 }
@@ -472,6 +473,18 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
 
     private fun downloadsPayload(): JSONObject {
         return JSONObject().put("items", itemsJson())
+    }
+
+    /** Signature ringkas daftar item: tanpa alokasi JSON, dipakai SSE untuk
+     *  memutuskan apakah payload perlu di-build ulang (hemat GC di tick 2x/detik). */
+    private fun itemsSignature(items: List<DownloadItem>): Int {
+        var h = 0
+        items.forEach { item ->
+            h = h * 31 + item.id.hashCode() * 7 + item.state.hashCode() * 13 +
+                item.bytesDownloaded.hashCode() * 17 + item.speedBps.hashCode() * 19 +
+                item.etaSeconds.hashCode() * 23 + (item.error?.hashCode() ?: 0) * 29
+        }
+        return h
     }
 
     private fun itemsJson(): JSONArray {
@@ -1287,46 +1300,44 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
         val q = session.parms["q"]?.trim()?.lowercase().orEmpty()
         val type = session.parms["type"]?.trim().orEmpty()
         val page = (session.parms["page"]?.toIntOrNull() ?: 0).coerceAtLeast(0)
-        val all = scannedGallery().filter {
-            (q.isEmpty() || it.name.lowercase().contains(q)) &&
-                when (type) {
-                    "video" -> it.isVideo
-                    "image" -> !it.isVideo
-                    else -> true
-                }
-        }
-        val start = (page * GALLERY_PAGE_SIZE).coerceAtMost(all.size)
-        val end = minOf(start + GALLERY_PAGE_SIZE, all.size)
-        val hasMore = end < all.size
+        // Iterasi sekali tanpa membuat daftar hasil filter penuh di memori
+        // (hemat alokasi untuk galeri besar); hanya halaman aktif yang di-hold.
+        val start = page * GALLERY_PAGE_SIZE
+        val pageEnd = start + GALLERY_PAGE_SIZE
         val arr = JSONArray()
         val cache = loadVideoDurations()
         var extracted = 0
-        for (i in start until end) {
-            val e = all[i]
-            val o = JSONObject()
-            o.put("name", e.name)
-            o.put("size", e.size)
-            o.put("modified", e.modified)
-            o.put("isVideo", e.isVideo)
-            o.put("token", e.token)
-            if (e.isVideo && !e.isPartial) {
-                var d = cache.optLong(e.token, 0L)
-                if (d <= 0 && e.durationMs > 0) d = e.durationMs
-                if (d <= 0 && extracted < 20) {
-                    d = videoDurationMs(e.token)
-                    if (d > 0) cache.put(e.token, d)
-                    extracted++
+        var matched = 0
+        for (e in scannedGallery()) {
+            if (q.isNotEmpty() && !e.name.lowercase().contains(q)) continue
+            if ((type == "video" && !e.isVideo) || (type == "image" && e.isVideo)) continue
+            if (matched >= start && matched < pageEnd) {
+                val o = JSONObject()
+                o.put("name", e.name)
+                o.put("size", e.size)
+                o.put("modified", e.modified)
+                o.put("isVideo", e.isVideo)
+                o.put("token", e.token)
+                if (e.isVideo && !e.isPartial) {
+                    var d = cache.optLong(e.token, 0L)
+                    if (d <= 0 && e.durationMs > 0) d = e.durationMs
+                    if (d <= 0 && extracted < 20) {
+                        d = videoDurationMs(e.token)
+                        if (d > 0) cache.put(e.token, d)
+                        extracted++
+                    }
+                    o.put("durationMs", d)
                 }
-                o.put("durationMs", d)
+                arr.put(o)
             }
-            arr.put(o)
+            matched++
         }
         if (extracted > 0) saveVideoDurations(cache)
         return jsonResponse(
             JSONObject()
                 .put("items", arr)
-                .put("hasMore", hasMore)
-                .put("total", all.size)
+                .put("hasMore", matched > pageEnd)
+                .put("total", matched)
         )
     }
 
@@ -1891,15 +1902,20 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
                     }
                 }
             }
+            var lastItemsSig = Int.MIN_VALUE
             launch {
                 runCatching {
-                    App.engine.items.collect {
-                        // Throttle 1 dtk: cukup realtime tapi tidak membebani
-                        // perangkat lama (sebelumnya tiap 250ms + StatFs tiap push).
-                        if (sseClients.isNotEmpty() &&
-                            System.currentTimeMillis() - sseLastPushAt >= SSE_MIN_INTERVAL_MS
-                        ) {
-                            pushFrame(buildPayload(false))
+                    App.engine.items.collect { items ->
+                        // Hindari build JSON tiap tick: push hanya saat isi item
+                        // berubah (signature), tetap dengan throttle 1 dtk.
+                        val sig = itemsSignature(items)
+                        if (sig != lastItemsSig) {
+                            lastItemsSig = sig
+                            if (sseClients.isNotEmpty() &&
+                                System.currentTimeMillis() - sseLastPushAt >= SSE_MIN_INTERVAL_MS
+                            ) {
+                                pushFrame(buildPayload(false))
+                            }
                         }
                     }
                 }
@@ -2010,7 +2026,12 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
     fun appendLog(message: String) {
         synchronized(logLock) {
             val stamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
-            logBuffer.addLast("$stamp $message")
+            val line = if (message.length <= MAX_LOG_LINE_LENGTH) {
+                "$stamp $message"
+            } else {
+                "$stamp ${message.take(MAX_LOG_LINE_LENGTH)}…"
+            }
+            logBuffer.addLast(line)
             while (logBuffer.size > MAX_REALTIME_LOG_LINES) logBuffer.removeFirst()
         }
     }
@@ -2044,7 +2065,8 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
 
     companion object {
         private const val SERVER_SOCKET_TIMEOUT_MS = 60_000
-        private const val MAX_REALTIME_LOG_LINES = 600
+        private const val MAX_REALTIME_LOG_LINES = 300
+        private const val MAX_LOG_LINE_LENGTH = 400
         private const val FS_PREFIX = "f:"
         private const val MS_PREFIX = "m:"
         private const val MAX_BODY_SIZE = 4L * 1024 * 1024

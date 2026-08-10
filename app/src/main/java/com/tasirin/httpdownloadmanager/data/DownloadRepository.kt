@@ -8,6 +8,10 @@ import org.json.JSONObject
 class DownloadRepository(context: Context) {
 
     private val prefs = context.getSharedPreferences("downloads", Context.MODE_PRIVATE)
+    // Cache hasil enkripsi kredensial per pasangan plaintext: menghindari AES
+    // + IV acak diulang tiap kali save penuh (hot path download aktif).
+    // synchronizedMap: save bisa dipanggil dari thread UI (flush) dan IO (job).
+    private val credCache = Collections.synchronizedMap(HashMap<String, Pair<String, String>>())
 
     fun load(): List<DownloadItem> {
         val raw = prefs.getString(KEY_ITEMS, null) ?: return emptyList()
@@ -17,7 +21,46 @@ class DownloadRepository(context: Context) {
             // Satu entry korup tidak boleh menghapus seluruh daftar.
             parseItem(arr.optJSONObject(i))?.let { items.add(it) }
         }
-        return items
+        return overlayProgress(items)
+    }
+
+    /** Terapkan progres ringan (id -> bytes/total) di atas snapshot terakhir.
+     *  Snapshot penuh hanya disimpan saat state berubah; progres yang sedang
+     *  berjalan disimpan terpisah supaya resume tetap akurat tanpa JSON besar. */
+    private fun overlayProgress(items: List<DownloadItem>): List<DownloadItem> {
+        val prog = runCatching {
+            val raw = prefs.getString(KEY_PROGRESS, null) ?: return items
+            JSONObject(raw)
+        }.getOrNull() ?: return items
+        return items.map { item ->
+            val p = prog.optJSONObject(item.id) ?: return@map item
+            val b = p.optLong("b", item.bytesDownloaded)
+            val t = p.optLong("t", item.totalBytes)
+            if (b > item.bytesDownloaded || t > item.totalBytes) {
+                item.copy(bytesDownloaded = b, totalBytes = t)
+            } else {
+                item
+            }
+        }
+    }
+
+    /** Simpan progres kompak (id -> bytes/total) tanpa enkripsi & tanpa detail
+     *  segmen; dipanggil berkala selama download aktif. */
+    fun saveProgress(items: List<DownloadItem>) {
+        val o = JSONObject()
+        items.forEach { item ->
+            if (item.state == DownloadState.DOWNLOADING || item.state == DownloadState.PENDING ||
+                (item.bytesDownloaded > 0 && item.state == DownloadState.PAUSED)
+            ) {
+                o.put(
+                    item.id,
+                    JSONObject()
+                        .put("b", item.bytesDownloaded)
+                        .put("t", item.totalBytes)
+                )
+            }
+        }
+        prefs.edit().putString(KEY_PROGRESS, o.toString()).apply()
     }
 
     private fun parseItem(o: JSONObject?): DownloadItem? {
@@ -76,8 +119,9 @@ class DownloadRepository(context: Context) {
             o.put("addedAt", item.addedAt)
             o.put("nameIsCustom", item.nameIsCustom)
             o.put("autoResume", item.autoResume)
-            o.put("username", Crypto.encrypt(item.username))
-            o.put("password", Crypto.encrypt(item.password))
+            val (encUser, encPass) = encryptedCreds(item)
+            o.put("username", encUser)
+            o.put("password", encPass)
             o.put("headers", item.headers)
             o.put("destination", item.destination)
             o.put("folderPath", item.folderPath)
@@ -102,7 +146,20 @@ class DownloadRepository(context: Context) {
             o.put("segments", segArr)
             arr.put(o)
         }
-        prefs.edit().putString(KEY_ITEMS, arr.toString()).apply()
+        // Snapshot penuh sudah memuat progres terbaru -> hapus progres ringan
+        // supaya tidak menimpa data yang lebih lama saat load berikutnya.
+        prefs.edit().putString(KEY_ITEMS, arr.toString()).remove(KEY_PROGRESS).apply()
+    }
+
+    private fun encryptedCreds(item: DownloadItem): Pair<String, String> {
+        val plain = item.username + "\u0000" + item.password
+        credCache[plain]?.let { return it }
+        val pair = Crypto.encrypt(item.username) to Crypto.encrypt(item.password)
+        // Cache dibatasi: sesi panjang dengan banyak kredensial unik tidak
+        // boleh menumpuk (entries lama yang tidak terpakai dibuang).
+        if (credCache.size > MAX_CRED_CACHE) credCache.clear()
+        credCache[plain] = pair
+        return pair
     }
 
     private fun parseStringList(arr: JSONArray?): List<String> {
@@ -138,5 +195,7 @@ class DownloadRepository(context: Context) {
 
     companion object {
         private const val KEY_ITEMS = "items"
+        private const val KEY_PROGRESS = "progress"
+        private const val MAX_CRED_CACHE = 128
     }
 }

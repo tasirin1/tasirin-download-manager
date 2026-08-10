@@ -199,6 +199,7 @@ class GalleryActivity : AppCompatActivity() {
     companion object {
         private const val SPAN_COUNT = 3
         private const val THUMB_SIZE = 256
+        private const val MAX_THUMB_CACHE_KB = 24 * 1024
 
         @Volatile
         private var thumbCache: LruCache<String, Bitmap>? = null
@@ -214,7 +215,9 @@ class GalleryActivity : AppCompatActivity() {
                             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                             am.memoryClass
                         }.getOrDefault(128)
-                        val maxKb = (memoryClass / 8) * 1024
+                        // Cap absolut: memoryClass/8 bagus, tapi jangan lebih dari
+                        // 24 MB agar device RAM kecil (Android 5+) tetap lega.
+                        val maxKb = minOf((memoryClass / 8) * 1024, MAX_THUMB_CACHE_KB)
                         cache = object : LruCache<String, Bitmap>(maxKb) {
                             override fun sizeOf(key: String, value: Bitmap): Int =
                                 runCatching { value.byteCount / 1024 }.getOrDefault(256)
