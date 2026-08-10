@@ -11,13 +11,13 @@
         <item>&#9749;</item>
     </string-array>
     <string-array name="about_rows">
-        <item>Pembuat: Julius Rudi Tasirin</item>
-        <item>Dibuat pakai: Samsung A05 (RAM 4 GB, ROM 64 GB)</item>
-        <item>Dikoding oleh: AnyClaw AI — berbekal prompt AI yang baik</item>
-        <item>Didukung: pemahaman mendalam tentang IT</item>
-        <item>Bahasa: Indonesia lengkap (aplikasi &amp; remote web)</item>
-        <item>Untuk: Android — HP, STB &amp; TV box</item>
-        <item>VPN: Indonesia</item>
-        <item>Bekal: segelas kopi + waktu luang</item>
+        <item>Maker: Julius Rudi Tasirin</item>
+        <item>Built with: Samsung A05 (4 GB RAM, 64 GB ROM)</item>
+        <item>Coded by: AnyClaw AI — powered by good AI prompting</item>
+        <item>Supported by: deep IT understanding</item>
+        <item>Language: English (app &amp; remote web)</item>
+        <item>For: Android — phones, STB &amp; TV boxes</item>
+        <item>Package: full-featured, only ~1.7 MB</item>
+        <item>Fuel: a cup of coffee + spare time</item>
     </string-array>
 </resources>
