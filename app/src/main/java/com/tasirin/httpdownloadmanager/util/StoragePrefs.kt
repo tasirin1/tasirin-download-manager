@@ -56,10 +56,6 @@ object StoragePrefs {
         return raw?.takeIf { it.isNotEmpty() }?.let { Uri.parse(it) }
     }
 
-    fun getFolderName(context: Context): String? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_FOLDER_NAME, null)
-
     fun saveFolder(context: Context, uri: Uri?, name: String?) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_FOLDER_URI, uri?.toString())
