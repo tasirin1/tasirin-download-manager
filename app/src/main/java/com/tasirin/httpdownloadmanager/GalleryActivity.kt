@@ -381,12 +381,10 @@ private class GalleryAdapter(
 
     private fun formatDate(ms: Long): String {
         if (ms <= 0) return ""
-        return DATE_FORMAT.format(java.util.Date(ms))
-    }
-
-    // Adapter berjalan di main thread; formatter tunggal aman & hemat alokasi.
-    private companion object {
-        val DATE_FORMAT = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
+        // Dibuat per-panggilan agar mengikuti locale saat berubah (tidak disimpan statis).
+        return java.text.SimpleDateFormat(
+            "dd MMM yyyy", java.util.Locale.getDefault()
+        ).format(java.util.Date(ms))
     }
 
     class Holder(val binding: ItemGalleryBinding) : RecyclerView.ViewHolder(binding.root) {
