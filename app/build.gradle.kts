@@ -6,20 +6,21 @@ plugins {
 
 android {
     namespace = "com.tasirin.httpdownloadmanager"
-    // compileSdk 36 (Android 16): unblocks lifecycle 2.11 / activity 1.13. targetSdk tetap 34
-    // (perubahan perilaku runtime baru aktif saat targetSdk naik — lihat AGENTS.md).
+    // compileSdk 36 / targetSdk 36 (Android 16): unblocks lifecycle 2.11 / activity 1.13.
+    // Perilaku runtime baru aktif saat targetSdk naik — lihat AGENTS.md.
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.tasirin.httpdownloadmanager"
         minSdk = 21
-        // targetSdk 35: Android 5 (minSdk 21) tetap didukung penuh.
+        // targetSdk 36: Android 5 (minSdk 21) tetap didukung penuh.
         // Android 5–10: WRITE_EXTERNAL_STORAGE + legacy storage bekerja penuh.
         // Android 11+: MANAGE_EXTERNAL_STORAGE ("Akses semua file").
-        // targetSdk 35: boot-start download lewat JobScheduler (BootResumeJobService)
+        // targetSdk 35+: boot-start download lewat JobScheduler (BootResumeJobService)
         // karena dataSync FGS dilarang start dari BOOT_COMPLETED; edge-to-edge
-        // ditangani applyEdgeToEdge di 4 aktivitas.
-        targetSdk = 35
+        // ditangani applyEdgeToEdge di 4 aktivitas; predictive back default aktif
+        // (tidak ada onBackPressed custom, pakai OnBackPressedDispatcher AndroidX).
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
@@ -75,8 +76,8 @@ android {
         textReport = true
         textOutput = File("stdout")
         // Sengaja dinonaktifkan:
-        // - OldTargetApi: targetSdk 35 sengaja (naik 36 menyusul setelah uji manual
-        //   Android 15/16 sesuai peta jalan AGENTS.md), bukan bug.
+        // - OldTargetApi: targetSdk 36 sengaja (naik 37 menyusul setelah uji manual
+        //   Android 16 sesuai peta jalan AGENTS.md), bukan bug.
         // - GradleDependency: update dependensi dikelola Dependabot (PR lewat CI).
         disable += setOf("OldTargetApi", "GradleDependency")
     }

@@ -129,7 +129,7 @@ Fitur halaman remote:
 
 ## Penyimpanan
 
-Default file disimpan ke **Folder Downloads**. `minSdk 21` dipertahankan (Android 5+ tetap didukung), `targetSdk 35`. Android 5–10 memakai `WRITE_EXTERNAL_STORAGE` + legacy storage (akses penuh); Android 11+ memakai `MANAGE_EXTERNAL_STORAGE` ("Akses semua file").
+Default file disimpan ke **Folder Downloads**. `minSdk 21` dipertahankan (Android 5+ tetap didukung), `targetSdk 36`. Android 5–10 memakai `WRITE_EXTERNAL_STORAGE` + legacy storage (akses penuh); Android 11+ memakai `MANAGE_EXTERNAL_STORAGE` ("Akses semua file").
 
 - **Input path teks**: ketik path mentah seperti `/storage/emulated/0/Download` — folder otomatis dibuat kalau belum ada
 - **Folder tambahan (mount)**: ketuk **+** untuk menambah path lain (mis. `/sdcard/Movies`) agar ikut tampil di file manager — cocok untuk folder buatan Total Commander, folder SD card, dll.
@@ -215,7 +215,7 @@ resmi. Seluruh perubahan dikirim sebagai commit + push, lalu CI yang membangun.
 
 Panduan pengelolaan repo yang dulu ada di sini (struktur, arsitektur, aturan
 pengembangan, cara memicu build & release, pipeline CI, secrets, file yang
-disentuh per fitur, verifikasi build, dan peta jalan targetSdk 35) sudah
+disentuh per fitur, verifikasi build, dan peta jalan targetSdk 36) sudah
 dipindahkan ke **[AGENTS.md](AGENTS.md)**.
 
 > **Wajib untuk AI**: baca `AGENTS.md` sebelum mengubah, memperbaiki, atau

@@ -8,7 +8,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di `README.md
 ```
 .
 ├── .github/workflows/build.yml       # CI: bump versionCode → build APK → release
-├── app/build.gradle.kts              # minSdk 21 / targetSdk 34, compileSdk 36, desugaring, R8
+├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
 │   ├── assets/
@@ -84,7 +84,7 @@ diperbarui.
    `"1.0"`; `versionCode` di-bump otomatis oleh CI (`100000 + run_number`).
 5. **Jaga kompatibilitas Android 5 (minSdk 21)**: API baru harus punya fallback
    (contoh: `RELATIVE_PATH`, `NetworkCallback`); jangan naikkan minSdk.
-6. **`targetSdk 34`**: storage di Android 11+ wajib `MANAGE_EXTERNAL_STORAGE`
+6. **`targetSdk 36`**: storage di Android 11+ wajib `MANAGE_EXTERNAL_STORAGE`
    ("Akses semua file") — jangan turunkan tanpa strategi storage pengganti.
 7. **Remote web = UI utama**: setiap perubahan halaman remote (dan endpoint API)
    harus tetap mobile-first dan ramah D-pad TV; jangan menambah dependensi berat
@@ -165,12 +165,12 @@ Pastikan conclusion `success` dan release punya asset APK dengan nama
 `tasirin-download-manager-v1.0-<code>.apk`. Verifikasi manual: pasang APK di HP,
 buka remote web dari browser, tes tambah URL, dan buka Galeri.
 
-## Peta jalan: targetSdk 35/36 (Android 15/16)
+## Peta jalan: targetSdk 36/37 (Android 16/17)
 
-**Implementasi selesai, uji manual menunggu.** `targetSdk 35` + `compileSdk 36`
-aktif. Perilaku Android 15/16 (FGS boot, edge-to-edge) sudah ditangani di kode;
-yang tersisa adalah **Fase 3 — uji manual di perangkat fisik** sebelum memutuskan
-naik ke `targetSdk 36`.
+**Implementasi selesai, uji manual menunggu.** `targetSdk 36` + `compileSdk 36`
+aktif. Perilaku Android 15/16 (FGS boot, edge-to-edge, predictive back) sudah
+ditangani di kode; yang tersisa adalah **Fase 3 — uji manual di perangkat fisik**
+sebelum memutuskan naik ke `targetSdk 37`.
 
 - **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
   di-update bertahap via CI, toolchain Gradle 9.6.1 + AGP 9.0.1 (built-in
@@ -184,8 +184,14 @@ naik ke `targetSdk 36`.
   - **Edge-to-edge dipaksakan**: `applyEdgeToEdge()` (insets system bars)
     dipasang di `MainActivity`/`SettingsActivity`/`LogActivity`/`GalleryActivity`.
   - **Izin notifikasi & storage**: alur runtime request + special access tetap.
+- **Fase 2c — selesai**: `targetSdk 36`.
+  - **Predictive back default**: aktif otomatis untuk targetSdk 36; app tidak
+    memakai `onBackPressed()` custom (hanya `OnBackPressedDispatcher` AndroidX),
+    jadi animasi back bawaan tetap berfungsi.
+  - **16 KB page size**: app murni Java/Kotlin tanpa native library — tidak
+    terdampak.
 - **Fase 3 — BELUM**: uji manual di perangkat Android 15/16 (auto-start boot,
   download background, server remote, galeri); kalau sudah, boleh naik
-  `targetSdk 36` (compileSdk sudah 36, lint `OldTargetApi` tetap di-suppress).
+  `targetSdk 37` (lint `OldTargetApi` tetap di-suppress).
 - **Pantangan**: jangan naikkan `minSdk` (tetap 21), dan jangan gabung perubahan
   targetSdk dengan PR fitur lain.
