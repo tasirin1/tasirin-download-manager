@@ -406,9 +406,12 @@ private class GalleryAdapter(
         b.textName.text = e.name
         b.textExt.text = e.name.substringAfterLast('.', "").uppercase()
         val ctx = holder.itemView.context
+        b.playOverlay.visibility = if (e.isVideo) View.VISIBLE else View.GONE
         b.textInfo.text = if (e.isPartial) {
             val pct = if (e.progressPercent in 0..100) " · ${e.progressPercent}%" else ""
             ctx.getString(R.string.gallery_partial_badge) + pct + " · " + Formats.bytes(e.size)
+        } else if (e.isVideo && e.durationMs > 0) {
+            Formats.duration(e.durationMs) + " · " + Formats.bytes(e.size)
         } else {
             Formats.bytes(e.size) + " · " + formatDate(e.modified)
         }

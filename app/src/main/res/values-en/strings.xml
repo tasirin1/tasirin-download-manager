@@ -262,6 +262,7 @@
     <string name="action_monitor_off">Stop watching</string>
     <string name="status_monitor">watching</string>
     <string name="gallery_partial_badge">not finished · streaming</string>
+    <string name="gallery_play_desc">Play video</string>
 
     <string name="settings_pin_enforced">Require PIN when server runs</string>
     <string name="settings_fs_full_access">Full access to main storage (file manager)</string>

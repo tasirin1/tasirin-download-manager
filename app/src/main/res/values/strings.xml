@@ -264,6 +264,7 @@
     <string name="action_monitor_off">Berhenti memantau</string>
     <string name="status_monitor">memantau</string>
     <string name="gallery_partial_badge">belum selesai · streaming</string>
+    <string name="gallery_play_desc">Putar video</string>
 
     <string name="settings_pin_enforced">Paksa PIN saat server menyala</string>
     <string name="settings_fs_full_access">Akses penuh penyimpanan utama (file manager)</string>
