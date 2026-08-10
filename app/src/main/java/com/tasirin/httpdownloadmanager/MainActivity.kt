@@ -42,6 +42,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.data.DownloadState
+import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.databinding.ActivityMainBinding
 import com.tasirin.httpdownloadmanager.ui.DownloadAdapter
 import com.tasirin.httpdownloadmanager.util.MimeTypes
@@ -101,6 +102,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
         binding.fabAdd.setOnClickListener { showAddDialog() }
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
+        binding.emptyRemoteButton.setOnClickListener { openRemote() }
+        binding.btnOpenRemote.setOnClickListener { openRemote() }
+        binding.serverCard.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
 
         binding.btnPauseAll.setOnClickListener {
             App.engine.pauseAll()
@@ -123,14 +129,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     binding.emptyView.visibility =
                         if (filtered.isEmpty()) View.VISIBLE else View.GONE
                     updateBulkButtons()
+                    updateStats(items)
                 }
             }
         }
 
         setupFilterViews()
-        findViewById<TextView>(R.id.server_status)?.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        }
 
         requestPermissionsIfNeeded()
         runCatching {
@@ -196,12 +200,45 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     private fun updateServerStatus() {
         val tv = findViewById<TextView>(R.id.server_status) ?: return
+        val detail = findViewById<TextView>(R.id.server_detail) ?: return
+        val btn = findViewById<View>(R.id.btn_open_remote) ?: return
         val alive = App.httpServer.isAlive
         tv.text = getString(
             if (alive) R.string.server_status_running else R.string.server_status_stopped
         )
-        tv.setTextColor(ContextCompat.getColor(this, R.color.white))
-        tv.setBackgroundResource(if (alive) R.drawable.bg_status_on else R.drawable.bg_status_off)
+        tv.setTextColor(ContextCompat.getColor(this, if (alive) R.color.status_on else R.color.status_off))
+        if (alive) {
+            detail.text = remoteUrl() ?: getString(R.string.remote_no_url)
+            btn.isEnabled = true
+        } else {
+            detail.text = getString(R.string.server_status_detail_off)
+            btn.isEnabled = false
+        }
+    }
+
+    /** Buka halaman remote web di browser. */
+    private fun openRemote() {
+        if (!App.httpServer.isAlive) {
+            Snackbar.make(binding.root, R.string.server_not_running_hint, Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        val url = remoteUrl()
+        if (url == null) {
+            Snackbar.make(binding.root, R.string.remote_no_url, Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            Snackbar.make(binding.root, R.string.open_remote_failed, Snackbar.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Alamat remote pertama (http://ip:port/), null bila tidak ada IP. */
+    private fun remoteUrl(): String? {
+        if (!App.httpServer.isAlive) return null
+        return HttpControlServer.ipv4Addresses().firstOrNull()
+            ?.let { "http://$it:${App.httpServer.listeningPort}/" }
     }
 
     /** Stop DownloadService bila tidak ada download aktif (server juga mati). */
@@ -586,6 +623,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
+    override fun onTap(item: DownloadItem) {
+        when (item.state) {
+            DownloadState.DOWNLOADING, DownloadState.PENDING -> App.engine.pause(item.id)
+            DownloadState.PAUSED, DownloadState.FAILED -> App.engine.resume(item.id)
+            DownloadState.COMPLETED -> openDownload(item)
+            else -> Unit
+        }
+    }
+
     override fun onLongPress(item: DownloadItem) {
         val options = mutableListOf<Pair<String, () -> Unit>>()
         if (item.state == DownloadState.DOWNLOADING || item.state == DownloadState.PENDING) {
@@ -830,7 +876,26 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             binding.emptyView.visibility =
                 if (filtered.isEmpty()) View.VISIBLE else View.GONE
             updateBulkButtons()
+            updateStats(App.engine.items.value)
         }
+    }
+
+    private fun updateStats(items: List<DownloadItem>) {
+        val active = items.count {
+            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
+        }
+        val done = items.count { it.state == DownloadState.COMPLETED }
+        val failed = items.count { it.state == DownloadState.FAILED }
+        val speed = items.filter { it.state == DownloadState.DOWNLOADING }
+            .fold(0L) { acc, it -> acc + it.speedBps }
+        findViewById<TextView>(R.id.stat_total_value)?.text = items.size.toString()
+        findViewById<TextView>(R.id.stat_active_value)?.text = active.toString()
+        findViewById<TextView>(R.id.stat_done_value)?.text = done.toString()
+        findViewById<TextView>(R.id.stat_failed_value)?.text = failed.toString()
+        findViewById<TextView>(R.id.stat_active_label)?.text = getString(
+            if (speed > 0) R.string.stat_active_speed else R.string.stat_active,
+            Formats.speed(speed)
+        )
     }
 
     private fun applyFilter(items: List<DownloadItem>): List<DownloadItem> {

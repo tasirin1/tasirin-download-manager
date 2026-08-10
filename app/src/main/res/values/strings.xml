@@ -87,6 +87,15 @@
     <string name="notification_server_active">Server remote aktif (HTTP) — bisa diakses dari perangkat lain</string>
     <string name="server_status_running">Server: aktif</string>
     <string name="server_status_stopped">Server: mati</string>
+    <string name="open_remote">Buka Remote Web</string>
+    <string name="server_status_detail_off">Nyalakan lewat Pengaturan</string>
+    <string name="server_not_running_hint">Server belum aktif. Nyalakan dari Pengaturan.</string>
+    <string name="open_remote_failed">Gagal membuka remote web</string>
+    <string name="stat_total">Total</string>
+    <string name="stat_active">Aktif</string>
+    <string name="stat_done">Selesai</string>
+    <string name="stat_failed">Gagal</string>
+    <string name="stat_active_speed">Aktif · %1$s</string>
     <string name="action_about">Tentang</string>
     <string name="log_exported">Log server diekspor ke folder Download (httpdm-serverlog-*.txt)</string>
     <string name="log_export_failed">Gagal mengekspor log</string>

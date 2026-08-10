@@ -23,6 +23,7 @@ class DownloadAdapter(private val listener: Listener) :
 
     interface Listener {
         fun onAction(item: DownloadItem, action: Action)
+        fun onTap(item: DownloadItem)
         fun onLongPress(item: DownloadItem)
     }
 
@@ -110,6 +111,7 @@ class DownloadAdapter(private val listener: Listener) :
             b.textLocation.visibility = View.GONE
         }
 
+        b.root.setOnClickListener { listener.onTap(item) }
         b.root.setOnLongClickListener {
             listener.onLongPress(item)
             true

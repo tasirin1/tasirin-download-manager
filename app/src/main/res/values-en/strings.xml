@@ -85,6 +85,15 @@
     <string name="notification_server_active">Remote server active (HTTP) — reachable from other devices</string>
     <string name="server_status_running">Server: active</string>
     <string name="server_status_stopped">Server: off</string>
+    <string name="open_remote">Open Remote Web</string>
+    <string name="server_status_detail_off">Turn on via Settings</string>
+    <string name="server_not_running_hint">Server is off. Turn it on in Settings.</string>
+    <string name="open_remote_failed">Failed to open remote web</string>
+    <string name="stat_total">Total</string>
+    <string name="stat_active">Active</string>
+    <string name="stat_done">Done</string>
+    <string name="stat_failed">Failed</string>
+    <string name="stat_active_speed">Active · %1$s</string>
     <string name="action_about">About</string>
     <string name="log_exported">Server log exported to Download folder (httpdm-serverlog-*.txt)</string>
     <string name="log_export_failed">Failed to export log</string>
