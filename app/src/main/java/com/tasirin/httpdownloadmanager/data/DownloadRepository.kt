@@ -2,6 +2,7 @@ package com.tasirin.httpdownloadmanager.data
 
 import android.content.Context
 import com.tasirin.httpdownloadmanager.util.Crypto
+import java.util.Collections
 import org.json.JSONArray
 import org.json.JSONObject
 
