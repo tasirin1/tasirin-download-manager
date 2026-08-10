@@ -47,6 +47,7 @@ import com.tasirin.httpdownloadmanager.ui.DownloadAdapter
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
+import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -90,6 +91,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         try {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyEdgeToEdge(binding.root)
 
         setSupportActionBar(binding.toolbar)
 

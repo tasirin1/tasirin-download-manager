@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.snackbar.Snackbar
 import com.tasirin.httpdownloadmanager.databinding.ActivityLogBinding
+import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -38,6 +39,7 @@ class LogActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityLogBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
