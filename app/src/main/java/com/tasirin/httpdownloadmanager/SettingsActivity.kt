@@ -34,9 +34,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
@@ -46,6 +43,7 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.UpdateInfo
 import com.tasirin.httpdownloadmanager.util.Updater
+import com.tasirin.httpdownloadmanager.util.QrEncoder
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.sha256Hex
@@ -798,14 +796,19 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun generateQrCode(content: String, size: Int): Bitmap? {
         return runCatching {
-            val hints = mapOf(EncodeHintType.MARGIN to 1)
-            val matrix = QRCodeWriter().encode(
-                content, BarcodeFormat.QR_CODE, size, size, hints
-            )
+            val matrix = QrEncoder.encode(content) ?: return null
+            val quiet = 1 // quiet zone 1 modul biar mudah discan
+            val dim = matrix.size + quiet * 2
+            val scale = (size / dim).coerceAtLeast(1)
+            val offset = (size - matrix.size * scale) / 2
             val pixels = IntArray(size * size)
             for (y in 0 until size) {
                 for (x in 0 until size) {
-                    pixels[y * size + x] = if (matrix[x, y]) Color.BLACK else Color.WHITE
+                    val mx = (x - offset) / scale
+                    val my = (y - offset) / scale
+                    val dark = mx in 0 until matrix.size && my in 0 until matrix.size &&
+                        matrix.get(mx, my)
+                    pixels[y * size + x] = if (dark) Color.BLACK else Color.WHITE
                 }
             }
             Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
