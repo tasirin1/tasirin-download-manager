@@ -580,16 +580,20 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun wireGallerySection() {
-        binding.inputGalleryImage.setText(StoragePrefs.getGalleryImageFolder(this).orEmpty())
-        binding.inputGalleryVideo.setText(StoragePrefs.getGalleryVideoFolder(this).orEmpty())
+        // View binding tidak mengekspos view dari <include>, jadi pakai
+        // findViewById (pola yang sama seperti wireStorageSection).
+        findViewById<EditText>(R.id.input_gallery_image)
+            .setText(StoragePrefs.getGalleryImageFolder(this).orEmpty())
+        findViewById<EditText>(R.id.input_gallery_video)
+            .setText(StoragePrefs.getGalleryVideoFolder(this).orEmpty())
     }
 
     private fun applyGalleryFolders() {
         StoragePrefs.setGalleryImageFolder(
-            this, binding.inputGalleryImage.text?.toString()?.trim().orEmpty()
+            this, findViewById<EditText>(R.id.input_gallery_image).text?.toString()?.trim().orEmpty()
         )
         StoragePrefs.setGalleryVideoFolder(
-            this, binding.inputGalleryVideo.text?.toString()?.trim().orEmpty()
+            this, findViewById<EditText>(R.id.input_gallery_video).text?.toString()?.trim().orEmpty()
         )
         App.logEvent("FOLDER GALERI: foto=${StoragePrefs.getGalleryImageFolder(this) ?: "semua"} video=${StoragePrefs.getGalleryVideoFolder(this) ?: "semua"}")
     }
