@@ -189,7 +189,6 @@
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/stats_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="12dp"
@@ -216,7 +215,6 @@
                 tools:text="5" />
 
             <TextView
-                android:id="@+id/stat_total_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/stat_total"
@@ -272,7 +270,6 @@
                 tools:text="3" />
 
             <TextView
-                android:id="@+id/stat_done_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/stat_done"
@@ -300,7 +297,6 @@
                 tools:text="1" />
 
             <TextView
-                android:id="@+id/stat_failed_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/stat_failed"

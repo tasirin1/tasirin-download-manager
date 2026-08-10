@@ -13,10 +13,12 @@ class ServerLog(
 ) {
     private val lock = Any()
     private val buffer = ArrayDeque<String>()
+    // Formatter dipakai hanya di dalam synchronized(lock) -> aman dipakai bersama.
+    private val stampFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
 
     fun append(message: String) {
         synchronized(lock) {
-            val stamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
+            val stamp = stampFormat.format(Date())
             val line = if (message.length <= maxLineLength) {
                 "$stamp $message"
             } else {

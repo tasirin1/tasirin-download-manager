@@ -8,7 +8,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import android.media.ThumbnailUtils
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -21,6 +20,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.lifecycle.lifecycleScope
@@ -29,6 +29,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivityGalleryBinding
 import com.tasirin.httpdownloadmanager.databinding.ItemGalleryBinding
+import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
@@ -151,7 +152,7 @@ class GalleryActivity : AppCompatActivity() {
         val intent = when {
             e.isPartial -> partialPlayIntent(e, mime)
             !e.contentUri.isNullOrEmpty() ->
-                Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(e.contentUri), mime)
+                Intent(Intent.ACTION_VIEW).setDataAndType(e.contentUri.toUri(), mime)
             !e.filePath.isNullOrEmpty() -> {
                 val uri = FileProvider.getUriForFile(
                     this, "$packageName.fileprovider", File(e.filePath)
@@ -175,7 +176,7 @@ class GalleryActivity : AppCompatActivity() {
         val item = App.engine.items.value.find { it.fileName == e.name }
         if (item != null && App.httpServer.isAlive) {
             val url = "http://127.0.0.1:${App.httpServer.listeningPort}/stream_part/${item.id}"
-            return Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(url), mime)
+            return Intent(Intent.ACTION_VIEW).setDataAndType(url.toUri(), mime)
         }
         if (!e.filePath.isNullOrEmpty()) {
             val uri = FileProvider.getUriForFile(
@@ -233,14 +234,15 @@ class GalleryActivity : AppCompatActivity() {
             withContext(Dispatchers.IO) {
                 val cache = cacheFor(context)
                 cache.get(e.token)?.let { return@withContext it }
-                diskThumb(context, e.token)?.let {
+                val key = thumbKey(e.token)
+                diskThumb(context, key)?.let {
                     cache.put(e.token, it)
                     return@withContext it
                 }
                 val bmp = generateThumb(context, e, req)
                 if (bmp != null) {
                     cache.put(e.token, bmp)
-                    saveDiskThumb(context, e.token, bmp)
+                    saveDiskThumb(context, key, bmp)
                 }
                 bmp
             }
@@ -251,7 +253,7 @@ class GalleryActivity : AppCompatActivity() {
             e: MediaLibrary.MediaEntry,
             req: Int
         ): Bitmap? {
-            val uri = e.contentUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
+            val uri = e.contentUri?.let { runCatching { it.toUri() }.getOrNull() }
             val id = uri?.lastPathSegment?.toLongOrNull()
             if (uri != null && id != null) {
                 val native = if (Build.VERSION.SDK_INT >= 29) {
@@ -306,19 +308,17 @@ class GalleryActivity : AppCompatActivity() {
             File(context.cacheDir, "thumbs").apply { runCatching { mkdirs() } }
 
         private fun thumbKey(token: String): String = runCatching {
-            MessageDigest.getInstance("SHA-256")
-                .digest(token.toByteArray())
-                .joinToString("") { "%02x".format(it) }
+            Hex.encode(MessageDigest.getInstance("SHA-256").digest(token.toByteArray()))
         }.getOrDefault(token.hashCode().toString()) + ".jpg"
 
-        private fun diskThumb(context: Context, token: String): Bitmap? = runCatching {
-            val f = File(thumbDir(context), thumbKey(token))
+        private fun diskThumb(context: Context, key: String): Bitmap? = runCatching {
+            val f = File(thumbDir(context), key)
             if (f.isFile && f.length() > 0) BitmapFactory.decodeFile(f.absolutePath) else null
         }.getOrNull()
 
-        private fun saveDiskThumb(context: Context, token: String, bmp: Bitmap) {
+        private fun saveDiskThumb(context: Context, key: String, bmp: Bitmap) {
             runCatching {
-                val f = File(thumbDir(context), thumbKey(token))
+                val f = File(thumbDir(context), key)
                 FileOutputStream(f).use { out ->
                     bmp.compress(Bitmap.CompressFormat.JPEG, 78, out)
                 }
@@ -339,13 +339,13 @@ class GalleryActivity : AppCompatActivity() {
             runCatching {
                 val resolver = context.contentResolver
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                resolver.openInputStream(Uri.parse(uri))?.use {
+                resolver.openInputStream(uri.toUri())?.use {
                     BitmapFactory.decodeStream(it, null, bounds)
                 }
                 val opts = BitmapFactory.Options().apply {
                     inSampleSize = computeSample(bounds, req)
                 }
-                resolver.openInputStream(Uri.parse(uri))?.use {
+                resolver.openInputStream(uri.toUri())?.use {
                     BitmapFactory.decodeStream(it, null, opts)
                 }
             }.getOrNull()
@@ -381,10 +381,12 @@ private class GalleryAdapter(
 
     private fun formatDate(ms: Long): String {
         if (ms <= 0) return ""
-        // Dibuat per-panggilan agar mengikuti locale saat berubah (tidak disimpan statis).
-        return java.text.SimpleDateFormat(
-            "dd MMM yyyy", java.util.Locale.getDefault()
-        ).format(java.util.Date(ms))
+        return DATE_FORMAT.format(java.util.Date(ms))
+    }
+
+    // Adapter berjalan di main thread; formatter tunggal aman & hemat alokasi.
+    private companion object {
+        val DATE_FORMAT = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
     }
 
     class Holder(val binding: ItemGalleryBinding) : RecyclerView.ViewHolder(binding.root) {
