@@ -103,6 +103,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Jembatan boot -> DownloadService (JobScheduler) untuk targetSdk 35. -->
+        <service
+            android:name=".receiver.BootResumeJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

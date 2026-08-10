@@ -3,8 +3,6 @@ package com.tasirin.httpdownloadmanager.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 
 class BootReceiver : BroadcastReceiver() {
@@ -16,16 +14,8 @@ class BootReceiver : BroadcastReceiver() {
         val serverAutostart = StoragePrefs.isServerAutoStartEnabled(context) &&
             StoragePrefs.isServerStartAllowed(context)
         if (!downloadAutostart && !serverAutostart) return
-        com.tasirin.httpdownloadmanager.App.logEvent(
-            "BOOT/UPDATE: autostart download=$downloadAutostart, server=$serverAutostart"
-        )
-        runCatching {
-            val serviceIntent = Intent(context, DownloadService::class.java)
-            if (Build.VERSION.SDK_INT >= 26) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
-        }
+        // targetSdk 35: dataSync FGS tidak boleh start langsung dari boot;
+        // jadwalkan JobScheduler yang meneruskan ke DownloadService.
+        BootResumeJobService.schedule(context)
     }
 }
