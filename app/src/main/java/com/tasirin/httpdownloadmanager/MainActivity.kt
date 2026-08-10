@@ -919,12 +919,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED
         }
         val hasFailed = items.any { it.state == DownloadState.FAILED }
-        findViewById<View>(R.id.btn_pause_all)?.visibility =
-            if (hasActive) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.btn_resume_all)?.visibility =
-            if (hasResumable) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.btn_retry_failed)?.visibility =
-            if (hasFailed) View.VISIBLE else View.GONE
+        binding.btnPauseAll.visibility = if (hasActive) View.VISIBLE else View.GONE
+        binding.btnResumeAll.visibility = if (hasResumable) View.VISIBLE else View.GONE
+        binding.btnRetryFailed.visibility = if (hasFailed) View.VISIBLE else View.GONE
     }
 
     private fun refreshList() {
