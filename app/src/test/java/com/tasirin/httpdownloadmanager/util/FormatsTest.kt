@@ -22,6 +22,16 @@ class FormatsTest {
     }
 
     @Test
+    fun `duration - format sesuai rentang`() {
+        assertEquals("0:00", Formats.duration(0))
+        assertEquals("0:00", Formats.duration(-100))
+        assertEquals("0:05", Formats.duration(5000))
+        assertEquals("1:05", Formats.duration(65000))
+        assertEquals("10:00", Formats.duration(600000))
+        assertEquals("1:01:01", Formats.duration(3661000))
+    }
+
+    @Test
     fun `eta - format sesuai rentang`() {
         assertEquals("0s", Formats.eta(0))
         assertEquals("0s", Formats.eta(-5))

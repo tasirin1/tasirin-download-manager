@@ -20,6 +20,20 @@ object Formats {
         return String.format(Locale.US, "%.2f MB/s", kb / 1024.0)
     }
 
+    /** Durasi video/gambar -> "m:ss" atau "h:mm:ss" (0 -> "0:00"). */
+    fun duration(ms: Long): String {
+        if (ms <= 0) return "0:00"
+        val total = ms / 1000
+        val h = total / 3600
+        val m = (total % 3600) / 60
+        val s = total % 60
+        return if (h > 0) {
+            String.format(Locale.US, "%d:%02d:%02d", h, m, s)
+        } else {
+            String.format(Locale.US, "%d:%02d", m, s)
+        }
+    }
+
     fun eta(seconds: Long): String {
         if (seconds <= 0) return "0s"
         val h = seconds / 3600

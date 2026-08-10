@@ -125,6 +125,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
                     session.method == Method.POST && session.uri == "/api/delete_media" -> deleteMedia(session)
                     session.method == Method.POST && session.uri == "/api/fs_action" -> fsAction(session)
                     session.method == Method.GET && session.uri == "/api/fs_zip" -> fsZip(session)
+                    session.method == Method.GET && session.uri == "/api/media_zip" -> mediaZip(session)
                     session.method == Method.GET && session.uri.startsWith("/file/") -> serveFile(session)
                     else -> newFixedLengthResponse(
                         Response.Status.NOT_FOUND,
@@ -778,6 +779,39 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
         )
     }
 
+    private fun mediaZip(session: IHTTPSession): Response {
+        val tokens = session.parms["tokens"].orEmpty().split(",").filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return notFound()
+        val tmp = try {
+            File.createTempFile("mediazip", ".zip", context.cacheDir).also { tmpFile ->
+                try {
+                    ZipOutputStream(BufferedOutputStream(FileOutputStream(tmpFile))).use { zos ->
+                        ZipCreator.zipTokens(zos, tokens, context)
+                    }
+                } catch (e: Exception) {
+                    runCatching { tmpFile.delete() }
+                    throw e
+                }
+            }
+        } catch (e: Exception) {
+            logError(e)
+            return notFound()
+        }
+        if (tmp.length() == 0L) {
+            tmp.delete()
+            return notFound()
+        }
+        appendLog("ZIP MEDIA: ${tokens.size} file (${Formats.bytes(tmp.length())})")
+        return streamMedia(
+            name = "galeri-${tokens.size}-file.zip",
+            mime = "application/zip",
+            input = DeleteOnCloseStream(FileInputStream(tmp), tmp),
+            total = tmp.length(),
+            rangeHeader = session.headers["range"] ?: session.headers["Range"],
+            download = true
+        )
+    }
+
     private fun deleteMedia(session: IHTTPSession): Response {
         val params = readForm(session)
         val token = params["token"].orEmpty()
@@ -1198,6 +1232,13 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
                         extracted++
                     }
                     o.put("durationMs", d)
+                } else {
+                    // Dimensi asli untuk galeri rasio asli (masonry) di remote web.
+                    val dim = imageDimensions(e)
+                    if (dim != null) {
+                        o.put("w", dim.first)
+                        o.put("h", dim.second)
+                    }
                 }
                 arr.put(o)
             }
@@ -1260,6 +1301,19 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             else -> fsListFiles(raw.removePrefix(FS_PREFIX))
         }
     }
+
+    private fun imageDimensions(e: MediaLibrary.MediaEntry): Pair<Int, Int>? = runCatching {
+        val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        val path = e.filePath
+        if (path != null) {
+            android.graphics.BitmapFactory.decodeFile(path, opts)
+        } else if (e.contentUri != null) {
+            context.contentResolver.openInputStream(Uri.parse(e.contentUri))?.use { s ->
+                android.graphics.BitmapFactory.decodeStream(s, null, opts)
+            }
+        }
+        if (opts.outWidth > 0 && opts.outHeight > 0) opts.outWidth to opts.outHeight else null
+    }.getOrNull()
 
     private fun fsRoots(): Response {
         val items = JSONArray()
