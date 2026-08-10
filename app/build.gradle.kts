@@ -28,7 +28,7 @@ android {
     // Hanya bahasa id/in (Indonesia) + en yang ikut di APK; locale library lain
     // (ar, de, fr, es, ...) dibuang dari resources.arsc — hemat ukuran.
     androidResources {
-        localeFilters += listOf("en", "in", "id")
+        localeFilters += listOf("en", "id")
     }
 
     signingConfigs {
@@ -75,6 +75,10 @@ android {
         viewBinding = true
     }
 
+    packaging {
+        resources.excludes += "META-INF/**"
+    }
+
     lint {
         // Pengaman kompatibilitas API 21: kegagalan lint (mis. NewApi) menggagalkan build.
         abortOnError = true
@@ -105,8 +109,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.2")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.2")
     implementation("androidx.activity:activity-ktx:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")

@@ -44,6 +44,7 @@ import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
+import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.UpdateInfo
 import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
@@ -766,22 +767,8 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun requestPermissionsIfNeeded() {
-        val needed = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            needed.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        if (Build.VERSION.SDK_INT >= 23 &&
-            checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            needed.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-        if (needed.isNotEmpty()) {
-            permissionLauncher.launch(needed.toTypedArray())
-        }
+        val needed = Permissions.missingRuntime(this)
+        if (needed.isNotEmpty()) permissionLauncher.launch(needed)
     }
 
 

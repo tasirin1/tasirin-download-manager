@@ -17,6 +17,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import com.tasirin.httpdownloadmanager.App
+import com.tasirin.httpdownloadmanager.util.CrashLog
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.FileSaver
@@ -26,9 +27,6 @@ import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import androidx.documentfile.provider.DocumentFile
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -48,21 +46,13 @@ import java.io.InputStream
 import java.io.RandomAccessFile
 import java.io.FileOutputStream
 import java.io.BufferedOutputStream
-import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
 import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
-import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import java.net.NetworkInterface
-import java.net.URLDecoder
 
 class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.serverPort(context)) {
 
@@ -101,8 +91,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             context.packageManager.getPackageInfo(context.packageName, 0).versionCode
         }.getOrDefault(0)
     }
-    private val logLock = Any()
-    private val logBuffer = ArrayDeque<String>()
+    private val serverLog = ServerLog()
 
     override fun serve(session: IHTTPSession): Response {
         val startedAt = System.currentTimeMillis()
@@ -742,42 +731,6 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
         }
     }
 
-    private fun drainBody(session: IHTTPSession) {
-        val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
-            .coerceAtMost(MAX_UPLOAD_BYTES)
-        if (length <= 0) return
-        val buffer = ByteArray(64 * 1024)
-        var remaining = length
-        while (remaining > 0) {
-            val chunk = minOf(buffer.size.toLong(), remaining).toInt()
-            val read = session.inputStream.read(buffer, 0, chunk)
-            if (read == -1) break
-            remaining -= read
-        }
-    }
-
-    private fun copyUploadBody(session: IHTTPSession, length: Long, out: java.io.OutputStream) {
-        // PENTING: jangan tutup session.inputStream (tanpa .use). Stream itu
-        // socket.getInputStream(); menutupnya menutup koneksi TCP sebelum
-        // respons terkirim -> browser menganggap upload gagal (retry terus).
-        // NanoHTTPD menutup stream sendiri setelah serve() selesai.
-        val input = session.inputStream
-        val buffer = ByteArray(64 * 1024)
-        var remaining = length
-        while (remaining > 0) {
-            val chunk = minOf(buffer.size.toLong(), remaining).toInt()
-            val read = input.read(buffer, 0, chunk)
-            if (read == -1) break
-            out.write(buffer, 0, read)
-            remaining -= read
-        }
-        if (remaining > 0) {
-            throw IOException(
-                "Koneksi terputus: hanya ${length - remaining} dari $length byte diterima"
-            )
-        }
-    }
-
     private fun fsZip(session: IHTTPSession): Response {
         val raw = session.parms["path"].orEmpty()
         if (raw.isEmpty()) return notFound()
@@ -796,9 +749,9 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
                 try {
                     ZipOutputStream(BufferedOutputStream(FileOutputStream(tmpFile))).use { zos ->
                         if (raw.startsWith(MS_PREFIX)) {
-                            zipMedia(zos, raw.removePrefix(MS_PREFIX))
+                            ZipCreator.zipMedia(zos, raw.removePrefix(MS_PREFIX), context)
                         } else {
-                            zipFile(zos, File(raw.removePrefix(FS_PREFIX)), "")
+                            ZipCreator.zipFile(zos, File(raw.removePrefix(FS_PREFIX)), "")
                         }
                     }
                 } catch (e: Exception) {
@@ -823,62 +776,6 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
         )
-    }
-
-    private fun zipFile(zos: ZipOutputStream, file: File, prefix: String) {
-        val entryPath = if (prefix.isEmpty()) file.name else "$prefix/${file.name}"
-        if (file.isDirectory) {
-            val children = runCatching { file.listFiles() }.getOrNull()
-            if (children.isNullOrEmpty()) {
-                zos.putNextEntry(ZipEntry("$entryPath/"))
-                zos.closeEntry()
-                return
-            }
-            children.sortedBy { it.name.lowercase() }.forEach { child ->
-                zipFile(zos, child, entryPath)
-            }
-        } else if (file.isFile) {
-            zos.putNextEntry(ZipEntry(entryPath))
-            file.inputStream().use { it.copyTo(zos) }
-            zos.closeEntry()
-        }
-    }
-
-    private fun zipMedia(zos: ZipOutputStream, relative: String) {
-        if (Build.VERSION.SDK_INT < 29) return
-        val base = relative.trim('/')
-        val folder = base + "/"
-        val resolver = context.contentResolver
-        val collection = MediaLibrary.mediaCollectionForRoot(base)
-        val projection = arrayOf(
-            MediaStore.MediaColumns._ID,
-            MediaStore.MediaColumns.DISPLAY_NAME,
-            MediaStore.MediaColumns.RELATIVE_PATH
-        )
-        runCatching {
-            resolver.query(
-                collection, projection,
-                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
-                arrayOf("$folder%"), null
-            )?.use { c ->
-                val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-                val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-                val iRel = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
-                while (c.moveToNext()) {
-                    val relPath = c.getString(iRel) ?: continue
-                    val name = c.getString(iName) ?: continue
-                    if (!relPath.startsWith(folder)) continue
-                    val entry = relPath.removePrefix(folder) + name
-                    resolver.openInputStream(
-                        ContentUris.withAppendedId(collection, c.getLong(iId))
-                    )?.use { input ->
-                        zos.putNextEntry(ZipEntry(entry))
-                        input.copyTo(zos)
-                        zos.closeEntry()
-                    }
-                }
-            }
-        }
     }
 
     private fun deleteMedia(session: IHTTPSession): Response {
@@ -1268,32 +1165,6 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
                 remaining -= skipped
             }
         }
-    }
-
-    private fun readForm(session: IHTTPSession): Map<String, String> {
-        val map = mutableMapOf<String, String>()
-        session.parms.forEach { (k, v) -> map[k] = v }
-        val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
-            .coerceIn(0L, MAX_BODY_SIZE).toInt()
-        if (length > 0) {
-            val bytes = ByteArray(length)
-            var offset = 0
-            while (offset < length) {
-                val read = session.inputStream.read(bytes, offset, length - offset)
-                if (read == -1) break
-                offset += read
-            }
-            val body = String(bytes, 0, offset, Charsets.UTF_8)
-            body.split("&").forEach { pair ->
-                val idx = pair.indexOf('=')
-                if (idx > 0) {
-                    val key = URLDecoder.decode(pair.substring(0, idx), "UTF-8")
-                    val value = URLDecoder.decode(pair.substring(idx + 1), "UTF-8")
-                    map[key] = value
-                }
-            }
-        }
-        return map
     }
 
     private fun galleryJson(session: IHTTPSession): Response {
@@ -1997,7 +1868,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
     private fun qrPngResponse(session: IHTTPSession): Response {
         val text = session.parms["text"].orEmpty()
         if (text.isEmpty()) return notFound()
-        val bytes = generateQr(text) ?: return notFound()
+        val bytes = QrCode.generate(text) ?: return notFound()
         return newFixedLengthResponse(
             Response.Status.OK,
             "image/png",
@@ -2006,53 +1877,15 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
         ).also { it.addHeader("Cache-Control", "no-store") }
     }
 
-    private fun generateQr(text: String): ByteArray? = runCatching {
-        val size = 520
-        val matrix = QRCodeWriter().encode(
-            text, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 1)
-        )
-        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
-        for (x in 0 until size) {
-            for (y in 0 until size) {
-                bmp.setPixel(x, y, if (matrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
-            }
-        }
-        val out = ByteArrayOutputStream()
-        bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
-        bmp.recycle()
-        out.toByteArray()
-    }.getOrNull()
+    fun appendLog(message: String) = serverLog.append(message)
 
-    fun appendLog(message: String) {
-        synchronized(logLock) {
-            val stamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
-            val line = if (message.length <= MAX_LOG_LINE_LENGTH) {
-                "$stamp $message"
-            } else {
-                "$stamp ${message.take(MAX_LOG_LINE_LENGTH)}…"
-            }
-            logBuffer.addLast(line)
-            while (logBuffer.size > MAX_REALTIME_LOG_LINES) logBuffer.removeFirst()
-        }
-    }
+    fun snapshotLog(): String = serverLog.snapshot()
 
-    fun snapshotLog(): String = synchronized(logLock) { logBuffer.joinToString("\n") }
-
-    fun clearLog() = synchronized(logLock) { logBuffer.clear() }
+    fun clearLog() = serverLog.clear()
 
     private fun logError(e: Exception) {
         appendLog("ERROR ${e.message}")
-        runCatching {
-            val file = File(context.filesDir, App.CRASH_LOG_FILE)
-            val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-            val text = buildString {
-                appendLine("=== $stamp [serve] ===")
-                appendLine(Log.getStackTraceString(e))
-                appendLine()
-            }
-            val existing = if (file.exists()) file.readText() else ""
-            file.writeText((existing + text).takeLast(100_000))
-        }
+        CrashLog.append(context, "serve", e)
     }
 
     private fun jsonResponse(obj: JSONObject): Response {
@@ -2065,11 +1898,8 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
 
     companion object {
         private const val SERVER_SOCKET_TIMEOUT_MS = 60_000
-        private const val MAX_REALTIME_LOG_LINES = 300
-        private const val MAX_LOG_LINE_LENGTH = 400
         private const val FS_PREFIX = "f:"
         private const val MS_PREFIX = "m:"
-        private const val MAX_BODY_SIZE = 4L * 1024 * 1024
         private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024
         private const val MAX_UPLOAD_MB = 2048
         private const val SHARE_TTL_HOURS = 24
@@ -2153,53 +1983,3 @@ private class DeleteOnCloseStream(
 }
 
 private data class ShareEntry(val itemId: String, val expiresAt: Long)
-
-private class SseStream : InputStream() {
-    private val queue = LinkedBlockingQueue<ByteArray>(32)
-
-    @Volatile
-    var isClosed = false
-        private set
-
-    private var current: ByteArray? = null
-    private var pos = 0
-
-    fun push(text: String) {
-        if (!isClosed && !queue.offer(text.toByteArray(Charsets.UTF_8))) {
-            // Antrean penuh berarti klien tidak lagi membaca (koneksi putus).
-            isClosed = true
-        }
-    }
-
-    fun closeStream() {
-        isClosed = true
-    }
-
-    override fun close() {
-        isClosed = true
-        super.close()
-    }
-
-    override fun read(): Int {
-        while (true) {
-            val cur = current
-            if (cur != null && pos < cur.size) return cur[pos++].toInt() and 0xff
-            if (isClosed) return -1
-            val next = try {
-                queue.poll(20, TimeUnit.SECONDS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                return -1
-            }
-            if (next != null) {
-                current = next
-                pos = 0
-            } else {
-                // Tidak ada data selama 20 detik: kirim komentar heartbeat
-                // supaya koneksi tidak diputus proxy/timout.
-                current = ": ping\n\n".toByteArray(Charsets.UTF_8)
-                pos = 0
-            }
-        }
-    }
-}

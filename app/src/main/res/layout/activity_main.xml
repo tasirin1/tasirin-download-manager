@@ -369,13 +369,17 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/fab_add"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
-            android:layout_margin="20dp"
-            android:contentDescription="@string/add_download"
-            android:src="@drawable/ic_add" />
+            android:layout_margin="16dp"
+            android:minHeight="52dp"
+            android:paddingHorizontal="22dp"
+            android:text="@string/add_download"
+            android:textSize="15sp"
+            app:icon="@drawable/ic_add"
+            app:iconGravity="textStart" />
     </FrameLayout>
 </LinearLayout>
