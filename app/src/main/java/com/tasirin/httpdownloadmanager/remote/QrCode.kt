@@ -2,7 +2,6 @@ package com.tasirin.httpdownloadmanager.remote
 
 import android.graphics.Bitmap
 import androidx.core.graphics.createBitmap
-import androidx.core.graphics.set
 import com.tasirin.httpdownloadmanager.util.QrEncoder
 import java.io.ByteArrayOutputStream
 
@@ -27,7 +26,7 @@ object QrCode {
                 pixels[x * size + y] = if (dark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
             }
         }
-        bmp.set(0, 0, size, size, pixels)
+        bmp.setPixels(pixels, 0, size, 0, 0, size, size)
         val out = ByteArrayOutputStream()
         bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
         bmp.recycle()
