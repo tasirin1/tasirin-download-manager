@@ -613,7 +613,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             val txt = TextView(this)
             txt.text = texts[i]
             txt.textSize = 13.5f
-            txt.lineSpacingMultiplier = 1.05f
             txt.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
             row.addView(icon)
             row.addView(txt, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
