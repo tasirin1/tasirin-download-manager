@@ -44,7 +44,7 @@ class FileSaver(context: Context) {
         target.outputStream().use { out ->
             for (i in 0 until segmentCount) {
                 val part = partialFile(fileName, i)
-                if (!part.exists()) throw IOException("Segmen $i tidak ditemukan")
+                if (!part.exists()) throw IOException("Segment $i not found")
                 part.inputStream().use { input -> input.copyTo(out) }
                 part.delete()
             }
@@ -106,7 +106,7 @@ class FileSaver(context: Context) {
             }
             val dir = File(cleanFolder)
             if (!dir.isDirectory && !dir.mkdirs()) {
-                throw IOException("Folder tujuan tidak valid atau tidak bisa ditulis: $cleanFolder")
+                throw IOException("Destination folder is invalid or not writable: $cleanFolder")
             }
             val target = uniqueTargetFile(File(dir, fileName))
             try {
@@ -189,10 +189,10 @@ class FileSaver(context: Context) {
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val uri = resolver.insert(collection, values)
-            ?: throw IOException("Gagal membuat file di MediaStore")
+            ?: throw IOException("Failed to create file in MediaStore")
         try {
             resolver.openOutputStream(uri)?.use { out -> writer(out) }
-                ?: throw IOException("Gagal membuka output MediaStore")
+                ?: throw IOException("Failed to open MediaStore output")
             values.clear()
             values.put(MediaStore.Downloads.IS_PENDING, 0)
             resolver.update(uri, values, null, null)

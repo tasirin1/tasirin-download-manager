@@ -145,12 +145,12 @@ class DownloadEngine(appContext: Context) {
         flushSave()
         StoragePrefs.addRecentUrl(context, cleanUrl)
         val host = runCatching { URL(cleanUrl).host }.getOrDefault("")
-        App.logEvent("DOWNLOAD DITAMBAH: $name (${host.ifEmpty { "URL lokal/kustom" }})")
+        App.logEvent("DOWNLOAD ADDED: $name (${host.ifEmpty { "local/custom URL" }})")
         attemptStart(item.id)
     }
 
     fun pause(id: String) {
-        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD DIPAUSE: ${it.fileName}") }
+        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD PAUSED: ${it.fileName}") }
         retryAttempts.remove(id)
         speedTracker.reset(id)
         jobs.remove(id)?.cancel()
@@ -164,7 +164,7 @@ class DownloadEngine(appContext: Context) {
     fun resume(id: String) {
         val item = _items.value.find { it.id == id } ?: return
         if (item.state != DownloadState.PAUSED && item.state != DownloadState.FAILED) return
-        App.logEvent("DOWNLOAD DILANJUTKAN: ${item.fileName}")
+        App.logEvent("DOWNLOAD RESUMED: ${item.fileName}")
         retryAttempts.remove(id)
         updateItem(id) { it.copy(state = DownloadState.PENDING, autoResume = true) }
         attemptStart(id)
@@ -182,7 +182,7 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun cancel(id: String) {
-        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD DIBATALKAN: ${it.fileName}") }
+        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD CANCELLED: ${it.fileName}") }
         retryAttempts.remove(id)
         speedTracker.reset(id)
         jobs.remove(id)?.cancel()
@@ -199,7 +199,7 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun remove(id: String) {
-        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD DIHAPUS: ${it.fileName}") }
+        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD DELETED: ${it.fileName}") }
         retryAttempts.remove(id)
         speedTracker.reset(id)
         jobs.remove(id)?.cancel()
@@ -527,7 +527,7 @@ class DownloadEngine(appContext: Context) {
         val job = scope.launch {
             try {
                 updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }
-                App.logEvent("DOWNLOAD MULAI: ${item.fileName}")
+                App.logEvent("DOWNLOAD STARTED: ${item.fileName}")
                 runDownload(item)
             } catch (e: CancellationException) {
                 throw e
@@ -552,7 +552,7 @@ class DownloadEngine(appContext: Context) {
     ): FileSaver.PublishResult {
         if (item.folderPath.isNotBlank()) {
             return saver.publishToPath(partial, fileName, item.folderPath)
-                ?: throw IOException("Folder tujuan tidak valid atau tidak bisa ditulis: ${item.folderPath}")
+                ?: throw IOException("Destination folder is invalid or not writable: ${item.folderPath}")
         }
         return saver.publish(partial, fileName, item.destination)
     }
@@ -574,7 +574,7 @@ class DownloadEngine(appContext: Context) {
         speedTracker.reset(id)
         val maxRetries = StoragePrefs.maxRetries(context)
         val attempts = (retryAttempts[id] ?: 0) + 1
-        val rangeRejected = message?.contains("tidak mendukung Range") == true
+        val rangeRejected = message?.contains("does not support Range") == true
         val slowRejected = isSlowError(message)
         failedUrls.add(item.url)
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
@@ -592,7 +592,7 @@ class DownloadEngine(appContext: Context) {
         // gagal tidak perlu dicoba ulang: langsung coba cadangan berikutnya.
         if (allMirrors.isNotEmpty() && (rangeRejected || slowRejected || isConnectError(message))) {
             val next = allMirrors.first()
-            App.logEvent("DOWNLOAD GAGAL: ${item.fileName} — ${message ?: "?"} (pindah ke mirror: $next)")
+            App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} (switching to mirror: $next)")
             updateItem(id) {
                 it.copy(
                     url = next,
@@ -615,7 +615,7 @@ class DownloadEngine(appContext: Context) {
             // Server/proxy menolak resume (HTTP 403/501/416): mengulang URL yang
             // sama hanya membuang waktu, jadi tandai gagal tanpa percobaan ulang.
             retryAttempts.remove(id)
-            App.logEvent("DOWNLOAD GAGAL: ${item.fileName} — ${message ?: "?"} (server menolak resume; coba URL/mirror lain)")
+            App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} (server refused resume; try another URL/mirror)")
             updateItem(id) {
                 it.copy(
                     state = DownloadState.FAILED,
@@ -634,8 +634,8 @@ class DownloadEngine(appContext: Context) {
                 .coerceAtMost(RETRY_DELAY_MAX_MS)
             // Jitter 0-25% agar beberapa item tidak retry serentak (thundering herd).
             val backoff = baseBackoff + Random.nextLong(0, (baseBackoff / 4) + 1)
-            val retryInfo = "Gagal (percobaan $attempts/$maxRetries) — coba lagi dalam ${Formats.eta(backoff / 1000)}"
-            App.logEvent("DOWNLOAD GAGAL: ${item.fileName} — ${message ?: "?"} ($retryInfo)")
+            val retryInfo = "Failed (attempt $attempts/$maxRetries) — retrying in ${Formats.eta(backoff / 1000)}"
+            App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} ($retryInfo)")
             updateItem(id) { it.copy(state = DownloadState.PENDING, error = retryInfo) }
             scope.launch {
                 delay(backoff)
@@ -648,7 +648,7 @@ class DownloadEngine(appContext: Context) {
             // Gagal karena jaringan (mati/sinyal hilang): jangan tandai FAILED,
             // biarkan PAUSED agar otomatis lanjut saat koneksi pulih.
             retryAttempts.remove(id)
-            App.logEvent("DOWNLOAD TERPAUSE (jaringan): ${item.fileName} — ${message ?: "?"}")
+            App.logEvent("DOWNLOAD PAUSED (network): ${item.fileName} — ${message ?: "?"}")
             updateItem(id) {
                 it.copy(
                     state = DownloadState.PAUSED,
@@ -661,7 +661,7 @@ class DownloadEngine(appContext: Context) {
             flushSave()
         } else {
             retryAttempts.remove(id)
-            App.logEvent("DOWNLOAD GAGAL: ${item.fileName} — ${message ?: "?"}")
+            App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"}")
             updateItem(id) {
                 it.copy(
                     state = DownloadState.FAILED,
@@ -677,7 +677,7 @@ class DownloadEngine(appContext: Context) {
 
     private fun isSlowError(message: String?): Boolean {
         val m = message.orEmpty().lowercase()
-        return m.contains("kecepatan terlalu rendah") || m.contains("koneksi macet")
+        return m.contains("speed too low") || m.contains("connection stalled")
     }
 
     private fun isConnectError(message: String?): Boolean {
@@ -734,7 +734,7 @@ class DownloadEngine(appContext: Context) {
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) {
             throw IOException(
-                "Penyimpanan hampir penuh (sisa ${Formats.bytes(freeNow)})"
+                "Storage almost full (free ${Formats.bytes(freeNow)})"
             )
         }
         coroutineContext.ensureActive()
@@ -854,7 +854,7 @@ class DownloadEngine(appContext: Context) {
             val cr = conn.getHeaderField("Content-Range")
             val actualStart = cr?.substringAfter("bytes ")?.substringBefore("-")?.trim()?.toLongOrNull()
             if (actualStart != null && actualStart != downloaded) {
-                throw IOException("Server melanjutkan dari byte $actualStart, bukan $downloaded")
+                throw IOException("Server resumed from byte $actualStart, not $downloaded")
             }
             total += downloaded
         } else if (downloaded > 0) {
@@ -864,8 +864,8 @@ class DownloadEngine(appContext: Context) {
         }
         if (total > 0 && saver.freeBytes() < total) {
             throw IOException(
-                "Penyimpanan tidak cukup: butuh ${Formats.bytes(total)}, " +
-                    "tersedia ${Formats.bytes(saver.freeBytes())}"
+                "Not enough storage: need ${Formats.bytes(total)}, " +
+                    "available ${Formats.bytes(saver.freeBytes())}"
             )
         }
 
@@ -933,7 +933,7 @@ class DownloadEngine(appContext: Context) {
             )
         }
         flushSave()
-        App.logEvent("DOWNLOAD SELESAI: $finalName (${Formats.bytes(downloaded)})")
+        App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
         } catch (e: IOException) {
             if (!coroutineContext.isActive) throw CancellationException()
             throw e
@@ -958,8 +958,8 @@ class DownloadEngine(appContext: Context) {
             segments = createSegments(total)
             if (total > 0 && saver.freeBytes() < total) {
                 throw IOException(
-                    "Penyimpanan tidak cukup: butuh ${Formats.bytes(total)}, " +
-                        "tersedia ${Formats.bytes(saver.freeBytes())}"
+                    "Not enough storage: need ${Formats.bytes(total)}, " +
+                        "available ${Formats.bytes(saver.freeBytes())}"
                 )
             }
             updateItem(item.id) {
@@ -985,14 +985,14 @@ class DownloadEngine(appContext: Context) {
             }
         } catch (e: IOException) {
             val current = _items.value.find { it.id == item.id }
-            if (e.message?.contains("tidak mendukung Range") == true) {
+            if (e.message?.contains("does not support Range") == true) {
                 // Server/proxy menolak Range (mis. proxy transparan ISP): semua
                 // percobaan Range akan gagal selamanya, jadi buang segmen lalu
                 // unduh sekali jalan tanpa Range (partial lama ikut dibuang).
                 failedUrls.add(item.url)
                 App.logEvent(
-                    "DOWNLOAD ${item.fileName}: Range ditolak (${e.message}), " +
-                        "unduh ulang sekali jalan"
+                    "DOWNLOAD ${item.fileName}: Range rejected (${e.message}), " +
+                        "downloading again in one pass"
                 )
                 saver.partialFiles(current ?: item).forEach { runCatching { it.delete() } }
                 updateItem(item.id) {
@@ -1047,7 +1047,7 @@ class DownloadEngine(appContext: Context) {
             )
         }
         flushSave()
-        App.logEvent("DOWNLOAD SELESAI: $finalName (${Formats.bytes(current.bytesDownloaded)})")
+        App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
     }
 
     private suspend fun downloadSegment(
@@ -1088,7 +1088,7 @@ class DownloadEngine(appContext: Context) {
             conn.setRequestProperty("Range", "bytes=${segment.start + downloaded}-${segment.end}")
             conn.connect()
             val code = conn.responseCode
-            if (code != 206) throw IOException("Server tidak mendukung Range (HTTP $code)")
+            if (code != 206) throw IOException("Server does not support Range (HTTP $code)")
 
             val input = conn.inputStream
             val output = BufferedOutputStream(FileOutputStream(partial, true))
@@ -1122,7 +1122,7 @@ class DownloadEngine(appContext: Context) {
                 runCatching { output.close() }
             }
             if (downloaded < (segment.end - segment.start + 1)) {
-                throw IOException("Segmen ${segment.index} tidak lengkap")
+                throw IOException("Segment ${segment.index} incomplete")
             }
             updateSegment(id, segment.index, downloaded)
         } catch (e: IOException) {
@@ -1156,7 +1156,7 @@ class DownloadEngine(appContext: Context) {
 
     private fun verifySize(id: String, downloaded: Long, total: Long) {
         if (total > 0 && downloaded != total) {
-            throw IOException("Ukuran tidak sesuai: diharapkan $total, diterima $downloaded")
+            throw IOException("Size mismatch: expected $total, received $downloaded")
         }
     }
 
@@ -1223,9 +1223,9 @@ class DownloadEngine(appContext: Context) {
         ) ?: return null
         val (algo, hex) = expected
         val digest = computeDigest(published, algo, saver)
-            ?: return "Tidak dapat membaca file untuk verifikasi checksum"
+            ?: return "Cannot read file for checksum verification"
         if (!digest.equals(hex, ignoreCase = true)) {
-            return "Checksum $algo tidak cocok (diharapkan $hex, didapat $digest)"
+            return "Checksum $algo mismatch (expected $hex, got $digest)"
         }
         updateItem(itemId) { it.copy(checksumVerified = true) }
         flushSave()
@@ -1375,7 +1375,7 @@ class DownloadEngine(appContext: Context) {
         val path = noQuery.toUri().lastPathSegment.orEmpty()
         val candidate = path.trim()
         if (candidate.isNotEmpty() && !candidate.contains('=')) return candidate
-        return "unduhan_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}"
+        return "download_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}"
     }
 
     companion object {
@@ -1466,12 +1466,12 @@ private class DownloadHealthWatchdog(limitKbps: Int) {
             if (slowSince == 0L) slowSince = now
             if (now - slowSince >= LOW_SPEED_TIMEOUT_MS) {
                 throw IOException(
-                    "Kecepatan terlalu rendah (${Formats.bytes(speed)}/dtk) — coba mirror/retry"
+                    "Speed too low (${Formats.bytes(speed)}/s) — try mirror/retry"
                 )
             }
         } else if (speed == 0L && now - lastAt >= STALL_TIMEOUT_MS) {
             throw IOException(
-                "Koneksi macet: tanpa data ${STALL_TIMEOUT_MS / 1000} detik — coba lagi"
+                "Connection stalled: no data for ${STALL_TIMEOUT_MS / 1000} seconds — retrying"
             )
         } else {
             slowSince = 0L

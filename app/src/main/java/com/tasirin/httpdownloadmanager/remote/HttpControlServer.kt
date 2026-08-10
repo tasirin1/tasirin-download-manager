@@ -177,13 +177,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             lastError = null
             cleanupCache()
             appendLog(
-                "SERVER MULAI di port $listeningPort (Android ${Build.VERSION.RELEASE} " +
+                "SERVER STARTED on port $listeningPort (Android ${Build.VERSION.RELEASE} " +
                     "API ${Build.VERSION.SDK_INT}, ${Build.MANUFACTURER} ${Build.MODEL}, " +
-                    "sisa penyimpanan ${Formats.bytes(App.engine.freeSpaceBytes())})"
+                    "free storage ${Formats.bytes(App.engine.freeSpaceBytes())})"
             )
         } catch (e: IOException) {
             lastError = e.message
-            appendLog("SERVER GAGAL MULAI: ${e.message}")
+            appendLog("SERVER FAILED TO START: ${e.message}")
             throw e
         }
     }
@@ -215,7 +215,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     fun stopServer() {
-        appendLog("SERVER BERHENTI (port $listeningPort)")
+        appendLog("SERVER STOPPED (port $listeningPort)")
         sseJob?.cancel()
         sseJob = null
         val frame = "data: {\"shutdown\":true}\n\n"
@@ -253,14 +253,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val now = System.currentTimeMillis()
         if (now < loginLockUntil) {
             val waitSec = ((loginLockUntil - now) / 1000) + 1
-            return loginPage("Terlalu banyak percobaan. Coba lagi dalam $waitSec detik.")
+            return loginPage("Too many attempts. Try again in $waitSec seconds.")
         }
         val params = readForm(session)
         val pin = params["pin"].orEmpty()
         val stored = storedPinHash()
         return if (stored != null && StoragePrefs.pinMatches(context, pin)) {
             loginFailures = 0
-            appendLog("LOGIN BERHASIL (${session.remoteIpAddress})")
+            appendLog("LOGIN OK (${session.remoteIpAddress})")
             val r = newFixedLengthResponse(
                 Response.Status.REDIRECT,
                 "text/html",
@@ -274,11 +274,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (loginFailures >= MAX_LOGIN_ATTEMPTS) {
                 loginLockUntil = now + LOGIN_LOCK_MS
                 loginFailures = 0
-                appendLog("LOGIN TERKUNCI $LOGIN_LOCK_MS ms (terlalu banyak percobaan, dari ${session.remoteIpAddress})")
+                appendLog("LOGIN LOCKED $LOGIN_LOCK_MS ms (too many attempts, from ${session.remoteIpAddress})")
             } else {
-                appendLog("LOGIN GAGAL: PIN salah (percobaan $loginFailures, dari ${session.remoteIpAddress})")
+                appendLog("LOGIN FAILED: wrong PIN (attempt $loginFailures, from ${session.remoteIpAddress})")
             }
-            loginPage("PIN salah, coba lagi.")
+            loginPage("Wrong PIN, try again.")
         }
     }
 
@@ -296,11 +296,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun loginPage(error: String): Response {
         val html = """<!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PIN Diperlukan</title>
+<title>PIN Required</title>
 <style>
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -426,16 +426,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
   </div>
   <h1>Tasirin Download Manager</h1>
-  <p class="sub">Server remote terkunci &middot; masukkan PIN untuk melanjutkan</p>
+  <p class="sub">Remote server locked &middot; enter the PIN to continue</p>
   <form method="POST" action="/api/login" autocomplete="off">
     <label for="pin">PIN</label>
     <div class="field">
       <input type="password" id="pin" name="pin" placeholder="&#9679;&#9679;&#9679;&#9679;" inputmode="numeric" maxlength="10" autofocus>
     </div>
-    <button type="submit">Masuk &rarr;</button>
+    <button type="submit">Log in &rarr;</button>
   </form>
   <div class="err ${if (error.isEmpty()) "" else "show"}">&#9888;&#65039; $error</div>
-  <div class="foot">Tasirin Download Manager &middot; akses lokal jaringan Anda</div>
+  <div class="foot">Tasirin Download Manager &middot; your local network access</div>
 </div>
 </body>
 </html>"""
@@ -447,7 +447,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun unauthorized(): Response = newFixedLengthResponse(
         Response.Status.UNAUTHORIZED,
         "application/json; charset=utf-8",
-        JSONObject().put("ok", false).put("error", "PIN diperlukan").toString()
+        JSONObject().put("ok", false).put("error", "PIN required").toString()
     )
 
     // Catatan ukuran: nanohttpd 2.3.1 otomatis gzip untuk mime text/* dan
@@ -457,7 +457,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun htmlPage(): Response {
         val html = cachedHtml ?: runCatching {
             context.assets.open("remote.html").bufferedReader().use { it.readText() }
-        }.getOrDefault("<h1>Halaman remote tidak tersedia</h1>").also { cachedHtml = it }
+        }.getOrDefault("<h1>Remote page unavailable</h1>").also { cachedHtml = it }
         return newFixedLengthResponse(
             Response.Status.OK,
             "text/html; charset=utf-8",
@@ -518,7 +518,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val params = readForm(session)
         val url = params["url"]?.trim().orEmpty()
         if (url.isEmpty()) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "url kosong"))
+            return jsonResponse(JSONObject().put("ok", false).put("error", "empty url"))
         }
         val speed = params["speedLimitKbps"]?.toIntOrNull()?.coerceIn(0, 100_000) ?: 0
         val priority = params["priority"]?.toIntOrNull()?.coerceIn(-1, 1) ?: 0
@@ -529,7 +529,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             !isFsPathAllowed(folderPath.removePrefix(FS_PREFIX))
         ) {
             return jsonResponse(
-                JSONObject().put("ok", false).put("error", "Folder tujuan tidak diizinkan")
+                JSONObject().put("ok", false).put("error", "Destination folder not allowed")
             )
         }
         App.engine.addDownload(
@@ -554,7 +554,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             !isFsPathAllowed(folderPath.removePrefix(FS_PREFIX))
         ) {
             return jsonResponse(
-                JSONObject().put("ok", false).put("error", "Folder tujuan tidak diizinkan")
+                JSONObject().put("ok", false).put("error", "Destination folder not allowed")
             )
         }
         val chunkIdx = session.parms["chunk"]?.toIntOrNull() ?: -1
@@ -568,13 +568,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (length <= 0 || length > MAX_UPLOAD_BYTES) {
             return jsonResponse(
                 JSONObject().put("ok", false)
-                    .put("error", "Ukuran tidak valid (maks ${MAX_UPLOAD_MB} MB)")
+                    .put("error", "Invalid size (max ${MAX_UPLOAD_MB} MB)")
             )
         }
         if (App.engine.freeSpaceBytes() < length) {
             return jsonResponse(
                 JSONObject().put("ok", false)
-                    .put("error", "Penyimpanan tidak cukup untuk upload")
+                    .put("error", "Not enough storage for upload")
             )
         }
         val finalName = uploadUniqueName(name, folderPath)
@@ -584,7 +584,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
             jsonResponse(JSONObject().put("ok", true).put("name", published.fileName ?: finalName))
         }.getOrElse {
-            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "gagal upload"))
+            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "upload failed"))
         }
     }
 
@@ -637,35 +637,35 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // dikirim = XHR error di client).
         completedUploads[id]?.let { done ->
             drainBody(session)
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks sudah selesai -> ok")
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks already done -> ok")
             return jsonResponse(JSONObject().put("ok", true).put("name", done.first))
         }
         finalizingUploads[id]?.let { pendingName ->
             drainBody(session)
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks sedang finalisasi -> pending")
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks finalizing -> pending")
             return jsonResponse(JSONObject().put("ok", true).put("pending", true).put("name", pendingName))
         }
         if (length > MAX_UPLOAD_BYTES) {
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks TOLAK: potongan terlalu besar")
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: chunk too large")
             return jsonResponse(
                 JSONObject().put("ok", false)
-                    .put("error", "Potongan terlalu besar (maks ${MAX_UPLOAD_MB} MB)")
+                    .put("error", "Chunk too large (max ${MAX_UPLOAD_MB} MB)")
             )
         }
         if (App.engine.freeSpaceBytes() < length) {
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks TOLAK: penyimpanan tidak cukup")
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: not enough storage")
             return jsonResponse(
                 JSONObject().put("ok", false)
-                    .put("error", "Penyimpanan tidak cukup untuk upload")
+                    .put("error", "Not enough storage for upload")
             )
         }
         val offset = session.parms["offset"]?.toLongOrNull()
             ?: chunkIdx.toLong() * DEFAULT_CHUNK_BYTES
         if (offset < 0 || offset > MAX_UPLOAD_BYTES) {
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks TOLAK: offset tidak valid")
-            return jsonResponse(JSONObject().put("ok", false).put("error", "offset tidak valid"))
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid offset")
+            return jsonResponse(JSONObject().put("ok", false).put("error", "invalid offset"))
         }
-        appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks terima: $name (${length}B offset=$offset)")
+        appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks received: $name (${length}B offset=$offset)")
         val tmp = File(context.cacheDir, "up_$id.tmp")
         var resultName = name
         return runCatching {
@@ -679,9 +679,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
                 !tmp.isFile -> {
-                    appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks GAGAL: harus mulai dari potongan pertama")
+                    appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks FAILED: must start from the first chunk")
                     return jsonResponse(
-                        JSONObject().put("ok", false).put("error", "Upload harus dimulai dari potongan pertama")
+                        JSONObject().put("ok", false).put("error", "Upload must start from the first chunk")
                     )
                 }
                 else -> {
@@ -696,13 +696,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (tmp.length() > MAX_UPLOAD_BYTES) {
                     tmp.delete()
                     return jsonResponse(
-                        JSONObject().put("ok", false).put("error", "File terlalu besar (maks ${MAX_UPLOAD_MB} MB)")
+                        JSONObject().put("ok", false).put("error", "File too large (max ${MAX_UPLOAD_MB} MB)")
                     )
                 }
                 if (App.engine.freeSpaceBytes() < tmp.length()) {
                     tmp.delete()
                     return jsonResponse(
-                        JSONObject().put("ok", false).put("error", "Penyimpanan tidak cukup untuk upload")
+                        JSONObject().put("ok", false).put("error", "Not enough storage for upload")
                     )
                 }
                 val finalName = uploadUniqueName(name, folderPath)
@@ -712,7 +712,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 // tujuan di background supaya client tidak menunggu lama dan
                 // tidak memicu retry (sebelumnya: potongan terakhir lambat ->
                 // timeout -> kirim ulang -> proses ganda -> "coba lagi" terus).
-                appendLog("UPLOAD #$id chunk terakhir diterima -> memfinalisasi sebagai $finalName")
+                appendLog("UPLOAD #$id last chunk received -> finalizing as $finalName")
                 serverScope.launch {
                     try {
                         val published = App.engine.importStream(
@@ -724,10 +724,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             MediaLibrary.notifyMediaChanged(context, it)
                         }
                         completedUploads[id] = finalName to System.currentTimeMillis()
-                        appendLog("UPLOAD #$id SELESAI -> $finalName")
+                        appendLog("UPLOAD #$id COMPLETED -> $finalName")
                     } catch (e: Exception) {
-                        failedUploads[id] = (e.message ?: "finalisasi gagal") to System.currentTimeMillis()
-                        appendLog("UPLOAD #$id finalisasi GAGAL: ${e.message}")
+                        failedUploads[id] = (e.message ?: "finalization failed") to System.currentTimeMillis()
+                        appendLog("UPLOAD #$id finalization FAILED: ${e.message}")
                         logError(e)
                     } finally {
                         tmp.delete()
@@ -742,9 +742,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             jsonResponse(JSONObject().put("ok", true).put("name", resultName))
         }.getOrElse {
             // Simpan jejak biar bisa dicek lewat Ekspor Log Error.
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks GAGAL: ${it.message}")
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks FAILED: ${it.message}")
             (it as? Exception)?.let { e -> logError(e) }
-            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "gagal upload"))
+            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "upload failed"))
         }
     }
 
@@ -784,7 +784,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             tmp.delete()
             return notFound()
         }
-        appendLog("ZIP DIBUAT: $folderName.zip (${Formats.bytes(tmp.length())})")
+        appendLog("ZIP CREATED: $folderName.zip (${Formats.bytes(tmp.length())})")
         return streamMedia(
             name = "$folderName.zip",
             mime = "application/zip",
@@ -819,7 +819,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         appendLog("ZIP MEDIA: ${tokens.size} file (${Formats.bytes(tmp.length())})")
         return streamMedia(
-            name = "galeri-${tokens.size}-file.zip",
+            name = "gallery-${tokens.size}-files.zip",
             mime = "application/zip",
             input = DeleteOnCloseStream(FileInputStream(tmp), tmp),
             total = tmp.length(),
@@ -832,11 +832,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val params = readForm(session)
         val token = params["token"].orEmpty()
         if (token.isEmpty()) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "token kosong"))
+            return jsonResponse(JSONObject().put("ok", false).put("error", "empty token"))
         }
         val raw = MediaLibrary.decodeToken(token)
         if (raw.isNullOrEmpty()) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "token tidak valid"))
+            return jsonResponse(JSONObject().put("ok", false).put("error", "invalid token"))
         }
         val allowed = when {
             raw.startsWith(FS_PREFIX) -> isFsPathAllowed(raw.removePrefix(FS_PREFIX))
@@ -846,7 +846,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             else -> false
         }
         if (!allowed) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "tidak diizinkan"))
+            return jsonResponse(JSONObject().put("ok", false).put("error", "not allowed"))
         }
         val deleted = App.engine.deleteMedia(raw)
         return jsonResponse(JSONObject().put("ok", deleted))
@@ -876,7 +876,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))
                 val name = params["name"]?.trim().orEmpty()
                 if (name.isBlank() || name.contains('/') || name.contains('\\')) {
-                    return jsonResponse(JSONObject().put("ok", false).put("error", "nama tidak valid"))
+                    return jsonResponse(JSONObject().put("ok", false).put("error", "invalid name"))
                 }
                 App.engine.rename(id, name)
             }
@@ -892,7 +892,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             "retry_failed" -> App.engine.retryFailed()
             "clear_completed" -> App.engine.clearCompleted()
             else -> return jsonResponse(
-                JSONObject().put("ok", false).put("error", "aksi tidak dikenal")
+                JSONObject().put("ok", false).put("error", "unknown action")
             )
         }
         return jsonResponse(JSONObject().put("ok", true))
@@ -1274,11 +1274,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 any = true
             }
         }
-        // Fallback kalau belum ada folder diatur: tampilkan Folder Download
+        // Fallback kalau belum ada folder diatur: tampilkan folder Download
         // bawaan supaya file manager tidak kosong.
         if (!any) {
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)?.let { d ->
-                if (d.isDirectory) add("Folder Download", FS_PREFIX + d.absolutePath)
+                if (d.isDirectory) add(d.name, FS_PREFIX + d.absolutePath)
             }
         }
         return jsonResponse(JSONObject().put("items", items))
@@ -1374,11 +1374,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun fsDupes(session: IHTTPSession): Response {
         val raw = session.parms["path"].orEmpty()
         if (raw.isEmpty() || !raw.startsWith(FS_PREFIX)) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "path tidak valid"))
+            return jsonResponse(JSONObject().put("ok", false).put("error", "invalid path"))
         }
         val root = File(raw.removePrefix(FS_PREFIX))
         if (!root.isDirectory || !isFsPathAllowed(root.absolutePath)) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "folder tidak diizinkan"))
+            return jsonResponse(JSONObject().put("ok", false).put("error", "folder not allowed"))
         }
         val byKey = LinkedHashMap<String, MutableList<JSONObject>>()
         var visited = 0
@@ -1416,8 +1416,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
         }
         appendLog(
-            "FS CARI DUPIKAT: ${root.absolutePath} — ${groups.length()} grup " +
-                "(${if (visited >= cap) "dibatasi" else visited} file dipindai)"
+            "FS FIND DUPLICATES: ${root.absolutePath} — ${groups.length()} group(s) " +
+                "(${if (visited >= cap) "limited" else visited} files scanned)"
         )
         return jsonResponse(
             JSONObject()
@@ -1454,7 +1454,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             path.startsWith(MS_PREFIX) -> fsActionMedia(action, path.removePrefix(MS_PREFIX), name, dest)
             else -> fsActionFiles(action, path.removePrefix(FS_PREFIX), name, dest)
         }
-        appendLog("FS ${action.uppercase()}: $path -> ${if (ok) "OK" else "GAGAL"}")
+        appendLog("FS ${action.uppercase()}: $path -> ${if (ok) "OK" else "FAILED"}")
         return jsonResponse(JSONObject().put("ok", ok))
     }
 
@@ -1794,11 +1794,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val id = params["id"].orEmpty()
         val item = App.engine.items.value.find {
             it.id == id && it.state == DownloadState.COMPLETED
-        } ?: return jsonResponse(JSONObject().put("ok", false).put("error", "file tidak ditemukan"))
+        } ?: return jsonResponse(JSONObject().put("ok", false).put("error", "file not found"))
         pruneShares()
         val token = UUID.randomUUID().toString().replace("-", "").take(16)
         shareTokens[token] = ShareEntry(item.id, System.currentTimeMillis() + SHARE_TTL_MS)
-        appendLog("SHARE DIBUAT: ${item.fileName} (berlaku $SHARE_TTL_HOURS jam)")
+        appendLog("SHARE CREATED: ${item.fileName} (valid for $SHARE_TTL_HOURS hours)")
         return jsonResponse(
             JSONObject().put("ok", true)
                 .put("token", token)

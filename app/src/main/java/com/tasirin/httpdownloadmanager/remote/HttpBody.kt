@@ -67,7 +67,7 @@ internal fun copyUploadBody(session: NanoHTTPD.IHTTPSession, length: Long, out: 
     }
     if (remaining > 0) {
         throw IOException(
-            "Koneksi terputus: hanya ${length - remaining} dari $length byte diterima"
+            "Connection lost: only ${length - remaining} of $length bytes received"
         )
     }
 }

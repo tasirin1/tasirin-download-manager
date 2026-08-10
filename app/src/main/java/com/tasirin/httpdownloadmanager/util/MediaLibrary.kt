@@ -325,9 +325,9 @@ object MediaLibrary {
 
         if (galleryImageFolder != null || galleryVideoFolder != null) {
             App.logEvent(
-                "GALERI SCAN: ${list.count { !it.isVideo }} foto, " +
-                    "${list.count { it.isVideo }} video " +
-                    "(foto: ${galleryImageFolder ?: "semua"}, video: ${galleryVideoFolder ?: "semua"})"
+                "GALLERY SCAN: ${list.count { !it.isVideo }} photos, " +
+                    "${list.count { it.isVideo }} videos " +
+                    "(photos: ${galleryImageFolder ?: "all"}, videos: ${galleryVideoFolder ?: "all"})"
             )
         }
 
