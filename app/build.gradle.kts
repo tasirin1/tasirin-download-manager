@@ -82,9 +82,7 @@ android {
     lint {
         // Pengaman kompatibilitas API 21: kegagalan lint (mis. NewApi) menggagalkan build.
         abortOnError = true
-        // Cetak daftar warning lengkap ke stdout supaya terlihat di log CI.
-        textReport = true
-        textOutput = File("stdout")
+        // Laporan lint selalu dibuat otomatis; warning tampil sebagai annotation CI.
         // Sengaja dinonaktifkan:
         // - OldTargetApi: targetSdk 36 sengaja (naik 37 menyusul setelah uji manual
         //   Android 16 sesuai peta jalan AGENTS.md), bukan bug.
