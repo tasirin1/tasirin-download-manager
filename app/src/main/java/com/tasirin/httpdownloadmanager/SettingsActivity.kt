@@ -48,6 +48,7 @@ import com.tasirin.httpdownloadmanager.util.UpdateInfo
 import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
+import com.tasirin.httpdownloadmanager.util.sha256Hex
 import java.io.File
 
 /** Halaman pengaturan: server remote, keamanan, log, unduhan, dan penyimpanan. */
@@ -414,7 +415,9 @@ class SettingsActivity : AppCompatActivity() {
             StoragePrefs.setFsFullAccessEnabled(this, !StoragePrefs.isFsFullAccessEnabled(this))
             renderChecks()
         }
-        binding.inputPin.setText(StoragePrefs.getServerPin(this).orEmpty())
+        // PIN disimpan sebagai hash — field dikosongkan, hint menjelaskan
+        // aturannya (kosongkan = nonaktif).
+        binding.inputPin.setText("")
         binding.inputPort.setText(
             String.format(java.util.Locale.US, "%d", StoragePrefs.serverPort(this))
         )
@@ -608,9 +611,11 @@ class SettingsActivity : AppCompatActivity() {
             applyExtraFolders(binding.root)
             applyGalleryFolders()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
-            val oldPin = StoragePrefs.getServerPin(this).orEmpty()
-            if (newPin != oldPin) {
-                App.logEvent(if (newPin.isEmpty()) "PIN DIHAPUS" else "PIN DIATUR")
+            val oldPinHash = StoragePrefs.getServerPin(this).orEmpty()
+            if (newPin.isEmpty()) {
+                if (oldPinHash.isNotEmpty()) App.logEvent("PIN DIHAPUS")
+            } else if (sha256Hex(newPin) != oldPinHash) {
+                App.logEvent("PIN DIATUR")
             }
             StoragePrefs.setServerPin(this, newPin)
             if (StoragePrefs.isPinEnforced(this) &&

@@ -24,11 +24,11 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
-import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
+import com.tasirin.httpdownloadmanager.util.sha256Hex
 import androidx.documentfile.provider.DocumentFile
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -50,7 +50,6 @@ import java.io.RandomAccessFile
 import java.io.FileOutputStream
 import java.io.BufferedOutputStream
 import java.net.Inet4Address
-import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -225,18 +224,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun pinEnabled(): Boolean =
         !StoragePrefs.getServerPin(context).isNullOrEmpty()
 
+    /** Normalisasi PIN tersimpan menjadi hash SHA-256. Nilai lama dari versi
+     *  sebelum hash berupa plaintext — di-hash sekali supaya cookie lama tetap
+     *  berlaku tanpa memaksa login ulang. */
+    private fun storedPinHash(): String? {
+        val stored = StoragePrefs.getServerPin(context).orEmpty()
+        if (stored.isEmpty()) return null
+        return if (stored.length == 64 && stored.all { it in HEX_CHARS }) stored
+        else sha256Hex(stored)
+    }
+
     private fun pinOk(session: IHTTPSession): Boolean {
-        if (!pinEnabled()) return true
-        val expected = sha256(StoragePrefs.getServerPin(context).orEmpty())
+        val expected = storedPinHash() ?: return true
         val cookie = session.headers["cookie"] ?: return false
         return cookie.split(";").any {
             it.trim().startsWith("dm_pin=$expected")
         }
     }
-
-    private fun sha256(value: String): String = runCatching {
-        Hex.encode(MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)))
-    }.getOrDefault("")
 
     private fun login(session: IHTTPSession): Response {
         val now = System.currentTimeMillis()
@@ -246,8 +250,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         val params = readForm(session)
         val pin = params["pin"].orEmpty()
-        val stored = StoragePrefs.getServerPin(context).orEmpty()
-        return if (stored.isNotEmpty() && pin == stored) {
+        val stored = storedPinHash()
+        return if (stored != null && stored == sha256Hex(pin)) {
             loginFailures = 0
             appendLog("LOGIN BERHASIL (${session.remoteIpAddress})")
             val r = newFixedLengthResponse(
@@ -255,7 +259,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 "text/html",
                 "<html><body>OK</body></html>"
             )
-            r.addHeader("Set-Cookie", "dm_pin=${sha256(stored)}; Max-Age=2592000; Path=/")
+            r.addHeader("Set-Cookie", "dm_pin=$stored; Max-Age=2592000; Path=/")
             r.addHeader("Location", "/")
             r
         } else {
@@ -619,7 +623,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         length: Long
     ): Response {
         val id = session.parms["id"]?.trim()?.take(64)
-            ?: sha256("$name|$folderPath").take(16)
+            ?: sha256Hex("$name|$folderPath").take(16)
         // Upload sudah selesai / sedang difinalisasi: balas cepat. Body tetap
         // dibaca & dibuang supaya koneksi keep-alive tidak rusak dan browser
         // tidak menganggap permintaan gagal (menutup koneksi saat body masih
@@ -979,7 +983,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun getOrCreateThumb(raw: String): File? {
-        val key = sha256(raw).take(16)
+        val key = sha256Hex(raw).take(16)
         val dir = File(context.cacheDir, "thumbs").apply { runCatching { mkdirs() } }
         if (!dir.isDirectory) return null
         val cached = File(dir, "$key.jpg")
@@ -1974,6 +1978,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val DEFAULT_CHUNK_BYTES = 2L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
+        private const val HEX_CHARS = "0123456789abcdef"
         private const val FS_STATS_TTL_MS = 10_000L
         private const val SSE_MIN_INTERVAL_MS = 1_000L
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu

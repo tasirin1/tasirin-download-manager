@@ -138,9 +138,11 @@ object StoragePrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_SERVER_PIN, null)?.takeIf { it.isNotBlank() }
 
+    /** Simpan PIN sebagai hash SHA-256; nilai kosong menghapus PIN. */
     fun setServerPin(context: Context, pin: String?) {
+        val hash = pin?.trim()?.takeIf { it.isNotEmpty() }?.let { sha256Hex(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
-            putString(KEY_SERVER_PIN, pin?.trim()?.takeIf { it.isNotEmpty() })
+            putString(KEY_SERVER_PIN, hash)
         }
     }
 
