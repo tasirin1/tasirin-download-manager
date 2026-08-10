@@ -13,7 +13,6 @@ import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import android.text.Editable
@@ -31,6 +30,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -188,7 +188,7 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
         runCatching {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         }.onFailure {
             Toast.makeText(this, R.string.open_remote_failed, Toast.LENGTH_SHORT).show()
         }
@@ -252,7 +252,7 @@ class SettingsActivity : AppCompatActivity() {
                     startActivity(
                         Intent(
                             Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:$packageName")
+                            "package:$packageName".toUri()
                         )
                     )
                 }.onFailure {
@@ -580,16 +580,20 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun wireGallerySection() {
-        binding.inputGalleryImage.setText(StoragePrefs.getGalleryImageFolder(this).orEmpty())
-        binding.inputGalleryVideo.setText(StoragePrefs.getGalleryVideoFolder(this).orEmpty())
+        // View binding tidak mengekspos view dari <include>, jadi pakai
+        // findViewById (pola yang sama seperti wireStorageSection).
+        findViewById<EditText>(R.id.input_gallery_image)
+            .setText(StoragePrefs.getGalleryImageFolder(this).orEmpty())
+        findViewById<EditText>(R.id.input_gallery_video)
+            .setText(StoragePrefs.getGalleryVideoFolder(this).orEmpty())
     }
 
     private fun applyGalleryFolders() {
         StoragePrefs.setGalleryImageFolder(
-            this, binding.inputGalleryImage.text?.toString()?.trim().orEmpty()
+            this, findViewById<EditText>(R.id.input_gallery_image).text?.toString()?.trim().orEmpty()
         )
         StoragePrefs.setGalleryVideoFolder(
-            this, binding.inputGalleryVideo.text?.toString()?.trim().orEmpty()
+            this, findViewById<EditText>(R.id.input_gallery_video).text?.toString()?.trim().orEmpty()
         )
         App.logEvent("FOLDER GALERI: foto=${StoragePrefs.getGalleryImageFolder(this) ?: "semua"} video=${StoragePrefs.getGalleryVideoFolder(this) ?: "semua"}")
     }
@@ -789,7 +793,7 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(
                 Intent(
                     Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                    Uri.parse("package:$packageName")
+                    "package:$packageName".toUri()
                 )
             )
         }.onFailure {

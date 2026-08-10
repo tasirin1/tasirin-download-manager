@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager.remote
 
+import androidx.core.net.toUri
 import android.content.ContentUris
 import android.content.Context
 import android.os.Build
@@ -44,7 +45,7 @@ object ZipCreator {
                     name = f.name
                     input = if (f.isFile) f.inputStream() else null
                 } else {
-                    val uri = android.net.Uri.parse(raw.removePrefix("u:"))
+                    val uri = raw.removePrefix("u:").toUri()
                     name = displayNameFor(context, uri)
                     input = context.contentResolver.openInputStream(uri)
                 }

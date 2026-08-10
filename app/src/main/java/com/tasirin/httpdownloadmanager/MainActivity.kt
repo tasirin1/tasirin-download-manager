@@ -31,6 +31,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
@@ -61,6 +62,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: DownloadAdapter
     private var pendingMoveId: String? = null
+    private lateinit var statTotal: TextView
+    private lateinit var statActive: TextView
+    private lateinit var statDone: TextView
+    private lateinit var statFailed: TextView
+    private lateinit var statActiveLabel: TextView
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -93,6 +99,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         applyEdgeToEdge(binding.root)
+        // Cache TextView statistik: updateStats dipanggil ~2x/detik saat
+        // download aktif, findViewById tiap tick tidak perlu.
+        statTotal = binding.statTotalValue
+        statActive = binding.statActiveValue
+        statDone = binding.statDoneValue
+        statFailed = binding.statFailedValue
+        statActiveLabel = binding.statActiveLabel
 
         setSupportActionBar(binding.toolbar)
 
@@ -228,7 +241,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             return
         }
         runCatching {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         }.onFailure {
             Snackbar.make(binding.root, R.string.open_remote_failed, Snackbar.LENGTH_SHORT).show()
         }
@@ -617,7 +630,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 startActivity(
                     Intent(
                         Intent.ACTION_VIEW,
-                        Uri.parse("https://github.com/tasirin1/tasirin-download-manager")
+                        "https://github.com/tasirin1/tasirin-download-manager".toUri()
                     )
                 )
             }
@@ -798,7 +811,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             startActivity(
                 Intent(
                     Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                    Uri.parse("package:$packageName")
+                    "package:$packageName".toUri()
                 )
             )
         }.onFailure {
@@ -933,18 +946,24 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     private fun updateStats(items: List<DownloadItem>) {
-        val active = items.count {
-            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
+        var active = 0
+        var done = 0
+        var failed = 0
+        var speed = 0L
+        for (item in items) {
+            when (item.state) {
+                DownloadState.DOWNLOADING, DownloadState.PENDING -> active++
+                DownloadState.COMPLETED -> done++
+                DownloadState.FAILED -> failed++
+                else -> {}
+            }
+            if (item.state == DownloadState.DOWNLOADING) speed += item.speedBps
         }
-        val done = items.count { it.state == DownloadState.COMPLETED }
-        val failed = items.count { it.state == DownloadState.FAILED }
-        val speed = items.filter { it.state == DownloadState.DOWNLOADING }
-            .fold(0L) { acc, it -> acc + it.speedBps }
-        findViewById<TextView>(R.id.stat_total_value)?.text = items.size.toString()
-        findViewById<TextView>(R.id.stat_active_value)?.text = active.toString()
-        findViewById<TextView>(R.id.stat_done_value)?.text = done.toString()
-        findViewById<TextView>(R.id.stat_failed_value)?.text = failed.toString()
-        findViewById<TextView>(R.id.stat_active_label)?.text = getString(
+        statTotal.text = items.size.toString()
+        statActive.text = active.toString()
+        statDone.text = done.toString()
+        statFailed.text = failed.toString()
+        statActiveLabel.text = getString(
             if (speed > 0) R.string.stat_active_speed else R.string.stat_active,
             Formats.speed(speed)
         )
@@ -1011,7 +1030,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val mime = MimeTypes.forFile(item.fileName)
         val intent = when {
             !item.contentUri.isNullOrEmpty() -> {
-                Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(item.contentUri), mime)
+                Intent(Intent.ACTION_VIEW).setDataAndType(item.contentUri.toUri(), mime)
             }
             !item.filePath.isNullOrEmpty() -> {
                 val uri = FileProvider.getUriForFile(
@@ -1065,7 +1084,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
             !item.contentUri.isNullOrEmpty() -> {
-                val uri = Uri.parse(item.contentUri)
+                val uri = item.contentUri.toUri()
                 val rel = runCatching {
                     if (Build.VERSION.SDK_INT >= 29 && uri.authority == MediaStore.AUTHORITY) {
                         contentResolver.query(

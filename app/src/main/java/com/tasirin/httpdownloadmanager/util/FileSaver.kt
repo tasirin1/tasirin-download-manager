@@ -8,6 +8,7 @@ import android.os.Environment
 import android.os.StatFs
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import java.io.File
@@ -356,7 +357,7 @@ class FileSaver(context: Context) {
     fun deleteFiles(item: DownloadItem) {
         partialFiles(item).forEach { runCatching { it.delete() } }
         if (!item.contentUri.isNullOrEmpty()) {
-            runCatching { appContext.contentResolver.delete(Uri.parse(item.contentUri), null, null) }
+            runCatching { appContext.contentResolver.delete(item.contentUri.toUri(), null, null) }
         }
         if (!item.filePath.isNullOrEmpty()) {
             runCatching { File(item.filePath).delete() }
@@ -368,7 +369,7 @@ class FileSaver(context: Context) {
         return runCatching {
             when {
                 !item.contentUri.isNullOrEmpty() -> {
-                    val uri = Uri.parse(item.contentUri)
+                    val uri = item.contentUri.toUri()
                     if (Build.VERSION.SDK_INT >= 29 && uri.authority == MediaStore.AUTHORITY) {
                         val rel = mediaRelativePath(uri)?.trim('/')
                         val finalName = if (rel != null) {
@@ -402,7 +403,7 @@ class FileSaver(context: Context) {
                 ?: return null
             val input = when {
                 !item.contentUri.isNullOrEmpty() ->
-                    appContext.contentResolver.openInputStream(Uri.parse(item.contentUri))
+                    appContext.contentResolver.openInputStream(item.contentUri.toUri())
                 !item.filePath.isNullOrEmpty() -> File(item.filePath).inputStream()
                 else -> null
             } ?: return null
@@ -473,7 +474,7 @@ class FileSaver(context: Context) {
         return runCatching {
             when {
                 !result.contentUri.isNullOrEmpty() -> {
-                    val uri = Uri.parse(result.contentUri)
+                    val uri = result.contentUri.toUri()
                     if (Build.VERSION.SDK_INT >= 29 && uri.authority == MediaStore.AUTHORITY) {
                         val values = ContentValues().apply {
                             put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/$sub/")

@@ -12,6 +12,8 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.BatteryManager
+import android.annotation.SuppressLint
+import androidx.core.net.toUri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -22,6 +24,7 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
+import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
@@ -54,7 +57,11 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.zip.ZipOutputStream
 import java.net.NetworkInterface
 
-class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.serverPort(context)) {
+class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort(appContext)) {
+    // Object ini hidup seumur proses (disimpan statis di App.httpServer):
+    // simpan Application context saja, jangan pernah Activity (anti-leak).
+    @SuppressLint("StaticFieldLeak")
+    private val context: Context = appContext.applicationContext
 
     @Volatile
     var lastError: String? = null
@@ -228,9 +235,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
     }
 
     private fun sha256(value: String): String = runCatching {
-        val md = MessageDigest.getInstance("SHA-256")
-        md.digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        Hex.encode(MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)))
     }.getOrDefault("")
 
     private fun login(session: IHTTPSession): Response {
@@ -825,7 +830,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
         val allowed = when {
             raw.startsWith(FS_PREFIX) -> isFsPathAllowed(raw.removePrefix(FS_PREFIX))
             raw.startsWith("u:") -> runCatching {
-                isMediaUriAllowed(Uri.parse(raw.removePrefix("u:")))
+                isMediaUriAllowed(raw.removePrefix("u:").toUri())
             }.getOrDefault(false)
             else -> false
         }
@@ -897,7 +902,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             input = FileInputStream(file)
             total = file.length()
         } else if (!item.contentUri.isNullOrEmpty()) {
-            val uri = Uri.parse(item.contentUri)
+            val uri = item.contentUri.toUri()
             val resolver = context.contentResolver
             val stream = resolver.openInputStream(uri) ?: return notFound()
             val len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
@@ -1005,7 +1010,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
                     }
                 }
                 raw.startsWith("u:") -> {
-                    val uri = Uri.parse(raw.substring(2))
+                    val uri = raw.substring(2).toUri()
                     if (!isMediaUriAllowed(uri)) return null
                     val name = DocumentFile.fromSingleUri(context, uri)?.name.orEmpty()
                     if (MediaLibrary.mediaKind(name) == "video") {
@@ -1099,7 +1104,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
                 name = file.name
             }
             raw.startsWith("u:") -> {
-                val uri = Uri.parse(raw.substring(2))
+                val uri = raw.substring(2).toUri()
                 if (!isMediaUriAllowed(uri)) return notFound()
                 val resolver = context.contentResolver
                 val stream = resolver.openInputStream(uri) ?: return notFound()
@@ -1269,7 +1274,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             try {
                 when {
                     raw.startsWith("f:") -> mmr.setDataSource(File(raw.substring(2)).absolutePath)
-                    raw.startsWith("u:") -> mmr.setDataSource(context, Uri.parse(raw.substring(2)))
+                    raw.startsWith("u:") -> mmr.setDataSource(context, raw.substring(2).toUri())
                     else -> return 0L
                 }
                 mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
@@ -1308,7 +1313,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
         if (path != null) {
             android.graphics.BitmapFactory.decodeFile(path, opts)
         } else if (e.contentUri != null) {
-            context.contentResolver.openInputStream(Uri.parse(e.contentUri))?.use { s ->
+            context.contentResolver.openInputStream(e.contentUri.toUri())?.use { s ->
                 android.graphics.BitmapFactory.decodeStream(s, null, opts)
             }
         }
@@ -1590,7 +1595,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
     private fun fsActionMedia(action: String, uriStr: String, name: String, dest: String): Boolean {
         val resolver = context.contentResolver
         return runCatching {
-            val uri = Uri.parse(uriStr)
+            val uri = uriStr.toUri()
             if (!isMediaUriAllowed(uri)) return@runCatching false
             when (action) {
                 "delete" -> resolver.delete(uri, null, null) > 0
@@ -1905,7 +1910,7 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
             input = FileInputStream(file)
             total = file.length()
         } else if (!item.contentUri.isNullOrEmpty()) {
-            val uri = Uri.parse(item.contentUri)
+            val uri = item.contentUri.toUri()
             val resolver = context.contentResolver
             val stream = resolver.openInputStream(uri) ?: return notFound()
             total = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L

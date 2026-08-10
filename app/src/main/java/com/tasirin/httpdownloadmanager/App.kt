@@ -75,7 +75,11 @@ class App : Application() {
     @SuppressLint("StaticFieldLeak")
     companion object {
         const val CRASH_LOG_FILE = "crash.log"
+        // StaticFieldLeak: sengaja ditahan — kedua objek menyimpan Application
+        // context saja (dijamin di konstruktor) dan hidup seumur proses.
+        @SuppressLint("StaticFieldLeak")
         lateinit var engine: DownloadEngine
+        @SuppressLint("StaticFieldLeak")
         lateinit var httpServer: HttpControlServer
 
         /** Buat ulang server remote dengan port terbaru dari prefs.
@@ -89,7 +93,10 @@ class App : Application() {
         fun restartHttpServer(context: Context) {
             val wasAlive = httpServer.isAlive
             runCatching { httpServer.stopServer() }
-            httpServer = HttpControlServer(context)
+            // Wajib applicationContext: instance ini hidup seumur proses dan
+            // disimpan statis — Activity context (dari SettingsActivity) akan
+            // bocor. HttpControlServer juga menormalkan ulang di konstruktor.
+            httpServer = HttpControlServer(context.applicationContext)
             if (wasAlive) {
                 runCatching { httpServer.startServer() }
             }

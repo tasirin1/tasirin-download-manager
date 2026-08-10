@@ -622,103 +622,9 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- ===== SEKSI: GALERI ===== -->
-            <LinearLayout
-                android:id="@+id/section_gallery"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_status_card"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:id="@+id/header_gallery"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/settings_section_gallery"
-                        android:textColor="@color/primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:id="@+id/chevron_gallery"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        android:src="@drawable/ic_chevron"
-                        app:tint="@color/text_secondary" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/content_gallery"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="14dp"
-                    android:paddingBottom="14dp">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_gallery_image_label"
-                        android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-                    <EditText
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        android:minHeight="48dp"
-                        android:id="@+id/input_gallery_image"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:hint="@string/settings_gallery_folder_hint"
-                        android:importantForAutofill="no"
-                        android:inputType="text"
-                        android:maxLines="2" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/settings_gallery_video_label"
-                        android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-                    <EditText
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        android:minHeight="48dp"
-                        android:id="@+id/input_gallery_video"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:hint="@string/settings_gallery_folder_hint"
-                        android:importantForAutofill="no"
-                        android:inputType="text"
-                        android:maxLines="2" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="@string/settings_gallery_hint"
-                        android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-                </LinearLayout>
-            </LinearLayout>
+            <!-- ===== SEKSI: GALERI (di layout terpisah supaya jumlah view
+                 activity_settings di bawah ambang lint) ===== -->
+            <include layout="@layout/section_gallery" />
 
             <!-- ===== SEKSI: LAINNYA ===== -->
             <LinearLayout
@@ -805,7 +711,6 @@
     </ScrollView>
 
     <LinearLayout
-        android:id="@+id/save_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/card_bg"
