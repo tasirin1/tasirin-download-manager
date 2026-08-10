@@ -62,7 +62,9 @@ object ZipCreator {
         context.contentResolver.query(uri, projection, null, null, null)?.use { c ->
             if (c.moveToFirst()) {
                 val idx = c.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
-                if (idx >= 0) c.getString(idx)
+                if (idx >= 0) c.getString(idx) else null
+            } else {
+                null
             }
         }
     }.getOrNull()?.takeIf { it.isNotBlank() }
