@@ -47,7 +47,9 @@ class DownloadItemCodecTest {
             DownloadItemCodec.encode(listOf(item)), coerceActiveToPaused = false
         )
         assertEquals(1, decoded.size)
-        assertEquals(item, decoded[0])
+        // speedBps/etaSeconds sengaja transient (tidak dipersist, dihitung ulang
+        // saat download berjalan) — konsisten dengan perilaku lama.
+        assertEquals(item.copy(speedBps = 0, etaSeconds = 0), decoded[0])
     }
 
     @Test
