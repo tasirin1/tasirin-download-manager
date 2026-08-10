@@ -111,4 +111,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation("junit:junit:4.13.2")
+    // org.json asli untuk unit test JVM (android.jar hanya stub). Test-only:
+    // tidak ikut ke APK.
+    testImplementation("org.json:json:20240303")
 }
