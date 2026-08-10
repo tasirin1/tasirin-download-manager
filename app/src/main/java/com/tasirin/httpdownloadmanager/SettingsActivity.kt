@@ -2,9 +2,12 @@ package com.tasirin.httpdownloadmanager
 
 import android.annotation.SuppressLint
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
@@ -20,13 +23,16 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.zxing.BarcodeFormat
@@ -86,11 +92,116 @@ class SettingsActivity : AppCompatActivity() {
         wireGallerySection()
         wireSave()
         binding.btnCheckUpdate.setOnClickListener { checkForUpdate() }
+        setupCollapsibleSections()
+        setupQuickNav()
+        binding.btnOpenRemote.setOnClickListener { openRemoteNow() }
+        binding.btnCopyUrl.setOnClickListener { copyRemoteUrl() }
     }
 
     override fun onResume() {
         super.onResume()
         renderServer()
+    }
+
+
+
+    /** Seksi kartu yang bisa dilipat (state disimpan di StoragePrefs). */
+    private class SectionSpec(
+        val sectionId: Int,
+        val headerId: Int,
+        val contentId: Int,
+        val chevronId: Int,
+        val key: String
+    )
+
+    private val sections = listOf(
+        SectionSpec(R.id.section_server, R.id.header_server, R.id.content_server, R.id.chevron_server, "server"),
+        SectionSpec(R.id.section_download, R.id.header_download, R.id.content_download, R.id.chevron_download, "download"),
+        SectionSpec(R.id.section_storage, R.id.header_storage, R.id.content_storage, R.id.chevron_storage, "storage"),
+        SectionSpec(R.id.section_gallery, R.id.header_gallery, R.id.content_gallery, R.id.chevron_gallery, "gallery"),
+        SectionSpec(R.id.section_other, R.id.header_other, R.id.content_other, R.id.chevron_other, "other")
+    )
+
+    private val navMap = mapOf(
+        R.id.nav_server to sections[0],
+        R.id.nav_download to sections[1],
+        R.id.nav_storage to sections[2],
+        R.id.nav_gallery to sections[3],
+        R.id.nav_other to sections[4]
+    )
+
+    private fun setupCollapsibleSections() {
+        sections.forEach { spec ->
+            val content = findViewById<View>(spec.contentId)
+            val chevron = findViewById<ImageView>(spec.chevronId)
+            val collapsed = StoragePrefs.isSectionCollapsed(this, spec.key)
+            content.visibility = if (collapsed) View.GONE else View.VISIBLE
+            chevron.rotation = if (collapsed) 0f else 180f
+            findViewById<View>(spec.headerId).setOnClickListener {
+                val nowCollapsed = content.visibility == View.VISIBLE
+                content.visibility = if (nowCollapsed) View.GONE else View.VISIBLE
+                chevron.animate().rotation(if (nowCollapsed) 0f else 180f).setDuration(150).start()
+                StoragePrefs.setSectionCollapsed(this, spec.key, nowCollapsed)
+            }
+        }
+    }
+
+    private fun setupQuickNav() {
+        navMap.forEach { (chipId, spec) ->
+            findViewById<View>(chipId).setOnClickListener {
+                expandSection(spec)
+                scrollToSection(spec)
+            }
+        }
+    }
+
+    private fun expandSection(spec: SectionSpec) {
+        findViewById<View>(spec.contentId).visibility = View.VISIBLE
+        findViewById<ImageView>(spec.chevronId).rotation = 180f
+        StoragePrefs.setSectionCollapsed(this, spec.key, false)
+    }
+
+    private fun scrollToSection(spec: SectionSpec) {
+        val target = findViewById<View>(spec.sectionId) ?: return
+        var offset = 0
+        var p: View? = target
+        while (p != null && p.id != R.id.settings_content) {
+            offset += p.top
+            p = p.parent as? View
+        }
+        binding.scrollSettings.post {
+            binding.scrollSettings.smoothScrollTo(0, (offset - 8).coerceAtLeast(0))
+        }
+    }
+
+    private fun remoteUrl(): String? =
+        if (App.httpServer.isAlive) {
+            HttpControlServer.ipv4Addresses().firstOrNull()
+                ?.let { "http://$it:${App.httpServer.listeningPort}/" }
+        } else null
+
+    private fun openRemoteNow() {
+        val url = remoteUrl()
+        if (url == null) {
+            Toast.makeText(this, R.string.server_not_running_hint, Toast.LENGTH_SHORT).show()
+            return
+        }
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            Toast.makeText(this, R.string.open_remote_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun copyRemoteUrl() {
+        val url = remoteUrl()
+        if (url == null) {
+            Toast.makeText(this, R.string.server_not_running_hint, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("remote", url))
+        Toast.makeText(this, R.string.address_copied, Toast.LENGTH_SHORT).show()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -155,6 +266,8 @@ class SettingsActivity : AppCompatActivity() {
         binding.serverSwitch.text = getString(
             if (server.isAlive) R.string.server_stop else R.string.server_start
         )
+        binding.btnOpenRemote.isEnabled = server.isAlive
+        binding.btnCopyUrl.isEnabled = server.isAlive
         if (server.isAlive) {
             binding.serverStatus.setText(R.string.remote_running)
             val urls = HttpControlServer.ipv4Addresses()
@@ -218,11 +331,17 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun renderToggle(btn: Button, on: Boolean, label: String) {
-        btn.text = getString(
-            R.string.label_value,
-            label,
-            getString(if (on) R.string.toggle_on else R.string.toggle_off)
+        btn.text = label
+        val color = ContextCompat.getColor(
+            this, if (on) R.color.status_on else R.color.text_secondary
         )
+        btn.setTextColor(color)
+        if (btn is MaterialButton) {
+            btn.setIconResource(if (on) R.drawable.ic_check else R.drawable.ic_close)
+            btn.iconTint = ColorStateList.valueOf(color)
+            btn.iconGravity = MaterialButton.ICON_GRAVITY_END
+            btn.iconPadding = 12
+        }
     }
 
     private fun renderChecks() {

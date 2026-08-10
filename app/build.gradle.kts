@@ -73,6 +73,8 @@ android {
 
     buildFeatures {
         viewBinding = true
+        // buildConfig: BuildConfig.MIN_SDK/TARGET_SDK/VERSION_CODE untuk dialog Tentang.
+        buildConfig = true
     }
 
     lint {

@@ -13,443 +13,819 @@
         android:layout_height="?attr/actionBarSize"
         app:title="@string/action_settings" />
 
-    <ScrollView
+    <HorizontalScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp">
+
+            <TextView
+                android:id="@+id/nav_server"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:layout_marginEnd="6dp"
+                android:minHeight="40dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:text="@string/settings_section_server"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/nav_download"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:layout_marginEnd="6dp"
+                android:minHeight="40dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:text="@string/settings_section_download"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/nav_storage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:layout_marginEnd="6dp"
+                android:minHeight="40dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:text="@string/settings_section_storage"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/nav_gallery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:layout_marginEnd="6dp"
+                android:minHeight="40dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:text="@string/settings_section_gallery"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/nav_other"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:layout_marginEnd="6dp"
+                android:minHeight="40dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:text="@string/settings_nav_other"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <ScrollView
+        android:id="@+id/scroll_settings"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:fillViewport="true">
 
         <LinearLayout
+            android:id="@+id/settings_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="20dp"
-            android:paddingBottom="24dp">
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="16dp">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/settings_section_server"
-                android:textColor="@color/primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/server_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-            <Button
-                android:id="@+id/storage_btn"
-                style="@style/TvOutlinedButton"
+            <!-- ===== SEKSI: SERVER ===== -->
+            <LinearLayout
+                android:id="@+id/section_server"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/remote_storage_btn"
-                android:visibility="gone" />
+                android:background="@drawable/bg_status_card"
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/urls"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textIsSelectable="true"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
+                <LinearLayout
+                    android:id="@+id/header_server"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="14dp">
 
-            <ImageView
-                android:id="@+id/qr"
-                android:layout_width="200dp"
-                android:layout_height="200dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="12dp"
-                android:contentDescription="@string/remote_qr_desc"
-                android:visibility="gone" />
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_server"
+                        android:textColor="@color/primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
 
-            <Button
-                android:id="@+id/server_switch"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:minHeight="48dp"
-                android:text="@string/server_switch" />
+                    <ImageView
+                        android:id="@+id/chevron_server"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron"
+                        app:tint="@color/text_secondary" />
+                </LinearLayout>
 
-            <Button
-                android:id="@+id/check_server_autostart"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:nextFocusDown="@id/input_pin"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_server_autostart" />
+                <LinearLayout
+                    android:id="@+id/content_server"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="14dp"
+                    android:paddingBottom="14dp">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_pin_label"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
+                    <TextView
+                        android:id="@+id/server_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
 
-            <EditText
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:minHeight="48dp"
-                android:id="@+id/input_pin"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_input_tv"
-                android:hint="@string/settings_pin_hint"
-                android:maxLength="10"
-                android:inputType="textPassword"
-                tools:ignore="TextFields"
-                android:nextFocusDown="@id/check_pin_enforced"
-                android:nextFocusUp="@id/check_server_autostart" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/check_pin_enforced"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:nextFocusUp="@id/input_pin"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_pin_enforced" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_open_remote"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:minHeight="48dp"
+                            android:text="@string/open_remote"
+                            android:textSize="13sp" />
 
-            <Button
-                android:id="@+id/check_fs_full_access"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:nextFocusDown="@id/input_port"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_fs_full_access" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_copy_url"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:minHeight="48dp"
+                            android:text="@string/copy_address"
+                            android:textSize="13sp" />
+                    </LinearLayout>
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_port_label"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
+                    <Button
+                        android:id="@+id/storage_btn"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/remote_storage_btn"
+                        android:visibility="gone" />
 
-            <EditText
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:minHeight="48dp"
-                android:id="@+id/input_port"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_input_tv"
-                android:digits="0123456789"
-                android:hint="@string/settings_port_hint"
-                android:importantForAutofill="no"
-                android:inputType="text"
-                android:nextFocusDown="@id/btn_log"
-                android:nextFocusUp="@id/check_fs_full_access" />
+                    <TextView
+                        android:id="@+id/urls"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textIsSelectable="true"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-            <Button
-                android:id="@+id/btn_log"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:nextFocusUp="@id/input_port"
-                android:layout_marginTop="16dp"
-                android:text="@string/remote_log_label" />
+                    <ImageView
+                        android:id="@+id/qr"
+                        android:layout_width="200dp"
+                        android:layout_height="200dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="12dp"
+                        android:contentDescription="@string/remote_qr_desc"
+                        android:visibility="gone" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/settings_section_download"
-                android:textColor="@color/primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                    <Button
+                        android:id="@+id/server_switch"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:minHeight="48dp"
+                        android:text="@string/server_switch" />
 
-            <Button
-                android:id="@+id/check_background"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_background" />
+                    <Button
+                        android:id="@+id/check_server_autostart"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:nextFocusDown="@id/input_pin"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_server_autostart" />
 
-            <Button
-                android:id="@+id/check_autostart"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_autostart" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_pin_label"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-            <Button
-                android:id="@+id/check_auto_sort"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_auto_sort" />
+                    <EditText
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:minHeight="48dp"
+                        android:id="@+id/input_pin"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:hint="@string/settings_pin_hint"
+                        android:maxLength="10"
+                        android:inputType="textPassword"
+                        tools:ignore="TextFields"
+                        android:nextFocusDown="@id/check_pin_enforced"
+                        android:nextFocusUp="@id/check_server_autostart" />
 
-            <Button
-                android:id="@+id/check_small_first"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_small_first" />
+                    <Button
+                        android:id="@+id/check_pin_enforced"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:nextFocusUp="@id/input_pin"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_pin_enforced" />
 
-            <Button
-                android:id="@+id/check_battery"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_battery" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/settings_hint_pin"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
 
-            <Button
-                android:id="@+id/check_delete_partial"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="48dp"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:text="@string/settings_delete_partial_on_cancel" />
+                    <Button
+                        android:id="@+id/check_fs_full_access"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:nextFocusDown="@id/input_port"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_fs_full_access" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/settings_concurrent"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/settings_hint_fs"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
 
-            <Spinner
-                android:id="@+id/spinner_concurrent"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_port_label"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_speed_limit"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
+                    <EditText
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:minHeight="48dp"
+                        android:id="@+id/input_port"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:digits="0123456789"
+                        android:hint="@string/settings_port_hint"
+                        android:importantForAutofill="no"
+                        android:inputType="text"
+                        android:nextFocusDown="@id/btn_log"
+                        android:nextFocusUp="@id/check_fs_full_access" />
 
-            <Spinner
-                android:id="@+id/spinner_speed"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                    <Button
+                        android:id="@+id/btn_log"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nextFocusUp="@id/input_port"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/remote_log_label" />
+                </LinearLayout>
+            </LinearLayout>
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_retry"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-            <Spinner
-                android:id="@+id/spinner_retry"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_segments"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-            <Spinner
-                android:id="@+id/spinner_segments"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_connect_timeout"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-            <Spinner
-                android:id="@+id/spinner_connect_timeout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_read_timeout"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-            <Spinner
-                android:id="@+id/spinner_read_timeout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_timeout_hint"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="?android:attr/textColorSecondary" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/settings_section_storage"
-                android:textColor="@color/primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <include
-                layout="@layout/view_storage_section" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/settings_section_gallery"
-                android:textColor="@color/primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="@string/settings_gallery_image_label"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-            <EditText
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:minHeight="48dp"
-                android:id="@+id/input_gallery_image"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_input_tv"
-                android:hint="@string/settings_gallery_folder_hint"
-                android:importantForAutofill="no"
-                android:inputType="text"
-                android:maxLines="2" />
-
-            <TextView
+            <!-- ===== SEKSI: UNDUHAN ===== -->
+            <LinearLayout
+                android:id="@+id/section_download"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/settings_gallery_video_label"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
+                android:background="@drawable/bg_status_card"
+                android:orientation="vertical">
 
-            <EditText
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:minHeight="48dp"
-                android:id="@+id/input_gallery_video"
+                <LinearLayout
+                    android:id="@+id/header_download"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_download"
+                        android:textColor="@color/primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <ImageView
+                        android:id="@+id/chevron_download"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron"
+                        app:tint="@color/text_secondary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/content_download"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="14dp"
+                    android:paddingBottom="14dp">
+
+                    <Button
+                        android:id="@+id/check_background"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_background" />
+
+                    <Button
+                        android:id="@+id/check_autostart"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_autostart" />
+
+                    <Button
+                        android:id="@+id/check_auto_sort"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_auto_sort" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/settings_hint_auto_sort"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <Button
+                        android:id="@+id/check_small_first"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_small_first" />
+
+                    <Button
+                        android:id="@+id/check_battery"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_battery" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/settings_hint_battery"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <Button
+                        android:id="@+id/check_delete_partial"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_delete_partial_on_cancel" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/settings_concurrent"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <Spinner
+                        android:id="@+id/spinner_concurrent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="12dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_speed_limit"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <Spinner
+                        android:id="@+id/spinner_speed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="12dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_retry"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <Spinner
+                        android:id="@+id/spinner_retry"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="12dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_segments"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <Spinner
+                        android:id="@+id/spinner_segments"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="12dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_connect_timeout"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <Spinner
+                        android:id="@+id/spinner_connect_timeout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="12dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_read_timeout"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <Spinner
+                        android:id="@+id/spinner_read_timeout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="12dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_timeout_hint"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== SEKSI: PENYIMPANAN ===== -->
+            <LinearLayout
+                android:id="@+id/section_storage"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_input_tv"
-                android:hint="@string/settings_gallery_folder_hint"
-                android:importantForAutofill="no"
-                android:inputType="text"
-                android:maxLines="2" />
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_status_card"
+                android:orientation="vertical">
 
-            <TextView
+                <LinearLayout
+                    android:id="@+id/header_storage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_storage"
+                        android:textColor="@color/primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <ImageView
+                        android:id="@+id/chevron_storage"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron"
+                        app:tint="@color/text_secondary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/content_storage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="14dp"
+                    android:paddingBottom="14dp">
+
+                    <include layout="@layout/view_storage_section" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== SEKSI: GALERI ===== -->
+            <LinearLayout
+                android:id="@+id/section_gallery"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/settings_gallery_hint"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="?android:attr/textColorSecondary" />
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_status_card"
+                android:orientation="vertical">
 
-            <TextView
+                <LinearLayout
+                    android:id="@+id/header_gallery"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_gallery"
+                        android:textColor="@color/primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <ImageView
+                        android:id="@+id/chevron_gallery"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron"
+                        app:tint="@color/text_secondary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/content_gallery"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="14dp"
+                    android:paddingBottom="14dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_gallery_image_label"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <EditText
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:minHeight="48dp"
+                        android:id="@+id/input_gallery_image"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_input_tv"
+                        android:hint="@string/settings_gallery_folder_hint"
+                        android:importantForAutofill="no"
+                        android:inputType="text"
+                        android:maxLines="2" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/settings_gallery_video_label"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <EditText
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:minHeight="48dp"
+                        android:id="@+id/input_gallery_video"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_input_tv"
+                        android:hint="@string/settings_gallery_folder_hint"
+                        android:importantForAutofill="no"
+                        android:inputType="text"
+                        android:maxLines="2" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/settings_gallery_hint"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== SEKSI: LAINNYA ===== -->
+            <LinearLayout
+                android:id="@+id/section_other"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/settings_section_cleanup"
-                android:textColor="@color/primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_status_card"
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btn_cleanup"
-                style="@style/TvOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="@string/cleanup_button" />
+                <LinearLayout
+                    android:id="@+id/header_other"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="14dp">
 
-            <TextView
-                android:id="@+id/cleanup_result"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="?android:attr/textColorSecondary" />
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_nav_other"
+                        android:textColor="@color/primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/settings_section_update"
-                android:textColor="@color/primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                    <ImageView
+                        android:id="@+id/chevron_other"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron"
+                        app:tint="@color/text_secondary" />
+                </LinearLayout>
 
-            <TextView
-                android:id="@+id/update_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="?android:attr/textColorSecondary" />
+                <LinearLayout
+                    android:id="@+id/content_other"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="14dp"
+                    android:paddingBottom="14dp">
 
-            <Button
-                android:id="@+id/btn_check_update"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_btn_tv"
-                android:backgroundTint="@null"
-                android:text="@string/update_check" />
+                    <Button
+                        android:id="@+id/btn_cleanup"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/cleanup_button" />
 
-            <Button
-                android:id="@+id/btn_save"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:background="@drawable/bg_btn_tv"
-                android:backgroundTint="@null"
-                android:text="@string/save" />
+                    <TextView
+                        android:id="@+id/cleanup_result"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/update_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <Button
+                        android:id="@+id/btn_check_update"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_btn_tv"
+                        android:backgroundTint="@null"
+                        android:text="@string/update_check" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/save_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/card_bg"
+        android:elevation="6dp"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="10dp">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/line" />
+
+        <Button
+            android:id="@+id/btn_save"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_btn_tv"
+            android:backgroundTint="@null"
+            android:text="@string/save" />
+    </LinearLayout>
 </LinearLayout>

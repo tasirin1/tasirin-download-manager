@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="about_icons">
+        <item>&#128104;&#8205;&#128187;</item>
+        <item>&#128241;</item>
+        <item>&#129302;</item>
+        <item>&#128736;&#65039;</item>
+        <item>&#128483;&#65039;</item>
+        <item>&#128250;</item>
+        <item>&#127760;</item>
+        <item>&#9749;</item>
+    </string-array>
+    <string-array name="about_rows">
+        <item>Pembuat: Julius Rudi Tasirin</item>
+        <item>Dibuat pakai: Samsung A05 (RAM 4 GB, ROM 64 GB)</item>
+        <item>Dikoding oleh: AnyClaw AI — berbekal prompt AI yang baik</item>
+        <item>Didukung: pemahaman mendalam tentang IT</item>
+        <item>Bahasa: Indonesia lengkap (aplikasi &amp; remote web)</item>
+        <item>Untuk: Android — HP, STB &amp; TV box</item>
+        <item>VPN: Indonesia</item>
+        <item>Bekal: segelas kopi + waktu luang</item>
+    </string-array>
+</resources>

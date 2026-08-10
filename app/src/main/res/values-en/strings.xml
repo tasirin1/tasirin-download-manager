@@ -89,6 +89,17 @@
     <string name="server_status_detail_off">Turn on via Settings</string>
     <string name="server_not_running_hint">Server is off. Turn it on in Settings.</string>
     <string name="open_remote_failed">Failed to open remote web</string>
+    <string name="copy_address">Copy Address</string>
+    <string name="address_copied">Remote address copied to clipboard</string>
+    <string name="settings_hint_pin">PIN is required to open the remote web from a browser</string>
+    <string name="settings_hint_fs">Let the remote file manager read the whole storage (Android 11+)</string>
+    <string name="settings_hint_auto_sort">Files are auto-moved to category folders when finished</string>
+    <string name="settings_hint_battery">Turn off battery optimization so downloads &amp; server keep running in background</string>
+    <string name="settings_nav_other">Other</string>
+    <string name="about_github">Open GitHub</string>
+    <string name="about_check_update">Check Update</string>
+    <string name="about_tech">minSdk %1$d · targetSdk %2$d · build %3$d</string>
+    <string name="about_releases_hint">Open the GitHub releases page for the latest version</string>
     <string name="stat_total">Total</string>
     <string name="stat_active">Active</string>
     <string name="stat_done">Done</string>
@@ -99,20 +110,6 @@
     <string name="log_export_failed">Failed to export log</string>
     <string name="about_title">About Tasirin Download Manager</string>
     <string name="about_version">Version %1$s</string>
-    <string name="about_profile">&#128100; Creator: Julius Rudi Tasirin
-&#128241; Built on: Samsung A05 (4 GB RAM, 64 GB ROM)
-&#129302; Coded by: AnyClaw AI — backed by good AI prompting skills
-&#129504; Powered by: deep IT understanding
-&#128492; Language: complete Indonesian (app &amp; remote web)
-&#128250; Made for: Android — phones, STB &amp; TV boxes (tested on B860H V2 + Sharp Aquos TV)
-&#127760; VPN: Indonesia
-&#9881;&#65039; Build &amp; source code: GitHub
-&#9749; Powered by: a cup of coffee + spare time
-&#128481; Network: Tenda N318 WiFi router (WISP)
-&#128049; Faithful companion when stressed &amp; hunting bugs: the cat
-&#128293; It started from: boredom &amp; strong curiosity
-&#128218; Will to learn: never-ending
-&#128025; GitHub: tasirin1</string>
     <string name="ok">OK</string>
     <string name="checksum_hint_optional">Optional checksum (md5:/sha1:/sha256:) — e.g. md5:abcdef&#8230;</string>
     <string name="shortcut_add_download">Add Download</string>
@@ -147,8 +144,6 @@
     <string name="server_switch">Server</string>
     <string name="server_start">Start server</string>
     <string name="server_stop">Stop server</string>
-    <string name="toggle_on">On</string>
-    <string name="toggle_off">Off</string>
     <string name="settings_segments">Parallel segments per download</string>
 
     <string name="previous_crash_title">Error log from previous launch</string>
@@ -299,7 +294,6 @@
         <item quantity="other">Cleaned: %1$d files (%2$s) removed</item>
     </plurals>
     <string name="cleanup_empty">No junk files found</string>
-    <string name="about_version_build">%1$s (build %2$d)\n\n%3$s</string>
     <string name="label_value">%1$s: %2$s</string>
     <string name="gallery_thumb_desc">Media preview</string>
 </resources>
