@@ -23,9 +23,12 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        // Hanya bahasa id/in (Indonesia) + en yang ikut di APK; locale library
-        // lain (ar, de, fr, es, ...) dibuang dari resources.arsc — hemat ukuran.
-        resConfigs += listOf("en", "in", "id")
+    }
+
+    // Hanya bahasa id/in (Indonesia) + en yang ikut di APK; locale library lain
+    // (ar, de, fr, es, ...) dibuang dari resources.arsc — hemat ukuran.
+    androidResources {
+        localeFilters += listOf("en", "in", "id")
     }
 
     signingConfigs {
