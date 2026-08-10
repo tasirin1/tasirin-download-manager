@@ -107,8 +107,8 @@ class DownloadItemCodecTest {
         assertEquals(1, decoded.size)
         val it = decoded[0]
         assertEquals("", it.checksum)
-        assertEquals(emptyList(), it.mirrors)
-        assertEquals(emptyList(), it.segments)
+        assertTrue(it.mirrors.isEmpty())
+        assertTrue(it.segments.isEmpty())
         assertEquals(false, it.monitor)
         assertEquals(0, it.addedAt)
     }
