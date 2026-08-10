@@ -126,8 +126,9 @@ diperbarui.
 5. `assembleRelease` **hanya bila `KEYSTORE_BASE64` terisi** (artifact `app-release`).
 6. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
 7. Publish release `v1.0` dengan APK signed (fallback debug bila tanpa secrets).
-8. **VirusTotal scan** (opsional, hanya bila `VT_API_KEY` terisi) — tautan laporan
-   muncul di log build.
+8. **VirusTotal scan** (opsional, hanya bila `VT_API_KEY` terisi) — submit APK
+   rilis, polling sampai analisis selesai, lalu ringkasan deteksi (X/Y engine)
+   dicetak di log + job summary; hanya jalan pada push ke `main` (bukan PR).
 
 ## Secrets yang dibutuhkan (Settings → Secrets and variables → Actions)
 

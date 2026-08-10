@@ -107,14 +107,66 @@ jobs:
             --notes "APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box. Beri izin Penyimpanan saat diminta." \
             --latest
 
-      - name: VirusTotal scan (jika API key tersedia)
+      - name: VirusTotal submit (jika API key tersedia)
+        id: vt-submit
         if: github.event_name != 'pull_request' && env.VT_API_KEY != ''
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
           [ -f app/build/outputs/apk/release/app-release.apk ] && APK="app/build/outputs/apk/release/app-release.apk"
           SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          echo "Mengunggah $APK ke VirusTotal..."
+          echo "SHA-256: $SHA"
           RESP=$(curl -s --max-time 120 -H "x-apikey: $VT_API_KEY" \
             --form "file=@$APK" https://www.virustotal.com/api/v3/files)
           ID=$(echo "$RESP" | jq -r '.data.id // empty')
-          echo "VirusTotal analysis id: $ID"
-          echo "VirusTotal report: https://www.virustotal.com/gui/file/$SHA"
+          if [ -z "$ID" ]; then
+            echo "::warning::VirusTotal menolak upload: $(echo "$RESP" | jq -c '.error // .' | head -c 300)"
+          else
+            echo "VirusTotal analysis id: $ID"
+            echo "VirusTotal report: https://www.virustotal.com/gui/file/$SHA"
+            echo "id=$ID" >> "$GITHUB_OUTPUT"
+            echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: VirusTotal tunggu hasil & ringkasan
+        if: steps.vt-submit.outputs.id != ''
+        run: |
+          ID="${{ steps.vt-submit.outputs.id }}"
+          SHA="${{ steps.vt-submit.outputs.sha }}"
+          STATUS="queued"
+          TRIES=0
+          while [ "$STATUS" = "queued" ] || [ "$STATUS" = "in-progress" ]; do
+            TRIES=$((TRIES + 1))
+            if [ "$TRIES" -gt 30 ]; then
+              echo "::warning::VirusTotal belum selesai setelah ~10 menit — cek manual: https://www.virustotal.com/gui/file/$SHA"
+              exit 0
+            fi
+            sleep 20
+            RESP=$(curl -s --max-time 60 -H "x-apikey: $VT_API_KEY" \
+              "https://www.virustotal.com/api/v3/analyses/$ID")
+            STATUS=$(echo "$RESP" | jq -r '.data.attributes.status // "queued"')
+          done
+          echo "Status analisis: $STATUS"
+          if [ "$STATUS" != "completed" ]; then
+            echo "::warning::Analisis VirusTotal selesai dengan status '$STATUS' — cek manual: https://www.virustotal.com/gui/file/$SHA"
+            exit 0
+          fi
+          STATS=$(echo "$RESP" | jq -c '.data.attributes.stats // {}')
+          MALICIOUS=$(echo "$STATS" | jq -r '.malicious // 0')
+          SUSPICIOUS=$(echo "$STATS" | jq -r '.suspicious // 0')
+          TOTAL=$(echo "$STATS" | jq '[.[] | numbers] | add // 0')
+          echo "VirusTotal: $MALICIOUS dari $TOTAL engine mendeteksi malware"
+          echo "  malicious: $MALICIOUS | suspicious: $SUSPICIOUS | total: $TOTAL"
+          if [ "$MALICIOUS" -gt 0 ] || [ "$SUSPICIOUS" -gt 0 ]; then
+            echo "::warning::VirusTotal melaporkan $MALICIOUS malicious / $SUSPICIOUS suspicious — cek https://www.virustotal.com/gui/file/$SHA"
+            echo "$RESP" | jq -r '.data.attributes.results // {} | to_entries[] | select(.value.category == "malicious" or .value.category == "suspicious") | "  - \(.key): \(.value.result // .value.category)"'
+          else
+            echo "VirusTotal: bersih (tidak ada deteksi)"
+          fi
+          {
+            echo "### VirusTotal"
+            echo ""
+            echo "- Status: **completed**"
+            echo "- Deteksi: **$MALICIOUS/$TOTAL** engine"
+            echo "- Report: https://www.virustotal.com/gui/file/$SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
