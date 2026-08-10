@@ -611,20 +611,23 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 textSize = 16f
                 setPadding(0, 0, dp(10), 0)
             }
-            val text = TextView(this).apply {
+            val txt = TextView(this).apply {
                 text = texts[i]
                 textSize = 13.5f
                 lineSpacingMultiplier = 1.05f
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
             }
             row.addView(icon)
-            row.addView(text, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(txt, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             rows.addView(row, lp)
         }
+        val targetSdk = runCatching {
+            packageManager.getApplicationInfo(packageName, 0).targetSdkVersion
+        }.getOrDefault(36)
         view.findViewById<TextView>(R.id.about_footer).text = getString(
             R.string.about_tech,
-            BuildConfig.MIN_SDK_VERSION,
-            BuildConfig.TARGET_SDK_VERSION,
+            21, // minSdk dijaga 21 (aturan AGENTS.md: jangan naikkan)
+            targetSdk,
             build
         )
         view.findViewById<Button>(R.id.btn_about_github).setOnClickListener {
