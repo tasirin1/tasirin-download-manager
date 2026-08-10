@@ -7,4 +7,8 @@
     <color name="status_on">#2E7D32</color>
     <color name="status_off">#B00020</color>
     <color name="text_secondary">#757575</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="line">#E3E8F2</color>
+    <color name="chip_pressed">#E8EAF6</color>
+    <color name="progress_track">#E0E0E0</color>
 </resources>
