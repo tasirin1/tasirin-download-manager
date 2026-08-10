@@ -28,16 +28,20 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di `README.md
 │       │   └── DownloadService.kt    # Foreground service + notifikasi + lanjut otomatis
 │       ├── receiver/BootReceiver.kt  # Auto-start saat boot (download & server)
 │       ├── remote/HttpControlServer.kt # Server HTTP remote (nanohttpd) + semua endpoint API
+│       ├── remote/QrCode.kt          # QR PNG untuk /api/qr (pakai util/QrEncoder)
 │       ├── ui/DownloadAdapter.kt     # RecyclerView adapter daftar download
 │       └── util/
 │           ├── Updater.kt            # Self-update APK dari GitHub release + verifikasi tanda tangan
 │           ├── FileSaver.kt          # Simpan file (MediaStore / folder, auto-sort)
 │           ├── MediaLibrary.kt       # Scan galeri + thumbnail (kondisional API 29+)
 │           ├── StoragePrefs.kt       # Semua kunci SharedPreferences ("storage_settings")
+│           ├── QrEncoder.kt          # Encoder QR mandiri (tanpa zxing di APK)
+│           ├── Spinners.kt, Streams.kt  # Helper spinner + baca stream terbatas
 │           ├── MimeTypes.kt, Crypto.kt, Formats.kt, FileNames.kt,
 │           ├── NotificationHelper.kt, TlsCompat.kt            # Pendukung
 ├── app/src/test/                     # Unit test JVM (junit4): Formats, FileNames,
-│                                     # MimeTypes, DownloadItem — jalan di CI
+│                                     # MimeTypes, DownloadItem, QrEncoder (decode
+│                                     # via zxing test-scope) — jalan di CI
 └── gradle wrapper                    # build via ./gradlew (CI saja untuk rilis)
 ```
 
@@ -89,6 +93,9 @@ diperbarui.
 7. **Remote web = UI utama**: setiap perubahan halaman remote (dan endpoint API)
    harus tetap mobile-first dan ramah D-pad TV; jangan menambah dependensi berat
    (APK tetap kecil); hindari *switch* di remote — pakai tombol biasa.
+   Catatan: zxing hanya di `testImplementation` (verifikasi decode QR) — APK
+   memakai encoder sendiri (`util/QrEncoder.kt`), jangan kembalikan zxing ke
+   runtime tanpa alasan kuat.
    `assets/remote.html` sengaja di-minify (hemat ukuran; gzip transfer sudah
    otomatis di nanohttpd) — versi readable bisa dilihat dari history git
    (commit sebelum `chore(perf)` minify).
