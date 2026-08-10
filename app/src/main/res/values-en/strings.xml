@@ -13,7 +13,6 @@
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
 
-    <string name="settings_section_update">Update</string>
     <string name="update_check">Check for Updates</string>
     <string name="update_checking">Checking for updates&#8230;</string>
     <string name="update_failed">Update check failed — check internet connection</string>
@@ -99,7 +98,6 @@
     <string name="about_github">Open GitHub</string>
     <string name="about_check_update">Check Update</string>
     <string name="about_tech">minSdk %1$d · targetSdk %2$d · build %3$d</string>
-    <string name="about_releases_hint">Open the GitHub releases page for the latest version</string>
     <string name="stat_total">Total</string>
     <string name="stat_active">Active</string>
     <string name="stat_done">Done</string>
@@ -288,7 +286,6 @@
     <string name="settings_gallery_video_label">Video gallery folder (optional)</string>
     <string name="settings_gallery_folder_hint">Folder path, e.g. /storage/emulated/0/DCIM/Camera</string>
     <string name="settings_gallery_hint">Leave empty to scan all storage. Format: f:path or m:RelativePath — /sdcard/… paths are recognized as /storage/emulated/0/…</string>
-    <string name="settings_section_cleanup">Cleanup</string>
     <string name="cleanup_button">Clean up junk files</string>
     <plurals name="cleanup_done">
         <item quantity="one">Cleaned: %1$d file (%2$s) removed</item>
