@@ -47,7 +47,6 @@ import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.QrEncoder
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
-import com.tasirin.httpdownloadmanager.util.sha256Hex
 import java.io.File
 
 /** Halaman pengaturan: server remote, keamanan, log, unduhan, dan penyimpanan. */
@@ -610,10 +609,10 @@ class SettingsActivity : AppCompatActivity() {
             applyExtraFolders(binding.root)
             applyGalleryFolders()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
-            val oldPinHash = StoragePrefs.getServerPin(this).orEmpty()
+            val oldPinHash = StoragePrefs.storedPinHash(this)
             if (newPin.isEmpty()) {
-                if (oldPinHash.isNotEmpty()) App.logEvent("PIN DIHAPUS")
-            } else if (sha256Hex(newPin) != oldPinHash) {
+                if (oldPinHash != null) App.logEvent("PIN DIHAPUS")
+            } else if (oldPinHash == null || !StoragePrefs.pinMatches(this, newPin)) {
                 App.logEvent("PIN DIATUR")
             }
             StoragePrefs.setServerPin(this, newPin)
