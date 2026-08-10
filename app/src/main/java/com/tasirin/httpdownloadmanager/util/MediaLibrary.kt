@@ -19,6 +19,8 @@ import java.io.File
 object MediaLibrary {
 
     private const val SCAN_TTL_MS = 15_000L
+    private const val GALLERY_MAX_ENTRIES = 3000
+    private const val THUMB_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
     @Volatile
     private var scanCache: Pair<Long, List<MediaEntry>>? = null
@@ -323,9 +325,25 @@ object MediaLibrary {
 
         // Hapus duplikat: file yang sama bisa muncul sebagai path (f:) dan
         // sebagai MediaStore (u:) — dedupe berdasar path file bila ada.
+        // Batasi jumlah entry yang di-hold di memori: cukup untuk 30 halaman
+        // galeri (100/halaman) dan membatasi beban RAM di device Android 5+.
         return list
             .distinctBy { it.filePath ?: it.contentUri ?: it.token }
             .sortedByDescending { it.modified }
+            .take(GALLERY_MAX_ENTRIES)
+    }
+
+    /** Hapus thumbnail disk yang sudah lama tak terpakai (> 7 hari). Dipanggil
+     *  saat aplikasi mulai; server remote punya pembersih serupa saat start. */
+    fun cleanupOldThumbs(context: Context, maxAgeMs: Long = THUMB_MAX_AGE_MS) {
+        runCatching {
+            val dir = File(context.cacheDir, "thumbs")
+            if (!dir.isDirectory) return
+            val now = System.currentTimeMillis()
+            dir.listFiles()?.forEach { f ->
+                if (f.isFile && now - f.lastModified() > maxAgeMs) f.delete()
+            }
+        }
     }
 
     /** Cek apakah file media masuk folder galeri terpilih.

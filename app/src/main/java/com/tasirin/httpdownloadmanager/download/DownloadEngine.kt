@@ -66,6 +66,8 @@ class DownloadEngine(private val context: Context) {
     private val activeConns = ConcurrentHashMap<String, HttpURLConnection>()
     private val speedTracker = SpeedTracker()
     private var saveJob: Job? = null
+    private var progressSaveJob: Job? = null
+    private var lastProgressSaveAt = 0L
     // URL yang pernah gagal di sesi ini: cadangan yang sama tidak dicoba
     // berulang-ulang (hemat waktu saat ISP/proxy menolak beberapa host).
     // newKeySet() baru ada API 24; pakai setFromMap agar aman di Android 5 (API 21).
@@ -903,11 +905,13 @@ class DownloadEngine(private val context: Context) {
                 downloaded += read
                 throttle.sleepIfNeeded(downloaded)
                 val now = System.currentTimeMillis()
-                if (now - lastNotify >= 250) {
+                if (now - lastNotify >= 500) {
                     lastNotify = now
                     coroutineContext.ensureActive()
                     val (speed, eta) = speedTracker.sample(item.id, downloaded, total)
-                    updateItem(item.id) {
+                    // Progress tick: jangan panggil save penuh (hemat CPU/GC);
+                    // progres ringan disimpan berkala oleh scheduleProgressSave.
+                    updateItem(item.id, persist = false) {
                         it.copy(
                             state = DownloadState.DOWNLOADING,
                             bytesDownloaded = downloaded,
@@ -916,6 +920,7 @@ class DownloadEngine(private val context: Context) {
                             etaSeconds = eta
                         )
                     }
+                    scheduleProgressSave()
                 }
             }
             output.flush()
@@ -1114,7 +1119,7 @@ class DownloadEngine(private val context: Context) {
                     downloaded += read
                     throttle.sleepIfNeeded(totalDownloaded(id))
                     val now = System.currentTimeMillis()
-                    if (now - lastNotify >= 250) {
+                    if (now - lastNotify >= 500) {
                         lastNotify = now
                         coroutineContext.ensureActive()
                         updateSegment(id, segment.index, downloaded)
@@ -1141,7 +1146,7 @@ class DownloadEngine(private val context: Context) {
 
     @Synchronized
     private fun updateSegment(id: String, index: Int, downloaded: Long) {
-        updateItem(id) { item ->
+        updateItem(id, persist = false) { item ->
             val segs = item.segments.map { if (it.index == index) it.copy(downloaded = downloaded) else it }
             val totalDone = segs.sumOf { it.downloaded }
             val (speed, eta) = speedTracker.sample(id, totalDone, item.totalBytes)
@@ -1152,6 +1157,7 @@ class DownloadEngine(private val context: Context) {
                 etaSeconds = eta
             )
         }
+        scheduleProgressSave()
     }
 
     private fun totalDownloaded(id: String): Long {
@@ -1329,16 +1335,20 @@ class DownloadEngine(private val context: Context) {
     }
 
     @Synchronized
-    private fun updateItem(id: String, transform: (DownloadItem) -> DownloadItem) {
-        update(_items.value.map { if (it.id == id) transform(it) else it })
+    private fun updateItem(
+        id: String,
+        persist: Boolean = true,
+        transform: (DownloadItem) -> DownloadItem
+    ) {
+        update(_items.value.map { if (it.id == id) transform(it) else it }, persist)
     }
 
     @Synchronized
-    private fun update(items: List<DownloadItem>) {
+    private fun update(items: List<DownloadItem>, persist: Boolean = true) {
         // Urutan daftar sudah dijaga (item baru di-prepend), jadi tidak perlu
-        // sort ulang O(n log n) setiap kali progress diperbarui (4x/detik).
+        // sort ulang O(n log n) setiap kali progress diperbarui (2x/detik).
         _items.value = items
-        scheduleSave()
+        if (persist) scheduleSave()
     }
 
     @Synchronized
@@ -1347,6 +1357,19 @@ class DownloadEngine(private val context: Context) {
         saveJob = scope.launch {
             delay(SAVE_DEBOUNCE_MS)
             repository.save(_items.value)
+        }
+    }
+
+    /** Progres ringan: JSON kecil (id -> bytes/total) tanpa enkripsi dan tanpa
+     *  detail segmen, disimpan paling cepat tiap 2 detik selama download aktif. */
+    @Synchronized
+    private fun scheduleProgressSave() {
+        val now = System.currentTimeMillis()
+        if (now - lastProgressSaveAt < PROGRESS_SAVE_INTERVAL_MS) return
+        lastProgressSaveAt = now
+        progressSaveJob?.cancel()
+        progressSaveJob = scope.launch {
+            repository.saveProgress(_items.value)
         }
     }
 
@@ -1372,6 +1395,7 @@ class DownloadEngine(private val context: Context) {
         private const val RETRY_DELAY_MAX_MS = 300_000L
         private const val MIN_FREE_BYTES = 2L * 1024 * 1024
         private const val SAVE_DEBOUNCE_MS = 400L
+        private const val PROGRESS_SAVE_INTERVAL_MS = 2_000L
         private const val MONITOR_INTERVAL_MS = 30 * 60 * 1000L
     }
 }
