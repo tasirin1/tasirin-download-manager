@@ -597,26 +597,24 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val icons = resources.getStringArray(R.array.about_icons)
         val texts = resources.getStringArray(R.array.about_rows)
         for (i in icons.indices) {
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-            }
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.gravity = android.view.Gravity.CENTER_VERTICAL
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
             if (i > 0) lp.topMargin = dp(6)
-            val icon = TextView(this).apply {
-                text = icons[i]
-                textSize = 16f
-                setPadding(0, 0, dp(10), 0)
-            }
-            val txt = TextView(this).apply {
-                text = texts[i]
-                textSize = 13.5f
-                lineSpacingMultiplier = 1.05f
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-            }
+            val icon = TextView(this)
+            icon.text = icons[i]
+            icon.textSize = 16f
+            icon.setPadding(0, 0, dp(10), 0)
+
+            val txt = TextView(this)
+            txt.text = texts[i]
+            txt.textSize = 13.5f
+            txt.lineSpacingMultiplier = 1.05f
+            txt.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
             row.addView(icon)
             row.addView(txt, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             rows.addView(row, lp)
