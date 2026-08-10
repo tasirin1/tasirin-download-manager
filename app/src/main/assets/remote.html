@@ -258,31 +258,36 @@
   .mm-rel-meta { color: #606060; font-size: 11.5px; margin-top: 3px; }
   .mm-rel-empty { color: #606060; font-size: 12.5px; padding: 6px 0 18px; }
   .mm-big { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.22); cursor: pointer; }
-  .mm-big .icon { width: 46px; height: 46px; flex: 0 0 46px; border-radius: 50%; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; }
-  .mm-big .icon svg { width: 20px; height: 20px; color: #fff; margin-left: 3px; }
+  .mm-big .icon { width: 56px; height: 56px; flex: 0 0 56px; border-radius: 50%; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; }
+  .mm-big .icon svg { width: 24px; height: 24px; color: #fff; margin-left: 3px; }
   .mm-spin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
   .mm-spin::before { content: ''; width: 36px; height: 36px; border-radius: 50%; border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; animation: mmSpin 1s linear infinite; }
   @keyframes mmSpin { to { transform: rotate(360deg); } }
   #mmToast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,.72); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; pointer-events: none; }
-  #mmCtrl { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 6px 2px; background: linear-gradient(transparent, rgba(0,0,0,.85)); transition: opacity .25s ease; }
+  #mmPlayerTop { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 4px; padding: 6px 8px 26px; background: linear-gradient(rgba(0,0,0,.78), transparent); pointer-events: none; transition: opacity .25s ease; }
+  #mmPlayerTop.hide { opacity: 0; }
+  #mmPlayerTop.hide button { pointer-events: none; }
+  #mmPlayerTop button { pointer-events: auto; flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(0,0,0,.42); color: #fff; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #mmPlayerTop button:hover { background: rgba(255,255,255,.18); }
+  #mmOverlayTitle { flex: 1; min-width: 0; color: #fff; font-size: 13px; font-weight: 600; line-height: 1.35; text-shadow: 0 1px 4px rgba(0,0,0,.6); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #mmCtrl { position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 6px 0; background: linear-gradient(transparent, rgba(0,0,0,.82)); transition: opacity .25s ease; }
   #mmCtrl.hide { opacity: 0; pointer-events: none; }
-  #mmSeekWrap { position: relative; height: 18px; display: flex; align-items: center; }
-  #mmBuf { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 3px; border-radius: 999px; background: rgba(255,255,255,.3); pointer-events: none; }
-  #mmSeek { -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 18px; margin: 0; background: transparent; }
-  #mmSeek::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(to right, #f00 var(--fill, 0%), rgba(255,255,255,.25) var(--fill, 0%)); }
-  #mmSeek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #f00; border: 0; margin-top: -4px; }
-  #mmCtrlRow { display: flex; align-items: center; gap: 6px; color: #fff; }
-  #mmCtrlRow button { flex: 0 0 auto; width: 34px; height: 34px; border: 0; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  #mmTime { font-size: 12px; font-variant-numeric: tabular-nums; }
-  #mmOverlayTitle { position: absolute; top: 0; left: 0; right: 0; padding: 14px 12px 28px; background: linear-gradient(rgba(0,0,0,.72), transparent); color: #fff; font-size: 13.5px; font-weight: 600; line-height: 1.4; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.55); transition: opacity .25s ease; }
-  #mmOverlayTitle.hide { opacity: 0; }
+  #mmSeekWrap { position: relative; height: 14px; display: flex; align-items: center; }
+  #mmBuf { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 4px; border-radius: 999px; background: rgba(255,255,255,.3); pointer-events: none; }
+  #mmSeek { -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 14px; margin: 0; background: transparent; }
+  #mmSeek::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: linear-gradient(to right, #f00 var(--fill, 0%), rgba(255,255,255,.25) var(--fill, 0%)); }
+  #mmSeek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #f00; border: 0; margin-top: -5px; }
+  #mmCtrlRow { display: flex; align-items: center; gap: 2px; color: #fff; }
+  #mmCtrlRow button { flex: 0 0 auto; width: 32px; height: 32px; border: 0; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #mmTime { font-size: 11.5px; font-variant-numeric: tabular-nums; }
   #mmSeekWrap:hover #mmSeek::-webkit-slider-runnable-track { height: 5px; }
   #mmSeek::-webkit-slider-thumb { transition: transform .12s ease; }
-  #mmSeekWrap:hover #mmSeek::-webkit-slider-thumb { transform: scale(1.4); }
-  #mmSeekTip { position: absolute; bottom: 13px; left: 0; transform: translateX(-50%); background: rgba(0,0,0,.82); color: #fff; font-size: 11.5px; font-weight: 600; padding: 3px 7px; border-radius: 6px; pointer-events: none; white-space: nowrap; z-index: 3; }
-  .mm-vol { -webkit-appearance: none; appearance: none; width: 64px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.35); outline: none; flex: 0 0 auto; }
-  .mm-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 0; margin-top: -4px; }
-  #mmAutoBtn { font-size: 11px; font-weight: 700; letter-spacing: .3px; color: rgba(255,255,255,.6); }
+  #mmSeekWrap:hover #mmSeek::-webkit-slider-thumb { transform: scale(1.3); }
+  #mmSeekTip { position: absolute; bottom: 9px; left: 0; transform: translateX(-50%); background: rgba(0,0,0,.82); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; pointer-events: none; white-space: nowrap; z-index: 3; }
+  .mm-vol { -webkit-appearance: none; appearance: none; width: 48px; height: 4px; border-radius: 999px; background: rgba(255,255,255,.35); outline: none; flex: 0 0 auto; }
+  .mm-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; margin-top: -4px; }
+  #mmSpeedBtn { font-size: 12px; font-weight: 600; }
+  #mmAutoBtn { font-size: 10.5px; font-weight: 700; letter-spacing: .3px; color: rgba(255,255,255,.6); }
   #mmAutoBtn.on { color: #f00; }
   #mmPlayer.mm-hide-cursor { cursor: none; }
   .mm-flex { flex: 1; }
@@ -530,7 +535,10 @@
   <div id="mmBody">
     <div id="mmPlayer" class="hidden">
       <video id="mmVideo" playsinline preload="metadata"></video>
-      <div id="mmOverlayTitle" class="hidden"></div>
+      <div id="mmPlayerTop" class="hidden">
+        <button id="mmPlayerBack" type="button" title="Tutup">&#10094;</button>
+        <div id="mmOverlayTitle"></div>
+      </div>
       <div id="mmBigPlay" class="mm-big hidden"><div class="icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>
       <div id="mmSpinner" class="mm-spin hidden"></div>
       <div id="mmToast" class="hidden"></div>
@@ -541,8 +549,8 @@
           <input id="mmSeek" type="range" min="0" max="1000" value="0" step="1">
         </div>
         <div id="mmCtrlRow">
-          <button id="mmPrevBtn" type="button" title="Video sebelumnya"></button>
           <button id="mmPlayBtn" type="button"></button>
+          <button id="mmPrevBtn" type="button" title="Video sebelumnya"></button>
           <button id="mmNextBtn" type="button" title="Video berikutnya"></button>
           <span id="mmTime">0:00 / 0:00</span>
           <span class="mm-flex"></span>
@@ -810,6 +818,8 @@ const mmTime = document.getElementById('mmTime');
 const mmMuteBtn = document.getElementById('mmMuteBtn');
 const mmFsBtn = document.getElementById('mmFsBtn');
 const mmOverlayTitle = document.getElementById('mmOverlayTitle');
+const mmTop = document.getElementById('mmTop');
+const mmPlayerTop = document.getElementById('mmPlayerTop');
 const mmSeekTip = document.getElementById('mmSeekTip');
 const mmVol = document.getElementById('mmVol');
 const mmAutoBtn = document.getElementById('mmAutoBtn');
@@ -823,15 +833,15 @@ let mmAutoNext = true;
 let mmNextList = [];
 try { mmAutoNext = localStorage.getItem('dm_auto_next') !== '0'; } catch (e) {}
 const ICONS = {
-  play: '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
-  pause: '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
-  sound: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.6 3l3.2-3.2-1.4-1.4-3.2 3.2-3.2-3.2-1.4 1.4 3.2 3.2-3.2 3.2 1.4 1.4 3.2-3.2 3.2 3.2 1.4-1.4z"/></svg>',
-  mute: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>',
-  fs: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>',
-  fsx: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>',
-  prev: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16 5v14L5 12z"/><path d="M5 4h2v16H5z"/></svg>',
-  next: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/><path d="M17 4h2v16h-2z"/></svg>',
-  replay: '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>'
+  play: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.6 3l3.2-3.2-1.4-1.4-3.2 3.2-3.2-3.2-1.4 1.4 3.2 3.2-3.2 3.2 1.4 1.4 3.2-3.2 3.2 3.2 1.4-1.4z"/></svg>',
+  mute: '<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>',
+  fs: '<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>',
+  fsx: '<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>',
+  prev: '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M16 5v14L5 12z"/><path d="M5 4h2v16H5z"/></svg>',
+  next: '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M8 5v14l11-7z"/><path d="M17 4h2v16h-2z"/></svg>',
+  replay: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>'
 };
 let mmType = 'image';
 let mmTimer = null;
@@ -865,6 +875,7 @@ function mmShowToast(text) {
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
   mmOverlayTitle.classList.remove('hide');
+  mmPlayerTop.classList.remove('hide');
   mmPlayer.classList.remove('mm-hide-cursor');
   clearTimeout(mmTimer);
   if (mmType === 'video' && !mmVideo.paused && !mmEnded) {
@@ -874,6 +885,7 @@ function mmShowCtrl() {
 function mmHideCtrl() {
   mmCtrl.classList.add('hide');
   mmOverlayTitle.classList.add('hide');
+  mmPlayerTop.classList.add('hide');
   mmPlayer.classList.add('mm-hide-cursor');
   mmSeekTip.classList.add('hidden');
 }
@@ -938,6 +950,8 @@ function closeMedia() {
   mmCtrl.classList.add('hidden');
   mmCtrl.classList.remove('hide');
   mmOverlayTitle.classList.add('hidden');
+  mmTop.classList.remove('hidden');
+  mmPlayerTop.classList.add('hidden');
   mmSeekTip.classList.add('hidden');
   mmPlayer.classList.remove('mm-hide-cursor');
   mmEnded = false;
@@ -952,6 +966,7 @@ function closeMedia() {
 }
 
 document.getElementById('mmBack').addEventListener('click', closeMedia);
+document.getElementById('mmPlayerBack').addEventListener('click', closeMedia);
 
 document.addEventListener('fullscreenchange', function () {
   mmFsBtn.innerHTML = document.fullscreenElement ? ICONS.fsx : ICONS.fs;
@@ -2455,6 +2470,9 @@ function openMedia(it, src) {
     mmCtrl.classList.remove('hidden');
     mmCtrl.classList.remove('hide');
     mmOverlayTitle.classList.remove('hidden');
+    mmTop.classList.add('hidden');
+    mmPlayerTop.classList.remove('hidden');
+    mmPlayerTop.classList.remove('hide');
     mmResetSpeed();
     mmPlayBtn.innerHTML = ICONS.play;
     mmMuteBtn.innerHTML = mmVideo.muted ? ICONS.mute : ICONS.sound;
@@ -2469,6 +2487,8 @@ function openMedia(it, src) {
       p.catch(function () { mmBigPlay.classList.remove('hidden'); mmShowCtrl(); });
     }
   } else {
+    mmTop.classList.remove('hidden');
+    mmPlayerTop.classList.add('hidden');
     mediaModal.classList.add('mm-img');
     mmImage.src = src;
     mmImage.classList.remove('hidden');
