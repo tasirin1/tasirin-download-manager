@@ -114,11 +114,15 @@
   .gal-info .m { margin-top: 3px; font-size: 11.5px; color: var(--muted); }
   .gal-sentinel { grid-column: 1 / -1; height: 24px; }
   #galleryStatus { color: var(--red); font-size: 13px; margin-bottom: 8px; }
-  .fs-path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 8px; word-break: break-all; }
+  .fs-sticky { position: sticky; top: 0; z-index: 25; background: var(--bg); padding: 6px 0 8px; margin: -6px 0 2px; }
+  .fs-path { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
+  .fs-path::-webkit-scrollbar { display: none; }
   .fs-crumb { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; background: var(--bg-soft); border: 1px solid var(--line); font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
   .fs-crumb:hover { color: var(--primary); border-color: var(--primary); }
   .fs-crumb.on { background: var(--primary-soft); color: var(--primary); cursor: default; }
   .fs-crumb-sep { color: var(--muted); opacity: .55; padding: 0 1px; }
+  .fs-crumb, .fs-crumb-sep, .fs-crumb-dots { flex: 0 0 auto; }
+  .fs-crumb-dots { padding: 3px 6px; font-weight: 700; color: var(--muted); }
   .fs-list { display: flex; flex-direction: column; gap: 6px; }
   .fs-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow-sm); transition: border-color .15s ease; }
   .fs-row.fs-dir { cursor: pointer; }
@@ -126,6 +130,10 @@
   .fs-row .fs-main { flex: 1 1 140px; min-width: 0; }
   .fs-row .fs-name { font-weight: 700; font-size: 13px; word-break: break-all; }
   .fs-row .fs-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .fs-ico { flex: 0 0 40px; height: 40px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 19px; background: var(--bg-soft); border: 1px solid var(--line); align-self: center; }
+  .fs-cap { height: 5px; border-radius: 999px; background: var(--bg-soft); border: 1px solid var(--line); overflow: hidden; margin-top: 6px; }
+  .fs-cap .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), #7a5cff); }
+  .fs-cap-txt { margin-top: 3px; }
   .fs-root { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; margin-bottom: 8px; box-shadow: var(--shadow-sm); transition: border-color .15s ease; }
   .fs-root:hover { border-color: var(--primary); }
   .fs-root .fs-rcap small { display: block; color: var(--muted); font-size: 12px; word-break: break-all; margin-top: 2px; }
@@ -158,8 +166,18 @@
   .fs-upload-head span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fs-upload .bar { height: 6px; border-radius: 999px; background: var(--primary-soft); overflow: hidden; }
   .fs-upload .fill { height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--primary), #7a5cff); transition: width .2s ease; }
-  .fs-batch { display: flex; align-items: center; gap: 8px; background: var(--primary-soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
-  .fs-batch span { font-size: 13px; font-weight: 700; margin-right: auto; }
+  .fs-upload-list { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; max-height: 30vh; overflow-y: auto; }
+  .fs-ul-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 2px; }
+  .fs-ul-row .st { flex: 0 0 18px; text-align: center; font-weight: 700; }
+  .fs-ul-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .fs-ul-row .sz { flex: 0 0 auto; color: var(--muted); }
+  .fs-ul-row.run .st { color: var(--primary); }
+  .fs-ul-row.ok .st { color: var(--green); }
+  .fs-ul-row.err .st { color: var(--red); }
+  .fs-batch { display: flex; align-items: center; gap: 8px; background: var(--primary-soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; position: sticky; bottom: 0; z-index: 28; box-shadow: 0 -6px 16px rgba(23,32,58,.08); }
+  .fs-batch span { font-size: 13px; font-weight: 700; }
+  .fs-batch #fsBatchCount { margin-right: auto; }
+  .fs-batch #fsBatchSize { font-size: 11.5px; font-weight: 600; color: var(--muted); }
   .fs-batch button { padding: 6px 11px; font-size: 12px; font-weight: 600; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
   .fs-batch button:hover { border-color: var(--primary); }
   .fs-batch button.danger { color: var(--red); }
@@ -294,6 +312,7 @@
   .empty .t { font-weight: 700; color: var(--ink); font-size: 15px; margin-top: 12px; }
   .empty .s { font-size: 12.5px; margin-top: 4px; }
   .empty .cta { margin-top: 16px; }
+  .empty-cta { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
   .skeleton { background: linear-gradient(90deg, rgba(120,130,160,.10) 25%, rgba(120,130,160,.18) 37%, rgba(120,130,160,.10) 63%); background-size: 400% 100%; animation: skShimmer 1.3s ease infinite; }
   @keyframes skShimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
   .sk-list { display: flex; flex-direction: column; gap: 12px; }
@@ -437,6 +456,7 @@
     <span class="count" id="fsCount"></span>
     <button id="fsUpBtn" type="button" class="btn-ghost" style="margin-left:auto">Naik</button>
   </div>
+  <div id="fsSticky" class="fs-sticky">
   <div id="fsPath" class="fs-path"></div>
   <div class="fs-tools" id="fsToolsRow">
     <span class="fs-loc-wrap">
@@ -455,10 +475,13 @@
     <button id="fsSelectBtn" type="button">Pilih</button>
     <button id="fsDupesBtn" type="button">Duplikat</button>
   </div>
+  </div>
   <input id="fsUploadFile" type="file" class="hidden" multiple>
   <input id="fsUploadDir" type="file" class="hidden" webkitdirectory multiple>
     <div id="fsBatch" class="fs-batch hidden">
       <span id="fsBatchCount"></span>
+      <span id="fsBatchSize"></span>
+      <button id="fsBatchAll" type="button">Pilih semua</button>
       <button id="fsBatchMove" type="button">Pindah</button>
       <button id="fsBatchDelete" type="button" class="danger">Hapus</button>
       <button id="fsBatchCancel" type="button">Batal</button>
@@ -467,6 +490,7 @@
     <div id="fsProgressBox" class="fs-upload hidden">
       <div class="fs-upload-head"><span id="fsProgressText"></span><span id="fsProgressPct"></span></div>
       <div class="bar"><div class="fill" id="fsProgressBar"></div></div>
+      <div id="fsProgressList" class="fs-upload-list"></div>
     </div>
     <div id="fsList" class="fs-list"></div>
   </div>
@@ -1124,6 +1148,8 @@ function updateStickyTop() {
   const tb = document.querySelector('.topbar');
   const st = document.getElementById('filtersSticky');
   if (tb && st) st.style.top = tb.offsetHeight + 'px';
+  const fsSt = document.getElementById('fsSticky');
+  if (tb && fsSt) fsSt.style.top = tb.offsetHeight + 'px';
 }
 window.addEventListener('resize', updateStickyTop);
 window.addEventListener('load', updateStickyTop);
@@ -1170,14 +1196,22 @@ function fsCrumbParts(p) {
   return parts;
 }
 
+function collapseCrumbs(parts) {
+  if (parts.length <= 4) return parts;
+  return [parts[0], {dots: true}, parts[parts.length - 2], parts[parts.length - 1]];
+}
+
 function renderFsCrumbs(p) {
   if (!p) {
     fsPathEl.textContent = 'Pilih lokasi penyimpanan';
     return;
   }
-  const parts = fsCrumbParts(p);
+  const parts = collapseCrumbs(fsCrumbParts(p));
   fsPathEl.innerHTML = parts.map(function (part, i) {
     const last = i === parts.length - 1;
+    if (part.dots) {
+      return '<span class="fs-crumb-dots">\u2026</span>' + (last ? '' : '<span class="fs-crumb-sep">\u203A</span>');
+    }
     const chip = '<span class="fs-crumb' + (last ? ' on' : '') + '" data-path="' + encodeURIComponent(part.path) + '">' + escapeHtml(part.label) + '</span>';
     return chip + (last ? '' : '<span class="fs-crumb-sep">\u203A</span>');
   }).join('');
@@ -1253,6 +1287,46 @@ function showFsSkeleton() {
   fsList.innerHTML = html + '</div>';
 }
 
+function fsIconFor(it) {
+  if (it.kind === 'dir') return '\u{1F4C1}';
+  const ext = extOf(it.name).toLowerCase();
+  if (FS_MEDIA_EXTS.indexOf(ext) >= 0) {
+    if (['jpg','jpeg','png','gif','webp','bmp','svg','heic'].indexOf(ext) >= 0) return '\u{1F5BC}\uFE0F';
+    if (['mp3','m4a','aac','wav','ogg','flac'].indexOf(ext) >= 0) return '\u{1F3B5}';
+    return '\u{1F3AC}';
+  }
+  if (['zip','rar','7z','tar','gz','bz2','xz'].indexOf(ext) >= 0) return '\u{1F4E6}';
+  if (ext === 'apk') return '\u{1F916}';
+  if (ext === 'pdf') return '\u{1F4C4}';
+  if (['txt','md','log','csv','json','xml','html','css','js','kt','java','py','sh','sql'].indexOf(ext) >= 0) return '\u{1F4DC}';
+  if (['doc','docx','xls','xlsx','ppt','pptx','odt','rtf'].indexOf(ext) >= 0) return '\u{1F4DD}';
+  return '\u{1F4C4}';
+}
+
+function fsQuickBtn(it) {
+  const url = it.kind === 'dir'
+    ? API + '/api/fs_zip?path=' + encodeURIComponent(it.path)
+    : API + '/api/media?token=' + encodeURIComponent(it.token) + '&dl=1';
+  return '<button class="item-menu-btn fs-q-btn" type="button" title="Unduh" data-url="' + url.replace(/&/g, '&amp;') + '">\u2B07</button>';
+}
+
+function fsRootIcon(r) {
+  const p = String(r.path || '').toLowerCase();
+  const n = String(r.name || '').toLowerCase();
+  if (n.indexOf('usb') >= 0 || p.indexOf('usb') >= 0) return '\u{1F50C}';
+  if (/\/[0-9a-f]{4}-[0-9a-f]{4}/.test(p) || n.indexOf('sd') >= 0 || n.indexOf('kartu') >= 0) return '\u{1F4BE}';
+  if (p.indexOf('emulated') >= 0 || p.indexOf('sdcard') >= 0) return '\u{1F4F1}';
+  return '\u{1F4BD}';
+}
+
+function fsRootCap(r) {
+  if (!r.totalBytes || r.totalBytes <= 0) return '';
+  const used = Math.max(0, (r.totalBytes || 0) - (r.freeBytes || 0));
+  const pct = Math.min(100, Math.round(used * 100 / r.totalBytes));
+  return '<div class="fs-cap"><div class="fill" style="width:' + pct + '%"></div></div>' +
+    '<small class="fs-cap-txt">' + fmt(used) + ' terpakai \u00b7 ' + fmt(r.totalBytes) + '</small>';
+}
+
 function renderFs(items) {
   const box = fsList;
   box.innerHTML = '';
@@ -1265,8 +1339,9 @@ function renderFs(items) {
       const row = document.createElement('div');
       row.className = 'fs-root';
       row.setAttribute('tabindex', '0');
-      row.innerHTML = '<div class="fs-main"><div class="fs-name">' + escapeHtml(r.name) + '</div>' +
-        '<div class="fs-rcap"><small>' + escapeHtml(r.path) + '</small></div></div>';
+      row.innerHTML = '<span class="fs-ico">' + fsRootIcon(r) + '</span>' +
+        '<div class="fs-main"><div class="fs-name">' + escapeHtml(r.name) + '</div>' +
+        '<div class="fs-rcap"><small>' + escapeHtml(r.path) + '</small>' + fsRootCap(r) + '</div></div>';
       row.addEventListener('click', function () {
         fsPath = r.path;
         loadFs();
@@ -1277,6 +1352,21 @@ function renderFs(items) {
   }
   if (!items.length) {
     box.innerHTML = emptyHtml('folder', 'Folder kosong', 'Tidak ada file di folder ini.');
+    const cta = document.createElement('div');
+    cta.className = 'empty-cta';
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'pill primary';
+    up.textContent = 'Upload';
+    up.addEventListener('click', function () { document.getElementById('fsUploadFile').click(); });
+    const mk = document.createElement('button');
+    mk.type = 'button';
+    mk.className = 'pill';
+    mk.textContent = 'Buat Folder';
+    mk.addEventListener('click', function () { document.getElementById('fsMkdirBtn').click(); });
+    cta.appendChild(up);
+    cta.appendChild(mk);
+    box.appendChild(cta);
     return;
   }
   for (const it of items) {
@@ -1298,9 +1388,10 @@ function renderFs(items) {
       : '';
     row.innerHTML =
       check +
+      '<span class="fs-ico">' + fsIconFor(it) + '</span>' +
       '<div class="fs-main"><div class="fs-name">' + escapeHtml(it.name) + '</div>' +
       (meta ? '<div class="fs-meta">' + meta + '</div>' : '') + '</div>' +
-      (!fsSelectMode ? '<button class="fs-more-btn" type="button" title="Aksi">\u22EF</button>' : '');
+      (!fsSelectMode ? fsQuickBtn(it) + '<button class="fs-more-btn" type="button" title="Aksi">\u22EF</button>' : '');
     row.addEventListener('click', function () {
       if (fsLpFired) { fsLpFired = false; return; }
       if (fsSelectMode) {
@@ -1318,6 +1409,13 @@ function renderFs(items) {
       moreBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
         openFsSheet(it);
+      });
+    }
+    const qBtn = row.querySelector('.fs-q-btn');
+    if (qBtn) {
+      qBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        fsDownloadUrl(qBtn.dataset.url);
       });
     }
     box.appendChild(row);
@@ -1365,6 +1463,12 @@ function toggleFsSelect(it, row) {
 function updateFsBatch() {
   fsBatch.classList.toggle('hidden', fsSelected.length === 0);
   document.getElementById('fsBatchCount').textContent = fsSelected.length + ' dipilih';
+  let total = 0;
+  fsSelected.forEach(function (it) {
+    total += (it.kind === 'file' ? it.size : (it.totalSize || 0)) || 0;
+  });
+  document.getElementById('fsBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt(total) : '';
+  document.getElementById('fsBatchAll').textContent = (fsItems || []).length > 0 && fsSelected.length === fsItems.length ? 'Batalkan semua' : 'Pilih semua';
 }
 
 fsSelectBtn.addEventListener('click', function () {
@@ -1409,6 +1513,20 @@ document.getElementById('fsBatchCancel').addEventListener('click', function () {
   fsSelectBtn.textContent = 'Pilih';
   fsBatch.classList.add('hidden');
   loadFs();
+});
+
+document.getElementById('fsBatchAll').addEventListener('click', function () {
+  const all = fsItems || [];
+  const allSel = all.length > 0 && fsSelected.length === all.length;
+  fsSelected.length = 0;
+  if (!allSel) {
+    for (let i = 0; i < all.length; i++) fsSelected.push(all[i]);
+  }
+  fsList.querySelectorAll('.fs-row .fs-check').forEach(function (c) {
+    c.classList.toggle('on', !allSel);
+    c.textContent = !allSel ? '\u2713' : '';
+  });
+  updateFsBatch();
 });
 
 const fsSheet = document.getElementById('fsSheet');
@@ -1592,7 +1710,7 @@ const UPLOAD_CHUNK = 2 * 1024 * 1024;
 
 let fsUploading = false;
 
-function uploadFiles(files, path, statusEl, progressBox, progressText, progressPct, progressBar, done) {
+function uploadFiles(files, path, statusEl, progressBox, progressText, progressPct, progressBar, done, listEl) {
   fsUploading = true;
   const jobs = Array.from(files).map(function (f) {
     const j = (f && f.file) ? f : { file: f, path: path };
@@ -1602,6 +1720,29 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
   const total = jobs.length;
   if (!total) return;
   const failed = [];
+  if (listEl) {
+    listEl.innerHTML = '';
+    jobs.forEach(function (j) {
+      const div = document.createElement('div');
+      div.className = 'fs-ul-row';
+      div.id = 'ul-' + j.id;
+      div.innerHTML = '<span class="st">\u23F3</span><span class="nm"></span><span class="sz"></span>';
+      div.querySelector('.nm').textContent = j.file.name;
+      div.querySelector('.sz').textContent = fmt(j.file.size);
+      listEl.appendChild(div);
+    });
+  }
+  function ulSet(id, status, cls) {
+    if (!listEl) return;
+    const row = document.getElementById('ul-' + id);
+    if (!row) return;
+    const st = row.querySelector('.st');
+    st.textContent = status;
+    row.classList.remove('ok', 'err', 'run');
+    if (cls) row.classList.add(cls);
+  }
+  function ulFail(id) { ulSet(id, '\u2717', 'err'); }
+  function ulOk(id) { ulSet(id, '\u2713', 'ok'); }
   let idx = 0;
   let sentBytes = 0;
   let totalBytes = 0;
@@ -1612,6 +1753,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
 
   function uploadOne(job, attempt) {
     const file = job.file;
+    ulSet(job.id, '\u2191', 'run');
     const target = job.path;
     statusEl.style.color = '';
     statusEl.textContent = 'Mengunggah ' + file.name + ' (' + (idx + 1) + '/' + total + ')' +
@@ -1629,6 +1771,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
     function nextChunk() {
       if (chunkIdx >= chunks) {
         sentBytes += file.size;
+        ulOk(job.id);
         finishOne();
         return;
       }
@@ -1663,6 +1806,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
           ? Math.round((totalBytes - bestDone) / speed) : 0;
         progressPct.textContent = pct + '% \u00b7 ' + fmtSpeed(speed) +
           (etaSec > 0 ? ' \u00b7 sisa ~' + fmtEta(etaSec) : '');
+        ulSet(job.id, Math.min(99, Math.round((start + chunkBest) * 100 / file.size)) + '%', 'run');
       };
       xhr.onload = function () {
         let ok = false;
@@ -1719,15 +1863,18 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
           if (done) {
             sentBytes += file.size;
             statusEl.textContent = 'Selesai: ' + (name || file.name);
+            ulOk(job.id);
             finishOne();
           } else if (err) {
             failed.push(file.name);
+          ulFail(job.id);
             statusEl.textContent = 'Gagal: ' + file.name + ' \u2014 ' + err;
             finishOne();
           } else if (tries < 200) {
             setTimeout(tick, 1500);
           } else {
             failed.push(file.name);
+          ulFail(job.id);
             statusEl.textContent = 'Gagal: ' + file.name + ' \u2014 penyelesaian terlalu lama';
             finishOne();
           }
@@ -1738,6 +1885,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
             setTimeout(tick, 1500);
           } else {
             failed.push(file.name);
+          ulFail(job.id);
             statusEl.textContent = 'Gagal: ' + file.name + ' \u2014 penyelesaian terlalu lama';
             finishOne();
           }
@@ -1775,21 +1923,25 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         if (done) {
           sentBytes += file.size;
           statusEl.textContent = 'Selesai: ' + (name || file.name);
+          ulOk(job.id);
           finishOne();
         } else if (pending) {
           pollFinalize();
         } else if (err) {
           failed.push(file.name);
+          ulFail(job.id);
           statusEl.textContent = 'Gagal: ' + file.name + ' \u2014 ' + err;
           finishOne();
         } else {
           failed.push(file.name);
+          ulFail(job.id);
           statusEl.textContent = 'Gagal: ' + file.name + (lastErr ? ' \u2014 ' + lastErr : '');
           finishOne();
         }
       };
       verify.onerror = verify.ontimeout = function () {
         failed.push(file.name);
+          ulFail(job.id);
         statusEl.textContent = 'Gagal: ' + file.name + (lastErr ? ' \u2014 ' + lastErr : '');
         finishOne();
       };
@@ -1865,6 +2017,7 @@ function startFsUpload(jobs) {
     document.getElementById('fsProgressText'),
     document.getElementById('fsProgressPct'),
     document.getElementById('fsProgressBar'),
+    document.getElementById('fsProgressList'),
     function (ok, failed) {
       btn.disabled = false;
       fsUploadFile.value = '';

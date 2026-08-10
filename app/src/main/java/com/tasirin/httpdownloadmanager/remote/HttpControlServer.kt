@@ -1264,12 +1264,18 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
     private fun fsRoots(): Response {
         val items = JSONArray()
         fun add(name: String, path: String) {
-            items.put(
-                JSONObject()
-                    .put("name", name)
-                    .put("path", path)
-                    .put("kind", "dir")
-            )
+            val obj = JSONObject()
+                .put("name", name)
+                .put("path", path)
+                .put("kind", "dir")
+            // Kapasitas media untuk kartu root di remote web (total & bebas).
+            val realPath = path.removePrefix(FS_PREFIX)
+            runCatching {
+                val stat = android.os.StatFs(realPath)
+                obj.put("totalBytes", stat.totalBytes)
+                obj.put("freeBytes", stat.availableBytes)
+            }
+            items.put(obj)
         }
         // Root file manager hanya menampilkan folder yang diatur di Pengaturan:
         // folder tujuan (Folder teks) + folder tambahan. Folder aplikasi dan
