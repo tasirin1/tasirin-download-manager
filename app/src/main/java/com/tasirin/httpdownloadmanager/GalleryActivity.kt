@@ -32,6 +32,7 @@ import com.tasirin.httpdownloadmanager.databinding.ItemGalleryBinding
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
+import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,6 +61,7 @@ class GalleryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityGalleryBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 

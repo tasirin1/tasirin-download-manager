@@ -165,31 +165,27 @@ Pastikan conclusion `success` dan release punya asset APK dengan nama
 `tasirin-download-manager-v1.0-<code>.apk`. Verifikasi manual: pasang APK di HP,
 buka remote web dari browser, tes tambah URL, dan buka Galeri.
 
-## Peta jalan: targetSdk 35 (Android 15/16)
+## Peta jalan: targetSdk 35/36 (Android 15/16)
 
-**Sebagian dikerjakan.** `compileSdk 36` sudah aktif (membuka update seperti
-recyclerview 1.4, lifecycle 2.11, activity 1.13; material tetap 1.12 karena
-versi baru menuntut minSdk 23); `targetSdk` sengaja tetap 34 karena perilaku Android
-15 (FGS boot, edge-to-edge) baru aktif saat targetSdk naik. APK disebar via
-GitHub (bukan Play Store), jadi targetSdk 35 tidak wajib — tujuan akhirnya
-perangkat Android 15/16 tetap berfungsi penuh.
+**Implementasi selesai, uji manual menunggu.** `targetSdk 35` + `compileSdk 36`
+aktif. Perilaku Android 15/16 (FGS boot, edge-to-edge) sudah ditangani di kode;
+yang tersisa adalah **Fase 3 — uji manual di perangkat fisik** sebelum memutuskan
+naik ke `targetSdk 36`.
 
 - **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
   di-update bertahap via CI, toolchain Gradle 9.6.1 + AGP 9.0.1 (built-in
   Kotlin, KGP dibundel AGP), core library desugaring aktif.
   `versionName`/`versionCode` tetap diatur CI.
-- **Fase 2a — selesai**: `compileSdk 36` (targetSdk tetap 34, tanpa perubahan
-  perilaku runtime Android 15/16).
-- **Fase 2b — saat siap**: naikkan `targetSdk` ke 35.
-  - **FGS dari `BOOT_COMPLETED`**: saat targetSdk 35, service `dataSync` tidak
-    boleh lagi start langsung dari receiver boot — migrasi ke `WorkManager`
-    (periode) atau `JobScheduler` untuk download lanjut + server auto-start.
-  - **Edge-to-edge dipaksakan**: layout perlu menangani `systemBars` insets
-    (Android 15 mewajibkan), revisi `MainActivity`/`SettingsActivity`/`LogActivity`.
-  - **Izin notifikasi & storage**: alur yang ada (runtime request + special
-    access) tetap berlaku — verifikasi ulang di Android 15.
-- **Fase 3 — setelah hijau**: uji manual di perangkat Android 15/16 (auto-start
-  boot, download background, server remote, galeri) sebelum dirilis via push ke
-  `main`.
-- **Pantangan**: jangan naikkan `minSdk` (tetap 21), jangan naikkan `targetSdk`
-  sebelum Fase 2b selesai, dan jangan gabung perubahan ini dengan PR fitur lain.
+- **Fase 2a — selesai**: `compileSdk 36`.
+- **Fase 2b — selesai**: `targetSdk 35`.
+  - **FGS dari `BOOT_COMPLETED`**: `dataSync` FGS dilarang start langsung dari
+    receiver boot — `BootReceiver` kini menjadwalkan `BootResumeJobService`
+    (JobScheduler, API 21+) yang meneruskan ke `DownloadService`.
+  - **Edge-to-edge dipaksakan**: `applyEdgeToEdge()` (insets system bars)
+    dipasang di `MainActivity`/`SettingsActivity`/`LogActivity`/`GalleryActivity`.
+  - **Izin notifikasi & storage**: alur runtime request + special access tetap.
+- **Fase 3 — BELUM**: uji manual di perangkat Android 15/16 (auto-start boot,
+  download background, server remote, galeri); kalau sudah, boleh naik
+  `targetSdk 36` (compileSdk sudah 36, lint `OldTargetApi` tetap di-suppress).
+- **Pantangan**: jangan naikkan `minSdk` (tetap 21), dan jangan gabung perubahan
+  targetSdk dengan PR fitur lain.

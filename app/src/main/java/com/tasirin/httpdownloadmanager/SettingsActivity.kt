@@ -40,6 +40,7 @@ import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.UpdateInfo
 import com.tasirin.httpdownloadmanager.util.Updater
+import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import java.io.File
 
 /** Halaman pengaturan: server remote, keamanan, log, unduhan, dan penyimpanan. */
@@ -60,6 +61,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
