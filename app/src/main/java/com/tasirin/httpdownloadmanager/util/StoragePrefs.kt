@@ -2,6 +2,7 @@ package com.tasirin.httpdownloadmanager.util
 
 import android.content.Context
 import android.net.Uri
+import java.security.MessageDigest
 import androidx.core.content.edit
 import androidx.core.net.toUri
 
@@ -10,6 +11,7 @@ object StoragePrefs {
     const val DEFAULT_PORT = 8080
 
     private const val PREFS = "storage_settings"
+    private const val HEX_CHARS = "0123456789abcdef"
     private const val KEY_FOLDER_URI = "folder_uri"
     private const val KEY_FOLDER_NAME = "folder_name"
     private const val KEY_BACKGROUND = "background_download"
@@ -144,6 +146,21 @@ object StoragePrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(KEY_SERVER_PIN, hash)
         }
+    }
+
+    /** Normalisasi PIN tersimpan menjadi hash SHA-256. Nilai lama dari versi
+     *  sebelum hash berupa plaintext — di-hash sekali supaya cookie lama tetap
+     *  berlaku tanpa memaksa login ulang. */
+    fun storedPinHash(context: Context): String? {
+        val stored = getServerPin(context).orEmpty()
+        return normalizePinHash(stored)
+    }
+
+    /** Cek PIN yang dimasukkan terhadap yang tersimpan dengan pembandingan
+     *  constant-time (anti timing attack lewat perbedaan panjang loop). */
+    fun pinMatches(context: Context, pin: String): Boolean {
+        val expected = storedPinHash(context) ?: return false
+        return constantEquals(sha256Hex(pin), expected)
     }
 
     fun isPinEnforced(context: Context): Boolean =
@@ -333,4 +350,19 @@ object StoragePrefs {
             putString(KEY_RECENT_URLS, "")
         }
     }
+
+    /** Murni (tanpa Context) supaya bisa diuji unit: nilai kosong -> null,
+     *  hash 64-hex -> langsung dipakai, selain itu (plaintext lama) -> di-hash. */
+    internal fun normalizePinHash(stored: String): String? {
+        if (stored.isEmpty()) return null
+        return if (stored.length == 64 && stored.all { it in HEX_CHARS }) stored
+        else sha256Hex(stored)
+    }
+
+    /** Bandingkan dua string tanpa short-circuit (constant-time). */
+    internal fun constantEquals(a: String, b: String): Boolean =
+        MessageDigest.isEqual(
+            a.toByteArray(Charsets.UTF_8),
+            b.toByteArray(Charsets.UTF_8)
+        )
 }

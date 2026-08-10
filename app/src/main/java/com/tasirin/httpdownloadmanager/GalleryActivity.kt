@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
+import android.content.ComponentCallbacks2
 import android.media.ThumbnailUtils
 import android.os.Build
 import android.os.Bundle
@@ -19,7 +20,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
-import androidx.core.graphics.scale
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -33,6 +33,7 @@ import com.tasirin.httpdownloadmanager.databinding.ItemGalleryBinding
 import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.Formats
+import com.tasirin.httpdownloadmanager.util.scaleDown
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import kotlinx.coroutines.CoroutineScope
@@ -232,6 +233,16 @@ class GalleryActivity : AppCompatActivity() {
         return null
     }
 
+    /** Sistem minta memori (Android 5+): buang cache thumbnail agar tidak
+     *  ikut membebani device RAM kecil. Thumbnail akan di-decode ulang dari
+     *  disk cache (thumbs/) saat galeri digulir lagi. */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            clearThumbCache()
+        }
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
             finish()
@@ -250,6 +261,14 @@ class GalleryActivity : AppCompatActivity() {
         @Volatile
         private var thumbCache: LruCache<String, Bitmap>? = null
         private val cacheLock = Any()
+
+        /** Buang seluruh cache thumbnail di memori (dipanggil saat tekanan
+         *  memori; disk cache tetap dipakai, jadi galeri tidak perlu re-scan). */
+        fun clearThumbCache() {
+            synchronized(cacheLock) {
+                thumbCache?.evictAll()
+            }
+        }
 
         private fun cacheFor(context: Context): LruCache<String, Bitmap> {
             var cache = thumbCache
@@ -337,16 +356,6 @@ class GalleryActivity : AppCompatActivity() {
                 return decodeUri(context, e.contentUri, req)
             }
             return null
-        }
-
-        private fun scaleDown(src: Bitmap, max: Int): Bitmap {
-            if (src.width <= max && src.height <= max) return src
-            val scale = max.toDouble() / maxOf(src.width, src.height)
-            val w = (src.width * scale).toInt().coerceAtLeast(1)
-            val h = (src.height * scale).toInt().coerceAtLeast(1)
-            val out = src.scale(w, h, true)
-            if (out !== src) src.recycle()
-            return out
         }
 
         private fun thumbDir(context: Context): File =

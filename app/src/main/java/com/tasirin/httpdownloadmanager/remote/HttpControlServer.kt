@@ -13,7 +13,6 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.BatteryManager
 import android.annotation.SuppressLint
-import androidx.core.graphics.scale
 import androidx.core.net.toUri
 import android.os.Build
 import android.os.Environment
@@ -25,11 +24,11 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
+import com.tasirin.httpdownloadmanager.util.scaleDown
 import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
-import com.tasirin.httpdownloadmanager.util.sha256Hex
 import androidx.documentfile.provider.DocumentFile
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -56,6 +55,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.zip.ZipOutputStream
 import java.net.NetworkInterface
+import java.security.MessageDigest
 
 class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort(appContext)) {
     // Object ini hidup seumur proses (disimpan statis di App.httpServer):
@@ -99,6 +99,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrDefault(0)
     }
     private val serverLog = ServerLog()
+    // Cache QR PNG: /api/qr jarang berubah isinya (URL server + PIN),
+    // render bitmap 520x520 tiap panggilan itu boros CPU/RAM.
+    private val qrCache = ConcurrentHashMap<String, ByteArray>()
 
     override fun serve(session: IHTTPSession): Response {
         val startedAt = System.currentTimeMillis()
@@ -225,23 +228,25 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun pinEnabled(): Boolean =
         !StoragePrefs.getServerPin(context).isNullOrEmpty()
 
-    /** Normalisasi PIN tersimpan menjadi hash SHA-256. Nilai lama dari versi
-     *  sebelum hash berupa plaintext — di-hash sekali supaya cookie lama tetap
-     *  berlaku tanpa memaksa login ulang. */
-    private fun storedPinHash(): String? {
-        val stored = StoragePrefs.getServerPin(context).orEmpty()
-        if (stored.isEmpty()) return null
-        return if (stored.length == 64 && stored.all { it in HEX_CHARS }) stored
-        else sha256Hex(stored)
-    }
+    /** PIN tersimpan sudah dinormalisasi jadi hash SHA-256 oleh StoragePrefs;
+     *  bandingkan dengan timing konstan (anti bocor lewat timing attack). */
+    private fun storedPinHash(): String? = StoragePrefs.storedPinHash(context)
 
     private fun pinOk(session: IHTTPSession): Boolean {
         val expected = storedPinHash() ?: return true
         val cookie = session.headers["cookie"] ?: return false
-        return cookie.split(";").any {
-            it.trim().startsWith("dm_pin=$expected")
-        }
+        val pin = cookie.split(";").map { it.trim() }
+            .firstOrNull { it.startsWith("dm_pin=") }
+            ?.substringAfter("dm_pin=") ?: return false
+        return constantEquals(pin, expected)
     }
+
+    /** Bandingkan dua string tanpa short-circuit (constant-time). */
+    private fun constantEquals(a: String, b: String): Boolean =
+        MessageDigest.isEqual(
+            a.toByteArray(Charsets.UTF_8),
+            b.toByteArray(Charsets.UTF_8)
+        )
 
     private fun login(session: IHTTPSession): Response {
         val now = System.currentTimeMillis()
@@ -252,7 +257,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val params = readForm(session)
         val pin = params["pin"].orEmpty()
         val stored = storedPinHash()
-        return if (stored != null && stored == sha256Hex(pin)) {
+        return if (stored != null && StoragePrefs.pinMatches(context, pin)) {
             loginFailures = 0
             appendLog("LOGIN BERHASIL (${session.remoteIpAddress})")
             val r = newFixedLengthResponse(
@@ -1082,16 +1087,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrNull()
     }
 
-    private fun scaleDown(src: Bitmap, max: Int): Bitmap {
-        if (src.width <= max && src.height <= max) return src
-        val scale = max.toDouble() / maxOf(src.width, src.height)
-        val w = (src.width * scale).toInt().coerceAtLeast(1)
-        val h = (src.height * scale).toInt().coerceAtLeast(1)
-        val out = src.scale(w, h, true)
-        if (out !== src) src.recycle()
-        return out
-    }
-
     private fun serveMedia(session: IHTTPSession): Response {
         val token = session.parms["token"].orEmpty()
         if (token.isEmpty()) return notFound()
@@ -1128,87 +1123,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = download
         )
-    }
-
-    private fun streamMedia(
-        name: String,
-        mime: String,
-        input: InputStream,
-        total: Long,
-        rangeHeader: String?,
-        download: Boolean
-    ): Response {
-        val safeName = name.replace("\"", "_").replace("\\", "_")
-        val disposition = if (download) {
-            "attachment; filename=\"$safeName\""
-        } else {
-            "inline; filename=\"$safeName\""
-        }
-        val response = runCatching {
-            val range = if (total > 0) parseRange(rangeHeader, total) else null
-            when {
-                range != null -> {
-                    val (start, end) = range
-                    val partLen = end - start + 1
-                    if (start > 0) skipFully(input, start)
-                    newFixedLengthResponse(
-                        Response.Status.PARTIAL_CONTENT, mime, input, partLen
-                    ).also {
-                        it.addHeader("Content-Range", "bytes $start-$end/$total")
-                    }
-                }
-                total > 0 -> newFixedLengthResponse(Response.Status.OK, mime, input, total)
-                else -> newChunkedResponse(Response.Status.OK, mime, input)
-            }
-        }.getOrElse {
-            runCatching { input.close() }
-            return newFixedLengthResponse(
-                Response.Status.INTERNAL_ERROR,
-                "text/plain; charset=utf-8",
-                "Error: ${it.message}"
-            )
-        }
-        response.addHeader("Accept-Ranges", "bytes")
-        response.addHeader("Content-Disposition", disposition)
-        return response
-    }
-
-    private fun notFound(): Response = newFixedLengthResponse(
-        Response.Status.NOT_FOUND,
-        "text/plain; charset=utf-8",
-        "File tidak ditemukan"
-    )
-
-    private fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
-        if (header.isNullOrBlank() || total <= 0) return null
-        val m = Regex("bytes=(\\d*)-(\\d*)").find(header) ?: return null
-        val start = m.groupValues[1].toLongOrNull()
-        val endRaw = m.groupValues[2].toLongOrNull()
-        return when {
-            start != null -> {
-                val s = start.coerceIn(0, total - 1)
-                val e = (endRaw ?: (total - 1)).coerceIn(s, total - 1)
-                s to e
-            }
-            endRaw != null -> {
-                val n = endRaw.coerceAtLeast(1)
-                (total - n).coerceAtLeast(0) to (total - 1)
-            }
-            else -> null
-        }
-    }
-
-    private fun skipFully(input: InputStream, n: Long) {
-        var remaining = n
-        while (remaining > 0) {
-            val skipped = input.skip(remaining)
-            if (skipped <= 0) {
-                if (input.read() == -1) return
-                remaining--
-            } else {
-                remaining -= skipped
-            }
-        }
     }
 
     private fun galleryJson(session: IHTTPSession): Response {
@@ -1938,7 +1852,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun qrPngResponse(session: IHTTPSession): Response {
         val text = session.parms["text"].orEmpty()
         if (text.isEmpty()) return notFound()
-        val bytes = QrCode.generate(text) ?: return notFound()
+        val bytes = qrCache[text] ?: QrCode.generate(text)?.also { cached ->
+            // Batasi isi cache: teks QR berubah-ubah tidak boleh menumpuk.
+            if (qrCache.size >= QR_CACHE_MAX) qrCache.clear()
+            qrCache[text] = cached
+        } ?: return notFound()
         return newFixedLengthResponse(
             Response.Status.OK,
             "image/png",
@@ -1979,9 +1897,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val DEFAULT_CHUNK_BYTES = 2L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
-        private const val HEX_CHARS = "0123456789abcdef"
         private const val FS_STATS_TTL_MS = 10_000L
         private const val SSE_MIN_INTERVAL_MS = 1_000L
+        private const val QR_CACHE_MAX = 8
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu
         // koneksi hidup (dan fallback polling klien tidak ikut jalan).
         private const val SSE_HEARTBEAT_MS = 3_000L
@@ -1996,61 +1914,3 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrDefault(emptyList())
     }
 }
-
-private class ChainInputStream(private val files: List<File>) : InputStream() {
-    private var current: InputStream? = null
-    private var idx = 0
-
-    private fun next(): InputStream? {
-        current?.let { runCatching { it.close() } }
-        if (idx >= files.size) return null
-        val f = files[idx++]
-        val stream = FileInputStream(f)
-        current = stream
-        return stream
-    }
-
-    override fun read(): Int {
-        while (true) {
-            val cur = current ?: next() ?: return -1
-            val b = cur.read()
-            if (b != -1) return b
-            current = null
-        }
-    }
-
-    override fun read(b: ByteArray, off: Int, len: Int): Int {
-        if (len == 0) return 0
-        while (true) {
-            val cur = current ?: next() ?: return -1
-            val n = cur.read(b, off, len)
-            if (n != -1) return n
-            current = null
-        }
-    }
-
-    override fun close() {
-        current?.let { runCatching { it.close() } }
-        current = null
-    }
-}
-
-private class RandomAccessOutputStream(private val raf: RandomAccessFile) : java.io.OutputStream() {
-    override fun write(b: Int) = raf.write(b)
-    override fun write(b: ByteArray, off: Int, len: Int) = raf.write(b, off, len)
-}
-
-private class DeleteOnCloseStream(
-    private val delegate: InputStream,
-    private val fileToDelete: File?
-) : InputStream() {
-    override fun read(): Int = delegate.read()
-    override fun read(b: ByteArray, off: Int, len: Int): Int = delegate.read(b, off, len)
-    override fun close() {
-        runCatching { delegate.close() }
-        val toDelete = fileToDelete
-        if (toDelete != null) runCatching { toDelete.delete() }
-    }
-}
-
-private data class ShareEntry(val itemId: String, val expiresAt: Long)
