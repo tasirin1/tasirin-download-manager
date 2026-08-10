@@ -138,7 +138,7 @@ object Updater {
         }
         certs.any { cert ->
             val digest = MessageDigest.getInstance("SHA-256").digest(cert)
-            hex(digest).equals(RELEASE_CERT_SHA256, ignoreCase = true)
+            Hex.encode(digest).equals(RELEASE_CERT_SHA256, ignoreCase = true)
         }
     }.getOrDefault(false)
 
@@ -151,16 +151,6 @@ object Updater {
             }
         }
         return info.signatures?.map { it.toByteArray() } ?: emptyList()
-    }
-
-    private fun hex(bytes: ByteArray): String {
-        val sb = StringBuilder(bytes.size * 2)
-        for (b in bytes) {
-            val v = b.toInt() and 0xFF
-            sb.append(Character.forDigit(v ushr 4, 16))
-            sb.append(Character.forDigit(v and 0x0F, 16))
-        }
-        return sb.toString()
     }
 
     private fun get(context: Context, url: String): String? = runCatching {

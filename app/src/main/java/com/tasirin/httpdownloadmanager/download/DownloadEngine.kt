@@ -1,11 +1,13 @@
 package com.tasirin.httpdownloadmanager.download
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Base64
+import androidx.core.net.toUri
 import com.tasirin.httpdownloadmanager.App
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadRepository
@@ -13,6 +15,7 @@ import com.tasirin.httpdownloadmanager.data.DownloadSegment
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.Formats
+import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
@@ -48,7 +51,11 @@ import java.util.UUID
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
-class DownloadEngine(private val context: Context) {
+class DownloadEngine(appContext: Context) {
+    // Engine hidup seumur proses (disimpan statis di App.engine): simpan
+    // Application context saja, jangan pernah Activity (anti-leak).
+    @SuppressLint("StaticFieldLeak")
+    private val context: Context = appContext.applicationContext
 
     /** Buka koneksi; untuk https tambahkan trust anchor CA lama (Android 6-7). */
     private fun openConn(url: String): HttpURLConnection {
@@ -239,7 +246,7 @@ class DownloadEngine(private val context: Context) {
 
     fun deleteMedia(raw: String): Boolean {
         val path = if (raw.startsWith("f:")) raw.substring(2) else null
-        val uri = if (raw.startsWith("u:")) runCatching { Uri.parse(raw.substring(2)) }.getOrNull() else null
+        val uri = if (raw.startsWith("u:")) runCatching { raw.substring(2).toUri() }.getOrNull() else null
         if (path == null && uri == null) return false
         val deleted = if (path != null) {
             val fileGone = runCatching { File(path).delete() }.getOrDefault(false)
@@ -302,7 +309,9 @@ class DownloadEngine(private val context: Context) {
                 conn.connect()
                 val code = conn.responseCode
                 if (code !in 200..299) return null
-                val body = conn.inputStream.bufferedReader().use { it.readText() }.take(1_000_000)
+                // Baca terbatas: master playlist normal kecil; body raksasa dari
+                // URL nakal tidak boleh dimuat penuh ke memori.
+                val body = conn.inputStream.use { readBounded(it, HLS_PROBE_MAX_BYTES) }
                 HlsParser.parseMaster(body, url)
             } finally {
                 conn.disconnect()
@@ -1230,7 +1239,7 @@ class DownloadEngine(private val context: Context) {
         val input = when {
             !published.filePath.isNullOrEmpty() -> File(published.filePath).inputStream()
             !published.contentUri.isNullOrEmpty() ->
-                context.contentResolver.openInputStream(Uri.parse(published.contentUri))
+                context.contentResolver.openInputStream(published.contentUri.toUri())
             else -> null
         } ?: return null
         input.use { stream ->
@@ -1241,7 +1250,7 @@ class DownloadEngine(private val context: Context) {
                 if (read == -1) break
                 md.update(buf, 0, read)
             }
-            md.digest().joinToString("") { "%02x".format(it) }
+            Hex.encode(md.digest())
         }
     }.getOrNull()
 
@@ -1360,9 +1369,24 @@ class DownloadEngine(private val context: Context) {
         repository.save(_items.value)
     }
 
+    /** Baca stream paling banyak [max] byte lalu tutup; aman untuk probe
+     *  URL yang tidak dikenal (hindari OOM dari body raksasa). */
+    private fun readBounded(input: java.io.InputStream, max: Int): String {
+        val buf = ByteArray(16 * 1024)
+        val out = java.io.ByteArrayOutputStream(max)
+        var remaining = max
+        while (remaining > 0) {
+            val n = input.read(buf, 0, minOf(buf.size, remaining))
+            if (n < 0) break
+            out.write(buf, 0, n)
+            remaining -= n
+        }
+        return String(out.toByteArray(), Charsets.UTF_8)
+    }
+
     private fun guessFileName(url: String): String {
         val noQuery = url.substringBefore('?').substringBefore('#')
-        val path = Uri.parse(noQuery).lastPathSegment.orEmpty()
+        val path = noQuery.toUri().lastPathSegment.orEmpty()
         val candidate = path.trim()
         if (candidate.isNotEmpty() && !candidate.contains('=')) return candidate
         return "unduhan_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}"
@@ -1370,6 +1394,7 @@ class DownloadEngine(private val context: Context) {
 
     companion object {
         private const val BUFFER_SIZE = 64 * 1024
+        private const val HLS_PROBE_MAX_BYTES = 1_000_000
         private const val SEGMENT_MIN_BYTES = 5L * 1024 * 1024
         private const val RETRY_DELAY_1_MS = 5_000L
         private const val RETRY_DELAY_MAX_MS = 300_000L
