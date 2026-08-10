@@ -44,6 +44,10 @@ jobs:
       - name: Lint & unit test
         run: ./gradlew lintDebug testDebugUnitTest
 
+      - name: Tampilkan laporan lint di log
+        if: always()
+        run: cat app/build/reports/lint-results-debug.txt || true
+
       - name: Build release APK (jika secret signing tersedia)
         if: env.KEYSTORE_BASE64 != ''
         env:
