@@ -19,7 +19,6 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -48,6 +47,7 @@ import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.UpdateInfo
 import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
+import com.tasirin.httpdownloadmanager.util.setupSpinner
 import java.io.File
 
 /** Halaman pengaturan: server remote, keamanan, log, unduhan, dan penyimpanan. */
@@ -450,11 +450,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         val concurrentOptions = resources.getStringArray(R.array.concurrent_options)
-        binding.spinnerConcurrent.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item, concurrentOptions
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(this, binding.spinnerConcurrent, concurrentOptions.toList())
         binding.spinnerConcurrent.setSelection(
             (StoragePrefs.maxConcurrent(this) - 1).coerceIn(0, concurrentOptions.size - 1)
         )
@@ -471,11 +467,7 @@ class SettingsActivity : AppCompatActivity() {
         if (currentSpeed !in speedKbps) {
             speedOptions.add(getString(R.string.settings_speed_custom, currentSpeed))
         }
-        binding.spinnerSpeed.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item, speedOptions
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(this, binding.spinnerSpeed, speedOptions)
         binding.spinnerSpeed.setSelection(
             if (currentSpeed in speedKbps) speedKbps.indexOf(currentSpeed) else speedOptions.size - 1
         )
@@ -490,11 +482,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         val retryOptions = resources.getStringArray(R.array.retry_options)
-        binding.spinnerRetry.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item, retryOptions
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(this, binding.spinnerRetry, retryOptions.toList())
         binding.spinnerRetry.setSelection(
             StoragePrefs.maxRetries(this).coerceIn(0, retryOptions.size - 1)
         )
@@ -507,11 +495,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val segmentOptions = resources.getStringArray(R.array.segment_options)
         val segmentValues = intArrayOf(1, 2, 4, 6, 8)
-        binding.spinnerSegments.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item, segmentOptions
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(this, binding.spinnerSegments, segmentOptions.toList())
         binding.spinnerSegments.setSelection(
             segmentValues.indexOf(StoragePrefs.segmentCount(this)).coerceAtLeast(0)
         )
@@ -524,11 +508,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val connectOptions = resources.getStringArray(R.array.connect_timeout_options)
         val connectValues = intArrayOf(5, 10, 15, 30, 60)
-        binding.spinnerConnectTimeout.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item, connectOptions
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(this, binding.spinnerConnectTimeout, connectOptions.toList())
         binding.spinnerConnectTimeout.setSelection(
             connectValues.indexOf(StoragePrefs.getConnectTimeoutSec(this)).coerceAtLeast(0)
         )
@@ -541,11 +521,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val readOptions = resources.getStringArray(R.array.read_timeout_options)
         val readValues = intArrayOf(10, 15, 30, 60, 120)
-        binding.spinnerReadTimeout.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item, readOptions
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(this, binding.spinnerReadTimeout, readOptions.toList())
         binding.spinnerReadTimeout.setSelection(
             readValues.indexOf(StoragePrefs.getReadTimeoutSec(this)).coerceAtLeast(0)
         )

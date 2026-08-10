@@ -20,7 +20,6 @@ import android.view.Window
 import android.view.WindowManager
 import android.view.MenuItem
 import android.view.View
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -50,6 +49,7 @@ import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
+import com.tasirin.httpdownloadmanager.util.setupSpinner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -302,22 +302,20 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val headersInput = view.findViewById<EditText>(R.id.input_headers)
         val checksumInput = view.findViewById<EditText>(R.id.input_checksum)
         val mirrorInput = view.findViewById<EditText>(R.id.input_mirrors)
-        val speedPerOptions = resources.getStringArray(R.array.speed_limit_per_options)
         val speedKbps = SPEED_KBPS
         val spinnerSpeedPer = view.findViewById<Spinner>(R.id.spinner_speed_limit_per)
-        spinnerSpeedPer.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item, speedPerOptions
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(
+            this,
+            spinnerSpeedPer,
+            resources.getStringArray(R.array.speed_limit_per_options).toList()
+        )
         val priorityValues = PRIORITY_VALUES
         val spinnerPriority = view.findViewById<Spinner>(R.id.spinner_priority)
-        spinnerPriority.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item,
-            resources.getStringArray(R.array.priority_options)
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(
+            this,
+            spinnerPriority,
+            resources.getStringArray(R.array.priority_options).toList()
+        )
         spinnerPriority.setSelection(1)
         val recentTitle = view.findViewById<TextView>(R.id.recent_title)
         val recentScroll = view.findViewById<View>(R.id.recent_scroll)
@@ -833,22 +831,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             speedPerOptions.add(getString(R.string.settings_speed_custom, itemSpeed))
         }
         val spinnerSpeed = view.findViewById<Spinner>(R.id.spinner_speed_limit_per)
-        spinnerSpeed.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item, speedPerOptions
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(this, spinnerSpeed, speedPerOptions)
         val speedIndex = speedKbps.indexOf(itemSpeed)
         spinnerSpeed.setSelection(if (speedIndex >= 0) speedIndex else speedPerOptions.size - 1)
 
         val priorityValues = PRIORITY_VALUES
         val spinnerPriority = view.findViewById<Spinner>(R.id.spinner_priority)
-        spinnerPriority.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item,
-            resources.getStringArray(R.array.priority_options)
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        setupSpinner(
+            this,
+            spinnerPriority,
+            resources.getStringArray(R.array.priority_options).toList()
+        )
         spinnerPriority.setSelection(
             priorityValues.indexOf(item.priority).coerceAtLeast(0)
         )
