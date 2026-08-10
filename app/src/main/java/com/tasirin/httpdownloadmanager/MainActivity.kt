@@ -1,11 +1,9 @@
 package com.tasirin.httpdownloadmanager
 
 import android.annotation.SuppressLint
-import android.Manifest
 import android.app.Dialog
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -46,6 +44,7 @@ import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.databinding.ActivityMainBinding
 import com.tasirin.httpdownloadmanager.ui.DownloadAdapter
 import com.tasirin.httpdownloadmanager.util.MimeTypes
+import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Updater
@@ -259,22 +258,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     private fun requestPermissionsIfNeeded() {
-        val needed = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            needed.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        if (Build.VERSION.SDK_INT >= 23 &&
-            checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            needed.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-        if (needed.isNotEmpty()) {
-            permissionLauncher.launch(needed.toTypedArray())
-        }
+        val needed = Permissions.missingRuntime(this)
+        if (needed.isNotEmpty()) permissionLauncher.launch(needed)
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
