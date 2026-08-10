@@ -99,6 +99,7 @@
     <string name="about_check_update">Check Update</string>
     <string name="about_tech">minSdk %1$d · targetSdk %2$d · build %3$d</string>
     <string name="stat_total">Total</string>
+    <string name="stat_number">%d</string>
     <string name="stat_active">Active</string>
     <string name="stat_done">Done</string>
     <string name="stat_failed">Failed</string>

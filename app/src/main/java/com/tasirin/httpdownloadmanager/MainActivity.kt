@@ -949,10 +949,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
             if (item.state == DownloadState.DOWNLOADING) speed += item.speedBps
         }
-        statTotal.text = items.size.toString()
-        statActive.text = active.toString()
-        statDone.text = done.toString()
-        statFailed.text = failed.toString()
+        statTotal.text = getString(R.string.stat_number, items.size)
+        statActive.text = getString(R.string.stat_number, active)
+        statDone.text = getString(R.string.stat_number, done)
+        statFailed.text = getString(R.string.stat_number, failed)
         statActiveLabel.text = getString(
             if (speed > 0) R.string.stat_active_speed else R.string.stat_active,
             Formats.speed(speed)
