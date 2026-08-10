@@ -109,8 +109,7 @@ diperbarui.
 - **Dependabot** → PR update dependensi (Gradle/Actions) lewat alur PR biasa
   (build + lint + test, tanpa release) — review lalu merge. Yang di-ignore
   (perlu upgrade toolchain manual): major AGP & Kotlin, `material`, `activity`,
-  `lifecycle` (minSdk 23), `androidx.core` (compileSdk 37), `gradle-wrapper`
-  (AGP 8.x maks. Gradle 9.5).
+  `lifecycle` (minSdk 23), `androidx.core` (compileSdk 37).
 - **Manual**: GitHub → Actions → *Build APK* → *Run workflow*
   (atau `gh workflow run build.yml -R tasirin1/tasirin-download-manager`).
 - **Jangan edit release manual** — selalu lewat workflow.
@@ -176,8 +175,9 @@ GitHub (bukan Play Store), jadi targetSdk 35 tidak wajib — tujuan akhirnya
 perangkat Android 15/16 tetap berfungsi penuh.
 
 - **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
-  di-update bertahap via CI, toolchain Gradle 9.5.1 + AGP 8.13.2 + Kotlin 2.4.10,
-  core library desugaring aktif. `versionName`/`versionCode` tetap diatur CI.
+  di-update bertahap via CI, toolchain Gradle 9.6.1 + AGP 9.0.1 (built-in
+  Kotlin, KGP dibundel AGP), core library desugaring aktif.
+  `versionName`/`versionCode` tetap diatur CI.
 - **Fase 2a — selesai**: `compileSdk 36` (targetSdk tetap 34, tanpa perubahan
   perilaku runtime Android 15/16).
 - **Fase 2b — saat siap**: naikkan `targetSdk` ke 35.
