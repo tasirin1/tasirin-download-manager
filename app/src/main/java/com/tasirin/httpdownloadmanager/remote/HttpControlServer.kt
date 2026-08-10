@@ -13,6 +13,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.BatteryManager
 import android.annotation.SuppressLint
+import androidx.core.net.toUri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
