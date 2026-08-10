@@ -89,6 +89,9 @@ diperbarui.
 7. **Remote web = UI utama**: setiap perubahan halaman remote (dan endpoint API)
    harus tetap mobile-first dan ramah D-pad TV; jangan menambah dependensi berat
    (APK tetap kecil); hindari *switch* di remote — pakai tombol biasa.
+   `assets/remote.html` sengaja di-minify (hemat ukuran; gzip transfer sudah
+   otomatis di nanohttpd) — versi readable bisa dilihat dari history git
+   (commit sebelum `chore(perf)` minify).
 8. **Jaringan jangan di main thread**; polling adaptif (2s aktif / 10s idle);
    SSE wajib punya fallback polling & reconnect.
 9. **Jangan commit keystore** (`*.jks`, `keystore.b64` sudah di-`.gitignore`).

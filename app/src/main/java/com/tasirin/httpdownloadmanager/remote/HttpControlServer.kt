@@ -443,6 +443,10 @@ class HttpControlServer(private val context: Context) : NanoHTTPD(StoragePrefs.s
         JSONObject().put("ok", false).put("error", "PIN diperlukan").toString()
     )
 
+    // Catatan ukuran: nanohttpd 2.3.1 otomatis gzip untuk mime text/* dan
+    // application/json (useGzipWhenAccepted) selama client kirim Accept-Encoding: gzip —
+    // jadi halaman remote, JSON API, dan login page sudah terkompresi tanpa kode manual.
+    // SSE (chunked) sengaja tidak di-gzip agar streaming tetap realtime.
     private fun htmlPage(): Response {
         val html = cachedHtml ?: runCatching {
             context.assets.open("remote.html").bufferedReader().use { it.readText() }
