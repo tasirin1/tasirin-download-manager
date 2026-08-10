@@ -572,7 +572,7 @@ class SettingsActivity : AppCompatActivity() {
         StoragePrefs.setGalleryVideoFolder(
             this, findViewById<EditText>(R.id.input_gallery_video).text?.toString()?.trim().orEmpty()
         )
-        App.logEvent("FOLDER GALERI: foto=${StoragePrefs.getGalleryImageFolder(this) ?: "semua"} video=${StoragePrefs.getGalleryVideoFolder(this) ?: "semua"}")
+        App.logEvent("GALLERY FOLDERS: photos=${StoragePrefs.getGalleryImageFolder(this) ?: "all"} videos=${StoragePrefs.getGalleryVideoFolder(this) ?: "all"}")
     }
 
     private fun addExtraFolderRow(box: LinearLayout, path: String) {
@@ -611,9 +611,9 @@ class SettingsActivity : AppCompatActivity() {
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
             val oldPinHash = StoragePrefs.storedPinHash(this)
             if (newPin.isEmpty()) {
-                if (oldPinHash != null) App.logEvent("PIN DIHAPUS")
+                if (oldPinHash != null) App.logEvent("PIN REMOVED")
             } else if (oldPinHash == null || !StoragePrefs.pinMatches(this, newPin)) {
-                App.logEvent("PIN DIATUR")
+                App.logEvent("PIN SET")
             }
             StoragePrefs.setServerPin(this, newPin)
             if (StoragePrefs.isPinEnforced(this) &&
@@ -632,7 +632,7 @@ class SettingsActivity : AppCompatActivity() {
                 val oldPort = App.httpServer.listeningPort
                 StoragePrefs.setServerPort(this, newPort)
                 if (newPort != oldPort) {
-                    App.logEvent("PORT DIGANTI: $oldPort -> $newPort")
+                    App.logEvent("PORT CHANGED: $oldPort -> $newPort")
                     App.restartHttpServer(this)
                 }
             }

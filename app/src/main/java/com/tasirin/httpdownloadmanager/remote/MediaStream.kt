@@ -6,7 +6,7 @@ import java.io.InputStream
 internal fun notFound(): NanoHTTPD.Response = NanoHTTPD.newFixedLengthResponse(
     NanoHTTPD.Response.Status.NOT_FOUND,
     "text/plain; charset=utf-8",
-    "File tidak ditemukan"
+    "File not found"
 )
 
 /** Respons media/streaming dengan dukungan HTTP Range (resume & seek). */

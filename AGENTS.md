@@ -1,7 +1,8 @@
 # Panduan pengelolaan repo (untuk AI)
 
 Baca file ini SEBELUM mengubah, memperbaiki, atau mengelola repository ini.
-Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di `README.md`.
+Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
+`README.md` (Indonesia) dan `README.en.md` (Inggris) — jaga keduanya sinkron.
 
 ## Struktur repository
 
@@ -27,7 +28,10 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di `README.md
 │       │   ├── DownloadEngine.kt     # Inti unduhan: Range, multi-segmen, HLS, retry, mirror
 │       │   └── DownloadService.kt    # Foreground service + notifikasi + lanjut otomatis
 │       ├── receiver/BootReceiver.kt  # Auto-start saat boot (download & server)
-│       ├── remote/HttpControlServer.kt # Server HTTP remote (nanohttpd) + semua endpoint API
+│       ├── remote/HttpControlServer.kt # Server HTTP remote (nanohttpd) + endpoint API
+│       ├── remote/MediaStream.kt     # Streaming + HTTP Range + notFound (helper respons)
+│       ├── remote/ServerStreams.kt   # Stream gabungan partial, upload stream, delete-on-close
+│       ├── remote/ShareToken.kt      # Token berbagi file sementara
 │       ├── remote/QrCode.kt          # QR PNG untuk /api/qr (pakai util/QrEncoder)
 │       ├── ui/DownloadAdapter.kt     # RecyclerView adapter daftar download
 │       └── util/
@@ -36,6 +40,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di `README.md
 │           ├── MediaLibrary.kt       # Scan galeri + thumbnail (kondisional API 29+)
 │           ├── StoragePrefs.kt       # Semua kunci SharedPreferences ("storage_settings")
 │           ├── QrEncoder.kt          # Encoder QR mandiri (tanpa zxing di APK)
+│           ├── BitmapUtil.kt         # scaleDown bersama (galeri + server remote)
 │           ├── Spinners.kt, Streams.kt  # Helper spinner + baca stream terbatas
 │           ├── MimeTypes.kt, Crypto.kt, Formats.kt, FileNames.kt,
 │           ├── NotificationHelper.kt, TlsCompat.kt            # Pendukung
@@ -80,7 +85,12 @@ diperbarui.
 1. **Build resmi HANYA via GitHub Actions** — jangan build lokal untuk rilis.
    Build lokal (`./gradlew assembleDebug`) hanya untuk debugging cepat dan tidak
    pernah menggantikan CI.
-2. **Bahasa**: kode, komentar, string UI, dan commit memakai **Bahasa Indonesia**.
+2. **Bahasa**:
+   - **UI aplikasi memakai Bahasa Inggris** (default `values/strings.xml`, tanpa
+     `values-en` lagi — terjemahan default = Inggris; `remote.html` juga Inggris).
+     Jangan menulis teks UI baru dalam Bahasa Indonesia.
+   - **Komentar kode, dokumentasi internal, dan commit tetap Bahasa Indonesia**
+     (kecuali konten yang memang untuk pengguna internasional, seperti README.en.md).
 3. **Gaya commit**: `type(scope): deskripsi` — tipe yang dipakai di repo ini:
    `feat`, `fix`, `ui`, `perf`, `refactor`, `docs`, `chore`, `rebrand`
    (contoh: `ui(remote): ...`, `perf(gallery): ...`). Satu commit satu tujuan.

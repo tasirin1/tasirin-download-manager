@@ -9,6 +9,8 @@
 [![Build](https://github.com/tasirin1/tasirin-download-manager/actions/workflows/build.yml/badge.svg)](https://github.com/tasirin1/tasirin-download-manager/actions)
 [![Release](https://img.shields.io/github/v/release/tasirin1/tasirin-download-manager)](https://github.com/tasirin1/tasirin-download-manager/releases)
 
+<p align="center"><b>&#127760; Bahasa: <a href="README.md">Indonesia</a> &middot; <a href="README.en.md">English</a></b></p>
+
 **Satu aplikasi untuk semua kebutuhan file di perangkat Android:** unduh cepat, kelola dari browser lewat jaringan Wi-Fi, jelajah file, mainkan galeri ala YouTube, dan pantau semuanya secara realtime — cocok dipakai di HP maupun TV box (Android 5.0+ / API 21+).
 
 Dibangun dengan **Kotlin + Jetpack**, tanpa iklan, tanpa akun. Kode terbuka di GitHub dan setiap pembaruan otomatis di-build menjadi APK siap pasang.
@@ -60,7 +62,7 @@ Fitur unduhan:
 - **Auto-sort lengkap** setelah selesai: `Videos/`, `Photos/`, `Music/`, `Documents/`, `APK/` (pengaturan)
 - **Fallback cerdas saat Range ditolak**: server yang tidak mendukung Range otomatis diunduh sekali jalan (single-stream), tanpa gagal total
 - **Mirror otomatis** untuk server yang lambat/gagal, URL gagal di-blacklist agar tidak dicoba ulang tanpa henti
-- Tema ikuti sistem (otomatis / terang / gelap), bahasa Indonesia/Inggris (ikut sistem)
+- Tema ikuti sistem (otomatis / terang / gelap); bahasa UI: Inggris
 
 ## Unduh
 

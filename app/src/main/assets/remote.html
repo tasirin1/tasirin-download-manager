@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <!-- Remote web Tasirin (HTML+CSS+JS satu file, di-minify; versi readable ada di history git). -->
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -405,49 +405,49 @@
 <div class="topbar">
   <div class="topbar-in">
     <div class="brand"><span>Tasirin Download Manager<small>Remote Control</small></span></div>
-    <span id="speedTotal" class="speed-total hidden" title="Kecepatan download aktif">&#9889; 0 B/s <span class="st-sub"></span></span>
+    <span id="speedTotal" class="speed-total hidden" title="Active download speed">&#9889; 0 B/s <span class="st-sub"></span></span>
     <button id="newBtn" class="pill primary" type="button">+ New Download</button>
-    <button id="galleryBtn" class="pill" type="button">Galeri</button>
+    <button id="galleryBtn" class="pill" type="button">Gallery</button>
     <button id="fsBtn" class="pill" type="button">File Manager</button>
     <button id="themeBtn" class="pill" type="button">&#127769;</button>
   </div>
 </div>
 
 <div id="connBanner" class="conn-banner hidden">
-  <span id="connBannerText">Koneksi server terputus.</span>
-  <button id="connReloadBtn" type="button">Muat Ulang</button>
+  <span id="connBannerText">Server connection lost.</span>
+  <button id="connReloadBtn" type="button">Reload</button>
 </div>
 
 <div class="wrap">
   <div class="status-card" id="deviceStatus">
-    <span><span class="dot"></span>Menghubungkan ke device…</span>
+    <span><span class="dot"></span>Connecting to device…</span>
   </div>
 
   <div class="toolbar hidden" id="downloadsToolbar">
-    <button id="pauseAllBtn" type="button">&#9209; Jeda semua</button>
-    <button id="resumeAllBtn" type="button">&#9654; Lanjut semua</button>
-    <button id="retryFailedBtn" type="button">&#8635; Ulangi gagal</button>
-    <button id="clearCompletedBtn" type="button">&#128465; Bersihkan selesai</button>
+    <button id="pauseAllBtn" type="button">&#9209; Pause all</button>
+    <button id="resumeAllBtn" type="button">&#9654; Resume all</button>
+    <button id="retryFailedBtn" type="button">&#8635; Retry failed</button>
+    <button id="clearCompletedBtn" type="button">&#128465; Clear completed</button>
   </div>
 
   <div id="filtersSticky">
     <div class="seg" id="downloadsFilters">
-      <button id="webFilterAll" type="button" class="on">Semua</button>
-      <button id="webFilterActive" type="button">Aktif</button>
-      <button id="webFilterCompleted" type="button">Selesai</button>
-      <button id="webFilterFailed" type="button">Gagal</button>
+      <button id="webFilterAll" type="button" class="on">All</button>
+      <button id="webFilterActive" type="button">Active</button>
+      <button id="webFilterCompleted" type="button">Completed</button>
+      <button id="webFilterFailed" type="button">Failed</button>
     </div>
   </div>
 
   <div id="addSheet" class="sheet hidden">
     <form id="addForm" class="sheet-box add-sheet">
-      <div class="sheet-title" id="addSheetTitle">Tambah Download</div>
-      <input id="url" type="url" placeholder="URL file (https://…)" required>
-      <input id="name" type="text" placeholder="Nama file (opsional)">
-      <input id="checksum" type="text" placeholder="Checksum opsional (md5:/sha1:/sha256:)">
+      <div class="sheet-title" id="addSheetTitle">Add Download</div>
+      <input id="url" type="url" placeholder="File URL (https://…)" required>
+      <input id="name" type="text" placeholder="File name (optional)">
+      <input id="checksum" type="text" placeholder="Optional checksum (md5:/sha1:/sha256:)">
       <div class="grid2">
         <select id="speed">
-          <option value="0">Kecepatan: global</option>
+          <option value="0">Speed: global</option>
           <option value="128">128 KB/s</option>
           <option value="256">256 KB/s</option>
           <option value="512">512 KB/s</option>
@@ -456,37 +456,37 @@
           <option value="5120">5 MB/s</option>
         </select>
         <select id="priority">
-          <option value="-1">Prioritas: Rendah</option>
-          <option value="0" selected>Prioritas: Normal</option>
-          <option value="1">Prioritas: Tinggi</option>
+          <option value="-1">Priority: Low</option>
+          <option value="0" selected>Priority: Normal</option>
+          <option value="1">Priority: High</option>
         </select>
       </div>
-      <input id="storage" type="text" placeholder="Path folder tujuan di device (kosongkan = default)" value="">
+      <input id="storage" type="text" placeholder="Destination folder path on device (empty = default)" value="">
       <div class="form-row">
-        <button type="submit" class="btn-main">Tambah Download</button>
-        <button id="cancelAdd" type="button" class="btn-ghost">Batal</button>
+        <button type="submit" class="btn-main">Add Download</button>
+        <button id="cancelAdd" type="button" class="btn-ghost">Cancel</button>
       </div>
     </form>
   </div>
 
   <div id="galleryView" class="hidden">
-    <div class="gal-toolbar"><h2>Galeri Device</h2><span class="count" id="galleryCount"></span>
-      <button id="galSelectBtn" type="button" class="btn-ghost" style="margin-left:auto">Pilih</button>
+    <div class="gal-toolbar"><h2>Device Gallery</h2><span class="count" id="galleryCount"></span>
+      <button id="galSelectBtn" type="button" class="btn-ghost" style="margin-left:auto">Select</button>
     </div>
-    <div class="gal-search"><input id="gallerySearch" type="search" placeholder="Cari foto/video…" autocomplete="off"></div>
+    <div class="gal-search"><input id="gallerySearch" type="search" placeholder="Search photos/videos…" autocomplete="off"></div>
     <div class="seg" id="galleryFilters">
-      <button type="button" class="on" data-gal="all">Semua</button>
-      <button type="button" data-gal="image">Foto</button>
-      <button type="button" data-gal="video">Video</button>
+      <button type="button" class="on" data-gal="all">All</button>
+      <button type="button" data-gal="image">Photos</button>
+      <button type="button" data-gal="video">Videos</button>
     </div>
     <div id="galleryStatus"></div>
     <div id="galBatch" class="fs-batch hidden">
       <span id="galBatchCount"></span>
       <span id="galBatchSize"></span>
-      <button id="galBatchAll" type="button">Pilih semua</button>
-      <button id="galBatchZip" type="button">Unduh ZIP</button>
-      <button id="galBatchDelete" type="button" class="danger">Hapus</button>
-      <button id="galBatchCancel" type="button">Batal</button>
+      <button id="galBatchAll" type="button">Select all</button>
+      <button id="galBatchZip" type="button">Download ZIP</button>
+      <button id="galBatchDelete" type="button" class="danger">Delete</button>
+      <button id="galBatchCancel" type="button">Cancel</button>
     </div>
     <div id="galleryGrid" class="gal-grid"></div>
   </div>
@@ -495,17 +495,17 @@
   <div class="gal-toolbar">
     <h2>File Manager</h2>
     <span class="count" id="fsCount"></span>
-    <button id="fsUpBtn" type="button" class="btn-ghost" style="margin-left:auto">Naik</button>
+    <button id="fsUpBtn" type="button" class="btn-ghost" style="margin-left:auto">Up</button>
   </div>
   <div id="fsSticky" class="fs-sticky">
   <div id="fsPath" class="fs-path"></div>
   <div class="fs-tools" id="fsToolsRow">
     <span class="fs-loc-wrap">
-      <select id="fsLocation" title="Pindah ke lokasi">
-        <option value="">Lokasi&hellip;</option>
+      <select id="fsLocation" title="Move to location">
+        <option value="">Location&hellip;</option>
       </select>
     </span>
-    <button id="fsMkdirBtn" type="button">Folder</button>
+    <button id="fsMkdirBtn" type="button">New Folder</button>
     <span class="fs-up-wrap">
       <button id="fsUploadBtn" type="button">Upload</button>
       <div id="fsUpMenu" class="hidden">
@@ -513,8 +513,8 @@
         <button type="button" data-up="dir">Upload folder&hellip;</button>
       </div>
     </span>
-    <button id="fsSelectBtn" type="button">Pilih</button>
-    <button id="fsDupesBtn" type="button">Duplikat</button>
+    <button id="fsSelectBtn" type="button">Select</button>
+    <button id="fsDupesBtn" type="button">Duplicates</button>
   </div>
   </div>
   <input id="fsUploadFile" type="file" class="hidden" multiple>
@@ -522,10 +522,10 @@
     <div id="fsBatch" class="fs-batch hidden">
       <span id="fsBatchCount"></span>
       <span id="fsBatchSize"></span>
-      <button id="fsBatchAll" type="button">Pilih semua</button>
-      <button id="fsBatchMove" type="button">Pindah</button>
-      <button id="fsBatchDelete" type="button" class="danger">Hapus</button>
-      <button id="fsBatchCancel" type="button">Batal</button>
+      <button id="fsBatchAll" type="button">Select all</button>
+      <button id="fsBatchMove" type="button">Move</button>
+      <button id="fsBatchDelete" type="button" class="danger">Delete</button>
+      <button id="fsBatchCancel" type="button">Cancel</button>
     </div>
     <div id="fsStatus"></div>
     <div id="fsProgressBox" class="fs-upload hidden">
@@ -541,24 +541,24 @@
   <div class="app-footer" id="appFooter"></div>
 </div>
 
-<button id="fabNewBtn" class="fab" type="button" title="Tambah download">+</button>
+<button id="fabNewBtn" class="fab" type="button" title="Add download">+</button>
 
 <div id="mediaModal">
   <div id="mmTop">
-    <button id="mmBack" type="button" title="Tutup">&#10005;</button>
+    <button id="mmBack" type="button" title="Close">&#10005;</button>
   </div>
   <div id="mmImgTop" class="hidden">
-    <button id="mmImgBack" type="button" title="Tutup">&#10094;</button>
+    <button id="mmImgBack" type="button" title="Close">&#10094;</button>
     <span id="mmImgName"></span>
     <span id="mmImgCount"></span>
   </div>
-  <button id="mmImgPrev" type="button" title="Foto sebelumnya">&#10094;</button>
-  <button id="mmImgNext" type="button" title="Foto berikutnya">&#10095;</button>
+  <button id="mmImgPrev" type="button" title="Previous photo">&#10094;</button>
+  <button id="mmImgNext" type="button" title="Next photo">&#10095;</button>
   <div id="mmBody">
     <div id="mmPlayer" class="hidden">
       <video id="mmVideo" playsinline preload="metadata"></video>
       <div id="mmPlayerTop" class="hidden">
-        <button id="mmPlayerBack" type="button" title="Tutup">&#10094;</button>
+        <button id="mmPlayerBack" type="button" title="Close">&#10094;</button>
         <div id="mmOverlayTitle"></div>
       </div>
       <div id="mmBigPlay" class="mm-big hidden"><div class="icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>
@@ -572,12 +572,12 @@
         </div>
         <div id="mmCtrlRow">
           <button id="mmPlayBtn" type="button"></button>
-          <button id="mmPrevBtn" type="button" title="Video sebelumnya"></button>
-          <button id="mmNextBtn" type="button" title="Video berikutnya"></button>
+          <button id="mmPrevBtn" type="button" title="Previous video"></button>
+          <button id="mmNextBtn" type="button" title="Next video"></button>
           <span id="mmTime">0:00 / 0:00</span>
           <span class="mm-flex"></span>
-          <button id="mmSpeedBtn" type="button" title="Kecepatan putar">1&#215;</button>
-          <button id="mmAutoBtn" type="button" title="Putar otomatis video berikutnya">AUTO</button>
+          <button id="mmSpeedBtn" type="button" title="Playback speed">1&#215;</button>
+          <button id="mmAutoBtn" type="button" title="Auto-play next video">AUTO</button>
           <button id="mmMuteBtn" type="button"></button>
           <input id="mmVol" class="mm-vol" type="range" min="0" max="100" value="100" title="Volume">
           <button id="mmFsBtn" type="button"></button>
@@ -597,17 +597,17 @@
   <div class="sheet-box">
     <div class="sheet-title" id="fsSheetTitle"></div>
     <div class="sheet-list" id="fsSheetList"></div>
-    <button id="fsSheetCancel" type="button" class="sheet-cancel">Batal</button>
+    <button id="fsSheetCancel" type="button" class="sheet-cancel">Cancel</button>
   </div>
 </div>
 
 <div id="fsDupesModal" class="sheet hidden">
   <div class="sheet-box">
-    <div class="sheet-title" id="fsDupesTitle">Cari file duplikat</div>
+    <div class="sheet-title" id="fsDupesTitle">Find duplicate files</div>
     <div id="fsDupesBody" class="fs-dupes"></div>
     <div class="cm-row" style="margin-top:10px">
-      <button id="fsDupesCancel" type="button" class="btn-ghost">Tutup</button>
-      <button id="fsDupesDelete" type="button" class="danger" disabled>Hapus terpilih (0)</button>
+      <button id="fsDupesCancel" type="button" class="btn-ghost">Close</button>
+      <button id="fsDupesDelete" type="button" class="danger" disabled>Delete selected (0)</button>
     </div>
   </div>
 </div>
@@ -616,17 +616,17 @@
   <div class="sheet-box">
     <div class="sheet-title" id="itemSheetTitle"></div>
     <div class="sheet-list" id="itemSheetList"></div>
-    <button id="itemSheetCancel" type="button" class="sheet-cancel">Batal</button>
+    <button id="itemSheetCancel" type="button" class="sheet-cancel">Cancel</button>
   </div>
 </div>
 
 <div id="confirmModal" class="cm-overlay hidden">
   <div class="cm-box">
-    <div class="cm-title" id="confirmTitle">Hapus?</div>
+    <div class="cm-title" id="confirmTitle">Delete?</div>
     <div class="cm-text" id="confirmText"></div>
     <div class="cm-row">
-      <button id="confirmNo" type="button" class="btn-ghost">Batal</button>
-      <button id="confirmYes" type="button" class="danger">Hapus</button>
+      <button id="confirmNo" type="button" class="btn-ghost">Cancel</button>
+      <button id="confirmYes" type="button" class="danger">Delete</button>
     </div>
   </div>
 </div>
@@ -637,7 +637,7 @@
     <input id="inputField" type="text" class="cm-input" autocomplete="off">
     <div class="cm-text" id="inputHint"></div>
     <div class="cm-row">
-      <button id="inputNo" type="button" class="btn-ghost">Batal</button>
+      <button id="inputNo" type="button" class="btn-ghost">Cancel</button>
       <button id="inputYes" type="button" class="danger">OK</button>
     </div>
   </div>
@@ -645,14 +645,14 @@
 
 <div id="shareModal" class="cm-overlay hidden">
   <div class="cm-box">
-    <div class="cm-title">Bagikan file</div>
+    <div class="cm-title">Share file</div>
     <div class="cm-text" id="shareText"></div>
-    <img id="shareQr" class="share-qr" alt="QR" title="QR tautan berbagi">
+    <img id="shareQr" class="share-qr" alt="QR" title="Share link QR">
     <input id="shareLink" type="text" readonly class="cm-input" autocomplete="off">
     <div class="cm-row">
-      <button id="shareCopy" type="button" class="btn-ghost">Salin</button>
-      <button id="shareOpen" type="button" class="btn-main">Buka</button>
-      <button id="shareClose" type="button" class="btn-ghost">Tutup</button>
+      <button id="shareCopy" type="button" class="btn-ghost">Copy</button>
+      <button id="shareOpen" type="button" class="btn-main">Open</button>
+      <button id="shareClose" type="button" class="btn-ghost">Close</button>
     </div>
   </div>
 </div>
@@ -693,7 +693,7 @@ function applyTheme(theme) {
   if (m) m.setAttribute('content', resolved === 'dark' ? '#0e1116' : '#4353e6');
   localStorage.setItem('dm_theme', theme);
   themeBtn.textContent = theme === 'light' ? '\u{1F31E}' : (theme === 'dark' ? '\u{1F319}' : '\u{1F317}');
-  themeBtn.title = theme === 'auto' ? 'Tema: otomatis' : (theme === 'dark' ? 'Tema: gelap' : 'Tema: terang');
+  themeBtn.title = theme === 'auto' ? 'Theme: auto' : (theme === 'dark' ? 'Theme: dark' : 'Theme: light');
 }
 applyTheme(localStorage.getItem('dm_theme') || 'auto');
 themeBtn.addEventListener('click', function () {
@@ -754,13 +754,13 @@ function renderStatus(st) {
   const el = document.getElementById('deviceStatus');
   if (!el) return;
   const parts = [];
-  parts.push('<span class="st-item"><span class="dot"></span><b>Device terhubung</b></span>');
+  parts.push('<span class="st-item"><span class="dot"></span><b>Device connected</b></span>');
   if (typeof st.storageFree === 'number') {
-    parts.push('<span class="st-item">Sisa <b>' + fmt(st.storageFree) + '</b></span>');
+    parts.push('<span class="st-item">Free <b>' + fmt(st.storageFree) + '</b></span>');
   }
   let text = parts.join('<span class="st-sep">\u00b7</span>');
   if (st.storageWriteOk === false) {
-    text += '<span class="st-item st-warn">&#9888;&#65039; Izin akses file belum aktif — buka aplikasi &gt; Remote (HTTP) &gt; Aktifkan akses file.</span>';
+    text += '<span class="st-item st-warn">&#9888;&#65039; File access permission not enabled — open the app &gt; Remote (HTTP) &gt; Enable file access.</span>';
   }
   el.innerHTML = text;
   el.classList.remove('offline');
@@ -772,7 +772,7 @@ function renderStatus(st) {
     const proto = location.protocol;
     const host = location.hostname;
     showConnBanner(
-      'Server pindah ke port ' + st.port + ' — muat ulang ke alamat baru.',
+      'Server moved to port ' + st.port + ' — reload to the new address.',
       proto + '//' + host + ':' + st.port + location.pathname
     );
   }
@@ -787,7 +787,7 @@ async function refreshStatus() {
     renderStatus(await res.json());
   } catch (e) {
     el.classList.add('offline');
-    el.innerHTML = '<span class="st-item"><span class="dot"></span><b>Server tidak terhubung</b> — mulai server dari aplikasi</span>';
+    el.innerHTML = '<span class="st-item"><span class="dot"></span><b>Server not connected</b> — start the server from the app</span>';
   }
 }
 
@@ -1041,7 +1041,7 @@ async function loadGallery(reset) {
     if (galleryFilter && galleryFilter !== 'all') params.set('type', galleryFilter);
     const res = await fetch(API + '/api/gallery?' + params.toString());
     if (res.status === 401) {
-      galleryStatus.textContent = 'PIN diperlukan. Muat ulang halaman untuk login.';
+      galleryStatus.textContent = 'PIN required. Reload the page to log in.';
       if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
       galleryGrid.innerHTML = '';
       return;
@@ -1062,8 +1062,8 @@ async function loadGallery(reset) {
         const filtered = galleryFilter !== 'all';
         galleryGrid.innerHTML = emptyHtml(
           'search',
-          q ? 'Tidak ada hasil' : (filtered ? 'Tidak ada ' + (galleryFilter === 'video' ? 'video' : 'foto') : 'Belum ada foto/video'),
-          q ? 'Coba kata kunci lain.' : (filtered ? 'Coba filter lain atau ubah kata kunci.' : 'File di folder download akan muncul di sini.')
+          q ? 'No results' : (filtered ? 'No ' + (galleryFilter === 'video' ? 'videos' : 'photos') : 'No photos/videos yet'),
+          q ? 'Try a different keyword.' : (filtered ? 'Try a different filter or change the keyword.' : 'Files in the download folder will appear here.')
         );
         if (!q && !filtered) {
           const cta = document.createElement('div');
@@ -1071,7 +1071,7 @@ async function loadGallery(reset) {
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'pill primary';
-          b.textContent = 'Buka File Manager';
+          b.textContent = 'Open File Manager';
           b.addEventListener('click', function () { location.hash = '#/files'; });
           cta.appendChild(b);
           galleryGrid.appendChild(cta);
@@ -1088,9 +1088,9 @@ async function loadGallery(reset) {
     loadMoreGallery();
   } catch (e) {
     if (reset) {
-      galleryStatus.textContent = 'Gagal memuat galeri: ' + e;
+      galleryStatus.textContent = 'Failed to load gallery: ' + e;
       if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
-      galleryGrid.innerHTML = emptyHtml('warn', 'Gagal memuat galeri', String(e));
+      galleryGrid.innerHTML = emptyHtml('warn', 'Failed to load gallery', String(e));
     }
   }
   galleryLoading = false;
@@ -1149,13 +1149,13 @@ function renderGalleryCell(it) {
   const selOn = galSelected.indexOf(it) >= 0;
   cell.innerHTML =
     '<div class="gal-thumb" style="padding-top:' + ratio + '%">' +
-      '<button class="del" title="Hapus" type="button">&#128465;</button>' +
+      '<button class="del" title="Delete" type="button">&#128465;</button>' +
       '<span class="gal-check' + (selOn ? ' on' : '') + '">' + (selOn ? '\u2713' : '') + '</span>' +
       '<div class="ext">' + escapeHtml(extOf(it.name)) + '</div>' +
       '<img loading="lazy" src="' + thumb + '" alt="' + escapeHtml(it.name) + '" onerror="this.remove()">' +
       (it.isVideo ? '<div class="gal-play"><span></span></div>' : '') +
       (it.isVideo ? '<div class="gal-badge">' + (it.durationMs > 0 ? mmFmtTime(it.durationMs / 1000) : escapeHtml(extOf(it.name))) + '</div>' : '') +
-      (resume > 0 ? '<div class="gal-resume">Lanjut dari ' + mmFmtTime(resume) + '</div>' : '') +
+      (resume > 0 ? '<div class="gal-resume">Resume from ' + mmFmtTime(resume) + '</div>' : '') +
     '</div>' +
     '<div class="gal-info">' +
       '<div class="n">' + escapeHtml(it.name) + '</div>' +
@@ -1169,7 +1169,7 @@ function renderGalleryCell(it) {
   if (delBtn) {
     delBtn.addEventListener('click', function (ev) {
       ev.stopPropagation();
-      if (!confirm('Hapus file ini?\n' + it.name)) return;
+      if (!confirm('Delete this file?\n' + it.name)) return;
       doDeleteMedia(it.token, function () {
         cell.remove();
         const c = parseInt(galleryCount.textContent, 10);
@@ -1190,7 +1190,7 @@ function renderGalleryCell(it) {
 function galSetSelectMode(on) {
   galSelectMode = on;
   galSelected.length = 0;
-  document.getElementById('galSelectBtn').textContent = on ? 'Batal pilih' : 'Pilih';
+  document.getElementById('galSelectBtn').textContent = on ? 'Cancel selection' : 'Select';
   galleryGrid.classList.toggle('gal-selecting', on);
   galBatch.classList.add('hidden');
   reRenderGalleryLoaded();
@@ -1216,12 +1216,12 @@ function toggleGalSelect(it, cell) {
 
 function updateGalBatch() {
   galBatch.classList.toggle('hidden', galSelected.length === 0);
-  document.getElementById('galBatchCount').textContent = galSelected.length + ' dipilih';
+  document.getElementById('galBatchCount').textContent = galSelected.length + ' selected';
   let total = 0;
   galSelected.forEach(function (it) { total += it.size || 0; });
   document.getElementById('galBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt(total) : '';
   document.getElementById('galBatchAll').textContent =
-    galleryItems.length > 0 && galSelected.length === galleryItems.length ? 'Batalkan semua' : 'Pilih semua';
+    galleryItems.length > 0 && galSelected.length === galleryItems.length ? 'Cancel all' : 'Select all';
 }
 
 document.getElementById('galSelectBtn').addEventListener('click', function () {
@@ -1247,7 +1247,7 @@ document.getElementById('galBatchAll').addEventListener('click', function () {
 });
 document.getElementById('galBatchDelete').addEventListener('click', function () {
   if (!galSelected.length) return;
-  if (!confirm('Hapus ' + galSelected.length + ' file?')) return;
+  if (!confirm('Delete ' + galSelected.length + ' files?')) return;
   (async function () {
     for (const it of galSelected.slice()) {
       await doDeleteMedia(it.token, function () {});
@@ -1314,8 +1314,8 @@ function applyRoute() {
   });
   galleryView.classList.toggle('hidden', route !== 'gallery');
   fsView.classList.toggle('hidden', route !== 'files');
-  galleryBtn.textContent = route === 'gallery' ? 'Tutup galeri' : 'Galeri';
-  fsBtn.textContent = route === 'files' ? 'Tutup file' : 'File Manager';
+  galleryBtn.textContent = route === 'gallery' ? 'Close gallery' : 'Gallery';
+  fsBtn.textContent = route === 'files' ? 'Close files' : 'File Manager';
   document.getElementById('fabNewBtn').classList.toggle('hidden', route !== 'downloads');
   if (route === 'gallery') {
     restartAnim(galleryView);
@@ -1326,7 +1326,7 @@ function applyRoute() {
     toggleAddForm(false);
     fsSelectMode = false;
     fsSelected.length = 0;
-    fsSelectBtn.textContent = 'Pilih';
+    fsSelectBtn.textContent = 'Select';
     fsBatch.classList.add('hidden');
     loadFsLocations();
     loadFs();
@@ -1392,7 +1392,7 @@ function fsCrumbParts(p) {
   const prefix = p.indexOf('m:') === 0 ? 'm:' : 'f:';
   const rel = p.slice(2).replace(/^\/+|\/+$/g, '');
   const segs = rel.split('/').filter(Boolean);
-  const parts = [{label: '\u{1F4C1} Penyimpanan', path: ''}];
+  const parts = [{label: '\u{1F4C1} Storage', path: ''}];
   let cur = prefix;
   segs.forEach(function (seg) {
     cur += (cur === 'm:' ? '' : '/') + seg;
@@ -1408,7 +1408,7 @@ function collapseCrumbs(parts) {
 
 function renderFsCrumbs(p) {
   if (!p) {
-    fsPathEl.textContent = 'Pilih lokasi penyimpanan';
+    fsPathEl.textContent = 'Select a storage location';
     return;
   }
   const parts = collapseCrumbs(fsCrumbParts(p));
@@ -1439,7 +1439,7 @@ async function loadFsLocations() {
     fsLocation.innerHTML = '';
     const ph = document.createElement('option');
     ph.value = '';
-    ph.textContent = 'Lokasi\u2026';
+    ph.textContent = 'Location\u2026';
     fsLocation.appendChild(ph);
     fsLocations.forEach(function (r) {
       const o = document.createElement('option');
@@ -1450,7 +1450,7 @@ async function loadFsLocations() {
     const matched = fsLocations.some(function (r) { return r.path === cur; });
     if (cur && matched) fsLocation.value = cur;
   } catch (e) {
-    fsLocation.innerHTML = '<option value="">Lokasi\u2026</option>';
+    fsLocation.innerHTML = '<option value="">Location\u2026</option>';
   }
 }
 
@@ -1478,8 +1478,8 @@ async function loadFs() {
     if (!fsPath) loadFsLocations();
     renderFs(fsItems);
   } catch (e) {
-    fsMsg('Gagal memuat: ' + e, true);
-    fsList.innerHTML = emptyHtml('warn', 'Gagal memuat folder', String(e));
+    fsMsg('Failed to load: ' + e, true);
+    fsList.innerHTML = emptyHtml('warn', 'Failed to load folder', String(e));
   }
 }
 
@@ -1512,7 +1512,7 @@ function fsQuickBtn(it) {
   const url = it.kind === 'dir'
     ? API + '/api/fs_zip?path=' + encodeURIComponent(it.path)
     : API + '/api/media?token=' + encodeURIComponent(it.token) + '&dl=1';
-  return '<button class="item-menu-btn fs-q-btn" type="button" title="Unduh" data-url="' + url.replace(/&/g, '&amp;') + '">\u2B07</button>';
+  return '<button class="item-menu-btn fs-q-btn" type="button" title="Download" data-url="' + url.replace(/&/g, '&amp;') + '">\u2B07</button>';
 }
 
 function fsRootIcon(r) {
@@ -1537,7 +1537,7 @@ function renderFs(items) {
   box.innerHTML = '';
   if (!fsPath) {
     if (!items.length) {
-      box.innerHTML = emptyHtml('storage', 'Tidak ada penyimpanan tersedia', '');
+      box.innerHTML = emptyHtml('storage', 'No storage available', '');
       return;
     }
     for (const r of items) {
@@ -1556,7 +1556,7 @@ function renderFs(items) {
     return;
   }
   if (!items.length) {
-    box.innerHTML = emptyHtml('folder', 'Folder kosong', 'Tidak ada file di folder ini.');
+    box.innerHTML = emptyHtml('folder', 'Empty folder', 'No files in this folder.');
     const cta = document.createElement('div');
     cta.className = 'empty-cta';
     const up = document.createElement('button');
@@ -1567,7 +1567,7 @@ function renderFs(items) {
     const mk = document.createElement('button');
     mk.type = 'button';
     mk.className = 'pill';
-    mk.textContent = 'Buat Folder';
+    mk.textContent = 'New Folder';
     mk.addEventListener('click', function () { document.getElementById('fsMkdirBtn').click(); });
     cta.appendChild(up);
     cta.appendChild(mk);
@@ -1596,7 +1596,7 @@ function renderFs(items) {
       '<span class="fs-ico">' + fsIconFor(it) + '</span>' +
       '<div class="fs-main"><div class="fs-name">' + escapeHtml(it.name) + '</div>' +
       (meta ? '<div class="fs-meta">' + meta + '</div>' : '') + '</div>' +
-      (!fsSelectMode ? fsQuickBtn(it) + '<button class="fs-more-btn" type="button" title="Aksi">\u22EF</button>' : '');
+      (!fsSelectMode ? fsQuickBtn(it) + '<button class="fs-more-btn" type="button" title="Actions">\u22EF</button>' : '');
     row.addEventListener('click', function () {
       if (fsLpFired) { fsLpFired = false; return; }
       if (fsSelectMode) {
@@ -1635,7 +1635,7 @@ function attachFsLongPress(row, it) {
     fsLpTimer = setTimeout(function () {
       fsLpFired = true;
       fsSelectMode = true;
-      fsSelectBtn.textContent = 'Batal pilih';
+      fsSelectBtn.textContent = 'Cancel selection';
       fsSelected.length = 0;
       fsSelected.push(it);
       renderFs(fsItems);
@@ -1667,27 +1667,27 @@ function toggleFsSelect(it, row) {
 
 function updateFsBatch() {
   fsBatch.classList.toggle('hidden', fsSelected.length === 0);
-  document.getElementById('fsBatchCount').textContent = fsSelected.length + ' dipilih';
+  document.getElementById('fsBatchCount').textContent = fsSelected.length + ' selected';
   let total = 0;
   fsSelected.forEach(function (it) {
     total += (it.kind === 'file' ? it.size : (it.totalSize || 0)) || 0;
   });
   document.getElementById('fsBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt(total) : '';
-  document.getElementById('fsBatchAll').textContent = (fsItems || []).length > 0 && fsSelected.length === fsItems.length ? 'Batalkan semua' : 'Pilih semua';
+  document.getElementById('fsBatchAll').textContent = (fsItems || []).length > 0 && fsSelected.length === fsItems.length ? 'Cancel all' : 'Select all';
 }
 
 fsSelectBtn.addEventListener('click', function () {
   if (!fsPath) return;
   fsSelectMode = !fsSelectMode;
   fsSelected.length = 0;
-  fsSelectBtn.textContent = fsSelectMode ? 'Batal pilih' : 'Pilih';
+  fsSelectBtn.textContent = fsSelectMode ? 'Cancel selection' : 'Select';
   fsBatch.classList.add('hidden');
   loadFs();
 });
 
 document.getElementById('fsBatchDelete').addEventListener('click', function () {
   if (!fsSelected.length) return;
-  showConfirm('Hapus ' + fsSelected.length + ' item?', 'Folder dihapus beserta isinya.', 'Hapus', function () {
+  showConfirm('Delete ' + fsSelected.length + ' item(s)?', 'The folder will be deleted along with its contents.', 'Delete', function () {
     (async function () {
       for (const it of fsSelected) {
         await postFsAction({action: 'delete', path: it.path});
@@ -1700,7 +1700,7 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
 
 document.getElementById('fsBatchMove').addEventListener('click', function () {
   if (!fsSelected.length) return;
-  showInput('Pindah', fsPath, 'Path folder tujuan di device\nContoh: f:/storage/emulated/0/Download/sub\natau: m:Download/sub', 'Pindah', function (dest) {
+  showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move', function (dest) {
     if (!dest) return;
     (async function () {
       for (const it of fsSelected) {
@@ -1715,7 +1715,7 @@ document.getElementById('fsBatchMove').addEventListener('click', function () {
 document.getElementById('fsBatchCancel').addEventListener('click', function () {
   fsSelectMode = false;
   fsSelected.length = 0;
-  fsSelectBtn.textContent = 'Pilih';
+  fsSelectBtn.textContent = 'Select';
   fsBatch.classList.add('hidden');
   loadFs();
 });
@@ -1757,8 +1757,8 @@ function openFsSheet(it) {
     acts.push({label: '\u{1F4E6} Download folder (ZIP)', dl: API + '/api/fs_zip?path=' + encodeURIComponent(it.path)});
   }
   acts.push({label: '\u270E Rename', op: 'rename'});
-  acts.push({label: '\u27A1 Pindah', op: 'move'});
-  acts.push({label: '\u{1F5D1} Hapus', op: 'delete', danger: true});
+  acts.push({label: '\u27A1 Move', op: 'move'});
+  acts.push({label: '\u{1F5D1} Delete', op: 'delete', danger: true});
   acts.forEach(function (a) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1792,19 +1792,19 @@ function openItemSheet(it) {
   if (it.state === 'COMPLETED') {
     acts.push({label: '\u25B6 Stream', stream: API + '/file/' + encId});
     acts.push({label: '\u2B07 Download', dl: API + '/file/' + encId + '?dl=1'});
-    acts.push({label: '\u{1F517} Bagikan', op: 'share'});
-    acts.push({label: '\u270F Ubah nama', op: 'rename'});
+    acts.push({label: '\u{1F517} Share', op: 'share'});
+    acts.push({label: '\u270F Rename', op: 'rename'});
   }
-  if (it.state === 'DOWNLOADING') acts.push({label: '\u23F8 Jeda', op: 'pause'});
-  if (it.state === 'PAUSED' || it.state === 'FAILED') acts.push({label: '\u25B6 Lanjut', op: 'resume'});
+  if (it.state === 'DOWNLOADING') acts.push({label: '\u23F8 Pause', op: 'pause'});
+  if (it.state === 'PAUSED' || it.state === 'FAILED') acts.push({label: '\u25B6 Resume', op: 'resume'});
   if (it.state === 'PENDING' || it.state === 'PAUSED' || it.state === 'FAILED') {
-    acts.push({label: '\u23F1 Batas kecepatan', op: 'limit'});
+    acts.push({label: '\u23F1 Speed limit', op: 'limit'});
   }
   if (it.state === 'DOWNLOADING' || it.state === 'PENDING' || it.state === 'PAUSED') {
-    acts.push({label: '\u2715 Batal', op: 'cancel'});
+    acts.push({label: '\u2715 Cancel', op: 'cancel'});
   }
   if (it.state === 'COMPLETED' || it.state === 'FAILED' || it.state === 'CANCELLED') {
-    acts.push({label: '\u{1F5D1} Hapus', op: 'delete', danger: true});
+    acts.push({label: '\u{1F5D1} Delete', op: 'delete', danger: true});
   }
   acts.forEach(function (a) {
     const b = document.createElement('button');
@@ -1816,7 +1816,7 @@ function openItemSheet(it) {
       if (a.stream) { window.open(a.stream, '_blank'); return; }
       if (a.dl) { fsDownloadUrl(a.dl); return; }
       if (a.op === 'rename') {
-        showInput('Ubah nama', it.fileName, 'Nama baru untuk file ini', 'Simpan', function (name) {
+        showInput('Rename', it.fileName, 'New name for this file', 'Save', function (name) {
           if (!name || name === it.fileName) return;
           doActionNow(it.id, 'rename', {name: name});
         });
@@ -1824,10 +1824,10 @@ function openItemSheet(it) {
       }
       if (a.op === 'limit') {
         showInput(
-          'Batas kecepatan',
+          'Speed limit',
           String(it.speedLimitKbps || 0),
-          'KB/s (0 = tanpa batas). Opsional prioritas -1/0/1 di belakang, contoh: 512 1',
-          'Simpan',
+          'KB/s (0 = unlimited). Optional priority -1/0/1 at the end, e.g. 512 1',
+          'Save',
           function (val) {
             const parts = val.trim().split(/\s+/);
             const speed = parseInt(parts[0], 10);
@@ -1867,20 +1867,20 @@ function fsOpenMedia(it) {
 
 async function doFsOp(it, op) {
   if (op === 'delete') {
-    showConfirm('Hapus ' + (it.kind === 'dir' ? 'folder' : 'file') + '?',
-      'Hapus \"' + it.name + '\" dari device? Folder dihapus beserta isinya.',
-      'Hapus',
+    showConfirm('Delete ' + (it.kind === 'dir' ? 'folder' : 'file') + '?',
+      'Delete \"' + it.name + '\" from the device? The folder will be deleted along with its contents.',
+      'Delete',
       function () {
         postFsAction({action: 'delete', path: it.path}).then(loadFs);
       });
   } else if (op === 'rename') {
-    showInput('Rename', it.name, 'Nama baru untuk \"' + it.name + '\"', 'Rename',
+    showInput('Rename', it.name, 'New name for \"' + it.name + '\"', 'Rename',
       function (name) {
         if (!name) return;
         postFsAction({action: 'rename', path: it.path, name: name}).then(loadFs);
       });
   } else if (op === 'move') {
-    showInput('Pindah', fsPath, 'Path folder tujuan di device\nContoh: f:/storage/emulated/0/Download/sub\natau: m:Download/sub', 'Pindah',
+    showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move',
       function (dest) {
         if (!dest) return;
         postFsAction({action: 'move', path: it.path, dest: dest}).then(loadFs);
@@ -1893,19 +1893,19 @@ async function postFsAction(params) {
   Object.entries(params).forEach(function (e) { body.append(e[0], e[1]); });
   const res = await fetch(API + '/api/fs_action', {method: 'POST', body});
   const data = await res.json();
-  if (!data.ok) fsMsg('Operasi gagal', true);
+  if (!data.ok) fsMsg('Operation failed', true);
 }
 
 document.getElementById('fsMkdirBtn').addEventListener('click', async function () {
   if (!fsPath) {
-    fsMsg('Buka folder tujuan dulu', true);
+    fsMsg('Open the destination folder first', true);
     return;
   }
   if (fsPath.startsWith('m:')) {
-    fsMsg('MediaStore: folder tidak bisa dibuat manual', true);
+    fsMsg('MediaStore: folders cannot be created manually', true);
     return;
   }
-  showInput('Buat folder baru', 'Folder Baru', 'Nama folder baru di: ' + fsPath, 'Buat', function (name) {
+  showInput('Create new folder', 'New Folder', 'New folder name in: ' + fsPath, 'Create', function (name) {
     if (!name) return;
     postFsAction({action: 'mkdir', path: fsPath, name: name}).then(loadFs);
   });
@@ -2038,17 +2038,17 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
           retryChunk();
         }
       };
-      xhr.onerror = function () { lastErr = 'koneksi terputus'; retryChunk(); };
-      xhr.onabort = function () { lastErr = 'permintaan dibatalkan'; retryChunk(); };
+      xhr.onerror = function () { lastErr = 'connection lost'; retryChunk(); };
+      xhr.onabort = function () { lastErr = 'request cancelled'; retryChunk(); };
       xhr.ontimeout = function () {
-        lastErr = 'waktu habis, koneksi macet (akan dicoba lagi)';
+        lastErr = 'timeout, stalled connection (will retry)';
         retryChunk();
       };
       xhr.send(file.slice(start, end));
     }
 
     function pollFinalize() {
-      statusEl.textContent = 'Menyelesaikan ' + file.name + ' \u2026';
+      statusEl.textContent = 'Finalizing ' + file.name + ' \u2026';
       let tries = 0;
       (function tick() {
         const v = new XMLHttpRequest();
@@ -2067,20 +2067,20 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
           tries++;
           if (done) {
             sentBytes += file.size;
-            statusEl.textContent = 'Selesai: ' + (name || file.name);
+            statusEl.textContent = 'Done: ' + (name || file.name);
             ulOk(job.id);
             finishOne();
           } else if (err) {
             failed.push(file.name);
           ulFail(job.id);
-            statusEl.textContent = 'Gagal: ' + file.name + ' \u2014 ' + err;
+            statusEl.textContent = 'Failed: ' + file.name + ' \u2014 ' + err;
             finishOne();
           } else if (tries < 200) {
             setTimeout(tick, 1500);
           } else {
             failed.push(file.name);
           ulFail(job.id);
-            statusEl.textContent = 'Gagal: ' + file.name + ' \u2014 penyelesaian terlalu lama';
+            statusEl.textContent = 'Failed: ' + file.name + ' \u2014 finalization took too long';
             finishOne();
           }
         };
@@ -2091,7 +2091,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
           } else {
             failed.push(file.name);
           ulFail(job.id);
-            statusEl.textContent = 'Gagal: ' + file.name + ' \u2014 penyelesaian terlalu lama';
+            statusEl.textContent = 'Failed: ' + file.name + ' \u2014 finalization took too long';
             finishOne();
           }
         };
@@ -2127,7 +2127,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         } catch (e) {}
         if (done) {
           sentBytes += file.size;
-          statusEl.textContent = 'Selesai: ' + (name || file.name);
+          statusEl.textContent = 'Done: ' + (name || file.name);
           ulOk(job.id);
           finishOne();
         } else if (pending) {
@@ -2135,19 +2135,19 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         } else if (err) {
           failed.push(file.name);
           ulFail(job.id);
-          statusEl.textContent = 'Gagal: ' + file.name + ' \u2014 ' + err;
+          statusEl.textContent = 'Failed: ' + file.name + ' \u2014 ' + err;
           finishOne();
         } else {
           failed.push(file.name);
           ulFail(job.id);
-          statusEl.textContent = 'Gagal: ' + file.name + (lastErr ? ' \u2014 ' + lastErr : '');
+          statusEl.textContent = 'Failed: ' + file.name + (lastErr ? ' \u2014 ' + lastErr : '');
           finishOne();
         }
       };
       verify.onerror = verify.ontimeout = function () {
         failed.push(file.name);
           ulFail(job.id);
-        statusEl.textContent = 'Gagal: ' + file.name + (lastErr ? ' \u2014 ' + lastErr : '');
+        statusEl.textContent = 'Failed: ' + file.name + (lastErr ? ' \u2014 ' + lastErr : '');
         finishOne();
       };
       verify.send();
@@ -2230,9 +2230,9 @@ function startFsUpload(jobs) {
 
       loadFs();
       if (ok) {
-        fsMsg('Selesai: ' + jobs.length + ' file diunggah');
+        fsMsg('Done: ' + jobs.length + ' files uploaded');
       } else {
-        fsMsg(jobs.length - failed.length + ' berhasil, ' + failed.length + ' gagal: ' + failed.join(', '), true);
+        fsMsg(jobs.length - failed.length + ' succeeded, ' + failed.length + ' failed: ' + failed.join(', '), true);
       }
     }
   );
@@ -2240,7 +2240,7 @@ function startFsUpload(jobs) {
 
 document.getElementById('fsUploadBtn').addEventListener('click', function () {
   if (!fsPath) {
-    fsMsg('Buka folder tujuan dulu', true);
+    fsMsg('Open the destination folder first', true);
     return;
   }
   document.getElementById('fsUpMenu').classList.toggle('hidden');
@@ -2251,7 +2251,7 @@ document.getElementById('fsUpMenu').addEventListener('click', function (e) {
   if (!item) return;
   this.classList.add('hidden');
   if (!fsPath) {
-    fsMsg('Buka folder tujuan dulu', true);
+    fsMsg('Open the destination folder first', true);
     return;
   }
   if (item.getAttribute('data-up') === 'dir') {
@@ -2302,34 +2302,34 @@ let fsDupesChecked = [];
 
 document.getElementById('fsDupesBtn').addEventListener('click', async function () {
   if (!fsPath) {
-    fsMsg('Buka folder dulu untuk mencari duplikat', true);
+    fsMsg('Open a folder first to find duplicates', true);
     return;
   }
-  fsDupesBody.innerHTML = '<div class="fs-dupe-note">Memindai…</div>';
+  fsDupesBody.innerHTML = '<div class="fs-dupe-note">Scanning\u2026</div>';
   fsDupesDeleteBtn.disabled = true;
-  fsDupesDeleteBtn.textContent = 'Hapus terpilih (0)';
+  fsDupesDeleteBtn.textContent = 'Delete selected (0)';
   fsDupesModal.classList.remove('hidden');
   try {
     const res = await fetch(API + '/api/fs_dupes?path=' + encodeURIComponent(fsPath));
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'gagal');
+    if (!data.ok) throw new Error(data.error || 'failed');
     renderFsDupes(data.groups || [], !!data.truncated);
   } catch (e) {
-    fsDupesBody.innerHTML = emptyHtml('warn', 'Gagal mencari duplikat', String(e));
+    fsDupesBody.innerHTML = emptyHtml('warn', 'Failed to find duplicates', String(e));
   }
 });
 
 function renderFsDupes(groups, truncated) {
   fsDupesChecked = [];
   if (!groups.length) {
-    fsDupesBody.innerHTML = emptyHtml('check', 'Tidak ada duplikat', 'Semua file unik di folder ini.');
+    fsDupesBody.innerHTML = emptyHtml('check', 'No duplicates', 'All files in this folder are unique.');
     fsDupesDeleteBtn.disabled = true;
-    fsDupesDeleteBtn.textContent = 'Hapus terpilih (0)';
+    fsDupesDeleteBtn.textContent = 'Delete selected (0)';
     return;
   }
   let html = truncated
-    ? '<div class="fs-dupe-note">Folder sangat besar \u2014 hasil dibatasi 5.000 file.</div>'
+    ? '<div class="fs-dupe-note">Folder is very large \u2014 results limited to 5,000 files.</div>'
     : '';
   groups.forEach(function (g) {
     html += '<div class="fs-dupe-group"><div class="fs-dupe-ghead">' +
@@ -2357,15 +2357,15 @@ function updateFsDupesDelete() {
     fsDupesBody.querySelectorAll('.fs-dupe-row input:checked')
   );
   fsDupesDeleteBtn.disabled = fsDupesChecked.length === 0;
-  fsDupesDeleteBtn.textContent = 'Hapus terpilih (' + fsDupesChecked.length + ')';
+  fsDupesDeleteBtn.textContent = 'Delete selected (' + fsDupesChecked.length + ')';
 }
 
 document.getElementById('fsDupesDelete').addEventListener('click', function () {
   if (!fsDupesChecked.length) return;
   showConfirm(
-    'Hapus ' + fsDupesChecked.length + ' file duplikat?',
-    'File pertama di tiap grup tetap disimpan.',
-    'Hapus',
+    'Delete ' + fsDupesChecked.length + ' duplicate files?',
+    'The first file in each group is kept.',
+    'Delete',
     function () {
       (async function () {
         const paths = fsDupesChecked.map(function (cb) {
@@ -2385,7 +2385,7 @@ document.getElementById('fsDupesDelete').addEventListener('click', function () {
         }
         fsDupesModal.classList.add('hidden');
         loadFs();
-        fsMsg(ok + ' dihapus' + (fail ? ', ' + fail + ' gagal' : ''), fail > 0);
+        fsMsg(ok + ' deleted' + (fail ? ', ' + fail + ' failed' : ''), fail > 0);
       })();
     }
   );
@@ -2445,10 +2445,10 @@ async function doDeleteMedia(token, ok) {
     if (data.ok) {
       if (ok) ok();
     } else {
-      alert('Gagal menghapus: ' + (data.error || '?'));
+      alert('Failed to delete: ' + (data.error || '?'));
     }
   } catch (e) {
-    alert('Gagal menghapus: ' + e);
+    alert('Failed to delete: ' + e);
   }
 }
 
@@ -2476,7 +2476,7 @@ function mmStepImage(delta) {
   if (idx < 0) idx = delta > 0 ? -1 : mmImageList.length;
   const next = idx + delta;
   if (next < 0 || next >= mmImageList.length) {
-    mmShowToast(delta > 0 ? 'Sudah foto terakhir' : 'Foto pertama');
+    mmShowToast(delta > 0 ? 'Last photo' : 'First photo');
     return;
   }
   const it = mmImageList[next];
@@ -2534,7 +2534,7 @@ function openMedia(it, src) {
   mmImageList = (galleryItems || []).filter(function (v) { return !v.isVideo; });
   mmOverlayTitle.textContent = it.name;
   mmTitle.textContent = it.name;
-  mmSub.textContent = fmt(it.size) + (it.modified > 0 ? ' \u00b7 ' + fmtDate(it.modified) : '') + (it.isVideo ? ' \u00b7 video' : ' \u00b7 foto');
+  mmSub.textContent = fmt(it.size) + (it.modified > 0 ? ' \u00b7 ' + fmtDate(it.modified) : '') + (it.isVideo ? ' \u00b7 video' : ' \u00b7 photo');
   mmDesc.classList.remove('hidden');
   mmBody.scrollTop = 0;
   mmImage.classList.add('hidden');
@@ -2608,12 +2608,12 @@ function renderRelated(current) {
   mmNextList = others;
   mmRelated.classList.remove('hidden');
   if (!others.length) {
-    mmRelated.innerHTML = '<div class="mm-rel-empty">Belum ada video lain di galeri.</div>';
+    mmRelated.innerHTML = '<div class="mm-rel-empty">No other videos in the gallery.</div>';
     return;
   }
   const head = document.createElement('div');
   head.className = 'mm-rel-title';
-  head.textContent = 'Saran video';
+  head.textContent = 'Video suggestions';
   mmRelated.appendChild(head);
   for (const v of others) {
     const row = document.createElement('div');
@@ -2929,7 +2929,7 @@ mmVideo.addEventListener('volumechange', mmSyncVol);
 mmVideo.addEventListener('error', function () {
   mmSpinner.classList.add('hidden');
   mmBigPlay.classList.remove('hidden');
-  mmShowToast('Gagal memuat video');
+  mmShowToast('Failed to load video');
   mmShowCtrl();
 });
 mmVideo.addEventListener('pause', function () {
@@ -2976,7 +2976,7 @@ mmVideo.addEventListener('loadedmetadata', function () {
   if (pos >= 10 && d > 0 && pos < d - 10) {
     mmVideo.currentTime = pos;
     mmSeekUI();
-    mmShowToast('Lanjutkan dari ' + mmFmtTime(pos));
+    mmShowToast('Resume from ' + mmFmtTime(pos));
   }
 });
 mmVideo.addEventListener('waiting', function () {
@@ -3009,7 +3009,7 @@ async function refresh() {
   try {
     const res = await fetch(API + '/api/downloads');
     if (res.status === 401) {
-      document.getElementById('status').textContent = 'PIN diperlukan. Muat ulang halaman untuk login.';
+      document.getElementById('status').textContent = 'PIN required. Reload the page to log in.';
       return;
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -3025,7 +3025,7 @@ async function refresh() {
   } catch (e) {
     failCount++;
     if (failCount > 2) {
-      document.getElementById('status').textContent = 'Tidak dapat terhubung ke server. Cek server di aplikasi.';
+      document.getElementById('status').textContent = 'Cannot connect to the server. Check the server in the app.';
     }
   }
 }
@@ -3057,7 +3057,7 @@ function fmtEta(seconds) {
 }
 
 function stateLabel(s) {
-  return {PENDING:'Menunggu', DOWNLOADING:'Mendownload', PAUSED:'Dijeda', COMPLETED:'Selesai', FAILED:'Gagal', CANCELLED:'Dibatalkan'}[s] || s;
+  return {PENDING:'Waiting', DOWNLOADING:'Downloading', PAUSED:'Paused', COMPLETED:'Completed', FAILED:'Failed', CANCELLED:'Cancelled'}[s] || s;
 }
 
 function stateBadge(s) {
@@ -3092,7 +3092,7 @@ function renderSpeedTotal(items) {
   });
   if (!active) { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
-  el.innerHTML = '&#9889; ' + fmtSpeed(total) + ' <span class="st-sub">' + active + ' aktif</span>';
+  el.innerHTML = '&#9889; ' + fmtSpeed(total) + ' <span class="st-sub">' + active + ' active</span>';
 }
 
 function updateToolbar(items) {
@@ -3216,13 +3216,13 @@ function rebuildList(items) {
   });
   if (!filtered.length) {
     if (items.length) {
-      list.innerHTML = emptyHtml('search', 'Tidak ada item di filter ini', 'Coba pilih filter lain.');
+      list.innerHTML = emptyHtml('search', 'No items in this filter', 'Try selecting another filter.');
     } else {
       list.innerHTML = emptyHtml(
         'download',
-        'Belum ada download',
-        'Ketuk tombol + New Download untuk mulai.',
-        'Tambah Download'
+        'No downloads yet',
+        'Tap the + New Download button to start.',
+        'Add Download'
       );
       const cta = list.querySelector('.cta button');
       if (cta) cta.addEventListener('click', onNewDownloadClick);
@@ -3245,7 +3245,7 @@ function rebuildList(items) {
       '<div class="item-top"><div class="icon">' + fileIcon(it.fileName) + '</div><div class="item-body">' +
       '<div class="name">' + escapeHtml(it.fileName) + '</div>' + err +
       '</div>' +
-      '<button class="item-menu-btn" type="button" title="Aksi">\u22EF</button>' +
+      '<button class="item-menu-btn" type="button" title="Actions">\u22EF</button>' +
       '</div>' +
       rowSubHtml(it);
     const menuBtn = li.querySelector('.item-menu-btn');
@@ -3317,12 +3317,12 @@ inputModal.addEventListener('click', function (e) {
 function doAction(id, action) {
   if (action === 'delete') {
     const it = currentItems.find(function (x) { return x.id === id; });
-    const label = it && it.fileName ? it.fileName : 'item ini';
-    showConfirm('Hapus item?', 'Hapus \"' + label + '\" dari daftar download? File di device juga ikut terhapus.', 'Hapus', function () { doActionNow(id, action); });
+    const label = it && it.fileName ? it.fileName : 'this item';
+    showConfirm('Delete item?', 'Delete \"' + label + '\" from the download list? The file on the device will also be deleted.', 'Delete', function () { doActionNow(id, action); });
     return;
   }
   if (action === 'clear_completed') {
-    showConfirm('Bersihkan daftar selesai?', 'Semua item berstatus Selesai akan dikeluarkan dari daftar. File di device TIDAK ikut terhapus.', 'Bersihkan', function () { doActionNow(id, action); });
+    showConfirm('Clear completed list?', 'All completed items will be removed from the list. Files on the device will NOT be deleted.', 'Clear', function () { doActionNow(id, action); });
     return;
   }
   if (action === 'share') {
@@ -3347,17 +3347,17 @@ async function shareItem(id) {
     const res = await fetch(API + '/api/share', {method: 'POST', body});
     const data = await res.json();
     if (!data || !data.ok) {
-      showConfirm('Gagal membuat tautan', (data && data.error) || 'File tidak ditemukan.', 'OK', function () {});
+      showConfirm('Failed to create link', (data && data.error) || 'File not found.', 'OK', function () {});
       return;
     }
     const url = location.origin + '/share/' + data.token;
     document.getElementById('shareText').textContent =
-      'Tautan berlaku ' + data.expiresInHours + ' jam. Siapa pun yang memegang tautan ini bisa mengunduh file tanpa PIN.';
+      'Link valid for ' + data.expiresInHours + ' hours. Anyone with this link can download the file without a PIN.';
     document.getElementById('shareLink').value = url;
     document.getElementById('shareQr').src = API + '/api/qr?text=' + encodeURIComponent(url);
     shareModal.classList.remove('hidden');
   } catch (e) {
-    showConfirm('Gagal membuat tautan', String(e), 'OK', function () {});
+    showConfirm('Failed to create link', String(e), 'OK', function () {});
   }
 }
 function closeShare() {
@@ -3431,7 +3431,7 @@ function connectEvents() {
     try {
       const data = JSON.parse(ev.data);
       if (data.shutdown) {
-        showConnBanner('Server dihentikan atau port berubah. Cek aplikasi → Remote (HTTP) untuk alamat baru.');
+        showConnBanner('Server stopped or port changed. Check the app → Remote (HTTP) for the new address.');
         return;
       }
       const items = data.items || [];
@@ -3444,7 +3444,7 @@ function connectEvents() {
     sseFailCount++;
     if (sseFailCount > 2) {
       document.getElementById('deviceStatus').classList.add('offline');
-      showConnBanner('Koneksi realtime terputus. Cek server di aplikasi masih hidup.');
+      showConnBanner('Realtime connection lost. Check that the server in the app is still running.');
     }
   };
 }
@@ -3490,7 +3490,7 @@ async function pollSnapshot() {
   } catch (e) {
     failCount++;
     if (failCount > 2) {
-      document.getElementById('status').textContent = 'Tidak dapat terhubung ke server. Cek server di aplikasi.';
+      document.getElementById('status').textContent = 'Cannot connect to the server. Check the server in the app.';
     }
   }
 }

@@ -83,17 +83,17 @@ class LogActivity : AppCompatActivity() {
         val log = App.httpServer.snapshotLog()
         val header = buildString {
             appendLine("=== Tasirin Download Manager - Log Server (realtime) ===")
-            appendLine("Waktu: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())}")
+            appendLine("Time: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())}")
             appendLine(
-                "Versi app: " + runCatching {
+                "App version: " + runCatching {
                     val info = packageManager.getPackageInfo(packageName, 0)
                     info.versionName + " (build " + info.versionCode + ")"
                 }.getOrDefault("?")
             )
             appendLine("Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-            appendLine("Perangkat: ${Build.MANUFACTURER} ${Build.MODEL}")
+            appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
             appendLine()
-            append(if (log.isBlank()) "(Belum ada aktivitas server)\n" else log)
+            append(if (log.isBlank()) "(No server activity yet)\n" else log)
             appendLine()
         }
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
@@ -158,7 +158,7 @@ class LogActivity : AppCompatActivity() {
     /** Sorot baris GAGAL/ERROR merah dan kata kunci pencarian kuning. */
     private fun highlightLog(text: String): CharSequence {
         val q = logSearch.trim()
-        if (q.isEmpty() && !text.contains("GAGAL") && !text.contains("ERROR") &&
+        if (q.isEmpty() && !text.contains("ERROR") &&
             !text.contains("FAILED")
         ) {
             return text
@@ -183,7 +183,7 @@ class LogActivity : AppCompatActivity() {
             val lineEnd = text.indexOf('\n', lineStart)
             val end = if (lineEnd < 0) sb.length else lineEnd
             val upper = text.substring(lineStart, end).uppercase()
-            if (upper.contains("GAGAL") || upper.contains("ERROR") || upper.contains("FAILED")) {
+            if (upper.contains("ERROR") || upper.contains("FAILED")) {
                 sb.setSpan(
                     ForegroundColorSpan(Color.RED),
                     lineStart, end, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
