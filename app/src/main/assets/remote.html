@@ -244,6 +244,21 @@
   #mmVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
   #mmImage { display: block; max-width: 100%; max-height: calc(100vh - 64px); margin: 8px auto 0; cursor: zoom-in; transition: transform .18s ease; touch-action: pan-y; }
   #mmImage.zoom { cursor: zoom-out; transform: scale(1.9); transform-origin: 50% 8%; }
+  #mmImgTop { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 8px; padding: 6px 8px 26px; background: linear-gradient(rgba(0,0,0,.72), transparent); color: #fff; transition: opacity .2s ease; }
+  #mmImgTop button { flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(0,0,0,.4); color: #fff; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #mmImgTop button:hover { background: rgba(255,255,255,.18); }
+  #mmImgName { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+  #mmImgCount { flex: 0 0 auto; font-size: 12px; color: rgba(255,255,255,.85); }
+  #mmImgPrev, #mmImgNext { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(0,0,0,.35); color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #mmImgPrev:hover, #mmImgNext:hover { background: rgba(255,255,255,.18); }
+  #mmImgPrev { left: 8px; }
+  #mmImgNext { right: 8px; }
+  #mediaModal.mm-img #mmBody { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #mediaModal.mm-img #mmImage { max-width: 100%; max-height: 100%; margin: 0; }
+  #mediaModal.mm-img #mmDesc, #mediaModal.mm-img #mmRelated { display: none; }
+  #mediaModal.mm-img.mm-chrome-hidden #mmImgTop,
+  #mediaModal.mm-img.mm-chrome-hidden #mmImgPrev,
+  #mediaModal.mm-img.mm-chrome-hidden #mmImgNext { opacity: 0; pointer-events: none; }
   #mmDesc { padding: 12px 16px 4px; }
   #mmTitle { color: #0f0f0f; font-size: 14.5px; font-weight: 500; line-height: 1.4; word-break: break-word; }
   #mmSub { color: #606060; font-size: 12.5px; margin-top: 5px; }
@@ -532,6 +547,13 @@
   <div id="mmTop">
     <button id="mmBack" type="button" title="Tutup">&#10005;</button>
   </div>
+  <div id="mmImgTop" class="hidden">
+    <button id="mmImgBack" type="button" title="Tutup">&#10094;</button>
+    <span id="mmImgName"></span>
+    <span id="mmImgCount"></span>
+  </div>
+  <button id="mmImgPrev" type="button" title="Foto sebelumnya">&#10094;</button>
+  <button id="mmImgNext" type="button" title="Foto berikutnya">&#10095;</button>
   <div id="mmBody">
     <div id="mmPlayer" class="hidden">
       <video id="mmVideo" playsinline preload="metadata"></video>
@@ -801,6 +823,11 @@ if (galleryFilters) {
 const mediaModal = document.getElementById('mediaModal');
 const mmBody = document.getElementById('mmBody');
 const mmImage = document.getElementById('mmImage');
+const mmImgTop = document.getElementById('mmImgTop');
+const mmImgName = document.getElementById('mmImgName');
+const mmImgCount = document.getElementById('mmImgCount');
+const mmImgPrev = document.getElementById('mmImgPrev');
+const mmImgNext = document.getElementById('mmImgNext');
 const mmVideo = document.getElementById('mmVideo');
 const mmTitle = document.getElementById('mmTitle');
 const mmSub = document.getElementById('mmSub');
@@ -937,7 +964,11 @@ function closeMedia() {
   mmGesture = null;
   mediaModal.classList.remove('open');
   mediaModal.classList.remove('mm-img');
+  mediaModal.classList.remove('mm-chrome-hidden');
   mmImage.classList.remove('zoom');
+  mmImgTop.classList.add('hidden');
+  mmImgPrev.classList.add('hidden');
+  mmImgNext.classList.add('hidden');
   document.body.style.overflow = '';
   mmVideo.pause();
   mmVideo.removeAttribute('src');
@@ -963,10 +994,31 @@ function closeMedia() {
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {}
   }
+  mmPopGuard();
 }
 
 document.getElementById('mmBack').addEventListener('click', closeMedia);
 document.getElementById('mmPlayerBack').addEventListener('click', closeMedia);
+document.getElementById('mmImgBack').addEventListener('click', closeMedia);
+mmImgPrev.addEventListener('click', function () { mmStepImage(-1); });
+mmImgNext.addEventListener('click', function () { mmStepImage(1); });
+
+let mmGuardActive = false;
+function mmPushGuard() {
+  if (mmGuardActive) return;
+  mmGuardActive = true;
+  try { history.pushState({ mm: 1 }, '', location.href); } catch (e) {}
+}
+function mmPopGuard() {
+  if (!mmGuardActive) return;
+  mmGuardActive = false;
+  try { history.back(); } catch (e) {}
+}
+window.addEventListener('popstate', function () {
+  if (!mmGuardActive) return;
+  mmGuardActive = false;
+  if (mediaModal.classList.contains('open')) closeMedia();
+});
 
 document.addEventListener('fullscreenchange', function () {
   mmFsBtn.innerHTML = document.fullscreenElement ? ICONS.fsx : ICONS.fs;
@@ -2228,6 +2280,21 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
+document.addEventListener('keydown', function (e) {
+  if (!mediaModal.classList.contains('open')) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if (e.key === 'Escape') {
+    closeMedia();
+    return;
+  }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    const delta = e.key === 'ArrowLeft' ? -1 : 1;
+    if (mmType === 'image') mmStepImage(delta); else mmStepVideo(delta);
+  }
+});
+
 const fsDupesModal = document.getElementById('fsDupesModal');
 const fsDupesBody = document.getElementById('fsDupesBody');
 const fsDupesDeleteBtn = document.getElementById('fsDupesDelete');
@@ -2418,10 +2485,29 @@ function mmStepImage(delta) {
 
 let mmImgSwipe = null;
 let mmImgSwiped = 0;
-mmImage.addEventListener('click', function () {
+let mmImgTapTimer = null;
+let mmImgLastTap = 0;
+let mmImgLastTapX = 0;
+mmImage.addEventListener('click', function (e) {
   if (mmType !== 'image') return;
   if (Date.now() - mmImgSwiped < 400) return;
-  mmImage.classList.toggle('zoom');
+  const now = Date.now();
+  const dt = now - mmImgLastTap;
+  const near = Math.abs(e.clientX - mmImgLastTapX) < 80;
+  mmImgLastTap = now;
+  mmImgLastTapX = e.clientX;
+  clearTimeout(mmImgTapTimer);
+  if (dt < 350 && near) {
+    mmImage.classList.toggle('zoom');
+    return;
+  }
+  mmImgTapTimer = setTimeout(function () {
+    mediaModal.classList.toggle('mm-chrome-hidden');
+  }, 280);
+});
+mmBody.addEventListener('click', function (e) {
+  if (mmType !== 'image' || e.target !== mmBody) return;
+  mediaModal.classList.toggle('mm-chrome-hidden');
 });
 mmImage.addEventListener('touchstart', function (e) {
   if (mmType !== 'image' || e.touches.length !== 1) { mmImgSwipe = null; return; }
@@ -2470,6 +2556,10 @@ function openMedia(it, src) {
     mmCtrl.classList.remove('hidden');
     mmCtrl.classList.remove('hide');
     mmOverlayTitle.classList.remove('hidden');
+    mmImgTop.classList.add('hidden');
+    mmImgPrev.classList.add('hidden');
+    mmImgNext.classList.add('hidden');
+    mediaModal.classList.remove('mm-chrome-hidden');
     mmTop.classList.add('hidden');
     mmPlayerTop.classList.remove('hidden');
     mmPlayerTop.classList.remove('hide');
@@ -2487,14 +2577,22 @@ function openMedia(it, src) {
       p.catch(function () { mmBigPlay.classList.remove('hidden'); mmShowCtrl(); });
     }
   } else {
-    mmTop.classList.remove('hidden');
+    mmTop.classList.add('hidden');
     mmPlayerTop.classList.add('hidden');
+    mmImgTop.classList.remove('hidden');
+    mmImgPrev.classList.remove('hidden');
+    mmImgNext.classList.remove('hidden');
+    mmImgName.textContent = it.name;
+    const imgIdx = mmTokenIdx(mmImageList, it.token);
+    mmImgCount.textContent = (mmImageList.length > 0 && imgIdx >= 0) ? (imgIdx + 1) + '/' + mmImageList.length : '';
+    mediaModal.classList.remove('mm-chrome-hidden');
     mediaModal.classList.add('mm-img');
     mmImage.src = src;
     mmImage.classList.remove('hidden');
   }
   renderRelated(it);
   mediaModal.classList.add('open');
+  mmPushGuard();
   document.body.style.overflow = 'hidden';
 }
 
