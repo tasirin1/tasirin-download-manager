@@ -303,38 +303,7 @@ class DownloadEngine(private val context: Context) {
                 val code = conn.responseCode
                 if (code !in 200..299) return null
                 val body = conn.inputStream.bufferedReader().use { it.readText() }.take(1_000_000)
-                if (!body.contains("#EXT-X-STREAM-INF")) return null
-                val variants = mutableListOf<HlsVariant>()
-                val lines = body.split('\n')
-                var i = 0
-                while (i < lines.size) {
-                    val line = lines[i].trim()
-                    if (line.startsWith("#EXT-X-STREAM-INF")) {
-                        val next = lines.getOrNull(i + 1)?.trim().orEmpty()
-                        if (next.isNotEmpty() && !next.startsWith("#")) {
-                            val bandwidth = Regex("BANDWIDTH=(\\d+)")
-                                .find(line)?.groupValues?.get(1)?.toLongOrNull()
-                            val res = Regex("RESOLUTION=(\\d+x\\d+)")
-                                .find(line)?.groupValues?.get(1)
-                            val name = Regex("NAME=\"([^\"]+)\"")
-                                .find(line)?.groupValues?.get(1)
-                            val kbps = bandwidth?.div(1000L) ?: 0L
-                            val label = name
-                                ?: (res?.let { "$it · $kbps kbps" })
-                                ?: "$kbps kbps"
-                            val variantUrl = if (next.startsWith("http")) {
-                                next
-                            } else {
-                                resolveHlsUrl(url, next)
-                            }
-                            variants.add(HlsVariant(label, variantUrl, bandwidth ?: 0L))
-                        }
-                        i += 2
-                        continue
-                    }
-                    i++
-                }
-                if (variants.isEmpty()) null else variants.sortedByDescending { it.bandwidth }
+                HlsParser.parseMaster(body, url)
             } finally {
                 conn.disconnect()
             }
@@ -372,17 +341,6 @@ class DownloadEngine(private val context: Context) {
             }
         }.getOrNull()
     }
-
-    private fun resolveHlsUrl(base: String, relative: String): String {
-        if (relative.startsWith("http://") || relative.startsWith("https://")) return relative
-        if (relative.startsWith("/")) {
-            val u = URL(base)
-            return "${u.protocol}://${u.host}${if (u.port > 0) ":${u.port}" else ""}$relative"
-        }
-        val idx = base.lastIndexOf('/')
-        return if (idx > 0) base.substring(0, idx + 1) + relative else relative
-    }
-
 
     fun pauseAll() {
         val ids = _items.value.filter {
@@ -607,11 +565,12 @@ class DownloadEngine(private val context: Context) {
         val maxRetries = StoragePrefs.maxRetries(context)
         val attempts = (retryAttempts[id] ?: 0) + 1
         val rangeRejected = message?.contains("tidak mendukung Range") == true
+        val slowRejected = isSlowError(message)
         failedUrls.add(item.url)
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
         // Bila host GitHub tak terjangkau, buat mirror proxy otomatis.
-        val autoMirrors = if (item.mirrors.isEmpty() && isConnectError(message) &&
-            isGitHubUrl(item.url)
+        val autoMirrors = if (item.mirrors.isEmpty() &&
+            (isConnectError(message) || isSlowError(message)) && isGitHubUrl(item.url)
         ) {
             githubMirrors(item.url)
         } else {
@@ -621,7 +580,7 @@ class DownloadEngine(private val context: Context) {
             .filterNot { it in failedUrls }
         // Error Range pasti gagal lagi di URL yang sama, dan mirror yang pernah
         // gagal tidak perlu dicoba ulang: langsung coba cadangan berikutnya.
-        if (allMirrors.isNotEmpty() && (rangeRejected || isConnectError(message))) {
+        if (allMirrors.isNotEmpty() && (rangeRejected || slowRejected || isConnectError(message))) {
             val next = allMirrors.first()
             App.logEvent("DOWNLOAD GAGAL: ${item.fileName} — ${message ?: "?"} (pindah ke mirror: $next)")
             updateItem(id) {
@@ -704,6 +663,11 @@ class DownloadEngine(private val context: Context) {
             }
             flushSave()
         }
+    }
+
+    private fun isSlowError(message: String?): Boolean {
+        val m = message.orEmpty().lowercase()
+        return m.contains("kecepatan terlalu rendah") || m.contains("koneksi macet")
     }
 
     private fun isConnectError(message: String?): Boolean {
@@ -839,6 +803,9 @@ class DownloadEngine(private val context: Context) {
         var downloaded = item.bytesDownloaded
         var fileName = item.fileName
         var partialFile = saver.partialFile(fileName)
+        val health = DownloadHealthWatchdog(
+            if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
+        )
         // Resume anti-korup: catatan bytes harus sinkron dengan ukuran file parsial.
         if (downloaded > 0 && partialFile.length() != downloaded) {
             downloaded = 0
@@ -909,6 +876,7 @@ class DownloadEngine(private val context: Context) {
                     lastNotify = now
                     coroutineContext.ensureActive()
                     val (speed, eta) = speedTracker.sample(item.id, downloaded, total)
+                    health.check(now, downloaded, total, speed)
                     // Progress tick: jangan panggil save penuh (hemat CPU/GC);
                     // progres ringan disimpan berkala oleh scheduleProgressSave.
                     updateItem(item.id, persist = false) {
@@ -1081,7 +1049,12 @@ class DownloadEngine(private val context: Context) {
     ) {
         val item = _items.value.find { it.id == id } ?: return
         val partial = saver.partialFile(fileName, segment.index)
+        val health = DownloadHealthWatchdog(
+            if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
+        )
         var downloaded = segment.downloaded
+        var lastSegBytes = downloaded
+        var lastSegAt = System.currentTimeMillis()
         // Resume anti-korup per segmen: ukuran file parsial harus sinkron.
         if (downloaded > 0 && partial.length() != downloaded) {
             downloaded = 0
@@ -1122,6 +1095,13 @@ class DownloadEngine(private val context: Context) {
                     if (now - lastNotify >= 500) {
                         lastNotify = now
                         coroutineContext.ensureActive()
+                        val segTotal = segment.end - segment.start + 1
+                        val speed = if (now > lastSegAt) {
+                            ((downloaded - lastSegBytes) * 1000L) / (now - lastSegAt)
+                        } else 0L
+                        lastSegBytes = downloaded
+                        lastSegAt = now
+                        health.check(now, downloaded, segTotal, speed)
                         updateSegment(id, segment.index, downloaded)
                     }
                 }
@@ -1452,6 +1432,45 @@ private class SpeedThrottle(
             }
         }
         if (delayMs > 0) delay(delayMs)
+    }
+}
+
+/** Watchdog per-unduhan: mendeteksi koneksi macet (tanpa byte baru) atau
+ *  kecepatan anjlok (di bawah ambang minimum terus-menerus), lalu melempar
+ *  IOException supaya handleFailure bisa pindah mirror / retry. Otomatis
+ *  nonaktif bila pengguna memasang batas kecepatan di bawah ambang. */
+private class DownloadHealthWatchdog(limitKbps: Int) {
+    private val limitedLow = limitKbps > 0 && limitKbps * 1024L <= MIN_GOOD_SPEED_BPS
+    private var lastBytes = 0L
+    private var lastAt = System.currentTimeMillis()
+    private var slowSince = 0L
+
+    fun check(now: Long, downloaded: Long, total: Long, speed: Long) {
+        if (total <= 0 || downloaded >= total) return
+        if (downloaded != lastBytes) {
+            lastBytes = downloaded
+            lastAt = now
+        }
+        if (speed > 0 && !limitedLow && speed < MIN_GOOD_SPEED_BPS) {
+            if (slowSince == 0L) slowSince = now
+            if (now - slowSince >= LOW_SPEED_TIMEOUT_MS) {
+                throw IOException(
+                    "Kecepatan terlalu rendah (${Formats.bytes(speed)}/dtk) — coba mirror/retry"
+                )
+            }
+        } else if (speed == 0L && now - lastAt >= STALL_TIMEOUT_MS) {
+            throw IOException(
+                "Koneksi macet: tanpa data ${STALL_TIMEOUT_MS / 1000} detik — coba lagi"
+            )
+        } else {
+            slowSince = 0L
+        }
+    }
+
+    companion object {
+        private const val MIN_GOOD_SPEED_BPS = 2L * 1024
+        private const val LOW_SPEED_TIMEOUT_MS = 20_000L
+        private const val STALL_TIMEOUT_MS = 30_000L
     }
 }
 
