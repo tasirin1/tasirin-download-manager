@@ -95,15 +95,20 @@
   .gal-search { margin-bottom: 10px; }
   .gal-toolbar h2 { margin: 0; font-size: 16px; }
   .gal-toolbar .count { font-size: 12px; color: var(--muted); }
-  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px 14px; }
+  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px 14px; grid-auto-flow: dense; }
+  .gal-grid.gal-selecting .gal-cell .del { display: none; }
+  .gal-grid.gal-selecting .gal-cell .gal-check { display: flex; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .item:focus-visible, .fs-row:focus-visible, .fs-root:focus-visible, .gal-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
   .app-footer { position: fixed; left: 0; right: 0; bottom: 0; text-align: center; color: var(--muted); font-size: 11.5px; padding: 8px 0; background: var(--bg); border-top: 1px solid var(--line); z-index: 45; }
   .gal-cell { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .15s ease, box-shadow .15s ease; }
   .gal-cell:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
-  .gal-thumb { position: relative; aspect-ratio: 16 / 9; background: #1c2230; overflow: hidden; }
-  .gal-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .gal-thumb .ext { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #9aa4b2; font-size: 22px; font-weight: 800; text-transform: uppercase; }
+  .gal-thumb { position: relative; padding-top: 56.25%; background: #1c2230; overflow: hidden; }
+  .gal-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gal-thumb .ext { position: absolute; left: 6px; top: 6px; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.78); color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+  .gal-check { position: absolute; top: 6px; right: 6px; z-index: 4; width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); background: rgba(0,0,0,.45); color: #fff; font-size: 14px; font-weight: 700; display: none; align-items: center; justify-content: center; line-height: 1; }
+  .gal-check.on { background: var(--primary); border-color: #fff; }
+  .gal-resume { position: absolute; right: 6px; bottom: 6px; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.78); color: #fff; font-size: 10px; font-weight: 700; }
   .gal-thumb .gal-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.18); }
   .gal-thumb .gal-play span { width: 0; height: 0; border-top: 14px solid transparent; border-bottom: 14px solid transparent; border-left: 22px solid rgba(255,255,255,.95); filter: drop-shadow(0 1px 4px rgba(0,0,0,.6)); }
   .gal-thumb .gal-badge { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.78); color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
@@ -222,6 +227,11 @@
   html[data-theme="dark"] .mm-rel-empty { color: #93a1b5; }
   html[data-theme="dark"] .mm-rel-thumb { background: #232b38; }
   #mediaModal { position: fixed; inset: 0; background: #f9f9f9; z-index: 60; display: none; flex-direction: column; }
+  #mediaModal.mm-img { background: #000; }
+  #mediaModal.mm-img #mmBack { color: #fff; }
+  #mediaModal.mm-img #mmBack:hover { background: rgba(255,255,255,.14); }
+  #mediaModal.mm-img #mmTitle { color: #fff; }
+  #mediaModal.mm-img #mmSub { color: rgba(255,255,255,.7); }
   #mediaModal.open { display: flex; }
   #mmTop { flex: 0 0 auto; display: flex; align-items: center; padding: 6px 10px; }
   #mmBack { width: 38px; height: 38px; border: 0; border-radius: 50%; background: transparent; color: #111; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -232,7 +242,8 @@
   #mmPlayer:fullscreen { width: 100%; height: 100%; }
   #mmPlayer:fullscreen::before, #mmPlayer:-webkit-full-screen::before { padding-top: 0; }
   #mmVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-  #mmImage { display: block; max-width: 100%; max-height: 62vh; margin: 8px auto 0; }
+  #mmImage { display: block; max-width: 100%; max-height: calc(100vh - 64px); margin: 8px auto 0; cursor: zoom-in; transition: transform .18s ease; touch-action: pan-y; }
+  #mmImage.zoom { cursor: zoom-out; transform: scale(1.9); transform-origin: 50% 8%; }
   #mmDesc { padding: 12px 16px 4px; }
   #mmTitle { color: #0f0f0f; font-size: 14.5px; font-weight: 500; line-height: 1.4; word-break: break-word; }
   #mmSub { color: #606060; font-size: 12.5px; margin-top: 5px; }
@@ -255,22 +266,22 @@
   #mmToast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,.72); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; pointer-events: none; }
   #mmCtrl { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 8px 4px; background: linear-gradient(transparent, rgba(0,0,0,.85)); transition: opacity .25s ease; }
   #mmCtrl.hide { opacity: 0; pointer-events: none; }
-  #mmSeekWrap { position: relative; height: 16px; display: flex; align-items: center; }
+  #mmSeekWrap { position: relative; height: 22px; display: flex; align-items: center; }
   #mmBuf { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 3px; border-radius: 999px; background: rgba(255,255,255,.3); pointer-events: none; }
-  #mmSeek { -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 16px; margin: 0; background: transparent; }
-  #mmSeek::-webkit-slider-runnable-track { height: 3px; border-radius: 999px; background: linear-gradient(to right, #f00 var(--fill, 0%), rgba(255,255,255,.25) var(--fill, 0%)); }
-  #mmSeek::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #f00; border: 0; margin-top: -4.5px; }
+  #mmSeek { -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 22px; margin: 0; background: transparent; }
+  #mmSeek::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(to right, #f00 var(--fill, 0%), rgba(255,255,255,.25) var(--fill, 0%)); }
+  #mmSeek::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #f00; border: 0; margin-top: -5px; }
   #mmCtrlRow { display: flex; align-items: center; gap: 8px; color: #fff; }
-  #mmCtrlRow button { flex: 0 0 auto; width: 32px; height: 32px; border: 0; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  #mmTime { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  #mmCtrlRow button { flex: 0 0 auto; width: 42px; height: 42px; border: 0; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #mmTime { font-size: 13px; font-variant-numeric: tabular-nums; }
   #mmOverlayTitle { position: absolute; top: 0; left: 0; right: 0; padding: 14px 12px 28px; background: linear-gradient(rgba(0,0,0,.72), transparent); color: #fff; font-size: 13.5px; font-weight: 600; line-height: 1.4; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.55); transition: opacity .25s ease; }
   #mmOverlayTitle.hide { opacity: 0; }
   #mmSeekWrap:hover #mmSeek::-webkit-slider-runnable-track { height: 5px; }
   #mmSeek::-webkit-slider-thumb { transition: transform .12s ease; }
   #mmSeekWrap:hover #mmSeek::-webkit-slider-thumb { transform: scale(1.4); }
   #mmSeekTip { position: absolute; bottom: 17px; left: 0; transform: translateX(-50%); background: rgba(0,0,0,.82); color: #fff; font-size: 11.5px; font-weight: 600; padding: 3px 7px; border-radius: 6px; pointer-events: none; white-space: nowrap; z-index: 3; }
-  .mm-vol { -webkit-appearance: none; appearance: none; width: 74px; height: 4px; border-radius: 999px; background: rgba(255,255,255,.35); outline: none; flex: 0 0 auto; }
-  .mm-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
+  .mm-vol { -webkit-appearance: none; appearance: none; width: 92px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.35); outline: none; flex: 0 0 auto; }
+  .mm-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; margin-top: -5px; }
   #mmAutoBtn { font-size: 11px; font-weight: 700; letter-spacing: .3px; color: rgba(255,255,255,.6); }
   #mmAutoBtn.on { color: #f00; }
   #mmPlayer.mm-hide-cursor { cursor: none; }
@@ -439,7 +450,9 @@
   </div>
 
   <div id="galleryView" class="hidden">
-    <div class="gal-toolbar"><h2>Galeri Device</h2><span class="count" id="galleryCount"></span></div>
+    <div class="gal-toolbar"><h2>Galeri Device</h2><span class="count" id="galleryCount"></span>
+      <button id="galSelectBtn" type="button" class="btn-ghost" style="margin-left:auto">Pilih</button>
+    </div>
     <div class="gal-search"><input id="gallerySearch" type="search" placeholder="Cari foto/video…" autocomplete="off"></div>
     <div class="seg" id="galleryFilters">
       <button type="button" class="on" data-gal="all">Semua</button>
@@ -447,6 +460,14 @@
       <button type="button" data-gal="video">Video</button>
     </div>
     <div id="galleryStatus"></div>
+    <div id="galBatch" class="fs-batch hidden">
+      <span id="galBatchCount"></span>
+      <span id="galBatchSize"></span>
+      <button id="galBatchAll" type="button">Pilih semua</button>
+      <button id="galBatchZip" type="button">Unduh ZIP</button>
+      <button id="galBatchDelete" type="button" class="danger">Hapus</button>
+      <button id="galBatchCancel" type="button">Batal</button>
+    </div>
     <div id="galleryGrid" class="gal-grid"></div>
   </div>
 
@@ -520,7 +541,9 @@
           <input id="mmSeek" type="range" min="0" max="1000" value="0" step="1">
         </div>
         <div id="mmCtrlRow">
+          <button id="mmPrevBtn" type="button" title="Video sebelumnya"></button>
           <button id="mmPlayBtn" type="button"></button>
+          <button id="mmNextBtn" type="button" title="Video berikutnya"></button>
           <span id="mmTime">0:00 / 0:00</span>
           <span class="mm-flex"></span>
           <button id="mmSpeedBtn" type="button" title="Kecepatan putar">1&#215;</button>
@@ -752,6 +775,9 @@ let galleryHasMore = false;
 let galleryLoading = false;
 const gallerySearch = document.getElementById('gallerySearch');
 let galleryFilter = 'all';
+let galSelectMode = false;
+const galSelected = [];
+const galBatch = document.getElementById('galBatch');
 const galleryFilters = document.getElementById('galleryFilters');
 if (galleryFilters) {
   galleryFilters.addEventListener('click', function (e) {
@@ -788,6 +814,10 @@ const mmSeekTip = document.getElementById('mmSeekTip');
 const mmVol = document.getElementById('mmVol');
 const mmAutoBtn = document.getElementById('mmAutoBtn');
 const mmSeekWrap = document.getElementById('mmSeekWrap');
+const mmPrevBtn = document.getElementById('mmPrevBtn');
+const mmNextBtn = document.getElementById('mmNextBtn');
+let mmVideoList = [];
+let mmImageList = [];
 let mmEnded = false;
 let mmAutoNext = true;
 let mmNextList = [];
@@ -799,6 +829,8 @@ const ICONS = {
   mute: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>',
   fs: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>',
   fsx: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>',
+  prev: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M16 5v14L5 12z"/><path d="M5 4h2v16H5z"/></svg>',
+  next: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/><path d="M17 4h2v16h-2z"/></svg>',
   replay: '<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>'
 };
 let mmType = 'image';
@@ -892,6 +924,8 @@ function closeMedia() {
   mmPlayer.style.filter = '';
   mmGesture = null;
   mediaModal.classList.remove('open');
+  mediaModal.classList.remove('mm-img');
+  mmImage.classList.remove('zoom');
   document.body.style.overflow = '';
   mmVideo.pause();
   mmVideo.removeAttribute('src');
@@ -953,6 +987,7 @@ async function loadGallery(reset) {
       galleryItems = items;
       galleryPage = 1;
       galleryLoaded = 0;
+      galSelected.length = 0;
       if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
       galleryGrid.innerHTML = '';
       galleryCount.textContent = (data.total || items.length) + ' file';
@@ -963,6 +998,17 @@ async function loadGallery(reset) {
           q ? 'Tidak ada hasil' : (filtered ? 'Tidak ada ' + (galleryFilter === 'video' ? 'video' : 'foto') : 'Belum ada foto/video'),
           q ? 'Coba kata kunci lain.' : (filtered ? 'Coba filter lain atau ubah kata kunci.' : 'File di folder download akan muncul di sini.')
         );
+        if (!q && !filtered) {
+          const cta = document.createElement('div');
+          cta.className = 'empty-cta';
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'pill primary';
+          b.textContent = 'Buka File Manager';
+          b.addEventListener('click', function () { location.hash = '#/files'; });
+          cta.appendChild(b);
+          galleryGrid.appendChild(cta);
+        }
         galleryHasMore = false;
         galleryLoading = false;
         return;
@@ -1031,32 +1077,124 @@ function renderGalleryCell(it) {
   cell.setAttribute('tabindex', '0');
   const thumb = API + '/api/thumb?token=' + encodeURIComponent(it.token);
   const media = API + '/api/media?token=' + encodeURIComponent(it.token);
+  const ratio = (it.w && it.h && !it.isVideo) ? (it.h * 100 / it.w).toFixed(2) : 56.25;
+  const resume = it.isVideo ? loadVideoPos(it.token) : 0;
+  const selOn = galSelected.indexOf(it) >= 0;
   cell.innerHTML =
-    '<div class="gal-thumb">' +
+    '<div class="gal-thumb" style="padding-top:' + ratio + '%">' +
       '<button class="del" title="Hapus" type="button">&#128465;</button>' +
+      '<span class="gal-check' + (selOn ? ' on' : '') + '">' + (selOn ? '\u2713' : '') + '</span>' +
       '<div class="ext">' + escapeHtml(extOf(it.name)) + '</div>' +
       '<img loading="lazy" src="' + thumb + '" alt="' + escapeHtml(it.name) + '" onerror="this.remove()">' +
       (it.isVideo ? '<div class="gal-play"><span></span></div>' : '') +
       (it.isVideo ? '<div class="gal-badge">' + (it.durationMs > 0 ? mmFmtTime(it.durationMs / 1000) : escapeHtml(extOf(it.name))) + '</div>' : '') +
+      (resume > 0 ? '<div class="gal-resume">Lanjut dari ' + mmFmtTime(resume) + '</div>' : '') +
     '</div>' +
     '<div class="gal-info">' +
       '<div class="n">' + escapeHtml(it.name) + '</div>' +
       '<div class="m">' + fmt(it.size) + (it.modified > 0 ? ' \u00b7 ' + fmtDate(it.modified) : '') + '</div>' +
     '</div>';
   cell.addEventListener('click', function () {
+    if (galSelectMode) { toggleGalSelect(it, cell); return; }
     openMedia(it, media);
   });
-  cell.querySelector('.del').addEventListener('click', function (ev) {
-    ev.stopPropagation();
-    if (!confirm('Hapus file ini?\n' + it.name)) return;
-    doDeleteMedia(it.token, function () {
-      cell.remove();
-      const c = parseInt(galleryCount.textContent, 10);
-      if (!isNaN(c)) galleryCount.textContent = Math.max(0, c - 1) + ' file';
+  const delBtn = cell.querySelector('.del');
+  if (delBtn) {
+    delBtn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      if (!confirm('Hapus file ini?\n' + it.name)) return;
+      doDeleteMedia(it.token, function () {
+        cell.remove();
+        const c = parseInt(galleryCount.textContent, 10);
+        if (!isNaN(c)) galleryCount.textContent = Math.max(0, c - 1) + ' file';
+      });
     });
-  });
+  }
+  const img = cell.querySelector('img');
+  if (img) {
+    img.addEventListener('load', function () {
+      const extEl = cell.querySelector('.ext');
+      if (extEl) extEl.style.display = 'none';
+    });
+  }
   galleryGrid.insertBefore(cell, gallerySentinel);
 }
+
+function galSetSelectMode(on) {
+  galSelectMode = on;
+  galSelected.length = 0;
+  document.getElementById('galSelectBtn').textContent = on ? 'Batal pilih' : 'Pilih';
+  galleryGrid.classList.toggle('gal-selecting', on);
+  galBatch.classList.add('hidden');
+  reRenderGalleryLoaded();
+}
+
+function reRenderGalleryLoaded() {
+  const cells = galleryGrid.querySelectorAll('.gal-cell');
+  cells.forEach(function (c) { c.remove(); });
+  galleryLoaded = 0;
+  loadMoreGallery();
+}
+
+function toggleGalSelect(it, cell) {
+  const idx = galSelected.indexOf(it);
+  if (idx >= 0) galSelected.splice(idx, 1); else galSelected.push(it);
+  const check = cell.querySelector('.gal-check');
+  if (check) {
+    check.classList.toggle('on', idx < 0);
+    check.textContent = idx < 0 ? '\u2713' : '';
+  }
+  updateGalBatch();
+}
+
+function updateGalBatch() {
+  galBatch.classList.toggle('hidden', galSelected.length === 0);
+  document.getElementById('galBatchCount').textContent = galSelected.length + ' dipilih';
+  let total = 0;
+  galSelected.forEach(function (it) { total += it.size || 0; });
+  document.getElementById('galBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt(total) : '';
+  document.getElementById('galBatchAll').textContent =
+    galleryItems.length > 0 && galSelected.length === galleryItems.length ? 'Batalkan semua' : 'Pilih semua';
+}
+
+document.getElementById('galSelectBtn').addEventListener('click', function () {
+  galSetSelectMode(!galSelectMode);
+});
+document.getElementById('galBatchCancel').addEventListener('click', function () {
+  galSetSelectMode(false);
+});
+document.getElementById('galBatchAll').addEventListener('click', function () {
+  const allSel = galleryItems.length > 0 && galSelected.length === galleryItems.length;
+  galSelected.length = 0;
+  if (!allSel) {
+    for (let i = 0; i < galleryItems.length; i++) galSelected.push(galleryItems[i]);
+  }
+  galleryGrid.querySelectorAll('.gal-cell').forEach(function (cell) {
+    const check = cell.querySelector('.gal-check');
+    if (check) {
+      check.classList.toggle('on', !allSel);
+      check.textContent = !allSel ? '\u2713' : '';
+    }
+  });
+  updateGalBatch();
+});
+document.getElementById('galBatchDelete').addEventListener('click', function () {
+  if (!galSelected.length) return;
+  if (!confirm('Hapus ' + galSelected.length + ' file?')) return;
+  (async function () {
+    for (const it of galSelected.slice()) {
+      await doDeleteMedia(it.token, function () {});
+    }
+    galSetSelectMode(false);
+    loadGallery(true);
+  })();
+});
+document.getElementById('galBatchZip').addEventListener('click', function () {
+  if (!galSelected.length) return;
+  const tokens = galSelected.map(function (it) { return it.token; }).join(',');
+  fsDownloadUrl(API + '/api/media_zip?tokens=' + encodeURIComponent(tokens));
+  galSetSelectMode(false);
+});
 
 window.addEventListener('scroll', function () {
   if (gallerySentinel && gallerySentinel.offsetParent !== null) {
@@ -2232,11 +2370,67 @@ async function doDeleteMedia(token, ok) {
   }
 }
 
+function mmTokenIdx(list, token) {
+  for (let i = 0; i < list.length; i++) if (list[i].token === token) return i;
+  return -1;
+}
+
+function mmStepVideo(delta) {
+  if (mmType !== 'video' || !mmVideoList.length) return;
+  let idx = mmTokenIdx(mmVideoList, mmCurrentToken);
+  if (idx < 0) idx = delta > 0 ? -1 : mmVideoList.length;
+  const next = idx + delta;
+  if (next < 0 || next >= mmVideoList.length) {
+    mmShowToast(delta > 0 ? 'Sudah video terakhir' : 'Ini video pertama');
+    return;
+  }
+  const it = mmVideoList[next];
+  openMedia(it, API + '/api/media?token=' + encodeURIComponent(it.token));
+}
+
+function mmStepImage(delta) {
+  if (mmType !== 'image' || !mmImageList.length) return;
+  let idx = mmTokenIdx(mmImageList, mmCurrentToken);
+  if (idx < 0) idx = delta > 0 ? -1 : mmImageList.length;
+  const next = idx + delta;
+  if (next < 0 || next >= mmImageList.length) {
+    mmShowToast(delta > 0 ? 'Sudah foto terakhir' : 'Foto pertama');
+    return;
+  }
+  const it = mmImageList[next];
+  openMedia(it, API + '/api/media?token=' + encodeURIComponent(it.token));
+}
+
+let mmImgSwipe = null;
+let mmImgSwiped = 0;
+mmImage.addEventListener('click', function () {
+  if (mmType !== 'image') return;
+  if (Date.now() - mmImgSwiped < 400) return;
+  mmImage.classList.toggle('zoom');
+});
+mmImage.addEventListener('touchstart', function (e) {
+  if (mmType !== 'image' || e.touches.length !== 1) { mmImgSwipe = null; return; }
+  mmImgSwipe = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: true });
+mmImage.addEventListener('touchend', function (e) {
+  if (mmType !== 'image' || !mmImgSwipe) return;
+  const ch = e.changedTouches[0];
+  const dx = ch.clientX - mmImgSwipe.x;
+  const dy = ch.clientY - mmImgSwipe.y;
+  mmImgSwipe = null;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+    mmImgSwiped = Date.now();
+    mmStepImage(dx < 0 ? 1 : -1);
+  }
+}, { passive: true });
+
 function openMedia(it, src) {
   mmType = it.isVideo ? 'video' : 'image';
   mmCurrentToken = it.token;
   mmLastSave = 0;
   mmEnded = false;
+  mmVideoList = (galleryItems || []).filter(function (v) { return v.isVideo; });
+  mmImageList = (galleryItems || []).filter(function (v) { return !v.isVideo; });
   mmOverlayTitle.textContent = it.name;
   mmTitle.textContent = it.name;
   mmSub.textContent = fmt(it.size) + (it.modified > 0 ? ' \u00b7 ' + fmtDate(it.modified) : '') + (it.isVideo ? ' \u00b7 video' : ' \u00b7 foto');
@@ -2244,6 +2438,8 @@ function openMedia(it, src) {
   mmBody.scrollTop = 0;
   mmImage.classList.add('hidden');
   mmImage.removeAttribute('src');
+  mmImage.classList.remove('zoom');
+  mediaModal.classList.remove('mm-img');
   mmPlayer.classList.add('hidden');
   mmVideo.pause();
   mmVideo.removeAttribute('src');
@@ -2266,11 +2462,14 @@ function openMedia(it, src) {
     mmFsBtn.innerHTML = (document.fullscreenElement || document.webkitFullscreenElement) ? ICONS.fsx : ICONS.fs;
     mmVideo.src = src;
     mmVideo.load();
+    mmPrevBtn.innerHTML = ICONS.prev;
+    mmNextBtn.innerHTML = ICONS.next;
     var p = mmVideo.play();
     if (p && p.catch) {
       p.catch(function () { mmBigPlay.classList.remove('hidden'); mmShowCtrl(); });
     }
   } else {
+    mediaModal.classList.add('mm-img');
     mmImage.src = src;
     mmImage.classList.remove('hidden');
   }
@@ -2355,6 +2554,8 @@ function mmUpdateAutoBtn() {
 }
 
 mmPlayBtn.addEventListener('click', mmTogglePlay);
+mmPrevBtn.addEventListener('click', function () { mmStepVideo(-1); });
+mmNextBtn.addEventListener('click', function () { mmStepVideo(1); });
 
 mmSeek.addEventListener('input', function () {
   const d = mmVideo.duration || 0;
@@ -2403,9 +2604,16 @@ mmSeekWrap.addEventListener('mouseleave', function () {
 });
 
 document.addEventListener('keydown', function (e) {
-  if (mmType !== 'video' || mediaModal.classList.contains('hidden')) return;
+  if (!mediaModal.classList.contains('open')) return;
   const tag = (e.target && e.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (mmType !== 'video') {
+    if (mmType === 'image') {
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); mmStepImage(-1); }
+      else if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); mmStepImage(1); }
+    }
+    return;
+  }
   const d = mmVideo.duration || 0;
   switch (e.code) {
     case 'Space': e.preventDefault(); mmTogglePlay(); break;
@@ -2530,10 +2738,11 @@ function mmSetBrightness(v) {
   else mmPlayer.style.filter = 'brightness(' + v.toFixed(2) + ')';
 }
 mmPlayer.addEventListener('touchstart', function (e) {
-  if (e.touches.length !== 1) { mmGesture = null; return; }
+  if (mmType !== 'video' || e.touches.length !== 1) { mmGesture = null; return; }
   const left = e.touches[0].clientX < window.innerWidth / 2;
   mmGesture = {
     side: left ? 'b' : 'v',
+    startX: e.touches[0].clientX,
     startY: e.touches[0].clientY,
     startVal: left ? mmCurBrightness() : mmVideo.volume,
     active: false
@@ -2555,7 +2764,42 @@ mmPlayer.addEventListener('touchmove', function (e) {
     mmShowToast('\u{1F50A} ' + Math.round(val * 100) + '%');
   }
 }, { passive: false });
-mmPlayer.addEventListener('touchend', function () { mmGesture = null; });
+let mmTap = { x: 0, y: 0, t: 0 };
+mmPlayer.addEventListener('touchend', function (e) {
+  const ch = e.changedTouches[0];
+  const gx = mmGesture ? mmGesture.startX : ch.clientX;
+  const gy = mmGesture ? mmGesture.startY : ch.clientY;
+  const dx = ch.clientX - gx;
+  const dy = ch.clientY - gy;
+  if (!(mmGesture && mmGesture.active) && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+    mmGesture = null;
+    mmStepVideo(dx < 0 ? 1 : -1);
+    return;
+  }
+  const wasGesture = !!(mmGesture && mmGesture.active);
+  mmGesture = null;
+  if (wasGesture || Math.abs(dx) > 10 || Math.abs(dy) > 10) return;
+  if (mmType !== 'video') return;
+  const w = window.innerWidth;
+  const now = Date.now();
+  const isDbl = now - mmTap.t < 320 &&
+    Math.abs(ch.clientX - mmTap.x) < 44 && Math.abs(ch.clientY - mmTap.y) < 44;
+  mmTap = { x: ch.clientX, y: ch.clientY, t: now };
+  if (isDbl) {
+    if (ch.clientX < w / 3) mmSeekBy(-10);
+    else if (ch.clientX > w * 2 / 3) mmSeekBy(10);
+    else mmTogglePlay();
+    mmTap.t = 0;
+    return;
+  }
+  if (ch.clientX > w / 3 && ch.clientX < w * 2 / 3) {
+    mmTogglePlay();
+  } else if (mmCtrl.classList.contains('hide')) {
+    mmShowCtrl();
+  } else {
+    mmHideCtrl();
+  }
+});
 
 mmVideo.addEventListener('play', function () {
   mmEnded = false;

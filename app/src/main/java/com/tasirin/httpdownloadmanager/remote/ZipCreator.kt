@@ -31,6 +31,56 @@ object ZipCreator {
         }
     }
 
+    /** ZIP daftar token media (dipakai /api/media_zip: unduh banyak foto/video). */
+    fun zipTokens(zos: ZipOutputStream, tokens: List<String>, context: Context) {
+        val used = mutableMapOf<String, Int>()
+        tokens.forEach { token ->
+            val raw = MediaLibrary.decodeToken(token) ?: return@forEach
+            runCatching {
+                val name: String
+                val input: java.io.InputStream?
+                if (raw.startsWith("f:")) {
+                    val f = File(raw.removePrefix("f:"))
+                    name = f.name
+                    input = if (f.isFile) f.inputStream() else null
+                } else {
+                    val uri = android.net.Uri.parse(raw.removePrefix("u:"))
+                    name = displayNameFor(context, uri)
+                    input = context.contentResolver.openInputStream(uri)
+                }
+                if (input == null) return@runCatching
+                val entry = uniqueZipName(name, used)
+                zos.putNextEntry(ZipEntry(entry))
+                input.use { it.copyTo(zos) }
+                zos.closeEntry()
+            }
+        }
+    }
+
+    private fun displayNameFor(context: Context, uri: android.net.Uri): String = runCatching {
+        val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
+        context.contentResolver.query(uri, projection, null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                val idx = c.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                if (idx >= 0) c.getString(idx)
+            }
+        }
+    }.getOrNull()?.takeIf { it.isNotBlank() }
+        ?: uri.lastPathSegment?.substringAfterLast('/')
+        ?: "file"
+
+    private fun uniqueZipName(base: String, used: MutableMap<String, Int>): String {
+        val count = used.getOrDefault(base, 0)
+        used[base] = count + 1
+        if (count == 0) return base
+        val dot = base.lastIndexOf('.')
+        return if (dot > 0) {
+            base.substring(0, dot) + " ($count)" + base.substring(dot)
+        } else {
+            "$base ($count)"
+        }
+    }
+
     fun zipMedia(zos: ZipOutputStream, relative: String, context: Context) {
         if (Build.VERSION.SDK_INT < 29) return
         val base = relative.trim('/')
