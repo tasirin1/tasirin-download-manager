@@ -137,9 +137,9 @@ Remote page features:
 | `/api/add` | Add download URL |
 | `/api/action` | Pause/resume/cancel/delete/priority, etc. |
 | `/api/fs`, `/api/fs_action` | File browsing & actions (create/delete/rename/move) |
-| `/api/fs_dupes`, `/api/fs_zip` | Duplicate detection, download folder as ZIP |
+| `/api/fs_zip` | Download folder as ZIP |
 | `/api/upload`, `/api/upload_verify` | 2 MB chunk upload + verification |
-| `/api/gallery`, `/api/media`, `/api/thumb` | Gallery, streaming (Range), thumbnails |
+| `/api/gallery`, `/api/media`, `/api/media_zip`, `/api/thumb` | Gallery, streaming (Range), batch ZIP download, thumbnails |
 | `/api/delete_media` | Delete gallery media |
 | `/api/qr`, `/api/share` | QR code, temporary share link (24 hours) |
 

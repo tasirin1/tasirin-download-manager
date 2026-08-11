@@ -126,7 +126,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     session.method == Method.GET && session.uri == "/api/qr" -> qrPngResponse(session)
                     session.method == Method.GET && session.uri == "/api/gallery" -> galleryJson(session)
                     session.method == Method.GET && session.uri == "/api/fs" -> fsList(session)
-                    session.method == Method.GET && session.uri == "/api/fs_dupes" -> fsDupes(session)
                     session.method == Method.GET && session.uri == "/api/thumb" -> serveThumb(session)
                     session.method == Method.GET && session.uri == "/api/media" -> serveMedia(session)
                     session.method == Method.POST && session.uri == "/api/add" -> addDownload(session)
@@ -811,7 +810,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun mediaZip(session: IHTTPSession): Response {
-        val tokens = session.parms["tokens"].orEmpty().split(",").filter { it.isNotBlank() }
+        val tokens = session.parms["tokens"].orEmpty().split(",").filter { it.isNotBlank() }.toMutableList()
+        val paths = session.parms["paths"].orEmpty().split(",").filter { it.isNotBlank() }
+        if (tokens.isEmpty() && paths.isEmpty()) return notFound()
+        paths.forEach { p ->
+            if (p.startsWith(FS_PREFIX)) {
+                val f = File(p.removePrefix(FS_PREFIX))
+                if (f.exists() && isFsPathAllowed(f.absolutePath)) {
+                    tokens.add(MediaLibrary.tokenForPath(f.absolutePath))
+                }
+            }
+        }
         if (tokens.isEmpty()) return notFound()
         val tmp = try {
             File.createTempFile("mediazip", ".zip", context.cacheDir).also { tmpFile ->
@@ -1388,65 +1397,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             files.forEach { items.put(it) }
         }
         return jsonResponse(JSONObject().put("path", relative).put("items", items))
-    }
-
-    /** Cari file duplikat (nama + ukuran sama) di dalam folder secara rekursif. */
-    private fun fsDupes(session: IHTTPSession): Response {
-        val raw = session.parms["path"].orEmpty()
-        if (raw.isEmpty() || !raw.startsWith(FS_PREFIX)) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "invalid path"))
-        }
-        val root = File(raw.removePrefix(FS_PREFIX))
-        if (!root.isDirectory || !isFsPathAllowed(root.absolutePath)) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "folder not allowed"))
-        }
-        val byKey = LinkedHashMap<String, MutableList<JSONObject>>()
-        var visited = 0
-        val cap = 5_000
-        val maxDepth = 10
-        fun walk(dir: File, depth: Int) {
-            if (visited >= cap || depth > maxDepth) return
-            val children = runCatching { dir.listFiles() }.getOrNull() ?: return
-            children.sortedWith(
-                Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-            ).forEach { f ->
-                if (visited >= cap) return@forEach
-                if (f.isFile) {
-                    visited++
-                    val key = "${f.name}\u0000${f.length()}"
-                    val o = JSONObject()
-                        .put("path", FS_PREFIX + f.absolutePath)
-                        .put("name", f.name)
-                        .put("size", f.length())
-                        .put("modified", f.lastModified())
-                    byKey.getOrPut(key) { mutableListOf() }.add(o)
-                } else if (f.isDirectory) {
-                    walk(f, depth + 1)
-                }
-            }
-        }
-        walk(root, 0)
-        val groups = JSONArray()
-        byKey.values.forEach { files ->
-            if (files.size > 1) {
-                groups.put(
-                    JSONObject()
-                        .put("name", files[0].getString("name"))
-                        .put("size", files[0].getLong("size"))
-                        .put("files", JSONArray(files))
-                )
-            }
-        }
-        appendLog(
-            "FS FIND DUPLICATES: ${root.absolutePath} — ${groups.length()} group(s) " +
-                "(${if (visited >= cap) "limited" else visited} files scanned)"
-        )
-        return jsonResponse(
-            JSONObject()
-                .put("ok", true)
-                .put("groups", groups)
-                .put("truncated", visited >= cap)
-        )
     }
 
     private fun fsStats(path: String): Pair<Int, Long> {

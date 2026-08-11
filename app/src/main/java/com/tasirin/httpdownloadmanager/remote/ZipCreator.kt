@@ -34,7 +34,8 @@ object ZipCreator {
         }
     }
 
-    /** ZIP daftar token media (dipakai /api/media_zip: unduh banyak foto/video). */
+    /** ZIP daftar token media (dipakai /api/media_zip: unduh banyak foto/video,
+     *  file, atau folder filesystem secara rekursif). */
     fun zipTokens(zos: ZipOutputStream, tokens: List<String>, context: Context) {
         val used = mutableMapOf<String, Int>()
         tokens.forEach { token ->
@@ -44,6 +45,14 @@ object ZipCreator {
                 val input: java.io.InputStream?
                 if (raw.startsWith("f:")) {
                     val f = File(raw.removePrefix("f:"))
+                    if (f.isDirectory) {
+                        val root = uniqueZipName(f.name, used)
+                        val children = runCatching { f.listFiles() }.getOrNull() ?: return@runCatching
+                        children.sortedWith(
+                            Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
+                        ).forEach { child -> zipFile(zos, child, root) }
+                        return@runCatching
+                    }
                     name = f.name
                     input = if (f.isFile) f.inputStream() else null
                 } else {
