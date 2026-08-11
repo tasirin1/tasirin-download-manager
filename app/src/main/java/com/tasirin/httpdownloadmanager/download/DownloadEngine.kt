@@ -17,6 +17,7 @@ import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MimeTypes
+import com.tasirin.httpdownloadmanager.util.StorageCleanup
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.readBounded
@@ -497,6 +498,7 @@ class DownloadEngine(appContext: Context) {
         if (item.state != DownloadState.PENDING) return
         if (canStartNow()) {
             ensureServiceRunning()
+            StorageCleanup.runIfLow(context, _items.value)
             launchItem(item)
         }
     }
@@ -515,6 +517,7 @@ class DownloadEngine(appContext: Context) {
         if (active < max && pending.isNotEmpty()) {
             ensureServiceRunning()
         }
+        StorageCleanup.runIfLow(context, _items.value)
         for (item in pending) {
             if (active >= max) break
             launchItem(item)
