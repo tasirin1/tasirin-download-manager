@@ -44,8 +44,9 @@ class ServerSecurityTest {
 
     @Test
     fun isPathAllowed_pathKosong_false() {
-        assertFalse(ServerSecurity.isPathAllowed("", listOf(root())))
-        assertFalse(ServerSecurity.isPathAllowed("   ", listOf(root())))
+        val r = root()
+        assertFalse(ServerSecurity.isPathAllowed("", listOf(r)))
+        assertFalse(ServerSecurity.isPathAllowed("   ", listOf(r)))
     }
 
     @Test
