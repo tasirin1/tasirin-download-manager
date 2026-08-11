@@ -20,6 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Siapkan & periksa remote web (minify + node check + i18n)
+        run: python3 scripts/prepare_remote.py --check
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
