@@ -275,7 +275,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             Intent.ACTION_VIEW -> intent.data?.toString()
             else -> null
         } ?: return
-        val url = raw.trim().split(Regex("\\s+")).firstOrNull {
+        val url = raw.trim().split(URL_SPLIT).firstOrNull {
             it.startsWith("http://") || it.startsWith("https://")
         } ?: return
         showAddDialog(url)
