@@ -1232,6 +1232,7 @@
       <span id="fsBatchCount"></span>
       <span id="fsBatchSize"></span>
       <button id="fsBatchAll" type="button">Select all</button>
+      <button id="fsBatchDownload" type="button">Download</button>
       <button id="fsBatchMove" type="button">Move</button>
       <button id="fsBatchDelete" type="button" class="danger">Delete</button>
       <button id="fsBatchCancel" type="button">Cancel</button>
@@ -2412,12 +2413,31 @@ document.getElementById('fsBatchMove').addEventListener('click', function () {
   });
 });
 
-document.getElementById('fsBatchCancel').addEventListener('click', function () {
+function exitFsSelect() {
   fsSelectMode = false;
   fsSelected.length = 0;
   fsSelectBtn.textContent = 'Select';
   fsBatch.classList.add('hidden');
   loadFs();
+}
+
+document.getElementById('fsBatchDownload').addEventListener('click', function () {
+  if (!fsSelected.length) return;
+  const tokens = [];
+  const paths = [];
+  fsSelected.forEach(function (it) {
+    if (it.kind === 'file') tokens.push(it.token);
+    else paths.push(it.path);
+  });
+  let url = API + '/api/media_zip?';
+  if (tokens.length) url += 'tokens=' + encodeURIComponent(tokens.join(','));
+  if (paths.length) url += (tokens.length ? '&' : '') + 'paths=' + encodeURIComponent(paths.join(','));
+  fsDownloadUrl(url);
+  exitFsSelect();
+});
+
+document.getElementById('fsBatchCancel').addEventListener('click', function () {
+  exitFsSelect();
 });
 
 document.getElementById('fsBatchAll').addEventListener('click', function () {

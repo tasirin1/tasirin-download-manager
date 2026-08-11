@@ -810,7 +810,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun mediaZip(session: IHTTPSession): Response {
-        val tokens = session.parms["tokens"].orEmpty().split(",").filter { it.isNotBlank() }
+        val tokens = session.parms["tokens"].orEmpty().split(",").filter { it.isNotBlank() }.toMutableList()
+        val paths = session.parms["paths"].orEmpty().split(",").filter { it.isNotBlank() }
+        if (tokens.isEmpty() && paths.isEmpty()) return notFound()
+        paths.forEach { p ->
+            if (p.startsWith(FS_PREFIX)) {
+                val f = File(p.removePrefix(FS_PREFIX))
+                if (f.exists() && isFsPathAllowed(f.absolutePath)) {
+                    tokens.add(MediaLibrary.tokenForPath(f.absolutePath))
+                }
+            }
+        }
         if (tokens.isEmpty()) return notFound()
         val tmp = try {
             File.createTempFile("mediazip", ".zip", context.cacheDir).also { tmpFile ->

@@ -138,7 +138,7 @@ Fitur halaman remote:
 | `/api/fs`, `/api/fs_action` | Jelajah file & aksi (buat/hapus/rename/pindah) |
 | `/api/fs_zip` | Unduh folder sebagai ZIP |
 | `/api/upload`, `/api/upload_verify` | Upload chunk 2 MB + verifikasi |
-| `/api/gallery`, `/api/media`, `/api/thumb` | Galeri, streaming (Range), thumbnail |
+| `/api/gallery`, `/api/media`, `/api/media_zip`, `/api/thumb` | Galeri, streaming (Range), unduh batch ZIP, thumbnail |
 | `/api/delete_media` | Hapus media galeri |
 | `/api/qr`, `/api/share` | Kode QR, tautan berbagi sementara (24 jam) |
 

@@ -5,6 +5,13 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Download batch mode select
+
+### Ditambahkan
+- **Tombol Download di mode select File Manager remote**: pilih beberapa file
+  dan/atau folder sekaligus, lalu unduh sekali sebagai ZIP (folder di-zip
+  rekursif; endpoint `/api/media_zip` kini menerima `paths`).
+
 ## [v1.0 — 2026-08-11] — Remote web: hapus tombol unduh cepat per baris
 
 ### Diperbaiki
