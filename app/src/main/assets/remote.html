@@ -884,13 +884,6 @@ function fsIconFor(it) {
   return '\u{1F4C4}';
 }
 
-function fsQuickBtn(it) {
-  const url = it.kind === 'dir'
-    ? API + '/api/fs_zip?path=' + encodeURIComponent(it.path)
-    : API + '/api/media?token=' + encodeURIComponent(it.token) + '&dl=1';
-  return '<button class="item-menu-btn fs-q-btn" type="button" title="Download" data-url="' + url.replace(/&/g, '&amp;') + '">\u2B07</button>';
-}
-
 function fsRootIcon(r) {
   const p = String(r.path || '').toLowerCase();
   const n = String(r.name || '').toLowerCase();
@@ -973,7 +966,7 @@ function renderFs(items) {
       '<span class="fs-ico">' + fsIconFor(it) + '</span>' +
       '<div class="fs-main"><div class="fs-name">' + escapeHtml(it.name) + '</div>' +
       (meta ? '<div class="fs-meta">' + meta + '</div>' : '') + '</div>' +
-      (!fsSelectMode ? fsQuickBtn(it) + '<button class="fs-more-btn" type="button" title="Actions">\u22EF</button>' : '');
+      (!fsSelectMode ? '<button class="fs-more-btn" type="button" title="Actions">\u22EF</button>' : '');
     row.addEventListener('click', function () {
       if (fsLpFired) { fsLpFired = false; return; }
       if (fsSelectMode) {
@@ -991,13 +984,6 @@ function renderFs(items) {
       moreBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
         openFsSheet(it);
-      });
-    }
-    const qBtn = row.querySelector('.fs-q-btn');
-    if (qBtn) {
-      qBtn.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        fsDownloadUrl(qBtn.dataset.url);
       });
     }
     box.appendChild(row);
