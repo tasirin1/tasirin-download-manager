@@ -92,11 +92,20 @@ def minify_html(html: str) -> str:
     return html.strip()
 
 
+AFFIXES = "me|men|mem|meng|di|ter|ber|ke|pe|peng|se|dip|memp|meny|memper|menge"
+
 def banned_hits(text: str) -> list:
+    # Kata utuh ATAU bentuk berimbuhan Indonesia (meN-/di-/ter-/ber-/peN- + kata
+    # dasar), mis. "Mengunggah" = meng + unggah. Awalan opsional + akar kata
+    # dengan batas kata: "sizing" tidak tertangkap oleh akar "izin".
     hits = []
     for word in BANNED_ID:
-        for m in re.finditer(r"\b" + re.escape(word) + r"\b", text, re.IGNORECASE):
-            hits.append((word, m.group(0)))
+        pat = re.compile(
+            r"\b(?:" + AFFIXES + r")?(?:" + re.escape(word) + r")\b",
+            re.IGNORECASE,
+        )
+        for m in pat.finditer(text):
+            hits.append((word, text[max(0, m.start() - 20):m.end() + 20]))
     return hits
 
 
