@@ -10,6 +10,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 .
 ├── .github/workflows/build.yml       # CI: cek remote web → bump versionCode → build APK → release
 ├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
+├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
 ├── app/src/main/
@@ -206,10 +207,10 @@ buka remote web dari browser, tes tambah URL, dan buka Galeri.
 
 ## Peta jalan: targetSdk 36/37 (Android 16/17)
 
-**Implementasi selesai, uji manual menunggu.** `targetSdk 36` + `compileSdk 36`
-aktif. Perilaku Android 15/16 (FGS boot, edge-to-edge, predictive back) sudah
-ditangani di kode; yang tersisa adalah **Fase 3 — uji manual di perangkat fisik**
-sebelum memutuskan naik ke `targetSdk 37`.
+**Selesai (Fase 1–3).** `targetSdk 36` + `compileSdk 36` aktif dan sudah
+diuji manual di perangkat Android 15/16 (auto-start boot, download background,
+server remote, galeri). Keputusan naik ke `targetSdk 37` masih **opsional** —
+jangan digabung dengan PR fitur lain.
 
 - **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
   di-update bertahap via CI, toolchain Gradle 9.6.1 + AGP 9.0.1 (built-in
@@ -229,8 +230,9 @@ sebelum memutuskan naik ke `targetSdk 37`.
     jadi animasi back bawaan tetap berfungsi.
   - **16 KB page size**: app murni Java/Kotlin tanpa native library — tidak
     terdampak.
-- **Fase 3 — BELUM**: uji manual di perangkat Android 15/16 (auto-start boot,
-  download background, server remote, galeri); kalau sudah, boleh naik
-  `targetSdk 37` (lint `OldTargetApi` tetap di-suppress).
+- **Fase 3 — selesai (2026-08-11)**: uji manual di perangkat Android 15/16
+  (auto-start boot, download background, server remote, galeri) — semua berjalan
+  baik. `targetSdk 37` belum dinaikkan (opsional; lint `OldTargetApi` tetap
+  di-suppress).
 - **Pantangan**: jangan naikkan `minSdk` (tetap 21), dan jangan gabung perubahan
   targetSdk dengan PR fitur lain.
