@@ -9,7 +9,7 @@
 [![Build](https://github.com/tasirin1/tasirin-download-manager/actions/workflows/build.yml/badge.svg)](https://github.com/tasirin1/tasirin-download-manager/actions)
 [![Release](https://img.shields.io/github/v/release/tasirin1/tasirin-download-manager)](https://github.com/tasirin1/tasirin-download-manager/releases)
 
-<p align="center"><b>&#127760; Language: <a href="README.md">Indonesia</a> &middot; <a href="README.en.md">English</a></b></p>
+<p align="center"><b>&#127760; Language: <a href="README.md">Indonesia</a> &middot; <a href="README.en.md">English</a> &middot; <a href="CHANGELOG.md">Changelog</a></b></p>
 
 **One app for all your file needs on Android:** fast downloads, browser-based management over Wi-Fi, file browsing, a YouTube-style gallery player, and realtime monitoring — great on phones and TV boxes (Android 5.0+ / API 21+).
 
