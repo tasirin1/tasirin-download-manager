@@ -5,6 +5,18 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Upload tidak macet diam-diam (browser lama)
+
+### Diperbaiki
+- **Upload tidak lagi menggantung tanpa pesan**: semua kegagalan sisi klien
+  kini tampil sebagai pesan error dan tombol Upload tidak pernah terkunci
+  selamanya. Sebelumnya exception di tengah alur upload membuat status
+  "Uploading ..." macet tanpa ada request yang sampai ke server (terkonfirmasi
+  dari log server perangkat: tidak ada `POST /api/upload` sama sekali).
+- **Fallback `Blob.slice` untuk browser tua**: `webkitSlice`/`mozSlice`
+  dicoba bila `slice` tidak tersedia, dan bila sama sekali tidak didukung
+  muncul pesan error yang jelas alih-alih hang diam-diam.
+
 ## [v1.0 — 2026-08-11] — Perbaikan polling, SSE, & upload (temuan dari log perangkat nyata)
 
 ### Diperbaiki
