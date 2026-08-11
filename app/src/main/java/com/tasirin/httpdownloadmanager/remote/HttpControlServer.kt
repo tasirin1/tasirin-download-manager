@@ -1305,7 +1305,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val dir = File(path)
         if (dir.isDirectory && isFsPathAllowed(path)) {
             runCatching { dir.listFiles() }.getOrNull()
-                ?.sortedWith(compareBy({ it.isFile }, { it.name.lowercase() }))
+                ?.sortedWith(
+                    compareBy<File> { it.isFile }.thenComparator { a, b ->
+                        a.name.compareTo(b.name, ignoreCase = true)
+                    }
+                )
                 ?.forEach { f ->
                     val o = JSONObject()
                     o.put("name", f.name)
@@ -1373,7 +1377,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
             }
-            dirs.sortedBy { it.lowercase() }.forEach { sub ->
+            dirs.sortedWith(String.CASE_INSENSITIVE_ORDER).forEach { sub ->
                 items.put(
                     JSONObject()
                         .put("name", sub)
@@ -1403,7 +1407,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         fun walk(dir: File, depth: Int) {
             if (visited >= cap || depth > maxDepth) return
             val children = runCatching { dir.listFiles() }.getOrNull() ?: return
-            children.sortedBy { it.name.lowercase() }.forEach { f ->
+            children.sortedWith(
+                Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
+            ).forEach { f ->
                 if (visited >= cap) return@forEach
                 if (f.isFile) {
                     visited++

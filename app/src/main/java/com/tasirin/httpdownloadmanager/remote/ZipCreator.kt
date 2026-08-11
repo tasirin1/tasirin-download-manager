@@ -22,7 +22,9 @@ object ZipCreator {
                 zos.closeEntry()
                 return
             }
-            children.sortedBy { it.name.lowercase() }.forEach { child ->
+            children.sortedWith(
+                Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
+            ).forEach { child ->
                 zipFile(zos, child, entryPath)
             }
         } else if (file.isFile) {

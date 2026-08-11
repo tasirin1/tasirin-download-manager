@@ -2320,6 +2320,7 @@ function renderFs(items) {
   }
   if (!items.length) {
     box.innerHTML = emptyHtml('folder', 'Empty folder', 'No files in this folder.');
+    if (serverReadOnly) return;
     const cta = document.createElement('div');
     cta.className = 'empty-cta';
     const up = document.createElement('button');
@@ -2698,6 +2699,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
   if (!total) return;
   fsUploading = true;
   const failed = [];
+  const ulRows = {};
   if (listEl) {
     listEl.innerHTML = '';
     jobs.forEach(function (j) {
@@ -2707,15 +2709,16 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
       div.innerHTML = '<span class="st">\u23F3</span><span class="nm"></span><span class="sz"></span>';
       div.querySelector('.nm').textContent = j.file.name;
       div.querySelector('.sz').textContent = fmt(j.file.size);
+      ulRows[j.id] = { row: div, st: div.querySelector('.st') };
       listEl.appendChild(div);
     });
   }
   function ulSet(id, status, cls) {
     if (!listEl) return;
-    const row = document.getElementById('ul-' + id);
-    if (!row) return;
-    const st = row.querySelector('.st');
-    st.textContent = status;
+    const entry = ulRows[id];
+    if (!entry) return;
+    entry.st.textContent = status;
+    const row = entry.row;
     row.classList.remove('ok', 'err', 'run');
     if (cls) row.classList.add(cls);
   }

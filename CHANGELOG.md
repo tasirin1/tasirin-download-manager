@@ -5,6 +5,20 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Audit efisiensi lanjutan
+
+### Diperbaiki
+- **Sortir daftar file tanpa alokasi string per entri**: pemanggilan
+  `lowercase()` per nama (membuat string baru untuk tiap file tiap kali
+  direktori di-list) diganti comparator `compareTo(ignoreCase = true)` di
+  File Manager remote, browsing media, pencarian duplikat, dan pembuatan ZIP.
+- **Update progres upload lebih ringan**: baris status upload di remote web
+  di-cache — sebelumnya `getElementById` + `querySelector` dipanggil ulang
+  untuk tiap event progress (bisa puluhan kali per detik di browser TV tua).
+- **Empty-folder CTA di remote web** tidak lagi menampilkan tombol
+  Upload/New Folder saat server dalam mode read-only (konsisten dengan mode
+  read-only yang baru).
+
 ## [v1.0 — 2026-08-11] — Play Protect: kurangi sinyal berbahaya + server read-only
 
 ### Diperbaiki
