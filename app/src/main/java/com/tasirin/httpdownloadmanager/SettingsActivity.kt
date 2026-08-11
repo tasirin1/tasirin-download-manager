@@ -220,11 +220,10 @@ class SettingsActivity : AppCompatActivity() {
             if (f.delete()) files++
         }
         val itemNames = App.engine.items.value.map { it.fileName }.toSet()
-        val partPattern = Regex("\\.part(\\.\\d+)?$")
         runCatching {
             File(filesDir, "downloads").listFiles()?.forEach { f ->
-                val base = f.name.replace(partPattern, "")
-                if (partPattern.containsMatchIn(f.name) && base !in itemNames) {
+                val base = f.name.replace(PART_PATTERN, "")
+                if (PART_PATTERN.containsMatchIn(f.name) && base !in itemNames) {
                     deleteIf(f)
                 }
             }
@@ -816,6 +815,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     companion object {
+        private val PART_PATTERN = Regex("\\.part(\\.\\d+)?$")
         private val SPEED_KBPS = intArrayOf(0, 128, 256, 512, 1024, 2048, 5120)
     }
 }

@@ -5,6 +5,19 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Audit lanjutan (detail)
+
+### Diperbaiki
+- Pakai `RANGE_RE` yang sudah di-hoist di `parseRange` (sebelumnya masih
+  membuat `Regex` baru per permintaan Range — konstanta tidak terpakai).
+- Reuse `URL_SPLIT` di `MainActivity` saat mengekstrak URL dari teks share;
+  sekaligus membuang koma yang menempel di akhir URL ("url,url" terpisah
+  benar, bukan jadi satu URL rusak).
+- Hoist regex `.part` ke companion object di `SettingsActivity` (tidak
+  dikompilasi ulang tiap pembersihan).
+- Rapikan KDoc `restartHttpServer` yang terpisah dari fungsinya di `App.kt`.
+- `.gitignore`: abaikan `__pycache__/` hasil `prepare_remote.py`.
+
 ## [v1.0 — 2026-08-11] — Audit kode & efisiensi
 
 ### Diperbaiki

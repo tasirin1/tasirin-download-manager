@@ -59,7 +59,7 @@ private val RANGE_RE = Regex("bytes=(\\d*)-(\\d*)")
 
 internal fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
     if (header.isNullOrBlank() || total <= 0) return null
-    val m = Regex("bytes=(\\d*)-(\\d*)").find(header) ?: return null
+    val m = RANGE_RE.find(header) ?: return null
     val start = m.groupValues[1].toLongOrNull()
     val endRaw = m.groupValues[2].toLongOrNull()
     return when {

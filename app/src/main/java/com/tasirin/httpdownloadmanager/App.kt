@@ -82,14 +82,14 @@ class App : Application() {
         @SuppressLint("StaticFieldLeak")
         lateinit var httpServer: HttpControlServer
 
-        /** Buat ulang server remote dengan port terbaru dari prefs.
-         *  NanoHTTPD mengunci port saat konstruksi, jadi ganti port = instance baru.
-         *  Server tetap hidup bila sebelumnya hidup. */
         /** Catat kejadian ke log realtime server (aman dipanggil dari mana saja). */
         fun logEvent(message: String) {
             runCatching { if (::httpServer.isInitialized) httpServer.appendLog(message) }
         }
 
+        /** Buat ulang server remote dengan port terbaru dari prefs.
+         *  NanoHTTPD mengunci port saat konstruksi, jadi ganti port = instance baru.
+         *  Server tetap hidup bila sebelumnya hidup. */
         fun restartHttpServer(context: Context) {
             val wasAlive = httpServer.isAlive
             runCatching { httpServer.stopServer() }
