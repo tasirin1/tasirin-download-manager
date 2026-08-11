@@ -5,6 +5,20 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Audit kode & efisiensi
+
+### Diperbaiki
+- Buang kode mati: `stopServiceIfIdle` di `MainActivity` (tidak pernah dipanggil).
+- Hoist `Regex` yang dikompilasi berulang: parser HLS (per baris playlist),
+  `parseRange` streaming (per permintaan Range), nama file dari header
+  Content-Disposition (per download), nama asset APK updater, dan pemisah
+  whitespace checksum.
+- Ganti `split("\n".toRegex())` dengan `split('\n')` (tanpa kompilasi regex).
+- Perbaiki string Indonesia yang lolos guard: `'Mengunggah '` → `'Uploading '`
+  di remote web.
+- Guard i18n CI makin ketat: mendeteksi kata berimbuhan Indonesia
+  (meN-/di-/ter-/ber- + kata dasar, mis. "Mengunggah") tanpa false positive.
+
 ## [v1.0-build100352] — 2026-08-11
 
 ### Ditambahkan
