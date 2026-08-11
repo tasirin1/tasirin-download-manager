@@ -8,12 +8,14 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 
 ```
 .
-├── .github/workflows/build.yml       # CI: bump versionCode → build APK → release
+├── .github/workflows/build.yml       # CI: cek remote web → bump versionCode → build APK → release
 ├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
+├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
+├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
 │   ├── assets/
-│   │   └── remote.html               # SELURUH halaman remote web (HTML+CSS+JS satu file)
+│   │   └── remote.html               # Remote web minified (digenapi dari remote.src.html)
 │   ├── res/raw/                      # trust anchor TLS (digicert_global_root_g2.pem, isrg_root_x1.pem)
 │   └── java/com/tasirin/httpdownloadmanager/
 │       ├── App.kt                    # Application — inisialisasi engine download
@@ -30,6 +32,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │       ├── receiver/BootReceiver.kt  # Auto-start saat boot (download & server)
 │       ├── remote/HttpControlServer.kt # Server HTTP remote (nanohttpd) + endpoint API
 │       ├── remote/MediaStream.kt     # Streaming + HTTP Range + notFound (helper respons)
+│       ├── remote/ServerSecurity.kt  # Logika keamanan murni (path, PIN lock, upload, share)
 │       ├── remote/ServerStreams.kt   # Stream gabungan partial, upload stream, delete-on-close
 │       ├── remote/ShareToken.kt      # Token berbagi file sementara
 │       ├── remote/QrCode.kt          # QR PNG untuk /api/qr (pakai util/QrEncoder)
@@ -39,6 +42,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │           ├── FileSaver.kt          # Simpan file (MediaStore / folder, auto-sort)
 │           ├── MediaLibrary.kt       # Scan galeri + thumbnail (kondisional API 29+)
 │           ├── StoragePrefs.kt       # Semua kunci SharedPreferences ("storage_settings")
+│           ├── StorageCleanup.kt     # Auto-cleanup saat storage menipis (partial, thumbs, upload tmp)
 │           ├── QrEncoder.kt          # Encoder QR mandiri (tanpa zxing di APK)
 │           ├── BitmapUtil.kt         # scaleDown bersama (galeri + server remote)
 │           ├── Spinners.kt, Streams.kt  # Helper spinner + baca stream terbatas
@@ -107,17 +111,24 @@ diperbarui.
    memakai encoder sendiri (`util/QrEncoder.kt`), jangan kembalikan zxing ke
    runtime tanpa alasan kuat.
    `assets/remote.html` sengaja di-minify (hemat ukuran; gzip transfer sudah
-   otomatis di nanohttpd) — versi readable bisa dilihat dari history git
-   (commit sebelum `chore(perf)` minify).
-8. **Jaringan jangan di main thread**; polling adaptif (2s aktif / 10s idle);
+   otomatis di nanohttpd). **Sumber readable = `remote.src.html` di root repo**:
+   ubah di sana, lalu jalankan `python3 scripts/prepare_remote.py` dan commit
+   KEDUA file (CI memverifikasi sinkron lewat `--check`; jangan edit
+   `assets/remote.html` manual).
+8. **Guard remote web**: step CI `scripts/prepare_remote.py --check` memverifikasi
+   sinkron `remote.src.html` ↔ `remote.html`, `node --check` pada semua `<script>`,
+   dan larangan kata Indonesia di string UI (remote.html, values/*.xml, Kotlin).
+   Jalankan juga sebelum commit.
+9. **Jaringan jangan di main thread**; polling adaptif (2s aktif / 10s idle);
    SSE wajib punya fallback polling & reconnect.
-9. **Jangan commit keystore** (`*.jks`, `keystore.b64` sudah di-`.gitignore`).
-10. **PR**: workflow ikut build (tanpa release) — gunakan untuk mengecek
+10. **Jangan commit keystore** (`*.jks`, `keystore.b64` sudah di-`.gitignore`).
+11. **PR**: workflow ikut build (tanpa release) — gunakan untuk mengecek
     compile/CI sebelum merge ke `main`.
-11. **Lint & unit test wajib hijau** sebelum merge — `lintDebug` (abortOnError
+12. **Lint & unit test wajib hijau** sebelum merge — `lintDebug` (abortOnError
     aktif) mengawal API >21 jangan sampai lolos, `testDebugUnitTest` menjaga
-    logika murni (`Formats`, `FileNames`, `MimeTypes`, `DownloadItem`).
-12. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
+    logika murni (`Formats`, `FileNames`, `MimeTypes`, `DownloadItem`,
+    `ServerSecurity`).
+13. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
     versi sekaligus; tiap langkah lewat CI dulu.
 
 ## Cara memicu build & release
@@ -136,7 +147,9 @@ diperbarui.
 
 ## Alur pipeline (build.yml)
 
-1. Checkout → JDK 17 → Android SDK → Gradle (cache + verifikasi wrapper).
+1. Checkout → **`scripts/prepare_remote.py --check`** (sinkron remote.html,
+
+   node --check, guard i18n) → JDK 17 → Android SDK → Gradle (cache + verifikasi wrapper).
 2. **Bump versionCode**: `100000 + run_number` ditulis ke `app/build.gradle.kts`.
 3. `assembleDebug` (artifact `app-debug`).
 4. **Lint + unit test**: `lintDebug` (abortOnError) + `testDebugUnitTest`.
@@ -165,7 +178,12 @@ satu salinan aman (jangan di commit, jangan hanya di satu perangkat).
 - **Perilaku unduhan (segment, retry, fallback Range, HLS)** → `DownloadEngine.kt`
   (+ `DownloadService.kt` bila menyangkut foreground service/notifikasi).
 - **Endpoint API / halaman remote** → `HttpControlServer.kt` (endpoint) +
-  `assets/remote.html` (HTML/CSS/JS satu file).
+  `remote.src.html` (lalu jalankan `scripts/prepare_remote.py`).
+- **Keamanan server (path FS, lock PIN, offset upload, token share)** →
+  `remote/ServerSecurity.kt` (fungsi murni + unit test, jangan taruh logika
+  baru langsung di `HttpControlServer`).
+- **Pembersihan storage otomatis** → `util/StorageCleanup.kt` (partial file,
+  thumbnail lama, sisa upload).
 - **Galeri / thumbnail** → `MediaLibrary.kt` + `GalleryActivity.kt`.
 - **Pengaturan baru** → `SettingsActivity.kt` + `StoragePrefs.kt`
   (simpan kunci baru di sana) + `remote.html` bila perlu ditampilkan remote.
