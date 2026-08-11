@@ -1178,7 +1178,7 @@ class DownloadEngine(appContext: Context) {
             val encoded = Base64.encodeToString(raw.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             conn.setRequestProperty("Authorization", "Basic $encoded")
         }
-        headers.split("\n".toRegex()).forEach { line ->
+        headers.split('\n').forEach { line ->
             val idx = line.indexOf(':')
             if (idx > 0) {
                 val key = line.substring(0, idx).trim()
@@ -1292,7 +1292,7 @@ class DownloadEngine(appContext: Context) {
 
     private fun contentDispositionName(header: String?): String? {
         if (header.isNullOrBlank()) return null
-        val star = Regex("filename\\*=([^;]+)").find(header)
+        val star = CONTENT_DISPOSITION_STAR.find(header)
         if (star != null) {
             val value = star.groupValues[1].trim()
             val idx = value.indexOf("''")
@@ -1303,7 +1303,7 @@ class DownloadEngine(appContext: Context) {
                 if (!decoded.isNullOrBlank()) return decoded
             }
         }
-        val plain = Regex("filename=\"?([^\";]+)\"?").find(header)
+        val plain = CONTENT_DISPOSITION_PLAIN.find(header)
         return plain?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
     }
 
@@ -1382,6 +1382,8 @@ class DownloadEngine(appContext: Context) {
     }
 
     companion object {
+        private val CONTENT_DISPOSITION_STAR = Regex("filename\\*=([^;]+)")
+        private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")
         private const val BUFFER_SIZE = 64 * 1024
         private const val HLS_PROBE_MAX_BYTES = 1_000_000
         private const val SEGMENT_MIN_BYTES = 5L * 1024 * 1024

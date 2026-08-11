@@ -22,6 +22,7 @@ data class UpdateInfo(
 
 /** Cek & unduh APK rilis terbaru dari GitHub, lalu pasang lewat package installer. */
 object Updater {
+    private val APK_NAME_RE = Regex("-(\\d+)\\.apk$")
     private const val LATEST_API =
         "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest"
     private const val MAX_REDIRECTS = 5
@@ -40,7 +41,7 @@ object Updater {
         for (i in 0 until assets.length()) {
             val a = assets.optJSONObject(i) ?: continue
             val name = a.optString("name", "")
-            val code = Regex("""-(\d+)\.apk$""").find(name)?.groupValues?.get(1)?.toIntOrNull()
+            val code = APK_NAME_RE.find(name)?.groupValues?.get(1)?.toIntOrNull()
                 ?: continue
             val url = a.optString("browser_download_url", "")
             if (url.isEmpty()) continue
