@@ -31,6 +31,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.isVisible
 import androidx.core.widget.TextViewCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -146,7 +147,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun isSectionExpanded(section: ViewGroup, header: TextView): Boolean {
         for (i in 0 until section.childCount) {
             val child = section.getChildAt(i)
-            if (child !== header && child.visibility == View.VISIBLE) return true
+            if (child !== header && child.isVisible) return true
         }
         return false
     }
@@ -155,7 +156,7 @@ class SettingsActivity : AppCompatActivity() {
         for (i in 0 until section.childCount) {
             val child = section.getChildAt(i)
             if (child !== header) {
-                child.visibility = if (expanded) View.VISIBLE else View.GONE
+                child.isVisible = expanded
             }
         }
         TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
