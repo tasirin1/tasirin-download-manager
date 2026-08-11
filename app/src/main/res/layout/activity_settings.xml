@@ -125,45 +125,28 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_status_card"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp"
+                android:paddingBottom="14dp">
 
-                <LinearLayout
+                <TextView
                     android:id="@+id/header_server"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="-14dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:drawableEnd="@drawable/ic_chevron"
+                    android:drawablePadding="8dp"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
+                    android:minHeight="52dp"
                     android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/settings_section_server"
-                        android:textColor="@color/primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:id="@+id/chevron_server"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        android:src="@drawable/ic_chevron"
-                        app:tint="@color/text_secondary" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/content_server"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="14dp"
-                    android:paddingBottom="14dp">
+                    android:paddingVertical="14dp"
+                    android:text="@string/settings_section_server"
+                    android:textColor="@color/primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/server_status"
@@ -359,7 +342,6 @@
                         android:nextFocusUp="@id/input_port"
                         android:layout_marginTop="12dp"
                         android:text="@string/remote_log_label" />
-                </LinearLayout>
             </LinearLayout>
 
             <!-- ===== SEKSI: UNDUHAN ===== -->
@@ -369,45 +351,28 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_status_card"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp"
+                android:paddingBottom="14dp">
 
-                <LinearLayout
+                <TextView
                     android:id="@+id/header_download"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="-14dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:drawableEnd="@drawable/ic_chevron"
+                    android:drawablePadding="8dp"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
+                    android:minHeight="52dp"
                     android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/settings_section_download"
-                        android:textColor="@color/primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:id="@+id/chevron_download"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        android:src="@drawable/ic_chevron"
-                        app:tint="@color/text_secondary" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/content_download"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="14dp"
-                    android:paddingBottom="14dp">
+                    android:paddingVertical="14dp"
+                    android:text="@string/settings_section_download"
+                    android:textColor="@color/primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
                     <Button
                         android:id="@+id/check_background"
@@ -588,7 +553,6 @@
                         android:text="@string/settings_timeout_hint"
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?android:attr/textColorSecondary" />
-                </LinearLayout>
             </LinearLayout>
 
             <!-- ===== SEKSI: PENYIMPANAN ===== -->
@@ -598,48 +562,30 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_status_card"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp"
+                android:paddingBottom="14dp">
 
-                <LinearLayout
+                <TextView
                     android:id="@+id/header_storage"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="-14dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:drawableEnd="@drawable/ic_chevron"
+                    android:drawablePadding="8dp"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
+                    android:minHeight="52dp"
                     android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/settings_section_storage"
-                        android:textColor="@color/primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:id="@+id/chevron_storage"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        android:src="@drawable/ic_chevron"
-                        app:tint="@color/text_secondary" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/content_storage"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="14dp"
-                    android:paddingBottom="14dp">
+                    android:paddingVertical="14dp"
+                    android:text="@string/settings_section_storage"
+                    android:textColor="@color/primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
                     <include layout="@layout/view_storage_section" />
-                </LinearLayout>
             </LinearLayout>
 
             <!-- ===== SEKSI: GALERI (di layout terpisah supaya jumlah view
@@ -653,45 +599,28 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_status_card"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp"
+                android:paddingBottom="14dp">
 
-                <LinearLayout
+                <TextView
                     android:id="@+id/header_other"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="-14dp"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:drawableEnd="@drawable/ic_chevron"
+                    android:drawablePadding="8dp"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
+                    android:minHeight="52dp"
                     android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/settings_nav_other"
-                        android:textColor="@color/primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:id="@+id/chevron_other"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        android:src="@drawable/ic_chevron"
-                        app:tint="@color/text_secondary" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/content_other"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="14dp"
-                    android:paddingBottom="14dp">
+                    android:paddingVertical="14dp"
+                    android:text="@string/settings_nav_other"
+                    android:textColor="@color/primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
                     <Button
                         android:id="@+id/btn_cleanup"
@@ -725,7 +654,6 @@
                         android:background="@drawable/bg_btn_tv"
                         android:backgroundTint="@null"
                         android:text="@string/update_check" />
-                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
