@@ -160,6 +160,9 @@ const galleryGrid = document.getElementById('galleryGrid');
 const galleryCount = document.getElementById('galleryCount');
 const galleryStatus = document.getElementById('galleryStatus');
 let galleryItems = [];
+// Cache posisi video per render galeri: menghindari baca localStorage untuk
+// tiap cell video saat galeri di-render (bisa ratusan cell).
+let galleryVideoPos = {};
 const GALLERY_CHUNK = 24;
 let galleryLoaded = 0;
 let gallerySentinel = null;
@@ -291,9 +294,11 @@ function saveVideoPos(token) {
   if (d <= 0) return;
   if (t < 5 || d - t < 10) {
     try { localStorage.removeItem(vposKey(token)); } catch (e) {}
+    delete galleryVideoPos[token];
     return;
   }
   try { localStorage.setItem(vposKey(token), JSON.stringify({ t: t, d: d })); } catch (e) {}
+  galleryVideoPos[token] = t;
 }
 
 function loadVideoPos(token) {
@@ -415,6 +420,10 @@ async function loadGallery(reset) {
     const items = data.items || [];
     if (reset) {
       galleryItems = items;
+      galleryVideoPos = {};
+      for (const v of items) {
+        if (v.isVideo) galleryVideoPos[v.token] = loadVideoPos(v.token);
+      }
       galleryPage = 1;
       galleryLoaded = 0;
       galSelected.length = 0;
@@ -481,7 +490,14 @@ function ensureGallerySentinel() {
 function loadMoreGallery() {
   if (galleryLoaded < galleryItems.length) {
     const next = galleryItems.slice(galleryLoaded, galleryLoaded + GALLERY_CHUNK);
-    for (const it of next) renderGalleryCell(it);
+    for (const it of next) {
+      // Baca localStorage maksimal sekali per token (halaman pertama di-cache
+      // di loadGallery; halaman berikutnya diisi di sini).
+      if (it.isVideo && galleryVideoPos[it.token] === undefined) {
+        galleryVideoPos[it.token] = loadVideoPos(it.token);
+      }
+      renderGalleryCell(it);
+    }
     galleryLoaded += next.length;
   }
   if (galleryLoaded < galleryItems.length || galleryHasMore) {
@@ -508,7 +524,7 @@ function renderGalleryCell(it) {
   const thumb = API + '/api/thumb?token=' + encodeURIComponent(it.token);
   const media = API + '/api/media?token=' + encodeURIComponent(it.token);
   const ratio = (it.w && it.h && !it.isVideo) ? (it.h * 100 / it.w).toFixed(2) : 56.25;
-  const resume = it.isVideo ? loadVideoPos(it.token) : 0;
+  const resume = it.isVideo ? (galleryVideoPos[it.token] || 0) : 0;
   const selOn = galSelected.indexOf(it) >= 0;
   cell.innerHTML =
     '<div class="gal-thumb" style="padding-top:' + ratio + '%">' +
@@ -2522,17 +2538,15 @@ function rowSubHtml(it) {
     '</div>';
 }
 
+let rowNodes = new Map();
 function updateRows(items) {
-  const list = document.getElementById('list');
-  if (!list.querySelector('li[data-id]')) {
+  if (!rowNodes.size || !rowNodes.values().next().value.isConnected) {
     rebuildList(items);
     return;
   }
-  const rows = {};
-  list.querySelectorAll('li[data-id]').forEach(function (li) { rows[li.dataset.id] = li; });
   items.forEach(function (it) {
-    const li = rows[it.id];
-    if (!li) return;
+    const li = rowNodes.get(it.id);
+    if (!li || !li.isConnected) return;
     const sig = it.state + '|' + it.bytesDownloaded + '|' + it.speedBps + '|' + it.etaSeconds;
     if (lastRowSig[it.id] === sig) return;
     lastRowSig[it.id] = sig;
@@ -2545,6 +2559,7 @@ function updateRows(items) {
 
 function rebuildList(items) {
   lastRowSig = {};
+  rowNodes = new Map();
   const list = document.getElementById('list');
   list.innerHTML = '';
   const idListSig = items.map(function (it) { return it.id + '|' + it.state; }).join(';');
@@ -2607,6 +2622,7 @@ function rebuildList(items) {
         openItemSheet(it);
       });
     }
+    rowNodes.set(it.id, li);
     list.appendChild(li);
   }
 }

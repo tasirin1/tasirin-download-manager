@@ -6,3 +6,7 @@
 # dipakai untuk audit kode mati (jangan commit hasil auditnya).
 #
 # Jangan tambah -keep yang terlalu luas: memperbesar APK.
+
+# Gabungkan interface implementasi yang identik (hemat sebagian kecil APK).
+# Aman: aplikasi tidak bergantung pada identitas interface runtime.
+-mergeinterfacesaggressively

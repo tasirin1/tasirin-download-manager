@@ -54,6 +54,7 @@ import java.net.Inet4Address
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executors
 import java.util.zip.ZipOutputStream
 import java.net.NetworkInterface
 import java.security.MessageDigest
@@ -86,6 +87,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val completedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
     private val finalizingUploads = ConcurrentHashMap<String, String>()
     private val failedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
+    // Cache durasi video & dimensi gambar galeri: file/dimensi tidak berubah,
+    // jadi cukup di-hold di memori (dibatasi jumlahnya) — tanpa cache, tiap
+    // request halaman galeri membaca ulang file & header gambar dari disk.
+    @Volatile private var videoDurationsCache: JSONObject? = null
+    private val imageDimCache = ConcurrentHashMap<String, Pair<Int, Int>>()
+    // Statistik folder dihitung paralel: listing folder dengan banyak subfolder
+    // tidak lagi menunggu N listFiles() berurutan (lambat di storage TV box).
+    private val statPool = Executors.newFixedThreadPool(
+        Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+    )
     @Volatile private var batteryCache: Pair<Long, Pair<Int, Boolean>>? = null
     private var cachedHtml: String? = null
     private val appVersion: String by lazy {
@@ -233,6 +244,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         sseClients.forEach { it.closeStream() }
         sseClients.clear()
         shareTokens.clear()
+        // Server bisa dimatikan lalu dinyalakan ulang (ganti port) — pool
+        // statistik ikut dihentikan; instance baru membuat pool baru.
+        runCatching { statPool.shutdownNow() }
         super.stop()
     }
 
@@ -1230,11 +1244,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun loadVideoDurations(): JSONObject {
-        val f = File(context.filesDir, "video_durations.json")
-        return runCatching { JSONObject(f.readText()) }.getOrDefault(JSONObject())
+        videoDurationsCache?.let { return it }
+        val loaded = runCatching {
+            JSONObject(File(context.filesDir, "video_durations.json").readText())
+        }.getOrDefault(JSONObject())
+        videoDurationsCache = loaded
+        return loaded
     }
 
     private fun saveVideoDurations(cache: JSONObject) {
+        videoDurationsCache = cache
         if (cache.length() == 0) return
         runCatching {
             File(context.filesDir, "video_durations.json").writeText(cache.toString())
@@ -1252,18 +1271,29 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     }
 
-    private fun imageDimensions(e: MediaLibrary.MediaEntry): Pair<Int, Int>? = runCatching {
-        val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        val path = e.filePath
-        if (path != null) {
-            android.graphics.BitmapFactory.decodeFile(path, opts)
-        } else if (e.contentUri != null) {
-            context.contentResolver.openInputStream(e.contentUri.toUri())?.use { s ->
-                android.graphics.BitmapFactory.decodeStream(s, null, opts)
-            }
+    private fun imageDimensions(e: MediaLibrary.MediaEntry): Pair<Int, Int>? {
+        // File .part masih berubah saat download berjalan — jangan di-cache.
+        if (!e.isPartial) {
+            imageDimCache[e.token]?.let { return it }
         }
-        if (opts.outWidth > 0 && opts.outHeight > 0) opts.outWidth to opts.outHeight else null
-    }.getOrNull()
+        val result = runCatching {
+            val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            val path = e.filePath
+            if (path != null) {
+                android.graphics.BitmapFactory.decodeFile(path, opts)
+            } else if (e.contentUri != null) {
+                context.contentResolver.openInputStream(e.contentUri.toUri())?.use { s ->
+                    android.graphics.BitmapFactory.decodeStream(s, null, opts)
+                }
+            }
+            if (opts.outWidth > 0 && opts.outHeight > 0) opts.outWidth to opts.outHeight else null
+        }.getOrNull()
+        if (result != null && !e.isPartial) {
+            if (imageDimCache.size > 5000) imageDimCache.clear()
+            imageDimCache[e.token] = result
+        }
+        return result
+    }
 
     private fun fsRoots(): Response {
         val items = JSONArray()
@@ -1313,28 +1343,35 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val items = JSONArray()
         val dir = File(path)
         if (dir.isDirectory && isFsPathAllowed(path)) {
-            runCatching { dir.listFiles() }.getOrNull()
+            val entries = runCatching { dir.listFiles() }.getOrNull()
                 ?.sortedWith(
                     compareBy<File> { it.isFile }.thenComparator { a, b ->
                         a.name.compareTo(b.name, ignoreCase = true)
                     }
-                )
-                ?.forEach { f ->
-                    val o = JSONObject()
-                    o.put("name", f.name)
-                    o.put("path", FS_PREFIX + f.absolutePath)
-                    o.put("kind", if (f.isDirectory) "dir" else "file")
-                    o.put("size", if (f.isFile) f.length() else 0L)
-                    o.put("modified", f.lastModified())
-                    if (f.isDirectory) {
-                        val (itemCount, totalSize) = fsStats(f.absolutePath)
-                        o.put("itemCount", itemCount)
-                        o.put("totalSize", totalSize)
-                    } else {
-                        o.put("token", MediaLibrary.tokenForPath(f.absolutePath))
-                    }
-                    items.put(o)
+                ).orEmpty()
+            // Statistik subfolder dihitung paralel supaya listing folder besar
+            // tidak membayar N listFiles() berurutan di storage lambat.
+            val statFutures = entries.filter { it.isDirectory }.associateWith { f ->
+                statPool.submit<Pair<Int, Long>> { fsStats(f.absolutePath) }
+            }
+            entries.forEach { f ->
+                val o = JSONObject()
+                o.put("name", f.name)
+                o.put("path", FS_PREFIX + f.absolutePath)
+                o.put("kind", if (f.isDirectory) "dir" else "file")
+                o.put("size", if (f.isFile) f.length() else 0L)
+                o.put("modified", f.lastModified())
+                if (f.isDirectory) {
+                    val (itemCount, totalSize) = runCatching {
+                        statFutures[f]?.get()
+                    }.getOrNull() ?: (0 to 0L)
+                    o.put("itemCount", itemCount)
+                    o.put("totalSize", totalSize)
+                } else {
+                    o.put("token", MediaLibrary.tokenForPath(f.absolutePath))
                 }
+                items.put(o)
+            }
         }
         return jsonResponse(JSONObject().put("path", path).put("items", items))
     }
@@ -1747,9 +1784,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
             }
             // Ticker status: tetap push walau tidak ada perubahan item,
-            // supaya baterai/penyimpanan/port selalu segar.
+            // supaya baterai/penyimpanan/port selalu segar. Interval 10 dtk:
+            // client yang butuh data lebih sering memakai /api/snapshot.
             while (true) {
-                delay(3_000)
+                delay(10_000)
                 runCatching {
                     if (sseClients.isNotEmpty()) pushFrame(buildPayload(true))
                 }

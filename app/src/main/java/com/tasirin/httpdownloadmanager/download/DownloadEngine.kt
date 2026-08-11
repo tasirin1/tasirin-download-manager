@@ -885,7 +885,10 @@ class DownloadEngine(appContext: Context) {
                 downloaded += read
                 throttle.sleepIfNeeded(downloaded)
                 val now = System.currentTimeMillis()
-                if (now - lastNotify >= 500) {
+                // Progres di-throttle 1x/detik: salinan daftar + emisi StateFlow
+                // (ke UI, notifikasi, SSE) tidak perlu 2x/detik — hemat CPU/GC
+                // saat banyak download paralel, UI tetap terasa halus.
+                if (now - lastNotify >= 1000) {
                     lastNotify = now
                     coroutineContext.ensureActive()
                     val (speed, eta) = speedTracker.sample(item.id, downloaded, total)
@@ -1105,7 +1108,7 @@ class DownloadEngine(appContext: Context) {
                     downloaded += read
                     throttle.sleepIfNeeded(totalDownloaded(id))
                     val now = System.currentTimeMillis()
-                    if (now - lastNotify >= 500) {
+                    if (now - lastNotify >= 1000) {
                         lastNotify = now
                         coroutineContext.ensureActive()
                         val segTotal = segment.end - segment.start + 1
