@@ -40,7 +40,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │       ├── remote/QrCode.kt          # QR PNG untuk /api/qr (pakai util/QrEncoder)
 │       ├── ui/DownloadAdapter.kt     # RecyclerView adapter daftar download
 │       └── util/
-│           ├── Updater.kt            # Self-update APK dari GitHub release + verifikasi tanda tangan
+│           ├── Updater.kt            # Cek & unduh APK update (tanpa auto-install) + verifikasi tanda tangan
 │           ├── FileSaver.kt          # Simpan file (MediaStore / folder, auto-sort)
 │           ├── MediaLibrary.kt       # Scan galeri + thumbnail (kondisional API 29+)
 │           ├── StoragePrefs.kt       # Semua kunci SharedPreferences ("storage_settings")
@@ -81,7 +81,7 @@ diperbarui.
 - **Kunci SharedPreferences** (`storage_settings`): `folder_uri`, `folder_name`,
   `text_folder_path`, `extra_folders`, `background_download`, `auto_start_boot`,
   `server_background`, `server_autostart_boot`, `server_port`, `server_pin`,
-  `pin_enforced`, `fs_full_access`, `max_concurrent`, `segments`,
+  `pin_enforced`, `fs_full_access`, `server_read_only`, `max_concurrent`, `segments`,
   `speed_limit_kbps`, `max_retries`, `connect_timeout_sec`, `read_timeout_sec`,
   `small_first`, `delete_partial_on_cancel`, `recent_urls`, `sort_mode`,
   `auto_sort`, `battery_exempt`, `gallery_image_folder`, `gallery_video_folder`.
@@ -190,8 +190,10 @@ satu salinan aman (jangan di commit, jangan hanya di satu perangkat).
 - **Galeri / thumbnail** → `MediaLibrary.kt` + `GalleryActivity.kt`.
 - **Pengaturan baru** → `SettingsActivity.kt` + `StoragePrefs.kt`
   (simpan kunci baru di sana) + `remote.html` bila perlu ditampilkan remote.
-- **Self-update APK** → `Updater.kt` (format nama asset `-<code>.apk` wajib
-  dipertahankan agar versi terbaca).
+- **Self-update APK** → `Updater.kt` — **download-only** (format nama asset
+  `-<code>.apk` wajib dipertahankan agar versi terbaca). Jangan kembalikan
+  auto-install (`REQUEST_INSTALL_PACKAGES`): sengaja dihapus untuk menurunkan
+  sinyal berbahaya bagi Play Protect aplikasi sideload.
 - **Log server** → `LogActivity.kt` + buffer log (lihat `App.kt`/engine).
 - **Versi app** → jangan manual; CI yang mengatur (lihat aturan di atas).
 

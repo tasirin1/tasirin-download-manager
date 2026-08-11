@@ -78,9 +78,28 @@ APK release sudah **ditandatangani dengan kunci rilis resmi** (bukan debug), jad
   dari nama asset `tasirin-download-manager-v1.0-<code>.apk`, memilih kode
   tertinggi.
 - Ada versi baru → dialog **Pembaruan tersedia** di Pengaturan → unduh APK ke
-  cache (verifikasi ukuran) → install via installer sistem
-  (`REQUEST_INSTALL_PACKAGES`).
-- Tidak perlu sideload manual: release di-refresh tiap build CI.
+  folder **Downloads** (tanda tangan release diverifikasi) → **pasang manual**
+  dari file manager. Aplikasi sengaja **tidak** meminta izin "install aplikasi
+  lain" (`REQUEST_INSTALL_PACKAGES`) supaya profil risikonya lebih rendah bagi
+  Play Protect.
+
+## Play Protect memperingatkan "membahayakan data"
+
+Ini **normal untuk aplikasi sideload** (bukan dari Play Store) yang meminta
+"Access all files" (`MANAGE_EXTERNAL_STORAGE`) — dibutuhkan File Manager remote
+dan akses path langsung. Plus aplikasi menjalankan server HTTP lokal yang bisa
+mengunduh/mengunggah file, sehingga heuristik Play Protect menganggapnya
+"berisiko terhadap data". Bukan malware:
+
+- Scan **VirusTotal 0/75** untuk semua rilis terakhir (tautan report tampil di
+  log build GitHub Actions).
+- APK ditandatangani kunci rilis resmi; tanda tangan diverifikasi sebelum
+  update dipakai.
+- Tanpa izin "Access all files", download & galeri tetap berfungsi (via
+  MediaStore); hanya File Manager remote yang butuh izin tersebut.
+
+Saat instalasi muncul peringatan, pilih **Install anyway**. Izin "install
+aplikasi lain" yang dulu ikut memicu peringatan sudah dihapus sejak rilis ini.
 
 ## Remote Web Realtime
 

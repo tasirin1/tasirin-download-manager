@@ -18,6 +18,7 @@ object StoragePrefs {
     private const val KEY_AUTOSTART = "auto_start_boot"
     private const val KEY_SERVER_BACKGROUND = "server_background"
     private const val KEY_SERVER_AUTOSTART = "server_autostart_boot"
+    private const val KEY_SERVER_READ_ONLY = "server_read_only"
     private const val KEY_TEXT_FOLDER = "text_folder_path"
     private const val KEY_BATTERY_EXEMPT = "battery_exempt"
     private const val KEY_SERVER_PIN = "server_pin"
@@ -180,6 +181,17 @@ object StoragePrefs {
     fun setFsFullAccessEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putBoolean(KEY_FS_FULL_ACCESS, enabled)
+        }
+    }
+
+    /** Server remote read-only: upload, ubah file, dan hapus media ditolak. */
+    fun isServerReadOnly(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_SERVER_READ_ONLY, false)
+
+    fun setServerReadOnly(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putBoolean(KEY_SERVER_READ_ONLY, enabled)
         }
     }
 

@@ -20,14 +20,13 @@
     <string name="update_available">Update available: %1$s (build %2$d)</string>
     <string name="update_title">Update available</string>
     <string name="update_message">Version %1$s (build %2$d) is available (%3$s).\nDownload now?</string>
-    <string name="update_download">Download &amp; Install</string>
+    <string name="update_download">Download</string>
     <string name="update_downloading">Downloading update&#8230;</string>
     <string name="update_progress_detail">%1$s / %2$s</string>
     <string name="update_progress_unknown">%1$s downloaded</string>
     <string name="update_download_failed">Failed to download update</string>
     <string name="update_signature_failed">Update rejected — APK signature does not match the official release key</string>
-    <string name="update_install_failed">Cannot open installer — enable &quot;Install unknown apps&quot; and try again</string>
-    <string name="update_ready">Update ready to install</string>
+    <string name="update_downloaded_path">Update downloaded to %1$s — install it manually</string>
     <string name="invalid_url">URL must not be empty</string>
 
     <string name="pause">Pause</string>
@@ -56,6 +55,7 @@
     <string name="storage_extra_folder_hint">Folder path, e.g. /sdcard/movie</string>
     <string name="storage_remove_folder">&#10005;</string>
     <string name="storage_text_folder_hint">Folder path (e.g. /storage/emulated/0/Download)</string>
+    <string name="storage_hint_all_files">&quot;All files access&quot; is only needed for the remote File Manager &amp; direct paths. Downloads &amp; gallery keep working via MediaStore without it.</string>
     <string name="storage_text_folder_invalid">Path is not valid or not a folder</string>
     <string name="storage_text_folder_saved">Folder saved: %1$s</string>
 
@@ -265,6 +265,8 @@
 
     <string name="settings_pin_enforced">Require PIN when server runs</string>
     <string name="settings_fs_full_access">Full access to main storage (file manager)</string>
+    <string name="settings_server_read_only">Read-only server</string>
+    <string name="settings_hint_read_only">Blocks upload, rename, move, delete &amp; create from the remote web. Download &amp; browsing still work.</string>
     <string name="remote_storage_btn">Enable file access (storage permission)</string>
     <string name="remote_pin_required">Set a PIN in Settings first before starting the server (for network security)</string>
     <string name="settings_server_autostart">Start server automatically after device restart</string>

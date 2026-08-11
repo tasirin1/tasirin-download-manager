@@ -19,7 +19,6 @@
     <uses-permission
         android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
         tools:ignore="BatteryLife" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Package visibility untuk targetSdk 30+ (buka file / share / pick);
          diabaikan oleh Android 5–10. -->

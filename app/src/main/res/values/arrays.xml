@@ -9,6 +9,7 @@
         <item>&#128250;</item>
         <item>&#127760;</item>
         <item>&#9749;</item>
+        <item>&#9888;&#65039;</item>
     </string-array>
     <string-array name="about_rows">
         <item>Maker: Julius Rudi Tasirin</item>
@@ -19,5 +20,6 @@
         <item>For: Android — phones, STB &amp; TV boxes</item>
         <item>Package: full-featured, only ~1.7 MB</item>
         <item>Fuel: a cup of coffee + spare time</item>
+        <item>Play Protect may warn on sideload (All Files Access) — VirusTotal scan is clean 0/75</item>
     </string-array>
 </resources>

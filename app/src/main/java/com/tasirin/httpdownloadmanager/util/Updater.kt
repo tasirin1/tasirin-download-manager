@@ -4,8 +4,6 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.content.Context
-import android.content.Intent
-import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -20,7 +18,9 @@ data class UpdateInfo(
     val apkSize: Long
 )
 
-/** Cek & unduh APK rilis terbaru dari GitHub, lalu pasang lewat package installer. */
+/** Cek & unduh APK rilis terbaru dari GitHub. Instalasi dilakukan manual oleh
+ *  pengguna (tanpa REQUEST_INSTALL_PACKAGES — mengurangi sinyal berbahaya
+ *  bagi Play Protect untuk aplikasi sideload). */
 object Updater {
     private val APK_NAME_RE = Regex("-(\\d+)\\.apk$")
     private const val LATEST_API =
@@ -105,19 +105,6 @@ object Updater {
             target
         }
     }.getOrNull()
-
-    fun install(context: Context, file: File): Boolean = runCatching {
-        val uri = FileProvider.getUriForFile(
-            context, "${context.packageName}.fileprovider", file
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        if (intent.resolveActivity(context.packageManager) == null) return false
-        context.startActivity(intent)
-        true
-    }.getOrDefault(false)
 
     /** Pastikan APK ditandatangani sertifikat release resmi sebelum dipasang.
      *  API 28+ memakai GET_SIGNING_CERTIFICATES (v2/v3), Android 5-8 memakai

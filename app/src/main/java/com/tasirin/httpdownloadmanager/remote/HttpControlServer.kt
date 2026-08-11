@@ -558,6 +558,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun handleUpload(session: IHTTPSession): Response {
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
         val name = session.parms["name"]?.trim()
             ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")
             ?.takeIf { it.isNotEmpty() }
@@ -843,6 +844,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun deleteMedia(session: IHTTPSession): Response {
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
         val params = readForm(session)
         val token = params["token"].orEmpty()
         if (token.isEmpty()) {
@@ -1458,6 +1460,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun fsAction(session: IHTTPSession): Response {
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
         val params = readForm(session)
         val action = params["action"].orEmpty()
         val path = params["path"].orEmpty()
@@ -1688,10 +1691,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         obj.put("storageFree", App.engine.freeSpaceBytes())
         obj.put("port", listeningPort)
         obj.put("storageWriteOk", storageWriteOk())
+        obj.put("readOnly", StoragePrefs.isServerReadOnly(context))
         obj.put("appVersion", appVersion)
         obj.put("appBuild", appBuild)
         return obj
     }
+
+    private fun readOnlyDenied(): Response =
+        jsonResponse(JSONObject().put("ok", false).put("error", "Server is read-only"))
 
     private fun storageWriteOk(): Boolean {
         // Izin menulis ke folder f: (path langsung). Android 11+ wajib

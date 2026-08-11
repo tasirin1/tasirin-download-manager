@@ -5,6 +5,25 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Play Protect: kurangi sinyal berbahaya + server read-only
+
+### Diperbaiki
+- **Izin &quot;install aplikasi lain&quot; (`REQUEST_INSTALL_PACKAGES`) dihapus** —
+  update APK kini hanya mengunduh ke folder Downloads (tanda tangan release
+  diverifikasi) lalu dipasang manual dari file manager. Izin ini termasuk
+  pemicu utama peringatan Play Protect untuk aplikasi sideload.
+- **Mode server read-only** (Pengaturan → Server): upload, ubah nama, pindah,
+  hapus, dan buat folder dari remote web ditolak di sisi server; UI remote
+  menyembunyikan tombol aksi dan menampilkan banner. Download & browsing tetap
+  berfungsi.
+- **Penjelasan peringatan Play Protect** ditambahkan di README (ID/EN) dan
+  dialog About: peringatan &quot;membahayakan data&quot; adalah normal untuk
+  aplikasi sideload dengan &quot;All Files Access&quot; (bukan malware; scan
+  VirusTotal 0/75 untuk semua rilis terakhir).
+- **Klarifikasi izin storage** di Pengaturan: &quot;All Files Access&quot; hanya
+  diperlukan File Manager remote &amp; path langsung — download & galeri tetap
+  berfungsi via MediaStore tanpanya.
+
 ## [v1.0 — 2026-08-11] — Upload macet: akar masalah ditemukan & diperbaiki
 
 ### Diperbaiki
