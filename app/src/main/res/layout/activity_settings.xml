@@ -309,6 +309,26 @@
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?android:attr/textColorSecondary" />
 
+                    <Button
+                        android:id="@+id/check_server_read_only"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:gravity="start|center_vertical"
+                        android:nextFocusDown="@id/input_port"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/settings_server_read_only" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/settings_hint_read_only"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

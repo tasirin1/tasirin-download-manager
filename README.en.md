@@ -78,9 +78,29 @@ Release APKs are **signed with the official release key** (not debug), so Androi
   read from the asset name `tasirin-download-manager-v1.0-<code>.apk`, picking
   the highest code.
 - New version found → **Update available** dialog in Settings → download the APK
-  to cache (size verified) → install via the system installer
-  (`REQUEST_INSTALL_PACKAGES`).
-- No manual sideloading needed: the release is refreshed on every CI build.
+  to the **Downloads** folder (release signature verified) → **install it
+  manually** from a file manager. The app intentionally does **not** request
+  "install other apps" (`REQUEST_INSTALL_PACKAGES`) to keep a lower risk
+  profile for Play Protect.
+
+## Play Protect warns "harmful to your data"
+
+This is **normal for sideloaded apps** (not from Play Store) that request
+"All files access" (`MANAGE_EXTERNAL_STORAGE`) — required by the remote File
+Manager and direct-path access. The app also runs a local HTTP server that can
+download/upload files, so Play Protect's heuristics rate it "risky for data".
+It is **not malware**:
+
+- **VirusTotal scan is 0/75** for all recent releases (report link appears in
+  the GitHub Actions build log).
+- The APK is signed with the official release key; the signature is verified
+  before an update is used.
+- Without "All files access", downloads & gallery keep working (via MediaStore);
+  only the remote File Manager needs that permission.
+
+When the install warning appears, choose **Install anyway**. The "install other
+apps" permission that also triggered warnings has been removed since this
+release.
 
 ## Realtime Remote Web
 

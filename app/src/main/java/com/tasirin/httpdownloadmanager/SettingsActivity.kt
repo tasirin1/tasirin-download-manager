@@ -40,6 +40,7 @@ import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.Formats
+import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.UpdateInfo
@@ -360,6 +361,11 @@ class SettingsActivity : AppCompatActivity() {
             getString(R.string.settings_fs_full_access)
         )
         renderToggle(
+            binding.checkServerReadOnly,
+            StoragePrefs.isServerReadOnly(this),
+            getString(R.string.settings_server_read_only)
+        )
+        renderToggle(
             binding.checkBackground,
             StoragePrefs.isBackgroundEnabled(this),
             getString(R.string.settings_background)
@@ -410,6 +416,10 @@ class SettingsActivity : AppCompatActivity() {
         }
         binding.checkFsFullAccess.setOnClickListener {
             StoragePrefs.setFsFullAccessEnabled(this, !StoragePrefs.isFsFullAccessEnabled(this))
+            renderChecks()
+        }
+        binding.checkServerReadOnly.setOnClickListener {
+            StoragePrefs.setServerReadOnly(this, !StoragePrefs.isServerReadOnly(this))
             renderChecks()
         }
         // PIN disimpan sebagai hash — field dikosongkan, hint menjelaskan
@@ -705,17 +715,26 @@ class SettingsActivity : AppCompatActivity() {
             }
             runOnUiThread {
                 runCatching { if (dialog.isShowing) dialog.dismiss() }
-                binding.updateStatus.text = when {
-                    file == null -> getString(R.string.update_download_failed)
-                    !Updater.isSignatureValid(this, file) -> {
-                        file.delete()
-                        getString(R.string.update_signature_failed)
-                    }
-                    Updater.install(this, file) -> getString(R.string.update_ready)
-                    else -> getString(R.string.update_install_failed)
-                }
+                binding.updateStatus.text = saveDownloadedUpdate(file, info)
             }
         }.start()
+    }
+
+    /** Simpan APK hasil unduhan ke folder Downloads publik (tanpa pasang
+     *  otomatis — aplikasi tidak lagi meminta REQUEST_INSTALL_PACKAGES). */
+    private fun saveDownloadedUpdate(file: File?, info: UpdateInfo): String {
+        if (file == null) return getString(R.string.update_download_failed)
+        if (!Updater.isSignatureValid(this, file)) {
+            file.delete()
+            return getString(R.string.update_signature_failed)
+        }
+        val displayName = "tasirin-download-manager-${info.versionName}-${info.versionCode}.apk"
+        val saved = FileSaver(this).saveStream(displayName, "download", "") { out ->
+            file.inputStream().use { it.copyTo(out) }
+        }
+        file.delete()
+        val location = saved?.filePath ?: saved?.contentUri ?: saved?.fileName ?: displayName
+        return getString(R.string.update_downloaded_path, location)
     }
 
     private fun refreshActiveStorageUi() {

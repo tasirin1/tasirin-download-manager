@@ -1505,6 +1505,10 @@ function renderStatus(st) {
     parts.push('<span class="st-item">Free <b>' + fmt(st.storageFree) + '</b></span>');
   }
   let text = parts.join('<span class="st-sep">\u00b7</span>');
+  serverReadOnly = !!st.readOnly;
+  if (serverReadOnly) {
+    text += '<span class="st-item st-warn">&#128274;&#65039; Read-only server: upload &amp; file changes disabled.</span>';
+  }
   if (st.storageWriteOk === false) {
     text += '<span class="st-item st-warn">&#9888;&#65039; File access permission not enabled — open the app &gt; Remote (HTTP) &gt; Enable file access.</span>';
   }
@@ -2031,9 +2035,13 @@ const fsSelectBtn = document.getElementById('fsSelectBtn');
 const fsBatch = document.getElementById('fsBatch');
 const fsToolsRow = document.getElementById('fsToolsRow');
 const fsLocation = document.getElementById('fsLocation');
+const fsMkdirBtn = document.getElementById('fsMkdirBtn');
+const fsUploadBtn = document.getElementById('fsUploadBtn');
+const fsDupesBtn = document.getElementById('fsDupesBtn');
 const fsUploadFile = document.getElementById('fsUploadFile');
 const fsUploadDir = document.getElementById('fsUploadDir');
 let fsLocations = [];
+let serverReadOnly = false;
 const FS_MEDIA_EXTS = ['jpg','jpeg','png','gif','webp','bmp','mp4','mkv','webm','avi','mov','3gp','m4v','mpg','mpeg','mp3','m4a','aac','wav','ogg','flac'];
 let fsLpTimer = null;
 let fsLpFired = false;
@@ -2224,7 +2232,10 @@ async function loadFs() {
     renderFsCrumbs(fsPath);
     fsUpBtn.disabled = !fsPath;
     fsToolsRow.classList.toggle('hidden', !fsPath);
-    fsSelectBtn.classList.toggle('hidden', !fsPath);
+    fsSelectBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
+    fsMkdirBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
+    fsUploadBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
+    fsDupesBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
     fsItems = data.items || [];
     fsCount.textContent = fsItems.length ? fsItems.length + ' item' : '';
     if (!fsPath && !fsLocationsLoaded) loadFsLocations();
@@ -2999,6 +3010,10 @@ function fsUploadJobsFrom(files) {
 
 function startFsUpload(jobs) {
   if (!jobs.length) return;
+  if (serverReadOnly) {
+    fsMsg('Server is read-only — upload disabled', true);
+    return;
+  }
   const btn = document.getElementById('fsUploadBtn');
   btn.disabled = true;
   try {
