@@ -5,7 +5,9 @@ Mode:
   python3 scripts/prepare_remote.py            -> regenerasi remote.html (minified)
                                                  dari remote.src.html (readable).
   python3 scripts/prepare_remote.py --check    -> verifikasi sinkron, node --check,
-                                                 dan larangan kata Indonesia pada UI.
+                                                 larangan kata Indonesia pada UI,
+                                                 dan smoke test alur upload
+                                                 (scripts/upload_smoke_test.js).
                                                  (exit 1 bila ada masalah)
 """
 import re
@@ -168,6 +170,65 @@ def node_check() -> list:
     return errors
 
 
+def run_upload_smoke() -> str:
+    # Smoke test alur upload klien (stub DOM/XHR, tanpa dependensi). Menangkap
+    # regresi seperti argumen uploadFiles() yang tertukar (listEl = callback).
+    script = ROOT / "scripts" / "upload_smoke_test.js"
+    try:
+        proc = subprocess.run(
+            ["node", str(script)], capture_output=True, text=True, cwd=str(ROOT)
+        )
+    except FileNotFoundError:
+        return "node tidak ditemukan di PATH (dibutuhkan untuk smoke test upload)"
+    if proc.returncode != 0:
+        return (proc.stderr or proc.stdout or "").strip()
+    print((proc.stdout or "").strip())
+    return ""
+
+
+def check_upload_call(text: str) -> list:
+    # Guard regresi: pemanggilan uploadFiles() di startFsUpload pernah
+    # tertukar urutannya (fsProgressList dikirim sebagai `done`, callback
+    # sebagai `listEl`) sehingga upload selalu gagal diam-diam dengan
+    # "listEl.appendChild is not a function". Pastikan callback (argumen
+    # ke-8 = done) SELALU mendahului fsProgressList (argumen ke-9 = listEl).
+    problems = []
+    start = text.find("function startFsUpload")
+    if start < 0:
+        return problems
+    call = text.find("uploadFiles(", start)
+    if call < 0:
+        problems.append("startFsUpload tidak memanggil uploadFiles()")
+        return problems
+    body = text[call + len("uploadFiles("):]
+    depth = 0
+    end = -1
+    for i, ch in enumerate(body):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            if depth == 0:
+                end = i
+                break
+            depth -= 1
+    if end < 0:
+        problems.append("uploadFiles(): argumen tidak bisa diurai")
+        return problems
+    args = body[:end]
+    cb_at = args.find("function (ok, failed)")
+    list_at = args.find("fsProgressList")
+    if cb_at < 0 or list_at < 0:
+        problems.append(
+            "uploadFiles(): pola argumen (callback/fsProgressList) tidak ditemukan"
+        )
+        return problems
+    if list_at < cb_at:
+        problems.append(
+            "uploadFiles(): argumen done/listEl tertukar - callback harus sebelum fsProgressList"
+        )
+    return problems
+
+
 def main() -> int:
     if not SRC.exists():
         print(f"ERROR: {SRC} tidak ditemukan.")
@@ -200,6 +261,12 @@ def main() -> int:
         kt_hits = scan_kotlin()
         if kt_hits:
             problems.append("string literal Kotlin memuat kata Indonesia: " + ", ".join(kt_hits))
+
+        problems.extend(check_upload_call(src_text))
+
+        smoke_error = run_upload_smoke()
+        if smoke_error:
+            problems.append("smoke test upload gagal: " + smoke_error)
 
         if problems:
             print("CHECK GAGAL:")

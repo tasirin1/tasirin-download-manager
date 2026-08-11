@@ -13,6 +13,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
+├── scripts/upload_smoke_test.js      # Smoke test alur upload (stub DOM/XHR, tanpa dependensi)
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
 │   ├── assets/
@@ -118,8 +119,9 @@ diperbarui.
    `assets/remote.html` manual).
 8. **Guard remote web**: step CI `scripts/prepare_remote.py --check` memverifikasi
    sinkron `remote.src.html` ↔ `remote.html`, `node --check` pada semua `<script>`,
-   dan larangan kata Indonesia di string UI (remote.html, values/*.xml, Kotlin).
-   Jalankan juga sebelum commit.
+   larangan kata Indonesia di string UI (remote.html, values/*.xml, Kotlin), dan
+   smoke test alur upload klien (`scripts/upload_smoke_test.js`). Jalankan juga
+   sebelum commit.
 9. **Jaringan jangan di main thread**; polling adaptif (2s aktif / 10s idle);
    SSE wajib punya fallback polling & reconnect.
 10. **Jangan commit keystore** (`*.jks`, `keystore.b64` sudah di-`.gitignore`).
