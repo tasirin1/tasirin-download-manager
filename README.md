@@ -136,7 +136,7 @@ Fitur halaman remote:
 | `/api/add` | Tambah URL download |
 | `/api/action` | Jeda/lanjut/batal/hapus/prioritas, dll. |
 | `/api/fs`, `/api/fs_action` | Jelajah file & aksi (buat/hapus/rename/pindah) |
-| `/api/fs_dupes`, `/api/fs_zip` | Deteksi duplikat, unduh folder sebagai ZIP |
+| `/api/fs_zip` | Unduh folder sebagai ZIP |
 | `/api/upload`, `/api/upload_verify` | Upload chunk 2 MB + verifikasi |
 | `/api/gallery`, `/api/media`, `/api/thumb` | Galeri, streaming (Range), thumbnail |
 | `/api/delete_media` | Hapus media galeri |
