@@ -687,6 +687,7 @@ function applyRoute() {
     fsSelected.length = 0;
     fsSelectBtn.textContent = 'Select';
     fsBatch.classList.add('hidden');
+    fsLocationsLoaded = false;
     loadFsLocations();
     loadFs();
   } else {
@@ -794,6 +795,7 @@ async function loadFsLocations() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     fsLocations = data.items || [];
+    fsLocationsLoaded = true;
     const cur = fsPath || '';
     fsLocation.innerHTML = '';
     const ph = document.createElement('option');
@@ -821,6 +823,10 @@ fsLocation.addEventListener('change', function () {
   loadFs();
 });
 
+// Lokasi storage hanya perlu dimuat sekali saat masuk File Manager; tanpa
+// penanda ini, buka halaman root memicu 3-4x GET /api/fs?path= yang sama.
+let fsLocationsLoaded = false;
+
 async function loadFs() {
   showFsSkeleton();
   try {
@@ -834,7 +840,7 @@ async function loadFs() {
     fsSelectBtn.classList.toggle('hidden', !fsPath);
     fsItems = data.items || [];
     fsCount.textContent = fsItems.length ? fsItems.length + ' item' : '';
-    if (!fsPath) loadFsLocations();
+    if (!fsPath && !fsLocationsLoaded) loadFsLocations();
     renderFs(fsItems);
   } catch (e) {
     fsMsg('Failed to load: ' + e, true);
@@ -1275,7 +1281,6 @@ const UPLOAD_CHUNK = 2 * 1024 * 1024;
 let fsUploading = false;
 
 function uploadFiles(files, path, statusEl, progressBox, progressText, progressPct, progressBar, done, listEl) {
-  fsUploading = true;
   const jobs = Array.from(files).map(function (f) {
     const j = (f && f.file) ? f : { file: f, path: path };
     j.id = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -1283,6 +1288,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
   });
   const total = jobs.length;
   if (!total) return;
+  fsUploading = true;
   const failed = [];
   if (listEl) {
     listEl.innerHTML = '';
@@ -1317,6 +1323,13 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
 
   function uploadOne(job, attempt) {
     const file = job.file;
+    if (file.size === 0) {
+      failed.push(file.name);
+      ulFail(job.id);
+      statusEl.textContent = 'Failed: ' + file.name + ' \u2014 empty file (0 bytes)';
+      finishOne();
+      return;
+    }
     ulSet(job.id, '\u2191', 'run');
     const target = job.path;
     statusEl.style.color = '';
@@ -1764,8 +1777,19 @@ fsUploadFile.addEventListener('change', function () {
 });
 
 fsUploadDir.addEventListener('change', function () {
-  const jobs = fsUploadJobsFrom(fsUploadDir.files);
+  const files = fsUploadDir.files;
+  // Browser tanpa dukungan webkitdirectory memilih file tunggal (bukan
+  // folder): webkitRelativePath kosong -> struktur folder hilang. Beri tahu
+  // pengguna alih-alih diam-diam menaruh file flat di folder tujuan.
+  let flat = false;
+  for (let i = 0; i < files.length; i++) {
+    if (!files[i].webkitRelativePath) { flat = true; break; }
+  }
+  const jobs = fsUploadJobsFrom(files);
   if (!jobs.length) return;
+  if (flat) {
+    fsMsg('Folder structure will not be preserved: this browser cannot pick a folder (webkitdirectory unsupported). Files are uploaded to the current folder.', true);
+  }
   startFsUpload(jobs);
 });
 
@@ -2778,9 +2802,12 @@ refreshStatus();
 let sse = null;
 let sseFailCount = 0;
 let lastSseAt = 0;
+let sseGaveUp = false;
+let lastForcedReconnectAt = 0;
 function connectEvents() {
   if (sse) { try { sse.close(); } catch (e) {} }
   sse = new EventSource(API + '/api/events');
+  lastSseAt = Date.now();
   sse.onopen = function () { sseFailCount = 0; hideConnBanner(); };
   sse.onmessage = function (ev) {
     sseFailCount = 0;
@@ -2794,6 +2821,7 @@ function connectEvents() {
         return;
       }
       const items = data.items || [];
+      markItemsChanged(items);
       lastItems = items;
       if (data.status) renderStatus(data.status);
       render(items);
@@ -2809,16 +2837,20 @@ function connectEvents() {
 }
 // SEKSI: SSE (EventSource) + polling adaptif + reconnect
 // SSE (bila hidup) adalah sumber utama realtime; polling hanya pengaman saat
-// stream diam/terblokir (mis. buffering proxy WISP). Interval naik-turun:
-// cepat saat ada transfer aktif, lambat saat idle. Bila SSE "terlihat" terbuka
-// tapi tidak mengirim apa-apa terlalu lama, paksa buka ulang EventSource.
+// stream diam/terblokir (mis. buffering proxy WISP atau WebView lama yang
+// menahan buffer EventSource). Interval naik-turun: 2 detik hanya saat ada
+// transfer yang benar-benar berjalan & data berubah; sisanya 10 detik.
+// WebView/browser tua kadang membiarkan EventSource "terbuka" tapi tidak
+// pernah memicu onmessage: setelah satu percobaan reconnect masih diam,
+// SSE dimatikan permanen untuk sesi ini dan polling adaptif mengambil alih
+// (mencegah reconnect storm yang terlihat di log server perangkat TV).
 let lastItems = [];
-let lastForcedReconnectAt = 0;
 let pollTimer = null;
-const POLL_FAST_MS = 700;
+const POLL_FAST_MS = 2000;
 const POLL_IDLE_MS = 10000;
 const SSE_SILENT_MS = 20000;
 const SSE_RECONNECT_COOLDOWN_MS = 10000;
+const CHANGE_WINDOW_MS = 15000;
 
 function anyActiveTransfer() {
   if (fsUploading) return true;
@@ -2827,6 +2859,31 @@ function anyActiveTransfer() {
     if (st === 'DOWNLOADING' || st === 'PENDING') return true;
   }
   return false;
+}
+
+function itemsSig(items) {
+  let h = 0;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    h = (h * 31 + it.id.length * 7 + it.state.length * 13 +
+      Math.min(it.bytesDownloaded, 999999999) * 17) | 0;
+  }
+  return h;
+}
+
+let lastItemsSig = 0;
+let lastChangeAt = Date.now();
+function markItemsChanged(items) {
+  const sig = itemsSig(items);
+  if (sig !== lastItemsSig) {
+    lastItemsSig = sig;
+    lastChangeAt = Date.now();
+  }
+}
+
+function nextPollMs() {
+  const recentChange = Date.now() - lastChangeAt < CHANGE_WINDOW_MS;
+  return (anyActiveTransfer() && recentChange) ? POLL_FAST_MS : POLL_IDLE_MS;
 }
 
 async function pollSnapshot() {
@@ -2844,6 +2901,7 @@ async function pollSnapshot() {
     hideConnBanner();
     if (data.status) renderStatus(data.status);
     const items = data.items || [];
+    markItemsChanged(items);
     lastItems = items;
     if (currentRoute() === 'downloads') render(items);
   } catch (e) {
@@ -2855,23 +2913,36 @@ async function pollSnapshot() {
 }
 
 function pollTick() {
-  // SSE diam terlalu lama (stream terbuka tapi tidak ada data): paksa
-  // reconnect, biasanya memulihkan realtime tanpa polling terus-menerus.
+  // SSE terbuka tapi diam terus-menerus: WebView tua menahan buffer, onmessage
+  // tidak pernah datang. Coba reconnect sekali; bila masih diam, matikan SSE
+  // untuk sesi ini dan pakai polling adaptif saja (tidak ada reconnect storm).
   if (sse && sse.readyState === EventSource.OPEN &&
-      Date.now() - lastSseAt > SSE_SILENT_MS &&
-      Date.now() - lastForcedReconnectAt > SSE_RECONNECT_COOLDOWN_MS) {
-    lastForcedReconnectAt = Date.now();
-    connectEvents();
+      Date.now() - lastSseAt > SSE_SILENT_MS) {
+    if (!sseGaveUp && Date.now() - lastForcedReconnectAt > SSE_RECONNECT_COOLDOWN_MS) {
+      lastForcedReconnectAt = Date.now();
+      sseGaveUp = true;
+      connectEvents();
+    } else {
+      sseGaveUp = true;
+      try { sse.close(); } catch (e) {}
+      sse = null;
+    }
+  }
+  if (sse && sse.readyState !== EventSource.OPEN && !sseGaveUp) {
+    // EventSource reconnect internal gagal terus: berhenti mencoba.
+    try { sse.close(); } catch (e) {}
+    sse = null;
+    sseGaveUp = true;
   }
   const stale = !sse || sse.readyState !== EventSource.OPEN ||
     Date.now() - lastSseAt > 4000;
   if (stale) pollSnapshot();
-  pollTimer = setTimeout(pollTick, anyActiveTransfer() ? POLL_FAST_MS : POLL_IDLE_MS);
+  pollTimer = setTimeout(pollTick, nextPollMs());
 }
 
 function startPolling() {
   connectEvents();
-  pollTimer = setTimeout(pollTick, anyActiveTransfer() ? POLL_FAST_MS : POLL_IDLE_MS);
+  pollTimer = setTimeout(pollTick, nextPollMs());
 }
 
 // Tab kembali terlihat (habis tidur/minimize): segarkan segera tanpa nunggu
@@ -2885,7 +2956,8 @@ if (typeof EventSource !== 'undefined') {
 } else {
   // Browser tanpa EventSource (sangat tua): polling adaptif saja.
   sse = null;
-  pollTimer = setTimeout(pollTick, anyActiveTransfer() ? POLL_FAST_MS : POLL_IDLE_MS);
+  sseGaveUp = true;
+  pollTimer = setTimeout(pollTick, nextPollMs());
 }
 </script>
 </body></html>

@@ -160,6 +160,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun appendRequestLog(session: IHTTPSession, response: Response, elapsedMs: Long) {
+        // Endpoint polling murni (snapshot/events/pin_enabled) dipanggil terus
+        // oleh halaman remote; tanpa pengecualian ini buffer 300 baris penuh
+        // hanya oleh polling dan kejadian penting (download, upload, aksi)
+        // cepat hilang dari log. Request gagal tetap dicatat.
+        val isPolling = response.status.requestStatus == 200 &&
+            session.method == Method.GET && (
+                session.uri == "/api/snapshot" ||
+                    session.uri == "/api/events" ||
+                    session.uri == "/api/pin_enabled"
+                )
+        if (isPolling) return
         val query = session.queryParameterString?.take(160)?.let { "?$it" }.orEmpty()
         val remote = session.remoteIpAddress.orEmpty()
         appendLog(
