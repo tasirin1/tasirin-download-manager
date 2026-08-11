@@ -18,10 +18,10 @@ import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.Button
 import android.widget.EditText
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -29,9 +29,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.view.isVisible
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.isVisible
+import androidx.core.widget.TextViewCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
@@ -110,17 +111,15 @@ class SettingsActivity : AppCompatActivity() {
     private class SectionSpec(
         val sectionId: Int,
         val headerId: Int,
-        val contentId: Int,
-        val chevronId: Int,
         val key: String
     )
 
     private val sections = listOf(
-        SectionSpec(R.id.section_server, R.id.header_server, R.id.content_server, R.id.chevron_server, "server"),
-        SectionSpec(R.id.section_download, R.id.header_download, R.id.content_download, R.id.chevron_download, "download"),
-        SectionSpec(R.id.section_storage, R.id.header_storage, R.id.content_storage, R.id.chevron_storage, "storage"),
-        SectionSpec(R.id.section_gallery, R.id.header_gallery, R.id.content_gallery, R.id.chevron_gallery, "gallery"),
-        SectionSpec(R.id.section_other, R.id.header_other, R.id.content_other, R.id.chevron_other, "other")
+        SectionSpec(R.id.section_server, R.id.header_server, "server"),
+        SectionSpec(R.id.section_download, R.id.header_download, "download"),
+        SectionSpec(R.id.section_storage, R.id.header_storage, "storage"),
+        SectionSpec(R.id.section_gallery, R.id.header_gallery, "gallery"),
+        SectionSpec(R.id.section_other, R.id.header_other, "other")
     )
 
     private val navMap = mapOf(
@@ -133,18 +132,38 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun setupCollapsibleSections() {
         sections.forEach { spec ->
-            val content = findViewById<View>(spec.contentId)
-            val chevron = findViewById<ImageView>(spec.chevronId)
+            val section = findViewById<ViewGroup>(spec.sectionId)
+            val header = findViewById<TextView>(spec.headerId)
             val collapsed = StoragePrefs.isSectionCollapsed(this, spec.key)
-            content.isVisible = !collapsed
-            chevron.rotation = if (collapsed) 0f else 180f
-            findViewById<View>(spec.headerId).setOnClickListener {
-                val nowCollapsed = content.isVisible
-                content.isVisible = !nowCollapsed
-                chevron.animate().rotation(if (nowCollapsed) 0f else 180f).setDuration(150).start()
-                StoragePrefs.setSectionCollapsed(this, spec.key, nowCollapsed)
+            setSectionExpanded(section, header, !collapsed)
+            header.setOnClickListener {
+                val nowExpanded = isSectionExpanded(section, header)
+                setSectionExpanded(section, header, !nowExpanded)
+                StoragePrefs.setSectionCollapsed(this, spec.key, nowExpanded)
             }
         }
+    }
+
+    private fun isSectionExpanded(section: ViewGroup, header: TextView): Boolean {
+        for (i in 0 until section.childCount) {
+            val child = section.getChildAt(i)
+            if (child !== header && child.isVisible) return true
+        }
+        return false
+    }
+
+    private fun setSectionExpanded(section: ViewGroup, header: TextView, expanded: Boolean) {
+        for (i in 0 until section.childCount) {
+            val child = section.getChildAt(i)
+            if (child !== header) {
+                child.isVisible = expanded
+            }
+        }
+        TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            header, 0, 0,
+            if (expanded) R.drawable.ic_chevron_up else R.drawable.ic_chevron,
+            0
+        )
     }
 
     private fun setupQuickNav() {
@@ -157,8 +176,9 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun expandSection(spec: SectionSpec) {
-        findViewById<View>(spec.contentId).visibility = View.VISIBLE
-        findViewById<ImageView>(spec.chevronId).rotation = 180f
+        val section = findViewById<ViewGroup>(spec.sectionId)
+        val header = findViewById<TextView>(spec.headerId)
+        setSectionExpanded(section, header, true)
         StoragePrefs.setSectionCollapsed(this, spec.key, false)
     }
 

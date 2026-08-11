@@ -5,6 +5,17 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Pengaturan: kurangi jumlah view (hilangkan warning lint)
+
+### Diperbaiki
+- **Layout `activity_settings.xml` turun dari 81 ke 66 view** — warning lint
+  `TooManyViews` ("more than 80 views, bad for performance") hilang. Header
+  section collapsible tidak lagi memakai `LinearLayout` + `TextView` +
+  `ImageView` (cukup satu `TextView` dengan chevron `drawableEnd`, swap
+  `ic_chevron`/`ic_chevron_up`); wrapper `content_*` per section dihapus —
+  kontrol langsung menempel di section, padding dipindah ke card. Inflasi
+  dan memori halaman Pengaturan lebih hemat.
+
 ## [v1.0 — 2026-08-11] — Audit efisiensi: cache galeri, throttle, R8
 
 ### Diperbaiki
