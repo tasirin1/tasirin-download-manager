@@ -25,10 +25,10 @@ android {
         versionName = "1.0"
     }
 
-    // Hanya bahasa id/in (Indonesia) + en yang ikut di APK; locale library lain
-    // (ar, de, fr, es, ...) dibuang dari resources.arsc — hemat ukuran.
+    // UI memakai Inggris (default values/); locale library lain (ar, de, fr,
+    // es, ...) dibuang dari resources.arsc — hemat ukuran.
     androidResources {
-        localeFilters += listOf("en", "id")
+        localeFilters += listOf("en")
     }
 
     signingConfigs {
