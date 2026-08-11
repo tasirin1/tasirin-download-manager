@@ -5,6 +5,14 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Remote web: hapus tombol unduh cepat per baris
+
+### Diperbaiki
+- **Tombol ⬇ Download di tiap baris File Manager remote dihapus** — rawan
+  tertekan tidak sengaja (apalagi saat dikontrol dari remote TV / D-pad).
+  Aksi download tetap tersedia lewat menu **⋯** pada baris yang sama
+  (Stream / Download / Download folder ZIP).
+
 ## [v1.0 — 2026-08-11] — Audit efisiensi lanjutan
 
 ### Diperbaiki
