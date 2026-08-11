@@ -1280,6 +1280,16 @@ const UPLOAD_CHUNK = 2 * 1024 * 1024;
 
 let fsUploading = false;
 
+// Potong File/Blob dengan fallback nama lama (browser tua kadang tidak
+// punya Blob.slice tanpa prefix). Lempar error deskriptif bila tidak ada
+// sama sekali supaya gagal tampil di UI, bukan macet diam-diam.
+function sliceFile(file, start, end) {
+  if (file.slice) return file.slice(start, end);
+  if (file.webkitSlice) return file.webkitSlice(start, end);
+  if (file.mozSlice) return file.mozSlice(start, end);
+  throw new Error('this browser cannot read file content (Blob.slice unsupported)');
+}
+
 function uploadFiles(files, path, statusEl, progressBox, progressText, progressPct, progressBar, done, listEl) {
   const jobs = Array.from(files).map(function (f) {
     const j = (f && f.file) ? f : { file: f, path: path };
@@ -1345,6 +1355,14 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
     let lastBytes = 0;
     let lastTime = 0;
 
+    function failUpload(err) {
+      const msg = (err && err.message) ? err.message : String(err);
+      failed.push(file.name);
+      ulFail(job.id);
+      statusEl.textContent = 'Failed: ' + file.name + ' \u2014 ' + msg;
+      finishOne();
+    }
+
     function nextChunk() {
       if (chunkIdx >= chunks) {
         sentBytes += file.size;
@@ -1355,11 +1373,16 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
       const start = chunkIdx * UPLOAD_CHUNK;
       const end = Math.min(start + UPLOAD_CHUNK, file.size);
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', API + '/api/upload?name=' + encodeURIComponent(file.name) +
-        '&path=' + encodeURIComponent(target) +
-        '&id=' + encodeURIComponent(id) +
-        '&chunk=' + chunkIdx + '&chunks=' + chunks +
-        '&offset=' + start);
+      try {
+        xhr.open('POST', API + '/api/upload?name=' + encodeURIComponent(file.name) +
+          '&path=' + encodeURIComponent(target) +
+          '&id=' + encodeURIComponent(id) +
+          '&chunk=' + chunkIdx + '&chunks=' + chunks +
+          '&offset=' + start);
+      } catch (err) {
+        failUpload(err);
+        return;
+      }
 
       xhr.timeout = 120000;
       xhr.upload.onprogress = function (e) {
@@ -1416,7 +1439,12 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         lastErr = 'timeout, stalled connection (will retry)';
         retryChunk();
       };
-      xhr.send(file.slice(start, end));
+      try {
+        xhr.send(sliceFile(file, start, end));
+      } catch (err) {
+        failUpload(err);
+        return;
+      }
     }
 
     function pollFinalize() {
@@ -1586,28 +1614,39 @@ function startFsUpload(jobs) {
   if (!jobs.length) return;
   const btn = document.getElementById('fsUploadBtn');
   btn.disabled = true;
-  uploadFiles(
-    jobs,
-    fsPath,
-    fsStatus,
-    document.getElementById('fsProgressBox'),
-    document.getElementById('fsProgressText'),
-    document.getElementById('fsProgressPct'),
-    document.getElementById('fsProgressBar'),
-    document.getElementById('fsProgressList'),
-    function (ok, failed) {
-      btn.disabled = false;
-      fsUploadFile.value = '';
-      fsUploadDir.value = '';
+  try {
+    uploadFiles(
+      jobs,
+      fsPath,
+      fsStatus,
+      document.getElementById('fsProgressBox'),
+      document.getElementById('fsProgressText'),
+      document.getElementById('fsProgressPct'),
+      document.getElementById('fsProgressBar'),
+      document.getElementById('fsProgressList'),
+      function (ok, failed) {
+        btn.disabled = false;
+        fsUploadFile.value = '';
+        fsUploadDir.value = '';
 
-      loadFs();
-      if (ok) {
-        fsMsg('Done: ' + jobs.length + ' files uploaded');
-      } else {
-        fsMsg(jobs.length - failed.length + ' succeeded, ' + failed.length + ' failed: ' + failed.join(', '), true);
+        loadFs();
+        if (ok) {
+          fsMsg('Done: ' + jobs.length + ' files uploaded');
+        } else {
+          fsMsg(jobs.length - failed.length + ' succeeded, ' + failed.length + ' failed: ' + failed.join(', '), true);
+        }
       }
-    }
-  );
+    );
+  } catch (err) {
+    // Kesalahan apa pun saat upload dimulai harus terlihat, dan tombol tidak
+    // boleh terkunci selamanya (sebelumnya: exception di tengah alur membuat
+    // "Uploading ..." macet tanpa ada request yang sampai ke server).
+    btn.disabled = false;
+    fsUploading = false;
+    fsUploadFile.value = '';
+    fsUploadDir.value = '';
+    fsMsg('Upload failed to start: ' + ((err && err.message) ? err.message : err), true);
+  }
 }
 
 document.getElementById('fsUploadBtn').addEventListener('click', function () {
@@ -1771,26 +1810,34 @@ fsDupesModal.addEventListener('click', function (e) {
 });
 
 fsUploadFile.addEventListener('change', function () {
-  const jobs = fsUploadJobsFrom(fsUploadFile.files);
-  if (!jobs.length) return;
-  startFsUpload(jobs);
+  try {
+    const jobs = fsUploadJobsFrom(fsUploadFile.files);
+    if (!jobs.length) return;
+    startFsUpload(jobs);
+  } catch (err) {
+    fsMsg('Upload failed to start: ' + ((err && err.message) ? err.message : err), true);
+  }
 });
 
 fsUploadDir.addEventListener('change', function () {
-  const files = fsUploadDir.files;
-  // Browser tanpa dukungan webkitdirectory memilih file tunggal (bukan
-  // folder): webkitRelativePath kosong -> struktur folder hilang. Beri tahu
-  // pengguna alih-alih diam-diam menaruh file flat di folder tujuan.
-  let flat = false;
-  for (let i = 0; i < files.length; i++) {
-    if (!files[i].webkitRelativePath) { flat = true; break; }
+  try {
+    const files = fsUploadDir.files;
+    // Browser tanpa dukungan webkitdirectory memilih file tunggal (bukan
+    // folder): webkitRelativePath kosong -> struktur folder hilang. Beri tahu
+    // pengguna alih-alih diam-diam menaruh file flat di folder tujuan.
+    let flat = false;
+    for (let i = 0; i < files.length; i++) {
+      if (!files[i].webkitRelativePath) { flat = true; break; }
+    }
+    const jobs = fsUploadJobsFrom(files);
+    if (!jobs.length) return;
+    if (flat) {
+      fsMsg('Folder structure will not be preserved: this browser cannot pick a folder (webkitdirectory unsupported). Files are uploaded to the current folder.', true);
+    }
+    startFsUpload(jobs);
+  } catch (err) {
+    fsMsg('Upload failed to start: ' + ((err && err.message) ? err.message : err), true);
   }
-  const jobs = fsUploadJobsFrom(files);
-  if (!jobs.length) return;
-  if (flat) {
-    fsMsg('Folder structure will not be preserved: this browser cannot pick a folder (webkitdirectory unsupported). Files are uploaded to the current folder.', true);
-  }
-  startFsUpload(jobs);
 });
 
 fsList.addEventListener('dragover', function (e) {
@@ -1807,7 +1854,11 @@ fsList.addEventListener('drop', function (e) {
   if (!fsPath) return;
   const dt = e.dataTransfer;
   if (!dt || !dt.files || !dt.files.length) return;
-  startFsUpload(fsUploadJobsFrom(dt.files));
+  try {
+    startFsUpload(fsUploadJobsFrom(dt.files));
+  } catch (err) {
+    fsMsg('Upload failed to start: ' + ((err && err.message) ? err.message : err), true);
+  }
 });
 
 function extOf(name) {
