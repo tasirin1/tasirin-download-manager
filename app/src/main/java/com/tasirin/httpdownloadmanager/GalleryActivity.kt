@@ -440,12 +440,17 @@ private class GalleryAdapter(
         diff.dispatchUpdatesTo(this)
     }
 
+    // Formatter di-cache per-locale: onBindViewHolder bisa dipanggil ratusan
+    // kali saat scroll, membuat SimpleDateFormat per bind itu alokasi sia-sia.
+    // (SimpleDateFormat tidak thread-safe, tapi bind selalu di main thread.)
+    private var dateFormat: java.text.SimpleDateFormat? = null
+
     private fun formatDate(ms: Long): String {
         if (ms <= 0) return ""
-        // Dibuat per-panggilan agar mengikuti locale saat berubah (tidak disimpan statis).
-        return java.text.SimpleDateFormat(
+        val fmt = dateFormat ?: java.text.SimpleDateFormat(
             "dd MMM yyyy", java.util.Locale.getDefault()
-        ).format(java.util.Date(ms))
+        ).also { dateFormat = it }
+        return fmt.format(java.util.Date(ms))
     }
 
     class Holder(val binding: ItemGalleryBinding) : RecyclerView.ViewHolder(binding.root) {

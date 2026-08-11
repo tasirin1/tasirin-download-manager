@@ -5,6 +5,26 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Audit efisiensi: cache galeri, throttle, R8
+
+### Diperbaiki
+- **Cache durasi video & dimensi gambar galeri remote di memori** — request
+  halaman galeri tidak lagi membaca `video_durations.json` + header gambar dari
+  disk berulang kali (hemat I/O saat scroll/search/pagination).
+- **Throttle progres download jadi 1x/detik** (sebelumnya 2x/detik) — salinan
+  daftar & emisi StateFlow ke UI/notifikasi/SSE dikurangi saat banyak download
+  paralel.
+- **SSE ticker status diperlambat jadi 10 dtk** (sebelumnya 3 dtk) — client
+  yang butuh data segar memakai `/api/snapshot`.
+- **Statistik subfolder dihitung paralel** di File Manager remote — listing
+  folder besar tidak lagi menunggu N `listFiles()` berurutan di storage lambat.
+- **Remote web**: cache node daftar download per id (tanpa `querySelectorAll`
+  tiap poll), cache posisi video per render galeri (baca `localStorage`
+  maksimal sekali per token).
+- **GalleryActivity**: formatter tanggal di-cache per-locale (tidak dibuat
+  per bind).
+- **R8**: flag `-mergeinterfacesaggressively` — APK sedikit lebih kecil.
+
 ## [v1.0 — 2026-08-11] — Download batch mode select
 
 ### Ditambahkan
