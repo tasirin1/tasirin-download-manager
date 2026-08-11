@@ -1623,7 +1623,6 @@ function startFsUpload(jobs) {
       document.getElementById('fsProgressText'),
       document.getElementById('fsProgressPct'),
       document.getElementById('fsProgressBar'),
-      document.getElementById('fsProgressList'),
       function (ok, failed) {
         btn.disabled = false;
         fsUploadFile.value = '';
@@ -1635,7 +1634,8 @@ function startFsUpload(jobs) {
         } else {
           fsMsg(jobs.length - failed.length + ' succeeded, ' + failed.length + ' failed: ' + failed.join(', '), true);
         }
-      }
+      },
+      document.getElementById('fsProgressList')
     );
   } catch (err) {
     // Kesalahan apa pun saat upload dimulai harus terlihat, dan tombol tidak

@@ -5,17 +5,26 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
-## [v1.0 — 2026-08-11] — Upload tidak macet diam-diam (browser lama)
+## [v1.0 — 2026-08-11] — Upload macet: akar masalah ditemukan & diperbaiki
 
 ### Diperbaiki
-- **Upload tidak lagi menggantung tanpa pesan**: semua kegagalan sisi klien
-  kini tampil sebagai pesan error dan tombol Upload tidak pernah terkunci
-  selamanya. Sebelumnya exception di tengah alur upload membuat status
-  "Uploading ..." macet tanpa ada request yang sampai ke server (terkonfirmasi
-  dari log server perangkat: tidak ada `POST /api/upload` sama sekali).
+- **Upload file kini benar-benar berfungsi**: pemanggilan `uploadFiles()` di
+  `startFsUpload` menukar argumen `done` dan `listEl` — elemen daftar progres
+  dikirim sebagai `done` dan fungsi callback dikirim sebagai `listEl`, sehingga
+  `listEl.appendChild` melempar "listEl.appendChild is not a function" dan
+  upload gagal diam-diam di semua perangkat/browser (terkonfirmasi dari log
+  server: tidak ada `POST /api/upload` yang sampai). Urutan argumen diperbaiki
+  (callback = `done`, `fsProgressList` = `listEl`).
+- **Kegagalan upload tidak lagi menggantung tanpa pesan**: seluruh alur upload
+  dibungkus pengaman — error tampil sebagai `Failed: <file> — <pesan>` dan
+  tombol Upload tidak pernah terkunci selamanya.
 - **Fallback `Blob.slice` untuk browser tua**: `webkitSlice`/`mozSlice`
   dicoba bila `slice` tidak tersedia, dan bila sama sekali tidak didukung
-  muncul pesan error yang jelas alih-alih hang diam-diam.
+  muncul pesan error yang jelas.
+- **Guard regresi**: `scripts/prepare_remote.py --check` kini memverifikasi
+  urutan argumen `uploadFiles()` dan menjalankan smoke test alur upload klien
+  (`scripts/upload_smoke_test.js`, stub DOM/XHR tanpa dependensi) — bug
+  semacam ini tidak bisa lolos CI lagi.
 
 ## [v1.0 — 2026-08-11] — Perbaikan polling, SSE, & upload (temuan dari log perangkat nyata)
 
