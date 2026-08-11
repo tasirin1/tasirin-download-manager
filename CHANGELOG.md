@@ -5,6 +5,13 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Remote web: tombol Select sejajar Upload di File Manager
+
+### Diperbaiki
+- **Tombol Select File Manager kini sejajar dengan tombol Upload** — di layar
+  sempit (≤600px) Select tidak lagi turun ke baris sendiri selebar penuh; grid
+  toolbar dirapikan dari 5 ke 4 kolom (hilangkan kolom kosong di kanan).
+
 ## [v1.0 — 2026-08-11] — Pengaturan: kurangi jumlah view (hilangkan warning lint)
 
 ### Diperbaiki
