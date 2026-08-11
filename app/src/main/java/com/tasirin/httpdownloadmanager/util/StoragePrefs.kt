@@ -261,7 +261,7 @@ object StoragePrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_RECENT_URLS, "")
             .orEmpty()
-            .split("\n".toRegex())
+            .split('\n')
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 

@@ -16,6 +16,7 @@ import java.io.IOException
 import java.io.OutputStream
 
 class FileSaver(context: Context) {
+    private val WHITESPACE_RE = Regex("\\s+")
 
     private val appContext = context.applicationContext
     private val downloadDir = File(appContext.filesDir, "downloads").apply { mkdirs() }
@@ -283,7 +284,7 @@ class FileSaver(context: Context) {
             val side = File(parent, base + ext)
             if (side.exists()) {
                 val first = runCatching {
-                    side.readText().trim().split(Regex("\\s+")).firstOrNull().orEmpty()
+                    side.readText().trim().split(WHITESPACE_RE).firstOrNull().orEmpty()
                 }.getOrDefault("")
                 if (first.length >= 32) return algo to first.lowercase()
             }

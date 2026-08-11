@@ -55,6 +55,8 @@ internal fun streamMedia(
     return response
 }
 
+private val RANGE_RE = Regex("bytes=(\\d*)-(\\d*)")
+
 internal fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
     if (header.isNullOrBlank() || total <= 0) return null
     val m = Regex("bytes=(\\d*)-(\\d*)").find(header) ?: return null

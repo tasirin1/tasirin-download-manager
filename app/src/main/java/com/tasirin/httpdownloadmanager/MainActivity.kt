@@ -38,7 +38,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.tasirin.httpdownloadmanager.data.DownloadItem
-import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.databinding.ActivityMainBinding
@@ -252,16 +251,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         if (!App.httpServer.isAlive) return null
         return HttpControlServer.ipv4Addresses().firstOrNull()
             ?.let { "http://$it:${App.httpServer.listeningPort}/" }
-    }
-
-    /** Stop DownloadService bila tidak ada download aktif (server juga mati). */
-    private fun stopServiceIfIdle() {
-        val anyActive = App.engine.items.value.any {
-            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-        }
-        if (!anyActive) {
-            runCatching { stopService(Intent(this, DownloadService::class.java)) }
-        }
     }
 
     override fun onNewIntent(intent: Intent) {

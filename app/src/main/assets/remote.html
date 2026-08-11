@@ -1320,7 +1320,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
     ulSet(job.id, '\u2191', 'run');
     const target = job.path;
     statusEl.style.color = '';
-    statusEl.textContent = 'Mengunggah ' + file.name + ' (' + (idx + 1) + '/' + total + ')' +
+    statusEl.textContent = 'Uploading ' + file.name + ' (' + (idx + 1) + '/' + total + ')' +
       (attempt > 1 ? ' \u00b7 coba ke-' + attempt : '') + ' \u2026';
     progressText.textContent = file.name + (attempt > 1 ? ' (coba ' + attempt + ')' : '');
     const id = job.id;

@@ -3,6 +3,9 @@ package com.tasirin.httpdownloadmanager.download
 /** Parser playlist master HLS (m3u8) — murni JVM, bisa diuji unit.
  *  Mengembalikan daftar varian (kualitas), null bila bukan master playlist. */
 object HlsParser {
+    private val BANDWIDTH_RE: Regex = Regex("BANDWIDTH=(\\d+)")
+    private val RESOLUTION_RE: Regex = Regex("RESOLUTION=(\\d+x\\d+)")
+    private val NAME_RE: Regex = Regex("NAME=\"([^\"]+)\"")
 
     /** Parse isi master playlist. baseUrl dipakai untuk melengkapi URL varian
      *  yang relatif. Hasil diurutkan menurun menurut bandwidth. */
@@ -16,11 +19,11 @@ object HlsParser {
             if (line.startsWith("#EXT-X-STREAM-INF")) {
                 val next = lines.getOrNull(i + 1)?.trim().orEmpty()
                 if (next.isNotEmpty() && !next.startsWith("#")) {
-                    val bandwidth = Regex("BANDWIDTH=(\\d+)")
+                    val bandwidth = BANDWIDTH_RE
                         .find(line)?.groupValues?.get(1)?.toLongOrNull()
-                    val res = Regex("RESOLUTION=(\\d+x\\d+)")
+                    val res = RESOLUTION_RE
                         .find(line)?.groupValues?.get(1)
-                    val name = Regex("NAME=\"([^\"]+)\"")
+                    val name = NAME_RE
                         .find(line)?.groupValues?.get(1)
                     val kbps = bandwidth?.div(1000L) ?: 0L
                     val label = name
