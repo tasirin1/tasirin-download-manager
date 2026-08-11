@@ -5,6 +5,32 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-11] — Perbaikan polling, SSE, & upload (temuan dari log perangkat nyata)
+
+### Diperbaiki
+- **Polling remote tidak lagi membombardir server**: interval cepat 700 ms
+  diubah ke 2 detik dan hanya aktif saat ada transfer yang benar-benar
+  berjalan (data berubah); tanpa perubahan selama 15 detik polling kembali
+  ke 10 detik. Sebelumnya TV box memicu `GET /api/snapshot` ~1,4x/detik
+  terus-menerus (terlihat di log server: ratusan baris polling).
+- **SSE mati otomatis di WebView/browser tua**: EventSource "terbuka" tapi
+  `onmessage` tidak pernah datang (buffer WebView lama); sebelumnya koneksi
+  dipaksa reconnect tiap ~10 detik tanpa henti. Sekarang: 1 percobaan
+  reconnect, bila masih diam SSE dimatikan untuk sesi itu dan polling
+  adaptif mengambil alih.
+- **Log server tidak dibanjiri polling**: `GET /api/snapshot`, `/api/events`,
+  dan `/api/pin_enabled` (status 200) tidak lagi dicatat — buffer 300 baris
+  terisi kejadian penting (download, upload, aksi) saja; request gagal tetap
+  dicatat.
+- **File Manager tidak memanggil `/api/fs?path=` berulang** saat buka halaman
+  root (3-4x menjadi 1-2x).
+- **Upload folder di browser tanpa `webkitdirectory`**: kini muncul peringatan
+  jelas bahwa struktur folder tidak dipertahankan (sebelumnya diam-diam
+  berubah jadi upload file flat ke folder aktif).
+- **Upload file 0 byte** ditolak di sisi klien dengan pesan jelas
+  ("empty file (0 bytes)") alih-alih gagal diam-diam.
+- **`fsUploading` tidak macet** bila seleksi upload kosong.
+
 ## [v1.0 — 2026-08-11] — Audit lanjutan (detail)
 
 ### Diperbaiki
