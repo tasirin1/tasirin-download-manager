@@ -104,6 +104,9 @@ class App : Application() {
 
         fun appendCrash(context: android.content.Context, tag: String, t: Throwable) {
             CrashLog.append(context, tag, t)
+            // Ringkasan satu baris masuk log server realtime + ekspor TXT,
+            // supaya crash juga terlihat dari remote web tanpa buka file.
+            logEvent("CRASH [$tag]: ${t.javaClass.simpleName}: ${t.message?.take(160)}")
         }
     }
 }
