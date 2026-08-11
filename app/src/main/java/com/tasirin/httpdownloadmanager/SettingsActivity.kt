@@ -31,6 +31,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.widget.TextViewCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
@@ -157,8 +158,8 @@ class SettingsActivity : AppCompatActivity() {
                 child.visibility = if (expanded) View.VISIBLE else View.GONE
             }
         }
-        header.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            0, 0,
+        TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            header, 0, 0,
             if (expanded) R.drawable.ic_chevron_up else R.drawable.ic_chevron,
             0
         )
