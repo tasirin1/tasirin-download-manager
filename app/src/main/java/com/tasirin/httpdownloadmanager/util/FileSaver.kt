@@ -291,7 +291,8 @@ class FileSaver(context: Context) {
         return null
     }
 
-    fun cleanupOrphanPartials(items: List<DownloadItem>) {
+    fun cleanupOrphanPartials(items: List<DownloadItem>): Long {
+        var freed = 0L
         runCatching {
             val expected = buildSet {
                 items.forEach { item ->
@@ -307,10 +308,14 @@ class FileSaver(context: Context) {
             downloadDir.listFiles()?.forEach { f ->
                 val name = f.name
                 if ((name.endsWith(".part") || name.contains(".part.")) && name !in expected) {
-                    runCatching { f.delete() }
+                    runCatching {
+                        val size = f.length()
+                        if (f.delete()) freed += size
+                    }
                 }
             }
         }
+        return freed
     }
 
     private fun publishToMediaStore(partial: File, fileName: String): PublishResult {

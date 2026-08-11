@@ -251,7 +251,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun login(session: IHTTPSession): Response {
         val now = System.currentTimeMillis()
-        if (now < loginLockUntil) {
+        if (ServerSecurity.isPinLocked(now, loginLockUntil)) {
             val waitSec = ((loginLockUntil - now) / 1000) + 1
             return loginPage("Too many attempts. Try again in $waitSec seconds.")
         }
@@ -271,8 +271,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             r
         } else {
             loginFailures++
-            if (loginFailures >= MAX_LOGIN_ATTEMPTS) {
-                loginLockUntil = now + LOGIN_LOCK_MS
+            val lockUntil = ServerSecurity.pinLockUntilAfter(
+                loginFailures, MAX_LOGIN_ATTEMPTS, LOGIN_LOCK_MS, now
+            )
+            if (lockUntil > 0) {
+                loginLockUntil = lockUntil
                 loginFailures = 0
                 appendLog("LOGIN LOCKED $LOGIN_LOCK_MS ms (too many attempts, from ${session.remoteIpAddress})")
             } else {
@@ -661,7 +664,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         val offset = session.parms["offset"]?.toLongOrNull()
             ?: chunkIdx.toLong() * DEFAULT_CHUNK_BYTES
-        if (offset < 0 || offset > MAX_UPLOAD_BYTES) {
+        if (!ServerSecurity.isChunkOffsetAllowed(offset, MAX_UPLOAD_BYTES)) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid offset")
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid offset"))
         }
@@ -1625,15 +1628,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return roots
     }
 
-    private fun isFsPathAllowed(path: String): Boolean {
-        if (path.isBlank()) return false
-        val target = runCatching { File(path).canonicalFile.absolutePath }.getOrNull()
-            ?: return false
-        return allowedFsRoots().any { root ->
-            val rp = runCatching { root.canonicalFile.absolutePath }.getOrNull() ?: return@any false
-            target == rp || target.startsWith(rp + File.separator)
-        }
-    }
+    private fun isFsPathAllowed(path: String): Boolean =
+        ServerSecurity.isPathAllowed(path, allowedFsRoots())
 
     /** URI konten hanya sah bila berasal dari MediaStore Download (area aplikasi)
      *  atau dokumen SAF yang memang diberi izin oleh pengguna. */
@@ -1810,7 +1806,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val now = System.currentTimeMillis()
         val iter = shareTokens.entries.iterator()
         while (iter.hasNext()) {
-            if (iter.next().value.expiresAt < now) iter.remove()
+            if (ServerSecurity.isShareExpired(iter.next().value.expiresAt, now)) iter.remove()
         }
     }
 

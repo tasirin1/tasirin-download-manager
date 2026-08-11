@@ -343,15 +343,22 @@ object MediaLibrary {
 
     /** Hapus thumbnail disk yang sudah lama tak terpakai (> 7 hari). Dipanggil
      *  saat aplikasi mulai; server remote punya pembersih serupa saat start. */
-    fun cleanupOldThumbs(context: Context, maxAgeMs: Long = THUMB_MAX_AGE_MS) {
+    fun cleanupOldThumbs(context: Context, maxAgeMs: Long = THUMB_MAX_AGE_MS): Long {
+        var freed = 0L
         runCatching {
             val dir = File(context.cacheDir, "thumbs")
-            if (!dir.isDirectory) return
+            if (!dir.isDirectory) return freed
             val now = System.currentTimeMillis()
             dir.listFiles()?.forEach { f ->
-                if (f.isFile && now - f.lastModified() > maxAgeMs) f.delete()
+                if (f.isFile && now - f.lastModified() > maxAgeMs) {
+                    runCatching {
+                        val size = f.length()
+                        if (f.delete()) freed += size
+                    }
+                }
             }
         }
+        return freed
     }
 
     /** Cek apakah file media masuk folder galeri terpilih.

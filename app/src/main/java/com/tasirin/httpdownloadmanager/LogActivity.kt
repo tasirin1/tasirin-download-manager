@@ -94,6 +94,15 @@ class LogActivity : AppCompatActivity() {
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
             appendLine()
             append(if (log.isBlank()) "(No server activity yet)\n" else log)
+            val crashText = runCatching {
+                val f = File(filesDir, App.CRASH_LOG_FILE)
+                if (f.exists()) f.readText().trim() else ""
+            }.getOrDefault("")
+            if (crashText.isNotEmpty()) {
+                appendLine()
+                appendLine("=== Crash log (previous launches) ===")
+                appendLine(crashText)
+            }
             appendLine()
         }
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
