@@ -18,11 +18,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.DiffUtil
@@ -63,7 +62,6 @@ class GalleryActivity : AppCompatActivity() {
     private enum class GalleryFilter { ALL, IMAGE, VIDEO }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        runCatching { installSplashScreen() }
         super.onCreate(savedInstanceState)
         binding = ActivityGalleryBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -174,7 +172,7 @@ class GalleryActivity : AppCompatActivity() {
         }
 
     private fun confirmDelete(e: MediaLibrary.MediaEntry) {
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle(R.string.gallery_delete_title)
             .setMessage(getString(R.string.gallery_delete_message, e.name))
             .setPositiveButton(R.string.delete) { _, _ ->

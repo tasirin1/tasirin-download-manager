@@ -28,15 +28,13 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.snackbar.Snackbar
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
@@ -81,17 +79,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 takePersistablePermission(uri)
                 App.engine.move(id, uri)
             }.onFailure {
-                Snackbar.make(
-                    binding.root,
-                    R.string.storage_picker_error,
-                    Snackbar.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, R.string.storage_picker_error, Toast.LENGTH_LONG).show()
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        runCatching { installSplashScreen() }
         super.onCreate(savedInstanceState)
         showPreviousCrashIfAny()
         try {
@@ -122,15 +115,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
         binding.btnPauseAll.setOnClickListener {
             App.engine.pauseAll()
-            Snackbar.make(binding.root, R.string.pause_all, Snackbar.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.pause_all, Toast.LENGTH_SHORT).show()
         }
         binding.btnResumeAll.setOnClickListener {
             App.engine.resumeAll()
-            Snackbar.make(binding.root, R.string.resume_all, Snackbar.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.resume_all, Toast.LENGTH_SHORT).show()
         }
         binding.btnRetryFailed.setOnClickListener {
             App.engine.retryFailed()
-            Snackbar.make(binding.root, R.string.retry_failed, Snackbar.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.retry_failed, Toast.LENGTH_SHORT).show()
         }
 
         lifecycleScope.launch {
@@ -176,7 +169,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             if (!file.exists()) return@runCatching
             val text = file.readText().trim()
             if (text.isEmpty()) return@runCatching
-            MaterialAlertDialogBuilder(this)
+            AlertDialog.Builder(this)
                 .setTitle(R.string.previous_crash_title)
                 .setMessage(text.take(3000))
                 .setPositiveButton(R.string.clear_log) { _, _ -> file.delete() }
@@ -197,7 +190,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             setContentView(tv)
         }
         runCatching {
-            MaterialAlertDialogBuilder(this)
+            AlertDialog.Builder(this)
                 .setTitle(R.string.fatal_error_title)
                 .setMessage(stack)
                 .setPositiveButton(R.string.ok, null)
@@ -231,18 +224,18 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     /** Buka halaman remote web di browser. */
     private fun openRemote() {
         if (!App.httpServer.isAlive) {
-            Snackbar.make(binding.root, R.string.server_not_running_hint, Snackbar.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.server_not_running_hint, Toast.LENGTH_SHORT).show()
             return
         }
         val url = remoteUrl()
         if (url == null) {
-            Snackbar.make(binding.root, R.string.remote_no_url, Snackbar.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.remote_no_url, Toast.LENGTH_SHORT).show()
             return
         }
         runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         }.onFailure {
-            Snackbar.make(binding.root, R.string.open_remote_failed, Snackbar.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.open_remote_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -461,7 +454,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
 
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle(R.string.add_download)
             .setView(view)
             .setNegativeButton(R.string.cancel, null)
@@ -470,7 +463,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     .split(URL_SPLIT)
                     .filter { it.startsWith("http://") || it.startsWith("https://") }
                 if (urls.isEmpty()) {
-                    Snackbar.make(binding.root, R.string.invalid_url, Snackbar.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
                 val name = nameInput.text?.toString()?.trim().orEmpty()
@@ -523,7 +516,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         mirrors: List<String> = emptyList()
     ) {
         val labels = variants.map { it.name } + getString(R.string.hls_direct)
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle(R.string.hls_quality_title)
             .setItems(labels.toTypedArray()) { _, which ->
                 val target = if (which < variants.size) variants[which].url else originalUrl
@@ -654,7 +647,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     getString(R.string.update_available, info.versionName, info.versionCode)
                 else -> getString(R.string.update_latest)
             }
-            MaterialAlertDialogBuilder(this@MainActivity)
+            AlertDialog.Builder(this@MainActivity)
                 .setTitle(R.string.update_check)
                 .setMessage(msg)
                 .setPositiveButton(R.string.ok, null)
@@ -728,7 +721,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             options.add(getString(R.string.delete) to { App.engine.remove(item.id) })
         }
         val labels = options.map { it.first }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle(item.fileName)
             .setItems(labels) { _, which -> options[which].second.invoke() }
             .show()
@@ -740,7 +733,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         input.isFocusableInTouchMode = true
         input.setText(item.fileName)
         input.setSelection(input.text.length)
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle(R.string.action_rename)
             .setView(input)
             .setNegativeButton(R.string.cancel, null)
@@ -802,11 +795,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 )
             )
         }.onFailure {
-            Snackbar.make(
-                binding.root,
-                R.string.battery_request_failed,
-                Snackbar.LENGTH_LONG
-            ).show()
+            Toast.makeText(this, R.string.battery_request_failed, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -835,7 +824,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             priorityValues.indexOf(item.priority).coerceAtLeast(0)
         )
 
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle(item.fileName)
             .setView(view)
             .setNegativeButton(R.string.cancel, null)
@@ -984,7 +973,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     private fun showSortDialog() {
         val options = resources.getStringArray(R.array.sort_options)
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle(R.string.sort_by)
             .setSingleChoiceItems(options, sortMode) { _, which ->
                 sortMode = which
@@ -1025,7 +1014,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             try {
                 startActivity(intent)
             } catch (_: Exception) {
-                Snackbar.make(binding.root, R.string.no_app_to_open, Snackbar.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -1033,12 +1022,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private fun openFolder(item: DownloadItem) {
         val intent = folderIntent(item)
         if (intent == null) {
-            Snackbar.make(binding.root, R.string.open_folder_unavailable, Snackbar.LENGTH_LONG)
+            Toast.makeText(this, R.string.open_folder_unavailable, Toast.LENGTH_LONG)
                 .show()
             return
         }
         runCatching { startActivity(intent) }.onFailure {
-            Snackbar.make(binding.root, R.string.open_folder_unavailable, Snackbar.LENGTH_LONG)
+            Toast.makeText(this, R.string.open_folder_unavailable, Toast.LENGTH_LONG)
                 .show()
         }
     }

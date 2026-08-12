@@ -33,7 +33,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/settings_gallery_image_label"
-        android:textAppearance="?attr/textAppearanceBodyMedium" />
+        android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <EditText
         android:focusable="true"
@@ -54,7 +54,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:text="@string/settings_gallery_video_label"
-        android:textAppearance="?attr/textAppearanceBodyMedium" />
+        android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <EditText
         android:focusable="true"
@@ -75,6 +75,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:text="@string/settings_gallery_hint"
-        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textAppearance="?android:attr/textAppearanceSmall"
         android:textColor="?android:attr/textColorSecondary" />
 </LinearLayout>

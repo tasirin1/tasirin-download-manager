@@ -5,6 +5,24 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-12] — APK lebih kecil: tanpa Material, splashscreen klasik, R8 agresif
+
+### Diubah
+- **Library Material (1.12.0) dihapus** — MaterialToolbar → Toolbar AppCompat,
+  MaterialButton → Button, MaterialCardView → FrameLayout + drawable rounded,
+  MaterialAlertDialogBuilder → AlertDialog, Snackbar → Toast. Tema beralih ke
+  `Theme.AppCompat.NoActionBar` (satu tema terang; `values-night` dihapus).
+  Ukuran APK turun beberapa ratus KB tanpa menghapus fitur.
+- **core-splashscreen dihapus** — splash klasik via `windowBackground` tema
+  (kompat Android 5+), perilaku sama tanpa library tambahan.
+- **R8 lebih agresif** — `-allowaccessmodification`, `-optimizationpasses 5`,
+  dan `-repackageclasses ''` untuk memperkecil dex.
+- **`remote.html` lebih ringkas** — `prepare_remote.py` kini juga membuang
+  indentasi, baris kosong, dan komentar `//` pada blok JS (sumber readable
+  tetap `remote.src.html`); guard CI (sync + `node --check` + smoke upload)
+  tetap hijau.
+- **Ikon launcher round dihapus** — cukup satu set ikon launcher biasa.
+
 ## [v1.0 — 2026-08-12] — Hemat RAM: pagination file manager, cache galeri terbatas, cleanup thumbnail terjadwal
 
 ### Diperbaiki

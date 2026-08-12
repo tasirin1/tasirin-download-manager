@@ -17,8 +17,6 @@ import android.text.TextWatcher
 import android.widget.Toast
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.google.android.material.snackbar.Snackbar
 import com.tasirin.httpdownloadmanager.databinding.ActivityLogBinding
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import java.io.File
@@ -35,7 +33,6 @@ class LogActivity : AppCompatActivity() {
     private var lastLogKey: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        runCatching { installSplashScreen() }
         super.onCreate(savedInstanceState)
         binding = ActivityLogBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -52,7 +49,7 @@ class LogActivity : AppCompatActivity() {
                 .ifEmpty { getString(R.string.remote_log_empty) }
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("server log", text))
-            Snackbar.make(binding.root, R.string.remote_log_copied, Snackbar.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.remote_log_copied, Toast.LENGTH_SHORT).show()
         }
         binding.logClear.setOnClickListener {
             App.httpServer.clearLog()

@@ -7,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
@@ -27,15 +26,12 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.isVisible
 import androidx.core.widget.TextViewCompat
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.snackbar.Snackbar
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
@@ -65,7 +61,6 @@ class SettingsActivity : AppCompatActivity() {
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        runCatching { installSplashScreen() }
         super.onCreate(savedInstanceState)
         binding = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -313,36 +308,24 @@ class SettingsActivity : AppCompatActivity() {
                 StoragePrefs.setServerAutoStartEnabled(this, false)
                 App.httpServer.stopServer()
                 stopServiceIfIdle()
-                Snackbar.make(binding.root, R.string.remote_stopped, Snackbar.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
             } else {
                 if (StoragePrefs.isPinEnforced(this) &&
                     StoragePrefs.getServerPin(this).isNullOrEmpty()
                 ) {
-                    Snackbar.make(
-                        binding.root,
-                        R.string.remote_pin_required,
-                        Snackbar.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this, R.string.remote_pin_required, Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
                 StoragePrefs.setServerBackgroundEnabled(this, true)
                 val result = runCatching { App.httpServer.startServer() }
                 if (result.isFailure) {
                     StoragePrefs.setServerBackgroundEnabled(this, false)
-                    Snackbar.make(
-                        binding.root,
-                        getString(
+                    Toast.makeText(this, getString(
                             R.string.remote_start_failed,
                             App.httpServer.lastError ?: result.exceptionOrNull()?.message ?: "?"
-                        ),
-                        Snackbar.LENGTH_LONG
-                    ).show()
+                        ), Toast.LENGTH_LONG).show()
                 } else {
-                    Snackbar.make(
-                        binding.root,
-                        getString(R.string.remote_started, App.httpServer.listeningPort),
-                        Snackbar.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this, getString(R.string.remote_started, App.httpServer.listeningPort), Toast.LENGTH_SHORT).show()
                 }
             }
             renderServer()
@@ -356,11 +339,13 @@ class SettingsActivity : AppCompatActivity() {
             this, if (on) R.color.status_on else R.color.text_secondary
         )
         btn.setTextColor(color)
-        if (btn is MaterialButton) {
-            btn.setIconResource(if (on) R.drawable.ic_check else R.drawable.ic_close)
-            btn.iconTint = ColorStateList.valueOf(color)
-            btn.iconGravity = MaterialButton.ICON_GRAVITY_END
-            btn.iconPadding = 12
+        val icon = ContextCompat.getDrawable(
+            this, if (on) R.drawable.ic_check else R.drawable.ic_close
+        )
+        if (icon != null) {
+            icon.mutate().setTint(color)
+            btn.setCompoundDrawablesRelative(null, null, icon, null)
+            btn.compoundDrawablePadding = 12
         }
     }
 
@@ -688,7 +673,7 @@ class SettingsActivity : AppCompatActivity() {
                     binding.updateStatus.text = getString(
                         R.string.update_available, info.versionName, info.versionCode
                     )
-                    MaterialAlertDialogBuilder(this)
+                    AlertDialog.Builder(this)
                         .setTitle(R.string.update_title)
                         .setMessage(
                             getString(
@@ -713,7 +698,7 @@ class SettingsActivity : AppCompatActivity() {
         val view = layoutInflater.inflate(R.layout.dialog_update_progress, null)
         val bar = view.findViewById<ProgressBar>(R.id.update_progress_bar)
         val txt = view.findViewById<TextView>(R.id.update_progress_text)
-        val dialog = MaterialAlertDialogBuilder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.update_title)
             .setView(view)
             .setNegativeButton(R.string.cancel, null)
@@ -814,11 +799,7 @@ class SettingsActivity : AppCompatActivity() {
                 )
             )
         }.onFailure {
-            Snackbar.make(
-                binding.root,
-                R.string.battery_request_failed,
-                Snackbar.LENGTH_LONG
-            ).show()
+            Toast.makeText(this, R.string.battery_request_failed, Toast.LENGTH_LONG).show()
         }
     }
 

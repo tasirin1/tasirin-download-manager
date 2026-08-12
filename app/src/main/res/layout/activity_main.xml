@@ -6,13 +6,13 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <com.google.android.material.appbar.MaterialToolbar
+    <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         app:title="@string/app_name">
 
-    </com.google.android.material.appbar.MaterialToolbar>
+    </androidx.appcompat.widget.Toolbar>
 
     <LinearLayout
         android:id="@+id/server_card"
@@ -55,9 +55,9 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
+        <Button
             android:id="@+id/btn_open_remote"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/TvOutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
@@ -344,19 +344,22 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="20sp" />
 
-            <com.google.android.material.button.MaterialButton
+            <Button
                 android:id="@+id/empty_add_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
+                android:background="@drawable/bg_btn_filled"
+                android:backgroundTint="@null"
                 android:minHeight="56dp"
                 android:paddingHorizontal="28dp"
                 android:text="@string/add_download"
+                android:textColor="@color/white"
                 android:textSize="16sp" />
 
-            <com.google.android.material.button.MaterialButton
+            <Button
                 android:id="@+id/empty_remote_button"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/TvOutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
@@ -366,17 +369,20 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
+        <Button
             android:id="@+id/fab_add"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
             android:layout_margin="16dp"
+            android:background="@drawable/bg_btn_filled"
+            android:backgroundTint="@null"
+            android:drawableStart="@drawable/ic_add"
+            android:drawablePadding="8dp"
             android:minHeight="52dp"
             android:paddingHorizontal="22dp"
             android:text="@string/add_download"
-            android:textSize="15sp"
-            app:icon="@drawable/ic_add"
-            app:iconGravity="textStart" />
+            android:textColor="@color/white"
+            android:textSize="15sp" />
     </FrameLayout>
 </LinearLayout>

@@ -68,13 +68,33 @@ def minify_css(css: str) -> str:
     return css.strip()
 
 
+def minify_js(js: str) -> str:
+    # Aman untuk sumber ini (tanpa template literal / line-continuation):
+    # membuang indentasi, baris kosong, dan komentar // di awal baris tidak
+    # mengubah semantik; baris dipertahankan supaya ASI (semicolon insertion)
+    # tetap aman. node --check di CI memverifikasi hasilnya.
+    out = []
+    for line in js.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("//"):
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def minify_html(html: str) -> str:
     # Komentar HTML dibuang (sumber readable tetap di remote.src.html).
     html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
     scripts = []
 
     def shield_script(match):
-        scripts.append(match.group(0))
+        block = match.group(0)
+        inner = re.match(r"<script>(.*)</script>", block, re.S)
+        if inner:
+            block = "<script>" + minify_js(inner.group(1)) + "</script>"
+        scripts.append(block)
         return "\x01%d\x01" % (len(scripts) - 1)
 
     # Blok <script> dijaga utuh: minifier tidak boleh menyentuh isi JS

@@ -9,7 +9,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:text="@string/storage_download_folder"
-        android:textAppearance="?attr/textAppearanceBodyMedium" />
+        android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <EditText
         android:focusable="true"
@@ -30,7 +30,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:text="@string/storage_hint_all_files"
-        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textAppearance="?android:attr/textAppearanceSmall"
         android:textColor="?android:attr/textColorSecondary" />
 
     <TextView
@@ -38,7 +38,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:text="@string/storage_extra_folders"
-        android:textAppearance="?attr/textAppearanceBodyMedium" />
+        android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <LinearLayout
         android:id="@+id/extra_folders_container"

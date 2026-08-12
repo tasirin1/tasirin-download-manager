@@ -58,7 +58,12 @@ class DownloadAdapter(private val listener: Listener) :
         val quickPause = item.state == DownloadState.DOWNLOADING || item.state == DownloadState.PENDING
         if (quickResume || quickPause) {
             quick.visibility = View.VISIBLE
-            quick.setIconResource(if (quickResume) R.drawable.ic_play else R.drawable.ic_pause)
+            val quickIcon = ContextCompat.getDrawable(
+                b.root.context,
+                if (quickResume) R.drawable.ic_play else R.drawable.ic_pause
+            )?.mutate()
+            quickIcon?.setTint(ContextCompat.getColor(b.root.context, R.color.primary))
+            quick.setCompoundDrawablesRelative(null, null, quickIcon, null)
             quick.contentDescription = b.root.context.getString(
                 if (quickResume) R.string.resume else R.string.pause
             )
