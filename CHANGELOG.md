@@ -5,6 +5,16 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-12] — Perbaikan: latar biru di tampilan utama setelah hapus Material
+
+### Diperbaiki
+- **Latar biru splash menutupi semua halaman** — tema aplikasi sebelumnya
+  mewarisi `Theme.HttpDownloadManager.Splash` (windowBackground biru) dan
+  tanpa `installSplashScreen()` tidak ada yang menukar ke tema terang,
+  sehingga teks gelap nyaris tak terlihat. Sekarang: aplikasi default
+  `Theme.HttpDownloadManager` (terang), splash hanya di `MainActivity`
+  via `android:theme` manifest + `setTheme()` klasik sebelum konten digambar.
+
 ## [v1.0 — 2026-08-12] — APK lebih kecil: tanpa Material, splashscreen klasik, R8 agresif
 
 ### Diubah
