@@ -383,6 +383,9 @@
   .fs-tools button:hover {
  border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
 
+  #fsSearchBtn {
+ grid-column: 1 / -1; }
+
   .fs-loc-wrap {
  min-width: 0; display: flex; }
 
@@ -4254,7 +4257,6 @@ function connectEvents() {
         return;
       }
       const items = data.items || [];
-      markItemsChanged(items);
       lastItems = items;
       if (data.status) renderStatus(data.status);
       render(items);
@@ -4271,19 +4273,18 @@ function connectEvents() {
 // SEKSI: SSE (EventSource) + polling adaptif + reconnect
 // SSE (bila hidup) adalah sumber utama realtime; polling hanya pengaman saat
 // stream diam/terblokir (mis. buffering proxy WISP atau WebView lama yang
-// menahan buffer EventSource). Interval naik-turun: 2 detik hanya saat ada
-// transfer yang benar-benar berjalan & data berubah; sisanya 10 detik.
+// menahan buffer EventSource). Interval naik-turun: 1 detik saat ada
+// transfer yang berjalan (realtime), sisanya 10 detik.
 // WebView/browser tua kadang membiarkan EventSource "terbuka" tapi tidak
 // pernah memicu onmessage: setelah satu percobaan reconnect masih diam,
 // SSE dimatikan permanen untuk sesi ini dan polling adaptif mengambil alih
 // (mencegah reconnect storm yang terlihat di log server perangkat TV).
 let lastItems = [];
 let pollTimer = null;
-const POLL_FAST_MS = 2000;
+const POLL_FAST_MS = 1000;
 const POLL_IDLE_MS = 10000;
 const SSE_SILENT_MS = 20000;
 const SSE_RECONNECT_COOLDOWN_MS = 10000;
-const CHANGE_WINDOW_MS = 15000;
 
 function anyActiveTransfer() {
   if (fsUploading) return true;
@@ -4294,29 +4295,10 @@ function anyActiveTransfer() {
   return false;
 }
 
-function itemsSig(items) {
-  let h = 0;
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    h = (h * 31 + it.id.length * 7 + it.state.length * 13 +
-      Math.min(it.bytesDownloaded, 999999999) * 17) | 0;
-  }
-  return h;
-}
-
-let lastItemsSig = 0;
-let lastChangeAt = Date.now();
-function markItemsChanged(items) {
-  const sig = itemsSig(items);
-  if (sig !== lastItemsSig) {
-    lastItemsSig = sig;
-    lastChangeAt = Date.now();
-  }
-}
-
 function nextPollMs() {
-  const recentChange = Date.now() - lastChangeAt < CHANGE_WINDOW_MS;
-  return (anyActiveTransfer() && recentChange) ? POLL_FAST_MS : POLL_IDLE_MS;
+  // Selama ada transfer aktif, poll cepat (1 detik) supaya progres nyaris
+  // realtime; tanpa aktivitas baru, interval idle 10 detik menghemat request.
+  return anyActiveTransfer() ? POLL_FAST_MS : POLL_IDLE_MS;
 }
 
 async function pollSnapshot() {
@@ -4334,7 +4316,6 @@ async function pollSnapshot() {
     hideConnBanner();
     if (data.status) renderStatus(data.status);
     const items = data.items || [];
-    markItemsChanged(items);
     lastItems = items;
     if (currentRoute() === 'downloads') render(items);
   } catch (e) {
