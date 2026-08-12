@@ -160,8 +160,9 @@ diperbarui.
 6. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
 7. Publish release `v1.0` dengan APK signed (fallback debug bila tanpa secrets).
 8. **VirusTotal scan** (opsional, hanya bila `VT_API_KEY` terisi) — submit APK
-   rilis, polling sampai analisis selesai, lalu ringkasan deteksi (X/Y engine)
-   dicetak di log + job summary; hanya jalan pada push ke `main` (bukan PR).
+   rilis/debug, polling sampai analisis selesai, lalu ringkasan deteksi (X/Y
+   engine) dicetak di log + job summary; jalan di push `main` DAN di PR
+   (repositori sama) supaya APK yang mau di-merge sudah di-scan.
 
 ## Secrets yang dibutuhkan (Settings → Secrets and variables → Actions)
 
@@ -171,7 +172,7 @@ diperbarui.
 | `KEYSTORE_PASSWORD`  | Password keystore                   |
 | `KEY_ALIAS`          | Alias kunci signing                 |
 | `KEY_PASSWORD`       | Password kunci alias                |
-| `VT_API_KEY`         | (Opsional) API key VirusTotal — scan APK rilis, tanpa ini step dilewati |
+| `VT_API_KEY`         | (Opsional) API key VirusTotal — scan APK di `main` & PR, tanpa ini step dilewati |
 
 Keystore yang sama dipakai juga oleh repo **Tasirin Vaultwarden Host** — simpan
 satu salinan aman (jangan di commit, jangan hanya di satu perangkat).

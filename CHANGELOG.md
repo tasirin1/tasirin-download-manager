@@ -5,6 +5,26 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-12] — Status bar kontras, pencarian File Manager, scan VirusTotal di PR
+
+### Ditambahkan
+- **Pencarian File Manager di remote web** — tombol kecil "Search" di toolbar
+  membuka satu baris input; filter berjalan di sisi klien (hanya baris yang
+  sudah dimuat), tanpa beban RAM/endpoint server.
+- **VirusTotal ikut di-scan pada PR** — tidak hanya push `main`; APK PR ikut
+  dicek sebelum merge (butuh `VT_API_KEY`).
+
+### Diperbaiki
+- **Ikon status/navigation bar paksa gelap** (`SystemBarStyle.light`) — app
+  selalu tema terang, jadi ikon tidak lagi berubah putih saat mode gelap
+  sistem aktif (`EdgeToEdge.kt`).
+
+### Catatan audit
+- Desugaring: hanya `Iterable.forEach` sintetis yang terpakai (tanpa
+  `java.time`/`stream`/`Optional`); sisanya sudah dipangkas R8 — tidak ada
+  yang bisa dihemat lebih lanjut. Audit kode mati: tidak ditemukan
+  fungsi/properti tak terpakai.
+
 ## [v1.0 — 2026-08-12] — Perbaikan tema: benar-benar terang (Light) bukan gelap
 
 ### Diperbaiki
