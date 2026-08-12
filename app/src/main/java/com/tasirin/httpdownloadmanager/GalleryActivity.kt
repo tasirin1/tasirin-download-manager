@@ -90,7 +90,7 @@ class GalleryActivity : AppCompatActivity() {
                     .filter { it.state != DownloadState.COMPLETED }
                     .associate { it.fileName to it.progressPercent }
             fullList = withContext(Dispatchers.IO) {
-                MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount)
+                MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount).items
             }
             binding.progress.visibility = View.GONE
             applyFilterUi()
@@ -154,7 +154,7 @@ class GalleryActivity : AppCompatActivity() {
                     val next = minOf(loadedCount + GALLERY_PAGE, MediaLibrary.GALLERY_MAX_ENTRIES)
                     val had = fullList.size
                     fullList = withContext(Dispatchers.IO) {
-                        MediaLibrary.scan(this@GalleryActivity, partialProgress, next)
+                        MediaLibrary.scan(this@GalleryActivity, partialProgress, next).items
                     }
                     loadedCount = next
                     if (fullList.size <= had) break

@@ -387,6 +387,12 @@
   .fs-up-wrap > button {
  width: 100%; }
 
+  .fs-load-more {
+ width: 100%; padding: 10px 12px; font-size: 13px; font-weight: 600; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; transition: all .15s ease; }
+
+  .fs-load-more:hover {
+ border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+
   #fsUpMenu {
  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow); }
 
@@ -1988,6 +1994,10 @@ window.addEventListener('scroll', function () {
 
 let fsPath = '';
 let fsItems = [];
+let fsTotal = 0;
+let fsOffset = 0;
+let fsLoadingMore = false;
+const FS_PAGE = 1000;
 let fsSelectMode = false;
 const fsSelected = [];
 const fsView = document.getElementById('fsView');
@@ -2189,8 +2199,11 @@ let fsLocationsLoaded = false;
 
 async function loadFs() {
   showFsSkeleton();
+  fsOffset = 0;
+  fsTotal = 0;
   try {
-    const res = await fetch(API + '/api/fs?path=' + encodeURIComponent(fsPath));
+    const res = await fetch(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
+      '&offset=0&limit=' + FS_PAGE);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     fsStatus.textContent = '';
@@ -2201,7 +2214,8 @@ async function loadFs() {
     fsMkdirBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
     fsUploadBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
     fsItems = data.items || [];
-    fsCount.textContent = fsItems.length ? fsItems.length + ' item' : '';
+    fsTotal = data.total || fsItems.length;
+    fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
     if (!fsPath && !fsLocationsLoaded) loadFsLocations();
     renderFs(fsItems);
   } catch (e) {
@@ -2296,6 +2310,12 @@ function renderFs(items) {
     return;
   }
   for (const it of items) {
+    fsAppendRow(box, it);
+  }
+  fsUpdateLoadMore();
+}
+
+function fsAppendRow(box, it) {
     const row = document.createElement('div');
     row.className = 'fs-row';
     row.setAttribute('tabindex', '0');
@@ -2338,7 +2358,54 @@ function renderFs(items) {
       });
     }
     box.appendChild(row);
+}
+
+async function fsLoadMore() {
+  if (fsLoadingMore || !fsPath) return;
+  fsLoadingMore = true;
+  const btn = document.getElementById('fsLoadMoreBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Loading\u2026';
   }
+  try {
+    const res = await fetch(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
+      '&offset=' + fsOffset + '&limit=' + FS_PAGE);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const more = data.items || [];
+    fsItems = fsItems.concat(more);
+    fsOffset = fsItems.length;
+    fsTotal = data.total || fsItems.length;
+    fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
+    more.forEach(function (it) { fsAppendRow(fsList, it); });
+    fsUpdateLoadMore();
+  } catch (e) {
+    fsMsg('Failed to load more: ' + e, true);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Load more';
+    }
+  } finally {
+    fsLoadingMore = false;
+  }
+}
+
+function fsUpdateLoadMore() {
+  const hasMore = !!fsPath && fsTotal > fsItems.length;
+  const btn = document.getElementById('fsLoadMoreBtn');
+  if (!hasMore) {
+    if (btn) btn.remove();
+    return;
+  }
+  if (btn) return;
+  const b = document.createElement('button');
+  b.id = 'fsLoadMoreBtn';
+  b.type = 'button';
+  b.className = 'fs-load-more';
+  b.textContent = 'Load more';
+  b.addEventListener('click', fsLoadMore);
+  fsList.appendChild(b);
 }
 
 function attachFsLongPress(row, it) {
