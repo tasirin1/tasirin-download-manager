@@ -342,6 +342,17 @@
   .fs-row .fs-meta {
  font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
+  .fs-row-progress {
+ flex: 1 1 100%; height: 4px; border-radius: 999px; background: var(--bg-soft); overflow: hidden; margin-top: 6px; }
+
+  .fs-row-progress .fill {
+ height: 100%; border-radius: 999px; background: var(--primary); transition: width .15s ease; }
+
+  .fs-new-badge {
+ display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+ background: var(--primary); color: #fff; font-size: 9px; font-weight: 700;
+ letter-spacing: .4px; vertical-align: middle; }
+
   .fs-ico {
  flex: 0 0 40px; height: 40px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 19px; background: var(--bg-soft); border: 1px solid var(--line); align-self: center; }
 
@@ -1219,6 +1230,7 @@
   <div class="gal-toolbar">
     <h2>File Manager</h2>
     <span class="count" id="fsCount"></span>
+    <button id="fsHomeBtn" type="button" class="btn-ghost">Home</button>
     <button id="fsUpBtn" type="button" class="btn-ghost" style="margin-left:auto">Up</button>
   </div>
   <div id="fsSticky" class="fs-sticky">
@@ -2008,6 +2020,9 @@ window.addEventListener('scroll', function () {
 });
 
 let fsPath = '';
+let fsBackStack = [];
+let fsRestoredOnce = false;
+const FS_LAST_PATH_KEY = 'fsLastPath';
 let fsItems = [];
 let fsTotal = 0;
 let fsOffset = 0;
@@ -2073,6 +2088,10 @@ function applyRoute() {
     fsSelectBtn.textContent = 'Select';
     fsBatch.classList.add('hidden');
     fsLocationsLoaded = false;
+    if (!fsPath && localStorage.getItem(FS_LAST_PATH_KEY)) {
+      fsPath = localStorage.getItem(FS_LAST_PATH_KEY);
+      fsRestoredOnce = true;
+    }
     loadFsLocations();
     loadFs();
   } else {
@@ -2110,9 +2129,22 @@ document.querySelector('.brand').addEventListener('click', function () {
 });
 
 fsUpBtn.addEventListener('click', function () {
-  fsPath = parentFsPath(fsPath);
-  loadFs();
+  fsNavigate(parentFsPath(fsPath));
 });
+
+document.getElementById('fsHomeBtn').addEventListener('click', function () {
+  fsLocationsLoaded = false;
+  fsNavigate('');
+});
+
+function fsNavigate(path) {
+  if (path === fsPath) return;
+  fsBackStack.push(fsPath);
+  if (fsBackStack.length > 60) fsBackStack.shift();
+  try { history.pushState({ fsFolder: 1 }, '', location.href); } catch (e) {}
+  fsPath = path;
+  loadFs();
+}
 
 function parentFsPath(p) {
   if (!p) return '';
@@ -2168,8 +2200,7 @@ function renderFsCrumbs(p) {
   fsPathEl.querySelectorAll('.fs-crumb[data-path]').forEach(function (chip) {
     if (chip.classList.contains('on')) return;
     chip.addEventListener('click', function () {
-      fsPath = decodeURIComponent(chip.dataset.path);
-      loadFs();
+      fsNavigate(decodeURIComponent(chip.dataset.path));
     });
   });
 }
@@ -2203,9 +2234,8 @@ async function loadFsLocations() {
 fsLocation.addEventListener('change', function () {
   const v = fsLocation.value;
   if (!v) return;
-  fsPath = v;
   fsLocation.value = '';
-  loadFs();
+  fsNavigate(v);
 });
 
 // Lokasi storage hanya perlu dimuat sekali saat masuk File Manager; tanpa
@@ -2231,9 +2261,19 @@ async function loadFs() {
     fsItems = data.items || [];
     fsTotal = data.total || fsItems.length;
     fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
+    if (fsPath) localStorage.setItem(FS_LAST_PATH_KEY, fsPath);
+    else localStorage.removeItem(FS_LAST_PATH_KEY);
     if (!fsPath && !fsLocationsLoaded) loadFsLocations();
     renderFs(fsItems);
   } catch (e) {
+    if (fsRestoredOnce && fsPath) {
+      fsPath = '';
+      fsRestoredOnce = false;
+      localStorage.removeItem(FS_LAST_PATH_KEY);
+      fsMsg('Last folder unavailable \u2014 showing storage roots', true);
+      loadFs();
+      return;
+    }
     fsMsg('Failed to load: ' + e, true);
     fsList.innerHTML = emptyHtml('warn', 'Failed to load folder', String(e));
   }
@@ -2297,8 +2337,7 @@ function renderFs(items) {
         '<div class="fs-main"><div class="fs-name">' + escapeHtml(r.name) + '</div>' +
         '<div class="fs-rcap"><small>' + escapeHtml(r.path) + '</small>' + fsRootCap(r) + '</div></div>';
       row.addEventListener('click', function () {
-        fsPath = r.path;
-        loadFs();
+        fsNavigate(r.path);
       });
       box.appendChild(row);
     }
@@ -2350,7 +2389,8 @@ function fsAppendRow(box, it) {
     row.innerHTML =
       check +
       '<span class="fs-ico">' + fsIconFor(it) + '</span>' +
-      '<div class="fs-main"><div class="fs-name">' + escapeHtml(it.name) + '</div>' +
+      '<div class="fs-main"><div class="fs-name">' + escapeHtml(it.name) +
+        (fsIsNew(it.name) ? '<span class="fs-new-badge">NEW</span>' : '') + '</div>' +
       (meta ? '<div class="fs-meta">' + meta + '</div>' : '') + '</div>' +
       (!fsSelectMode ? '<button class="fs-more-btn" type="button" title="Actions">\u22EF</button>' : '');
     row.addEventListener('click', function () {
@@ -2358,8 +2398,7 @@ function fsAppendRow(box, it) {
       if (fsSelectMode) {
         toggleFsSelect(it, row);
       } else if (it.kind === 'dir') {
-        fsPath = it.path;
-        loadFs();
+        fsNavigate(it.path);
       } else if (FS_MEDIA_EXTS.indexOf(extOf(it.name).toLowerCase()) >= 0) {
         fsOpenMedia(it);
       }
@@ -2437,6 +2476,52 @@ fsSearchBtn.addEventListener('click', function () {
   }
 });
 fsSearchInput.addEventListener('input', function () { fsSetSearch(this.value); });
+
+let fsNewBadges = {};
+function fsMarkNew(path, name) {
+  if (!path) return;
+  fsNewBadges[path] = fsNewBadges[path] || [];
+  if (fsNewBadges[path].indexOf(name) < 0) fsNewBadges[path].push(name);
+}
+function fsIsNew(name) {
+  const arr = fsNewBadges[fsPath];
+  return !!(arr && arr.indexOf(name) >= 0);
+}
+function fsFindFsRow(name) {
+  const rows = fsList.querySelectorAll('.fs-row');
+  for (let i = 0; i < rows.length; i++) {
+    const it = rows[i]._it;
+    if (it && it.name === name) return rows[i];
+  }
+  return null;
+}
+function fsRowUploadProgress(name, pct) {
+  const row = fsFindFsRow(name);
+  if (!row) return;
+  let bar = row.querySelector('.fs-row-progress');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'fs-row-progress';
+    bar.innerHTML = '<div class="fill"></div>';
+    row.appendChild(bar);
+  }
+  bar.querySelector('.fill').style.width = Math.max(3, Math.min(100, pct)) + '%';
+}
+function fsRowUploadDone(name) {
+  const row = fsFindFsRow(name);
+  if (!row) return;
+  const bar = row.querySelector('.fs-row-progress');
+  if (bar) {
+    bar.querySelector('.fill').style.width = '100%';
+    setTimeout(function () { bar.remove(); }, 500);
+  }
+}
+function fsRowUploadFail(name) {
+  const row = fsFindFsRow(name);
+  if (!row) return;
+  const bar = row.querySelector('.fs-row-progress');
+  if (bar) bar.remove();
+}
 
 function fsUpdateLoadMore() {
   const hasMore = !!fsPath && fsTotal > fsItems.length;
@@ -2783,6 +2868,8 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
   fsUploading = true;
   const failed = [];
   const ulRows = {};
+  const jobMeta = {};
+  jobs.forEach(function (j) { jobMeta[j.id] = { name: j.file.name, path: j.path }; });
   if (listEl) {
     listEl.innerHTML = '';
     jobs.forEach(function (j) {
@@ -2805,8 +2892,8 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
     row.classList.remove('ok', 'err', 'run');
     if (cls) row.classList.add(cls);
   }
-  function ulFail(id) { ulSet(id, '\u2717', 'err'); }
-  function ulOk(id) { ulSet(id, '\u2713', 'ok'); }
+  function ulFail(id) { ulSet(id, '\u2717', 'err'); if (jobMeta[id]) fsRowUploadFail(jobMeta[id].name); }
+  function ulOk(id) { ulSet(id, '\u2713', 'ok'); if (jobMeta[id]) { fsRowUploadDone(jobMeta[id].name); fsMarkNew(jobMeta[id].path, jobMeta[id].name); } }
   let idx = 0;
   let sentBytes = 0;
   let totalBytes = 0;
@@ -2891,6 +2978,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         progressPct.textContent = pct + '% \u00b7 ' + fmtSpeed(speed) +
           (etaSec > 0 ? ' \u00b7 sisa ~' + fmtEta(etaSec) : '');
         ulSet(job.id, Math.min(99, Math.round((start + chunkBest) * 100 / file.size)) + '%', 'run');
+        fsRowUploadProgress(file.name, Math.min(99, Math.round((start + chunkBest) * 100 / file.size)));
       };
       xhr.onload = function () {
         let ok = false;
@@ -4233,6 +4321,11 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 });
 
 window.addEventListener('hashchange', applyRoute);
+window.addEventListener('popstate', function () {
+  if (currentRoute() !== 'files' || fsBackStack.length === 0) return;
+  fsPath = fsBackStack.pop();
+  loadFs();
+});
 applyRoute();
 refreshStatus();
 let sse = null;
