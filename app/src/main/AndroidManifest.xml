@@ -43,7 +43,7 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         tools:targetApi="23"
-        android:theme="@style/Theme.HttpDownloadManager.Splash">
+        android:theme="@style/Theme.HttpDownloadManager">
 
         <meta-data
             android:name="android.app.shortcuts"
@@ -52,7 +52,8 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.HttpDownloadManager.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
