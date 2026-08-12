@@ -5,6 +5,20 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-12] — File Manager: Back naik folder, lokasi tersimpan, progress upload inline, badge NEW
+
+### Ditambahkan
+- **Tombol Back = naik folder** — browser/Android back (dan panah kiri TV)
+  menaikkan satu level folder via history stack; di root, back kembali ke
+  tab sebelumnya.
+- **Lokasi terakhir disimpan** (`localStorage`) — buka remote kembali
+  langsung kembali ke folder terakhir; tombol **Home** untuk balik ke root
+  storage. Bila folder tersimpan tidak lagi ada, otomatis fallback ke root.
+- **Progress upload inline di baris file** — file yang sedang di-upload ke
+  folder aktif menampilkan progress bar tipis di barisnya secara realtime.
+- **Badge "NEW"** — file yang baru di-upload ditandai badge kecil selama
+  sesi; tetap tampil setelah daftar di-refresh.
+
 ## [v1.0 — 2026-08-12] — Polling realtime saat transfer aktif, tombol Search selebar baris
 
 ### Diubah
