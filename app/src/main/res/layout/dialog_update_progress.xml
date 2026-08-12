@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/update_downloading"
-        android:textAppearance="?attr/textAppearanceBodyLarge" />
+        android:textAppearance="?android:attr/textAppearanceLarge" />
 
     <ProgressBar
         android:id="@+id/update_progress_bar"
@@ -24,6 +24,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textAppearance="?android:attr/textAppearanceSmall"
         android:textColor="?android:attr/textColorSecondary" />
 </LinearLayout>

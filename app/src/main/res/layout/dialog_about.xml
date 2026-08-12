@@ -12,7 +12,7 @@
         android:layout_height="72dp"
         android:layout_gravity="center_horizontal"
         android:contentDescription="@string/app_name"
-        android:src="@mipmap/ic_launcher_round" />
+        android:src="@mipmap/ic_launcher" />
 
     <TextView
         android:layout_width="match_parent"
@@ -60,9 +60,9 @@
         android:layout_marginTop="14dp"
         android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
+        <Button
             android:id="@+id/btn_about_github"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/TvOutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -71,9 +71,9 @@
             android:text="@string/about_github"
             android:textSize="13sp" />
 
-        <com.google.android.material.button.MaterialButton
+        <Button
             android:id="@+id/btn_about_update"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/TvOutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"

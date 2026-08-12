@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="12dp"
     android:layout_marginVertical="6dp"
-    app:cardCornerRadius="12dp">
+    android:background="@drawable/bg_card_rounded">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -29,11 +28,11 @@
                 android:layout_weight="1"
                 android:ellipsize="middle"
                 android:singleLine="true"
-                android:textAppearance="?attr/textAppearanceTitleMedium" />
+                android:textAppearance="?android:attr/textAppearanceMedium" />
 
-            <com.google.android.material.button.MaterialButton
+            <Button
                 android:id="@+id/button_quick"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/TvOutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="@string/pause"
@@ -41,9 +40,8 @@
                 android:minHeight="44dp"
                 android:paddingHorizontal="10dp"
                 android:visibility="gone"
-                app:icon="@drawable/ic_pause"
-                app:iconGravity="textStart"
-                app:iconPadding="0dp" />
+                android:drawableStart="@drawable/ic_pause"
+                android:drawablePadding="0dp" />
 
         </LinearLayout>
 
@@ -58,14 +56,14 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textSize="13sp" />
 
             <TextView
                 android:id="@+id/text_progress"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textSize="13sp" />
         </LinearLayout>
 
@@ -82,7 +80,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textAppearance="?android:attr/textAppearanceSmall"
             android:visibility="gone" />
 
         <TextView
@@ -91,7 +89,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="@string/checksum_ok"
-            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/status_on"
             android:visibility="gone" />
 
@@ -100,9 +98,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/text_secondary"
             android:visibility="gone" />
 
     </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+</FrameLayout>

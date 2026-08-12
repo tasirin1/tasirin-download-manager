@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <com.google.android.material.appbar.MaterialToolbar
+    <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
@@ -71,7 +71,7 @@
             android:gravity="center"
             android:padding="24dp"
             android:text="@string/gallery_empty"
-            android:textAppearance="?attr/textAppearanceBodyLarge"
+            android:textAppearance="?android:attr/textAppearanceLarge"
             android:visibility="gone" />
 
         <ProgressBar

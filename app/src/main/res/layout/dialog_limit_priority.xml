@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/speed_limit_per_label"
-        android:textAppearance="?attr/textAppearanceLabelMedium" />
+        android:textAppearance="?android:attr/textAppearanceSmall" />
 
     <Spinner
         android:id="@+id/spinner_speed_limit_per"
@@ -23,7 +23,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:text="@string/priority_label"
-        android:textAppearance="?attr/textAppearanceLabelMedium" />
+        android:textAppearance="?android:attr/textAppearanceSmall" />
 
     <Spinner
         android:id="@+id/spinner_priority"

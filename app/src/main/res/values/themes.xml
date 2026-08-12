@@ -1,5 +1,7 @@
 <resources>
-    <style name="Theme.HttpDownloadManager" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Tema AppCompat murni (tanpa library material): APK lebih kecil.
+         Satu tema terang saja — values-night dihapus (lihat CHANGELOG). -->
+    <style name="Theme.HttpDownloadManager" parent="Theme.AppCompat.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary_dark</item>
         <item name="colorAccent">@color/accent</item>
@@ -9,15 +11,15 @@
         <item name="colorControlHighlight">@color/accent</item>
     </style>
 
-    <style name="TvOutlinedButton" parent="Widget.Material3.Button.OutlinedButton">
+    <style name="TvOutlinedButton" parent="Widget.AppCompat.Button">
         <item name="android:background">@drawable/bg_btn_tv</item>
         <item name="android:backgroundTint">@null</item>
         <item name="backgroundTint">@null</item>
     </style>
 
-    <style name="Theme.HttpDownloadManager.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/primary</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
-        <item name="postSplashScreenTheme">@style/Theme.HttpDownloadManager</item>
+    <!-- Splash klasik tanpa library core-splashscreen: windowBackground
+         langsung dari tema (kompat Android 5+). -->
+    <style name="Theme.HttpDownloadManager.Splash" parent="Theme.HttpDownloadManager">
+        <item name="android:windowBackground">@drawable/splash_bg</item>
     </style>
 </resources>
