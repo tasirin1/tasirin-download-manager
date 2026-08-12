@@ -5,6 +5,17 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-12] — Polling realtime saat transfer aktif, tombol Search selebar baris
+
+### Diubah
+- **Polling adaptif lebih realtime** — interval cepat 2 detik → **1 detik**
+  selama ada transfer aktif (download/upload), tanpa syarat "data berubah"
+  lagi; idle tetap 10 detik. SSE tetap sumber utama; polling hanya pengaman.
+  Blok penanda perubahan yang tidak terpakai ikut dihapus.
+- **Tombol Search File Manager selebar baris** — tidak lagi menyisakan
+  kolom sempit saat membungkus di layar sempit; baris input pencarian tetap
+  muncul di bawahnya saat tombol ditekan.
+
 ## [v1.0 — 2026-08-12] — Status bar kontras, pencarian File Manager, scan VirusTotal di PR
 
 ### Ditambahkan
