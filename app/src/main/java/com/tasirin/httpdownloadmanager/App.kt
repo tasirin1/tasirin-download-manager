@@ -21,9 +21,16 @@ class App : Application() {
         httpServer = HttpControlServer(this)
         engine = DownloadEngine(this)
         runCatching { engine.cleanupOrphans() }
-        // Bersihkan thumbnail disk lama di latar belakang (RAM tidak terpengaruh,
-        // tapi disk cache tidak menumpuk tanpa menunggu server remote menyala).
-        Thread { MediaLibrary.cleanupOldThumbs(this) }.start()
+        // Bersihkan thumbnail disk lama maksimal sekali per 7 hari (RAM tidak
+        // terpengaruh; disk cache tidak menumpuk tanpa menunggu server remote
+        // menyala, tapi start aplikasi tidak membayar scan folder thumb tiap kali).
+        val lastThumbCleanup = StoragePrefs.lastThumbCleanup(this)
+        if (lastThumbCleanup == 0L ||
+            System.currentTimeMillis() - lastThumbCleanup >= THUMB_CLEANUP_INTERVAL_MS
+        ) {
+            StoragePrefs.setThumbCleanupDone(this, System.currentTimeMillis())
+            Thread { MediaLibrary.cleanupOldThumbs(this) }.start()
+        }
         // Server dinyalakan langsung dari Application supaya tetap jalan
         // walau halaman utama gagal terbuka (mis. crash di Activity).
         if (StoragePrefs.isServerBackgroundEnabled(this) &&
@@ -75,6 +82,7 @@ class App : Application() {
     @SuppressLint("StaticFieldLeak")
     companion object {
         const val CRASH_LOG_FILE = "crash.log"
+        private const val THUMB_CLEANUP_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
         // StaticFieldLeak: sengaja ditahan — kedua objek menyimpan Application
         // context saja (dijamin di konstruktor) dan hidup seumur proses.
         @SuppressLint("StaticFieldLeak")

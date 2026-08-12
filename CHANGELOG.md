@@ -5,6 +5,18 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-12] — Hemat RAM: pagination file manager, cache galeri terbatas, cleanup thumbnail terjadwal
+
+### Diperbaiki
+- **File Manager remote di-paginate (1000 entri/request + tombol "Load more")** —
+  folder raksasa tidak lagi membangun JSON semua entri + statistik semua
+  subfolder sekaligus di memori server.
+- **Cache galeri dibatasi halaman aktif + 1 buffer** — scan tidak lagi menahan
+  sampai 3000 entri di memori saat browsing biasa (total tetap akurat untuk
+  `hasMore`; saat ada filter/q, scan penuh dipakai supaya hasil pencarian akurat).
+- **Pembersihan thumbnail cache maksimal 1x per 7 hari** — tidak lagi memindai
+  folder thumb setiap kali aplikasi start.
+
 ## [v1.0 — 2026-08-11] — Remote web: tombol Select sejajar Upload di File Manager
 
 ### Diperbaiki

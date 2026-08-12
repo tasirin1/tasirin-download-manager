@@ -40,6 +40,7 @@ object StoragePrefs {
     private const val KEY_GALLERY_IMAGE_FOLDER = "gallery_image_folder"
     private const val KEY_GALLERY_VIDEO_FOLDER = "gallery_video_folder"
     private const val KEY_COLLAPSED_SECTIONS = "collapsed_sections"
+    private const val KEY_THUMB_CLEANUP_LAST = "thumb_cleanup_last"
 
     /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
     fun isSectionCollapsed(context: Context, key: String): Boolean =
@@ -361,6 +362,16 @@ object StoragePrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(KEY_RECENT_URLS, "")
         }
+    }
+
+    /** Terakhir kali thumbnail cache dibersihkan otomatis (0 = belum pernah). */
+    fun lastThumbCleanup(context: Context): Long =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getLong(KEY_THUMB_CLEANUP_LAST, 0L)
+
+    fun setThumbCleanupDone(context: Context, timeMs: Long) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit { putLong(KEY_THUMB_CLEANUP_LAST, timeMs) }
     }
 
     /** Murni (tanpa Context) supaya bisa diuji unit: nilai kosong -> null,

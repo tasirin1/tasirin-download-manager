@@ -80,7 +80,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var sseLastPayload = ""
     @Volatile private var sseLastPushAt = 0L
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
-    @Volatile private var galleryCache: Pair<Long, List<MediaLibrary.MediaEntry>>? = null
+    @Volatile private var galleryCache: Pair<Long, MediaLibrary.MediaScanResult>? = null
     @Volatile private var loginFailures = 0
     @Volatile private var loginLockUntil = 0L
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Pair<Int, Long>>>()
@@ -1173,11 +1173,21 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // (hemat alokasi untuk galeri besar); hanya halaman aktif yang di-hold.
         val start = page * GALLERY_PAGE_SIZE
         val pageEnd = start + GALLERY_PAGE_SIZE
+        // Browsing biasa: cache scan dibatasi ke halaman aktif + 1 buffer
+        // (bukan 3000 entri penuh) supaya RAM server tetap rendah. Saat ada
+        // filter (q/type) hasil biasanya kecil, jadi scan penuh dipakai agar
+        // hasMore tetap akurat tanpa halaman kosong berulang.
+        val scanLimit = if (q.isNotEmpty() || type.isNotEmpty()) {
+            MediaLibrary.GALLERY_MAX_ENTRIES
+        } else {
+            (pageEnd + GALLERY_PAGE_SIZE).coerceAtMost(MediaLibrary.GALLERY_MAX_ENTRIES)
+        }
         val arr = JSONArray()
         val cache = loadVideoDurations()
         var extracted = 0
         var matched = 0
-        for (e in scannedGallery()) {
+        val scan = scannedGallery(scanLimit)
+        for (e in scan.items) {
             if (q.isNotEmpty() && !e.name.lowercase().contains(q)) continue
             if ((type == "video" && !e.isVideo) || (type == "image" && e.isVideo)) continue
             if (matched >= start && matched < pageEnd) {
@@ -1212,18 +1222,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return jsonResponse(
             JSONObject()
                 .put("items", arr)
-                .put("hasMore", matched > pageEnd)
-                .put("total", matched)
+                .put("hasMore", matched < scan.total)
+                .put("total", scan.total)
         )
     }
 
-    private fun scannedGallery(): List<MediaLibrary.MediaEntry> {
+    private fun scannedGallery(maxEntries: Int): MediaLibrary.MediaScanResult {
         val now = System.currentTimeMillis()
         val cached = galleryCache
-        if (cached != null && now - cached.first < GALLERY_SCAN_TTL_MS) return cached.second
-        val list = MediaLibrary.scan(context)
-        galleryCache = now to list
-        return list
+        if (cached != null && now - cached.first < GALLERY_SCAN_TTL_MS &&
+            cached.second.items.size >= maxEntries
+        ) return cached.second
+        val result = MediaLibrary.scan(context, maxEntries = maxEntries)
+        galleryCache = now to result
+        return result
     }
 
     private fun videoDurationMs(token: String): Long {
@@ -1264,10 +1276,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun fsList(session: IHTTPSession): Response {
         val raw = session.parms["path"].orEmpty()
+        val offset = (session.parms["offset"]?.toIntOrNull() ?: 0).coerceAtLeast(0)
+        val limit = (session.parms["limit"]?.toIntOrNull() ?: FS_PAGE_SIZE)
+            .coerceIn(1, FS_PAGE_MAX)
         return when {
             raw.isEmpty() -> fsRoots()
-            raw.startsWith(MS_PREFIX) -> fsListMedia(raw.removePrefix(MS_PREFIX))
-            else -> fsListFiles(raw.removePrefix(FS_PREFIX))
+            raw.startsWith(MS_PREFIX) -> fsListMedia(raw.removePrefix(MS_PREFIX), offset, limit)
+            else -> fsListFiles(raw.removePrefix(FS_PREFIX), offset, limit)
         }
     }
 
@@ -1339,9 +1354,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return jsonResponse(JSONObject().put("items", items))
     }
 
-    private fun fsListFiles(path: String): Response {
+    private fun fsListFiles(path: String, offset: Int, limit: Int): Response {
         val items = JSONArray()
         val dir = File(path)
+        var total = 0
         if (dir.isDirectory && isFsPathAllowed(path)) {
             val entries = runCatching { dir.listFiles() }.getOrNull()
                 ?.sortedWith(
@@ -1349,12 +1365,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         a.name.compareTo(b.name, ignoreCase = true)
                     }
                 ).orEmpty()
-            // Statistik subfolder dihitung paralel supaya listing folder besar
-            // tidak membayar N listFiles() berurutan di storage lambat.
-            val statFutures = entries.filter { it.isDirectory }.associateWith { f ->
+            total = entries.size
+            // Hanya halaman aktif yang dibangun JSON-nya; statistik subfolder
+            // (itemCount/totalSize) dihitung paralel untuk halaman itu saja.
+            val page = entries.drop(offset).take(limit)
+            val statFutures = page.filter { it.isDirectory }.associateWith { f ->
                 statPool.submit<Pair<Int, Long>> { fsStats(f.absolutePath) }
             }
-            entries.forEach { f ->
+            page.forEach { f ->
                 val o = JSONObject()
                 o.put("name", f.name)
                 o.put("path", FS_PREFIX + f.absolutePath)
@@ -1373,11 +1391,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 items.put(o)
             }
         }
-        return jsonResponse(JSONObject().put("path", path).put("items", items))
+        return jsonResponse(
+            JSONObject().put("path", path).put("items", items).put("total", total)
+        )
     }
 
-    private fun fsListMedia(relative: String): Response {
+    private fun fsListMedia(relative: String, offset: Int, limit: Int): Response {
         val items = JSONArray()
+        var total = 0
         if (Build.VERSION.SDK_INT >= 29) {
             val base = relative.trim('/')
             val folder = if (base.isEmpty()) "" else base + "/"
@@ -1423,17 +1444,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
             }
+            val all = ArrayList<JSONObject>(dirs.size + files.size)
             dirs.sortedWith(String.CASE_INSENSITIVE_ORDER).forEach { sub ->
-                items.put(
+                all.add(
                     JSONObject()
                         .put("name", sub)
                         .put("path", "$MS_PREFIX$base/$sub")
                         .put("kind", "dir")
                 )
             }
-            files.forEach { items.put(it) }
+            all.addAll(files)
+            total = all.size
+            all.drop(offset).take(limit).forEach { items.put(it) }
         }
-        return jsonResponse(JSONObject().put("path", relative).put("items", items))
+        return jsonResponse(
+            JSONObject().put("path", relative).put("items", items).put("total", total)
+        )
     }
 
     private fun fsStats(path: String): Pair<Int, Long> {
@@ -1903,6 +1929,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
         private const val GALLERY_SCAN_TTL_MS = 15_000L
         private const val GALLERY_PAGE_SIZE = 100
+        // Listing file manager di-paginate: maks 1000 entri per request, klien
+        // memuat halaman berikutnya lewat tombol "Load more". Folder raksasa
+        // tidak lagi membangun JSON semua entri + statistik semua subfolder
+        // sekaligus di memori.
+        private const val FS_PAGE_SIZE = 1000
+        private const val FS_PAGE_MAX = 5000
         private const val DEFAULT_CHUNK_BYTES = 2L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
