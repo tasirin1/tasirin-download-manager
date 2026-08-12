@@ -5,6 +5,14 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-12] — Perbaikan tema: benar-benar terang (Light) bukan gelap
+
+### Diperbaiki
+- **Tema masih gelap setelah PR #73** — `Theme.AppCompat.NoActionBar` adalah
+  varian gelap, jadi latar hitam + kartu putih + teks putih nyaris tak
+  terbaca. Ganti ke `Theme.AppCompat.Light.NoActionBar`; `TvOutlinedButton`
+  diberi teks `@color/primary` agar senada desain lama.
+
 ## [v1.0 — 2026-08-12] — Perbaikan: latar biru di tampilan utama setelah hapus Material
 
 ### Diperbaiki

@@ -1,12 +1,12 @@
 <resources>
     <!-- Tema AppCompat murni (tanpa library material): APK lebih kecil.
          Satu tema terang saja — values-night dihapus (lihat CHANGELOG). -->
-    <style name="Theme.HttpDownloadManager" parent="Theme.AppCompat.NoActionBar">
+    <style name="Theme.HttpDownloadManager" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary_dark</item>
         <item name="colorAccent">@color/accent</item>
-        <!-- Fokus D-pad wajib kelihatan di tema terang & gelap, termasuk
-             Android 6 yang tidak menggambar highlight fokus otomatis. -->
+        <!-- Fokus D-pad wajib kelihatan (Android 6 tidak menggambar
+             highlight fokus otomatis). -->
         <item name="android:colorControlHighlight">@color/accent</item>
         <item name="colorControlHighlight">@color/accent</item>
     </style>
@@ -15,6 +15,7 @@
         <item name="android:background">@drawable/bg_btn_tv</item>
         <item name="android:backgroundTint">@null</item>
         <item name="backgroundTint">@null</item>
+        <item name="android:textColor">@color/primary</item>
     </style>
 
     <!-- Splash klasik tanpa library core-splashscreen: windowBackground
