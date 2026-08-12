@@ -368,6 +368,14 @@
 
   .fs-tools {
  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+  .fs-search-row {
+ display: flex; gap: 6px; margin-bottom: 8px; }
+
+  .fs-search-row input {
+ flex: 1; min-width: 0; padding: 8px 12px; font-size: 13px; border-radius: 999px;
+ border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+
+
 
   .fs-tools button {
  width: 100%; min-width: 0; padding: 8px 12px; font-size: 12.5px; font-weight: 600; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; transition: all .15s ease; }
@@ -1227,6 +1235,10 @@
       </div>
     </span>
     <button id="fsSelectBtn" type="button">Select</button>
+    <button id="fsSearchBtn" type="button">Search</button>
+  </div>
+  <div id="fsSearchRow" class="fs-search-row hidden">
+    <input id="fsSearchInput" type="search" placeholder="Search this folder\u2026" aria-label="Search files">
   </div>
   </div>
   <input id="fsUploadFile" type="file" class="hidden" multiple>
@@ -2357,7 +2369,9 @@ function fsAppendRow(box, it) {
         openFsSheet(it);
       });
     }
+    row._it = it;
     box.appendChild(row);
+    fsApplySearch(row);
 }
 
 async function fsLoadMore() {
@@ -2390,6 +2404,36 @@ async function fsLoadMore() {
     fsLoadingMore = false;
   }
 }
+
+const fsSearchBtn = document.getElementById('fsSearchBtn');
+const fsSearchInput = document.getElementById('fsSearchInput');
+const fsSearchRow = document.getElementById('fsSearchRow');
+let fsSearchQuery = '';
+
+function fsApplySearch(row) {
+  if (!fsSearchQuery) { row.style.display = ''; return; }
+  const it = row._it;
+  const hit = it && it.name && it.name.toLowerCase().indexOf(fsSearchQuery) >= 0;
+  row.style.display = hit ? '' : 'none';
+}
+
+function fsSetSearch(q) {
+  fsSearchQuery = q.trim().toLowerCase();
+  fsList.querySelectorAll('.fs-row').forEach(fsApplySearch);
+}
+
+fsSearchBtn.addEventListener('click', function () {
+  const hidden = fsSearchRow.classList.contains('hidden');
+  if (hidden) {
+    fsSearchRow.classList.remove('hidden');
+    fsSearchInput.focus();
+  } else {
+    fsSearchRow.classList.add('hidden');
+    fsSearchInput.value = '';
+    fsSetSearch('');
+  }
+});
+fsSearchInput.addEventListener('input', function () { fsSetSearch(this.value); });
 
 function fsUpdateLoadMore() {
   const hasMore = !!fsPath && fsTotal > fsItems.length;
