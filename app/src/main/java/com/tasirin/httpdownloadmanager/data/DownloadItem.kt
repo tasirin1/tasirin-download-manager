@@ -22,6 +22,7 @@ data class DownloadItem(
     val contentUri: String? = null,
     val filePath: String? = null,
     val addedAt: Long = System.currentTimeMillis(),
+    val finishedAt: Long = 0,
     val nameIsCustom: Boolean = false,
     val autoResume: Boolean = false,
     val username: String = "",

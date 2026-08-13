@@ -239,7 +239,8 @@ class DownloadEngine(appContext: Context) {
             contentUri = published.contentUri,
             filePath = published.filePath,
             nameIsCustom = true,
-            autoResume = false
+            autoResume = false,
+            finishedAt = System.currentTimeMillis()
         )
         update(listOf(item) + _items.value)
         flushSave()
@@ -935,7 +936,8 @@ class DownloadEngine(appContext: Context) {
                 autoResume = false,
                 speedBps = 0,
                 etaSeconds = 0,
-                etag = serverEtag
+                etag = serverEtag,
+                finishedAt = System.currentTimeMillis()
             )
         }
         flushSave()
@@ -1049,7 +1051,8 @@ class DownloadEngine(appContext: Context) {
                 autoResume = false,
                 speedBps = 0,
                 etaSeconds = 0,
-                etag = headers?.etag.orEmpty()
+                etag = headers?.etag.orEmpty(),
+                finishedAt = System.currentTimeMillis()
             )
         }
         flushSave()

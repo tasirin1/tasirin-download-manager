@@ -18,6 +18,7 @@ class DownloadItemCodecTest {
         contentUri = "content://media/123",
         filePath = "/storage/emulated/0/Download/video.mp4",
         addedAt = 1_700_000_000_000,
+        finishedAt = 1_700_000_100_000,
         nameIsCustom = true,
         autoResume = true,
         username = "user",
