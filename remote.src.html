@@ -612,10 +612,7 @@
  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
   #mmImage {
- display: block; max-width: 100%; max-height: calc(100vh - 64px); margin: 8px auto 0; cursor: zoom-in; transition: transform .18s ease; touch-action: pan-y; }
-
-  #mmImage.zoom {
- cursor: zoom-out; transform: scale(1.9); transform-origin: 50% 8%; }
+ display: block; max-width: 100%; max-height: calc(100vh - 64px); margin: 8px auto 0; cursor: zoom-in; touch-action: none; transform-origin: 0 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
   #mmImgTop {
  position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 8px; padding: 6px 8px 26px; background: linear-gradient(rgba(0,0,0,.72), transparent); color: #fff; transition: opacity .2s ease; }
@@ -632,6 +629,9 @@
   #mmImgCount {
  flex: 0 0 auto; font-size: 12px; color: rgba(255,255,255,.85); }
 
+  #mediaModal.mm-img #mmImgDelBtn {
+ color: #ff8a80; }
+
   #mmImgPrev, #mmImgNext {
  position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(0,0,0,.35); color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
@@ -645,7 +645,7 @@
  right: 8px; }
 
   #mediaModal.mm-img #mmBody {
- display: flex; align-items: center; justify-content: center; overflow: hidden; }
+ position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 
   #mediaModal.mm-img #mmImage {
  max-width: 100%; max-height: 100%; margin: 0; }
@@ -1309,6 +1309,9 @@
     <button id="mmImgBack" type="button" title="Close">&#10094;</button>
     <span id="mmImgName"></span>
     <span id="mmImgCount"></span>
+    <button id="mmImgPlayBtn" type="button" title="Slideshow">&#9654;</button>
+    <button id="mmImgDlBtn" type="button" title="Download photo">&#11015;</button>
+    <button id="mmImgDelBtn" type="button" title="Delete photo">&#128465;</button>
   </div>
   <button id="mmImgPrev" type="button" title="Previous photo">&#10094;</button>
   <button id="mmImgNext" type="button" title="Next photo">&#10095;</button>
@@ -1344,6 +1347,7 @@
       </div>
     </div>
     <img id="mmImage" class="hidden">
+    <div id="mmImgSpin" class="mm-spin hidden"></div>
     <div id="mmDesc" class="hidden">
       <div id="mmTitle"></div>
       <div id="mmSub"></div>
@@ -1583,6 +1587,10 @@ const mmImgName = document.getElementById('mmImgName');
 const mmImgCount = document.getElementById('mmImgCount');
 const mmImgPrev = document.getElementById('mmImgPrev');
 const mmImgNext = document.getElementById('mmImgNext');
+const mmImgPlayBtn = document.getElementById('mmImgPlayBtn');
+const mmImgDlBtn = document.getElementById('mmImgDlBtn');
+const mmImgDelBtn = document.getElementById('mmImgDelBtn');
+const mmImgSpin = document.getElementById('mmImgSpin');
 const mmVideo = document.getElementById('mmVideo');
 const mmTitle = document.getElementById('mmTitle');
 const mmSub = document.getElementById('mmSub');
@@ -1733,7 +1741,9 @@ function closeMedia() {
   mediaModal.classList.remove('open');
   mediaModal.classList.remove('mm-img');
   mediaModal.classList.remove('mm-chrome-hidden');
-  mmImage.classList.remove('zoom');
+  mmImgResetZoom();
+  mmImgSpin.classList.add('hidden');
+  mmStopSlide();
   mmImgTop.classList.add('hidden');
   mmImgPrev.classList.add('hidden');
   mmImgNext.classList.add('hidden');
@@ -1768,8 +1778,8 @@ function closeMedia() {
 document.getElementById('mmBack').addEventListener('click', closeMedia);
 document.getElementById('mmPlayerBack').addEventListener('click', closeMedia);
 document.getElementById('mmImgBack').addEventListener('click', closeMedia);
-mmImgPrev.addEventListener('click', function () { mmStepImage(-1); });
-mmImgNext.addEventListener('click', function () { mmStepImage(1); });
+mmImgPrev.addEventListener('click', function () { mmStopSlide(); mmStepImage(-1); });
+mmImgNext.addEventListener('click', function () { mmStopSlide(); mmStepImage(1); });
 
 let mmGuardActive = false;
 function mmPushGuard() {
@@ -3430,14 +3440,142 @@ function mmStepImage(delta) {
   openMedia(it, API + '/api/media?token=' + encodeURIComponent(it.token));
 }
 
+// --- Penampil foto: zoom/pan (pinch, double-tap, roda), swipe tutup, slideshow ---
+let mmImgZoom = { s: 1, tx: 0, ty: 0 };
+let mmImgPinch = null;
 let mmImgSwipe = null;
 let mmImgSwiped = 0;
 let mmImgTapTimer = null;
 let mmImgLastTap = 0;
 let mmImgLastTapX = 0;
+let mmImgMousePan = null;
+let mmImgDragged = false;
+let mmImgPreloads = [];
+let mmSlideTimer = null;
+let mmSlideOn = false;
+
+function mmImgResetZoom() {
+  mmImgZoom.s = 1; mmImgZoom.tx = 0; mmImgZoom.ty = 0;
+  mmImage.style.transform = '';
+  mmImage.style.cursor = '';
+}
+function mmImgClamp() {
+  const s = mmImgZoom.s;
+  const bodyW = mmBody.clientWidth || window.innerWidth || 1;
+  const bodyH = mmBody.clientHeight || window.innerHeight || 1;
+  const imgW = mmImage.offsetWidth || 1;
+  const imgH = mmImage.offsetHeight || 1;
+  const layoutLeft = Math.max(0, (bodyW - imgW) / 2);
+  const layoutTop = Math.max(0, (bodyH - imgH) / 2);
+  const vw = imgW * s, vh = imgH * s;
+  let minTx = -layoutLeft, maxTx = bodyW - layoutLeft - vw;
+  mmImgZoom.tx = maxTx < minTx ? (bodyW - vw) / 2 - layoutLeft : Math.max(minTx, Math.min(maxTx, mmImgZoom.tx));
+  let minTy = -layoutTop, maxTy = bodyH - layoutTop - vh;
+  mmImgZoom.ty = maxTy < minTy ? (bodyH - vh) / 2 - layoutTop : Math.max(minTy, Math.min(maxTy, mmImgZoom.ty));
+}
+function mmImgApply() {
+  if (mmImgZoom.s <= 1.001) { mmImgResetZoom(); return; }
+  mmImgClamp();
+  mmImage.style.transform = 'translate(' + mmImgZoom.tx + 'px,' + mmImgZoom.ty + 'px) scale(' + mmImgZoom.s + ')';
+  mmImage.style.cursor = mmImgDragged ? 'grabbing' : 'grab';
+}
+function mmImgZoomTo(clientX, clientY, ns) {
+  ns = Math.max(1, Math.min(5, ns));
+  const bodyRect = mmBody.getBoundingClientRect();
+  const bodyW = bodyRect.width || window.innerWidth || 1;
+  const bodyH = bodyRect.height || window.innerHeight || 1;
+  const imgW = mmImage.offsetWidth || bodyW;
+  const imgH = mmImage.offsetHeight || bodyH;
+  const layoutLeft = Math.max(0, (bodyW - imgW) / 2);
+  const layoutTop = Math.max(0, (bodyH - imgH) / 2);
+  const fx = (clientX - bodyRect.left) / bodyW;
+  const fy = (clientY - bodyRect.top) / bodyH;
+  const s = mmImgZoom.s;
+  const px = Math.max(0, Math.min(imgW, (fx * bodyW - layoutLeft - mmImgZoom.tx) / s));
+  const py = Math.max(0, Math.min(imgH, (fy * bodyH - layoutTop - mmImgZoom.ty) / s));
+  mmImgZoom.tx = px * (s - ns) + mmImgZoom.tx;
+  mmImgZoom.ty = py * (s - ns) + mmImgZoom.ty;
+  mmImgZoom.s = ns;
+  mmImgApply();
+}
+
+function mmImgPreload() {
+  mmImgPreloads.forEach(function (p) { try { p.src = ''; } catch (e) {} });
+  mmImgPreloads = [];
+  if (mmType !== 'image' || typeof Image === 'undefined') return;
+  const idx = mmTokenIdx(mmImageList, mmCurrentToken);
+  [idx - 1, idx + 1].forEach(function (i) {
+    if (i >= 0 && i < mmImageList.length) {
+      const im = new Image();
+      im.src = API + '/api/media?token=' + encodeURIComponent(mmImageList[i].token);
+      mmImgPreloads.push(im);
+    }
+  });
+}
+
+function mmImgCurrent() {
+  const idx = mmTokenIdx(mmImageList, mmCurrentToken);
+  return (idx >= 0 && mmImageList[idx]) ? mmImageList[idx] : null;
+}
+
+function mmStopSlide() {
+  mmSlideOn = false;
+  clearTimeout(mmSlideTimer);
+  if (mmImgPlayBtn) mmImgPlayBtn.textContent = '\u25B6';
+}
+function mmSlideTick() {
+  if (!mmSlideOn || mmType !== 'image') { mmStopSlide(); return; }
+  const idx = mmTokenIdx(mmImageList, mmCurrentToken);
+  if (idx < 0 || idx >= mmImageList.length - 1) {
+    mmStopSlide();
+    mmShowToast('End of slideshow');
+    return;
+  }
+  mmStepImage(1);
+  mmSlideTimer = setTimeout(mmSlideTick, 3500);
+}
+
+mmImgPlayBtn.addEventListener('click', function () {
+  if (mmType !== 'image') return;
+  mmSlideOn = !mmSlideOn;
+  mmImgPlayBtn.textContent = mmSlideOn ? '\u23F8' : '\u25B6';
+  clearTimeout(mmSlideTimer);
+  if (mmSlideOn) mmSlideTimer = setTimeout(mmSlideTick, 3500);
+});
+mmImgDlBtn.addEventListener('click', function () {
+  const it = mmImgCurrent();
+  if (!it) return;
+  mmStopSlide();
+  fsDownloadUrl(API + '/api/media?token=' + encodeURIComponent(it.token) + '&dl=1');
+  mmShowToast('Download started');
+});
+mmImgDelBtn.addEventListener('click', function () {
+  const it = mmImgCurrent();
+  if (!it) return;
+  if (!confirm('Delete this photo?\n' + it.name)) return;
+  mmStopSlide();
+  doDeleteMedia(it.token, function () {
+    const li = mmImageList.indexOf(it);
+    if (li >= 0) mmImageList.splice(li, 1);
+    const gi = galleryItems.indexOf(it);
+    if (gi >= 0) galleryItems.splice(gi, 1);
+    galleryGrid.querySelectorAll('.gal-cell').forEach(function (cell) {
+      const img = cell.querySelector('img');
+      if (img && img.src && img.src.indexOf(encodeURIComponent(it.token)) >= 0) cell.remove();
+    });
+    const c = parseInt(galleryCount.textContent, 10);
+    if (!isNaN(c)) galleryCount.textContent = Math.max(0, c - 1) + ' file';
+    if (!mmImageList.length) { closeMedia(); loadGallery(true); return; }
+    const next = mmImageList[Math.min(li, mmImageList.length - 1)];
+    openMedia(next, API + '/api/media?token=' + encodeURIComponent(next.token));
+  });
+});
+
 mmImage.addEventListener('click', function (e) {
   if (mmType !== 'image') return;
+  if (mmImgDragged) { mmImgDragged = false; return; }
   if (Date.now() - mmImgSwiped < 400) return;
+  mmStopSlide();
   const now = Date.now();
   const dt = now - mmImgLastTap;
   const near = Math.abs(e.clientX - mmImgLastTapX) < 80;
@@ -3445,7 +3583,7 @@ mmImage.addEventListener('click', function (e) {
   mmImgLastTapX = e.clientX;
   clearTimeout(mmImgTapTimer);
   if (dt < 350 && near) {
-    mmImage.classList.toggle('zoom');
+    mmImgZoomTo(e.clientX, e.clientY, mmImgZoom.s > 1.001 ? 1 : 2.5);
     return;
   }
   mmImgTapTimer = setTimeout(function () {
@@ -3457,23 +3595,124 @@ mmBody.addEventListener('click', function (e) {
   mediaModal.classList.toggle('mm-chrome-hidden');
 });
 mmImage.addEventListener('touchstart', function (e) {
-  if (mmType !== 'image' || e.touches.length !== 1) { mmImgSwipe = null; return; }
-  mmImgSwipe = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-}, { passive: true });
-mmImage.addEventListener('touchend', function (e) {
-  if (mmType !== 'image' || !mmImgSwipe) return;
-  const ch = e.changedTouches[0];
-  const dx = ch.clientX - mmImgSwipe.x;
-  const dy = ch.clientY - mmImgSwipe.y;
+  if (mmType !== 'image') return;
+  mmStopSlide();
   mmImgSwipe = null;
-  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) {
-    mmImgSwiped = Date.now();
-    mmStepImage(dx < 0 ? 1 : -1);
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    const t1 = e.touches[0], t2 = e.touches[1];
+    mmImgPinch = {
+      d: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1,
+      s: mmImgZoom.s,
+      cx: (t1.clientX + t2.clientX) / 2,
+      cy: (t1.clientY + t2.clientY) / 2,
+      moved: false
+    };
+    return;
   }
-}, { passive: true });
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    mmImgSwipe = {
+      x: t.clientX, y: t.clientY,
+      tx: mmImgZoom.tx, ty: mmImgZoom.ty,
+      pan: mmImgZoom.s > 1.001,
+      moved: false
+    };
+  }
+}, { passive: false });
+mmImage.addEventListener('touchmove', function (e) {
+  if (mmType !== 'image') return;
+  if (mmImgPinch && e.touches.length === 2) {
+    e.preventDefault();
+    const t1 = e.touches[0], t2 = e.touches[1];
+    const d = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1;
+    mmImgPinch.moved = true;
+    mmImgZoomTo(mmImgPinch.cx, mmImgPinch.cy, mmImgPinch.s * d / mmImgPinch.d);
+    return;
+  }
+  if (mmImgSwipe) {
+    const t = e.touches[0];
+    const dx = t.clientX - mmImgSwipe.x;
+    const dy = t.clientY - mmImgSwipe.y;
+    if (mmImgSwipe.pan) {
+      if (mmImgZoom.s > 1.001) {
+        e.preventDefault();
+        mmImgZoom.tx = mmImgSwipe.tx + dx;
+        mmImgZoom.ty = mmImgSwipe.ty + dy;
+        mmImgApply();
+      }
+      return;
+    }
+    if (Math.abs(dx) > 12 || Math.abs(dy) > 12) {
+      mmImgSwipe.moved = true;
+      e.preventDefault();
+    }
+  }
+}, { passive: false });
+mmImage.addEventListener('touchend', function (e) {
+  if (mmType !== 'image') return;
+  if (mmImgPinch) {
+    const wasPinch = mmImgPinch.moved;
+    mmImgPinch = null;
+    if (wasPinch) { mmImgSwiped = Date.now(); mmImgSwipe = null; }
+    return;
+  }
+  if (!mmImgSwipe) return;
+  const s = mmImgSwipe;
+  const ch = e.changedTouches[0];
+  const dx = ch.clientX - s.x;
+  const dy = ch.clientY - s.y;
+  mmImgSwipe = null;
+  if (s.pan) return;
+  if (s.moved) {
+    if (dy > 70 && Math.abs(dy) > Math.abs(dx) * 1.2) {
+      closeMedia();
+      return;
+    }
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      mmImgSwiped = Date.now();
+      mmStepImage(dx < 0 ? 1 : -1);
+    }
+  }
+});
+mmImage.addEventListener('load', function () {
+  if (mmType !== 'image') return;
+  mmImgSpin.classList.add('hidden');
+});
+mmImage.addEventListener('error', function () {
+  if (mmType !== 'image') return;
+  mmImgSpin.classList.add('hidden');
+  mmShowToast('Failed to load photo');
+});
+mmImage.addEventListener('mousedown', function (e) {
+  if (mmType !== 'image' || e.button !== 0) return;
+  mmImgDragged = false;
+  if (mmImgZoom.s > 1.001) {
+    e.preventDefault();
+    mmImgMousePan = { x: e.clientX, y: e.clientY, tx: mmImgZoom.tx, ty: mmImgZoom.ty };
+  }
+});
+document.addEventListener('mousemove', function (e) {
+  if (!mmImgMousePan) return;
+  const dx = e.clientX - mmImgMousePan.x, dy = e.clientY - mmImgMousePan.y;
+  if (Math.abs(dx) > 4 || Math.abs(dy) > 4) mmImgDragged = true;
+  mmImgZoom.tx = mmImgMousePan.tx + dx;
+  mmImgZoom.ty = mmImgMousePan.ty + dy;
+  mmImgApply();
+});
+document.addEventListener('mouseup', function () {
+  mmImgMousePan = null;
+});
+mmImage.addEventListener('wheel', function (e) {
+  if (mmType !== 'image') return;
+  e.preventDefault();
+  mmStopSlide();
+  mmImgZoomTo(e.clientX, e.clientY, mmImgZoom.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+}, { passive: false });
 
 function openMedia(it, src) {
   mmType = it.isVideo ? 'video' : 'image';
+  if (mmType === 'video') mmStopSlide();
   mmCurrentToken = it.token;
   mmLastSave = 0;
   mmEnded = false;
@@ -3486,7 +3725,8 @@ function openMedia(it, src) {
   mmBody.scrollTop = 0;
   mmImage.classList.add('hidden');
   mmImage.removeAttribute('src');
-  mmImage.classList.remove('zoom');
+  mmImgResetZoom();
+  mmImgSpin.classList.add('hidden');
   mediaModal.classList.remove('mm-img');
   mmPlayer.classList.add('hidden');
   mmVideo.pause();
@@ -3531,11 +3771,15 @@ function openMedia(it, src) {
     mmImgNext.classList.remove('hidden');
     mmImgName.textContent = it.name;
     const imgIdx = mmTokenIdx(mmImageList, it.token);
-    mmImgCount.textContent = (mmImageList.length > 0 && imgIdx >= 0) ? (imgIdx + 1) + '/' + mmImageList.length : '';
+    const dim = (it.w && it.h) ? ' \u00b7 ' + it.w + '\u00d7' + it.h : '';
+    mmImgCount.textContent = (mmImageList.length > 0 && imgIdx >= 0) ? (imgIdx + 1) + '/' + mmImageList.length + dim : (it.w && it.h ? it.w + '\u00d7' + it.h : '');
     mediaModal.classList.remove('mm-chrome-hidden');
     mediaModal.classList.add('mm-img');
+    mmImgResetZoom();
+    mmImgSpin.classList.remove('hidden');
     mmImage.src = src;
     mmImage.classList.remove('hidden');
+    mmImgPreload();
   }
   renderRelated(it);
   mediaModal.classList.add('open');
@@ -3674,8 +3918,8 @@ document.addEventListener('keydown', function (e) {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (mmType !== 'video') {
     if (mmType === 'image') {
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); mmStepImage(-1); }
-      else if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); mmStepImage(1); }
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); mmStopSlide(); mmStepImage(-1); }
+      else if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); mmStopSlide(); mmStepImage(1); }
     }
     return;
   }

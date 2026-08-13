@@ -5,6 +5,27 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Penampil foto: zoom/pan, swipe tutup, aksi, preload, slideshow, dimensi
+
+### Ditambahkan
+- **Pinch zoom + pan** — perbesar dengan dua jari (atau roda mouse di
+  desktop) dan geser untuk menjelajah foto yang diperbesar.
+- **Double-tap zoom ke titik sentuh** — perbesar tepat di lokasi yang
+  disentuh; double-tap lagi untuk zoom-out.
+- **Swipe ke bawah untuk menutup penampil** — saat tidak diperbesar, geser
+  ke bawah kembali ke galeri.
+- **Tombol aksi di penampil** — Download (⬇), Delete (🗑), dan Slideshow (▶)
+  di bar atas; hapus foto langsung dari penampil tanpa keluar dulu.
+- **Preload foto tetangga** — foto sebelum/sesudah dimuat diam-diam supaya
+  pindah foto tidak blank.
+- **Spinner loading + pesan error** — indikator saat foto dimuat dan toast
+  bila gagal.
+- **Slideshow otomatis** — putar otomatis tiap 3,5 detik, berhenti saat
+  disentuh/di-close.
+- **Info dimensi foto (W×H)** — ukuran piksel tampil di bar atas penampil.
+- **Smoke test math zoom** — verifikasi titik sentuh dipertahankan saat
+  zoom-in/out (guard CI).
+
 ## [v1.0 — 2026-08-12] — Scroll posisi File Manager, indikator volume/brightness ala YouTube, smoke test navigasi FS
 
 ### Ditambahkan
