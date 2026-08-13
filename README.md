@@ -128,7 +128,7 @@ Fitur halaman remote:
 
 | Endpoint | Fungsi |
 |---|---|
-| `/api/status`, `/api/snapshot` | Status server & device (versi, port, PIN, ringkasan cepat) |
+| `/api/snapshot` | Status server & device (versi, port, ringkasan cepat) |
 | `/api/events` | SSE — event realtime (download, log, galeri) |
 | `/api/pin_enabled` | Apakah PIN diaktifkan |
 | `/api/login`, `/api/logout` | Sesi PIN (token) |

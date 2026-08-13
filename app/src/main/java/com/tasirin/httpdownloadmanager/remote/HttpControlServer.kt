@@ -1,17 +1,13 @@
 package com.tasirin.httpdownloadmanager.remote
 
-import android.Manifest
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.BatteryManager
 import android.annotation.SuppressLint
 import androidx.core.net.toUri
 import android.os.Build
@@ -97,7 +93,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val statPool = Executors.newFixedThreadPool(
         Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
     )
-    @Volatile private var batteryCache: Pair<Long, Pair<Int, Boolean>>? = null
     private var cachedHtml: String? = null
     private val appVersion: String by lazy {
         // SDK 35 menandai versionName nullable — paksa non-null supaya by lazy aman.
@@ -131,7 +126,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         jsonResponse(JSONObject().put("enabled", pinEnabled()))
                     session.method == Method.GET && session.uri == "/api/downloads" -> downloadsJson()
                     session.method == Method.GET && session.uri == "/api/snapshot" -> snapshotJson()
-                    session.method == Method.GET && session.uri == "/api/status" -> statusJson()
                     session.method == Method.GET && session.uri == "/api/events" -> sseResponse()
                     session.method == Method.POST && session.uri == "/api/share" -> createShare(session)
                     session.method == Method.GET && session.uri == "/api/qr" -> qrPngResponse(session)
@@ -1730,18 +1724,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     }.getOrNull()
 
-    private fun statusJson(): Response {
-        return jsonResponse(statusObject())
-    }
-
     private fun statusObject(): JSONObject {
         val obj = JSONObject()
-        val (level, charging) = batteryStatus()
-        obj.put("batteryPercent", level)
-        obj.put("batteryCharging", charging)
-        obj.put("storageFree", App.engine.freeSpaceBytes())
         obj.put("port", listeningPort)
-        obj.put("storageWriteOk", storageWriteOk())
         obj.put("readOnly", StoragePrefs.isServerReadOnly(context))
         obj.put("appVersion", appVersion)
         obj.put("appBuild", appBuild)
@@ -1750,39 +1735,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun readOnlyDenied(): Response =
         jsonResponse(JSONObject().put("ok", false).put("error", "Server is read-only"))
-
-    private fun storageWriteOk(): Boolean {
-        // Izin menulis ke folder f: (path langsung). Android 11+ wajib
-        // MANAGE_EXTERNAL_STORAGE; Android 6-10 wajib WRITE_EXTERNAL_STORAGE.
-        return if (Build.VERSION.SDK_INT >= 30) {
-            Environment.isExternalStorageManager()
-        } else if (Build.VERSION.SDK_INT >= 23) {
-            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-                PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-    }
-
-    private fun batteryStatus(): Pair<Int, Boolean> = runCatching {
-        // Status baterai jarang berubah: cache 3 dtk supaya push SSE tiap 3 dtk
-        // tidak mendaftarkan receiver berulang kali.
-        val now = System.currentTimeMillis()
-        val cached = batteryCache
-        if (cached != null && now - cached.first < BATTERY_CACHE_MS) return cached.second
-        val intent = context.registerReceiver(
-            null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        )
-        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
-        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-        val pct = if (level >= 0 && scale > 0) (level * 100 / scale) else -1
-        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-            status == BatteryManager.BATTERY_STATUS_FULL
-        val result = pct to charging
-        batteryCache = now to result
-        result
-    }.getOrDefault(-1 to false)
 
     // ---------- SSE: update real-time ----------
 
@@ -1976,7 +1928,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu
         // koneksi hidup (dan fallback polling klien tidak ikut jalan).
         private const val SSE_HEARTBEAT_MS = 3_000L
-        private const val BATTERY_CACHE_MS = 3_000L
 
         fun ipv4Addresses(): List<String> = runCatching {
             NetworkInterface.getNetworkInterfaces().toList().flatMap { ni ->

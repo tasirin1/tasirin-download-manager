@@ -129,7 +129,7 @@ Remote page features:
 
 | Endpoint | Purpose |
 |---|---|
-| `/api/status`, `/api/snapshot` | Server & device status (version, port, PIN, quick summary) |
+| `/api/snapshot` | Server & device status (version, port, quick summary) |
 | `/api/events` | SSE — realtime events (downloads, logs, gallery) |
 | `/api/pin_enabled` | Whether the PIN is enabled |
 | `/api/login`, `/api/logout` | PIN session (token) |
