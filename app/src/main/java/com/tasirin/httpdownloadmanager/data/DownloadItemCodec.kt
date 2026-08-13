@@ -22,6 +22,7 @@ object DownloadItemCodec {
             item.contentUri?.let { o.put("contentUri", it) }
             item.filePath?.let { o.put("filePath", it) }
             o.put("addedAt", item.addedAt)
+            o.put("finishedAt", item.finishedAt)
             o.put("nameIsCustom", item.nameIsCustom)
             o.put("autoResume", item.autoResume)
             o.put("username", item.username)
@@ -87,6 +88,7 @@ object DownloadItemCodec {
                 contentUri = o.optString("contentUri").ifEmpty { null },
                 filePath = o.optString("filePath").ifEmpty { null },
                 addedAt = o.optLong("addedAt", 0),
+                finishedAt = o.optLong("finishedAt", 0),
                 nameIsCustom = o.optBoolean("nameIsCustom", false),
                 autoResume = o.optBoolean("autoResume", false),
                 username = o.optString("username"),

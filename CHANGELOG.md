@@ -5,6 +5,24 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Tampilan utama remote web: bottom nav, hero status, ikon state, persen di bar, tanggal selesai & retry
+
+### Diperbaiki
+- **Bottom navigation** — akses Gallery & File Manager pindah dari pill atas ke
+  bar navigasi tetap di bawah (Downloads/Gallery/Files) ber-ikon + label,
+  dengan badge jumlah download aktif di tab Downloads; ramah jempol dan D-pad.
+- **Hero status card** — kartu status perangkat menyatu dengan free storage dan
+  kecepatan aktif (⚡ total speed · N active) yang diperbarui live; pill
+  kecepatan di topbar dihapus.
+- **Ikon state berwarna** — ikon file di kiri item diberi warna sesuai state:
+  hijau selesai, merah gagal/dibatalkan, amber jeda/antre, biru aktif.
+- **Persen di ujung progress bar** — persentase tampil di sisi kanan bar;
+  bar penuh berwarna hijau saat selesai.
+- **Tanggal selesai** — item COMPLETED menampilkan ukuran + waktu selesai
+  (field `finishedAt` baru di model, codec, engine, dan API download).
+- **Tombol Retry di kartu gagal** — item FAILED kini punya tombol Retry
+  langsung di bawah pesan error.
+
 ## [v1.0 — 2026-08-13] — Audit efisiensi: cache row FS, sort tanpa lowercase, hoist format/escape, wakelock guard
 
 ### Diperbaiki

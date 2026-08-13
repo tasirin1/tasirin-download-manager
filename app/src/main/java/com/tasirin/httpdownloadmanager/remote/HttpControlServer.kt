@@ -535,6 +535,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             o.put("etaSeconds", item.etaSeconds)
             o.put("speedLimitKbps", item.speedLimitKbps)
             o.put("addedAt", item.addedAt)
+            o.put("finishedAt", item.finishedAt)
             item.error?.let { o.put("error", it) }
             arr.put(o)
         }
