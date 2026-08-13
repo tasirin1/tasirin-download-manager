@@ -116,6 +116,7 @@ const sandbox = {
   fetch: () => new Promise(() => {}),
   XMLHttpRequest: FakeXHR,
   FileReader: function () {},
+  Image: function () { this.src = ''; },
   URLSearchParams,
   URL,
   Blob: function () {},
@@ -195,6 +196,22 @@ vm.runInContext('fsPath = "f:/sdcard"; fsNewBadges = {};', sandbox);
 sandbox.fsMarkNew('f:/sdcard', 'video.mp4');
 fsExpect(sandbox.fsIsNew('video.mp4') === true, 'badge NEW muncul untuk file baru');
 fsExpect(sandbox.fsIsNew('lama.mp4') === false, 'badge NEW tidak muncul untuk file lain');
+
+// --- Tes math zoom penampil foto (titik sentuh dipertahankan) ---
+const mmImgEl = elements['mmImage'];
+mmImgEl.offsetWidth = 800;
+mmImgEl.offsetHeight = 600;
+const mmBodyEl = elements['mmBody'];
+mmBodyEl.clientWidth = 800;
+mmBodyEl.clientHeight = 600;
+mmBodyEl.getBoundingClientRect = function () { return { top: 0, left: 0, width: 800, height: 600 }; };
+vm.runInContext('mmType = "image"; mmImgZoom = { s: 1, tx: 0, ty: 0 };', sandbox);
+sandbox.mmImgZoomTo(400, 300, 2.5);
+fsExpect(Math.abs(vm.runInContext('mmImgZoom.s', sandbox) - 2.5) < 0.001, 'zoom foto in 2.5x');
+fsExpect(Math.abs(vm.runInContext('mmImgZoom.tx', sandbox) + 600) < 1, 'zoom foto menahan titik sentuh (tx)');
+sandbox.mmImgZoomTo(400, 300, 1);
+fsExpect(vm.runInContext('mmImgZoom.s', sandbox) === 1, 'zoom foto out reset ke 1');
+fsExpect(vm.runInContext('mmImgZoom.tx', sandbox) === 0, 'zoom foto out tx kembali 0');
 
 // Reset state agar tes upload di bawah tidak terpengaruh
 vm.runInContext('fsPath = ""; fsBackStack.length = 0;', sandbox);
