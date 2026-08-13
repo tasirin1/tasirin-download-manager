@@ -41,6 +41,7 @@ BANNED_ID = [
     "layar", "warna", "gelap", "terang", "kamera", "mendukung", "menolak",
     "menolak", "melanjutkan", "dilanjutkan", "dibatalkan", "dipause",
     "menyimpan", "penyimpanan", "bersihkan", "dibersihkan", "memperbarui",
+    "sisa",
 ]
 
 
