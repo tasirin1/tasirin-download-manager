@@ -5,6 +5,19 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-12] — Scroll posisi File Manager, indikator volume/brightness ala YouTube, smoke test navigasi FS
+
+### Ditambahkan
+- **Posisi scroll folder dipertahankan** — kembali naik folder (Back/Up)
+  mengembalikan posisi scroll folder sebelumnya; tiap folder menyimpan
+  posisinya sendiri selama sesi.
+- **Indikator volume & brightness saat swipe vertikal** — pemutar video kini
+  menampilkan indikator ala YouTube (ikon + persen + bar vertikal) saat
+  menggeser sisi kiri layar untuk brightness dan sisi kanan untuk volume.
+- **Smoke test navigasi File Manager** — `upload_smoke_test.js` kini juga
+  memverifikasi `parentFsPath`, breadcrumb (`fsCrumbParts`/`collapseCrumbs`),
+  back-stack + Back, tombol Up/Home, dan badge NEW; mencegah regresi di CI.
+
 ## [v1.0 — 2026-08-12] — File Manager: Back naik folder, lokasi tersimpan, progress upload inline, badge NEW
 
 ### Ditambahkan
