@@ -5,6 +5,18 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Audit kode: hapus fmtDate duplikat, perbaiki string UI upload
+
+### Diperbaiki
+- **Hapus `fmtDate` duplikat (kode mati)** — dua definisi `fmtDate` di
+  `remote.src.html` menimpa satu sama lain (hoisting); definisi pertama tidak
+  pernah dieksekusi dan dihapus. Satu implementasi tersisa, perilaku tampilan
+  tidak berubah.
+- **String UI upload ke Inggris** — teks "sisa ~" pada progres upload chunk
+  diganti "ETA ~" (guard i18n tidak menangkap kata "sisa" sebelumnya).
+- **Guard i18n diperkuat** — kata "sisa" ditambahkan ke daftar larangan
+  `BANNED_ID` di `scripts/prepare_remote.py` agar tidak muncul lagi.
+
 ## [v1.0 — 2026-08-13] — Sembunyikan tombol penampil foto saat zoom
 
 ### Diperbaiki

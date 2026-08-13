@@ -1560,7 +1560,7 @@ progressBar.style.width = pct + '%';
 const etaSec = speed > 0 && totalBytes > bestDone
 ? Math.round((totalBytes - bestDone) / speed) : 0;
 progressPct.textContent = pct + '% \u00b7 ' + fmtSpeed(speed) +
-(etaSec > 0 ? ' \u00b7 sisa ~' + fmtEta(etaSec) : '');
+(etaSec > 0 ? ' \u00b7 ETA ~' + fmtEta(etaSec) : '');
 ulSet(job.id, Math.min(99, Math.round((start + chunkBest) * 100 / file.size)) + '%', 'run');
 fsRowUploadProgress(file.name, Math.min(99, Math.round((start + chunkBest) * 100 / file.size)));
 };
@@ -1894,10 +1894,6 @@ fsMsg('Upload failed to start: ' + ((err && err.message) ? err.message : err), t
 function extOf(name) {
 const i = name.lastIndexOf('.');
 return i >= 0 ? name.slice(i + 1).slice(0, 6) : '\u2699';
-}
-function fmtDate(ms) {
-const d = new Date(ms);
-return d.getDate() + ' ' + ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][d.getMonth()] + ' ' + d.getFullYear();
 }
 async function doDeleteMedia(token, ok) {
 const body = new URLSearchParams({token: token});
