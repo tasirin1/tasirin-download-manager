@@ -720,6 +720,24 @@
   #mmToast {
  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,.72); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; pointer-events: none; }
 
+  #mmLevel {
+ position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 42;
+ display: flex; flex-direction: column; align-items: center; gap: 6px;
+ background: rgba(0,0,0,.72); color: #fff; padding: 12px 16px; border-radius: 12px;
+ min-width: 92px; text-align: center; pointer-events: none; }
+
+  #mmLevel .lv-ico {
+ font-size: 22px; }
+
+  #mmLevel .lv-val {
+ font-size: 13px; font-weight: 700; }
+
+  #mmLevel .lv-bar {
+ width: 6px; height: 64px; border-radius: 999px; background: rgba(255,255,255,.25); overflow: hidden; margin-top: 2px; }
+
+  #mmLevel .lv-bar i {
+ display: block; width: 100%; height: 50%; background: #fff; border-radius: 999px; transition: height .05s linear; }
+
   #mmPlayerTop {
  position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 4px; padding: 6px 8px 26px; background: linear-gradient(rgba(0,0,0,.78), transparent); pointer-events: none; transition: opacity .25s ease; }
 
@@ -1304,6 +1322,7 @@
       <div id="mmBigPlay" class="mm-big hidden"><div class="icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>
       <div id="mmSpinner" class="mm-spin hidden"></div>
       <div id="mmToast" class="hidden"></div>
+      <div id="mmLevel" class="hidden"><span class="lv-ico"></span><span class="lv-val"></span><span class="lv-bar"><i></i></span></div>
       <div id="mmSeekTip" class="hidden"></div>
       <div id="mmCtrl" class="hidden">
         <div id="mmSeekWrap">
@@ -1633,6 +1652,17 @@ function mmShowToast(text) {
   mmToast.classList.remove('hidden');
   clearTimeout(mmToast._t);
   mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, 700);
+}
+
+const mmLevel = document.getElementById('mmLevel');
+function mmShowLevel(kind, pct) {
+  if (!mmLevel) return;
+  mmLevel.querySelector('.lv-ico').textContent = kind === 'b' ? '\u{1F506}' : '\u{1F50A}';
+  mmLevel.querySelector('.lv-val').textContent = Math.round(pct * 100) + '%';
+  mmLevel.querySelector('.lv-bar i').style.height = Math.round(pct * 100) + '%';
+  mmLevel.classList.remove('hidden');
+  clearTimeout(mmLevel._t);
+  mmLevel._t = setTimeout(function () { mmLevel.classList.add('hidden'); }, 700);
 }
 
 function mmShowCtrl() {
@@ -2028,6 +2058,7 @@ let fsTotal = 0;
 let fsOffset = 0;
 let fsLoadingMore = false;
 const FS_PAGE = 1000;
+let fsScrollPos = {};
 let fsSelectMode = false;
 const fsSelected = [];
 const fsView = document.getElementById('fsView');
@@ -2137,8 +2168,16 @@ document.getElementById('fsHomeBtn').addEventListener('click', function () {
   fsNavigate('');
 });
 
+function fsSaveScroll() {
+  try { fsScrollPos[fsPath] = window.scrollY || 0; } catch (e) {}
+}
+function fsRestoreScroll() {
+  try { window.scrollTo(0, fsScrollPos[fsPath] || 0); } catch (e) {}
+}
+
 function fsNavigate(path) {
   if (path === fsPath) return;
+  fsSaveScroll();
   fsBackStack.push(fsPath);
   if (fsBackStack.length > 60) fsBackStack.shift();
   try { history.pushState({ fsFolder: 1 }, '', location.href); } catch (e) {}
@@ -2265,6 +2304,7 @@ async function loadFs() {
     else localStorage.removeItem(FS_LAST_PATH_KEY);
     if (!fsPath && !fsLocationsLoaded) loadFsLocations();
     renderFs(fsItems);
+    fsRestoreScroll();
   } catch (e) {
     if (fsRestoredOnce && fsPath) {
       fsPath = '';
@@ -3783,10 +3823,10 @@ mmPlayer.addEventListener('touchmove', function (e) {
   const val = Math.min(1, Math.max(0, mmGesture.startVal + delta));
   if (mmGesture.side === 'b') {
     mmSetBrightness(val);
-    mmShowToast('\u{1F506} ' + Math.round(val * 100) + '%');
+    mmShowLevel('b', val);
   } else {
     mmVideo.volume = val;
-    mmShowToast('\u{1F50A} ' + Math.round(val * 100) + '%');
+    mmShowLevel('v', val);
   }
 }, { passive: false });
 let mmTap = { x: 0, y: 0, t: 0 };
@@ -4323,6 +4363,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 window.addEventListener('hashchange', applyRoute);
 window.addEventListener('popstate', function () {
   if (currentRoute() !== 'files' || fsBackStack.length === 0) return;
+  fsSaveScroll();
   fsPath = fsBackStack.pop();
   loadFs();
 });

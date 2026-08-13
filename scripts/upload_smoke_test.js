@@ -22,6 +22,7 @@ const main = blocks[1][1];
 function makeEl(id) {
   return {
     id: id || '',
+    _handlers: {},
     _text: '',
     style: {},
     dataset: {},
@@ -38,7 +39,8 @@ function makeEl(id) {
     appendChild(c) { this.children.push(c); return c; },
     querySelector() { return makeEl(); },
     querySelectorAll() { return []; },
-    addEventListener() {}, removeEventListener() {},
+    addEventListener(type, fn) { (this._handlers[type] = this._handlers[type] || []).push(fn); },
+    removeEventListener() {},
     setAttribute() {}, getAttribute() { return null; },
     closest() { return null; },
     focus() {}, click() {}, scrollIntoView() {},
@@ -93,8 +95,12 @@ const sandbox = {
     head: makeEl('head'),
   },
   window: {
-    addEventListener() {}, removeEventListener() {},
+    _handlers: {},
+    addEventListener(type, fn) { (this._handlers[type] = this._handlers[type] || []).push(fn); },
+    removeEventListener() {},
     innerWidth: 800, innerHeight: 600,
+    scrollY: 0,
+    scrollTo() {},
     location: { search: '', pathname: '/', hash: '' },
   },
   location: { search: '', pathname: '/', hash: '', reload() {} },
@@ -129,6 +135,69 @@ try {
 // Spy fsMsg untuk mendeteksi pesan selesai (callback done startFsUpload).
 const msgs = [];
 sandbox.fsMsg = function (text, isErr) { msgs.push({ text: String(text), isErr: !!isErr }); };
+
+// --- Tes navigasi & breadcrumb File Manager (guard regresi) ---
+function fsExpect(cond, label) {
+  if (!cond) {
+    console.error('FAIL: ' + label);
+    process.exit(1);
+  }
+}
+
+fsExpect(sandbox.parentFsPath('f:/sdcard/Download/APK') === 'f:/sdcard/Download', 'parentFsPath naik 1 level (f:)');
+fsExpect(sandbox.parentFsPath('f:/sdcard') === '', 'parentFsPath dari f:/sdcard ke root');
+fsExpect(sandbox.parentFsPath('f:') === '', 'parentFsPath f: -> kosong');
+fsExpect(sandbox.parentFsPath('') === '', 'parentFsPath kosong -> kosong');
+fsExpect(sandbox.parentFsPath('m:a/b/c') === 'm:a/b', 'parentFsPath naik 1 level (m:)');
+fsExpect(sandbox.parentFsPath('m:a') === '', 'parentFsPath m: level 1 -> kosong');
+
+const parts = sandbox.fsCrumbParts('f:/sdcard/Download/APK');
+fsExpect(parts.length === 4, 'fsCrumbParts menghasilkan 4 bagian');
+fsExpect(parts[0].path === '' && parts[parts.length - 1].label === 'APK', 'fsCrumbParts root + label terakhir');
+fsExpect(parts[parts.length - 1].path === 'f:/sdcard/Download/APK', 'fsCrumbParts path terakhir benar');
+const long = sandbox.collapseCrumbs(sandbox.fsCrumbParts('f:/a/b/c/d/e/f'));
+fsExpect(long.length === 4 && long[1].dots === true, 'collapseCrumbs memendekkan breadcrumb panjang');
+
+function fireWindow(type) {
+  (sandbox.window._handlers[type] || []).forEach(function (h) {
+    h({ preventDefault() {}, stopPropagation() {} });
+  });
+}
+function fireEl(el, type) {
+  (el._handlers[type] || []).forEach(function (h) {
+    h({ preventDefault() {}, stopPropagation() {} });
+  });
+}
+
+// Back-stack & popstate (Back Android/browser = naik folder)
+vm.runInContext('fsPath = ""; fsBackStack.length = 0;', sandbox);
+sandbox.location.hash = '#/files';
+sandbox.fsNavigate('f:/sdcard');
+sandbox.fsNavigate('f:/sdcard/Download');
+fsExpect(vm.runInContext('fsBackStack.length', sandbox) === 2, 'back stack mencatat 2 folder');
+fsExpect(vm.runInContext('fsPath', sandbox) === 'f:/sdcard/Download', 'fsPath mengikuti navigasi');
+fireWindow('popstate');
+fsExpect(vm.runInContext('fsPath', sandbox) === 'f:/sdcard', 'Back kembali ke folder sebelumnya');
+fireWindow('popstate');
+fsExpect(vm.runInContext('fsPath', sandbox) === '', 'Back kembali ke root storage');
+fireWindow('popstate');
+fsExpect(vm.runInContext('fsPath', sandbox) === '', 'Back di root tidak mengubah folder');
+
+// Tombol Up & Home
+vm.runInContext('fsPath = "f:/sdcard/Download"; fsBackStack.length = 0;', sandbox);
+fireEl(elements['fsUpBtn'], 'click');
+fsExpect(vm.runInContext('fsPath', sandbox) === 'f:/sdcard', 'tombol Up naik 1 folder');
+fireEl(elements['fsHomeBtn'], 'click');
+fsExpect(vm.runInContext('fsPath', sandbox) === '', 'tombol Home kembali ke root');
+
+// Badge NEW untuk file yang baru di-upload
+vm.runInContext('fsPath = "f:/sdcard"; fsNewBadges = {};', sandbox);
+sandbox.fsMarkNew('f:/sdcard', 'video.mp4');
+fsExpect(sandbox.fsIsNew('video.mp4') === true, 'badge NEW muncul untuk file baru');
+fsExpect(sandbox.fsIsNew('lama.mp4') === false, 'badge NEW tidak muncul untuk file lain');
+
+// Reset state agar tes upload di bawah tidak terpengaruh
+vm.runInContext('fsPath = ""; fsBackStack.length = 0;', sandbox);
 
 // 1 file kecil (1 chunk) + 1 file besar multi-chunk.
 const jobs = sandbox.fsUploadJobsFrom([
