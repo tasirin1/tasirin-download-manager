@@ -72,24 +72,6 @@
   .wrap {
  max-width: 880px; margin: 18px auto 0; padding: 0 16px; }
 
-  .status-card {
- display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; box-shadow: var(--shadow-sm); margin-bottom: 14px; font-size: 12.5px; color: var(--muted); }
-
-  .status-card .dot {
- display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; box-shadow: 0 0 0 3px var(--green-bg); }
-
-  .status-card b {
- color: var(--ink); font-weight: 700; }
-
-  .status-card .st-item {
- display: inline-flex; align-items: center; gap: 5px; line-height: 1.35; white-space: nowrap; }
-
-  .status-card .st-sep {
- opacity: .45; }
-
-  .status-card .st-warn {
- color: #e53935; font-weight: 600; }
-
   .toolbar {
  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 
@@ -221,12 +203,6 @@
 
   .item-sub {
  padding-left: 54px; }
-
-  .st-speed {
- color: var(--accent); font-weight: 700; white-space: nowrap; }
-
-  .st-speed .st-sub {
- color: var(--muted); font-weight: 600; font-size: 11px; }
 
   .item-menu-btn, .fs-more-btn {
  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; align-self: center; transition: color .15s ease, border-color .15s ease, background .15s ease; }
@@ -968,16 +944,6 @@
   #filtersSticky .seg {
  margin-bottom: 0; }
 
-  .status-card.offline .dot {
- background: var(--red); box-shadow: 0 0 0 3px var(--red-bg); animation: dotBlink 1.1s ease-in-out infinite; }
-
-  @keyframes dotBlink {
- 0%, 100% {
- opacity: 1; }
- 50% {
- opacity: .35; }
- }
-
   .empty {
  padding: 44px 16px; text-align: center; color: var(--muted); }
 
@@ -1064,7 +1030,7 @@
  animation: itemIn .28s ease both; }
 
   @media (prefers-reduced-motion: reduce) {
- .view-anim, li.item.anim, .skeleton, .status-card.offline .dot {
+ .view-anim, li.item.anim, .skeleton {
  animation: none !important; }
  }
 
@@ -1161,12 +1127,6 @@
     .grid2 {
  grid-template-columns: 1fr; }
 
-    .status-card {
- gap: 4px 8px; font-size: 12px; padding: 9px 12px; }
-
-  .status-card .st-item {
- white-space: normal; }
-
   }
 
   .old-browser {
@@ -1220,14 +1180,6 @@
 </div>
 
 <div class="wrap">
-  <div class="status-card" id="deviceStatus">
-    <span class="st-item" id="stConn"><span class="dot"></span>Connecting to device…</span>
-    <span class="st-sep hidden" id="stSep">·</span>
-    <span class="st-item hidden" id="stFree"></span>
-    <span class="st-item st-speed hidden" id="stSpeed"></span>
-    <span class="st-item st-warn" id="stWarn"></span>
-  </div>
-
   <div class="toolbar hidden" id="downloadsToolbar">
     <button id="pauseAllBtn" type="button">&#9209; Pause all</button>
     <button id="resumeAllBtn" type="button">&#9654; Resume all</button>
@@ -1566,36 +1518,8 @@ addSheet.addEventListener('click', function (e) {
   if (e.target === addSheet) toggleAddForm(false);
 });
 
-function renderStatus(st) {
-  const el = document.getElementById('deviceStatus');
-  if (!el) return;
-  const conn = document.getElementById('stConn');
-  if (conn) conn.innerHTML = '<span class="dot"></span><b>Device connected</b>';
-  const free = document.getElementById('stFree');
-  const sep = document.getElementById('stSep');
-  const hasFree = typeof st.storageFree === 'number';
-  if (free) {
-    free.textContent = hasFree ? 'Free ' + fmt(st.storageFree) : '';
-    free.classList.toggle('hidden', !hasFree);
-  }
-  if (sep) sep.classList.toggle('hidden', !hasFree);
+function applyServerStatus(st) {
   serverReadOnly = !!st.readOnly;
-  const warn = document.getElementById('stWarn');
-  if (warn) {
-    const w = [];
-    if (serverReadOnly) {
-      w.push('<span class="st-item st-warn">&#128274;&#65039; Read-only server: upload &amp; file changes disabled.</span>');
-    }
-    if (st.storageWriteOk === false) {
-      w.push('<span class="st-item st-warn">&#9888;&#65039; File access permission not enabled — open the app &gt; Remote (HTTP) &gt; Enable file access.</span>');
-    }
-    warn.innerHTML = w.join('<span class="st-sep">\u00b7</span>');
-  }
-  el.classList.remove('offline');
-  const footer = document.getElementById('appFooter');
-  if (footer && st.appVersion) {
-    footer.textContent = 'Server v' + st.appVersion + (st.appBuild ? ' (build ' + st.appBuild + ')' : '') + ' \u00b7 Tasirin Download Manager';
-  }
   if (st.port && location.port && Number(st.port) !== Number(location.port)) {
     const proto = location.protocol;
     const host = location.hostname;
@@ -1604,23 +1528,9 @@ function renderStatus(st) {
       proto + '//' + host + ':' + st.port + location.pathname
     );
   }
-}
-
-async function refreshStatus() {
-  const el = document.getElementById('deviceStatus');
-  if (!el) return;
-  try {
-    const res = await fetch(API + '/api/status');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    renderStatus(await res.json());
-  } catch (e) {
-    el.classList.add('offline');
-    const conn = document.getElementById('stConn');
-    if (conn) conn.innerHTML = '<span class="dot"></span><b>Server not connected</b> — start the server from the app';
-    ['stFree', 'stSep', 'stSpeed'].forEach(function (id) {
-      const x = document.getElementById(id);
-      if (x) x.classList.add('hidden');
-    });
+  const footer = document.getElementById('appFooter');
+  if (footer && st.appVersion) {
+    footer.textContent = 'Server v' + st.appVersion + (st.appBuild ? ' (build ' + st.appBuild + ')' : '') + ' \u00b7 Tasirin Download Manager';
   }
 }
 
@@ -2187,7 +2097,7 @@ fsBtn.addEventListener('click', function () {
   location.hash = (currentRoute() === 'files') ? '#/' : '#/files';
 });
 
-const DOWNLOADS_VIEW = ['deviceStatus', 'downloadsToolbar', 'filtersSticky', 'addSheet', 'status', 'list'];
+const DOWNLOADS_VIEW = ['downloadsToolbar', 'filtersSticky', 'addSheet', 'status', 'list'];
 
 function currentRoute() {
   const h = location.hash;
@@ -4318,7 +4228,6 @@ async function refresh() {
     failCount = 0;
     hasLoadedItems = true;
     document.getElementById('status').textContent = '';
-    document.getElementById('deviceStatus').classList.remove('offline');
     hideConnBanner();
     const items = data.items || [];
     lastItems = items;
@@ -4376,24 +4285,6 @@ function fileIcon(name) {
   if (FILE_ICON_ARC.indexOf(e) >= 0) return '\u{1F4E6}';
   if (FILE_ICON_DOC.indexOf(e) >= 0) return '\u{1F4C4}';
   return '\u{1F4CE}';
-}
-
-function renderSpeedTotal(items) {
-  const el = document.getElementById('stSpeed');
-  if (!el) return;
-  let total = 0;
-  let active = 0;
-  items.forEach(function (it) {
-    if (it.state === 'DOWNLOADING') {
-      active++;
-      if (it.speedBps > 0) total += it.speedBps;
-    } else if (it.state === 'PENDING') {
-      active++;
-    }
-  });
-  if (!active) { el.classList.add('hidden'); return; }
-  el.classList.remove('hidden');
-  el.innerHTML = '<span class="st-sep">\u00b7</span> &#9889; ' + fmtSpeed(total) + ' <span class="st-sub">' + active + ' active</span>';
 }
 
 function updateToolbar(items) {
@@ -4516,7 +4407,6 @@ function updateRows(items) {
       li._sub = li.querySelector('.item-sub');
     }
   });
-  renderSpeedTotal(items);
   updateToolbar(items);
 }
 
@@ -4536,7 +4426,6 @@ function rebuildList(items) {
     const d = actA - actB;
     return d !== 0 ? d : ((b.addedAt || 0) - (a.addedAt || 0));
   });
-  renderSpeedTotal(items);
   updateToolbar(items);
   const filtered = items.filter(function (it) {
     if (webFilter === 'ALL') return true;
@@ -4762,7 +4651,6 @@ window.addEventListener('popstate', function () {
   loadFs();
 });
 applyRoute();
-refreshStatus();
 let sse = null;
 let sseFailCount = 0;
 let lastSseAt = 0;
@@ -4777,7 +4665,6 @@ function connectEvents() {
     sseFailCount = 0;
     lastSseAt = Date.now();
     hasLoadedItems = true;
-    document.getElementById('deviceStatus').classList.remove('offline');
     try {
       const data = JSON.parse(ev.data);
       if (data.shutdown) {
@@ -4786,14 +4673,13 @@ function connectEvents() {
       }
       const items = data.items || [];
       lastItems = items;
-      if (data.status) renderStatus(data.status);
+      if (data.status) applyServerStatus(data.status);
       render(items);
     } catch (e) {}
   };
   sse.onerror = function () {
     sseFailCount++;
     if (sseFailCount > 2) {
-      document.getElementById('deviceStatus').classList.add('offline');
       showConnBanner('Realtime connection lost. Check that the server in the app is still running.');
     }
   };
@@ -4840,9 +4726,8 @@ async function pollSnapshot() {
     failCount = 0;
     hasLoadedItems = true;
     document.getElementById('status').textContent = '';
-    document.getElementById('deviceStatus').classList.remove('offline');
     hideConnBanner();
-    if (data.status) renderStatus(data.status);
+    if (data.status) applyServerStatus(data.status);
     const items = data.items || [];
     lastItems = items;
     if (currentRoute() === 'downloads') render(items);

@@ -5,6 +5,21 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Hapus bilah status remote web
+
+### Diperbaiki
+- **Bilah status dihapus** — kartu status ("Device connected / Free storage /
+  kecepatan) di halaman remote web tidak lagi ditampilkan; informasinya
+  redundan dengan File Manager (kapasitas penyimpanan sudah terlihat di root
+  storage). HTML, CSS, dan JS terkait (`renderStatus`, `refreshStatus`,
+  `renderSpeedTotal`) dibuang — remote.html hemat ~3,9 KB.
+- **Logika penting dipertahankan** — flag `serverReadOnly` (menyembunyikan
+  tombol upload/select), banner "Server moved to port", dan versi server di
+  footer tetap jalan lewat helper `applyServerStatus()` yang dipanggil dari
+  SSE & polling snapshot.
+- **Smoke test baru** — verifikasi `applyServerStatus` menetapkan flag
+  read-only dan memunculkan banner pindah port.
+
 ## [v1.0 — 2026-08-13] — Perbaikan tab Downloads tidak bisa diklik dari File Manager/Galeri
 
 ### Diperbaiki
