@@ -317,7 +317,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             val density = resources.displayMetrics.density
             val q = query.trim().lowercase()
             val recents = StoragePrefs.recentUrls(this)
-                .filter { q.isEmpty() || it.lowercase().contains(q) }
+                .filter { q.isEmpty() || it.indexOf(q, ignoreCase = true) >= 0 }
                 .take(10)
             recents.forEach { u ->
                 val tv = TextView(this)
@@ -951,25 +951,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED
             }
         }
-        val stateRank = mapOf(
-            DownloadState.PENDING to 0,
-            DownloadState.DOWNLOADING to 1,
-            DownloadState.PAUSED to 2,
-            DownloadState.COMPLETED to 3,
-            DownloadState.FAILED to 4,
-            DownloadState.CANCELLED to 5
-        )
         return when (sortMode) {
             // Daftar engine sudah terurut addedAt desc, jadi tanpa sort ulang.
             0 -> filtered
             1 -> filtered.asReversed()
-            2 -> filtered.sortedBy { it.fileName.lowercase() }
-            3 -> filtered.sortedByDescending { it.fileName.lowercase() }
+            2 -> filtered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileName })
+            3 -> filtered.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.fileName })
             4 -> filtered.sortedByDescending { it.totalBytes }
             5 -> filtered.sortedBy { it.totalBytes }
             else -> filtered.sortedWith(
-                compareBy<DownloadItem> { stateRank[it.state] ?: 0 }
-                    .thenBy { it.fileName.lowercase() }
+                compareBy<DownloadItem> { STATE_RANK[it.state] ?: 0 }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.fileName }
             )
         }
     }
@@ -1082,6 +1074,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     companion object {
+        private val STATE_RANK = mapOf(
+            DownloadState.PENDING to 0,
+            DownloadState.DOWNLOADING to 1,
+            DownloadState.PAUSED to 2,
+            DownloadState.COMPLETED to 3,
+            DownloadState.FAILED to 4,
+            DownloadState.CANCELLED to 5
+        )
         private val URL_SPLIT = Regex("[\\s,]+")
         private const val EXTRA_ADD_DOWNLOAD = "com.tasirin.httpdownloadmanager.ADD_DOWNLOAD"
         private val SPEED_KBPS = intArrayOf(0, 128, 256, 512, 1024, 2048, 5120)

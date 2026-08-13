@@ -871,6 +871,7 @@ fsList.innerHTML = emptyHtml('warn', 'Failed to load folder', String(e));
 }
 }
 function showFsSkeleton() {
+fsRowCache = {};
 let html = '<div class="sk-list">';
 for (let i = 0; i < 4; i++) {
 html += '<div class="sk-item"><div class="sk-ico skeleton"></div><div class="sk-lines">' +
@@ -910,6 +911,7 @@ return '<div class="fs-cap"><div class="fill" style="width:' + pct + '%"></div><
 }
 function renderFs(items) {
 const box = fsList;
+fsRowCache = {};
 box.innerHTML = '';
 if (!fsPath) {
 if (!items.length) {
@@ -998,6 +1000,7 @@ openFsSheet(it);
 });
 }
 row._it = it;
+fsRowCache[it.name] = row;
 box.appendChild(row);
 fsApplySearch(row);
 }
@@ -1067,11 +1070,17 @@ function fsIsNew(name) {
 const arr = fsNewBadges[fsPath];
 return !!(arr && arr.indexOf(name) >= 0);
 }
+let fsRowCache = {};
 function fsFindFsRow(name) {
+const hit = fsRowCache[name];
+if (hit && hit._it && hit._it.name === name && hit.parentNode) return hit;
 const rows = fsList.querySelectorAll('.fs-row');
 for (let i = 0; i < rows.length; i++) {
 const it = rows[i]._it;
-if (it && it.name === name) return rows[i];
+if (it && it.name === name) {
+fsRowCache[name] = rows[i];
+return rows[i];
+}
 }
 return null;
 }
@@ -2680,7 +2689,7 @@ if (seconds <= 0) return '0s';
 const h = Math.floor(seconds / 3600);
 const m = Math.floor((seconds % 3600) / 60);
 const s = seconds % 60;
-if (h > 0) return h + 'j ' + String(m).padStart(2, '0') + 'm';
+if (h > 0) return h + 'h ' + String(m).padStart(2, '0') + 'm';
 if (m > 0) return m + 'm ' + String(s).padStart(2, '0') + 's';
 return s + 's';
 }
@@ -2873,9 +2882,9 @@ rowNodes.set(it.id, li);
 list.appendChild(li);
 }
 }
+var HTML_ENT = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 function escapeHtml(s) {
-return String(s).replace(/[&<>"']/g, c =>
-({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+return String(s).replace(/[&<>"']/g, c => HTML_ENT[c]);
 }
 const confirmModal = document.getElementById('confirmModal');
 let confirmCb = null;
