@@ -197,6 +197,18 @@ sandbox.location.hash = '#/files';
 fireEl(elements['tabDownloads'], 'click');
 fsExpect(sandbox.location.hash === '#/', 'tab Downloads kembali ke halaman download');
 
+// Bilah status dihapus: applyServerStatus mempertahankan flag read-only
+// dan banner pindah port tanpa elemen status-card.
+vm.runInContext('serverReadOnly = false;', sandbox);
+sandbox.applyServerStatus({ readOnly: true, appVersion: '1.0' });
+fsExpect(vm.runInContext('serverReadOnly', sandbox) === true, 'applyServerStatus menetapkan serverReadOnly');
+sandbox.location.port = '8082';
+sandbox.applyServerStatus({ port: 8081, appVersion: '1.0' });
+fsExpect(elements['connBannerText'].textContent.indexOf('Server moved to port 8081') >= 0,
+  'applyServerStatus memunculkan banner pindah port');
+delete sandbox.location.port;
+vm.runInContext('serverReadOnly = false;', sandbox);
+
 // Badge NEW untuk file yang baru di-upload
 vm.runInContext('fsPath = "f:/sdcard"; fsNewBadges = {};', sandbox);
 sandbox.fsMarkNew('f:/sdcard', 'video.mp4');
