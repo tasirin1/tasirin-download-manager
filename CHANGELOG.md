@@ -5,6 +5,16 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Perbaikan tab Downloads tidak bisa diklik dari File Manager/Galeri
+
+### Diperbaiki
+- **Tab Downloads kini bisa diklik kembali** — tombol `tabDownloads` di tab bar
+  remote web tidak punya handler klik sejak fitur bottom nav diperkenalkan,
+  jadi dari File Manager/Galeri tidak ada cara kembali ke halaman download
+  lewat tab. Handler ditambahkan mengikuti pola tab Galeri/File.
+- **Smoke test baru** — guard regresi memastikan klik tab Downloads dari
+  halaman Files kembali ke route downloads.
+
 ## [v1.0 — 2026-08-13] — Audit kode: hapus fmtDate duplikat, perbaiki string UI upload
 
 ### Diperbaiki

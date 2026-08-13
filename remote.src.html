@@ -1719,6 +1719,9 @@ let mmCurrentToken = '';
 let mmLastSave = 0;
 let mmGesture = null;
 
+document.getElementById('tabDownloads').addEventListener('click', function () {
+  location.hash = '#/';
+});
 galleryBtn.addEventListener('click', function () {
   location.hash = (currentRoute() === 'gallery') ? '#/' : '#/gallery';
 });

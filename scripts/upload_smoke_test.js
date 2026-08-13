@@ -191,6 +191,12 @@ fsExpect(vm.runInContext('fsPath', sandbox) === 'f:/sdcard', 'tombol Up naik 1 f
 fireEl(elements['fsHomeBtn'], 'click');
 fsExpect(vm.runInContext('fsPath', sandbox) === '', 'tombol Home kembali ke root');
 
+// Tombol Downloads di tab bar (guard regresi: tab Downloads sempat tanpa
+// handler klik sehingga tidak bisa kembali dari File Manager/Galeri).
+sandbox.location.hash = '#/files';
+fireEl(elements['tabDownloads'], 'click');
+fsExpect(sandbox.location.hash === '#/', 'tab Downloads kembali ke halaman download');
+
 // Badge NEW untuk file yang baru di-upload
 vm.runInContext('fsPath = "f:/sdcard"; fsNewBadges = {};', sandbox);
 sandbox.fsMarkNew('f:/sdcard', 'video.mp4');
