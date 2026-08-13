@@ -5,6 +5,27 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Pengelolaan repo untuk AI: AGENTS.md diperkuat, template PR/issue, branch protection
+
+### Diperbaiki
+- **AGENTS.md diperkuat** (PR #90):
+  - Section **Keputusan & larangan historis** — daftar fitur yang sengaja
+    dihapus/dilarang (auto-install, tema gelap native, bilah status,
+    `/api/status`, zxing runtime, `values-en`, naikkan minSdk) supaya AI
+    tidak menghidupkannya lagi.
+  - Section **Pola bug & guard-nya** — tabel bug berulang + smoke test/guard
+    yang melindunginya.
+  - **Cara cek rilis terbaru** — pola asset APK `-v1.0-<code>.apk` dan
+    perintah `gh` untuk memantau build/release.
+  - **Verifikasi keystore** — fingerprint SHA-256 sertifikat signing
+    (`c2785a61...`) + cara cek dengan `keytool`.
+  - Aturan baru: changelog wajib per PR (sebut nomor PR), satu PR satu
+    tujuan, pantau build `main` sampai rilis.
+- **Template PR & Issue** — `.github/PULL_REQUEST_TEMPLATE.md`,
+  `.github/ISSUE_TEMPLATE/bug_report.md`, `feature_request.md`, `config.yml`.
+- **Branch protection `main`** (pengaturan GitHub) — wajib PR, wajib CI
+  "Build APK" hijau, larang force-push & hapus branch.
+
 ## [v1.0 — 2026-08-13] — Audit kode: hapus payload status mati & optimasi polling web
 
 ### Diperbaiki

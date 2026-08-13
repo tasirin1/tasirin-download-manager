@@ -9,6 +9,8 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ```
 .
 ├── .github/workflows/build.yml       # CI: cek remote web → bump versionCode → build APK → release
+├── .github/PULL_REQUEST_TEMPLATE.md  # Template PR (wajib ringkasan + verifikasi)
+├── .github/ISSUE_TEMPLATE/           # Template issue (bug report & feature request)
 ├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
@@ -86,6 +88,40 @@ diperbarui.
   `small_first`, `delete_partial_on_cancel`, `recent_urls`, `sort_mode`,
   `auto_sort`, `battery_exempt`, `gallery_image_folder`, `gallery_video_folder`.
 
+## Keputusan & larangan historis
+
+Hal berikut sengaja dihapus/dilarang — JANGAN dihidupkan kembali tanpa alasan
+kuat dan tanpa diskusi:
+
+- **Auto-install APK** (`REQUEST_INSTALL_PACKAGES`) — dihapus; `Updater.kt`
+  download-only + verifikasi tanda tangan (kurangi sinyal berbahaya Play Protect).
+- **Tema gelap native** (`values-night`) — dihapus; app selalu tema terang.
+- **Bilah status remote web** (`#deviceStatus`, `renderStatus`,
+  `refreshStatus`, `renderSpeedTotal`) — dihapus 2026-08-13; info redundan
+  dengan File Manager. Status penting (`readOnly`, port berubah, versi)
+  ditangani `applyServerStatus()`.
+- **Endpoint `/api/status`** — dihapus (tidak ada klien lagi); status cukup
+  lewat `snapshotJson`/SSE.
+- **zxing di runtime** — hanya `testImplementation`; encoder QR sendiri
+  (`util/QrEncoder.kt`).
+- **`values-en`** — tidak ada; default `values/strings.xml` = Inggris.
+- **minSdk** — tetap 21 (Android 5+), jangan naikkan.
+- **Tombol tab Downloads** — butuh handler klik sendiri (pola
+  `tabGallery`/`tabFiles`); jangan hapus handler-nya.
+- **`fmtDate`** — hanya SATU definisi di `remote.src.html` (dua definisi
+  saling menimpa karena hoisting).
+
+## Pola bug yang pernah terjadi & guard-nya
+
+| Pola bug | Penyebab | Guard |
+|---|---|---|
+| Tab Downloads tidak bisa diklik dari File Manager/Galeri | `tabDownloads` tidak punya handler klik | smoke test klik `tabDownloads` di `scripts/upload_smoke_test.js` |
+| Tanggal file tampil format salah | dua `fmtDate` (hoisting, definisi kedua menang) | aturan satu definisi (lihat keputusan historis) |
+| Kata Indonesia lolos ke UI remote | kata pendek tidak ada di daftar larangan | `BANNED_ID` di `scripts/prepare_remote.py` — tambahkan kata baru saat ketemu |
+| Upload gagal diam-diam "listEl.appendChild is not a function" | argumen `uploadFiles()` tertukar | `check_upload_call` di `prepare_remote.py` + smoke test 4 chunk |
+| Tombol penampil foto tidak hilang saat zoom | class `mm-chrome-hidden` tidak diset | smoke test zoom (`+mm-chrome-hidden`/`-mm-chrome-hidden`) |
+| Path traversal / PIN bypass | logika keamanan bocor ke endpoint | unit test `ServerSecurity` — jangan pindahkan logika ke `HttpControlServer` |
+
 ## Aturan pengembangan
 
 1. **Build resmi HANYA via GitHub Actions** — jangan build lokal untuk rilis.
@@ -133,6 +169,13 @@ diperbarui.
     `ServerSecurity`).
 13. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
     versi sekaligus; tiap langkah lewat CI dulu.
+14. **Changelog wajib per PR** — setiap PR menambah entri `CHANGELOG.md`
+    (judul `## [v1.0 — tanggal] — ringkasan`) dan menyebut nomor PR pada isi
+    entri setelah PR dibuat. Satu PR = satu tujuan kecil; jangan campur
+    fitur + refactor + docs dalam satu PR.
+15. **Jangan berhenti di tengah alur rilis** — setelah PR merge, pantau build
+    `main` sampai sukses dan release punya asset APK terbaru (lihat
+    "Cara cek rilis terbaru").
 
 ## Cara memicu build & release
 
@@ -177,6 +220,19 @@ diperbarui.
 Keystore yang sama dipakai juga oleh repo **Tasirin Vaultwarden Host** — simpan
 satu salinan aman (jangan di commit, jangan hanya di satu perangkat).
 
+### Verifikasi keystore mana yang dipakai
+
+Fingerprint SHA-256 sertifikat signing release (alias `tasirin`) — BUKAN
+rahasia, sudah tertanam di `Updater.kt` sebagai `RELEASE_CERT_SHA256`:
+
+```
+c2785a618082683755eeae867e0a2e01f450b1fd448859d1ec21cf854c5713d1
+```
+
+Cara cek APK rilis: `keytool -printcert -jarfile <apk>` lalu bandingkan
+baris SHA-256 (hapus titik dua, huruf kecil). Bila berbeda, keystore yang
+dipakai CI bukan yang resmi — perbaiki sebelum rilis.
+
 ## Menambah/mengubah fitur — file mana yang disentuh
 
 - **Perilaku unduhan (segment, retry, fallback Range, HLS)** → `DownloadEngine.kt`
@@ -198,9 +254,14 @@ satu salinan aman (jangan di commit, jangan hanya di satu perangkat).
 - **Log server** → `LogActivity.kt` + buffer log (lihat `App.kt`/engine).
 - **Versi app** → jangan manual; CI yang mengatur (lihat aturan di atas).
 
-## Verifikasi setelah build
+## Cara cek rilis terbaru & verifikasi build
+
+- Release `v1.0` di-refresh tiap push ke `main`; asset APK selalu
+  `tasirin-download-manager-v1.0-<code>.apk` dengan `code = 100000 + run_number`.
+- Jangan ubah `versionName`/`versionCode` manual (di-bump CI).
 
 ```bash
+gh run list --branch main --limit 1            # build terakhir
 gh run watch <run-id> --exit-status
 gh run view <run-id> --json status,conclusion
 gh release view v1.0 --json assets -q '.assets[].name'
