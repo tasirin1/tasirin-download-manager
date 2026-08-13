@@ -5,6 +5,24 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Audit kode: hapus payload status mati & optimasi polling web
+
+### Diperbaiki
+- **Hapus kode mati server** — endpoint `/api/status` (`statusJson`) tidak
+  dipakai klien lagi sejak bilah status dihapus; dibuang bersama helper
+  `storageWriteOk()` dan `batteryStatus()` (field baterai tidak pernah
+  dikonsumsi klien mana pun). Payload SSE/snapshot kini hanya berisi
+  `port`/`readOnly`/`appVersion`/`appBuild` — hemat JSON build & I/O
+  `freeSpaceBytes()` tiap heartbeat.
+- **Cache elemen DOM di jalur polling** — `#status` dan `#list` diambil sekali
+  di awal (pola yang sama dengan elemen lain), tidak `getElementById` lagi di
+  tiap tick snapshot (1 detik saat download aktif).
+- **Hilangkan alokasi tak perlu** — `render()` tidak lagi menyalin array
+  (`items.slice()`) tiap snapshot; array hasil JSON sudah baru dan tidak
+  dimutasi.
+- **README sinkron** — tabel endpoint di `README.md`/`README.en.md`
+  menghapus `/api/status`.
+
 ## [v1.0 — 2026-08-13] — Hapus bilah status remote web
 
 ### Diperbaiki

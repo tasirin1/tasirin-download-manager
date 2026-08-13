@@ -1495,6 +1495,8 @@ Object.entries(WEB_FILTERS).forEach(function (e) {
 const addForm = document.getElementById('addForm');
 const addSheet = document.getElementById('addSheet');
 const newBtn = document.getElementById('newBtn');
+const statusLine = document.getElementById('status');
+const dlList = document.getElementById('list');
 let pendingAddForm = false;
 function toggleAddForm(show) {
   addSheet.classList.toggle('hidden', !show);
@@ -2139,7 +2141,7 @@ function applyRoute() {
     loadFsLocations();
     loadFs();
   } else {
-    restartAnim(document.getElementById('list'));
+    restartAnim(dlList);
     if (pendingAddForm) {
       pendingAddForm = false;
       toggleAddForm(true);
@@ -4206,7 +4208,7 @@ mmBody.addEventListener('click', function (e) {
 
 let hasLoadedItems = false;
 function showListSkeleton() {
-  const box = document.getElementById('list');
+  const box = dlList;
   let html = '<div class="sk-list">';
   for (let i = 0; i < 3; i++) {
     html += '<div class="sk-item"><div class="sk-ico skeleton"></div><div class="sk-lines">' +
@@ -4220,14 +4222,14 @@ async function refresh() {
   try {
     const res = await fetch(API + '/api/downloads');
     if (res.status === 401) {
-      document.getElementById('status').textContent = 'PIN required. Reload the page to log in.';
+      statusLine.textContent = 'PIN required. Reload the page to log in.';
       return;
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     failCount = 0;
     hasLoadedItems = true;
-    document.getElementById('status').textContent = '';
+    statusLine.textContent = '';
     hideConnBanner();
     const items = data.items || [];
     lastItems = items;
@@ -4235,7 +4237,7 @@ async function refresh() {
   } catch (e) {
     failCount++;
     if (failCount > 2) {
-      document.getElementById('status').textContent = 'Cannot connect to the server. Check the server in the app.';
+      statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
     }
   }
 }
@@ -4341,8 +4343,7 @@ function emptyHtml(kind, title, sub, cta) {
 }
 
 function render(items) {
-  const list = document.getElementById('list');
-  currentItems = items.slice();
+  currentItems = items;
   const struct = (webFilter || '') + '::' + structSig(items);
   if (struct !== lastStructSig) {
     lastStructSig = struct;
@@ -4413,7 +4414,7 @@ function updateRows(items) {
 function rebuildList(items) {
   lastRowSig = {};
   rowNodes = new Map();
-  const list = document.getElementById('list');
+  const list = dlList;
   list.innerHTML = '';
   const idListSig = items.map(function (it) { return it.id + '|' + it.state; }).join(';');
   const idsChanged = idListSig !== lastIdListSig;
@@ -4725,7 +4726,7 @@ async function pollSnapshot() {
     const data = await res.json();
     failCount = 0;
     hasLoadedItems = true;
-    document.getElementById('status').textContent = '';
+    statusLine.textContent = '';
     hideConnBanner();
     if (data.status) applyServerStatus(data.status);
     const items = data.items || [];
@@ -4734,7 +4735,7 @@ async function pollSnapshot() {
   } catch (e) {
     failCount++;
     if (failCount > 2) {
-      document.getElementById('status').textContent = 'Cannot connect to the server. Check the server in the app.';
+      statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
     }
   }
 }
