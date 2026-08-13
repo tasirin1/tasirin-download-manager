@@ -666,6 +666,15 @@ const fsUploadDir = document.getElementById('fsUploadDir');
 let fsLocations = [];
 let serverReadOnly = false;
 const FS_MEDIA_EXTS = ['jpg','jpeg','png','gif','webp','bmp','mp4','mkv','webm','avi','mov','3gp','m4v','mpg','mpeg','mp3','m4a','aac','wav','ogg','flac'];
+const FILE_ICON_VIDEO = ['mp4','mkv','webm','avi','mov','3gp','m4v','mpg','mpeg'];
+const FILE_ICON_IMG = ['jpg','jpeg','png','gif','webp','bmp'];
+const FILE_ICON_AUD = ['mp3','m4a','aac','wav','ogg','flac'];
+const FILE_ICON_ARC = ['zip','rar','7z','tar','gz','xz'];
+const FILE_ICON_DOC = ['txt','md','log','csv'];
+const FS_ICON_IMG = ['jpg','jpeg','png','gif','webp','bmp','svg','heic'];
+const FS_ICON_ARC = ['zip','rar','7z','tar','gz','bz2','xz'];
+const FS_ICON_DOC = ['txt','md','log','csv','json','xml','html','css','js','kt','java','py','sh','sql'];
+const FS_ICON_OFF = ['doc','docx','xls','xlsx','ppt','pptx','odt','rtf'];
 let fsLpTimer = null;
 let fsLpFired = false;
 fsBtn.addEventListener('click', function () {
@@ -898,15 +907,15 @@ function fsIconFor(it) {
 if (it.kind === 'dir') return '\u{1F4C1}';
 const ext = extOf(it.name).toLowerCase();
 if (FS_MEDIA_EXTS.indexOf(ext) >= 0) {
-if (['jpg','jpeg','png','gif','webp','bmp','svg','heic'].indexOf(ext) >= 0) return '\u{1F5BC}\uFE0F';
-if (['mp3','m4a','aac','wav','ogg','flac'].indexOf(ext) >= 0) return '\u{1F3B5}';
+if (FS_ICON_IMG.indexOf(ext) >= 0) return '\u{1F5BC}\uFE0F';
+if (FILE_ICON_AUD.indexOf(ext) >= 0) return '\u{1F3B5}';
 return '\u{1F3AC}';
 }
-if (['zip','rar','7z','tar','gz','bz2','xz'].indexOf(ext) >= 0) return '\u{1F4E6}';
+if (FS_ICON_ARC.indexOf(ext) >= 0) return '\u{1F4E6}';
 if (ext === 'apk') return '\u{1F916}';
 if (ext === 'pdf') return '\u{1F4C4}';
-if (['txt','md','log','csv','json','xml','html','css','js','kt','java','py','sh','sql'].indexOf(ext) >= 0) return '\u{1F4DC}';
-if (['doc','docx','xls','xlsx','ppt','pptx','odt','rtf'].indexOf(ext) >= 0) return '\u{1F4DD}';
+if (FS_ICON_DOC.indexOf(ext) >= 0) return '\u{1F4DC}';
+if (FS_ICON_OFF.indexOf(ext) >= 0) return '\u{1F4DD}';
 return '\u{1F4C4}';
 }
 function fsRootIcon(r) {
@@ -922,7 +931,7 @@ if (!r.totalBytes || r.totalBytes <= 0) return '';
 const used = Math.max(0, (r.totalBytes || 0) - (r.freeBytes || 0));
 const pct = Math.min(100, Math.round(used * 100 / r.totalBytes));
 return '<div class="fs-cap"><div class="fill" style="width:' + pct + '%"></div></div>' +
-'<small class="fs-cap-txt">' + fmt(used) + ' terpakai \u00b7 ' + fmt(r.totalBytes) + '</small>';
+'<small class="fs-cap-txt">' + fmt(used) + ' used \u00b7 ' + fmt(r.totalBytes) + '</small>';
 }
 function renderFs(items) {
 const box = fsList;
@@ -1380,7 +1389,7 @@ if (e.target === itemSheet) closeItemSheet();
 function fsOpenMedia(it) {
 const token = encodeURIComponent(it.token);
 const media = API + '/api/media?token=' + token;
-const isVideo = ['mp4','mkv','webm','avi','mov','3gp','m4v','mpg','mpeg'].indexOf(extOf(it.name).toLowerCase()) >= 0;
+const isVideo = FILE_ICON_VIDEO.indexOf(extOf(it.name).toLowerCase()) >= 0;
 openMedia(
 {name: it.name, size: it.size, modified: it.modified, token: it.token, isVideo: isVideo},
 media
@@ -2721,13 +2730,13 @@ return '<span class="badge ' + (map[s] || 'b-paused') + '">' + stateLabel(s) + '
 }
 function fileIcon(name) {
 const e = extOf(name).toLowerCase();
-if (['mp4','mkv','webm','avi','mov','3gp','m4v'].indexOf(e) >= 0) return '\u{1F3AC}';
-if (['jpg','jpeg','png','gif','webp','bmp'].indexOf(e) >= 0) return '\u{1F5BC}';
-if (['mp3','m4a','aac','wav','ogg','flac'].indexOf(e) >= 0) return '\u{1F3B5}';
+if (FILE_ICON_VIDEO.indexOf(e) >= 0) return '\u{1F3AC}';
+if (FILE_ICON_IMG.indexOf(e) >= 0) return '\u{1F5BC}';
+if (FILE_ICON_AUD.indexOf(e) >= 0) return '\u{1F3B5}';
 if (e === 'apk') return '\u{1F4E6}';
 if (e === 'pdf') return '\u{1F4C4}';
-if (['zip','rar','7z','tar','gz','xz'].indexOf(e) >= 0) return '\u{1F4E6}';
-if (['txt','md','log','csv'].indexOf(e) >= 0) return '\u{1F4C4}';
+if (FILE_ICON_ARC.indexOf(e) >= 0) return '\u{1F4E6}';
+if (FILE_ICON_DOC.indexOf(e) >= 0) return '\u{1F4C4}';
 return '\u{1F4CE}';
 }
 function renderSpeedTotal(items) {
@@ -2852,8 +2861,11 @@ if (!li || !li.isConnected) return;
 const sig = it.state + '|' + it.bytesDownloaded + '|' + it.speedBps + '|' + it.etaSeconds;
 if (lastRowSig[it.id] === sig) return;
 lastRowSig[it.id] = sig;
-const sub = li.querySelector('.item-sub');
-if (sub) sub.outerHTML = rowSubHtml(it);
+const sub = li._sub || li.querySelector('.item-sub');
+if (sub) {
+sub.outerHTML = rowSubHtml(it);
+li._sub = li.querySelector('.item-sub');
+}
 });
 renderSpeedTotal(items);
 updateToolbar(items);
@@ -2917,6 +2929,7 @@ li.innerHTML =
 '<button class="item-menu-btn" type="button" title="Actions">\u22EF</button>' +
 '</div>' +
 rowSubHtml(it);
+li._sub = li.querySelector('.item-sub');
 const menuBtn = li.querySelector('.item-menu-btn');
 if (menuBtn) {
 menuBtn.addEventListener('click', function (e) {

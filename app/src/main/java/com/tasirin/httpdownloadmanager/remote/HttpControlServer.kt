@@ -1415,7 +1415,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val selection = if (folder.isEmpty()) null else "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
             val selArgs = if (folder.isEmpty()) null else arrayOf("$folder%")
             val dirs = LinkedHashSet<String>()
-            val files = mutableListOf<JSONObject>()
+            // Entri file ringan dulu; JSONObject + token Base64 baru dibuat
+            // untuk halaman aktif (hemat alokasi saat folder ribuan file).
+            val files = mutableListOf<FsMediaEntry>()
             runCatching {
                 resolver.query(collection, projection, selection, selArgs, null)?.use { c ->
                     val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
@@ -1431,13 +1433,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             val name = c.getString(iName) ?: continue
                             val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
                             files.add(
-                                JSONObject()
-                                    .put("name", name)
-                                    .put("path", MS_PREFIX + uri)
-                                    .put("kind", "file")
-                                    .put("size", c.getLong(iSize))
-                                    .put("modified", c.getLong(iMod) * 1000L)
-                                    .put("token", MediaLibrary.tokenForUri(uri))
+                                FsMediaEntry(
+                                    name = name,
+                                    path = MS_PREFIX + uri,
+                                    size = c.getLong(iSize),
+                                    modified = c.getLong(iMod) * 1000L,
+                                    uri = uri
+                                )
                             )
                         } else {
                             dirs.add(rest.substringBefore('/'))
@@ -1445,23 +1447,52 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
             }
-            val all = ArrayList<JSONObject>(dirs.size + files.size)
-            dirs.sortedWith(String.CASE_INSENSITIVE_ORDER).forEach { sub ->
-                all.add(
-                    JSONObject()
-                        .put("name", sub)
-                        .put("path", "$MS_PREFIX$base/$sub")
-                        .put("kind", "dir")
-                )
+            val dirNames = dirs.sortedWith(String.CASE_INSENSITIVE_ORDER)
+            val totalCount = dirNames.size + files.size
+            total = totalCount
+            val pageStart = offset
+            val pageEnd = (offset + limit).coerceAtMost(totalCount)
+            if (pageStart < dirNames.size) {
+                val dirEnd = pageEnd.coerceAtMost(dirNames.size)
+                for (i in pageStart until dirEnd) {
+                    val sub = dirNames[i]
+                    items.put(
+                        JSONObject()
+                            .put("name", sub)
+                            .put("path", "$MS_PREFIX$base/$sub")
+                            .put("kind", "dir")
+                    )
+                }
             }
-            all.addAll(files)
-            total = all.size
-            all.drop(offset).take(limit).forEach { items.put(it) }
+            if (pageEnd > dirNames.size) {
+                val fStart = (pageStart - dirNames.size).coerceAtLeast(0)
+                val fEnd = (pageEnd - dirNames.size).coerceAtMost(files.size)
+                for (i in fStart until fEnd) {
+                    val f = files[i]
+                    items.put(
+                        JSONObject()
+                            .put("name", f.name)
+                            .put("path", f.path)
+                            .put("kind", "file")
+                            .put("size", f.size)
+                            .put("modified", f.modified)
+                            .put("token", MediaLibrary.tokenForUri(f.uri))
+                    )
+                }
+            }
         }
         return jsonResponse(
             JSONObject().put("path", relative).put("items", items).put("total", total)
         )
     }
+
+    private class FsMediaEntry(
+        val name: String,
+        val path: String,
+        val size: Long,
+        val modified: Long,
+        val uri: String
+    )
 
     private fun fsStats(path: String): Pair<Int, Long> {
         val now = System.currentTimeMillis()

@@ -175,12 +175,11 @@ class LogActivity : AppCompatActivity() {
             return text
         }
         val sb = SpannableStringBuilder(text)
-        val queryLower = q.lowercase()
         if (q.isNotEmpty()) {
-            val textLower = text.lowercase()
+            // Cari tanpa mengalokasikan salinan string lowercase per baris log.
             var from = 0
             while (true) {
-                val idx = textLower.indexOf(queryLower, from)
+                val idx = text.indexOf(q, from, ignoreCase = true)
                 if (idx < 0) break
                 sb.setSpan(
                     BackgroundColorSpan(0xFFFFE082.toInt()),

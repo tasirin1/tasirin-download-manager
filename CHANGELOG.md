@@ -5,6 +5,25 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Audit efisiensi: hoist ikon, cache baris, JSON FS ringan, pencarian log tanpa alokasi
+
+### Diperbaiki
+- **Hoist daftar ekstensi ikon** (remote web) — array ekstensi video/gambar/
+  audio/arsip/dokumen dipindah ke konstanta `FILE_ICON_*`/`FS_ICON_*` sehingga
+  tidak dialokasikan ulang di tiap pemanggilan ikon saat render baris
+  (daftar download, file manager, galeri).
+- **Cache referensi baris** — elemen `.item-sub` disimpan di baris saat
+  dirender; pembaruan progres tiap polling tidak perlu `querySelector`
+  per baris lagi.
+- **JSON halaman file media ringan** (`fsListMedia`) — entri file disimpan
+  sebagai data ringan dulu; `JSONObject` + token Base64 baru dibuat untuk
+  halaman aktif (hemat alokasi saat folder berisi ribuan file).
+- **Pencarian log tanpa alokasi** — `highlightLog` memakai
+  `indexOf(ignoreCase = true)` alih-alih membuat salinan `lowercase()` per
+  baris.
+- **Fix i18n** — teks "terpakai" pada kapasitas root File Manager diganti
+  "used" (guard kata Indonesia tidak menangkap kata ini sebelumnya).
+
 ## [v1.0 — 2026-08-13] — Perbaikan pan penampil foto saat zoom
 
 ### Diperbaiki
