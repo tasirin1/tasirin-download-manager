@@ -5,6 +5,17 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Perbaikan pan penampil foto saat zoom
+
+### Diperbaiki
+- **Geser foto saat zoom** — gambar yang diperbesar kini bisa digeser untuk
+  menjelajah area tertentu; sebelumnya `mmImgClamp()` selalu memaksa posisi
+  ke tengah sehingga pan (sentuh, mouse, dan pinch) langsung dibatalkan.
+  Tepi gambar tetap dikunci agar tidak lepas dari layar.
+- **Smoke test pan/zoom** — `upload_smoke_test.js` kini memverifikasi bahwa
+  clamp tidak mengembalikan gambar ke tengah saat digeser dan tepi tetap
+  terkunci (guard CI).
+
 ## [v1.0 — 2026-08-13] — Tampilan utama remote web: bottom nav, hero status, ikon state, persen di bar, tanggal selesai & retry
 
 ### Diperbaiki

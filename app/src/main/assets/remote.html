@@ -1958,10 +1958,14 @@ const imgH = mmImage.offsetHeight || 1;
 const layoutLeft = Math.max(0, (bodyW - imgW) / 2);
 const layoutTop = Math.max(0, (bodyH - imgH) / 2);
 const vw = imgW * s, vh = imgH * s;
-let minTx = -layoutLeft, maxTx = bodyW - layoutLeft - vw;
-mmImgZoom.tx = maxTx < minTx ? (bodyW - vw) / 2 - layoutLeft : Math.max(minTx, Math.min(maxTx, mmImgZoom.tx));
-let minTy = -layoutTop, maxTy = bodyH - layoutTop - vh;
-mmImgZoom.ty = maxTy < minTy ? (bodyH - vh) / 2 - layoutTop : Math.max(minTy, Math.min(maxTy, mmImgZoom.ty));
+const minTx = -layoutLeft, maxTx = bodyW - layoutLeft - vw;
+const minTy = -layoutTop, maxTy = bodyH - layoutTop - vh;
+mmImgZoom.tx = maxTx < minTx
+? Math.max(maxTx, Math.min(minTx, mmImgZoom.tx))
+: Math.max(minTx, Math.min(maxTx, mmImgZoom.tx));
+mmImgZoom.ty = maxTy < minTy
+? Math.max(maxTy, Math.min(minTy, mmImgZoom.ty))
+: Math.max(minTy, Math.min(maxTy, mmImgZoom.ty));
 }
 function mmImgApply() {
 if (mmImgZoom.s <= 1.001) { mmImgResetZoom(); return; }
