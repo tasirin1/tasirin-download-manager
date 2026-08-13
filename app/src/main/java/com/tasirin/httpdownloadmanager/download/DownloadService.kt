@@ -105,7 +105,10 @@ class DownloadService : Service() {
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "httpdm:download")
                     .apply { setReferenceCounted(false) }
             }
-            runCatching { wakeLock?.acquire(15 * 60 * 1000L) }
+            val lock = wakeLock
+            if (lock != null && !lock.isHeld) {
+                runCatching { lock.acquire(15 * 60 * 1000L) }
+            }
         } else {
             runCatching { wakeLock?.release() }
             wakeLock = null

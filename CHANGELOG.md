@@ -5,6 +5,25 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Audit efisiensi: cache row FS, sort tanpa lowercase, hoist format/escape, wakelock guard
+
+### Diperbaiki
+- **Cache baris File Manager** — `fsFindFsRow()` kini memakai cache
+  `fsRowCache` sehingga pencarian baris oleh pembaruan langsung (snapshot)
+  tidak perlu memindai seluruh daftar setiap kali; cache di-reset saat
+  render/skeleton dan diisi saat baris ditambahkan.
+- **Sort tanpa alokasi `lowercase()`** — daftar download (nama, status) dan
+  pencarian galeri/URL terbaru kini memakai `CASE_INSENSITIVE_ORDER` /
+  `indexOf(ignoreCase = true)` alih-alih membuat string baru untuk tiap item.
+- **`fmtEta` memakai satuan "h"** — singkatan jam konsisten dengan satuan
+  lain (m/s) dan tidak lagi memakai "j".
+- **Hoist `escapeHtml`** — tabel entitas HTML dipindah ke konstanta `HTML_ENT`
+  sehingga tidak dibuat ulang di tiap panggilan escape.
+- **Hoist `SimpleDateFormat` ekspor log** — formatter waktu ekspor TXT dibuat
+  sekali di `LogActivity` alih-alih tiap kali ekspor.
+- **Guard wakelock** — `acquire()` hanya dipanggil bila wakelock belum
+  di-hold, mencegah acquire bertumpuk saat status download berubah.
+
 ## [v1.0 — 2026-08-13] — Penampil foto: zoom/pan, swipe tutup, aksi, preload, slideshow, dimensi
 
 ### Ditambahkan

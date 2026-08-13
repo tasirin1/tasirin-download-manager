@@ -1188,7 +1188,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         var matched = 0
         val scan = scannedGallery(scanLimit)
         for (e in scan.items) {
-            if (q.isNotEmpty() && !e.name.lowercase().contains(q)) continue
+            if (q.isNotEmpty() && e.name.indexOf(q, ignoreCase = true) < 0) continue
             if ((type == "video" && !e.isVideo) || (type == "image" && e.isVideo)) continue
             if (matched >= start && matched < pageEnd) {
                 val o = JSONObject()
