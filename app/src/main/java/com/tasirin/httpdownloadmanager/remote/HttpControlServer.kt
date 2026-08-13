@@ -51,6 +51,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.zip.ZipOutputStream
 import java.net.NetworkInterface
 import java.security.MessageDigest
@@ -90,9 +91,21 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val imageDimCache = ConcurrentHashMap<String, Pair<Int, Int>>()
     // Statistik folder dihitung paralel: listing folder dengan banyak subfolder
     // tidak lagi menunggu N listFiles() berurutan (lambat di storage TV box).
-    private val statPool = Executors.newFixedThreadPool(
-        Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-    )
+    // Pool bisa mati saat stopServer() lalu startServer() pada instance yang
+    // sama (toggle server di Settings) — liveStatPool() membuat pool baru
+    // otomatis supaya listing subfolder tidak gagal setelah restart server.
+    @Volatile private var statPool: ThreadPoolExecutor = newStatPool()
+
+    private fun newStatPool(): ThreadPoolExecutor =
+        Executors.newFixedThreadPool(
+            Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+        ) as ThreadPoolExecutor
+
+    @Synchronized
+    private fun liveStatPool(): ThreadPoolExecutor {
+        if (statPool.isShutdown) statPool = newStatPool()
+        return statPool
+    }
     private var cachedHtml: String? = null
     private val appVersion: String by lazy {
         // SDK 35 menandai versionName nullable — paksa non-null supaya by lazy aman.
@@ -238,8 +251,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         sseClients.forEach { it.closeStream() }
         sseClients.clear()
         shareTokens.clear()
-        // Server bisa dimatikan lalu dinyalakan ulang (ganti port) — pool
-        // statistik ikut dihentikan; instance baru membuat pool baru.
+        // Server bisa dimatikan lalu dinyalakan ulang (ganti port / stop-start
+        // di Settings) — pool statistik ikut dihentikan; liveStatPool()
+        // membuat pool baru otomatis saat dibutuhkan lagi.
         runCatching { statPool.shutdownNow() }
         super.stop()
     }
@@ -1365,7 +1379,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // (itemCount/totalSize) dihitung paralel untuk halaman itu saja.
             val page = entries.drop(offset).take(limit)
             val statFutures = page.filter { it.isDirectory }.associateWith { f ->
-                statPool.submit<Pair<Int, Long>> { fsStats(f.absolutePath) }
+                liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) }
             }
             page.forEach { f ->
                 val o = JSONObject()
