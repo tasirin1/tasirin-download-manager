@@ -3557,6 +3557,7 @@ function mmImgResetZoom() {
   mmImgZoom.s = 1; mmImgZoom.tx = 0; mmImgZoom.ty = 0;
   mmImage.style.transform = '';
   mmImage.style.cursor = '';
+  mediaModal.classList.remove('mm-chrome-hidden');
 }
 function mmImgClamp() {
   const s = mmImgZoom.s;
@@ -3584,6 +3585,9 @@ function mmImgApply() {
   mmImgClamp();
   mmImage.style.transform = 'translate(' + mmImgZoom.tx + 'px,' + mmImgZoom.ty + 'px) scale(' + mmImgZoom.s + ')';
   mmImage.style.cursor = mmImgDragged ? 'grabbing' : 'grab';
+  // Saat zoom aktif, sembunyikan semua tombol penampil agar tidak menghalangi
+  // pandangan; tombol muncul kembali otomatis saat kembali ke ukuran penuh.
+  mediaModal.classList.add('mm-chrome-hidden');
 }
 function mmImgZoomTo(clientX, clientY, ns) {
   ns = Math.max(1, Math.min(5, ns));
@@ -3692,13 +3696,15 @@ mmImage.addEventListener('click', function (e) {
     mmImgZoomTo(e.clientX, e.clientY, mmImgZoom.s > 1.001 ? 1 : 2.5);
     return;
   }
-  mmImgTapTimer = setTimeout(function () {
-    mediaModal.classList.toggle('mm-chrome-hidden');
-  }, 280);
+  if (mmImgZoom.s <= 1.001) {
+    mmImgTapTimer = setTimeout(function () {
+      mediaModal.classList.toggle('mm-chrome-hidden');
+    }, 280);
+  }
 });
 mmBody.addEventListener('click', function (e) {
   if (mmType !== 'image' || e.target !== mmBody) return;
-  mediaModal.classList.toggle('mm-chrome-hidden');
+  if (mmImgZoom.s <= 1.001) mediaModal.classList.toggle('mm-chrome-hidden');
 });
 mmImage.addEventListener('touchstart', function (e) {
   if (mmType !== 'image') return;

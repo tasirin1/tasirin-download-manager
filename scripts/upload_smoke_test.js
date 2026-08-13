@@ -205,6 +205,15 @@ const mmBodyEl = elements['mmBody'];
 mmBodyEl.clientWidth = 800;
 mmBodyEl.clientHeight = 600;
 mmBodyEl.getBoundingClientRect = function () { return { top: 0, left: 0, width: 800, height: 600 }; };
+// Spy classList mediaModal: verifikasi tombol penampil disembunyikan saat
+// zoom aktif dan muncul lagi saat kembali ke ukuran penuh.
+const mmChromeLog = [];
+elements['mediaModal'].classList = {
+  add: function (c) { mmChromeLog.push('+' + c); },
+  remove: function (c) { mmChromeLog.push('-' + c); },
+  toggle: function (c) { mmChromeLog.push('~' + c); },
+  contains: function () { return false; }
+};
 vm.runInContext('mmType = "image"; mmImgZoom = { s: 1, tx: 0, ty: 0 };', sandbox);
 sandbox.mmImgZoomTo(400, 300, 2.5);
 fsExpect(Math.abs(vm.runInContext('mmImgZoom.s', sandbox) - 2.5) < 0.001, 'zoom foto in 2.5x');
@@ -222,6 +231,8 @@ fsExpect(Math.abs(vm.runInContext('mmImgZoom.tx', sandbox) + 1200) < 1, 'pan fot
 sandbox.mmImgZoomTo(400, 300, 1);
 fsExpect(vm.runInContext('mmImgZoom.s', sandbox) === 1, 'zoom foto out reset ke 1');
 fsExpect(vm.runInContext('mmImgZoom.tx', sandbox) === 0, 'zoom foto out tx kembali 0');
+fsExpect(mmChromeLog.indexOf('+mm-chrome-hidden') >= 0, 'zoom aktif menyembunyikan tombol penampil');
+fsExpect(mmChromeLog.indexOf('-mm-chrome-hidden') >= 0, 'kembali 1x menampilkan tombol penampil');
 
 // Reset state agar tes upload di bawah tidak terpengaruh
 vm.runInContext('fsPath = ""; fsBackStack.length = 0;', sandbox);
