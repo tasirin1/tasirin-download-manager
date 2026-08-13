@@ -5,6 +5,17 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-13] — Sembunyikan tombol penampil foto saat zoom
+
+### Diperbaiki
+- **Tombol penampil foto tersembunyi saat zoom aktif** — tombol atas dan
+  panah kiri/kanan otomatis disembunyikan begitu foto diperbesar (tap ganda,
+  pinch, atau scroll); tombol muncul kembali saat kembali ke ukuran penuh.
+- **Tap tunggal saat zoom** — mengetuk foto/area kosong saat zoom aktif tidak
+  lagi membolak-balik tombol; toggle chrome hanya berlaku di ukuran penuh.
+- **Smoke test baru** — verifikasi `mm-chrome-hidden` ditambahkan saat zoom
+  dan dihapus saat reset.
+
 ## [v1.0 — 2026-08-13] — Audit efisiensi: hoist ikon, cache baris, JSON FS ringan, pencarian log tanpa alokasi
 
 ### Diperbaiki
