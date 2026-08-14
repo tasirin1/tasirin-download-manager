@@ -145,13 +145,7 @@ jobs:
           else
             cp app/build/outputs/apk/debug/app-debug.apk "$OUT"
           fi
-          NOTES=$(python3 - <<'PY'
-import re
-s = open('CHANGELOG.md', encoding='utf-8').read()
-m = re.search(r'^## .*?(?=\n## |\Z)', s, re.M | re.S)
-print(m.group(0).strip() if m else '')
-PY
-)
+          NOTES=$(python3 -c "import re; s=open('CHANGELOG.md', encoding='utf-8').read(); m=re.search(r'^## .*?(?=\n## |\Z)', s, re.M | re.S); print(m.group(0).strip() if m else '')")
           if [ -z "$NOTES" ]; then
             NOTES="APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box."
           fi
