@@ -44,6 +44,23 @@ git config core.hooksPath .githooks
 Hook menjalankan `scripts/prepare_remote.py --check` (wajib) dan unit test
 cepat (kalau Java tersedia).
 
+## PR Dependabot
+
+- Update GitHub Actions (tidak menyentuh dependensi Gradle) di-auto-merge
+  setelah CI hijau — tidak perlu ditindaklanjuti.
+- Update dependensi Gradle **tidak** di-auto-merge: verifikasi dependensi
+  strict aktif, jadi wajib regenerasi `gradle/verification-metadata.xml`
+  (workflow *Update dependency verification metadata* dengan `--ref` branch
+  PR, commit artifact hasilnya) sebelum CI bisa hijau. Panduan otomatis
+  dikirim sebagai komentar di PR.
+
+## Label otomatis & issue/PR lama
+
+- Workflow `Labeler` memberi label otomatis per path (remote-web, gallery,
+  download-engine, settings, ci, docs).
+- Workflow `Stale` menandai issue/PR tidak aktif 60/30 hari dan menutupnya
+  bila 14 hari tidak ada respons (label `dependencies` dikecualikan).
+
 ## Menjalankan guard lokal
 
 ```bash

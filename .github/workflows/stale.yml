@@ -1,0 +1,31 @@
+name: Stale
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Tutup PR/issue tidak aktif
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-issue-stale: 60
+          days-before-pr-stale: 30
+          days-before-issue-close: 14
+          days-before-pr-close: 14
+          stale-issue-message: "Issue ini tidak ada aktivitas 60 hari. Beri tahu kalau masih relevan, kalau tidak akan ditutup 14 hari lagi."
+          stale-pr-message: "PR ini tidak ada aktivitas 30 hari. Lanjutkan atau akan ditutup 14 hari lagi."
+          close-issue-message: "Issue ditutup karena tidak ada aktivitas."
+          close-pr-message: "PR ditutup karena tidak ada aktivitas."
+          exempt-issue-labels: "help wanted,good first issue,enhancement"
+          exempt-pr-labels: "dependencies"
+          stale-issue-label: "stale"
+          stale-pr-label: "stale"
+          operations-per-run: 100

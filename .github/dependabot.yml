@@ -11,6 +11,20 @@ updates:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
+    groups:
+      androidx:
+        patterns:
+          - "androidx.*"
+      kotlinx:
+        patterns:
+          - "org.jetbrains.kotlinx:*"
+      gradle-tools:
+        patterns:
+          - "com.android.tools:*"
+          - "org.nanohttpd:*"
+          - "junit:*"
+          - "org.json:*"
+          - "com.google.zxing:*"
     ignore:
       # Major AGP/Kotlin perlu upgrade Gradle dulu; tangani manual bertahap,
       # bukan PR otomatis yang gagal CI (AGENTS.md aturan #12).
@@ -34,3 +48,7 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns:
+          - "*"

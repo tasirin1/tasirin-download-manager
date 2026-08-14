@@ -5,6 +5,30 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-15] — Keandalan rilis & automasi repo (PR #97)
+
+### Ditambahkan
+- **Concurrency CI** — push/PR baru di ref yang sama membatalkan run lama
+  (hemat menit Actions & antrean).
+- **Cek masa berlaku keystore di CI** — error bila sertifikat < 90 hari,
+  warning bila < 180 hari (tidak ketahuan mendadak saat release gagal).
+- **Verifikasi tanda tangan APK hasil build** — `keytool -printcert -jarfile`
+  pada APK release dibandingkan fingerprint kunci resmi `c2785a61...`.
+- **`mapping.txt` (R8) dilampirkan ke release** — untuk deobfuscate stack
+  trace saat crash (tidak masuk APK).
+- **Dependabot grouped + auto-merge** — update dikelompokkan (`androidx`,
+  `kotlinx`, `gradle-tools`, `actions`); PR yang tidak menyentuh dependensi
+  Gradle di-auto-merge setelah CI hijau, PR dependensi Gradle diberi komentar
+  panduan regenerasi metadata.
+- **Workflow `Stale`** — PR/issue tidak aktif 30/60 hari ditandai, ditutup
+  setelah 14 hari tanpa respons (label `dependencies` dikecualikan).
+- **Workflow `Labeler`** — label otomatis per path (remote-web, gallery,
+  download-engine, settings, ci, docs).
+- **Build terjadwal mingguan** (Senin 03:00 UTC) — verifikasi build dengan
+  toolchain terbaru; tidak mem-publish release.
+- Guard CHANGELOG kini dikecualikan untuk PR Dependabot (bump dependensi
+  dirangkum di rilis maintenance).
+
 ## [v1.0 — 2026-08-14] — Verifikasi dependensi Gradle + fix guard CHANGELOG di push main
 
 ### Diperbaiki
