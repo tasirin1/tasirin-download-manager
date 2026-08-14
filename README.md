@@ -21,6 +21,7 @@ Dibangun dengan **Kotlin + Jetpack**, tanpa iklan, tanpa akun. Kode terbuka di G
 
 ## Daftar isi
 
+- [Screenshot](#screenshot)
 - [Fitur](#fitur)
 - [Unduh](#unduh)
 - [Update otomatis APK](#update-otomatis-apk)
@@ -33,6 +34,19 @@ Dibangun dengan **Kotlin + Jetpack**, tanpa iklan, tanpa akun. Kode terbuka di G
 - [Build](#build)
 - [Panduan pengelolaan untuk AI (AGENTS.md)](#panduan-pengelolaan-untuk-ai-agentsmd)
 - [Lisensi](#lisensi)
+
+## Screenshot
+
+> Belum ada gambar terpasang — kirim tangkapan layar (remote web, galeri, daftar
+> download) lalu taruh di `docs/screenshots/` dengan nama `remote-web.png`,
+> `gallery.png`, `downloads.png` (atau beri tahu AI/contributor, gambar langsung
+> dipasang di sini).
+
+<p align="center">
+  <img src="docs/screenshots/remote-web.png" alt="Remote web" width="280">
+  <img src="docs/screenshots/gallery.png" alt="Galeri" width="280">
+  <img src="docs/screenshots/downloads.png" alt="Daftar download" width="280">
+</p>
 
 ## Fitur
 

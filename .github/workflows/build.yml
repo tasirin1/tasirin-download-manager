@@ -20,6 +20,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Pastikan CHANGELOG diperbarui untuk perubahan kode
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ] || [ "$BASE" = "null" ]; then
+            BASE="${{ github.event.before }}"
+          fi
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "Base commit tidak tersedia (push pertama / manual) — lewati guard CHANGELOG."
+            exit 0
+          fi
+          git fetch origin main --quiet || true
+          CHANGED=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || git diff --name-only "$BASE" HEAD)
+          NEEDS_CHANGELOG=$(echo "$CHANGED" | grep -E '^(app/src/main/|remote\.src\.html$|app/build\.gradle\.kts$|scripts/)' || true)
+          HAS_CHANGELOG=$(echo "$CHANGED" | grep -x 'CHANGELOG.md' || true)
+          if [ -n "$NEEDS_CHANGELOG" ] && [ -z "$HAS_CHANGELOG" ]; then
+            echo "::error::Perubahan kode (app/src/main, remote.src.html, app/build.gradle.kts, scripts/) wajib menyertakan update CHANGELOG.md"
+            echo "$NEEDS_CHANGELOG"
+            exit 1
+          fi
+          echo "Guard CHANGELOG: OK"
+
       - name: Siapkan & periksa remote web (minify + node check + i18n)
         run: python3 scripts/prepare_remote.py --check
 
@@ -31,6 +52,22 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+
+      - name: Cek kesehatan keystore (fingerprint signing)
+        if: env.KEYSTORE_BASE64 != ''
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/keystore.jks
+          EXPECT="c2785a618082683755eeae867e0a2e01f450b1fd448859d1ec21cf854c5713d1"
+          FP=$(keytool -exportcert -keystore /tmp/keystore.jks -alias "$KEY_ALIAS" -storepass "$KEYSTORE_PASSWORD" 2>/dev/null | openssl dgst -sha256 | awk '{print $2}')
+          echo "Fingerprint sertifikat signing: ${FP:-<tidak terbaca>}"
+          if [ -z "$FP" ] || [ "$FP" != "$EXPECT" ]; then
+            echo "::error::Fingerprint keystore tidak cocok dengan kunci release resmi (expected $EXPECT, got $FP)"
+            exit 1
+          fi
+          echo "Keystore sehat: sesuai kunci release resmi."
 
       - name: Set up Gradle (cache + verifikasi wrapper)
         uses: gradle/actions/setup-gradle@v6
@@ -108,10 +145,14 @@ jobs:
           else
             cp app/build/outputs/apk/debug/app-debug.apk "$OUT"
           fi
+          NOTES=$(python3 -c "import re; s=open('CHANGELOG.md', encoding='utf-8').read(); m=re.search(r'^## .*?(?=\n## |\Z)', s, re.M | re.S); print(m.group(0).strip() if m else '')")
+          if [ -z "$NOTES" ]; then
+            NOTES="APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box."
+          fi
           gh release delete "v${VER}" --yes --cleanup-tag || true
           gh release create "v${VER}" "$OUT" \
             --title "Tasirin Download Manager v${VER} (build ${CODE})" \
-            --notes "APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box. Beri izin Penyimpanan saat diminta." \
+            --notes "$NOTES" \
             --latest
 
       - name: VirusTotal submit (jika API key tersedia)

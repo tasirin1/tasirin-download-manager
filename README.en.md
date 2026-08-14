@@ -21,6 +21,7 @@ Built with **Kotlin + Jetpack**, no ads, no account. Open source on GitHub; ever
 
 ## Table of contents
 
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [Download](#download)
 - [Automatic APK updates](#automatic-apk-updates)
@@ -33,6 +34,18 @@ Built with **Kotlin + Jetpack**, no ads, no account. Open source on GitHub; ever
 - [Build](#build)
 - [AI maintenance guide (AGENTS.md)](#ai-maintenance-guide-agentsmd)
 - [License](#license)
+
+## Screenshots
+
+> No images attached yet — send screenshots (remote web, gallery, download list)
+> and drop them into `docs/screenshots/` as `remote-web.png`, `gallery.png`,
+> `downloads.png` (or tell an AI/contributor, and they will be mounted here).
+
+<p align="center">
+  <img src="docs/screenshots/remote-web.png" alt="Remote web" width="280">
+  <img src="docs/screenshots/gallery.png" alt="Gallery" width="280">
+  <img src="docs/screenshots/downloads.png" alt="Download list" width="280">
+</p>
 
 ## Features
 
