@@ -5,6 +5,15 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-14] — Fix: listing file manager 500 setelah restart server (PR #91)
+
+### Diperbaiki
+- **File Manager HTTP 500 setelah stop/start server** — `stopServer()` men-shutdown
+  `statPool`, tapi toggle server memakai instance `HttpControlServer` yang sama,
+  jadi pool tetap `Terminated` dan semua `GET /api/fs?path=<subfolder>` gagal
+  dengan `RejectedExecutionException`. `liveStatPool()` kini membuat pool baru
+  otomatis saat dibutuhkan.
+
 ## [v1.0 — 2026-08-13] — Pengelolaan repo untuk AI: AGENTS.md diperkuat, template PR/issue, branch protection
 
 ### Diperbaiki
