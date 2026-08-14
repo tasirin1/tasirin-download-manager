@@ -15,6 +15,7 @@ import com.tasirin.httpdownloadmanager.data.DownloadSegment
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.Formats
+import com.tasirin.httpdownloadmanager.util.Checksums
 import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StorageCleanup
@@ -770,6 +771,7 @@ class DownloadEngine(appContext: Context) {
             probe.connect()
             val code = probe.responseCode
             if (code in 200..299) {
+                captureHeaderChecksum(item, probe)
                 probeHeaders = headersOf(probe)
                 val total = contentLength(probe)
                 val ranges = probe.getHeaderField("Accept-Ranges") == "bytes"
@@ -837,6 +839,7 @@ class DownloadEngine(appContext: Context) {
 
         val code = conn.responseCode
         if (code !in 200..299) throw IOException("HTTP $code")
+        captureHeaderChecksum(item, conn)
 
         val resolvedName = resolveFinalName(item, headersOf(conn))
         if (resolvedName != fileName) {
@@ -1266,6 +1269,28 @@ class DownloadEngine(appContext: Context) {
 
     private fun contentLength(conn: HttpURLConnection): Long {
         return conn.getHeaderField("Content-Length")?.trim()?.toLongOrNull() ?: -1L
+    }
+
+    /** Header yang bisa membawa checksum file — dipakai untuk deteksi otomatis
+     *  (server mengirim Digest/Content-MD5/X-Checksum-*). */
+    private fun checksumHeadersOf(conn: HttpURLConnection): Map<String, String> {
+        val names = listOf(
+            "Digest", "X-Checksum-Sha256", "X-Checksum-Sha1",
+            "X-Checksum-MD5", "Content-MD5"
+        )
+        val map = HashMap<String, String>(names.size)
+        for (n in names) {
+            conn.getHeaderField(n)?.let { map[n] = it }
+        }
+        return map
+    }
+
+    /** Isi checksum item dari header respons bila user belum mengisinya manual. */
+    private fun captureHeaderChecksum(item: DownloadItem, conn: HttpURLConnection) {
+        if (item.checksum.isNotBlank()) return
+        val detected = Checksums.fromHeaders(checksumHeadersOf(conn)) ?: return
+        updateItem(item.id) { it.copy(checksum = detected) }
+        App.logEvent("DOWNLOAD ${item.fileName}: checksum ${detected.substringBefore(':')} detected from server headers")
     }
 
     private fun headersOf(conn: HttpURLConnection): ServerHeaders {

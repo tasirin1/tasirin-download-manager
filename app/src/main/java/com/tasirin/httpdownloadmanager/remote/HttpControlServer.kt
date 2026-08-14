@@ -1239,11 +1239,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun scannedGallery(maxEntries: Int): MediaLibrary.MediaScanResult {
         val now = System.currentTimeMillis()
         val cached = galleryCache
-        // Cache terpakai bila hasil lama memuat cukup entry untuk limit ini,
-        // atau scan lama sudah tuntas (items.size == total) — hindari scan
-        // ulang per halaman saat galeri lebih kecil dari limit.
-        if (cached != null && now - cached.first < GALLERY_SCAN_TTL_MS &&
-            (cached.second.items.size >= maxEntries || cached.second.items.size == cached.second.total)
+        if (cached != null && MediaLibrary.scanCacheUsable(
+                now - cached.first, GALLERY_SCAN_TTL_MS,
+                cached.second.items.size, cached.second.total, maxEntries
+            )
         ) return cached.second
         val result = MediaLibrary.scan(context, maxEntries = maxEntries)
         galleryCache = now to result

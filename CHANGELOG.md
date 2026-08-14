@@ -5,6 +5,21 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-14] — Checksum otomatis dari header server + unit test cache galeri (PR #93)
+
+### Ditambahkan
+- **Deteksi checksum otomatis dari header HTTP** — saat server mengirim
+  `Digest` (RFC 3230), `Content-MD5`, atau `X-Checksum-Sha256/Sha1/MD5`,
+  checksum dipakai otomatis (tanpa isi manual) lalu diverifikasi setelah
+  unduh selesai; item yang terverifikasi ditandai badge ✓ di remote web.
+- **Unit test baru**: `ChecksumsTest` (parser header Digest/base64/hex) dan
+  `ScanCacheTest` (kondisi cache galeri) — mem-guard dua pola bug yang
+  didokumentasikan di AGENTS.md.
+
+### Diperbaiki
+- Kondisi cache galeri dipindah ke `MediaLibrary.scanCacheUsable()` (fungsi
+  murni) supaya bisa diuji — perilaku sama dengan PR #92.
+
 ## [v1.0 — 2026-08-14] — Perf: cache scan galeri tidak berulang saat galeri kecil (PR #92)
 
 ### Diperbaiki
