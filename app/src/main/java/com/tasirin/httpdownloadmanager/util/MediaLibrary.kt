@@ -140,7 +140,11 @@ object MediaLibrary {
         val now = System.currentTimeMillis()
         val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
         scanCache?.let { (ts, items, total) ->
-            if (now - ts < SCAN_TTL_MS && items.size >= limit) {
+            // Cache terpakai bila (a) hasil lama sudah memuat cukup entry untuk
+            // limit ini, ATAU (b) scan lama tuntas (items.size == total) —
+            // tanpa (b), galeri kecil (total < limit) mengulang scan penuh
+            // MediaStore untuk setiap request halaman dalam masa TTL.
+            if (now - ts < SCAN_TTL_MS && (items.size >= limit || items.size == total)) {
                 return MediaScanResult(items.take(limit), total)
             }
         }
