@@ -11,6 +11,8 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── .github/workflows/build.yml       # CI: guard CHANGELOG → cek remote web → bump versionCode → build APK → release
 ├── .github/workflows/update-deps-verification.yml  # (manual) generate gradle/verification-metadata.xml
 ├── .github/workflows/auto-merge.yml  # Auto-merge PR Dependabot yang aman (non-Gradle)
+├── .github/workflows/codeql.yml       # CodeQL: analisis keamanan statis Java/Kotlin (push, PR, mingguan)
+├── .github/workflows/gitleaks.yml     # Deteksi secret ter-commit (push & PR)
 ├── .github/workflows/stale.yml       # Tutup PR/issue tidak aktif (mingguan)
 ├── .github/workflows/labeler.yml     # Label otomatis per path (config: .github/labeler.yml)
 ├── .github/dependabot.yml            # Update dependensi terjadwal (grouped, auto-merge aman)
@@ -245,7 +247,9 @@ kuat dan tanpa diskusi:
 
 Catatan: workflow memakai `concurrency` (run lama di ref sama dibatalkan) dan
 ada **build terjadwal mingguan** (Senin 03:00 UTC) yang hanya memverifikasi
-build — tidak mem-publish release.
+build — tidak mem-publish release. **CodeQL** (Java/Kotlin) dan **gitleaks**
+(deteksi secret) berjalan di tiap push/PR; temuan CodeQL muncul di tab
+Security & alerts repositori.
 
 ## Secrets yang dibutuhkan (Settings → Secrets and variables → Actions)
 
