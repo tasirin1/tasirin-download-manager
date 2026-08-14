@@ -121,6 +121,8 @@ kuat dan tanpa diskusi:
 | Upload gagal diam-diam "listEl.appendChild is not a function" | argumen `uploadFiles()` tertukar | `check_upload_call` di `prepare_remote.py` + smoke test 4 chunk |
 | Tombol penampil foto tidak hilang saat zoom | class `mm-chrome-hidden` tidak diset | smoke test zoom (`+mm-chrome-hidden`/`-mm-chrome-hidden`) |
 | Path traversal / PIN bypass | logika keamanan bocor ke endpoint | unit test `ServerSecurity` — jangan pindahkan logika ke `HttpControlServer` |
+| File Manager HTTP 500 setelah stop/start server | `stopServer()` men-shutdown `statPool`, tapi toggle server memakai instance yang sama → pool tetap `Terminated`, semua `statPool.submit()` lempar `RejectedExecutionException` (PR #91) | `liveStatPool()` membuat pool baru otomatis saat pool lama shutdown — jangan balikkan ke `statPool` langsung |
+| `GALLERY SCAN` berulang tiap request galeri | cache scan dianggap "belum lengkap" karena `items.size >= limit` gagal saat total file < limit → scan MediaStore penuh berulang dalam masa TTL | kondisi cache juga menerima scan tuntas: `items.size == total` (di `MediaLibrary.scanCached` + `scannedGallery`) |
 
 ## Aturan pengembangan
 

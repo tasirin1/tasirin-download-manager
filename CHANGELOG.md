@@ -5,6 +5,20 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-14] — Perf: cache scan galeri tidak berulang saat galeri kecil (PR #92)
+
+### Diperbaiki
+- **`GALLERY SCAN` berulang per request galeri** — kondisi cache hanya menerima
+  `items.size >= limit`, jadi galeri dengan total media < limit (mis. 77 file
+  vs limit 200–3000) memicu scan MediaStore penuh untuk tiap halaman dalam
+  masa TTL. Cache kini terpakai juga saat scan lama tuntas
+  (`items.size == total`), di `MediaLibrary.scanCached()` dan
+  `scannedGallery()` — satu scan cukup per 15 detik.
+
+### Dokumentasi
+- AGENTS.md — tabel **Pola bug & guard-nya** ditambah: pool `statPool`
+  mati setelah stop/start server (PR #91) dan scan galeri berulang.
+
 ## [v1.0 — 2026-08-14] — Fix: listing file manager 500 setelah restart server (PR #91)
 
 ### Diperbaiki
