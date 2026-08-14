@@ -5,7 +5,7 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
-## [v1.0 — 2026-08-14] — Checksum otomatis dari header server + unit test cache galeri
+## [v1.0 — 2026-08-14] — Checksum otomatis dari header server + unit test cache galeri (PR #93)
 
 ### Ditambahkan
 - **Deteksi checksum otomatis dari header HTTP** — saat server mengirim
