@@ -59,6 +59,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── app/src/test/                     # Unit test JVM (junit4): Formats, FileNames,
 │                                     # MimeTypes, DownloadItem, QrEncoder (decode
 │                                     # via zxing test-scope) — jalan di CI
+├── gradle/verification-metadata.xml  # Checksum sha256 semua dependensi (verifikasi strict di CI)
 └── gradle wrapper                    # build via ./gradlew (CI saja untuk rilis)
 ```
 
@@ -203,6 +204,11 @@ kuat dan tanpa diskusi:
   (build + lint + test, tanpa release) — review lalu merge. Yang di-ignore
   (perlu upgrade toolchain manual): major AGP & Kotlin, `activity`,
   `lifecycle` (minSdk 23), `androidx.core` (compileSdk 37).
+- **Setiap perubahan dependensi wajib ikut regenerasi metadata verifikasi**
+  (`gradle/verification-metadata.xml`) — verifikasi strict aktif, jadi
+  dependensi baru/tanpa checksum membuat CI gagal. Alur: jalankan workflow
+  manual `update-deps-verification.yml` (pakai `--ref <branch>`), unduh
+  artifact, commit metadata, lalu push bersama PR-nya.
 - **Manual**: GitHub → Actions → *Build APK* → *Run workflow*
   (atau `gh workflow run build.yml -R tasirin1/tasirin-download-manager`).
 - **Jangan edit release manual** — selalu lewat workflow.
@@ -212,7 +218,8 @@ kuat dan tanpa diskusi:
 1. Checkout → **guard CHANGELOG** (perubahan kode wajib update `CHANGELOG.md`)
    → **`scripts/prepare_remote.py --check`** (sinkron remote.html, node
    --check, guard i18n) → JDK 17 → **cek kesehatan keystore** (fingerprint
-   `c2785a61...`) → Android SDK → Gradle (cache + verifikasi wrapper).
+   `c2785a61...`) → Android SDK → Gradle (cache + verifikasi wrapper +
+   **verifikasi dependensi strict** lewat `gradle/verification-metadata.xml`).
 2. **Bump versionCode**: `100000 + run_number` ditulis ke `app/build.gradle.kts`.
 3. `assembleDebug` (artifact `app-debug`).
 4. **Lint + unit test**: `lintDebug` (abortOnError) + `testDebugUnitTest`.

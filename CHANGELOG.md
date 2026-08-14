@@ -5,6 +5,23 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-14] — Verifikasi dependensi Gradle + fix guard CHANGELOG di push main
+
+### Diperbaiki
+- **Guard CHANGELOG gagal di push `main`** — clone shallow tidak punya commit
+  `before` sehingga `git diff` exit 128 dan mematikan build. Kini checkout
+  memakai `fetch-depth: 0` + fallback aman (`|| true`) (PR #95).
+
+### Ditambahkan
+- **Verifikasi dependensi Gradle aktif (strict)** — `gradle/verification-
+  metadata.xml` (sha256, 402 komponen: AGP, Kotlin, lint, aapt2, semua
+  dependency runtime/test) di-commit ke repo; `org.gradle.dependency.
+  verification=strict` di `gradle.properties` membuat CI menolak perubahan
+  dependensi yang tidak punya checksum.
+- **Workflow `update-deps-verification` digenerate via `build` penuh** —
+  metadata sekarang mencakup artifact yang hanya muncul saat task nyata
+  (aapt2 binary), bukan sekadar `help`.
+
 ## [v1.0 — 2026-08-14] — Kualitas maintenance: guard CI, keystore check, CONTRIBUTING, screenshot
 
 ### Ditambahkan
