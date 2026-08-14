@@ -10,6 +10,11 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 .
 ├── .github/workflows/build.yml       # CI: guard CHANGELOG → cek remote web → bump versionCode → build APK → release
 ├── .github/workflows/update-deps-verification.yml  # (manual) generate gradle/verification-metadata.xml
+├── .github/workflows/auto-merge.yml  # Auto-merge PR Dependabot yang aman (non-Gradle)
+├── .github/workflows/stale.yml       # Tutup PR/issue tidak aktif (mingguan)
+├── .github/workflows/labeler.yml     # Label otomatis per path (config: .github/labeler.yml)
+├── .github/dependabot.yml            # Update dependensi terjadwal (grouped, auto-merge aman)
+├── .github/labeler.yml               # Mapping path → label untuk labeler.yml
 ├── .github/PULL_REQUEST_TEMPLATE.md  # Template PR (wajib ringkasan + verifikasi)
 ├── .github/ISSUE_TEMPLATE/           # Template issue (bug report & feature request)
 ├── CONTRIBUTING.md                   # Panduan kontribusi singkat (baca juga AGENTS.md)
@@ -200,10 +205,14 @@ kuat dan tanpa diskusi:
   (dihapus & dibuat ulang, `--latest`) berisi APK
   `tasirin-download-manager-v1.0-<code>.apk`.
 - **Pull request** → build saja (verifikasi), **tidak** publish release.
-- **Dependabot** → PR update dependensi (Gradle/Actions) lewat alur PR biasa
-  (build + lint + test, tanpa release) — review lalu merge. Yang di-ignore
-  (perlu upgrade toolchain manual): major AGP & Kotlin, `activity`,
-  `lifecycle` (minSdk 23), `androidx.core` (compileSdk 37).
+- **Dependabot** → update dikelompokkan (`androidx`, `kotlinx`,
+  `gradle-tools`, `actions`). PR yang TIDAK menyentuh dependensi Gradle
+  (mis. update GitHub Actions) di-**auto-merge** setelah CI hijau (workflow
+  `auto-merge.yml`). PR dependensi Gradle tetap manual karena wajib
+  regenerasi metadata verifikasi. Yang di-ignore (perlu upgrade toolchain
+  manual): major AGP & Kotlin, `activity`, `lifecycle` (minSdk 23),
+  `androidx.core` (compileSdk 37). Guard CHANGELOG dikecualikan untuk author
+  `dependabot[bot]`.
 - **Setiap perubahan dependensi wajib ikut regenerasi metadata verifikasi**
   (`gradle/verification-metadata.xml`) — verifikasi strict aktif, jadi
   dependensi baru/tanpa checksum membuat CI gagal. Alur: jalankan workflow
@@ -215,21 +224,28 @@ kuat dan tanpa diskusi:
 
 ## Alur pipeline (build.yml)
 
-1. Checkout → **guard CHANGELOG** (perubahan kode wajib update `CHANGELOG.md`)
-   → **`scripts/prepare_remote.py --check`** (sinkron remote.html, node
-   --check, guard i18n) → JDK 17 → **cek kesehatan keystore** (fingerprint
-   `c2785a61...`) → Android SDK → Gradle (cache + verifikasi wrapper +
+1. Checkout → **guard CHANGELOG** (perubahan kode wajib update `CHANGELOG.md`;
+   dikecualikan untuk PR Dependabot) → **`scripts/prepare_remote.py --check`**
+   (sinkron remote.html, node --check, guard i18n) → JDK 17 → **cek kesehatan
+   keystore** (fingerprint `c2785a61...` + **masa berlaku**: error < 90 hari,
+   warning < 180 hari) → Android SDK → Gradle (cache + verifikasi wrapper +
    **verifikasi dependensi strict** lewat `gradle/verification-metadata.xml`).
 2. **Bump versionCode**: `100000 + run_number` ditulis ke `app/build.gradle.kts`.
 3. `assembleDebug` (artifact `app-debug`).
 4. **Lint + unit test**: `lintDebug` (abortOnError) + `testDebugUnitTest`.
 5. `assembleRelease` **hanya bila `KEYSTORE_BASE64` terisi** (artifact `app-release`).
-6. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
-7. Publish release `v1.0` dengan APK signed (fallback debug bila tanpa secrets).
-8. **VirusTotal scan** (opsional, hanya bila `VT_API_KEY` terisi) — submit APK
+6. **Verifikasi tanda tangan APK release** (`keytool -printcert -jarfile`
+   dibandingkan `c2785a61...`) — membuktikan APK benar ditandatangani kunci resmi.
+7. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
+8. Publish release `v1.0`: APK signed + **`mapping.txt`** (deobfuscation R8).
+9. **VirusTotal scan** (opsional, hanya bila `VT_API_KEY` terisi) — submit APK
    rilis/debug, polling sampai analisis selesai, lalu ringkasan deteksi (X/Y
    engine) dicetak di log + job summary; jalan di push `main` DAN di PR
    (repositori sama) supaya APK yang mau di-merge sudah di-scan.
+
+Catatan: workflow memakai `concurrency` (run lama di ref sama dibatalkan) dan
+ada **build terjadwal mingguan** (Senin 03:00 UTC) yang hanya memverifikasi
+build — tidak mem-publish release.
 
 ## Secrets yang dibutuhkan (Settings → Secrets and variables → Actions)
 

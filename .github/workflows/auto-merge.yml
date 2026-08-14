@@ -1,0 +1,48 @@
+name: Auto-merge dependabot
+
+# Hanya untuk PR Dependabot. PR yang mengubah dependensi Gradle runtime tetap
+# manual (wajib regenerasi verification-metadata dulu — lihat AGENTS.md);
+# yang aman (mis. update GitHub Actions) di-auto-merge setelah CI hijau.
+on:
+  pull_request_target:
+    types: [opened, synchronize, labeled, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge PR Dependabot
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Deteksi perubahan dependensi Gradle
+        id: files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FILES=$(gh pr diff ${{ github.event.pull_request.number }} --name-only 2>/dev/null || true)
+          echo "File berubah di PR:"
+          echo "$FILES"
+          if echo "$FILES" | grep -qE '^(app/build\.gradle\.kts|build\.gradle\.kts|gradle/|gradle\.properties|settings\.gradle\.kts)'; then
+            echo "GRADLE_DEPS=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Komentar panduan (PR dependensi Gradle)
+        if: env.GRADLE_DEPS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "PR ini mengubah dependensi Gradle. Verifikasi dependensi strict aktif, jadi sebelum merge:
+          1. Jalankan workflow *Update dependency verification metadata* (Actions → pilih workflow → Run workflow) dengan \`--ref\` branch PR ini.
+          2. Unduh artifact \`verification-metadata\`, commit \`gradle/verification-metadata.xml\`, push ke branch PR.
+          3. Setelah CI hijau, merge manual.
+          Lihat AGENTS.md → 'Setiap perubahan dependensi wajib ikut regenerasi metadata verifikasi'."
+
+      - name: Auto-merge setelah CI hijau (bukan dependensi Gradle)
+        if: env.GRADLE_DEPS != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --merge --auto

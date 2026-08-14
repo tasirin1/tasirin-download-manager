@@ -5,6 +5,15 @@ on:
     branches: ["main"]
   pull_request:
   workflow_dispatch:
+  # Build terjadwal (mingguan): pastikan repo tetap build dengan toolchain
+  # terbaru walau tidak ada perubahan. Tidak mem-publish release.
+  schedule:
+    - cron: "0 3 * * 1"
+
+# Batal run lama saat push/PR baru di ref yang sama — hemat menit Actions.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -25,6 +34,10 @@ jobs:
           fetch-depth: 0
 
       - name: Pastikan CHANGELOG diperbarui untuk perubahan kode
+        # PR Dependabot (bump dependensi) dikecualikan — changelog dirangkum di
+        # rilis maintenance; perubahan dependensi wajib regenerasi
+        # verification-metadata (lihat AGENTS.md).
+        if: github.actor != 'dependabot[bot]'
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
           if [ -z "$BASE" ] || [ "$BASE" = "null" ]; then
@@ -73,6 +86,25 @@ jobs:
           fi
           echo "Keystore sehat: sesuai kunci release resmi."
 
+          # Cek masa berlaku sertifikat: error bila < 90 hari, warning bila < 180 hari.
+          EXPIRY=$(keytool -list -v -keystore /tmp/keystore.jks -alias "$KEY_ALIAS" -storepass "$KEYSTORE_PASSWORD" 2>/dev/null | sed -n 's/^Valid from: .* until: \(.*\)$/\1/p')
+          if [ -n "$EXPIRY" ]; then
+            EXP_EPOCH=$(date -d "$EXPIRY" +%s 2>/dev/null || echo "")
+            if [ -n "$EXP_EPOCH" ]; then
+              DAYS=$(( (EXP_EPOCH - $(date +%s)) / 86400 ))
+              echo "Sertifikat berlaku sampai: $EXPIRY (sisa $DAYS hari)"
+              if [ "$DAYS" -lt 90 ]; then
+                echo "::error::Sertifikat keystore hampir kedaluwarsa (sisa $DAYS hari) — perbarui keystore segera!"
+                exit 1
+              fi
+              if [ "$DAYS" -lt 180 ]; then
+                echo "::warning::Sertifikat keystore sisa $DAYS hari — rencanakan perbaruan."
+              fi
+            else
+              echo "::warning::Format tanggal kedaluwarsa tidak dikenal — lewati cek masa berlaku."
+            fi
+          fi
+
       - name: Set up Gradle (cache + verifikasi wrapper)
         uses: gradle/actions/setup-gradle@v6
 
@@ -105,6 +137,19 @@ jobs:
             -PstorePassword="$KEYSTORE_PASSWORD" \
             -PkeyAlias="$KEY_ALIAS" \
             -PkeyPassword="$KEY_PASSWORD"
+
+      - name: Verifikasi tanda tangan APK release (kunci resmi)
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+          EXPECT="c2785a618082683755eeae867e0a2e01f450b1fd448859d1ec21cf854c5713d1"
+          FP=$(keytool -printcert -jarfile "$APK" 2>/dev/null | awk '/^[[:space:]]*SHA256:/ {gsub(":", "", $2); print tolower($2)}' | head -1)
+          echo "SHA-256 sertifikat pada APK: ${FP:-<tidak terbaca>}"
+          if [ -z "$FP" ] || [ "$FP" != "$EXPECT" ]; then
+            echo "::error::APK release tidak ditandatangani kunci resmi (expected $EXPECT, got $FP)"
+            exit 1
+          fi
+          echo "APK release: ditandatangani kunci release resmi."
 
       - name: Cek ukuran APK (jaga APK tetap kecil)
         if: always()
@@ -141,7 +186,8 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Publish GitHub Release
-        if: github.event_name != 'pull_request'
+        # Schedule (build mingguan) hanya verifikasi build, tidak publish release.
+        if: github.event_name != 'pull_request' && github.event_name != 'schedule'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -158,7 +204,12 @@ jobs:
             NOTES="APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box."
           fi
           gh release delete "v${VER}" --yes --cleanup-tag || true
-          gh release create "v${VER}" "$OUT" \
+          # Lampirkan mapping.txt (deobfuscation R8) bila ada — tidak masuk APK.
+          MAPPING_ARGS=""
+          if [ -f app/build/outputs/mapping/release/mapping.txt ]; then
+            MAPPING_ARGS="app/build/outputs/mapping/release/mapping.txt"
+          fi
+          gh release create "v${VER}" "$OUT" $MAPPING_ARGS \
             --title "Tasirin Download Manager v${VER} (build ${CODE})" \
             --notes "$NOTES" \
             --latest
