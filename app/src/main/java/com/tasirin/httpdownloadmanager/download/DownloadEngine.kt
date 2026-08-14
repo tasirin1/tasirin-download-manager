@@ -1290,7 +1290,7 @@ class DownloadEngine(appContext: Context) {
         if (item.checksum.isNotBlank()) return
         val detected = Checksums.fromHeaders(checksumHeadersOf(conn)) ?: return
         updateItem(item.id) { it.copy(checksum = detected) }
-        App.logEvent("DOWNLOAD ${item.fileName}: checksum ${detected.substringBefore(':')} dari header server")
+        App.logEvent("DOWNLOAD ${item.fileName}: checksum ${detected.substringBefore(':')} detected from server headers")
     }
 
     private fun headersOf(conn: HttpURLConnection): ServerHeaders {
