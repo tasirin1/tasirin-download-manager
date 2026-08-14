@@ -24,7 +24,10 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Generate metadata (sha256 semua dependency)
-        run: ./gradlew --write-verification-metadata sha256 help --no-daemon
+        # Task build (bukan help) supaya semua artifact yang dipakai CI tercatat:
+        # aapt2 binary, lint, unit test, debug+release, dll. Metadata yang
+        # dihasilkan ini di-commit ke repo untuk verifikasi dependensi.
+        run: ./gradlew --write-verification-metadata sha256 build --no-daemon
 
       - name: Upload gradle/verification-metadata.xml
         uses: actions/upload-artifact@v7
