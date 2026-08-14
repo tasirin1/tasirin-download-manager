@@ -5,6 +5,26 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-14] — Kualitas maintenance: guard CI, keystore check, CONTRIBUTING, screenshot
+
+### Ditambahkan
+- **Guard CHANGELOG di CI** — PR yang mengubah `app/src/main`,
+  `remote.src.html`, `app/build.gradle.kts`, atau `scripts/` tanpa update
+  `CHANGELOG.md` langsung gagal (aturan wajib changelog kini otomatis).
+- **Release notes otomatis dari CHANGELOG** — deskripsi release `v1.0` diambil
+  dari entri CHANGELOG terbaru.
+- **Cek kesehatan keystore di CI** — fingerprint sertifikat signing
+  (`c2785a61...`) diverifikasi dari `KEYSTORE_BASE64`; mismatch = build gagal.
+- **Workflow manual `update-deps-verification`** — generate
+  `gradle/verification-metadata.xml` (verifikasi dependensi Gradle; diaktifkan
+  di PR lanjutan).
+- **`CONTRIBUTING.md`** — panduan kontribusi singkat (alur PR, bahasa,
+  remote web, hook).
+- **Pre-commit hook opsional** (`.githooks/pre-commit`) — `prepare_remote.py
+  --check` + unit test cepat.
+- **Section Screenshot di README/README.en** — folder `docs/screenshots/`
+  siap diisi `remote-web.png`, `gallery.png`, `downloads.png`.
+
 ## [v1.0 — 2026-08-14] — Checksum otomatis dari header server + unit test cache galeri (PR #93)
 
 ### Ditambahkan

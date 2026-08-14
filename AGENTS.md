@@ -8,11 +8,15 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 
 ```
 .
-├── .github/workflows/build.yml       # CI: cek remote web → bump versionCode → build APK → release
+├── .github/workflows/build.yml       # CI: guard CHANGELOG → cek remote web → bump versionCode → build APK → release
+├── .github/workflows/update-deps-verification.yml  # (manual) generate gradle/verification-metadata.xml
 ├── .github/PULL_REQUEST_TEMPLATE.md  # Template PR (wajib ringkasan + verifikasi)
 ├── .github/ISSUE_TEMPLATE/           # Template issue (bug report & feature request)
+├── CONTRIBUTING.md                   # Panduan kontribusi singkat (baca juga AGENTS.md)
+├── .githooks/pre-commit              # Hook opsional: prepare_remote --check + unit test cepat
 ├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
+├── docs/screenshots/                 # Screenshot README (remote-web.png, gallery.png, downloads.png)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
 ├── scripts/upload_smoke_test.js      # Smoke test alur upload (stub DOM/XHR, tanpa dependensi)
@@ -174,11 +178,20 @@ kuat dan tanpa diskusi:
     versi sekaligus; tiap langkah lewat CI dulu.
 14. **Changelog wajib per PR** — setiap PR menambah entri `CHANGELOG.md`
     (judul `## [v1.0 — tanggal] — ringkasan`) dan menyebut nomor PR pada isi
-    entri setelah PR dibuat. Satu PR = satu tujuan kecil; jangan campur
-    fitur + refactor + docs dalam satu PR.
+    entri setelah PR dibuat. **Dijaga otomatis CI**: PR yang mengubah
+    `app/src/main`, `remote.src.html`, `app/build.gradle.kts`, atau `scripts/`
+    tanpa update `CHANGELOG.md` langsung gagal. Satu PR = satu tujuan kecil;
+    jangan campur fitur + refactor + docs dalam satu PR.
 15. **Jangan berhenti di tengah alur rilis** — setelah PR merge, pantau build
     `main` sampai sukses dan release punya asset APK terbaru (lihat
     "Cara cek rilis terbaru").
+16. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
+    .githooks` (jalankan `prepare_remote.py --check` + unit test cepat).
+    Hook tidak wajib; CI tetap penentu.
+17. **Cek kesehatan keystore otomatis di CI** — workflow membandingkan
+    fingerprint sertifikat signing dari `KEYSTORE_BASE64` dengan
+    `c2785a61...`; mismatch = build gagal (keystore salah/korup terdeteksi
+    lebih awal).
 
 ## Cara memicu build & release
 
@@ -196,9 +209,10 @@ kuat dan tanpa diskusi:
 
 ## Alur pipeline (build.yml)
 
-1. Checkout → **`scripts/prepare_remote.py --check`** (sinkron remote.html,
-
-   node --check, guard i18n) → JDK 17 → Android SDK → Gradle (cache + verifikasi wrapper).
+1. Checkout → **guard CHANGELOG** (perubahan kode wajib update `CHANGELOG.md`)
+   → **`scripts/prepare_remote.py --check`** (sinkron remote.html, node
+   --check, guard i18n) → JDK 17 → **cek kesehatan keystore** (fingerprint
+   `c2785a61...`) → Android SDK → Gradle (cache + verifikasi wrapper).
 2. **Bump versionCode**: `100000 + run_number` ditulis ke `app/build.gradle.kts`.
 3. `assembleDebug` (artifact `app-debug`).
 4. **Lint + unit test**: `lintDebug` (abortOnError) + `testDebugUnitTest`.
