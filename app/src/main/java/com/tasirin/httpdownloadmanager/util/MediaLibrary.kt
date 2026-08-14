@@ -135,16 +135,18 @@ object MediaLibrary {
         }
     }
 
+    /** Kondisi cache scan terpakai: masih dalam TTL dan (hasil lama memuat
+     *  cukup entry untuk limit ini ATAU scan lama tuntas). Dipisah jadi fungsi
+     *  murni supaya bisa di-unit-test. */
+    fun scanCacheUsable(ageMs: Long, ttlMs: Long, itemsSize: Int, total: Int, limit: Int): Boolean =
+        ageMs < ttlMs && (itemsSize >= limit || itemsSize == total)
+
     private fun scanCached(context: Context, maxEntries: Int): MediaScanResult {
         ensureObserver(context)
         val now = System.currentTimeMillis()
         val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
         scanCache?.let { (ts, items, total) ->
-            // Cache terpakai bila (a) hasil lama sudah memuat cukup entry untuk
-            // limit ini, ATAU (b) scan lama tuntas (items.size == total) —
-            // tanpa (b), galeri kecil (total < limit) mengulang scan penuh
-            // MediaStore untuk setiap request halaman dalam masa TTL.
-            if (now - ts < SCAN_TTL_MS && (items.size >= limit || items.size == total)) {
+            if (scanCacheUsable(now - ts, SCAN_TTL_MS, items.size, total, limit)) {
                 return MediaScanResult(items.take(limit), total)
             }
         }

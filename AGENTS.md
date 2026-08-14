@@ -123,6 +123,7 @@ kuat dan tanpa diskusi:
 | Path traversal / PIN bypass | logika keamanan bocor ke endpoint | unit test `ServerSecurity` — jangan pindahkan logika ke `HttpControlServer` |
 | File Manager HTTP 500 setelah stop/start server | `stopServer()` men-shutdown `statPool`, tapi toggle server memakai instance yang sama → pool tetap `Terminated`, semua `statPool.submit()` lempar `RejectedExecutionException` (PR #91) | `liveStatPool()` membuat pool baru otomatis saat pool lama shutdown — jangan balikkan ke `statPool` langsung |
 | `GALLERY SCAN` berulang tiap request galeri | cache scan dianggap "belum lengkap" karena `items.size >= limit` gagal saat total file < limit → scan MediaStore penuh berulang dalam masa TTL | kondisi cache juga menerima scan tuntas: `items.size == total` (di `MediaLibrary.scanCached` + `scannedGallery`) |
+| Checksum dari header server salah di-parse (Digest/Content-MD5/X-Checksum-*) | base64 vs hex, huruf besar/kecil, preferensi sha-256 | unit test `ChecksumsTest` — format output wajib "algo:hex" huruf kecil (dipahami `parseChecksum` engine) |
 
 ## Aturan pengembangan
 

@@ -171,6 +171,9 @@
   .name {
  font-weight: 700; font-size: 14.5px; word-break: break-all; }
 
+  .checksum-ok {
+ color: var(--green); font-weight: 700; font-size: 13px; margin-left: 6px; }
+
   .meta {
  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-top: 3px; }
 
@@ -4463,9 +4466,10 @@ function rebuildList(items) {
     const err = it.error ? '<div class="err">' + escapeHtml(it.error) + '</div>' : '';
     const retry = it.state === 'FAILED'
       ? '<div class="err-actions"><button class="item-retry" type="button">\u21BB Retry</button></div>' : '';
+    const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
     li.innerHTML =
       '<div class="item-top"><div class="icon ' + iconStateCls(it.state) + '">' + fileIcon(it.fileName) + '</div><div class="item-body">' +
-      '<div class="name">' + escapeHtml(it.fileName) + '</div>' + err + retry +
+      '<div class="name">' + escapeHtml(it.fileName) + '</div>' + okBadge + err + retry +
       '</div>' +
       '<button class="item-menu-btn" type="button" title="Actions">\u22EF</button>' +
       '</div>' +
