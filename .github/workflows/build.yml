@@ -19,6 +19,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # Guard CHANGELOG butuh commit base (push/PR) — history penuh
+          # supaya git diff tidak gagal di clone shallow.
+          fetch-depth: 0
 
       - name: Pastikan CHANGELOG diperbarui untuk perubahan kode
         run: |
@@ -31,7 +35,7 @@ jobs:
             exit 0
           fi
           git fetch origin main --quiet || true
-          CHANGED=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || git diff --name-only "$BASE" HEAD)
+          CHANGED=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || git diff --name-only "$BASE" HEAD || true)
           NEEDS_CHANGELOG=$(echo "$CHANGED" | grep -E '^(app/src/main/|remote\.src\.html$|app/build\.gradle\.kts$|scripts/)' || true)
           HAS_CHANGELOG=$(echo "$CHANGED" | grep -x 'CHANGELOG.md' || true)
           if [ -n "$NEEDS_CHANGELOG" ] && [ -z "$HAS_CHANGELOG" ]; then
@@ -111,6 +115,10 @@ jobs:
             APK="$RELEASE_APK"; LIMIT=3670016; LABEL="release"
           else
             APK="$DEBUG_APK"; LIMIT=10485760; LABEL="debug (tanpa minify)"
+          fi
+          if [ ! -f "$APK" ]; then
+            echo "APK $LABEL belum ada (build sebelumnya gagal) — lewati cek ukuran."
+            exit 0
           fi
           SIZE=$(stat -c %s "$APK")
           echo "Ukuran APK $LABEL (${APK##*/}): $SIZE bytes"
