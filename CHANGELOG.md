@@ -5,6 +5,38 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-15] — Perbaikan bug video player & penampil foto (PR #109)
+
+### Diperbaiki
+- **Tap tengah pemutar video tidak bisa pause/play di layar sentuh** — handler
+  `touchend` membalik play/pause, lalu *click sintetis* Android menyusul dan
+  membatalkannya (play langsung di-pause 220 ms, pause langsung di-play lagi).
+  Kini `click` mengabaikan sentuhan (`pointerType === 'touch'`) karena semua
+  aksi sentuh sudah ditangani `touchend`; tombol play besar (overlay) ikut
+  berfungsi normal.
+- **Drag slider seek / volume / tombol bar tidak sengaja memicu play-pause
+  atau ganti video** — event sentuhan di kontrol membubble ke `mmPlayer`;
+  handler kini mengabaikan sentuhan yang berasal dari `#mmCtrl`/`#mmPlayerTop`
+  (slider, tombol, volume).
+- **Posisi resume video tersimpan ke token yang salah saat pindah video
+  (prev/next/auto-next)** — event `pause` asinkron menyimpan posisi video lama
+  ke token video baru, sehingga video baru tiba-tiba "Resume from" waktu asing.
+  Posisi lama kini disimpan eksplisit sebelum ganti token dan event `pause`
+  memakai token video yang benar-benar aktif.
+- **Auto-next memutar video yang salah urutan** — daftar lanjutan memakai
+  "video lain pertama" (misal B lanjut ke A, mundur). Kini auto-next memakai
+  video berikutnya sesuai urutan galeri (`mmVideoList.slice(idx + 1)`).
+- **Media dibuka dari File Manager kehilangan prev/next & hitungan** —
+  `mmVideoList`/`mmImageList` kosong karena `galleryItems` belum dimuat; item
+  saat ini kini dimasukkan ke daftar sebagai fallback.
+- **File audio (mp3/m4a/aac/dll) dibuka dari File Manager malah tampil di
+  penampil foto** — audio kini dibuka di pemutar (label "audio"), bukan gagal
+  "Failed to load photo".
+- **Jempol slider seek melompat saat digeser** — `timeupdate` menimpa posisi
+  slider saat drag; ada penanda `mmSeekDrag` + fallback event `change`.
+- **Pesan gagal muat video terlalu singkat & tidak informatif** — toast kini
+  2,6 detik dan menyebut format mungkin tidak didukung perangkat.
+
 ## [v1.0 — 2026-08-15] — Audit efisiensi: hot path engine, file manager, polling (PR #108)
 
 ### Diperbaiki
