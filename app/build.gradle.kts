@@ -126,7 +126,7 @@ tasks.withType<Test>().configureEach {
         isIncludeNoLocationClasses = true
         // Hindari ClassNotFoundException di agent saat JDK memuat kelas hidden
         // (GeneratedSerializationConstructorAccessor) pada Java 17+.
-        excludes.add("jdk.internal.*")
+        excludes = (excludes ?: emptyList()) + "jdk.internal.*"
     }
 }
 
