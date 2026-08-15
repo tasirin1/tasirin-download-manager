@@ -5,7 +5,7 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
-## [v1.0 — 2026-08-15] — Cakupan unit test JaCoCo (PR #99)
+## [v1.0 — 2026-08-15] — Cakupan unit test JaCoCo (PR #102)
 
 ### Ditambahkan
 - **JaCoCo coverage di CI** — `jacocoTestReport` (XML + ringkasan LINE/
