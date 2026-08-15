@@ -1557,7 +1557,7 @@ private class SpeedThrottle(
                 val limit = limitKbps * 1024L
                 val elapsed = System.currentTimeMillis() - startTime
                 val expected = startBytes + (elapsed * limit) / 1000L
-                if (totalDownloaded > expected) ((totalDownloaded - expected) * 1000L) / limit else 0L
+                if (total > expected) ((total - expected) * 1000L) / limit else 0L
             }
         }
         if (delayMs > 0) delay(delayMs)
