@@ -763,6 +763,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         }
                         published.filePath?.let {
                             fsMediaCache.clear()
+                            invalidateGalleryCache()
                             MediaLibrary.notifyMediaChanged(context, it)
                         }
                         completedUploads[id] = finalName to System.currentTimeMillis()
@@ -844,15 +845,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             runCatching { file.delete() }
         }
         val file = create() ?: return null
+        // Dua request bersamaan untuk key sama (browser mengunduh lewat
+        // beberapa request Range): putIfAbsent mencegah dua ZIP dibuat —
+        // file yang kalah dihapus supaya tidak bocor di cacheDir.
+        val prev = zipCache.putIfAbsent(key, now to file)
+        if (prev != null) {
+            runCatching { file.delete() }
+            return prev.second
+        }
         val it = zipCache.entries.iterator()
         while (it.hasNext()) {
             val (k, v) = it.next()
-            if (k == key || now - v.first >= ZIP_CACHE_TTL_MS) {
+            if (k != key && now - v.first >= ZIP_CACHE_TTL_MS) {
                 it.remove()
                 runCatching { v.second.delete() }
             }
         }
-        zipCache[key] = now to file
         return file
     }
 
@@ -925,6 +933,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return jsonResponse(JSONObject().put("ok", false).put("error", "not allowed"))
         }
         val deleted = App.engine.deleteMedia(raw)
+        if (deleted) {
+            invalidateGalleryCache()
+            if (raw.startsWith(FS_PREFIX)) {
+                MediaLibrary.notifyMediaChanged(context, raw.removePrefix(FS_PREFIX))
+            }
+        }
         return jsonResponse(JSONObject().put("ok", deleted))
     }
 
@@ -1256,12 +1270,21 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             matched++
         }
         if (extracted > 0) saveVideoDurations(cache)
+        val filtered = q.isNotEmpty() || type.isNotEmpty()
         return jsonResponse(
             JSONObject()
                 .put("items", arr)
-                .put("hasMore", matched < scan.total)
-                .put("total", scan.total)
+                .put("hasMore", matched > pageEnd)
+                // total = jumlah hasil filter (bukan seluruh media) saat ada
+                // q/type; tanpa filter tetap total scan agar count akurat.
+                .put("total", if (filtered) matched else scan.total)
         )
+    }
+
+    /** Galeri berubah (hapus/upload/pindah media) — buang snapshot 15 detik
+     *  supaya request berikutnya langsung scan ulang, tidak tampil basi. */
+    private fun invalidateGalleryCache() {
+        galleryCache = null
     }
 
     private fun scannedGallery(maxEntries: Int): MediaLibrary.MediaScanResult {
@@ -1587,6 +1610,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val gone = if (file.isDirectory) file.deleteRecursively() else file.delete()
                 if (gone) {
                     fsMediaCache.clear()
+                    invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath)
                 }
                 gone
@@ -1598,6 +1622,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val ok = file.renameTo(target)
                     if (ok) {
                         fsMediaCache.clear()
+                        invalidateGalleryCache()
                         MediaLibrary.notifyMediaChanged(
                             context, file.absolutePath, target.absolutePath
                         )
@@ -1619,6 +1644,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (target.exists()) return false
                 if (file.renameTo(target)) {
                     fsMediaCache.clear()
+                    invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     return true
                 }
@@ -1627,6 +1653,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     file.copyTo(target, overwrite = false)
                     file.delete()
                     fsMediaCache.clear()
+                    invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     true
                 }.getOrDefault(false)
