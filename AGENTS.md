@@ -26,6 +26,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── docs/screenshots/                 # Screenshot README (remote-web.png, gallery.png, downloads.png)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
+├── scripts/check_readme_sync.py      # Guard CI: struktur heading README.md vs README.en.md sinkron
 ├── scripts/upload_smoke_test.js      # Smoke test alur upload (stub DOM/XHR, tanpa dependensi)
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
@@ -231,7 +232,8 @@ kuat dan tanpa diskusi:
 
 1. Checkout → **guard CHANGELOG** (perubahan kode wajib update `CHANGELOG.md`;
    dikecualikan untuk PR Dependabot) → **`scripts/prepare_remote.py --check`**
-   (sinkron remote.html, node --check, guard i18n) → JDK 17 → **cek kesehatan
+   (sinkron remote.html, node --check, guard i18n) + **cek sinkron
+   README/README.en** (struktur heading) → JDK 17 → **cek kesehatan
    keystore** (fingerprint `c2785a61...` + **masa berlaku**: error < 90 hari,
    warning < 180 hari) → Android SDK → Gradle (cache + verifikasi wrapper +
    **verifikasi dependensi strict** lewat `gradle/verification-metadata.xml`).

@@ -12,6 +12,12 @@ if ! python3 scripts/prepare_remote.py --check; then
 fi
 echo "[pre-commit] remote web OK."
 
+echo "[pre-commit] memeriksa sinkron README/README.en..."
+if ! python3 scripts/check_readme_sync.py; then
+  echo "[pre-commit] GAGAL: struktur heading README tidak sinkron. Perbaiki sebelum commit."
+  exit 1
+fi
+
 if command -v java >/dev/null 2>&1 && [ -x ./gradlew ]; then
   echo "[pre-commit] menjalankan unit test cepat..."
   if ! ./gradlew :app:testDebugUnitTest -q; then
