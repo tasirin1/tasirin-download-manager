@@ -5,6 +5,34 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-15] — Audit efisiensi: hot path engine, file manager, polling (PR #108)
+
+### Diperbaiki
+- **Engine: biaya scan daftar saat throttle** — `SpeedThrottle.sleepIfNeeded`
+  kini menerima lambda, jadi total byte per item hanya dihitung saat ada batas
+  kecepatan (sebelumnya dihitung setiap pembacaan buffer 64 KB walau tanpa
+  limit).
+- **Engine: progres segmen digabung (coalesce)** — segmen menulis progres ke
+  penyangga ringan, lalu SATU `updateItem`/StateFlow per item per interval
+  (sebelumnya 1 salinan daftar + 1 emisi per segmen per detik; di item dengan
+  banyak segmen ini membebani UI/notifikasi/SSE). Nilai akhir tiap segmen
+  tetap ditulis langsung (verifikasi ukuran & resume tidak berubah).
+- **File manager: halaman default 1000 → 250 entri** (`FS_PAGE`) — JSON,
+  statistik subfolder, dan render DOM per request jauh lebih ringan; tombol
+  "Load more" menangani sisanya (server default disesuaikan ke 300).
+- **File manager media: cache listing MediaStore 5 dtk** — membrowse folder
+  media tidak lagi me-query ulang seluruh koleksi tiap halaman; cache
+  dibatalkan saat upload/aksi file/rename/move.
+- **Log server: polling berhenti saat layar tidak terlihat** (onStart/onStop)
+  dan hitung baris tanpa alokasi `text.lines()` per tick.
+- **SSE: pump dihentikan saat tidak ada klien** — coroutine heartbeat dan
+  collector item tidak berjalan sia-sia; `ensureSsePump()` menyalakan lagi saat
+  klien baru masuk.
+- **Main UI: statistik + tombol batch dihitung dalam satu iterasi** daftar
+  (sebelumnya 4× iterasi per emisi progress).
+- **Remote web: pilihan file memakai `Set`** (hapus `indexOf` O(n) per baris
+  saat render mode pilih) dan pencarian file manager di-debounce 250 ms.
+
 ## [v1.0 — 2026-08-15] — Version catalog dependensi (PR #106)
 
 ### Ditambahkan

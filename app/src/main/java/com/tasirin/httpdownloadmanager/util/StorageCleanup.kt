@@ -43,7 +43,7 @@ object StorageCleanup {
     }
 
     /** Hapus sisa upload chunk (up_*.tmp) yang sudah basi dari cacheDir. */
-    fun cleanupUploadTemps(
+    private fun cleanupUploadTemps(
         context: Context,
         maxAgeMs: Long = UPLOAD_TMP_MAX_AGE_MS
     ): Long {

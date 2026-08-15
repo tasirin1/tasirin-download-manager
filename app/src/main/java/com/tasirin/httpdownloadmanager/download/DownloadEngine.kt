@@ -97,6 +97,13 @@ class DownloadEngine(appContext: Context) {
     )
     val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
 
+    // Progres segmen per item (indeks segmen -> byte): segmen menulis di sini
+    // tiap detik TANPA emisi StateFlow; flush berkala menggabungkannya menjadi
+    // SATU updateItem per item (sebelumnya 1 salinan daftar + 1 emisi per
+    // segmen per detik) — hemat CPU/GC saat banyak segmen paralel.
+    private val segProgress = ConcurrentHashMap<String, LongArray>()
+    private val segFlushJobs = ConcurrentHashMap<String, Job>()
+
     init {
         startBackgroundLoops()
     }
@@ -187,6 +194,7 @@ class DownloadEngine(appContext: Context) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD CANCELLED: ${it.fileName}") }
         retryAttempts.remove(id)
         speedTracker.reset(id)
+        clearSegProgress(id)
         jobs.remove(id)?.cancel()
         activeConns.remove(id)?.disconnect()
         if (StoragePrefs.isDeletePartialOnCancel(context)) {
@@ -204,6 +212,7 @@ class DownloadEngine(appContext: Context) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD DELETED: ${it.fileName}") }
         retryAttempts.remove(id)
         speedTracker.reset(id)
+        clearSegProgress(id)
         jobs.remove(id)?.cancel()
         activeConns.remove(id)?.disconnect()
         _items.value.find { it.id == id }?.let { FileSaver(context).deleteFiles(it) }
@@ -887,7 +896,7 @@ class DownloadEngine(appContext: Context) {
                 if (read == -1) break
                 output.write(buffer, 0, read)
                 downloaded += read
-                throttle.sleepIfNeeded(downloaded)
+                throttle.sleepIfNeeded { downloaded }
                 val now = System.currentTimeMillis()
                 // Progres di-throttle 1x/detik: salinan daftar + emisi StateFlow
                 // (ke UI, notifikasi, SSE) tidak perlu 2x/detik — hemat CPU/GC
@@ -986,6 +995,10 @@ class DownloadEngine(appContext: Context) {
         }
 
         throttle.reset(segments.sumOf { it.downloaded })
+        // Sisa penyangga/flush dari percobaan sebelumnya dibuang: segmen baru
+        // menulis ulang dari state item saat ini (nilai basi tidak boleh
+        // menimpa progres percobaan baru).
+        clearSegProgress(item.id)
         try {
             coroutineScope {
                 segments.forEach { seg ->
@@ -1014,6 +1027,7 @@ class DownloadEngine(appContext: Context) {
                         etaSeconds = 0
                     )
                 }
+                clearSegProgress(item.id)
                 val fallbackConn = openConn(item.url)
                 try {
                     fallbackConn.requestMethod = "GET"
@@ -1059,6 +1073,7 @@ class DownloadEngine(appContext: Context) {
             )
         }
         flushSave()
+        clearSegProgress(item.id)
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
     }
 
@@ -1112,7 +1127,7 @@ class DownloadEngine(appContext: Context) {
                     if (read == -1) break
                     output.write(buffer, 0, read)
                     downloaded += read
-                    throttle.sleepIfNeeded(totalDownloaded(id))
+                    throttle.sleepIfNeeded { totalDownloaded(id) }
                     val now = System.currentTimeMillis()
                     if (now - lastNotify >= 1000) {
                         lastNotify = now
@@ -1124,7 +1139,8 @@ class DownloadEngine(appContext: Context) {
                         lastSegBytes = downloaded
                         lastSegAt = now
                         health.check(now, downloaded, segTotal, speed)
-                        updateSegment(id, segment.index, downloaded)
+                        // Progres ke penyangga; updateItem nyata dilakukan flush.
+                        recordSegmentProgress(id, segment.index, downloaded)
                     }
                 }
                 output.flush()
@@ -1164,6 +1180,68 @@ class DownloadEngine(appContext: Context) {
 
     private fun totalDownloaded(id: String): Long {
         return _items.value.find { it.id == id }?.segments?.sumOf { it.downloaded } ?: 0L
+    }
+
+    /** Tulis progres segmen ke penyangga (tanpa emisi StateFlow). Setiap indeks
+     *  hanya ditulis oleh segmen yang sama, jadi aman tanpa kunci tambahan. */
+    private fun recordSegmentProgress(id: String, index: Int, downloaded: Long) {
+        val count = _items.value.find { it.id == id }?.segments?.size ?: return
+        val arr = segProgress.getOrPut(id) { LongArray(count) { -1L } }
+        arr[index] = downloaded
+        scheduleSegFlush(id)
+    }
+
+    /** Jadwalkan penggabungan progres; paling banyak SATU job flush per item
+     *  (tick 1 dtk dari banyak segmen tidak menumpuk job). */
+    private fun scheduleSegFlush(id: String) {
+        if (segFlushJobs.containsKey(id)) return
+        synchronized(this) {
+            if (segFlushJobs.containsKey(id)) return
+            segFlushJobs[id] = scope.launch {
+                delay(SEG_FLUSH_INTERVAL_MS)
+                runCatching { flushSegmentProgress(id) }
+                segFlushJobs.remove(id)
+            }
+        }
+    }
+
+    /** Gabungkan semua progres segmen tertunda menjadi SATU updateItem (satu
+     *  salinan daftar + satu emisi StateFlow per interval per item). */
+    @Synchronized
+    private fun flushSegmentProgress(id: String) {
+        val pending = segProgress[id] ?: return
+        val current = _items.value.find { it.id == id } ?: return
+        // Jangan menimpa item yang sudah pause/gagal/selesai.
+        if (current.state != DownloadState.DOWNLOADING) return
+        val dirty = current.segments.any { seg ->
+            seg.index < pending.size &&
+                pending[seg.index] >= 0 && pending[seg.index] != seg.downloaded
+        }
+        if (!dirty) return
+        updateItem(id, persist = false) { item ->
+            var totalDone = 0L
+            val segs = item.segments.map { seg ->
+                val p = if (seg.index < pending.size) pending[seg.index] else -1L
+                val next = if (p >= 0 && p != seg.downloaded) seg.copy(downloaded = p) else seg
+                totalDone += next.downloaded
+                next
+            }
+            val (speed, eta) = speedTracker.sample(id, totalDone, item.totalBytes)
+            item.copy(
+                segments = segs,
+                bytesDownloaded = totalDone,
+                speedBps = speed,
+                etaSeconds = eta
+            )
+        }
+        scheduleProgressSave()
+    }
+
+    /** Buang penyangga progres + batalkan flush job (download selesai/gagal/
+     *  ulang dari awal). Nilai final tetap sudah ditulis via updateSegment. */
+    private fun clearSegProgress(id: String) {
+        segProgress.remove(id)
+        segFlushJobs.remove(id)?.cancel()
     }
 
     private fun verifySize(id: String, downloaded: Long, total: Long) {
@@ -1423,6 +1501,7 @@ class DownloadEngine(appContext: Context) {
         private const val MIN_FREE_BYTES = 2L * 1024 * 1024
         private const val SAVE_DEBOUNCE_MS = 400L
         private const val PROGRESS_SAVE_INTERVAL_MS = 2_000L
+        private const val SEG_FLUSH_INTERVAL_MS = 500L
         private const val MONITOR_INTERVAL_MS = 30 * 60 * 1000L
     }
 }
@@ -1463,11 +1542,14 @@ private class SpeedThrottle(
         }
     }
 
-    suspend fun sleepIfNeeded(totalDownloaded: Long) {
+    suspend fun sleepIfNeeded(totalDownloaded: () -> Long) {
         if (limitKbps <= 0) return
         val delayMs = synchronized(lock) {
-            val delta = (totalDownloaded - lastSeen).coerceAtLeast(0L)
-            lastSeen = totalDownloaded
+            // Total dihitung di sini (bukan saat pemanggilan) supaya download
+            // tanpa batas kecepatan tidak membayar biaya scan daftar item.
+            val total = totalDownloaded()
+            val delta = (total - lastSeen).coerceAtLeast(0L)
+            lastSeen = total
             val g = shared
             if (g != null) {
                 if (delta <= 0) 0L else g.waitFor(delta)

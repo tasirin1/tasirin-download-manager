@@ -2062,10 +2062,10 @@ let fsItems = [];
 let fsTotal = 0;
 let fsOffset = 0;
 let fsLoadingMore = false;
-const FS_PAGE = 1000;
+const FS_PAGE = 250;
 let fsScrollPos = {};
 let fsSelectMode = false;
-const fsSelected = [];
+const fsSelected = new Set();
 const fsView = document.getElementById('fsView');
 const fsBtn = document.getElementById('tabFiles');
 const fsList = document.getElementById('fsList');
@@ -2133,7 +2133,7 @@ function applyRoute() {
     restartAnim(fsView);
     toggleAddForm(false);
     fsSelectMode = false;
-    fsSelected.length = 0;
+    fsSelected.clear();
     fsSelectBtn.textContent = 'Select';
     fsBatch.classList.add('hidden');
     fsLocationsLoaded = false;
@@ -2442,9 +2442,9 @@ function fsAppendRow(box, it) {
       meta = it.itemCount + ' item';
       if (it.totalSize > 0) meta += ' \u00b7 ' + fmt(it.totalSize);
     }
-    const selIdx = fsSelected.indexOf(it);
+    const sel = fsSelectMode && fsSelected.has(it);
     const check = fsSelectMode
-      ? '<span class="fs-check' + (selIdx >= 0 ? ' on' : '') + '">' + (selIdx >= 0 ? '\u2713' : '') + '</span>'
+      ? '<span class="fs-check' + (sel ? ' on' : '') + '">' + (sel ? '\u2713' : '') + '</span>'
       : '';
     row.innerHTML =
       check +
@@ -2536,7 +2536,12 @@ fsSearchBtn.addEventListener('click', function () {
     fsSetSearch('');
   }
 });
-fsSearchInput.addEventListener('input', function () { fsSetSearch(this.value); });
+let fsSearchTimer = null;
+fsSearchInput.addEventListener('input', function () {
+  const v = this.value;
+  clearTimeout(fsSearchTimer);
+  fsSearchTimer = setTimeout(function () { fsSetSearch(v); }, 250);
+});
 
 let fsNewBadges = {};
 function fsMarkNew(path, name) {
@@ -2616,8 +2621,8 @@ function attachFsLongPress(row, it) {
       fsLpFired = true;
       fsSelectMode = true;
       fsSelectBtn.textContent = 'Cancel selection';
-      fsSelected.length = 0;
-      fsSelected.push(it);
+      fsSelected.clear();
+      fsSelected.add(it);
       renderFs(fsItems);
       updateFsBatch();
     }, 480);
@@ -2633,60 +2638,59 @@ function attachFsLongPress(row, it) {
 }
 
 function toggleFsSelect(it, row) {
-  const idx = fsSelected.indexOf(it);
-  if (idx >= 0) {
-    fsSelected.splice(idx, 1);
+  if (fsSelected.has(it)) {
+    fsSelected.delete(it);
   } else {
-    fsSelected.push(it);
+    fsSelected.add(it);
   }
   const check = row.querySelector('.fs-check');
-  check.classList.toggle('on', fsSelected.indexOf(it) >= 0);
-  check.textContent = fsSelected.indexOf(it) >= 0 ? '\u2713' : '';
+  check.classList.toggle('on', fsSelected.has(it));
+  check.textContent = fsSelected.has(it) ? '\u2713' : '';
   updateFsBatch();
 }
 
 function updateFsBatch() {
-  fsBatch.classList.toggle('hidden', fsSelected.length === 0);
-  document.getElementById('fsBatchCount').textContent = fsSelected.length + ' selected';
+  fsBatch.classList.toggle('hidden', fsSelected.size === 0);
+  document.getElementById('fsBatchCount').textContent = fsSelected.size + ' selected';
   let total = 0;
   fsSelected.forEach(function (it) {
     total += (it.kind === 'file' ? it.size : (it.totalSize || 0)) || 0;
   });
   document.getElementById('fsBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt(total) : '';
-  document.getElementById('fsBatchAll').textContent = (fsItems || []).length > 0 && fsSelected.length === fsItems.length ? 'Cancel all' : 'Select all';
+  document.getElementById('fsBatchAll').textContent = (fsItems || []).length > 0 && fsSelected.size === fsItems.length ? 'Cancel all' : 'Select all';
 }
 
 fsSelectBtn.addEventListener('click', function () {
   if (!fsPath) return;
   fsSelectMode = !fsSelectMode;
-  fsSelected.length = 0;
+  fsSelected.clear();
   fsSelectBtn.textContent = fsSelectMode ? 'Cancel selection' : 'Select';
   fsBatch.classList.add('hidden');
   loadFs();
 });
 
 document.getElementById('fsBatchDelete').addEventListener('click', function () {
-  if (!fsSelected.length) return;
-  showConfirm('Delete ' + fsSelected.length + ' item(s)?', 'The folder will be deleted along with its contents.', 'Delete', function () {
+  if (!fsSelected.size) return;
+  showConfirm('Delete ' + fsSelected.size + ' item(s)?', 'The folder will be deleted along with its contents.', 'Delete', function () {
     (async function () {
       for (const it of fsSelected) {
         await postFsAction({action: 'delete', path: it.path});
       }
-      fsSelected.length = 0;
+      fsSelected.clear();
       loadFs();
     })();
   });
 });
 
 document.getElementById('fsBatchMove').addEventListener('click', function () {
-  if (!fsSelected.length) return;
+  if (!fsSelected.size) return;
   showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move', function (dest) {
     if (!dest) return;
     (async function () {
       for (const it of fsSelected) {
         await postFsAction({action: 'move', path: it.path, dest: dest});
       }
-      fsSelected.length = 0;
+      fsSelected.clear();
       loadFs();
     })();
   });
@@ -2694,14 +2698,14 @@ document.getElementById('fsBatchMove').addEventListener('click', function () {
 
 function exitFsSelect() {
   fsSelectMode = false;
-  fsSelected.length = 0;
+  fsSelected.clear();
   fsSelectBtn.textContent = 'Select';
   fsBatch.classList.add('hidden');
   loadFs();
 }
 
 document.getElementById('fsBatchDownload').addEventListener('click', function () {
-  if (!fsSelected.length) return;
+  if (!fsSelected.size) return;
   const tokens = [];
   const paths = [];
   fsSelected.forEach(function (it) {
@@ -2721,10 +2725,10 @@ document.getElementById('fsBatchCancel').addEventListener('click', function () {
 
 document.getElementById('fsBatchAll').addEventListener('click', function () {
   const all = fsItems || [];
-  const allSel = all.length > 0 && fsSelected.length === all.length;
-  fsSelected.length = 0;
+  const allSel = all.length > 0 && fsSelected.size === all.length;
+  fsSelected.clear();
   if (!allSel) {
-    for (let i = 0; i < all.length; i++) fsSelected.push(all[i]);
+    for (let i = 0; i < all.length; i++) fsSelected.add(all[i]);
   }
   fsList.querySelectorAll('.fs-row .fs-check').forEach(function (c) {
     c.classList.toggle('on', !allSel);
