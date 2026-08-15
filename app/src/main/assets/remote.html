@@ -207,6 +207,8 @@ let mmLastTap = 0;
 let mmLastTapX = 0;
 let mmCurrentToken = '';
 let mmLastSave = 0;
+let mmActiveToken = '';
+let mmSeekDrag = false;
 let mmGesture = null;
 document.getElementById('tabDownloads').addEventListener('click', function () {
 location.hash = '#/';
@@ -222,11 +224,11 @@ const sec = Math.floor(t % 60);
 const mm = String(sec).padStart(2, '0');
 return h ? h + ':' + String(m).padStart(2, '0') + ':' + mm : m + ':' + mm;
 }
-function mmShowToast(text) {
+function mmShowToast(text, ms) {
 mmToast.textContent = text;
 mmToast.classList.remove('hidden');
 clearTimeout(mmToast._t);
-mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, 700);
+mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, ms || 700);
 }
 const mmLevel = document.getElementById('mmLevel');
 function mmShowLevel(kind, pct) {
@@ -283,8 +285,10 @@ function mmSeekUI() {
 const d = mmVideo.duration || 0;
 const t = mmVideo.currentTime || 0;
 const pct = d ? (t / d) * 1000 : 0;
+if (!mmSeekDrag) {
 mmSeek.value = Math.round(pct);
 mmSeek.style.setProperty('--fill', (pct / 10).toFixed(1) + '%');
+}
 mmTime.textContent = mmFmtTime(t) + ' / ' + mmFmtTime(d);
 }
 function mmUpdateBuffer() {
@@ -1357,9 +1361,13 @@ if (e.target === itemSheet) closeItemSheet();
 function fsOpenMedia(it) {
 const token = encodeURIComponent(it.token);
 const media = API + '/api/media?token=' + token;
-const isVideo = FILE_ICON_VIDEO.indexOf(extOf(it.name).toLowerCase()) >= 0;
+const ext = extOf(it.name).toLowerCase();
+const audio = FILE_ICON_AUD.indexOf(ext) >= 0;
+const base = {name: it.name, size: it.size, modified: it.modified, token: it.token};
 openMedia(
-{name: it.name, size: it.size, modified: it.modified, token: it.token, isVideo: isVideo},
+audio
+? Object.assign({}, base, {isVideo: true, kind: 'audio'})
+: Object.assign({}, base, {isVideo: FILE_ICON_VIDEO.indexOf(ext) >= 0}),
 media
 );
 }
@@ -2176,16 +2184,23 @@ mmStopSlide();
 mmImgZoomTo(e.clientX, e.clientY, mmImgZoom.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
 }, { passive: false });
 function openMedia(it, src) {
+const prevType = mmType;
 mmType = it.isVideo ? 'video' : 'image';
 if (mmType === 'video') mmStopSlide();
+if (prevType === 'video' && mmCurrentToken && mmCurrentToken !== it.token) {
+saveVideoPos(mmCurrentToken);
+}
 mmCurrentToken = it.token;
 mmLastSave = 0;
 mmEnded = false;
 mmVideoList = (galleryItems || []).filter(function (v) { return v.isVideo; });
 mmImageList = (galleryItems || []).filter(function (v) { return !v.isVideo; });
+if (mmType === 'video' && mmTokenIdx(mmVideoList, it.token) < 0) mmVideoList.push(it);
+else if (mmType === 'image' && mmTokenIdx(mmImageList, it.token) < 0) mmImageList.push(it);
 mmOverlayTitle.textContent = it.name;
 mmTitle.textContent = it.name;
-mmSub.textContent = fmt(it.size) + (it.modified > 0 ? ' \u00b7 ' + fmtDate(it.modified) : '') + (it.isVideo ? ' \u00b7 video' : ' \u00b7 photo');
+const kindLabel = it.kind === 'audio' ? ' \u00b7 audio' : (it.isVideo ? ' \u00b7 video' : ' \u00b7 photo');
+mmSub.textContent = fmt(it.size) + (it.modified > 0 ? ' \u00b7 ' + fmtDate(it.modified) : '') + kindLabel;
 mmDesc.classList.remove('hidden');
 mmBody.scrollTop = 0;
 mmImage.classList.add('hidden');
@@ -2257,10 +2272,19 @@ if (mmType !== 'video') {
 mmRelated.classList.add('hidden');
 return;
 }
-const others = galleryItems.filter(function (v) {
-return v.isVideo && v.token !== current.token;
-}).slice(0, 8);
-mmNextList = others;
+const idx = mmTokenIdx(mmVideoList, current.token);
+const others = [];
+if (idx >= 0) {
+mmNextList = mmVideoList.slice(idx + 1);
+for (let i = 0; i < mmVideoList.length && others.length < 8; i++) {
+if (i !== idx) others.push(mmVideoList[i]);
+}
+} else {
+mmNextList = [];
+for (let i = 0; i < mmVideoList.length && others.length < 8; i++) {
+if (mmVideoList[i].token !== current.token) others.push(mmVideoList[i]);
+}
+}
 mmRelated.classList.remove('hidden');
 if (!others.length) {
 mmRelated.innerHTML = '<div class="mm-rel-empty">No other videos in the gallery.</div>';
@@ -2326,6 +2350,17 @@ mmAutoBtn.classList.toggle('on', mmAutoNext);
 mmPlayBtn.addEventListener('click', mmTogglePlay);
 mmPrevBtn.addEventListener('click', function () { mmStepVideo(-1); });
 mmNextBtn.addEventListener('click', function () { mmStepVideo(1); });
+mmSeek.addEventListener('touchstart', function () { mmSeekDrag = true; }, { passive: true });
+mmSeek.addEventListener('mousedown', function () { mmSeekDrag = true; });
+function mmSeekDragEnd() {
+mmSeekDrag = false;
+mmSeekUI();
+}
+mmSeek.addEventListener('touchend', mmSeekDragEnd);
+mmSeek.addEventListener('change', mmSeekDragEnd);
+document.addEventListener('mouseup', function () {
+if (mmSeekDrag) mmSeekDragEnd();
+});
 mmSeek.addEventListener('input', function () {
 const d = mmVideo.duration || 0;
 if (!d) return;
@@ -2446,6 +2481,7 @@ mmLockLandscape();
 });
 mmPlayer.addEventListener('click', function (e) {
 if (e.target.closest('#mmCtrl')) return;
+if (e.pointerType === 'touch') return;
 const now = Date.now();
 const dt = now - mmLastTap;
 const prevX = mmLastTapX;
@@ -2497,6 +2533,7 @@ else mmPlayer.style.filter = 'brightness(' + v.toFixed(2) + ')';
 }
 mmPlayer.addEventListener('touchstart', function (e) {
 if (mmType !== 'video' || e.touches.length !== 1) { mmGesture = null; return; }
+if (e.target.closest && e.target.closest('#mmCtrl, #mmPlayerTop')) { mmGesture = null; return; }
 const left = e.touches[0].clientX < window.innerWidth / 2;
 mmGesture = {
 side: left ? 'b' : 'v',
@@ -2524,6 +2561,7 @@ mmShowLevel('v', val);
 }, { passive: false });
 let mmTap = { x: 0, y: 0, t: 0 };
 mmPlayer.addEventListener('touchend', function (e) {
+if (e.target.closest && e.target.closest('#mmCtrl, #mmPlayerTop')) return;
 const ch = e.changedTouches[0];
 const gx = mmGesture ? mmGesture.startX : ch.clientX;
 const gy = mmGesture ? mmGesture.startY : ch.clientY;
@@ -2559,6 +2597,7 @@ mmHideCtrl();
 }
 });
 mmVideo.addEventListener('play', function () {
+mmActiveToken = mmCurrentToken;
 mmEnded = false;
 mmPlayBtn.innerHTML = ICONS.pause;
 mmBigPlay.classList.add('hidden');
@@ -2568,13 +2607,13 @@ mmVideo.addEventListener('volumechange', mmSyncVol);
 mmVideo.addEventListener('error', function () {
 mmSpinner.classList.add('hidden');
 mmBigPlay.classList.remove('hidden');
-mmShowToast('Failed to load video');
+mmShowToast('Failed to load video \u2014 format may not be supported on this device', 2600);
 mmShowCtrl();
 });
 mmVideo.addEventListener('pause', function () {
 mmPlayBtn.innerHTML = ICONS.play;
 mmBigPlay.classList.remove('hidden');
-saveVideoPos(mmCurrentToken);
+saveVideoPos(mmActiveToken || mmCurrentToken);
 mmShowCtrl();
 });
 mmVideo.addEventListener('ended', function () {
