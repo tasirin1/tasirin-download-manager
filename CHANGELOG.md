@@ -5,6 +5,27 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-15] — Perbaikan bug galeri (pagination filter, sinkron hapus, cache) & cache ZIP (PR #111)
+
+### Diperbaiki
+- **Galeri ber-filter (pencarian/foto-video) memuat halaman kosong terus-menerus** —
+  `hasMore` lama dihitung dari total seluruh media (`matched < scan.total`), jadi setelah
+  hasil filter habis browser tetap meminta halaman berikutnya; hitungan "N file" juga
+  menampilkan total semua media. `hasMore` kini `matched > pageEnd` dan `total` = jumlah
+  hasil filter saat ada `q`/`type`.
+- **Hapus foto/video dari grid galeri tidak sinkron** — cell hilang tetapi daftar item dan
+  counter tidak ikut diperbarui, sehingga "Select all" dan prev/next masih menyertakan file
+  yang sudah dihapus. Item kini di-splice dari `galleryItems` dan counter dikurangi.
+- **Galeri tampil basi sampai 15 detik setelah hapus/upload/pindah media** — cache snapshot
+  galeri di server tidak dibuang saat media berubah. Cache kini di-invalidasi pada delete
+  media, finalisasi upload, dan aksi file manager (hapus/rename/move).
+- **Ganti filter/ketik pencarian bisa tidak berefek saat request lama belum selesai** —
+  flag `galleryLoading` membuat reset ter-skip dan respons lama bisa menimpa data baru.
+  Diganti nomor urut request (`gallerySeq`); respons basi diabaikan.
+- **Unduh folder membuat ZIP ganda saat browser mengirim beberapa request Range bersamaan** —
+  dua request yang sama-sama miss cache membuat arsip baru dan file kalah bocor di `cacheDir`;
+  kini `putIfAbsent` menjamin satu ZIP per path/token dan file kalah langsung dihapus.
+
 ## [v1.0 — 2026-08-15] — Perbaikan bug: back File Manager, panah ganda, cache ZIP (PR #110)
 
 ### Diperbaiki
