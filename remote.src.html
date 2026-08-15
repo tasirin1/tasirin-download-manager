@@ -1782,6 +1782,7 @@ mmImgPrev.addEventListener('click', function () { mmStopSlide(); mmStepImage(-1)
 mmImgNext.addEventListener('click', function () { mmStopSlide(); mmStepImage(1); });
 
 let mmGuardActive = false;
+let mmGuardPopPending = false;
 function mmPushGuard() {
   if (mmGuardActive) return;
   mmGuardActive = true;
@@ -1790,12 +1791,21 @@ function mmPushGuard() {
 function mmPopGuard() {
   if (!mmGuardActive) return;
   mmGuardActive = false;
+  if (mmGuardPopPending) { mmGuardPopPending = false; return; }
+  // back() ini hanya membersihkan entry guard media; popstate-nya jangan
+  // ditafsirkan handler file manager sebagai navigasi folder.
+  mmGuardPopPending = true;
   try { history.back(); } catch (e) {}
 }
 window.addEventListener('popstate', function () {
   if (!mmGuardActive) return;
   mmGuardActive = false;
-  if (mediaModal.classList.contains('open')) closeMedia();
+  if (mediaModal.classList.contains('open')) {
+    // Pop ini memang untuk menutup media (tombol back Android): jangan
+    // memicu back() lagi dari mmPopGuard.
+    mmGuardPopPending = true;
+    closeMedia();
+  }
 });
 
 document.addEventListener('fullscreenchange', function () {
@@ -3355,11 +3365,9 @@ document.addEventListener('keydown', function (e) {
     closeMedia();
     return;
   }
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-    e.preventDefault();
-    const delta = e.key === 'ArrowLeft' ? -1 : 1;
-    if (mmType === 'image') mmStepImage(delta); else mmStepVideo(delta);
-  }
+  // Panah kiri/kanan ditangani handler keydown media di bawah (seek video /
+  // ganti foto). Dulu dua handler ini aktif bersamaan: panah di video
+  // memindah video SEKALIGUS seek, dan di foto melompat 2 item per tekan.
 });
 
 fsUploadFile.addEventListener('change', function () {
@@ -4704,6 +4712,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 
 window.addEventListener('hashchange', applyRoute);
 window.addEventListener('popstate', function () {
+  if (mmGuardPopPending) { mmGuardPopPending = false; return; }
   if (currentRoute() !== 'files' || fsBackStack.length === 0) return;
   fsSaveScroll();
   fsPath = fsBackStack.pop();
@@ -4789,7 +4798,11 @@ async function pollSnapshot() {
     if (data.status) applyServerStatus(data.status);
     const items = data.items || [];
     lastItems = items;
-    if (currentRoute() === 'downloads') render(items);
+    if (currentRoute() === 'downloads') {
+      render(items);
+    } else {
+      updateToolbar(items);
+    }
   } catch (e) {
     failCount++;
     if (failCount > 2) {

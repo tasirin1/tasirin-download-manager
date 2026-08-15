@@ -343,6 +343,7 @@ document.getElementById('mmImgBack').addEventListener('click', closeMedia);
 mmImgPrev.addEventListener('click', function () { mmStopSlide(); mmStepImage(-1); });
 mmImgNext.addEventListener('click', function () { mmStopSlide(); mmStepImage(1); });
 let mmGuardActive = false;
+let mmGuardPopPending = false;
 function mmPushGuard() {
 if (mmGuardActive) return;
 mmGuardActive = true;
@@ -351,12 +352,17 @@ try { history.pushState({ mm: 1 }, '', location.href); } catch (e) {}
 function mmPopGuard() {
 if (!mmGuardActive) return;
 mmGuardActive = false;
+if (mmGuardPopPending) { mmGuardPopPending = false; return; }
+mmGuardPopPending = true;
 try { history.back(); } catch (e) {}
 }
 window.addEventListener('popstate', function () {
 if (!mmGuardActive) return;
 mmGuardActive = false;
-if (mediaModal.classList.contains('open')) closeMedia();
+if (mediaModal.classList.contains('open')) {
+mmGuardPopPending = true;
+closeMedia();
+}
 });
 document.addEventListener('fullscreenchange', function () {
 mmFsBtn.innerHTML = document.fullscreenElement ? ICONS.fsx : ICONS.fs;
@@ -1815,11 +1821,6 @@ if (e.key === 'Escape') {
 closeMedia();
 return;
 }
-if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-e.preventDefault();
-const delta = e.key === 'ArrowLeft' ? -1 : 1;
-if (mmType === 'image') mmStepImage(delta); else mmStepVideo(delta);
-}
 });
 fsUploadFile.addEventListener('change', function () {
 try {
@@ -3083,6 +3084,7 @@ refresh();
 });
 window.addEventListener('hashchange', applyRoute);
 window.addEventListener('popstate', function () {
+if (mmGuardPopPending) { mmGuardPopPending = false; return; }
 if (currentRoute() !== 'files' || fsBackStack.length === 0) return;
 fsSaveScroll();
 fsPath = fsBackStack.pop();
@@ -3154,7 +3156,11 @@ hideConnBanner();
 if (data.status) applyServerStatus(data.status);
 const items = data.items || [];
 lastItems = items;
-if (currentRoute() === 'downloads') render(items);
+if (currentRoute() === 'downloads') {
+render(items);
+} else {
+updateToolbar(items);
+}
 } catch (e) {
 failCount++;
 if (failCount > 2) {
