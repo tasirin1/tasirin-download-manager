@@ -124,6 +124,9 @@ dependencies {
 tasks.withType<Test>().configureEach {
     extensions.configure<JacocoTaskExtension>("jacoco") {
         isIncludeNoLocationClasses = true
+        // Hindari ClassNotFoundException di agent saat JDK memuat kelas hidden
+        // (GeneratedSerializationConstructorAccessor) pada Java 17+.
+        excludes.add("jdk.internal.*")
     }
 }
 
