@@ -2,7 +2,7 @@
 # Dependabot membaca grup dari sini; update versi cukup di satu tempat.
 [versions]
 agp = "9.3.1"
-coreKtx = "1.13.1"
+coreKtx = "1.19.0"
 documentfile = "1.1.0"
 nanohttpd = "2.3.1"
 appcompat = "1.7.0"
