@@ -17,12 +17,19 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
     steps:
+      # gh (pr diff/merge) butuh konteks repo git — tanpa checkout, gh gagal
+      # diam-diam dan semua PR Dependabot dianggap "non-Gradle".
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
       - name: Deteksi perubahan dependensi Gradle
         id: files
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FILES=$(gh pr diff ${{ github.event.pull_request.number }} --name-only 2>/dev/null || true)
+          FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' 2>/dev/null || true)
           echo "File berubah di PR:"
           echo "$FILES"
           if echo "$FILES" | grep -qE '^(app/build\.gradle\.kts|build\.gradle\.kts|gradle/|gradle\.properties|settings\.gradle\.kts)'; then
