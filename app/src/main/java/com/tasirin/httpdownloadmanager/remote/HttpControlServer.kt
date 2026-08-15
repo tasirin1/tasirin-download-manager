@@ -845,15 +845,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             runCatching { file.delete() }
         }
         val file = create() ?: return null
+        // Dua request bersamaan untuk key sama (browser mengunduh lewat
+        // beberapa request Range): putIfAbsent mencegah dua ZIP dibuat —
+        // file yang kalah dihapus supaya tidak bocor di cacheDir.
+        val prev = zipCache.putIfAbsent(key, now to file)
+        if (prev != null) {
+            runCatching { file.delete() }
+            return prev.second
+        }
         val it = zipCache.entries.iterator()
         while (it.hasNext()) {
             val (k, v) = it.next()
-            if (k == key || now - v.first >= ZIP_CACHE_TTL_MS) {
+            if (k != key && now - v.first >= ZIP_CACHE_TTL_MS) {
                 it.remove()
                 runCatching { v.second.delete() }
             }
         }
-        zipCache[key] = now to file
         return file
     }
 
