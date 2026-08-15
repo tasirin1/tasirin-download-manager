@@ -21,6 +21,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── .github/ISSUE_TEMPLATE/           # Template issue (bug report & feature request)
 ├── CONTRIBUTING.md                   # Panduan kontribusi singkat (baca juga AGENTS.md)
 ├── .githooks/pre-commit              # Hook opsional: prepare_remote --check + unit test cepat
+├── gradle/libs.versions.toml          # Version catalog — pusat versi dependensi & plugin
 ├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
 ├── docs/screenshots/                 # Screenshot README (remote-web.png, gallery.png, downloads.png)
@@ -187,7 +188,9 @@ kuat dan tanpa diskusi:
     `app/build.gradle.kts` — naikkan seiring bertambahnya test); ringkasan
     cakupan dicetak di job summary.
 13. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
-    versi sekaligus; tiap langkah lewat CI dulu.
+    versi sekaligus; tiap langkah lewat CI dulu. Versi dipusatkan di
+    `gradle/libs.versions.toml` (version catalog) — update cukup di satu
+    tempat, Dependabot ikut membacanya.
 14. **Changelog wajib per PR** — setiap PR menambah entri `CHANGELOG.md`
     (judul `## [v1.0 — tanggal] — ringkasan`) dan menyebut nomor PR pada isi
     entri setelah PR dibuat. **Dijaga otomatis CI**: PR yang mengubah

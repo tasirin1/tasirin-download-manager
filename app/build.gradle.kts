@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.application")  // built-in Kotlin sejak AGP 9 (KGP dibundel)
-    id("jacoco")                  // laporan cakupan unit test (toolVersion default Gradle)
+    alias(libs.plugins.android.application)  // AGP 9: built-in Kotlin (KGP dibundel)
+    id("jacoco")                            // laporan cakupan unit test (toolVersion default Gradle)
 }
 
 android {
@@ -100,21 +100,21 @@ kotlin {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.documentfile:documentfile:1.1.0")
-    implementation("org.nanohttpd:nanohttpd:2.3.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("androidx.activity:activity-ktx:1.9.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-    testImplementation("junit:junit:4.13.2")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.documentfile)
+    implementation(libs.nanohttpd)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.activity.ktx)
+    implementation(libs.kotlinx.coroutines.android)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+    testImplementation(libs.junit)
     // zxing hanya untuk verifikasi decode QR di unit test — tidak ikut ke APK
     // (encoder QR asli ada di util/QrEncoder.kt).
-    testImplementation("com.google.zxing:core:3.5.4")
+    testImplementation(libs.zxing.core)
     // org.json asli untuk unit test JVM (android.jar hanya stub). Test-only:
     // tidak ikut ke APK.
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.org.json)
 }
 
 // --- JaCoCo coverage (unit test JVM) ---
