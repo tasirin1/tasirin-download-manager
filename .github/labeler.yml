@@ -1,24 +1,36 @@
+# Format actions/labeler v5: tiap label = daftar aturan any/all.
 remote-web:
-  - remote.src.html
-  - assets/remote.html
-  - scripts/prepare_remote.py
-  - app/src/main/java/com/tasirin/httpdownloadmanager/remote/**
+  - any:
+      - remote.src.html
+      - assets/remote.html
+      - scripts/prepare_remote.py
+      - app/src/main/java/com/tasirin/httpdownloadmanager/remote/**
+
 gallery:
-  - app/src/main/java/com/tasirin/httpdownloadmanager/GalleryActivity.kt
-  - app/src/main/java/com/tasirin/httpdownloadmanager/util/MediaLibrary.kt
+  - any:
+      - app/src/main/java/com/tasirin/httpdownloadmanager/GalleryActivity.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/util/MediaLibrary.kt
+
 download-engine:
-  - app/src/main/java/com/tasirin/httpdownloadmanager/download/**
-  - app/src/main/java/com/tasirin/httpdownloadmanager/data/**
+  - any:
+      - app/src/main/java/com/tasirin/httpdownloadmanager/download/**
+      - app/src/main/java/com/tasirin/httpdownloadmanager/data/**
+
 settings:
-  - app/src/main/java/com/tasirin/httpdownloadmanager/SettingsActivity.kt
-  - app/src/main/java/com/tasirin/httpdownloadmanager/util/StoragePrefs.kt
+  - any:
+      - app/src/main/java/com/tasirin/httpdownloadmanager/SettingsActivity.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/util/StoragePrefs.kt
+
 ci:
-  - .github/workflows/**
-  - .github/dependabot.yml
-  - .github/labeler.yml
+  - any:
+      - .github/workflows/**
+      - .github/dependabot.yml
+      - .github/labeler.yml
+
 docs:
-  - README.md
-  - README.en.md
-  - CHANGELOG.md
-  - AGENTS.md
-  - CONTRIBUTING.md
+  - any:
+      - README.md
+      - README.en.md
+      - CHANGELOG.md
+      - AGENTS.md
+      - CONTRIBUTING.md
