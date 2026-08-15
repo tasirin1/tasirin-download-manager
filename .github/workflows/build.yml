@@ -126,26 +126,14 @@ jobs:
 
       - name: Coverage JaCoCo (laporan + ambang batas)
         run: |
-          echo "=== coverage: gradle mulai ==="
           ./gradlew jacocoTestReport jacocoTestCoverageVerification
-          echo "=== coverage: gradle selesai ==="
-          ls -la app/build/reports/jacoco/jacocoTestReport/ 2>/dev/null || echo "(folder laporan belum ada)"
           python3 - <<'PY'
           import glob, os, xml.etree.ElementTree as ET
-          print("PYTHON RAN")
           files = glob.glob("app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
-          print("XML files:", files)
           if not files:
               print("::warning::Laporan JaCoCo tidak ditemukan")
               raise SystemExit(0)
           root = ET.parse(files[0]).getroot()
-          print("XML root:", root.tag)
-          counters = list(root.iter("counter"))
-          print("counter count:", len(counters))
-          if counters:
-              print("first counter attrs:", counters[0].attrib)
-          import subprocess
-          print(subprocess.run(["find", "app/build", "-name", "*.exec", "-o", "-type", "d", "-name", "classes"], capture_output=True, text=True).stdout)
           summary = []
           for ctype in ("LINE", "BRANCH", "INSTRUCTION", "METHOD"):
               covered = missed = 0

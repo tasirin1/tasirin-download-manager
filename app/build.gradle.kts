@@ -131,9 +131,11 @@ tasks.withType<Test>().configureEach {
 }
 
 val jacocoExecData = layout.buildDirectory.file("jacoco/testDebugUnitTest.exec")
+// AGP 9 (built-in Kotlin): kelas ada di built_in_kotlinc + javac, bukan
+// tmp/kotlin-classes seperti AGP 8 + KGP.
 val jacocoClassDirs = files(
-    layout.buildDirectory.dir("tmp/kotlin-classes/debug"),
-    layout.buildDirectory.dir("intermediates/javac/debug/classes")
+    layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
+    layout.buildDirectory.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes")
 )
 
 tasks.register<JacocoReport>("jacocoTestReport") {
