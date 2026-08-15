@@ -5,6 +5,14 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-15] — Security scanning CodeQL + gitleaks (PR #98)
+
+### Ditambahkan
+- **CodeQL** (Java/Kotlin) — analisis keamanan statis di push `main`, semua
+  PR, dan terjadwal mingguan; hasilnya di tab Security repositori.
+- **Gitleaks** — deteksi secret/token ter-commit di tiap push & PR (guard
+  tambahan untuk keystore/token).
+
 ## [v1.0 — 2026-08-15] — Keandalan rilis & automasi repo (PR #97)
 
 ### Ditambahkan
