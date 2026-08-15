@@ -80,15 +80,6 @@ android {
         resources.excludes += "META-INF/**"
     }
 
-    testOptions {
-        unitTests.all {
-            jacoco {
-                // Sertakan kelas tanpa lokasi (mis. lambda inline) di coverage.
-                includeNoLocationClasses = true
-            }
-        }
-    }
-
     lint {
         // Pengaman kompatibilitas API 21: kegagalan lint (mis. NewApi) menggagalkan build.
         abortOnError = true
@@ -127,10 +118,16 @@ dependencies {
 }
 
 // --- JaCoCo coverage (unit test JVM) ---
-// Exec data dihasilkan AGP saat testDebugUnitTest (unit_test_code_coverage).
-val jacocoExecData = fileTree(layout.buildDirectory.dir("outputs/unit_test_code_coverage")) {
-    include("**/*.exec")
+// Ekstensi jacoco (plugin Gradle) menempel di semua task Test; exec data
+// ditulis ke build/jacoco/testDebugUnitTest.exec. (AGP 9 tidak lagi
+// mendukung blok testOptions.unitTests.all { jacoco { ... } }.)
+tasks.withType<Test>().configureEach {
+    extensions.configure<JacocoTaskExtension>("jacoco") {
+        isIncludeNoLocationClasses = true
+    }
 }
+
+val jacocoExecData = layout.buildDirectory.file("jacoco/testDebugUnitTest.exec")
 val jacocoClassDirs = files(
     layout.buildDirectory.dir("tmp/kotlin-classes/debug"),
     layout.buildDirectory.dir("intermediates/javac/debug/classes")
