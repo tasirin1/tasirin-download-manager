@@ -140,6 +140,10 @@ jobs:
               raise SystemExit(0)
           root = ET.parse(files[0]).getroot()
           print("XML root:", root.tag)
+          counters = list(root.iter("counter"))
+          print("counter count:", len(counters))
+          if counters:
+              print("first counter attrs:", counters[0].attrib)
           summary = []
           for ctype in ("LINE", "BRANCH", "INSTRUCTION", "METHOD"):
               covered = missed = 0
