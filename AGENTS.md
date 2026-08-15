@@ -181,7 +181,10 @@ kuat dan tanpa diskusi:
 12. **Lint & unit test wajib hijau** sebelum merge — `lintDebug` (abortOnError
     aktif) mengawal API >21 jangan sampai lolos, `testDebugUnitTest` menjaga
     logika murni (`Formats`, `FileNames`, `MimeTypes`, `DownloadItem`,
-    `ServerSecurity`).
+    `ServerSecurity`). Cakupan unit test (JaCoCo) di CI: `jacocoTestReport` +
+    `jacocoTestCoverageVerification` (ambang LINE 5%, lihat
+    `app/build.gradle.kts` — naikkan seiring bertambahnya test); ringkasan
+    cakupan dicetak di job summary.
 13. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
     versi sekaligus; tiap langkah lewat CI dulu.
 14. **Changelog wajib per PR** — setiap PR menambah entri `CHANGELOG.md`
