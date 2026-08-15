@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")  // built-in Kotlin sejak AGP 9 (KGP dibundel)
+    id("jacoco")                  // laporan cakupan unit test (toolVersion default Gradle)
 }
 
 android {
@@ -114,4 +115,57 @@ dependencies {
     // org.json asli untuk unit test JVM (android.jar hanya stub). Test-only:
     // tidak ikut ke APK.
     testImplementation("org.json:json:20240303")
+}
+
+// --- JaCoCo coverage (unit test JVM) ---
+// Ekstensi jacoco (plugin Gradle) menempel di semua task Test; exec data
+// ditulis ke build/jacoco/testDebugUnitTest.exec. (AGP 9 tidak lagi
+// mendukung blok testOptions.unitTests.all { jacoco { ... } }.)
+tasks.withType<Test>().configureEach {
+    extensions.configure<JacocoTaskExtension>("jacoco") {
+        isIncludeNoLocationClasses = true
+        // Hindari ClassNotFoundException di agent saat JDK memuat kelas hidden
+        // (GeneratedSerializationConstructorAccessor) pada Java 17+.
+        excludes = (excludes ?: emptyList()) + "jdk.internal.*"
+    }
+}
+
+val jacocoExecData = layout.buildDirectory.file("jacoco/testDebugUnitTest.exec")
+// AGP 9 (built-in Kotlin): kelas ada di built_in_kotlinc + javac, bukan
+// tmp/kotlin-classes seperti AGP 8 + KGP.
+val jacocoClassDirs = files(
+    layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
+    layout.buildDirectory.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes")
+)
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testDebugUnitTest")
+    group = "verification"
+    description = "Laporan cakupan unit test (JaCoCo)."
+    reports {
+        xml.required.set(true)
+        html.required.set(false)
+        csv.required.set(false)
+    }
+    classDirectories.setFrom(jacocoClassDirs)
+    executionData.setFrom(jacocoExecData)
+    sourceDirectories.setFrom(files("src/main/java"))
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn("testDebugUnitTest")
+    group = "verification"
+    description = "Gagalkan build bila cakupan garis di bawah ambang (lihat CI)."
+    executionData.setFrom(jacocoExecData)
+    classDirectories.setFrom(jacocoClassDirs)
+    sourceDirectories.setFrom(files("src/main/java"))
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.05".toBigDecimal()
+            }
+        }
+    }
 }
