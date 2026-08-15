@@ -5,6 +5,15 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-15] — Pemutar video: hapus gesture kecerahan & volume (PR #112)
+
+### Diubah
+- **Gesture kecerahan & volume di pemutar video dihapus** — geser vertikal di sisi kiri
+  layar (brightness) dan sisi kanan (volume) rentan kepencet di layar sentuh; volume tetap
+  bisa diatur lewat slider di kontrol pemutar. Geser kiri/kanan untuk ganti video, tap
+  play/pause, dan double-tap seek tetap berfungsi. Overlay indikator level (`#mmLevel`)
+  ikut dihapus.
+
 ## [v1.0 — 2026-08-15] — Perbaikan bug galeri (pagination filter, sinkron hapus, cache) & cache ZIP (PR #111)
 
 ### Diperbaiki
