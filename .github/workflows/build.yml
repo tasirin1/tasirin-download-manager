@@ -124,6 +124,35 @@ jobs:
         if: always()
         run: cat app/build/reports/lint-results-debug.txt || true
 
+      - name: Coverage JaCoCo (laporan + ambang batas)
+        run: |
+          ./gradlew jacocoTestReport jacocoTestCoverageVerification
+          python3 - <<'PY'
+          import glob, os, xml.etree.ElementTree as ET
+          files = glob.glob("app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
+          if not files:
+              print("::warning::Laporan JaCoCo tidak ditemukan")
+              raise SystemExit(0)
+          root = ET.parse(files[0]).getroot()
+          summary = []
+          for ctype in ("LINE", "BRANCH", "INSTRUCTION", "METHOD"):
+              covered = missed = 0
+              for c in root.iter("counter"):
+                  if c.get("type") == ctype:
+                      covered += int(c.get("covered", 0))
+                      missed += int(c.get("missed", 0))
+              total = covered + missed
+              if total:
+                  pct = covered / total
+                  line = f"- {ctype}: {pct:.1%} ({covered}/{total})"
+                  summary.append(line)
+                  print(f"JaCoCo {ctype}: {pct:.1%} ({covered}/{total})")
+          step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if step_summary and summary:
+              with open(step_summary, "a", encoding="utf-8") as fh:
+                  fh.write("### JaCoCo coverage (unit test)\n\n")
+                  fh.write("\n".join(summary) + "\n")
+
       - name: Build release APK (jika secret signing tersedia)
         if: env.KEYSTORE_BASE64 != ''
         env:

@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")  // built-in Kotlin sejak AGP 9 (KGP dibundel)
+    id("jacoco")                  // laporan cakupan unit test (toolVersion default Gradle)
 }
 
 android {
@@ -79,6 +80,15 @@ android {
         resources.excludes += "META-INF/**"
     }
 
+    testOptions {
+        unitTests.all {
+            jacoco {
+                // Sertakan kelas tanpa lokasi (mis. lambda inline) di coverage.
+                includeNoLocationClasses = true
+            }
+        }
+    }
+
     lint {
         // Pengaman kompatibilitas API 21: kegagalan lint (mis. NewApi) menggagalkan build.
         abortOnError = true
@@ -114,4 +124,46 @@ dependencies {
     // org.json asli untuk unit test JVM (android.jar hanya stub). Test-only:
     // tidak ikut ke APK.
     testImplementation("org.json:json:20240303")
+}
+
+// --- JaCoCo coverage (unit test JVM) ---
+// Exec data dihasilkan AGP saat testDebugUnitTest (unit_test_code_coverage).
+val jacocoExecData = fileTree(layout.buildDirectory.dir("outputs/unit_test_code_coverage")) {
+    include("**/*.exec")
+}
+val jacocoClassDirs = files(
+    layout.buildDirectory.dir("tmp/kotlin-classes/debug"),
+    layout.buildDirectory.dir("intermediates/javac/debug/classes")
+)
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testDebugUnitTest")
+    group = "verification"
+    description = "Laporan cakupan unit test (JaCoCo)."
+    reports {
+        xml.required.set(true)
+        html.required.set(false)
+        csv.required.set(false)
+    }
+    classDirectories.setFrom(jacocoClassDirs)
+    executionData.setFrom(jacocoExecData)
+    sourceDirectories.setFrom(files("src/main/java"))
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn("testDebugUnitTest")
+    group = "verification"
+    description = "Gagalkan build bila cakupan garis di bawah ambang (lihat CI)."
+    executionData.setFrom(jacocoExecData)
+    classDirectories.setFrom(jacocoClassDirs)
+    sourceDirectories.setFrom(files("src/main/java"))
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.05".toBigDecimal()
+            }
+        }
+    }
 }
