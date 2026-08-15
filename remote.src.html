@@ -1553,7 +1553,10 @@ let galleryLoaded = 0;
 let gallerySentinel = null;
 let galleryPage = 0;
 let galleryHasMore = false;
-let galleryLoading = false;
+// Nomor urut request galeri: respons lama (mis. ganti filter/ketik
+// pencarian saat request sebelumnya belum selesai) diabaikan supaya tidak
+// menimpa data terbaru dan reset tidak ter-skip oleh flag boolean.
+let gallerySeq = 0;
 const gallerySearch = document.getElementById('gallerySearch');
 let galleryFilter = 'all';
 let galSelectMode = false;
@@ -1818,8 +1821,7 @@ document.addEventListener('webkitfullscreenchange', function () {
 });
 
 async function loadGallery(reset) {
-  if (galleryLoading) return;
-  galleryLoading = true;
+  const seq = ++gallerySeq;
   if (reset) showGallerySkeleton();
   try {
     const q = gallerySearch ? gallerySearch.value.trim() : '';
@@ -1828,6 +1830,7 @@ async function loadGallery(reset) {
     if (q) params.set('q', q);
     if (galleryFilter && galleryFilter !== 'all') params.set('type', galleryFilter);
     const res = await fetch(API + '/api/gallery?' + params.toString());
+    if (seq !== gallerySeq) return;
     if (res.status === 401) {
       galleryStatus.textContent = 'PIN required. Reload the page to log in.';
       if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
@@ -1836,6 +1839,7 @@ async function loadGallery(reset) {
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    if (seq !== gallerySeq) return;
     galleryStatus.textContent = '';
     const items = data.items || [];
     if (reset) {
@@ -1869,7 +1873,6 @@ async function loadGallery(reset) {
           galleryGrid.appendChild(cta);
         }
         galleryHasMore = false;
-        galleryLoading = false;
         return;
       }
     } else {
@@ -1879,13 +1882,13 @@ async function loadGallery(reset) {
     galleryHasMore = !!data.hasMore;
     loadMoreGallery();
   } catch (e) {
+    if (seq !== gallerySeq) return;
     if (reset) {
       galleryStatus.textContent = 'Failed to load gallery: ' + e;
       if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
       galleryGrid.innerHTML = emptyHtml('warn', 'Failed to load gallery', String(e));
     }
   }
-  galleryLoading = false;
 }
 
 function showGallerySkeleton() {
@@ -1971,6 +1974,8 @@ function renderGalleryCell(it) {
       if (!confirm('Delete this file?\n' + it.name)) return;
       doDeleteMedia(it.token, function () {
         cell.remove();
+        const gi = galleryItems.indexOf(it);
+        if (gi >= 0) galleryItems.splice(gi, 1);
         const c = parseInt(galleryCount.textContent, 10);
         if (!isNaN(c)) galleryCount.textContent = Math.max(0, c - 1) + ' file';
       });
