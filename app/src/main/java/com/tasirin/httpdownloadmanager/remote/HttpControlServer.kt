@@ -803,38 +803,71 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             raw.startsWith(MS_PREFIX) -> raw.removePrefix(MS_PREFIX).trim('/').substringAfterLast('/')
             else -> File(raw.removePrefix(FS_PREFIX)).name
         }.ifEmpty { "folder" }
-        val tmp = try {
-            File.createTempFile("fszip", ".zip", context.cacheDir).also { tmpFile ->
-                try {
-                    ZipOutputStream(BufferedOutputStream(FileOutputStream(tmpFile))).use { zos ->
-                        if (raw.startsWith(MS_PREFIX)) {
-                            ZipCreator.zipMedia(zos, raw.removePrefix(MS_PREFIX), context)
-                        } else {
-                            ZipCreator.zipFile(zos, File(raw.removePrefix(FS_PREFIX)), "")
-                        }
-                    }
-                } catch (e: Exception) {
-                    runCatching { tmpFile.delete() }
-                    throw e
+        val key = "fs:" + raw
+        val tmp = zipCached(key) {
+            createTempZip { zos ->
+                if (raw.startsWith(MS_PREFIX)) {
+                    ZipCreator.zipMedia(zos, raw.removePrefix(MS_PREFIX), context)
+                } else {
+                    ZipCreator.zipFile(zos, File(raw.removePrefix(FS_PREFIX)), "")
                 }
             }
-        } catch (e: Exception) {
-            logError(e)
-            return notFound()
-        }
+        } ?: return notFound()
         if (tmp.length() == 0L) {
-            tmp.delete()
+            zipCache.remove(key)
+            runCatching { tmp.delete() }
             return notFound()
         }
         appendLog("ZIP CREATED: $folderName.zip (${Formats.bytes(tmp.length())})")
         return streamMedia(
             name = "$folderName.zip",
             mime = "application/zip",
-            input = DeleteOnCloseStream(FileInputStream(tmp), tmp),
+            input = FileInputStream(tmp),
             total = tmp.length(),
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
         )
+    }
+
+    /** ZIP folder/daftar token dibuat sekali lalu dipakai ulang dalam 60 detik.
+     *  Browser mengunduh lewat beberapa request Range (206); tanpa cache ini
+     *  folder di-zip ulang untuk tiap request (boros CPU + disk di Android TV). */
+    private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, File>>()
+
+    private fun zipCached(key: String, create: () -> File?): File? {
+        val now = System.currentTimeMillis()
+        zipCache[key]?.let { (createdAt, file) ->
+            if (now - createdAt < ZIP_CACHE_TTL_MS && file.isFile && file.length() > 0) {
+                return file
+            }
+            zipCache.remove(key)
+            runCatching { file.delete() }
+        }
+        val file = create() ?: return null
+        val it = zipCache.entries.iterator()
+        while (it.hasNext()) {
+            val (k, v) = it.next()
+            if (k == key || now - v.first >= ZIP_CACHE_TTL_MS) {
+                it.remove()
+                runCatching { v.second.delete() }
+            }
+        }
+        zipCache[key] = now to file
+        return file
+    }
+
+    private fun createTempZip(fill: (ZipOutputStream) -> Unit): File? = try {
+        File.createTempFile("fszip", ".zip", context.cacheDir).also { tmpFile ->
+            try {
+                ZipOutputStream(BufferedOutputStream(FileOutputStream(tmpFile))).use(fill)
+            } catch (e: Exception) {
+                runCatching { tmpFile.delete() }
+                throw e
+            }
+        }
+    } catch (e: Exception) {
+        logError(e)
+        null
     }
 
     private fun mediaZip(session: IHTTPSession): Response {
@@ -850,30 +883,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
         }
         if (tokens.isEmpty()) return notFound()
-        val tmp = try {
-            File.createTempFile("mediazip", ".zip", context.cacheDir).also { tmpFile ->
-                try {
-                    ZipOutputStream(BufferedOutputStream(FileOutputStream(tmpFile))).use { zos ->
-                        ZipCreator.zipTokens(zos, tokens, context)
-                    }
-                } catch (e: Exception) {
-                    runCatching { tmpFile.delete() }
-                    throw e
-                }
-            }
-        } catch (e: Exception) {
-            logError(e)
-            return notFound()
-        }
+        val key = "tokens:" + tokens.sorted().joinToString(",")
+        val tmp = zipCached(key) {
+            createTempZip { zos -> ZipCreator.zipTokens(zos, tokens, context) }
+        } ?: return notFound()
         if (tmp.length() == 0L) {
-            tmp.delete()
+            zipCache.remove(key)
+            runCatching { tmp.delete() }
             return notFound()
         }
         appendLog("ZIP MEDIA: ${tokens.size} file (${Formats.bytes(tmp.length())})")
         return streamMedia(
             name = "gallery-${tokens.size}-files.zip",
             mime = "application/zip",
-            input = DeleteOnCloseStream(FileInputStream(tmp), tmp),
+            input = FileInputStream(tmp),
             total = tmp.length(),
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
@@ -1973,6 +1996,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val FS_MEDIA_CACHE_MAX_FILES = 2_000
         private const val FS_MEDIA_CACHE_MAX_ENTRIES = 50
         private const val DEFAULT_CHUNK_BYTES = 2L * 1024 * 1024
+        private const val ZIP_CACHE_TTL_MS = 60_000L
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
         private const val FS_STATS_TTL_MS = 10_000L

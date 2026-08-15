@@ -5,6 +5,28 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-15] — Perbaikan bug: back File Manager, panah ganda, cache ZIP (PR #110)
+
+### Diperbaiki
+- **Menutup video/foto dari File Manager ikut naik 1–2 folder** — entry
+  history "guard media" membuat handler `popstate` file manager mengira tombol
+  back (atau tombol tutup) sebagai navigasi folder, lalu `mmPopGuard`
+  melakukan `history.back()` kedua sehingga folder naik dua tingkat. Pop yang
+  memang untuk menutup media kini ditandai (`mmGuardPopPending`) dan diabaikan
+  handler file manager.
+- **Panah kiri/kanan di media ganda** — dua handler `keydown` aktif
+  bersamaan: di pemutar video panah memindah video SEKALIGUS seek ±5s, di
+  penampil foto melompat 2 item per tekan. Aksi panah kini hanya ditangani
+  satu handler (seek video / ganti foto).
+- **Badge Downloads tidak ter-update saat polling di tab lain** —
+  `pollSnapshot` hanya me-render daftar di tab Downloads; badge tab Downloads
+  kini tetap diperbarui walau sedang di Galeri/File Manager (SSE mati).
+- **Unduh folder (ZIP) di-zip ulang untuk tiap request Range** — browser
+  mengirim beberapa request `206` untuk satu unduhan; `fsZip`/`mediaZip`
+  membuat arsip baru tiap request (boros CPU + disk di Android TV, terlihat
+  "ZIP CREATED" berulang di log). ZIP kini di-cache 60 detik per path/token
+  dan dipakai ulang untuk request berikutnya.
+
 ## [v1.0 — 2026-08-15] — Perbaikan bug video player & penampil foto (PR #109)
 
 ### Diperbaiki
