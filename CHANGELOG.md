@@ -5,7 +5,7 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
-## [v1.0 — 2026-08-15] — Version catalog dependensi (PR #105)
+## [v1.0 — 2026-08-15] — Version catalog dependensi (PR #106)
 
 ### Ditambahkan
 - `gradle/libs.versions.toml` — versi dependensi & plugin dipusatkan (AGP,
