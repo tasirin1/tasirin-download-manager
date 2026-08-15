@@ -71,14 +71,25 @@ class LogActivity : AppCompatActivity() {
         })
 
         refreshLog()
-        val pollLog = object : Runnable {
-            override fun run() {
-                if (isDestroyed || isFinishing) return
-                refreshLog()
-                binding.log.postDelayed(this, 1000)
-            }
+    }
+
+    private val pollLog = object : Runnable {
+        override fun run() {
+            if (isDestroyed || isFinishing) return
+            refreshLog()
+            binding.log.postDelayed(this, 1000)
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
         binding.log.postDelayed(pollLog, 1000)
+    }
+
+    override fun onStop() {
+        // Hentikan polling saat layar log tidak terlihat (hemat CPU/baterai).
+        binding.log.removeCallbacks(pollLog)
+        super.onStop()
     }
 
     private fun exportLogTxt() {
@@ -144,15 +155,25 @@ class LogActivity : AppCompatActivity() {
     private fun refreshLog() {
         val text = App.httpServer.snapshotLog()
             .ifEmpty { getString(R.string.remote_log_empty) }
-        val lines = text.lines().count { it.isNotBlank() }
-        binding.logCount.text = resources.getQuantityString(
-            R.plurals.remote_log_lines, lines, lines
-        )
         // Kunci render = isi log + kata kunci: teks sama tapi kata kunci
         // berubah tetap harus di-highlight ulang.
         val key = text + "\u0000" + logSearch
         if (key == lastLogKey) return
         lastLogKey = key
+        // Hitung baris non-kosong tanpa mengalokasikan daftar String (sebelumnya
+        // text.lines() membangun array baru setiap tick 1 dtk).
+        var lines = 0
+        var from = 0
+        while (from <= text.length) {
+            val nl = text.indexOf('\n', from)
+            val end = if (nl < 0) text.length else nl
+            if (end > from) lines++
+            if (nl < 0) break
+            from = nl + 1
+        }
+        binding.logCount.text = resources.getQuantityString(
+            R.plurals.remote_log_lines, lines, lines
+        )
         val prevScroll = binding.logScroll.scrollY
         binding.log.text = highlightLog(text)
         binding.logScroll.post {

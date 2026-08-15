@@ -94,7 +94,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         applyEdgeToEdge(binding.root)
-        // Cache TextView statistik: updateStats dipanggil ~2x/detik saat
+        // Cache TextView statistik: updateToolbar dipanggil ~2x/detik saat
         // download aktif, findViewById tiap tick tidak perlu.
         statTotal = binding.statTotalValue
         statActive = binding.statActiveValue
@@ -136,8 +136,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     adapter.submitList(filtered)
                     binding.emptyView.visibility =
                         if (filtered.isEmpty()) View.VISIBLE else View.GONE
-                    updateBulkButtons()
-                    updateStats(items)
+                    updateToolbar(items)
                 }
             }
         }
@@ -891,44 +890,26 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
-    private fun updateBulkButtons() {
-        val items = App.engine.items.value
-        val hasActive = items.any {
-            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-        }
-        val hasResumable = items.any {
-            it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED
-        }
-        val hasFailed = items.any { it.state == DownloadState.FAILED }
-        binding.btnPauseAll.visibility = if (hasActive) View.VISIBLE else View.GONE
-        binding.btnResumeAll.visibility = if (hasResumable) View.VISIBLE else View.GONE
-        binding.btnRetryFailed.visibility = if (hasFailed) View.VISIBLE else View.GONE
-    }
-
-    private fun refreshList() {
-        runCatching {
-            val filtered = applyFilter(App.engine.items.value)
-            adapter.submitList(filtered)
-            binding.emptyView.visibility =
-                if (filtered.isEmpty()) View.VISIBLE else View.GONE
-            updateBulkButtons()
-            updateStats(App.engine.items.value)
-        }
-    }
-
-    private fun updateStats(items: List<DownloadItem>) {
+    /** Statistik + visibilitas tombol batch dihitung dalam SATU iterasi daftar
+     *  (sebelumnya 4× iterasi per emisi: 3× any{} + 1× statistik). */
+    private fun updateToolbar(items: List<DownloadItem>) {
         var active = 0
         var done = 0
         var failed = 0
+        var paused = 0
         var speed = 0L
         for (item in items) {
             when (item.state) {
-                DownloadState.DOWNLOADING, DownloadState.PENDING -> active++
+                DownloadState.DOWNLOADING -> {
+                    active++
+                    speed += item.speedBps
+                }
+                DownloadState.PENDING -> active++
                 DownloadState.COMPLETED -> done++
                 DownloadState.FAILED -> failed++
+                DownloadState.PAUSED -> paused++
                 else -> {}
             }
-            if (item.state == DownloadState.DOWNLOADING) speed += item.speedBps
         }
         statTotal.text = getString(R.string.stat_number, items.size)
         statActive.text = getString(R.string.stat_number, active)
@@ -938,6 +919,20 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             if (speed > 0) R.string.stat_active_speed else R.string.stat_active,
             Formats.speed(speed)
         )
+        binding.btnPauseAll.visibility = if (active > 0) View.VISIBLE else View.GONE
+        binding.btnResumeAll.visibility = if (paused > 0 || failed > 0) View.VISIBLE else View.GONE
+        binding.btnRetryFailed.visibility = if (failed > 0) View.VISIBLE else View.GONE
+    }
+
+    private fun refreshList() {
+        runCatching {
+            val items = App.engine.items.value
+            val filtered = applyFilter(items)
+            adapter.submitList(filtered)
+            binding.emptyView.visibility =
+                if (filtered.isEmpty()) View.VISIBLE else View.GONE
+            updateToolbar(items)
+        }
     }
 
     private fun applyFilter(items: List<DownloadItem>): List<DownloadItem> {

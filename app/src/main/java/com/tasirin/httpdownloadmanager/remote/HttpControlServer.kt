@@ -73,7 +73,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     )
     private val sseClients = CopyOnWriteArrayList<SseStream>()
-    private var sseJob: Job? = null
+    @Volatile private var sseJob: Job? = null
     @Volatile private var sseLastPayload = ""
     @Volatile private var sseLastPushAt = 0L
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
@@ -81,6 +81,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var loginFailures = 0
     @Volatile private var loginLockUntil = 0L
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Pair<Int, Long>>>()
+    // Cache listing folder media per root (MediaStore): membrowse halaman demi
+    // halaman tidak perlu me-query ulang seluruh koleksi tiap request. Dibatalkan
+    // saat ada perubahan media (upload/aksi fs) atau kedaluwarsa 5 dtk.
+    private val fsMediaCache = ConcurrentHashMap<String, Pair<Long, Pair<List<String>, List<FsMediaEntry>>>>()
     private val completedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
     private val finalizingUploads = ConcurrentHashMap<String, String>()
     private val failedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
@@ -758,6 +762,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             tmp.inputStream().use { it.copyTo(out) }
                         }
                         published.filePath?.let {
+                            fsMediaCache.clear()
                             MediaLibrary.notifyMediaChanged(context, it)
                         }
                         completedUploads[id] = finalName to System.currentTimeMillis()
@@ -1412,52 +1417,67 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         var total = 0
         if (Build.VERSION.SDK_INT >= 29) {
             val base = relative.trim('/')
-            val folder = if (base.isEmpty()) "" else base + "/"
-            val resolver = context.contentResolver
-            val collection = MediaLibrary.mediaCollectionForRoot(base)
-            val projection = arrayOf(
-                MediaStore.MediaColumns._ID,
-                MediaStore.MediaColumns.DISPLAY_NAME,
-                MediaStore.MediaColumns.SIZE,
-                MediaStore.MediaColumns.DATE_MODIFIED,
-                MediaStore.MediaColumns.RELATIVE_PATH
-            )
-            val selection = if (folder.isEmpty()) null else "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
-            val selArgs = if (folder.isEmpty()) null else arrayOf("$folder%")
-            val dirs = LinkedHashSet<String>()
-            // Entri file ringan dulu; JSONObject + token Base64 baru dibuat
-            // untuk halaman aktif (hemat alokasi saat folder ribuan file).
-            val files = mutableListOf<FsMediaEntry>()
-            runCatching {
-                resolver.query(collection, projection, selection, selArgs, null)?.use { c ->
-                    val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-                    val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-                    val iSize = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-                    val iMod = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
-                    val iRel = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
-                    while (c.moveToNext()) {
-                        val relPath = c.getString(iRel) ?: continue
-                        if (folder.isNotEmpty() && !relPath.startsWith(folder)) continue
-                        val rest = relPath.removePrefix(folder).trim('/')
-                        if (rest.isEmpty() || !rest.contains('/')) {
-                            val name = c.getString(iName) ?: continue
-                            val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
-                            files.add(
-                                FsMediaEntry(
-                                    name = name,
-                                    path = MS_PREFIX + uri,
-                                    size = c.getLong(iSize),
-                                    modified = c.getLong(iMod) * 1000L,
-                                    uri = uri
+            val now = System.currentTimeMillis()
+            val cached = fsMediaCache[base]
+            val dirNames: List<String>
+            val files: List<FsMediaEntry>
+            if (cached != null && now - cached.first < FS_MEDIA_CACHE_TTL_MS) {
+                dirNames = cached.second.first
+                files = cached.second.second
+            } else {
+                val folder = if (base.isEmpty()) "" else base + "/"
+                val resolver = context.contentResolver
+                val collection = MediaLibrary.mediaCollectionForRoot(base)
+                val projection = arrayOf(
+                    MediaStore.MediaColumns._ID,
+                    MediaStore.MediaColumns.DISPLAY_NAME,
+                    MediaStore.MediaColumns.SIZE,
+                    MediaStore.MediaColumns.DATE_MODIFIED,
+                    MediaStore.MediaColumns.RELATIVE_PATH
+                )
+                val selection = if (folder.isEmpty()) null else "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
+                val selArgs = if (folder.isEmpty()) null else arrayOf("$folder%")
+                val dirs = LinkedHashSet<String>()
+                // Entri file ringan dulu; JSONObject + token Base64 baru dibuat
+                // untuk halaman aktif (hemat alokasi saat folder ribuan file).
+                val found = mutableListOf<FsMediaEntry>()
+                runCatching {
+                    resolver.query(collection, projection, selection, selArgs, null)?.use { c ->
+                        val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                        val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                        val iSize = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                        val iMod = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+                        val iRel = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
+                        while (c.moveToNext()) {
+                            val relPath = c.getString(iRel) ?: continue
+                            if (folder.isNotEmpty() && !relPath.startsWith(folder)) continue
+                            val rest = relPath.removePrefix(folder).trim('/')
+                            if (rest.isEmpty() || !rest.contains('/')) {
+                                val name = c.getString(iName) ?: continue
+                                val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
+                                found.add(
+                                    FsMediaEntry(
+                                        name = name,
+                                        path = MS_PREFIX + uri,
+                                        size = c.getLong(iSize),
+                                        modified = c.getLong(iMod) * 1000L,
+                                        uri = uri
+                                    )
                                 )
-                            )
-                        } else {
-                            dirs.add(rest.substringBefore('/'))
+                            } else {
+                                dirs.add(rest.substringBefore('/'))
+                            }
                         }
                     }
                 }
+                dirNames = dirs.sortedWith(String.CASE_INSENSITIVE_ORDER)
+                files = found
+                // Cache hanya daftar berukuran wajar; folder raksasa tidak ditahan di RAM.
+                if (files.size <= FS_MEDIA_CACHE_MAX_FILES) {
+                    fsMediaCache[base] = now to (dirNames to files)
+                    if (fsMediaCache.size > FS_MEDIA_CACHE_MAX_ENTRIES) fsMediaCache.clear()
+                }
             }
-            val dirNames = dirs.sortedWith(String.CASE_INSENSITIVE_ORDER)
             val totalCount = dirNames.size + files.size
             total = totalCount
             val pageStart = offset
@@ -1542,7 +1562,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return when (action) {
             "delete" -> runCatching {
                 val gone = if (file.isDirectory) file.deleteRecursively() else file.delete()
-                if (gone) MediaLibrary.notifyMediaChanged(context, file.absolutePath)
+                if (gone) {
+                    fsMediaCache.clear()
+                    MediaLibrary.notifyMediaChanged(context, file.absolutePath)
+                }
                 gone
             }.getOrDefault(false)
             "rename" -> {
@@ -1551,6 +1574,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val target = File(file.parentFile, name)
                     val ok = file.renameTo(target)
                     if (ok) {
+                        fsMediaCache.clear()
                         MediaLibrary.notifyMediaChanged(
                             context, file.absolutePath, target.absolutePath
                         )
@@ -1571,6 +1595,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val target = File(destDir, file.name)
                 if (target.exists()) return false
                 if (file.renameTo(target)) {
+                    fsMediaCache.clear()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     return true
                 }
@@ -1578,6 +1603,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 runCatching {
                     file.copyTo(target, overwrite = false)
                     file.delete()
+                    fsMediaCache.clear()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     true
                 }.getOrDefault(false)
@@ -1812,11 +1838,19 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Ticker status: tetap push walau tidak ada perubahan item,
             // supaya baterai/penyimpanan/port selalu segar. Interval 10 dtk:
             // client yang butuh data lebih sering memakai /api/snapshot.
+            // Saat tidak ada klien sama sekali, pump (dan collector item)
+            // dihentikan; ensureSsePump() memulai ulang saat klien baru masuk.
             while (true) {
                 delay(10_000)
-                runCatching {
-                    if (sseClients.isNotEmpty()) pushFrame(buildPayload(true))
+                if (sseClients.isEmpty()) {
+                    delay(1_000)
+                    if (sseClients.isEmpty()) {
+                        sseJob = null
+                        if (sseClients.isNotEmpty()) ensureSsePump()
+                        return@launch
+                    }
                 }
+                runCatching { pushFrame(buildPayload(true)) }
             }
         }
     }
@@ -1933,8 +1967,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // memuat halaman berikutnya lewat tombol "Load more". Folder raksasa
         // tidak lagi membangun JSON semua entri + statistik semua subfolder
         // sekaligus di memori.
-        private const val FS_PAGE_SIZE = 1000
+        private const val FS_PAGE_SIZE = 300
         private const val FS_PAGE_MAX = 5000
+        private const val FS_MEDIA_CACHE_TTL_MS = 5_000L
+        private const val FS_MEDIA_CACHE_MAX_FILES = 2_000
+        private const val FS_MEDIA_CACHE_MAX_ENTRIES = 50
         private const val DEFAULT_CHUNK_BYTES = 2L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
