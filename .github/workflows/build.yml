@@ -144,6 +144,8 @@ jobs:
           print("counter count:", len(counters))
           if counters:
               print("first counter attrs:", counters[0].attrib)
+          import subprocess
+          print(subprocess.run(["find", "app/build", "-name", "*.exec", "-o", "-type", "d", "-name", "classes"], capture_output=True, text=True).stdout)
           summary = []
           for ctype in ("LINE", "BRANCH", "INSTRUCTION", "METHOD"):
               covered = missed = 0
