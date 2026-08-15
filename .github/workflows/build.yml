@@ -152,6 +152,7 @@ jobs:
               with open(step_summary, "a", encoding="utf-8") as fh:
                   fh.write("### JaCoCo coverage (unit test)\n\n")
                   fh.write("\n".join(summary) + "\n")
+          PY
 
       - name: Build release APK (jika secret signing tersedia)
         if: env.KEYSTORE_BASE64 != ''
