@@ -1249,11 +1249,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 o.put("isVideo", e.isVideo)
                 o.put("token", e.token)
                 if (e.isVideo && !e.isPartial) {
-                    var d = cache.optLong(e.token, 0L)
+                    var d = videoDurationOf(cache, e.token)
                     if (d <= 0 && e.durationMs > 0) d = e.durationMs
                     if (d <= 0 && extracted < 20) {
                         d = videoDurationMs(e.token)
-                        if (d > 0) cache.put(e.token, d)
+                        if (d > 0) cacheVideoDuration(cache, e.token, d)
                         extracted++
                     }
                     o.put("durationMs", d)
@@ -1317,20 +1317,37 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrDefault(0L)
     }
 
+    private val videoDurationLock = Any()
+
     private fun loadVideoDurations(): JSONObject {
         videoDurationsCache?.let { return it }
-        val loaded = runCatching {
-            JSONObject(File(context.filesDir, "video_durations.json").readText())
-        }.getOrDefault(JSONObject())
-        videoDurationsCache = loaded
-        return loaded
+        synchronized(videoDurationLock) {
+            videoDurationsCache?.let { return it }
+            val loaded = runCatching {
+                JSONObject(File(context.filesDir, "video_durations.json").readText())
+            }.getOrDefault(JSONObject())
+            videoDurationsCache = loaded
+            return loaded
+        }
+    }
+
+    /** Baca durasi dari cache bersama — harus sinkron: banyak thread server
+     *  (nanohttpd) bisa membuka galeri bersamaan, dan org.json JSONObject
+     *  tidak thread-safe (put/optLong paralel bisa korup atau 500). */
+    private fun videoDurationOf(cache: JSONObject, token: String): Long =
+        synchronized(videoDurationLock) { cache.optLong(token, 0L) }
+
+    private fun cacheVideoDuration(cache: JSONObject, token: String, ms: Long) {
+        synchronized(videoDurationLock) { cache.put(token, ms) }
     }
 
     private fun saveVideoDurations(cache: JSONObject) {
-        videoDurationsCache = cache
-        if (cache.length() == 0) return
-        runCatching {
-            File(context.filesDir, "video_durations.json").writeText(cache.toString())
+        synchronized(videoDurationLock) {
+            videoDurationsCache = cache
+            if (cache.length() == 0) return
+            runCatching {
+                File(context.filesDir, "video_durations.json").writeText(cache.toString())
+            }
         }
     }
 
@@ -1880,69 +1897,79 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return res
     }
 
+    private val ssePumpLock = Any()
+
     private fun ensureSsePump() {
-        if (sseJob?.isActive == true) return
-        sseJob = serverScope.launch {
-            val buildPayload = { withStatus: Boolean ->
-                val payload = JSONObject().put("items", itemsJson())
-                if (withStatus) payload.put("status", statusObject())
-                payload.toString()
-            }
-            val pushFrame = { payloadText: String ->
-                runCatching {
-                    val now = System.currentTimeMillis()
-                    if (payloadText != sseLastPayload || now - sseLastPushAt > SSE_HEARTBEAT_MS) {
-                        sseLastPayload = payloadText
-                        sseLastPushAt = now
-                        val frame = "data: $payloadText\n\n"
-                        val closed = sseClients.filter { it.isClosed }
-                        if (closed.isNotEmpty()) sseClients.removeAll(closed)
-                        sseClients.forEach { it.push(frame) }
+        // Beberapa koneksi SSE datang bersamaan (tab/device ganda) bisa sama-
+        // sama melewati cek `isActive` sebelum sseJob terisi -> dua pump kembar
+        // yang push frame ganda ke semua klien. Kunci membuat hanya SATU pump.
+        synchronized(ssePumpLock) {
+            if (sseJob?.isActive == true) return
+            sseJob = serverScope.launch {
+                val me = coroutineContext[Job]
+                val buildPayload = { withStatus: Boolean ->
+                    val payload = JSONObject().put("items", itemsJson())
+                    if (withStatus) payload.put("status", statusObject())
+                    payload.toString()
+                }
+                val pushFrame = { payloadText: String ->
+                    runCatching {
+                        val now = System.currentTimeMillis()
+                        if (payloadText != sseLastPayload || now - sseLastPushAt > SSE_HEARTBEAT_MS) {
+                            sseLastPayload = payloadText
+                            sseLastPushAt = now
+                            val frame = "data: $payloadText\n\n"
+                            val closed = sseClients.filter { it.isClosed }
+                            if (closed.isNotEmpty()) sseClients.removeAll(closed)
+                            sseClients.forEach { it.push(frame) }
+                        }
                     }
                 }
-            }
-            var lastItemsSig = Int.MIN_VALUE
-            val collector = launch {
-                runCatching {
-                    App.engine.items.collect { items ->
-                        // Hindari build JSON tiap tick: push hanya saat isi item
-                        // berubah (signature), tetap dengan throttle 1 dtk.
-                        val sig = itemsSignature(items)
-                        if (sig != lastItemsSig) {
-                            lastItemsSig = sig
-                            if (sseClients.isNotEmpty() &&
-                                System.currentTimeMillis() - sseLastPushAt >= SSE_MIN_INTERVAL_MS
-                            ) {
-                                pushFrame(buildPayload(false))
+                var lastItemsSig = Int.MIN_VALUE
+                val collector = launch {
+                    runCatching {
+                        App.engine.items.collect { items ->
+                            // Hindari build JSON tiap tick: push hanya saat isi item
+                            // berubah (signature), tetap dengan throttle 1 dtk.
+                            val sig = itemsSignature(items)
+                            if (sig != lastItemsSig) {
+                                lastItemsSig = sig
+                                if (sseClients.isNotEmpty() &&
+                                    System.currentTimeMillis() - sseLastPushAt >= SSE_MIN_INTERVAL_MS
+                                ) {
+                                    pushFrame(buildPayload(false))
+                                }
                             }
                         }
                     }
                 }
-            }
-            try {
-                // Ticker status: tetap push walau tidak ada perubahan item,
-                // supaya baterai/penyimpanan/port selalu segar. Interval 10 dtk:
-                // client yang butuh data lebih sering memakai /api/snapshot.
-                // Saat tidak ada klien sama sekali, pump (dan collector item)
-                // dihentikan; ensureSsePump() memulai ulang saat klien baru masuk.
-                while (true) {
-                    delay(10_000)
-                    if (sseClients.isEmpty()) {
-                        delay(1_000)
+                try {
+                    // Ticker status: tetap push walau tidak ada perubahan item,
+                    // supaya baterai/penyimpanan/port selalu segar. Interval 10 dtk:
+                    // client yang butuh data lebih sering memakai /api/snapshot.
+                    // Saat tidak ada klien sama sekali, pump (dan collector item)
+                    // dihentikan; ensureSsePump() memulai ulang saat klien baru masuk.
+                    while (true) {
+                        delay(10_000)
                         if (sseClients.isEmpty()) {
-                            sseJob = null
-                            return@launch
+                            delay(1_000)
+                            if (sseClients.isEmpty()) {
+                                // Jangan menimpa referensi pump yang lebih baru
+                                // bila sudah ada penggantinya.
+                                if (sseJob === me) sseJob = null
+                                return@launch
+                            }
                         }
+                        runCatching { pushFrame(buildPayload(true)) }
                     }
-                    runCatching { pushFrame(buildPayload(true)) }
+                } finally {
+                    // Collector item adalah child pump: bila pump berhenti normal
+                    // (tanpa klien), cancel collector supaya tidak bocor — tanpa
+                    // ini, collect StateFlow yang tak pernah selesai membuat job
+                    // pump terjebak Completing dan collector menempel selamanya,
+                    // memakan CPU di setiap emisi item.
+                    collector.cancel()
                 }
-            } finally {
-                // Collector item adalah child pump: bila pump berhenti normal
-                // (tanpa klien), cancel collector supaya tidak bocor — tanpa
-                // ini, collect StateFlow yang tak pernah selesai membuat job
-                // pump terjebak Completing dan collector menempel selamanya,
-                // memakan CPU di setiap emisi item.
-                collector.cancel()
             }
         }
     }

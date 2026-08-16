@@ -5,6 +5,28 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-16] — Resume unduhan tidak buang progres + keamanan thread server (PR #115)
+
+### Diperbaiki
+- **Tiap putus jaringan mengulang unduhan dari nol** — catatan progres
+  (`bytesDownloaded`/segmen) disimpan 1×/detik, sedangkan file `.part` terus
+  bertambah di antara tick; saat koneksi putus, file parsial hampir selalu
+  "lebih panjang" dari catatan sehingga pemeriksaan anti-korup membuang
+  SELURUH progres. File parsial yang sedikit lebih maju dari catatan kini
+  dipangkas ke posisi tercatat lalu unduhan lanjut; mulai dari nol hanya bila
+  data benar-benar hilang (file lebih pendek dari catatan atau sisa `.part`
+  tanpa catatan). Berlaku untuk unduhan tunggal dan multi-segmen.
+- **Galeri bisa 500/JSON korup saat dibuka bersamaan** — cache durasi video
+  (`video_durations.json`) adalah `JSONObject` bersama yang diubah banyak
+  thread server (nanohttpd) tanpa sinkronisasi (contoh: request galeri
+  paralel dari beberapa tab/device). Akses baca/tulis kini dikunci sehingga
+  `put`/`optLong` paralel tidak korup.
+- **SSE bisa membuat dua pump kembar** — dua koneksi `/api/events` datang
+  bersamaan bisa sama-sama lolos cek `sseJob?.isActive` sebelum variabel
+  terisi, membuat dua pump yang push frame ganda ke semua klien. Pembuatan
+  pump kini dikunci dan pump yang berhenti tidak menimpa referensi pump yang
+  lebih baru.
+
 ## [v1.0 — 2026-08-16] — Navigasi File Manager di luar root + pump SSE (PR #114)
 
 ### Diperbaiki
