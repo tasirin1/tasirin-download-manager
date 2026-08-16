@@ -1420,7 +1420,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val items = JSONArray()
         val dir = File(path)
         var total = 0
-        if (dir.isDirectory && isFsPathAllowed(path)) {
+        // Bila folder bukan root yang sah tetapi induk dari salah satu root
+        // (mis. /storage/emulated/0 di atas folder tujuan), listing tetap
+        // dibolehkan dalam mode browse-only: tanpa statistik subfolder, token,
+        // dan tanpa aksi (delete/rename/move/upload tetap ditolak keamanan).
+        val allowed = isFsPathAllowed(path)
+        val browseOnly = !allowed && isFsBrowseAncestor(path)
+        if (dir.isDirectory && (allowed || browseOnly)) {
             val entries = runCatching { dir.listFiles() }.getOrNull()
                 ?.sortedWith(
                     compareBy<File> { it.isFile }.thenComparator { a, b ->
@@ -1431,8 +1437,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Hanya halaman aktif yang dibangun JSON-nya; statistik subfolder
             // (itemCount/totalSize) dihitung paralel untuk halaman itu saja.
             val page = entries.drop(offset).take(limit)
-            val statFutures = page.filter { it.isDirectory }.associateWith { f ->
-                liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) }
+            val statFutures = if (allowed) {
+                page.filter { it.isDirectory }.associateWith { f ->
+                    liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) }
+                }
+            } else {
+                emptyMap()
             }
             page.forEach { f ->
                 val o = JSONObject()
@@ -1442,12 +1452,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 o.put("size", if (f.isFile) f.length() else 0L)
                 o.put("modified", f.lastModified())
                 if (f.isDirectory) {
-                    val (itemCount, totalSize) = runCatching {
-                        statFutures[f]?.get()
-                    }.getOrNull() ?: (0 to 0L)
+                    val (itemCount, totalSize) = if (allowed) {
+                        runCatching { statFutures[f]?.get() }.getOrNull() ?: (0 to 0L)
+                    } else {
+                        0 to 0L
+                    }
                     o.put("itemCount", itemCount)
                     o.put("totalSize", totalSize)
-                } else {
+                } else if (allowed) {
                     o.put("token", MediaLibrary.tokenForPath(f.absolutePath))
                 }
                 items.put(o)
@@ -1457,6 +1469,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             JSONObject().put("path", path).put("items", items).put("total", total)
         )
     }
+
+    /** Path berada di atas (induk dari) salah satu root yang sah? Hanya untuk
+     *  listing browse-only — aksi tulis tetap butuh isFsPathAllowed. */
+    private fun isFsBrowseAncestor(path: String): Boolean =
+        ServerSecurity.isBrowseableAncestor(path, allowedFsRoots())
 
     private fun fsListMedia(relative: String, offset: Int, limit: Int): Response {
         val items = JSONArray()
@@ -1885,7 +1902,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
             }
             var lastItemsSig = Int.MIN_VALUE
-            launch {
+            val collector = launch {
                 runCatching {
                     App.engine.items.collect { items ->
                         // Hindari build JSON tiap tick: push hanya saat isi item
@@ -1902,22 +1919,30 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
             }
-            // Ticker status: tetap push walau tidak ada perubahan item,
-            // supaya baterai/penyimpanan/port selalu segar. Interval 10 dtk:
-            // client yang butuh data lebih sering memakai /api/snapshot.
-            // Saat tidak ada klien sama sekali, pump (dan collector item)
-            // dihentikan; ensureSsePump() memulai ulang saat klien baru masuk.
-            while (true) {
-                delay(10_000)
-                if (sseClients.isEmpty()) {
-                    delay(1_000)
+            try {
+                // Ticker status: tetap push walau tidak ada perubahan item,
+                // supaya baterai/penyimpanan/port selalu segar. Interval 10 dtk:
+                // client yang butuh data lebih sering memakai /api/snapshot.
+                // Saat tidak ada klien sama sekali, pump (dan collector item)
+                // dihentikan; ensureSsePump() memulai ulang saat klien baru masuk.
+                while (true) {
+                    delay(10_000)
                     if (sseClients.isEmpty()) {
-                        sseJob = null
-                        if (sseClients.isNotEmpty()) ensureSsePump()
-                        return@launch
+                        delay(1_000)
+                        if (sseClients.isEmpty()) {
+                            sseJob = null
+                            return@launch
+                        }
                     }
+                    runCatching { pushFrame(buildPayload(true)) }
                 }
-                runCatching { pushFrame(buildPayload(true)) }
+            } finally {
+                // Collector item adalah child pump: bila pump berhenti normal
+                // (tanpa klien), cancel collector supaya tidak bocor — tanpa
+                // ini, collect StateFlow yang tak pernah selesai membuat job
+                // pump terjebak Completing dan collector menempel selamanya,
+                // memakan CPU di setiap emisi item.
+                collector.cancel()
             }
         }
     }

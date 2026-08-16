@@ -17,6 +17,21 @@ object ServerSecurity {
         }
     }
 
+    /** Path adalah induk (strict) dari salah satu root? Dipakai untuk listing
+     *  browse-only di File Manager: folder di atas root (mis. /storage di atas
+     *  /storage/emulated/0/Download) boleh dilihat isinya, tapi aksi tulis
+     *  tetap hanya untuk path yang lolos [isPathAllowed]. */
+    fun isBrowseableAncestor(path: String, roots: List<File>): Boolean {
+        if (path.isBlank()) return false
+        val target = runCatching { File(path).canonicalFile.absolutePath }.getOrNull()
+            ?: return false
+        return roots.any { root ->
+            val rp = runCatching { root.canonicalFile.absolutePath }.getOrNull()
+                ?: return@any false
+            rp.startsWith(target + File.separator)
+        }
+    }
+
     /** Lock PIN masih aktif: percobaan login ditolak. */
     fun isPinLocked(now: Long, lockUntil: Long): Boolean = now < lockUntil
 

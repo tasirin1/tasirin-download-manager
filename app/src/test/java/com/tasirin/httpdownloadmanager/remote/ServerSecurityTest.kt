@@ -95,3 +95,47 @@ class ServerSecurityTest {
         assertFalse(ServerSecurity.isShareExpired(10_000, 5_000))
     }
 }
+
+    @Test
+    fun isBrowseableAncestor_indukDariRoot_true() {
+        val r = root()
+        val induk = r.parentFile
+        assertTrue(ServerSecurity.isBrowseableAncestor(induk.absolutePath, listOf(r)))
+    }
+
+    @Test
+    fun isBrowseableAncestor_rootItuSendiri_false() {
+        val r = root()
+        // Root itu sendiri bukan "induk strict" — isPathAllowed yang menangani.
+        assertFalse(ServerSecurity.isBrowseableAncestor(r.absolutePath, listOf(r)))
+    }
+
+    @Test
+    fun isBrowseableAncestor_pathLuar_false() {
+        val r = root()
+        val luar = tmp.newFolder("lain")
+        assertFalse(ServerSecurity.isBrowseableAncestor(luar.absolutePath, listOf(r)))
+    }
+
+    @Test
+    fun isBrowseableAncestor_pathKosong_false() {
+        val r = root()
+        assertFalse(ServerSecurity.isBrowseableAncestor("", listOf(r)))
+        assertFalse(ServerSecurity.isBrowseableAncestor("   ", listOf(r)))
+    }
+
+    @Test
+    fun isBrowseableAncestor_anakDariInduk_true() {
+        val r = root()
+        // Induk dua tingkat: /tmp/.../root/sub — naik ke /tmp harus terdeteksi.
+        val sub = File(r, "sub")
+        val indukJauh = r.parentFile?.parentFile ?: return
+        assertTrue(ServerSecurity.isBrowseableAncestor(indukJauh.absolutePath, listOf(sub)))
+    }
+
+    @Test
+    fun isBrowseableAncestor_prefixMiripBukanInduk_false() {
+        val r = root()
+        val mirip = File(r.parentFile, r.name + "x")
+        assertFalse(ServerSecurity.isBrowseableAncestor(mirip.absolutePath, listOf(r)))
+    }
