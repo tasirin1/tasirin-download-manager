@@ -42,6 +42,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
+import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import javax.net.ssl.HttpsURLConnection
 import java.net.URL
@@ -831,14 +832,30 @@ class DownloadEngine(appContext: Context) {
         val health = DownloadHealthWatchdog(
             if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
         )
-        // Resume anti-korup: catatan bytes harus sinkron dengan ukuran file parsial.
-        if (downloaded > 0 && partialFile.length() != downloaded) {
-            downloaded = 0
-            partialFile.delete()
-        } else if (downloaded == 0L && partialFile.exists()) {
-            // Mulai dari nol tapi ada sisa .part lama (crash/save belum sempat):
-            // tanpa ini data baru akan di-append di belakang data lama -> file korup.
-            partialFile.delete()
+        // Resume anti-korup: catatan bytes harus sinkron dengan ukuran file
+        // parsial. Bila file sedikit LEBIH PANJANG dari catatan (catatan
+        // tertinggal <1 dtk dari tick progres terakhir — sangat umum saat
+        // koneksi putus di tengah interval), cukup pangkas ke posisi catatan
+        // lalu lanjut: sebelumnya tiap putus jaringan mengulang unduhan dari
+        // nol karena file selalu tampak "lebih maju". Mulai dari nol hanya
+        // bila data benar-benar hilang (file lebih pendek dari catatan / sisa
+        // .part tanpa catatan sama sekali).
+        when (resumeAction(downloaded, partialFile.length())) {
+            ResumeAction.TRUNCATE_TO_RECORD -> {
+                val truncated = runCatching {
+                    RandomAccessFile(partialFile, "rw").use { it.setLength(downloaded) }
+                    true
+                }.getOrDefault(false)
+                if (!truncated) {
+                    downloaded = 0
+                    partialFile.delete()
+                }
+            }
+            ResumeAction.RESTART -> {
+                downloaded = 0
+                partialFile.delete()
+            }
+            ResumeAction.KEEP -> Unit
         }
         coroutineContext.ensureActive()
         activeConns[item.id] = conn
@@ -1093,14 +1110,27 @@ class DownloadEngine(appContext: Context) {
         var lastSegBytes = downloaded
         var lastSegAt = System.currentTimeMillis()
         // Resume anti-korup per segmen: ukuran file parsial harus sinkron.
-        if (downloaded > 0 && partial.length() != downloaded) {
-            downloaded = 0
-            partial.delete()
-            updateSegment(id, segment.index, 0)
-        } else if (downloaded == 0L && partial.exists()) {
-            // Sisa .part dari proses sebelumnya dengan catatan 0 byte: buang biar
-            // Range + append tidak menulis di belakang data lama (file korup).
-            partial.delete()
+        // File sedikit lebih panjang dari catatan (flush progres tiap 500 ms)
+        // hanya dipangkas, bukan dibuang — tanpa ini, tiap putus jaringan
+        // membuat SEMUA segmen mengulang dari nol.
+        when (resumeAction(downloaded, partial.length())) {
+            ResumeAction.TRUNCATE_TO_RECORD -> {
+                val truncated = runCatching {
+                    RandomAccessFile(partial, "rw").use { it.setLength(downloaded) }
+                    true
+                }.getOrDefault(false)
+                if (!truncated) {
+                    downloaded = 0
+                    partial.delete()
+                    updateSegment(id, segment.index, 0)
+                }
+            }
+            ResumeAction.RESTART -> {
+                downloaded = 0
+                partial.delete()
+                updateSegment(id, segment.index, 0)
+            }
+            ResumeAction.KEEP -> Unit
         }
         coroutineContext.ensureActive()
         val conn = openConn(item.url)
@@ -1504,6 +1534,27 @@ class DownloadEngine(appContext: Context) {
         private const val SEG_FLUSH_INTERVAL_MS = 500L
         private const val MONITOR_INTERVAL_MS = 30 * 60 * 1000L
     }
+}
+
+/** Keputusan resume anti-korup: apa yang dilakukan terhadap file parsial
+ *  sebelum melanjutkan unduhan. Dipisah jadi fungsi murni agar bisa
+ *  di-unit-test (lihat ResumeActionTest). */
+internal enum class ResumeAction {
+    /** File lebih panjang dari catatan: pangkas ke posisi catatan, lanjut. */
+    TRUNCATE_TO_RECORD,
+
+    /** Data hilang / sisa tanpa catatan: mulai dari nol (file dibuang). */
+    RESTART,
+
+    /** File sudah sinkron dengan catatan: tidak ada yang perlu dilakukan. */
+    KEEP
+}
+
+internal fun resumeAction(recorded: Long, fileLength: Long): ResumeAction = when {
+    recorded <= 0L -> if (fileLength > 0L) ResumeAction.RESTART else ResumeAction.KEEP
+    fileLength < recorded -> ResumeAction.RESTART
+    fileLength > recorded -> ResumeAction.TRUNCATE_TO_RECORD
+    else -> ResumeAction.KEEP
 }
 
 private data class ServerHeaders(
