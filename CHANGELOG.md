@@ -5,6 +5,20 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-16] — Perbaikan cache media & fetch ganda di File Manager (PR #113)
+
+### Diperbaiki
+- **Aksi di folder media (MediaStore, path `m:`) tidak me-refresh daftar** —
+  hapus/rename/pindah file lewat File Manager di folder media tidak membuang
+  cache listing (`fsMediaCache`) dan snapshot galeri, jadi perubahan baru
+  terlihat setelah 5–15 detik. Kedua cache kini di-invalidasi pada delete,
+  rename, move, dan perpindahan file ↔ MediaStore.
+- **File Manager mem-fetch daftar lokasi storage berulang** — `fsLocationsLoaded`
+  di-reset di tiap kunjungan tab Files dan `loadFsLocations()` bisa dipanggil
+  dua kali bersamaan (applyRoute + loadFs), menghasilkan `GET /api/fs?path=`
+  ganda tiap masuk tab. Flag sekarang tidak di-reset dan ada guard in-flight
+  (`fsLocationsLoading`).
+
 ## [v1.0 — 2026-08-15] — Pemutar video: hapus gesture kecerahan & volume (PR #112)
 
 ### Diubah
