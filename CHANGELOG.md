@@ -5,6 +5,20 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-16] — Navigasi File Manager di luar root + pump SSE (PR #114)
+
+### Diperbaiki
+- **Tombol Up & breadcrumb File Manager berhenti di folder kosong di luar root
+  yang diizinkan** — naik dari root (mis. `f:/storage/emulated/0`) menuju
+  `f:/storage/emulated` atau `/storage` menampilkan "Empty folder" karena
+  listing ditolak keamanan. Folder induk dari root sekarang bisa di-browse
+  (mode browse-only: tanpa statistik subfolder, token, dan tanpa aksi tulis;
+  delete/rename/move/upload tetap ditolak).
+- **Pump SSE bocor collector saat tidak ada klien** — saat pump berhenti normal
+  (SSE tanpa klien 2 tick), coroutine `items.collect` tidak di-cancel sehingga
+  tetap menempel selamanya dan memakan CPU di setiap emisi item (menumpuk tiap
+  siklus buka-tutup halaman remote). Collector kini di-cancel di `finally`.
+
 ## [v1.0 — 2026-08-16] — Perbaikan cache media & fetch ganda di File Manager (PR #113)
 
 ### Diperbaiki
