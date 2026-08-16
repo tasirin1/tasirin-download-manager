@@ -678,7 +678,6 @@ fsSelectMode = false;
 fsSelected.clear();
 fsSelectBtn.textContent = 'Select';
 fsBatch.classList.add('hidden');
-fsLocationsLoaded = false;
 if (!fsPath && localStorage.getItem(FS_LAST_PATH_KEY)) {
 fsPath = localStorage.getItem(FS_LAST_PATH_KEY);
 fsRestoredOnce = true;
@@ -792,6 +791,8 @@ fsNavigate(decodeURIComponent(chip.dataset.path));
 });
 }
 async function loadFsLocations() {
+if (fsLocationsLoaded || fsLocationsLoading) return;
+fsLocationsLoading = true;
 try {
 const res = await fetch(API + '/api/fs?path=');
 if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -814,6 +815,8 @@ const matched = fsLocations.some(function (r) { return r.path === cur; });
 if (cur && matched) fsLocation.value = cur;
 } catch (e) {
 fsLocation.innerHTML = '<option value="">Location\u2026</option>';
+} finally {
+fsLocationsLoading = false;
 }
 }
 fsLocation.addEventListener('change', function () {
@@ -823,6 +826,7 @@ fsLocation.value = '';
 fsNavigate(v);
 });
 let fsLocationsLoaded = false;
+let fsLocationsLoading = false;
 async function loadFs() {
 showFsSkeleton();
 fsOffset = 0;
