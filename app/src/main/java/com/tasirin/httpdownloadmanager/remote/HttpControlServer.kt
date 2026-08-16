@@ -1671,7 +1671,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return runCatching {
             val uri = uriStr.toUri()
             if (!isMediaUriAllowed(uri)) return@runCatching false
-            when (action) {
+            val ok = when (action) {
                 "delete" -> resolver.delete(uri, null, null) > 0
                 "rename" -> {
                     if (name.isBlank() || name.contains('/') || name.contains('\\')) return false
@@ -1700,6 +1700,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 else -> false
             }
+            if (ok) {
+                // MediaStore berubah: buang cache listing folder media & snapshot
+                // galeri supaya nama/hapus/pindah langsung terlihat (bukan 5-15 dtk).
+                fsMediaCache.clear()
+                invalidateGalleryCache()
+            }
+            ok
         }.getOrDefault(false)
     }
 
@@ -1726,7 +1733,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             resolver.delete(uri, null, null)
             return false
         }
-        return runCatching { file.delete() }.getOrDefault(false)
+        val gone = runCatching { file.delete() }.getOrDefault(false)
+        if (gone) {
+            fsMediaCache.clear()
+            invalidateGalleryCache()
+        }
+        return gone
     }
 
     private fun moveMediaToFile(uri: Uri, dest: String): Boolean {
@@ -1743,7 +1755,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             true
         }.getOrDefault(false)
         if (!written) return false
-        return resolver.delete(uri, null, null) > 0
+        val gone = resolver.delete(uri, null, null) > 0
+        if (gone) {
+            fsMediaCache.clear()
+            invalidateGalleryCache()
+        }
+        return gone
     }
 
     private fun mediaStoreName(uri: Uri): String? = runCatching {
