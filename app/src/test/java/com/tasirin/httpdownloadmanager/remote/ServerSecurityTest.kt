@@ -94,7 +94,6 @@ class ServerSecurityTest {
         assertTrue(ServerSecurity.isShareExpired(4_999, 5_000))
         assertFalse(ServerSecurity.isShareExpired(10_000, 5_000))
     }
-}
 
     @Test
     fun isBrowseableAncestor_indukDariRoot_true() {
@@ -139,3 +138,4 @@ class ServerSecurityTest {
         val mirip = File(r.parentFile, r.name + "x")
         assertFalse(ServerSecurity.isBrowseableAncestor(mirip.absolutePath, listOf(r)))
     }
+}
