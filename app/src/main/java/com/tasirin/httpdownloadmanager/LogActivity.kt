@@ -108,7 +108,9 @@ class LogActivity : AppCompatActivity() {
             appendLine()
             append(if (log.isBlank()) "(No server activity yet)\n" else log)
             val crashText = runCatching {
-                val f = File(filesDir, App.CRASH_LOG_FILE)
+                // Baca dari folder data eksternal (sinkron dengan CrashLog).
+                val dir = getExternalFilesDir(null) ?: filesDir
+                val f = File(dir, App.CRASH_LOG_FILE)
                 if (f.exists()) f.readText().trim() else ""
             }.getOrDefault("")
             if (crashText.isNotEmpty()) {

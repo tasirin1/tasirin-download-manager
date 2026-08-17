@@ -22,7 +22,10 @@ object CrashLog {
 
     fun append(context: Context, tag: String, t: Throwable) {
         runCatching {
-            val file = File(context.filesDir, FILE_NAME)
+            // Simpan di folder data eksternal: /Android/data/<pkg>/crash.log
+            // (terlihat dari file manager tanpa root; otomatis dihapus saat uninstall).
+            val dir = context.getExternalFilesDir(null) ?: context.filesDir
+            val file = File(dir, FILE_NAME)
             val stamp = stampFormat.format(Date())
             val text = buildString {
                 appendLine("=== $stamp [$tag] ===")

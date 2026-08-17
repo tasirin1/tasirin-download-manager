@@ -89,7 +89,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // pindah ke tema terang sebelum konten digambar (lihat themes.xml).
         setTheme(R.style.Theme_HttpDownloadManager)
         super.onCreate(savedInstanceState)
-        showPreviousCrashIfAny()
         try {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -165,20 +164,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     @SuppressLint("SetTextI18n") // Isi dialog crash = pesan + stack trace dinamis, bukan teks terjemahan.
-    private fun showPreviousCrashIfAny() {
-        runCatching {
-            val file = File(filesDir, App.CRASH_LOG_FILE)
-            if (!file.exists()) return@runCatching
-            val text = file.readText().trim()
-            if (text.isEmpty()) return@runCatching
-            AlertDialog.Builder(this)
-                .setTitle(R.string.previous_crash_title)
-                .setMessage(text.take(3000))
-                .setPositiveButton(R.string.clear_log) { _, _ -> file.delete() }
-                .setNegativeButton(R.string.close, null)
-                .show()
-        }
-    }
+
 
     @SuppressLint("SetTextI18n")
     private fun showFatalError(t: Throwable) {
