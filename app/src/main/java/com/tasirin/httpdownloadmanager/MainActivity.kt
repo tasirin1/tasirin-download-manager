@@ -163,9 +163,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
-    @SuppressLint("SetTextI18n") // Isi dialog crash = pesan + stack trace dinamis, bukan teks terjemahan.
-
-
     @SuppressLint("SetTextI18n")
     private fun showFatalError(t: Throwable) {
         App.appendCrash(this, "onCreate", t)
