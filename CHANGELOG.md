@@ -945,3 +945,4 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 Setiap rilis = push ke `main` → workflow `build.yml` → release `v1.0`
 di-refresh berisi APK `tasirin-download-manager-v1.0-<code>.apk`.
 Detail teknis untuk AI/maintainer ada di `AGENTS.md`.
+
