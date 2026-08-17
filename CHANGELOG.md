@@ -5,6 +5,14 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-17] — Fix critical: StoragePrefs recursive crash (PR #118)
+
+### Diperbaiki
+- **`StoragePrefs.prefs()` recursive call** — method memanggil dirinya sendiri
+  saat `cachedPrefs == null` → StackOverflowError → force close saat app baru
+  dibuka. Dipanggil langsung dari `App.onCreate()` → `isServerBackgroundEnabled()`.
+  Fix: panggil `context.getSharedPreferences()` langsung.
+
 ## [v1.0 — 2026-08-17] — Efisiensi round 3: alokasi memori + I/O (PR #118)
 
 ### Diperbaiki

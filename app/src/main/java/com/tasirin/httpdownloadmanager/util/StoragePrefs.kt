@@ -15,7 +15,7 @@ object StoragePrefs {
 
     /** Cache SharedPreferences instance untuk menghindari 58x getSharedPreferences call. */
     private fun prefs(context: Context): android.content.SharedPreferences {
-        return cachedPrefs ?: prefs(context)
+        return cachedPrefs ?: context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
             .also { cachedPrefs = it }
     }
     private const val HEX_CHARS = "0123456789abcdef"
