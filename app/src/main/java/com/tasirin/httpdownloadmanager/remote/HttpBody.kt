@@ -16,15 +16,19 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
     val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
         .coerceIn(0L, MAX_BODY_SIZE).toInt()
     if (length > 0) {
-        val bytes = ByteArray(length)
-        var offset = 0
-        while (offset < length) {
-            val read = session.inputStream.read(bytes, offset, length - offset)
+        // Baca per-baris tanpa alokasi ByteArray(length) penuh — hemats memori
+        // untuk form kecil (100 byte) yang sebelumnya alokasi 4MB.
+        val buf = ByteArray(8192)
+        val sb = StringBuilder(length.coerceAtMost(65536))
+        var remaining = length
+        while (remaining > 0) {
+            val toRead = minOf(buf.size, remaining)
+            val read = session.inputStream.read(buf, 0, toRead)
             if (read == -1) break
-            offset += read
+            sb.append(String(buf, 0, read, Charsets.UTF_8))
+            remaining -= read
         }
-        val body = String(bytes, 0, offset, Charsets.UTF_8)
-        body.split("&").forEach { pair ->
+        sb.toString().split("&").forEach { pair ->
             val idx = pair.indexOf('=')
             if (idx > 0) {
                 val key = URLDecoder.decode(pair.substring(0, idx), "UTF-8")

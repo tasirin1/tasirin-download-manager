@@ -93,12 +93,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // request halaman galeri membaca ulang file & header gambar dari disk.
     @Volatile private var videoDurationsCache: JSONObject? = null
     private val imageDimCache = ConcurrentHashMap<String, Pair<Int, Int>>()
+    // Cache itemsJson berdasarkan signature: hemat GC saat polling 2x/detik.
+    @Volatile private var cachedItemsSignature = 0
+    @Volatile private var cachedItemsJson: JSONArray? = null
+    // Cache statusObject: jarang berubah (port, readOnly, versi).
+    @Volatile private var cachedStatusJson: JSONObject? = null
     // Statistik folder dihitung paralel: listing folder dengan banyak subfolder
     // tidak lagi menunggu N listFiles() berurutan (lambat di storage TV box).
     // Pool bisa mati saat stopServer() lalu startServer() pada instance yang
     // sama (toggle server di Settings) — liveStatPool() membuat pool baru
     // otomatis supaya listing subfolder tidak gagal setelah restart server.
     @Volatile private var statPool: ThreadPoolExecutor = newStatPool()
+    // Cache allowedFsRoots: dibangun ulang hanya saat settings berubah,
+    // bukan setiap request (16x per request file manager).
+    @Volatile private var cachedFsRoots: List<File>? = null
 
     private fun newStatPool(): ThreadPoolExecutor =
         Executors.newFixedThreadPool(
@@ -533,8 +541,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun itemsJson(): JSONArray {
+        val items = App.engine.items.value
+        val sig = itemsSignature(items)
+        cachedItemsJson?.let { if (cachedItemsSignature == sig) return it }
         val arr = JSONArray()
-        App.engine.items.value.forEach { item ->
+        items.forEach { item ->
             val o = JSONObject()
             o.put("id", item.id)
             o.put("fileName", item.fileName)
@@ -551,6 +562,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             item.error?.let { o.put("error", it) }
             arr.put(o)
         }
+        cachedItemsSignature = sig
+        cachedItemsJson = arr
         return arr
     }
 
@@ -1289,6 +1302,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         galleryCache = null
     }
 
+    /** Invalidate itemsJson cache saat daftar download berubah. */
+    private fun invalidateItemsCache() {
+        cachedItemsSignature = 0
+        cachedItemsJson = null
+    }
+
+    /** Invalidate fsRoots cache saat settings berubah. */
+    private fun invalidateFsRootsCache() {
+        cachedFsRoots = null
+    }
+
+    /** Invalidate statusObject cache saat port/readOnly berubah. */
+    private fun invalidateStatusCache() {
+        cachedStatusJson = null
+    }
+
     private fun scannedGallery(maxEntries: Int): MediaLibrary.MediaScanResult {
         val now = System.currentTimeMillis()
         val cached = galleryCache
@@ -1389,8 +1418,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Saat melebihi batas, hapus separuh entri untuk menghindari spike
             // re-fetch dari thundering herd (clear-all).
             if (imageDimCache.size > MediaLibrary.GALLERY_MAX_ENTRIES) {
-                val keys = imageDimCache.keys.toList().take(imageDimCache.size / 2)
-                keys.forEach { imageDimCache.remove(it) }
+                // Evict separuh tanpa toList() — hemat alokasi list besar.
+                val toRemove = imageDimCache.size / 2
+                var removed = 0
+                val iter = imageDimCache.keys.iterator()
+                while (iter.hasNext() && removed < toRemove) {
+                    iter.next()
+                    iter.remove()
+                    removed++
+                }
             }
             imageDimCache[e.token] = result
         }
@@ -1833,6 +1869,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // ---------- Keamanan FS: hanya izinkan path di dalam root yang sah ----------
 
     private fun allowedFsRoots(): List<File> {
+        cachedFsRoots?.let { return it }
         val roots = mutableListOf<File>()
         roots.add(File(context.filesDir, "downloads"))
         StoragePrefs.getTextFolder(context)?.let { roots.add(File(it)) }
@@ -1844,6 +1881,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 ?.let { roots.add(it) }
         }
+        cachedFsRoots = roots
         return roots
     }
 
@@ -1885,11 +1923,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }.getOrNull()
 
     private fun statusObject(): JSONObject {
+        cachedStatusJson?.let { return it }
         val obj = JSONObject()
         obj.put("port", listeningPort)
         obj.put("readOnly", StoragePrefs.isServerReadOnly(context))
         obj.put("appVersion", appVersion)
         obj.put("appBuild", appBuild)
+        cachedStatusJson = obj
         return obj
     }
 
