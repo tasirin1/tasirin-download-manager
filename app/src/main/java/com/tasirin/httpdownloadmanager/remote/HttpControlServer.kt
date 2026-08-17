@@ -586,7 +586,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun handleUpload(session: IHTTPSession): Response {
         if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
         val name = session.parms["name"]?.trim()
-            ?.replace("/", "_")?.replace("\\", "_")?.replace("\\"", "_")?.replace("..", "_")
+            ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")?.replace("..", "_")
             ?.takeIf { it.isNotEmpty() }
             ?: "upload_${System.currentTimeMillis()}"
         val storage = session.parms["storage"]?.trim().orEmpty()
