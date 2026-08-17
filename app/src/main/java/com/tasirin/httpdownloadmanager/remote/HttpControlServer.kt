@@ -586,7 +586,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun handleUpload(session: IHTTPSession): Response {
         if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
         val name = session.parms["name"]?.trim()
-            ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")
+            ?.replace("/", "_")?.replace("\\", "_")?.replace("\\"", "_")?.replace("..", "_")
             ?.takeIf { it.isNotEmpty() }
             ?: "upload_${System.currentTimeMillis()}"
         val storage = session.parms["storage"]?.trim().orEmpty()
@@ -656,6 +656,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun uploadUniqueName(name: String, folderPath: String): String {
         val clean = folderPath.trim().removePrefix("f:")
         if (clean.isBlank() || clean.startsWith("m:")) return name
+        // Tolak path dengan traversal (defense in depth)
+        if (clean.contains("..")) return name
         val dir = File(clean)
         if (!dir.isDirectory) return name
         return FileNames.unique(name) { File(dir, it).exists() }
@@ -1383,7 +1385,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (opts.outWidth > 0 && opts.outHeight > 0) opts.outWidth to opts.outHeight else null
         }.getOrNull()
         if (result != null && !e.isPartial) {
-            if (imageDimCache.size > 5000) imageDimCache.clear()
+            // Batasi jumlah entry di cache (L-light: Pair<Int,Int> ~16 byte/entry).
+            // Saat melebihi batas, hapus separuh entri untuk menghindari spike
+            // re-fetch dari thundering herd (clear-all).
+            if (imageDimCache.size > MediaLibrary.GALLERY_MAX_ENTRIES) {
+                val keys = imageDimCache.keys.toList().take(imageDimCache.size / 2)
+                keys.forEach { imageDimCache.remove(it) }
+            }
             imageDimCache[e.token] = result
         }
         return result
@@ -1650,7 +1658,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 gone
             }.getOrDefault(false)
             "rename" -> {
-                if (name.isBlank() || name.contains('/') || name.contains('\\')) return false
+                if (name.isBlank() || name.contains('/') || name.contains('\\') || name == ".." || name.contains("../") || name.contains("..\\")) return false
                 runCatching {
                     val target = File(file.parentFile, name)
                     val ok = file.renameTo(target)
@@ -1693,7 +1701,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }.getOrDefault(false)
             }
             "mkdir" -> {
-                if (name.isBlank() || name.contains('/') || name.contains('\\')) return false
+                if (name.isBlank() || name.contains('/') || name.contains('\\') || name == ".." || name.contains("../") || name.contains("..\\")) return false
                 runCatching { File(file, name).mkdirs() }.getOrDefault(false)
             }
             else -> false
@@ -1767,10 +1775,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             resolver.delete(uri, null, null)
             return false
         }
+        // Invalidasi cache setelah copy ke MediaStore berhasil, supaya
+        // listing media langsung mendeteksi file baru walau delete asli gagal.
+        fsMediaCache.clear()
+        invalidateGalleryCache()
         val gone = runCatching { file.delete() }.getOrDefault(false)
-        if (gone) {
-            fsMediaCache.clear()
-            invalidateGalleryCache()
+        if (!gone) {
+            // Copy sukses tapi file asli gagal dihapus: data duplikasi
+            // tidak bisa dihindari (file sudah ada di MediaStore), tapi
+            // setidaknya cache sudah di-refresh dan file asli masih ada.
+            MediaLibrary.notifyMediaChanged(context, file.absolutePath)
         }
         return gone
     }
@@ -1790,11 +1804,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrDefault(false)
         if (!written) return false
         val gone = resolver.delete(uri, null, null) > 0
-        if (gone) {
-            fsMediaCache.clear()
-            invalidateGalleryCache()
+        if (!gone) {
+            // Rollback: hapus file yang sudah dicopy supaya tidak ada duplikasi data
+            runCatching { target.delete() }
+            return false
         }
-        return gone
+        fsMediaCache.clear()
+        invalidateGalleryCache()
+        return true
     }
 
     private fun mediaStoreName(uri: Uri): String? = runCatching {

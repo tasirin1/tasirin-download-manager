@@ -72,8 +72,8 @@ class DownloadEngine(appContext: Context) {
 
     private val repository = DownloadRepository(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val jobs = mutableMapOf<String, Job>()
-    private val retryAttempts = mutableMapOf<String, Int>()
+    private val jobs = ConcurrentHashMap<String, Job>()
+    private val retryAttempts = ConcurrentHashMap<String, Int>()
     private val activeConns = ConcurrentHashMap<String, HttpURLConnection>()
     private val speedTracker = SpeedTracker()
     private var saveJob: Job? = null

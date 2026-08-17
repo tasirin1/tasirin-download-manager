@@ -5,6 +5,31 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-17] — Keamanan path traversal + thread safety (PR #118)
+
+### Diperbaiki
+- **Path traversal di rename/mkdir File Manager** — parameter `name` pada
+  action `rename` dan `mkdir` tidak memeriksa `..`, memungkinkan aksi file
+  di luar direktori yang diizinkan. Penambahan sanitasi `..` di kedua action.
+- **Path traversal di upload name** — parameter `name` upload tidak sanitasi
+  `..`; meskipun mitigasi ada di `sanitizeFileName()` engine, penambahan
+  replace `..` → `_` di HTTP server sebagai defense-in-depth.
+- **Thread safety `jobs` & `retryAttempts` di DownloadEngine** — kedua map
+  menggunakan `mutableMapOf()` biasa (bukan thread-safe) tapi diakses dari
+  `Dispatchers.IO` dan `invokeOnCompletion` callback di thread berbeda.
+  Diganti ke `ConcurrentHashMap` untuk mencegah `ConcurrentModificationException`.
+- **Duplikasi data di `moveMediaToFile`** — jika copy ke filesystem berhasil
+  tapi `resolver.delete(uri)` gagal, file ada di dua tempat tanpa rollback.
+  Penambahan rollback: hapus file target bila delete gagal.
+- **Cache stale di `moveFileToMediaStore`** — invalidasi cache hanya terjadi
+  bila `file.delete()` berhasil; jika gagal, listing media tetap stale.
+  Cache kini di-clear setelah copy ke MediaStore berhasil.
+- **Upload name traversal defense-in-depth** — `uploadUniqueName` menolak
+  `folderPath` yang mengandung `..` sebagai lapis keamanan tambahan.
+- **Thundering herd di `imageDimCache`** — cache dimensi gambar di-clear
+  seluruhnya saat > 5000 entry, menyebabkan spike re-fetch. Diganti
+  partial eviction (hapus separuh entry) untuk menjaga performa.
+
 ## [v1.0 — 2026-08-17] — Pemutar video sticky + saran video scrollable (PR #116)
 
 ### Diubah
