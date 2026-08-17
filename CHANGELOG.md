@@ -5,6 +5,14 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-17] — Hapus dialog crash + pindah crash log ke folder eksternal
+
+### Diubah
+- **Dialog crash saat startup dihapus** — tidak lagi menampilkan dialog
+  error sebelumnya saat app baru dibuka.
+- **Crash log dipindah ke folder data eksternal** (`/Android/data/<pkg>/crash.log`)
+  — terlihat dari file manager tanpa root, otomatis dihapus saat uninstall.
+
 ## [v1.0 — 2026-08-17] — Fix critical: StoragePrefs recursive crash (PR #118)
 
 ### Diperbaiki
