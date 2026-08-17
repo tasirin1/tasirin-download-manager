@@ -691,12 +691,12 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun isSlowError(message: String?): Boolean {
-        val m = message.orEmpty().lowercase()
+        val m = message?.lowercase() ?: return false
         return m.contains("speed too low") || m.contains("connection stalled")
     }
 
     private fun isConnectError(message: String?): Boolean {
-        val m = message.orEmpty().lowercase()
+        val m = message?.lowercase() ?: return false
         return m.contains("failed to connect") ||
             m.contains("unable to resolve host") ||
             m.contains("unknownhost") ||

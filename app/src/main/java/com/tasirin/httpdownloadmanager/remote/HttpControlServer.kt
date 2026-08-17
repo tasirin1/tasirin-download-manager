@@ -200,8 +200,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     session.uri == "/api/pin_enabled"
                 )
         if (isPolling) return
-        val query = session.queryParameterString?.take(160)?.let { "?$it" }.orEmpty()
         val remote = session.remoteIpAddress.orEmpty()
+        val query = session.queryParameterString?.take(160)?.let { "?$it" }.orEmpty()
         appendLog(
             "${session.method.name} ${session.uri}$query -> HTTP ${response.status.requestStatus} " +
                 "(${elapsedMs}ms) $remote"
@@ -277,21 +277,32 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  bandingkan dengan timing konstan (anti bocor lewat timing attack). */
     private fun storedPinHash(): String? = StoragePrefs.storedPinHash(context)
 
+    /** Cache expected PIN bytes: hash tidak berubah selama sesi server,
+     *  jadi toByteArray() + SHA-256 decode hanya dilakukan sekali. */
+    @Volatile private var cachedExpectedPin: ByteArray? = null
+    @Volatile private var cachedExpectedPinHash: String? = null
+
     private fun pinOk(session: IHTTPSession): Boolean {
         val expected = storedPinHash() ?: return true
+        // Cache expected bytes: hindari toByteArray() di setiap request.
+        val expectedBytes = if (cachedExpectedPinHash == expected && cachedExpectedPin != null) {
+            cachedExpectedPin!!
+        } else {
+            expected.toByteArray(Charsets.UTF_8).also {
+                cachedExpectedPin = it
+                cachedExpectedPinHash = expected
+            }
+        }
         val cookie = session.headers["cookie"] ?: return false
-        val pin = cookie.split(";").map { it.trim() }
-            .firstOrNull { it.startsWith("dm_pin=") }
-            ?.substringAfter("dm_pin=") ?: return false
-        return constantEquals(pin, expected)
+        val pin = run {
+            var start = cookie.indexOf("dm_pin=")
+            if (start < 0) return@run null
+            start += 7 // "dm_pin=".length
+            val end = cookie.indexOf(';', start)
+            if (end > start) cookie.substring(start, end).trim() else cookie.substring(start).trim()
+        } ?: return false
+        return MessageDigest.isEqual(pin.toByteArray(Charsets.UTF_8), expectedBytes)
     }
-
-    /** Bandingkan dua string tanpa short-circuit (constant-time). */
-    private fun constantEquals(a: String, b: String): Boolean =
-        MessageDigest.isEqual(
-            a.toByteArray(Charsets.UTF_8),
-            b.toByteArray(Charsets.UTF_8)
-        )
 
     private fun login(session: IHTTPSession): Response {
         val now = System.currentTimeMillis()
@@ -1599,7 +1610,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 // Cache hanya daftar berukuran wajar; folder raksasa tidak ditahan di RAM.
                 if (files.size <= FS_MEDIA_CACHE_MAX_FILES) {
                     fsMediaCache[base] = now to (dirNames to files)
-                    if (fsMediaCache.size > FS_MEDIA_CACHE_MAX_ENTRIES) fsMediaCache.clear()
+                    if (fsMediaCache.size > FS_MEDIA_CACHE_MAX_ENTRIES) {
+                    val toRemove = fsMediaCache.size / 2
+                    var removed = 0
+                    val iter = fsMediaCache.keys.iterator()
+                    while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
+                }
                 }
             }
             val totalCount = dirNames.size + files.size
@@ -1660,7 +1676,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         val result = itemCount to totalSize
         fsStatsCache[path] = now to result
-        if (fsStatsCache.size > 300) fsStatsCache.clear()
+        if (fsStatsCache.size > 300) {
+                val toRemove = fsStatsCache.size / 2
+                var removed = 0
+                val iter = fsStatsCache.keys.iterator()
+                while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
+            }
         return result
     }
 

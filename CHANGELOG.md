@@ -5,6 +5,24 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-17] — Efisiensi round 2: cache eviction + PIN optimization (PR #118)
+
+### Diperbaiki
+- **`fsStatsCache` partial eviction** — hapus separuh entry via iterator
+  saat > 300 (menggantikan `clear()` yang menyebabkan thundering herd).
+- **`fsMediaCache` partial eviction** — hapus separuh entry via iterator
+  saat melebihi `FS_MEDIA_CACHE_MAX_ENTRIES`.
+- **`credCache` partial eviction** — hapus separuh entry via iterator
+  saat > 128 (menggantikan `clear()` yang memaksa re-encrypt semua kredensial).
+- **Cache expected PIN bytes** — `pinOk()` tidak lagi memanggil
+  `toByteArray()` di setiap request; hash di-cache satu kali per sesi.
+- **`isSlowError` / `isConnectError`** — `.orEmpty().lowercase()` diganti
+  `?.lowercase() ?: return false` (hilangkan alokasi String intermediate).
+- **`pinOk` indexOf** — `split(";").map { trim() }` diganti `indexOf`
+  langsung (hilangkan alokasi list per request).
+- **`appendRequestLog`** — `queryParameterString` dievaluasi setelah
+  `isPolling` check (bukan sebelumnya).
+
 ## [v1.0 — 2026-08-17] — Efisiensi kode: cache + buffering + alokasi memori (PR #119)
 
 ### Diperbaiki
