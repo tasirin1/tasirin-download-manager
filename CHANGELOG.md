@@ -5,6 +5,14 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-17] — Pemutar video sticky + saran video scrollable (PR #116)
+
+### Diubah
+- **Pemutar video terkunci di atas** (`position: sticky`) saat pengguna
+  menggulir daftar saran video di bawahnya — pengalaman seperti YouTube
+  mobile. Shadow halus di bawah player memisahkan area pemutar dari konten
+  yang bergulir.
+
 ## [v1.0 — 2026-08-16] — Resume unduhan tidak buang progres + keamanan thread server (PR #115)
 
 ### Diperbaiki
