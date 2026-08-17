@@ -64,21 +64,23 @@ object Checksums {
         if (clean.isEmpty() || clean.length % 4 == 1) return null
         var s = clean
         while (s.length % 4 != 0) s += "="
-        val out = ArrayList<Byte>(s.length * 3 / 4)
+        // Ukuran pasti: setiap 4 char base64 = 3 byte output (tanpa padding).
+        val buf = ByteArray(s.length * 3 / 4)
+        var pos = 0
         var i = 0
         while (i < s.length) {
             val c1 = if (s[i] == '=') return null else dec(s[i]) ?: return null
             val c2 = if (s[i + 1] == '=') return null else dec(s[i + 1]) ?: return null
             val c3 = if (s[i + 2] == '=') 0 else dec(s[i + 2]) ?: return null
             val c4 = if (s[i + 3] == '=') 0 else dec(s[i + 3]) ?: return null
-            out.add(((c1 shl 2) or (c2 shr 4)).toByte())
+            buf[pos++] = ((c1 shl 2) or (c2 shr 4)).toByte()
             if (s[i + 2] != '=') {
-                out.add(((c2 shl 4) or (c3 shr 2)).toByte())
-                if (s[i + 3] != '=') out.add(((c3 shl 6) or c4).toByte())
+                buf[pos++] = ((c2 shl 4) or (c3 shr 2)).toByte()
+                if (s[i + 3] != '=') buf[pos++] = ((c3 shl 6) or c4).toByte()
             }
             i += 4
         }
-        return out.toByteArray()
+        return if (pos == buf.size) buf else buf.copyOf(pos)
     }
 
     private fun algoPrefix(algo: String): String = when (algo) {

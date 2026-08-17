@@ -28,13 +28,22 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
             sb.append(String(buf, 0, read, Charsets.UTF_8))
             remaining -= read
         }
-        sb.toString().split("&").forEach { pair ->
-            val idx = pair.indexOf('=')
-            if (idx > 0) {
-                val key = URLDecoder.decode(pair.substring(0, idx), "UTF-8")
-                val value = URLDecoder.decode(pair.substring(idx + 1), "UTF-8")
-                map[key] = value
+        // Loop tanpa split("&") — hindari alokasi List<String> per request POST.
+        val body = sb.toString()
+        var start = 0
+        while (start <= body.length) {
+            val amp = body.indexOf('&', start)
+            val end = if (amp >= 0) amp else body.length
+            if (end > start) {
+                val eq = body.indexOf('=', start)
+                if (eq > start && eq < end) {
+                    val key = URLDecoder.decode(body.substring(start, eq), "UTF-8")
+                    val value = URLDecoder.decode(body.substring(eq + 1, end), "UTF-8")
+                    map[key] = value
+                }
             }
+            if (amp < 0) break
+            start = amp + 1
         }
     }
     return map

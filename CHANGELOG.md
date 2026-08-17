@@ -5,6 +5,24 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-17] — Efisiensi round 3: alokasi memori + I/O (PR #118)
+
+### Diperbaiki
+- **`Checksums.base64Decode`** — `ArrayList<Byte>` + `toByteArray()` diganti
+  `ByteArray` langsung (hilangkan alokasi ganda: List backing array + salinan).
+- **`MediaLibrary.scanCached`** — `list.count { !it.isVideo }` + `list.count { it.isVideo }`
+  (scan 2×) diganti single-pass `forEach` counter.
+- **DownloadEngine batch ops** — `pauseAll`/`resumeAll`/`retryFailed`/`clearCompleted`
+  tidak lagi membuat list `ids` intermediate; filter + forEach langsung.
+- **`DownloadEngine.applyAuthHeaders`** — `headers.split('\n').forEach` diganti
+  `indexOf('\n')` loop (hilangkan alokasi `List<String>` per request).
+- **`FileSaver.mergeSegments`** — `outputStream()` dibungkus `BufferedOutputStream`
+  (hemat syscall kecil ke disk saat merge banyak segmen).
+- **`HttpBody.readForm`** — `split("&").forEach` diganti `indexOf('&')` loop
+  (hilangkan alokasi `List<String>` per POST request).
+- **`LogActivity.highlightLog`** — `substring().uppercase()` per baris diganti
+  `contains(ignoreCase = true)` (hilangkan alokasi String uppercase per baris log).
+
 ## [v1.0 — 2026-08-17] — Efisiensi round 2: cache eviction + PIN optimization (PR #118)
 
 ### Diperbaiki

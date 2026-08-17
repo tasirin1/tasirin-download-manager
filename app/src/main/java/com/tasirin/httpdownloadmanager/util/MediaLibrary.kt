@@ -338,9 +338,11 @@ object MediaLibrary {
         }
 
         if (galleryImageFolder != null || galleryVideoFolder != null) {
+            var photoCount = 0
+            var videoCount = 0
+            list.forEach { if (it.isVideo) videoCount++ else photoCount++ }
             App.logEvent(
-                "GALLERY SCAN: ${list.count { !it.isVideo }} photos, " +
-                    "${list.count { it.isVideo }} videos " +
+                "GALLERY SCAN: $photoCount photos, $videoCount videos " +
                     "(photos: ${galleryImageFolder ?: "all"}, videos: ${galleryVideoFolder ?: "all"})"
             )
         }

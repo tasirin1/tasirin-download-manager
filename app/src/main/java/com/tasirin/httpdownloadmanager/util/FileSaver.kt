@@ -43,7 +43,7 @@ class FileSaver(context: Context) {
 
     fun mergeSegments(fileName: String, segmentCount: Int): File {
         val target = partialFile(fileName)
-        target.outputStream().use { out ->
+        BufferedOutputStream(target.outputStream()).use { out ->
             for (i in 0 until segmentCount) {
                 val part = partialFile(fileName, i)
                 if (!part.exists()) throw IOException("Segment $i not found")

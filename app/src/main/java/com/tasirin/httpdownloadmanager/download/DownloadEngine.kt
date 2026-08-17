@@ -223,8 +223,7 @@ class DownloadEngine(appContext: Context) {
 
     fun clearCompleted() {
         // Hanya membersihkan daftar; file hasil download TIDAK dihapus.
-        val ids = _items.value.filter { it.state == DownloadState.COMPLETED }.map { it.id }.toSet()
-        update(_items.value.filterNot { ids.contains(it.id) })
+        update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
         flushSave()
     }
 
@@ -366,24 +365,21 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun pauseAll() {
-        val ids = _items.value.filter {
+        _items.value.filter {
             it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-        }.map { it.id }
-        ids.forEach { pause(it) }
+        }.forEach { pause(it.id) }
     }
 
     fun resumeAll() {
-        val ids = _items.value.filter {
+        _items.value.filter {
             it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED
-        }.map { it.id }
-        ids.forEach { resume(it) }
+        }.forEach { resume(it.id) }
     }
 
     fun retryFailed() {
-        val ids = _items.value.filter { it.state == DownloadState.FAILED }.map { it.id }
-        ids.forEach { id ->
-            retryAttempts.remove(id)
-            updateItem(id) {
+        _items.value.filter { it.state == DownloadState.FAILED }.forEach { item ->
+            retryAttempts.remove(item.id)
+            updateItem(item.id) {
                 it.copy(state = DownloadState.PENDING, autoResume = true, error = null)
             }
         }
@@ -1295,13 +1291,22 @@ class DownloadEngine(appContext: Context) {
             val encoded = Base64.encodeToString(raw.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             conn.setRequestProperty("Authorization", "Basic $encoded")
         }
-        headers.split('\n').forEach { line ->
-            val idx = line.indexOf(':')
-            if (idx > 0) {
-                val key = line.substring(0, idx).trim()
-                val value = line.substring(idx + 1).trim()
-                if (key.isNotEmpty()) conn.setRequestProperty(key, value)
+        // Loop tanpa split() — hindari alokasi List<String> per request.
+        var start = 0
+        while (start <= headers.length) {
+            val nl = headers.indexOf('\n', start)
+            val end = if (nl >= 0) nl else headers.length
+            if (end > start) {
+                val line = headers.substring(start, end)
+                val idx = line.indexOf(':')
+                if (idx > 0) {
+                    val key = line.substring(0, idx).trim()
+                    val value = line.substring(idx + 1).trim()
+                    if (key.isNotEmpty()) conn.setRequestProperty(key, value)
+                }
             }
+            if (nl < 0) break
+            start = nl + 1
         }
     }
 
