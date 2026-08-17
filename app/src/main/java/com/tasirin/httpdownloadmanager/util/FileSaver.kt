@@ -13,6 +13,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import java.io.File
 import java.io.IOException
+import java.io.BufferedOutputStream
 import java.io.OutputStream
 
 class FileSaver(context: Context) {
@@ -42,7 +43,7 @@ class FileSaver(context: Context) {
 
     fun mergeSegments(fileName: String, segmentCount: Int): File {
         val target = partialFile(fileName)
-        target.outputStream().use { out ->
+        BufferedOutputStream(target.outputStream()).use { out ->
             for (i in 0 until segmentCount) {
                 val part = partialFile(fileName, i)
                 if (!part.exists()) throw IOException("Segment $i not found")
@@ -111,7 +112,7 @@ class FileSaver(context: Context) {
             }
             val target = uniqueTargetFile(File(dir, fileName))
             try {
-                target.outputStream().use { out -> writer(out) }
+                BufferedOutputStream(target.outputStream()).use { out -> writer(out) }
             } catch (e: Exception) {
                 // Gagal di tengah upload: buang file setengah jadi.
                 runCatching { target.delete() }
@@ -148,7 +149,7 @@ class FileSaver(context: Context) {
     private fun writeInternal(fileName: String, writer: (OutputStream) -> Unit): PublishResult {
         val target = uniqueTargetFile(File(downloadDir, fileName))
         try {
-            target.outputStream().use { out -> writer(out) }
+            BufferedOutputStream(target.outputStream()).use { out -> writer(out) }
         } catch (e: Exception) {
             runCatching { target.delete() }
             throw e

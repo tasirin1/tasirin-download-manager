@@ -213,8 +213,12 @@ class LogActivity : AppCompatActivity() {
         while (lineStart < sb.length) {
             val lineEnd = text.indexOf('\n', lineStart)
             val end = if (lineEnd < 0) sb.length else lineEnd
-            val upper = text.substring(lineStart, end).uppercase()
-            if (upper.contains("ERROR") || upper.contains("FAILED")) {
+            // contains ignoreCase: menggantikan substring().uppercase() —
+            // tanpa alokasi String baru per baris (regionMatches internal).
+            val lineStr = text.substring(lineStart, end)
+            if (lineStr.contains("ERROR", ignoreCase = true) ||
+                lineStr.contains("FAILED", ignoreCase = true)
+            ) {
                 sb.setSpan(
                     ForegroundColorSpan(Color.RED),
                     lineStart, end, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE

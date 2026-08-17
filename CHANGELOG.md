@@ -5,6 +5,89 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-17] — Efisiensi round 3: alokasi memori + I/O (PR #118)
+
+### Diperbaiki
+- **`Checksums.base64Decode`** — `ArrayList<Byte>` + `toByteArray()` diganti
+  `ByteArray` langsung (hilangkan alokasi ganda: List backing array + salinan).
+- **`MediaLibrary.scanCached`** — `list.count { !it.isVideo }` + `list.count { it.isVideo }`
+  (scan 2×) diganti single-pass `forEach` counter.
+- **DownloadEngine batch ops** — `pauseAll`/`resumeAll`/`retryFailed`/`clearCompleted`
+  tidak lagi membuat list `ids` intermediate; filter + forEach langsung.
+- **`DownloadEngine.applyAuthHeaders`** — `headers.split('\n').forEach` diganti
+  `indexOf('\n')` loop (hilangkan alokasi `List<String>` per request).
+- **`FileSaver.mergeSegments`** — `outputStream()` dibungkus `BufferedOutputStream`
+  (hemat syscall kecil ke disk saat merge banyak segmen).
+- **`HttpBody.readForm`** — `split("&").forEach` diganti `indexOf('&')` loop
+  (hilangkan alokasi `List<String>` per POST request).
+- **`LogActivity.highlightLog`** — `substring().uppercase()` per baris diganti
+  `contains(ignoreCase = true)` (hilangkan alokasi String uppercase per baris log).
+
+## [v1.0 — 2026-08-17] — Efisiensi round 2: cache eviction + PIN optimization (PR #118)
+
+### Diperbaiki
+- **`fsStatsCache` partial eviction** — hapus separuh entry via iterator
+  saat > 300 (menggantikan `clear()` yang menyebabkan thundering herd).
+- **`fsMediaCache` partial eviction** — hapus separuh entry via iterator
+  saat melebihi `FS_MEDIA_CACHE_MAX_ENTRIES`.
+- **`credCache` partial eviction** — hapus separuh entry via iterator
+  saat > 128 (menggantikan `clear()` yang memaksa re-encrypt semua kredensial).
+- **Cache expected PIN bytes** — `pinOk()` tidak lagi memanggil
+  `toByteArray()` di setiap request; hash di-cache satu kali per sesi.
+- **`isSlowError` / `isConnectError`** — `.orEmpty().lowercase()` diganti
+  `?.lowercase() ?: return false` (hilangkan alokasi String intermediate).
+- **`pinOk` indexOf** — `split(";").map { trim() }` diganti `indexOf`
+  langsung (hilangkan alokasi list per request).
+- **`appendRequestLog`** — `queryParameterString` dievaluasi setelah
+  `isPolling` check (bukan sebelumnya).
+
+## [v1.0 — 2026-08-17] — Efisiensi kode: cache + buffering + alokasi memori (PR #119)
+
+### Diperbaiki
+- **SharedPreferences cache di StoragePrefs** — 58x `getSharedPreferences()`
+  diganti cached instance, mengurangi overhead IPC di tiap akses prefs.
+- **CrashLog append mode** — `readText()` + `writeText()` penuh diganti
+  `BufferedWriter` append mode + trim periodis (hemat I/O saat banyak crash).
+- **Cache `itemsJson()` berdasarkan signature** — JSON array download tidak
+  dibangun ulang 2×/detik bila tidak ada perubahan (hemat GC).
+- **`imageDimCache` eviction tanpa `toList()`** — hapus separuh entry via
+  iterator langsung, tanpa alokasi list besar (~3000 key).
+- **Cache `allowedFsRoots()`** — roots dibangun ulang hanya saat settings
+  berubah, bukan 16× per request file manager.
+- **`readForm()` body allocation** — baca per-byte ke `StringBuilder` (8KB
+  buffer) tanpa alokasi `ByteArray(length)` penuh untuk form kecil.
+- **Cache `SimpleDateFormat`** — di CrashLog (`stampFormat`) dan
+  DownloadEngine (`DEFAULT_NAME_FORMAT`) — alokasi berulang dihapus.
+- **Cache `statusObject()`** — JSONObject status (port, readOnly, versi)
+  tidak dibangun ulang tiap request polling.
+- **`BufferedOutputStream` di FileSaver** — upload chunk besar dibungkus
+  buffer (hemat syscall kecil ke disk).
+
+## [v1.0 — 2026-08-17] — Keamanan path traversal + thread safety (PR #118)
+
+### Diperbaiki
+- **Path traversal di rename/mkdir File Manager** — parameter `name` pada
+  action `rename` dan `mkdir` tidak memeriksa `..`, memungkinkan aksi file
+  di luar direktori yang diizinkan. Penambahan sanitasi `..` di kedua action.
+- **Path traversal di upload name** — parameter `name` upload tidak sanitasi
+  `..`; meskipun mitigasi ada di `sanitizeFileName()` engine, penambahan
+  replace `..` → `_` di HTTP server sebagai defense-in-depth.
+- **Thread safety `jobs` & `retryAttempts` di DownloadEngine** — kedua map
+  menggunakan `mutableMapOf()` biasa (bukan thread-safe) tapi diakses dari
+  `Dispatchers.IO` dan `invokeOnCompletion` callback di thread berbeda.
+  Diganti ke `ConcurrentHashMap` untuk mencegah `ConcurrentModificationException`.
+- **Duplikasi data di `moveMediaToFile`** — jika copy ke filesystem berhasil
+  tapi `resolver.delete(uri)` gagal, file ada di dua tempat tanpa rollback.
+  Penambahan rollback: hapus file target bila delete gagal.
+- **Cache stale di `moveFileToMediaStore`** — invalidasi cache hanya terjadi
+  bila `file.delete()` berhasil; jika gagal, listing media tetap stale.
+  Cache kini di-clear setelah copy ke MediaStore berhasil.
+- **Upload name traversal defense-in-depth** — `uploadUniqueName` menolak
+  `folderPath` yang mengandung `..` sebagai lapis keamanan tambahan.
+- **Thundering herd di `imageDimCache`** — cache dimensi gambar di-clear
+  seluruhnya saat > 5000 entry, menyebabkan spike re-fetch. Diganti
+  partial eviction (hapus separuh entry) untuk menjaga performa.
+
 ## [v1.0 — 2026-08-17] — Pemutar video sticky + saran video scrollable (PR #116)
 
 ### Diubah

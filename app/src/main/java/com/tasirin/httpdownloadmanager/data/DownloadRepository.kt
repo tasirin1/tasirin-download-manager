@@ -53,7 +53,13 @@ class DownloadRepository(context: Context) {
         val pair = Crypto.encrypt(item.username) to Crypto.encrypt(item.password)
         // Cache dibatasi: sesi panjang dengan banyak kredensial unik tidak
         // boleh menumpuk (entries lama yang tidak terpakai dibuang).
-        if (credCache.size > MAX_CRED_CACHE) credCache.clear()
+        // Partial eviction: hapus separuh untuk menghindari spike re-encrypt.
+        if (credCache.size > MAX_CRED_CACHE) {
+            val half = credCache.size / 2
+            var removed = 0
+            val iter = credCache.keys.iterator()
+            while (iter.hasNext() && removed < half) { iter.next(); iter.remove(); removed++ }
+        }
         credCache[plain] = pair
         return pair
     }

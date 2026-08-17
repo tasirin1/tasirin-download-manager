@@ -72,8 +72,8 @@ class DownloadEngine(appContext: Context) {
 
     private val repository = DownloadRepository(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val jobs = mutableMapOf<String, Job>()
-    private val retryAttempts = mutableMapOf<String, Int>()
+    private val jobs = ConcurrentHashMap<String, Job>()
+    private val retryAttempts = ConcurrentHashMap<String, Int>()
     private val activeConns = ConcurrentHashMap<String, HttpURLConnection>()
     private val speedTracker = SpeedTracker()
     private var saveJob: Job? = null
@@ -223,8 +223,7 @@ class DownloadEngine(appContext: Context) {
 
     fun clearCompleted() {
         // Hanya membersihkan daftar; file hasil download TIDAK dihapus.
-        val ids = _items.value.filter { it.state == DownloadState.COMPLETED }.map { it.id }.toSet()
-        update(_items.value.filterNot { ids.contains(it.id) })
+        update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
         flushSave()
     }
 
@@ -366,24 +365,21 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun pauseAll() {
-        val ids = _items.value.filter {
+        _items.value.filter {
             it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-        }.map { it.id }
-        ids.forEach { pause(it) }
+        }.forEach { pause(it.id) }
     }
 
     fun resumeAll() {
-        val ids = _items.value.filter {
+        _items.value.filter {
             it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED
-        }.map { it.id }
-        ids.forEach { resume(it) }
+        }.forEach { resume(it.id) }
     }
 
     fun retryFailed() {
-        val ids = _items.value.filter { it.state == DownloadState.FAILED }.map { it.id }
-        ids.forEach { id ->
-            retryAttempts.remove(id)
-            updateItem(id) {
+        _items.value.filter { it.state == DownloadState.FAILED }.forEach { item ->
+            retryAttempts.remove(item.id)
+            updateItem(item.id) {
                 it.copy(state = DownloadState.PENDING, autoResume = true, error = null)
             }
         }
@@ -691,12 +687,12 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun isSlowError(message: String?): Boolean {
-        val m = message.orEmpty().lowercase()
+        val m = message?.lowercase() ?: return false
         return m.contains("speed too low") || m.contains("connection stalled")
     }
 
     private fun isConnectError(message: String?): Boolean {
-        val m = message.orEmpty().lowercase()
+        val m = message?.lowercase() ?: return false
         return m.contains("failed to connect") ||
             m.contains("unable to resolve host") ||
             m.contains("unknownhost") ||
@@ -1295,13 +1291,22 @@ class DownloadEngine(appContext: Context) {
             val encoded = Base64.encodeToString(raw.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             conn.setRequestProperty("Authorization", "Basic $encoded")
         }
-        headers.split('\n').forEach { line ->
-            val idx = line.indexOf(':')
-            if (idx > 0) {
-                val key = line.substring(0, idx).trim()
-                val value = line.substring(idx + 1).trim()
-                if (key.isNotEmpty()) conn.setRequestProperty(key, value)
+        // Loop tanpa split() — hindari alokasi List<String> per request.
+        var start = 0
+        while (start <= headers.length) {
+            val nl = headers.indexOf('\n', start)
+            val end = if (nl >= 0) nl else headers.length
+            if (end > start) {
+                val line = headers.substring(start, end)
+                val idx = line.indexOf(':')
+                if (idx > 0) {
+                    val key = line.substring(0, idx).trim()
+                    val value = line.substring(idx + 1).trim()
+                    if (key.isNotEmpty()) conn.setRequestProperty(key, value)
+                }
             }
+            if (nl < 0) break
+            start = nl + 1
         }
     }
 
@@ -1517,11 +1522,12 @@ class DownloadEngine(appContext: Context) {
         val path = noQuery.toUri().lastPathSegment.orEmpty()
         val candidate = path.trim()
         if (candidate.isNotEmpty() && !candidate.contains('=')) return candidate
-        return "download_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}"
+        return "download_${DEFAULT_NAME_FORMAT.format(Date())}"
     }
 
     companion object {
         private val CONTENT_DISPOSITION_STAR = Regex("filename\\*=([^;]+)")
+        private val DEFAULT_NAME_FORMAT = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
         private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")
         private const val BUFFER_SIZE = 64 * 1024
         private const val HLS_PROBE_MAX_BYTES = 1_000_000

@@ -11,6 +11,13 @@ object StoragePrefs {
     const val DEFAULT_PORT = 8080
 
     private const val PREFS = "storage_settings"
+    private var cachedPrefs: android.content.SharedPreferences? = null
+
+    /** Cache SharedPreferences instance untuk menghindari 58x getSharedPreferences call. */
+    private fun prefs(context: Context): android.content.SharedPreferences {
+        return cachedPrefs ?: prefs(context)
+            .also { cachedPrefs = it }
+    }
     private const val HEX_CHARS = "0123456789abcdef"
     private const val KEY_FOLDER_URI = "folder_uri"
     private const val KEY_FOLDER_NAME = "folder_name"
@@ -44,69 +51,69 @@ object StoragePrefs {
 
     /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
     fun isSectionCollapsed(context: Context, key: String): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
             ?.contains(key) == true
 
     fun setSectionCollapsed(context: Context, key: String, collapsed: Boolean) {
-        val set = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val set = prefs(context)
             .getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())!!.toMutableSet()
         if (collapsed) set.add(key) else set.remove(key)
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .edit {
                 putStringSet(KEY_COLLAPSED_SECTIONS, set)
             }
     }
 
     fun getFolderUri(context: Context): Uri? {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val raw = prefs(context)
             .getString(KEY_FOLDER_URI, null)
         return raw?.takeIf { it.isNotEmpty() }?.let { it.toUri() }
     }
 
     fun saveFolder(context: Context, uri: Uri?, name: String?) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putString(KEY_FOLDER_URI, uri?.toString())
             putString(KEY_FOLDER_NAME, name)
         }
     }
 
     fun isBackgroundEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_BACKGROUND, true)
 
     fun setBackgroundEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_BACKGROUND, enabled)
         }
     }
 
     fun isAutoStartEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_AUTOSTART, true)
 
     fun setAutoStartEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_AUTOSTART, enabled)
         }
     }
 
     fun isServerBackgroundEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_SERVER_BACKGROUND, false)
 
     fun setServerBackgroundEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_SERVER_BACKGROUND, enabled)
         }
     }
 
     fun getTextFolder(context: Context): String? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getString(KEY_TEXT_FOLDER, null)?.takeIf { it.isNotBlank() }
 
     fun getExtraFolders(context: Context): List<String> =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getString(KEY_EXTRA_FOLDERS, null)
             ?.split("\n")
             ?.map { it.trim() }
@@ -114,7 +121,7 @@ object StoragePrefs {
             .orEmpty()
 
     fun setExtraFolders(context: Context, folders: List<String>) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putString(
                 KEY_EXTRA_FOLDERS,
                 folders.map { it.trim() }.filter { it.isNotEmpty() }.distinct().joinToString("\n")
@@ -123,29 +130,29 @@ object StoragePrefs {
     }
 
     fun setTextFolder(context: Context, path: String?) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putString(KEY_TEXT_FOLDER, path?.takeIf { it.isNotBlank() })
         }
     }
 
     fun isBatteryExemptEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_BATTERY_EXEMPT, true)
 
     fun setBatteryExemptEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_BATTERY_EXEMPT, enabled)
         }
     }
 
     fun getServerPin(context: Context): String? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getString(KEY_SERVER_PIN, null)?.takeIf { it.isNotBlank() }
 
     /** Simpan PIN sebagai hash SHA-256; nilai kosong menghapus PIN. */
     fun setServerPin(context: Context, pin: String?) {
         val hash = pin?.trim()?.takeIf { it.isNotEmpty() }?.let { sha256Hex(it) }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putString(KEY_SERVER_PIN, hash)
         }
     }
@@ -166,38 +173,38 @@ object StoragePrefs {
     }
 
     fun isPinEnforced(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_PIN_ENFORCED, true)
 
     fun setPinEnforced(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_PIN_ENFORCED, enabled)
         }
     }
 
     fun isFsFullAccessEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_FS_FULL_ACCESS, false)
 
     fun setFsFullAccessEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_FS_FULL_ACCESS, enabled)
         }
     }
 
     /** Server remote read-only: upload, ubah file, dan hapus media ditolak. */
     fun isServerReadOnly(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_SERVER_READ_ONLY, false)
 
     fun setServerReadOnly(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_SERVER_READ_ONLY, enabled)
         }
     }
 
     fun isServerAutoStartEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_SERVER_AUTOSTART, true)
 
     /** Server hanya boleh start otomatis bila PIN wajib sudah disetel. */
@@ -205,73 +212,73 @@ object StoragePrefs {
         !isPinEnforced(context) || !getServerPin(context).isNullOrEmpty()
 
     fun setServerAutoStartEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_SERVER_AUTOSTART, enabled)
         }
     }
 
     fun maxConcurrent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getInt(KEY_MAX_CONCURRENT, 2).coerceIn(1, 5)
 
     fun setMaxConcurrent(context: Context, value: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putInt(KEY_MAX_CONCURRENT, value.coerceIn(1, 5))
         }
     }
 
     fun speedLimitKbps(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getInt(KEY_SPEED_LIMIT, 0).coerceIn(0, 100_000)
 
     fun setSpeedLimitKbps(context: Context, value: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putInt(KEY_SPEED_LIMIT, value.coerceIn(0, 100_000))
         }
     }
 
     fun maxRetries(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getInt(KEY_MAX_RETRIES, 2).coerceIn(0, 5)
 
     fun setMaxRetries(context: Context, value: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putInt(KEY_MAX_RETRIES, value.coerceIn(0, 5))
         }
     }
 
     fun isAutoSortEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_AUTO_SORT, false)
 
     fun setAutoSortEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_AUTO_SORT, enabled)
         }
     }
 
     fun isSmallFirstEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_SMALL_FIRST, false)
 
     fun setSmallFirstEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_SMALL_FIRST, enabled)
         }
     }
 
     fun isDeletePartialOnCancel(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getBoolean(KEY_DELETE_PARTIAL_ON_CANCEL, false)
 
     fun setDeletePartialOnCancel(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putBoolean(KEY_DELETE_PARTIAL_ON_CANCEL, enabled)
         }
     }
 
     fun recentUrls(context: Context): List<String> =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getString(KEY_RECENT_URLS, "")
             .orEmpty()
             .split('\n')
@@ -283,94 +290,94 @@ object StoragePrefs {
         if (clean.isEmpty()) return
         val current = recentUrls(context).filter { it != clean }
         val updated = (listOf(clean) + current).take(20)
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putString(KEY_RECENT_URLS, updated.joinToString("\n"))
         }
     }
 
     fun serverPort(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getInt(KEY_SERVER_PORT, DEFAULT_PORT).coerceIn(1024, 65535)
 
     fun setServerPort(context: Context, value: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putInt(KEY_SERVER_PORT, value.coerceIn(1024, 65535))
         }
     }
 
     fun segmentCount(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getInt(KEY_SEGMENTS, 4).coerceIn(1, 8)
 
     fun setSegmentCount(context: Context, value: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putInt(KEY_SEGMENTS, value.coerceIn(1, 8))
         }
     }
 
     fun sortMode(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getInt(KEY_SORT_MODE, 0).coerceIn(0, 6)
 
     fun setSortMode(context: Context, value: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putInt(KEY_SORT_MODE, value.coerceIn(0, 6))
         }
     }
 
     fun getConnectTimeoutSec(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getInt(KEY_CONNECT_TIMEOUT_SEC, 15)
 
     fun setConnectTimeoutSec(context: Context, sec: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putInt(KEY_CONNECT_TIMEOUT_SEC, sec.coerceIn(5, 120))
         }
     }
 
     fun getReadTimeoutSec(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getInt(KEY_READ_TIMEOUT_SEC, 30)
 
     fun setReadTimeoutSec(context: Context, sec: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putInt(KEY_READ_TIMEOUT_SEC, sec.coerceIn(10, 300))
         }
     }
 
     fun getGalleryImageFolder(context: Context): String? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getString(KEY_GALLERY_IMAGE_FOLDER, null)?.takeIf { it.isNotBlank() }
 
     fun setGalleryImageFolder(context: Context, path: String?) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putString(KEY_GALLERY_IMAGE_FOLDER, path?.takeIf { it.isNotBlank() }?.trim())
         }
     }
 
     fun getGalleryVideoFolder(context: Context): String? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getString(KEY_GALLERY_VIDEO_FOLDER, null)?.takeIf { it.isNotBlank() }
 
     fun setGalleryVideoFolder(context: Context, path: String?) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putString(KEY_GALLERY_VIDEO_FOLDER, path?.takeIf { it.isNotBlank() }?.trim())
         }
     }
 
     fun clearRecentUrls(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        prefs(context).edit {
             putString(KEY_RECENT_URLS, "")
         }
     }
 
     /** Terakhir kali thumbnail cache dibersihkan otomatis (0 = belum pernah). */
     fun lastThumbCleanup(context: Context): Long =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .getLong(KEY_THUMB_CLEANUP_LAST, 0L)
 
     fun setThumbCleanupDone(context: Context, timeMs: Long) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs(context)
             .edit { putLong(KEY_THUMB_CLEANUP_LAST, timeMs) }
     }
 
