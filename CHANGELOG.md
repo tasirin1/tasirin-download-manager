@@ -1,3 +1,13 @@
+## [v1.0 — 2026-08-18] — Fix photo viewer: mmImage was inside hidden mmVideoWrap
+
+### Diperbaiki
+- **Penampil foto gelap (akar masalah)** — `<img id="mmImage">` berada
+  di dalam `<div id="mmVideoWrap">`. Saat mode foto aktif, CSS
+  `#mediaModal.mm-img #mmVideoWrap { display: none }` menyembunyikan
+  seluruh kontainer termasuk gambar. Pindahkan `mmImage`,
+  `mmImgSpin`, `mmDesc` ke luar `mmVideoWrap` supaya tetap terlihat
+  saat mode foto.
+
 ## [v1.0 — 2026-08-18] — Fix photo viewer black screen (deeper)
 
 ### Diperbaiki
