@@ -1,3 +1,19 @@
+## [v1.0 — 2026-08-18] — Fix compile error
+
+### Diperbaiki
+- **isStopped unresolved reference** — NanoHTTPD 2.3.1 tidak punya
+  properti isStopped; diganti !isAlive.
+- **CrashLog trim Int/Long mismatch** — setLength() butuh Long;
+  tambah .toLong() pada MAX_BYTES.
+
+## [v1.0 — 2026-08-18] — Fix compile error
+
+### Diperbaiki
+- **isStopped unresolved reference** — NanoHTTPD 2.3.1 tidak punya
+  properti isStopped; diganti !isAlive.
+- **CrashLog trim Int/Long mismatch** — setLength() butuh Long;
+  tambah .toLong() pada MAX_BYTES.
+
 ## [v1.0 — 2026-08-18] — Efisiensi cache, debounce observer, memory fixes
 
 ### Diperbaiki
