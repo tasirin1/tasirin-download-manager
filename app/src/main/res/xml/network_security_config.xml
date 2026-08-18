@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Network security: HTTPS wajib untuk semua outbound (GitHub API, update),
+     tapi download manager perlu HTTP untuk URL unduhan user.
+     Cleartext diizinkan secara umum (download manager memang butuh HTTP),
+     tapi trust anchor TLS kustom tetap ditambah untuk server remote. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/digicert_global_root_g2" />
+            <certificates src="@raw/isrg_root_x1" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

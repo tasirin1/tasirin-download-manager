@@ -1,3 +1,15 @@
+## [v1.0 — 2026-08-18] — Reduce Play Protect flags
+
+### Diubah
+- **Manifest cleanup untuk Play Protect** — ganti `usesCleartextTraffic`
+  dengan `networkSecurityConfig` (lebih spesifik); hapus
+  `requestLegacyExternalStorage` (tidak relevan di targetSdk 36);
+  batasi `WRITE_EXTERNAL_STORAGE` ke `maxSdkVersion=28` (hanya
+  Android 5-9).
+- **network_security_config.xml baru** — trust anchor TLS kustom
+  (DigiCert G2 + ISRG X1) untuk server remote; cleartext tetap
+  diizinkan untuk download HTTP.
+
 ## [v1.0 — 2026-08-18] — Fix compile error
 
 ### Diperbaiki
