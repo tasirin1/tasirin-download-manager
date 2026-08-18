@@ -36,10 +36,18 @@ object CrashLog {
             BufferedWriter(
                 OutputStreamWriter(FileOutputStream(file, true), Charsets.UTF_8)
             ).use { it.write(text) }
-            // Trim bila melebihi batas (crash jarang, trim hanya perlu sesekali).
+            // Trim bila melebihi batas: baca dari akhir file (RandomAccessFile)
+            // supaya tidak perlu load seluruh file ke memori.
             if (file.length() > MAX_BYTES * 1.5) {
-                val tail = file.readText().takeLast(MAX_BYTES)
-                file.writeText(tail)
+                java.io.RandomAccessFile(file, "rw").use { raf ->
+                    val len = raf.length()
+                    val buf = ByteArray(MAX_BYTES)
+                    raf.seek(len - MAX_BYTES)
+                    raf.readFully(buf)
+                    raf.setLength(MAX_BYTES)
+                    raf.seek(0)
+                    raf.write(buf)
+                }
             }
         }
     }

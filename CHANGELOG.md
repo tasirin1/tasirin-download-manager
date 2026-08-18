@@ -1,3 +1,30 @@
+## [v1.0 — 2026-08-18] — Efisiensi cache, debounce observer, memory fixes
+
+### Diperbaiki
+- **Cache fsRoots/status tidak invalidate saat settings berubah** —
+  `invalidateFsRootsCache()` dan `invalidateStatusCache()` dipanggil
+  saat server start, supaya perubahan folder/port/readOnly langsung berlaku.
+- **Gallery cache invalidasi tidak dipanggil setelah move download** —
+  `DownloadEngine.move()` sekarang invalidate fsRoots cache.
+- **RejectedExecutionException di file manager** — `liveStatPool().submit()`
+  dibungkus `runCatching` supaya pool terminated tidak crash server (HTTP 500).
+- **qrCache.clear() menghapus semua entry** — diganti evict entry paling lama
+  saat cache penuh (max 8).
+- **GalleryAdapter CoroutineScope leak** — scope di-cancel di `onDestroy()`
+  supaya tidak bocor saat activity destroyed.
+- **GALLERY SCAN berulang terlalu sering** — ContentObserver di-debounce
+  minimum 3 detik antar invalidasi (sebelumnya: tiap perubahan MediaStore
+  langsung invalidate cache → scan ulang berulang).
+- **videoDurationsCache tidak terbatas** — prune otomatis saat >2000 entries
+  (buang 500 entry paling lama).
+- **completedUploads/failedUploads cap 400 clear semua** — diganti prune
+  entry paling lama bila melebihi 400 (pertahankan 200 terbaru).
+- **CrashLog.trim baca seluruh file ke memori** — diganti RandomAccessFile
+  in-place trim (hemat RAM di device rendah).
+- **fsMediaCache.clear() terlalu agresif** — diganti invalidasi path spesifik
+  (parent dir) untuk delete/rename/move/mkdir (hemat RAM, cache tetap valid
+  untuk path lain).
+
 # Changelog
 
 Semua perubahan penting dicatat di sini. Format mengikuti
@@ -11,6 +38,53 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - **Judul & tanggal video sticky** — wrapper `mmVideoWrap` mempertahankan
   pemutar video + deskripsi (judul/tanggal) di posisi atas saat
   menggulir daftar saran video di bawahnya.
+
+## [v1.0 — 2026-08-18] — Fix rename, cache TTL, concurrency, gallery sync
+
+### Diperbaiki
+- **Rename download tidak update `filePath`** — setelah rename file via UI,
+  `DownloadItem.filePath` tetap path lama → Open/Move gagal. Fix: `FileSaver.rename()`
+  sekarang return path baru + `DownloadEngine.rename()` update `filePath`.
+- **Rename tidak invalidate MediaStore** — file di-rename di disk tapi galeri
+  masih tampil nama lama. Fix: `FileSaver.rename()` panggil `notifyMediaChanged()`.
+- **NanoHTTPD startServer race** — pool internal bisa belum ready setelah stop();
+  retry loop 3x (600ms) supaya server tidak gagal start.
+- **`imageDimCache` tidak punya TTL** — entries gambar yang dihapus tetap di-cache
+  selamanya. Tambah TTL 2 menit + evict expired entries saat cache penuh.
+- **`fsLoadMore()` tidak ada guard klik ganda** — tambah `pointerEvents: none`
+  saat loading untuk cegah parallel requests.
+- **Gallery count setelah delete tidak sync** — single delete decrement count
+  secara lokal tanpa sync server. Fix: reload gallery dari server setelah delete.
+- **`mmImgClamp()` tidak clamp saat zoom out** — gambar bisa geser keluar viewport
+  saat pinch-out ke bawah 1x. Fix: reset translate ke (0,0) sebelum reset zoom.
+
+## [v1.0 — 2026-08-18] — Bug fixes: crash pool, cache invalidation, thread safety
+
+### Diperbaiki
+- **`RejectedExecutionException` saat stop/start server** — NanoHTTPD internal pool
+  terminated sebelum semua request selesai → crash berulang. Tambah guard
+  `isStopped` di `serve()` + `RejectedExecutionException` catch → 503 response.
+  Tambah delay 200ms di `stopServer()` supaya pool benar-benar terminated.
+- **Gallery cache tidak di-invalidate saat upload selesai** — `videoDurationsCache`
+  tidak di-reset → video baru tidak punya durasi di galeri sampai server restart.
+  Fix: invalidate di `deleteMedia()` dan `handleUploadFinalize`.
+- **Gallery cache tidak di-invalidate saat mkdir** — `fsAction("mkdir")` tidak
+  clear gallery cache → folder baru tidak terdeteksi galeri selama 30 detik.
+- **`pruneCompletedUploads()` tidak dipanggil periodik** — hanya dipanggil saat
+  upload chunk baru. Tambah periodic cleanup setiap 10 detik di SSE pump.
+- **`fsStatsCache` tidak punya periodic cleanup** — entries menumpuk tanpa batas.
+  Tambah `pruneFsStats()` dipanggil dari SSE pump.
+- **Gallery scan TTL terlalu pendek (15 detik)** — naikkan ke 30 detik untuk
+  device lambat (Android 5-6). Mengurangi scan ulang saat scroll galeri.
+- **QR cache tidak punya TTL** — entries QR di-cache selamanya sampai eviction
+  by size. Tambah TTL 5 menit → cache segar tanpa boros RAM.
+- **`credCache` thread safety** — eviction loop (size + iterator + remove) tidak
+  atomic pada `Collections.synchronizedMap`. Bisa race condition pada 2 thread
+  bersamaan. Fix: `synchronized(credCache)` block di sekitar eviction.
+- **`mmRelated` scroll overlap** — daftar saran video tumpang tindih dengan
+  sticky video wrapper di small screens. Tambah padding-top.
+- **`fsUpMenu` tidak auto-close** — dropdown upload tetap terbuka jika user tidak
+  pilih opsi. Tambah auto-close 5 detik + clear timer saat close manual.
 
 ## [v1.0 — 2026-08-17] — Hapus dialog crash + pindah crash log ke folder eksternal
 

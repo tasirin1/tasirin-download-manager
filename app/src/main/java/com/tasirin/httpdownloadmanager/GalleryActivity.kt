@@ -35,6 +35,7 @@ import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.scaleDown
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -241,6 +242,11 @@ class GalleryActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        adapter.release()
+        super.onDestroy()
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
             finish()
@@ -423,6 +429,8 @@ private class GalleryAdapter(
 
     private val items = mutableListOf<MediaLibrary.MediaEntry>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    fun release() { scope.cancel() }
 
     fun submit(list: List<MediaLibrary.MediaEntry>) {
         val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {

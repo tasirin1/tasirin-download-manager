@@ -410,8 +410,9 @@ class DownloadEngine(appContext: Context) {
     fun rename(id: String, newName: String) {
         val item = _items.value.find { it.id == id } ?: return
         if (item.state != DownloadState.COMPLETED) return
-        if (FileSaver(context).rename(item, newName)) {
-            updateItem(id) { it.copy(fileName = newName) }
+        val newPath = FileSaver(context).rename(item, newName)
+        if (newPath != null) {
+            updateItem(id) { it.copy(fileName = newName, filePath = newPath) }
         }
     }
 
@@ -498,6 +499,8 @@ class DownloadEngine(appContext: Context) {
                     fileName = result.fileName ?: item.fileName
                 )
             }
+            // Invalidasi cache galeri supaya file yang dipindah langsung terdeteksi.
+            com.tasirin.httpdownloadmanager.App.httpServer.invalidateFsRootsCache()
         }
     }
 

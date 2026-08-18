@@ -52,6 +52,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.RejectedExecutionException
 import java.util.zip.ZipOutputStream
 import java.net.NetworkInterface
 import java.security.MessageDigest
@@ -81,6 +82,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var loginFailures = 0
     @Volatile private var loginLockUntil = 0L
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Pair<Int, Long>>>()
+    private val fsStatsCacheTtlMs = 60_000L
     // Cache listing folder media per root (MediaStore): membrowse halaman demi
     // halaman tidak perlu me-query ulang seluruh koleksi tiap request. Dibatalkan
     // saat ada perubahan media (upload/aksi fs) atau kedaluwarsa 5 dtk.
@@ -92,7 +94,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // jadi cukup di-hold di memori (dibatasi jumlahnya) — tanpa cache, tiap
     // request halaman galeri membaca ulang file & header gambar dari disk.
     @Volatile private var videoDurationsCache: JSONObject? = null
-    private val imageDimCache = ConcurrentHashMap<String, Pair<Int, Int>>()
+    private val imageDimCache = ConcurrentHashMap<String, Triple<Long, Int, Int>>()
     // Cache itemsJson berdasarkan signature: hemat GC saat polling 2x/detik.
     @Volatile private var cachedItemsSignature = 0
     @Volatile private var cachedItemsJson: JSONArray? = null
@@ -133,9 +135,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val serverLog = ServerLog()
     // Cache QR PNG: /api/qr jarang berubah isinya (URL server + PIN),
     // render bitmap 520x520 tiap panggilan itu boros CPU/RAM.
-    private val qrCache = ConcurrentHashMap<String, ByteArray>()
+    private val qrCache = ConcurrentHashMap<String, Pair<Long, ByteArray>>()
 
     override fun serve(session: IHTTPSession): Response {
+        // NanoHTTPD internal pool bisa terminated saat stop/start server;
+        // tangkap RejectedExecutionException supaya tidak crash.
+        if (isStopped) return newFixedLengthResponse(
+            Response.Status.SERVICE_UNAVAILABLE,
+            "text/plain; charset=utf-8", "Server restarting"
+        )
         val startedAt = System.currentTimeMillis()
         val response = try {
             when {
@@ -176,6 +184,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 session.method == Method.GET && session.uri == "/" -> loginPage("")
                 else -> unauthorized()
             }
+        } catch (e: RejectedExecutionException) {
+            appendLog("Server pool terminated, request rejected")
+            newFixedLengthResponse(
+                Response.Status.SERVICE_UNAVAILABLE,
+                "text/plain; charset=utf-8",
+                "Server restarting, try again"
+            )
         } catch (e: Exception) {
             logError(e)
             newFixedLengthResponse(
@@ -209,23 +224,33 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     fun startServer() {
-        try {
-            // NanoHTTPD default SOCKET_READ_TIMEOUT = 5 dtk; terlalu pendek
-            // untuk potongan upload 2MB di jaringan lambat -> koneksi diputus
-            // saat upload tersendat. Naikkan jadi 60 dtk.
-            super.start(SERVER_SOCKET_TIMEOUT_MS)
-            lastError = null
-            cleanupCache()
-            appendLog(
-                "SERVER STARTED on port $listeningPort (Android ${Build.VERSION.RELEASE} " +
-                    "API ${Build.VERSION.SDK_INT}, ${Build.MANUFACTURER} ${Build.MODEL}, " +
-                    "free storage ${Formats.bytes(App.engine.freeSpaceBytes())})"
-            )
-        } catch (e: IOException) {
-            lastError = e.message
-            appendLog("SERVER FAILED TO START: ${e.message}")
-            throw e
+        // Retry loop: NanoHTTPD internal pool bisa belum ready setelah stop();
+        // tunggu & coba lagi sampai 3x (total ~600ms) supaya tidak crash.
+        invalidateFsRootsCache()
+        invalidateStatusCache()
+        var lastEx: IOException? = null
+        for (attempt in 1..3) {
+            try {
+                super.start(SERVER_SOCKET_TIMEOUT_MS)
+                lastError = null
+                cleanupCache()
+                appendLog(
+                    "SERVER STARTED on port $listeningPort (Android ${Build.VERSION.RELEASE} " +
+                        "API ${Build.VERSION.SDK_INT}, ${Build.MANUFACTURER} ${Build.MODEL}, " +
+                        "free storage ${Formats.bytes(App.engine.freeSpaceBytes())})"
+                )
+                return
+            } catch (e: IOException) {
+                lastEx = e
+                if (attempt < 3) {
+                    appendLog("SERVER START RETRY $attempt/3: ${e.message}")
+                    try { Thread.sleep(200) } catch (_: InterruptedException) {}
+                }
+            }
         }
+        lastError = lastEx?.message
+        appendLog("SERVER FAILED TO START: ${lastEx?.message}")
+        throw lastEx!!
     }
 
     private fun cleanupCache() {
@@ -268,6 +293,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // membuat pool baru otomatis saat dibutuhkan lagi.
         runCatching { statPool.shutdownNow() }
         super.stop()
+        // Tunggu sebentar supaya NanoHTTPD internal pool benar-benar terminated
+        // sebelum client request berikutnya datang (cegah RejectedExecutionException).
+        try { Thread.sleep(200) } catch (_: InterruptedException) {}
     }
 
     private fun pinEnabled(): Boolean =
@@ -667,14 +695,24 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return jsonResponse(JSONObject().put("ok", false))
     }
 
+    private fun pruneFsStats() {
+        val cutoff = System.currentTimeMillis() - fsStatsCacheTtlMs
+        fsStatsCache.entries.removeAll { it.value.first < cutoff }
+    }
+
     private fun pruneCompletedUploads() {
         val cutoff = System.currentTimeMillis() - 30 * 60 * 1000L
-        completedUploads.entries.filter { it.value.second < cutoff }
-            .forEach { completedUploads.remove(it.key) }
-        failedUploads.entries.filter { it.value.second < cutoff }
-            .forEach { failedUploads.remove(it.key) }
-        if (completedUploads.size > 400) completedUploads.clear()
-        if (failedUploads.size > 400) failedUploads.clear()
+        completedUploads.entries.removeIf { it.value.second < cutoff }
+        failedUploads.entries.removeIf { it.value.second < cutoff }
+        // Bila masih melebihi batas, buang yang paling lama.
+        if (completedUploads.size > 400) {
+            val cutoff2 = completedUploads.values.map { it.second }.sorted().getOrNull(200) ?: cutoff
+            completedUploads.entries.removeIf { it.value.second < cutoff2 }
+        }
+        if (failedUploads.size > 400) {
+            val cutoff2 = failedUploads.values.map { it.second }.sorted().getOrNull(200) ?: cutoff
+            failedUploads.entries.removeIf { it.value.second < cutoff2 }
+        }
     }
 
     private fun uploadUniqueName(name: String, folderPath: String): String {
@@ -790,6 +828,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         published.filePath?.let {
                             fsMediaCache.clear()
                             invalidateGalleryCache()
+                            videoDurationsCache = null
                             MediaLibrary.notifyMediaChanged(context, it)
                         }
                         completedUploads[id] = finalName to System.currentTimeMillis()
@@ -961,6 +1000,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val deleted = App.engine.deleteMedia(raw)
         if (deleted) {
             invalidateGalleryCache()
+            videoDurationsCache = null
             if (raw.startsWith(FS_PREFIX)) {
                 MediaLibrary.notifyMediaChanged(context, raw.removePrefix(FS_PREFIX))
             }
@@ -1313,19 +1353,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         galleryCache = null
     }
 
+    /** Hapus cache fsMedia hanya untuk path terkait (hemat RAM vs clear semua). */
+    private fun invalidateFsMediaCacheFor(path: String?) {
+        if (path == null) { fsMediaCache.clear(); return }
+        val normalized = path.trimEnd('/')
+        fsMediaCache.keys.removeAll { k -> k.isEmpty() || normalized.startsWith(k) || k.startsWith(normalized) }
+    }
+
     /** Invalidate itemsJson cache saat daftar download berubah. */
-    private fun invalidateItemsCache() {
+    fun invalidateItemsCache() {
         cachedItemsSignature = 0
         cachedItemsJson = null
     }
 
     /** Invalidate fsRoots cache saat settings berubah. */
-    private fun invalidateFsRootsCache() {
+    fun invalidateFsRootsCache() {
         cachedFsRoots = null
     }
 
     /** Invalidate statusObject cache saat port/readOnly berubah. */
-    private fun invalidateStatusCache() {
+    fun invalidateStatusCache() {
         cachedStatusJson = null
     }
 
@@ -1377,7 +1424,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  (nanohttpd) bisa membuka galeri bersamaan, dan org.json JSONObject
      *  tidak thread-safe (put/optLong paralel bisa korup atau 500). */
     private fun videoDurationOf(cache: JSONObject, token: String): Long =
-        synchronized(videoDurationLock) { cache.optLong(token, 0L) }
+        synchronized(videoDurationLock) {
+            // Prune cache bila terlalu besar (>2000 entries) saat dibaca.
+            if (cache.length() > 2000) {
+                val keys = cache.keys().asSequence().toList().take(cache.length() - 1500)
+                keys.forEach { cache.remove(it) }
+            }
+            cache.optLong(token, 0L)
+        }
 
     private fun cacheVideoDuration(cache: JSONObject, token: String, ms: Long) {
         synchronized(videoDurationLock) { cache.put(token, ms) }
@@ -1408,9 +1462,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun imageDimensions(e: MediaLibrary.MediaEntry): Pair<Int, Int>? {
+        val now = System.currentTimeMillis()
         // File .part masih berubah saat download berjalan — jangan di-cache.
         if (!e.isPartial) {
-            imageDimCache[e.token]?.let { return it }
+            val cached = imageDimCache[e.token]
+            if (cached != null && now - cached.first < IMAGE_DIM_CACHE_TTL_MS) {
+                return cached.second to cached.third
+            }
         }
         val result = runCatching {
             val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -1425,21 +1483,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (opts.outWidth > 0 && opts.outHeight > 0) opts.outWidth to opts.outHeight else null
         }.getOrNull()
         if (result != null && !e.isPartial) {
-            // Batasi jumlah entry di cache (L-light: Pair<Int,Int> ~16 byte/entry).
-            // Saat melebihi batas, hapus separuh entri untuk menghindari spike
-            // re-fetch dari thundering herd (clear-all).
+            // Evict entries older than TTL atau jika cache terlalu besar.
             if (imageDimCache.size > MediaLibrary.GALLERY_MAX_ENTRIES) {
-                // Evict separuh tanpa toList() — hemat alokasi list besar.
-                val toRemove = imageDimCache.size / 2
-                var removed = 0
-                val iter = imageDimCache.keys.iterator()
-                while (iter.hasNext() && removed < toRemove) {
-                    iter.next()
-                    iter.remove()
-                    removed++
+                val iter = imageDimCache.entries.iterator()
+                while (iter.hasNext()) {
+                    val entry = iter.next()
+                    if (now - entry.value.first > IMAGE_DIM_CACHE_TTL_MS) iter.remove()
+                }
+                // Jika masih terlalu besar, evict separuh yang paling lama.
+                if (imageDimCache.size > MediaLibrary.GALLERY_MAX_ENTRIES) {
+                    val half = imageDimCache.size / 2
+                    var removed = 0
+                    val iter2 = imageDimCache.keys.iterator()
+                    while (iter2.hasNext() && removed < half) { iter2.next(); iter2.remove(); removed++ }
                 }
             }
-            imageDimCache[e.token] = result
+            imageDimCache[e.token] = Triple(now, result.first, result.second)
         }
         return result
     }
@@ -1511,7 +1570,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val page = entries.drop(offset).take(limit)
             val statFutures = if (allowed) {
                 page.filter { it.isDirectory }.associateWith { f ->
-                    liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) }
+                    runCatching { liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) } }
+                        .getOrNull()
                 }
             } else {
                 emptyMap()
@@ -1708,7 +1768,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             "delete" -> runCatching {
                 val gone = if (file.isDirectory) file.deleteRecursively() else file.delete()
                 if (gone) {
-                    fsMediaCache.clear()
+                    invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
                     invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath)
                 }
@@ -1720,7 +1780,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val target = File(file.parentFile, name)
                     val ok = file.renameTo(target)
                     if (ok) {
-                        fsMediaCache.clear()
+                        invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
                         invalidateGalleryCache()
                         MediaLibrary.notifyMediaChanged(
                             context, file.absolutePath, target.absolutePath
@@ -1742,7 +1802,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val target = File(destDir, file.name)
                 if (target.exists()) return false
                 if (file.renameTo(target)) {
-                    fsMediaCache.clear()
+                    invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
+                    invalidateFsMediaCacheFor(destDir.absolutePath)
                     invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     return true
@@ -1751,7 +1812,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 runCatching {
                     file.copyTo(target, overwrite = false)
                     file.delete()
-                    fsMediaCache.clear()
+                    invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
+                    invalidateFsMediaCacheFor(destDir.absolutePath)
                     invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     true
@@ -1759,7 +1821,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
             "mkdir" -> {
                 if (name.isBlank() || name.contains('/') || name.contains('\\') || name == ".." || name.contains("../") || name.contains("..\\")) return false
-                runCatching { File(file, name).mkdirs() }.getOrDefault(false)
+                val created = runCatching { File(file, name).mkdirs() }.getOrDefault(false)
+                if (created) {
+                    invalidateFsMediaCacheFor(file.absolutePath)
+                    invalidateGalleryCache()
+                }
+                created
             }
             else -> false
         }
@@ -2029,6 +2096,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // dihentikan; ensureSsePump() memulai ulang saat klien baru masuk.
                     while (true) {
                         delay(10_000)
+                        // Prune cache upload & fs stats tiap 10 detik (hemat RAM).
+                        runCatching { pruneCompletedUploads() }
+                        runCatching { pruneFsStats() }
                         if (sseClients.isEmpty()) {
                             delay(1_000)
                             if (sseClients.isEmpty()) {
@@ -2118,11 +2188,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun qrPngResponse(session: IHTTPSession): Response {
         val text = session.parms["text"].orEmpty()
         if (text.isEmpty()) return notFound()
-        val bytes = qrCache[text] ?: QrCode.generate(text)?.also { cached ->
-            // Batasi isi cache: teks QR berubah-ubah tidak boleh menumpuk.
-            if (qrCache.size >= QR_CACHE_MAX) qrCache.clear()
-            qrCache[text] = cached
-        } ?: return notFound()
+        val now = System.currentTimeMillis()
+        val cached = qrCache[text]
+        val bytes = if (cached != null && now - cached.first < QR_CACHE_TTL_MS) {
+            cached.second
+        } else {
+            QrCode.generate(text)?.also { generated ->
+                // Batasi isi cache: evict yang paling lama bila penuh.
+                if (qrCache.size >= QR_CACHE_MAX) {
+                    val oldest = qrCache.entries.minByOrNull { it.value.first }
+                    oldest?.let { qrCache.remove(it.key) }
+                }
+                qrCache[text] = now to generated
+            } ?: return notFound()
+        }
         return newFixedLengthResponse(
             Response.Status.OK,
             "image/png",
@@ -2158,7 +2237,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_UPLOAD_MB = 2048
         private const val SHARE_TTL_HOURS = 24
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
-        private const val GALLERY_SCAN_TTL_MS = 15_000L
+        private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
         // Listing file manager di-paginate: maks 1000 entri per request, klien
         // memuat halaman berikutnya lewat tombol "Load more". Folder raksasa
@@ -2176,6 +2255,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val FS_STATS_TTL_MS = 10_000L
         private const val SSE_MIN_INTERVAL_MS = 1_000L
         private const val QR_CACHE_MAX = 8
+        private const val QR_CACHE_TTL_MS = 300_000L
+        private const val IMAGE_DIM_CACHE_TTL_MS = 120_000L
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu
         // koneksi hidup (dan fallback polling klien tidak ikut jalan).
         private const val SSE_HEARTBEAT_MS = 3_000L

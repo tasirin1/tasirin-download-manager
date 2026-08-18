@@ -165,8 +165,13 @@ object MediaLibrary {
                 val appContext = context.applicationContext
                 val thread = HandlerThread("media-scan-observer").apply { start() }
                 val observer = object : ContentObserver(Handler(thread.looper)) {
+                    private var lastInvalidate = 0L
                     override fun onChange(selfChange: Boolean) {
-                        scanCache = null
+                        val now = System.currentTimeMillis()
+                        if (now - lastInvalidate > 3_000L) {
+                            lastInvalidate = now
+                            scanCache = null
+                        }
                     }
                 }
                 val resolver = appContext.contentResolver

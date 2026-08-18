@@ -371,8 +371,10 @@ class FileSaver(context: Context) {
         }
     }
 
-    fun rename(item: DownloadItem, newName: String): Boolean {
-        if (newName.isBlank() || newName == item.fileName) return false
+    /** Rename file di disk/MediaStore. Kembalikan path/URI baru bila berhasil
+     *  (dipakai DownloadEngine untuk update DownloadItem.filePath). */
+    fun rename(item: DownloadItem, newName: String): String? {
+        if (newName.isBlank() || newName == item.fileName) return null
         return runCatching {
             when {
                 !item.contentUri.isNullOrEmpty() -> {
@@ -387,19 +389,24 @@ class FileSaver(context: Context) {
                         val values = ContentValues().apply {
                             put(MediaStore.Downloads.DISPLAY_NAME, finalName)
                         }
-                        appContext.contentResolver.update(uri, values, null, null) > 0
+                        val ok = appContext.contentResolver.update(uri, values, null, null) > 0
+                        if (ok) item.contentUri else null
                     } else {
-                        DocumentsContract.renameDocument(appContext.contentResolver, uri, newName) != null
+                        val newUri = DocumentsContract.renameDocument(appContext.contentResolver, uri, newName)
+                        if (newUri != null) newUri.toString() else null
                     }
                 }
                 !item.filePath.isNullOrEmpty() -> {
                     val file = File(item.filePath)
                     val target = File(file.parentFile, newName)
-                    file.exists() && file.renameTo(target)
+                    if (file.exists() && file.renameTo(target)) {
+                        MediaLibrary.notifyMediaChanged(appContext, file.absolutePath, target.absolutePath)
+                        target.absolutePath
+                    } else null
                 }
-                else -> false
+                else -> null
             }
-        }.getOrDefault(false)
+        }.getOrNull()
     }
 
     fun move(item: DownloadItem, destTreeUri: Uri): PublishResult? {
