@@ -1,3 +1,18 @@
+## [v1.0 — 2026-08-18] — Fix gallery pagination hasMore bug + code quality
+
+### Diperbaiki
+- **Galeri: `hasMore` salah saat scan terbatas** — `hasMore` sebelumnya
+  memakai `matched > pageEnd` (total item > batas halaman), yang salah
+  saat `scanLimit` memotong scan. Contoh: 150 item, halaman 2
+  (start=200) → `matched=150 > pageEnd=300` → `hasMore=false` padahal
+  halaman 1 masih punya item. Fix: hitung `pageCount` (item per halaman)
+  dan cek `pageCount >= PAGE_SIZE && (matched < scan.total || scan.items.size < scan.total)`.
+- **Cache pruning indentasi salah** — `fsMediaCache` & `fsStatsCache`
+  eviction code visual scope tidak konsisten (bukan bug fungsional,
+  tapi membingungkan untuk maintenance).
+- **`CrashLog` thread-safety** — `SimpleDateFormat` dibagi antar thread
+  (crash handler bisa dipanggil dari thread berbeda). Fix: `ThreadLocal`.
+
 ## [v1.0 — 2026-08-18] — Sticky video header: title/date locked during scroll
 
 ### Diperbaiki

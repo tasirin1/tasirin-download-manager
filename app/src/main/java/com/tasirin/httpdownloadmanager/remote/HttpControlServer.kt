@@ -1309,6 +1309,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val cache = loadVideoDurations()
         var extracted = 0
         var matched = 0
+        var pageCount = 0
         val scan = scannedGallery(scanLimit)
         for (e in scan.items) {
             if (q.isNotEmpty() && e.name.indexOf(q, ignoreCase = true) < 0) continue
@@ -1338,6 +1339,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
                 arr.put(o)
+                pageCount++
             }
             matched++
         }
@@ -1346,7 +1348,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return jsonResponse(
             JSONObject()
                 .put("items", arr)
-                .put("hasMore", matched > pageEnd)
+                .put("hasMore", pageCount >= GALLERY_PAGE_SIZE && (matched < scan.total || scan.items.size < scan.total))
                 // total = jumlah hasil filter (bukan seluruh media) saat ada
                 // q/type; tanpa filter tetap total scan agar count akurat.
                 .put("total", if (filtered) matched else scan.total)
@@ -1677,11 +1679,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (files.size <= FS_MEDIA_CACHE_MAX_FILES) {
                     fsMediaCache[base] = now to (dirNames to files)
                     if (fsMediaCache.size > FS_MEDIA_CACHE_MAX_ENTRIES) {
-                    val toRemove = fsMediaCache.size / 2
-                    var removed = 0
-                    val iter = fsMediaCache.keys.iterator()
-                    while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
-                }
+                        val toRemove = fsMediaCache.size / 2
+                        var removed = 0
+                        val iter = fsMediaCache.keys.iterator()
+                        while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
+                    }
                 }
             }
             val totalCount = dirNames.size + files.size
@@ -1743,11 +1745,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val result = itemCount to totalSize
         fsStatsCache[path] = now to result
         if (fsStatsCache.size > 300) {
-                val toRemove = fsStatsCache.size / 2
-                var removed = 0
-                val iter = fsStatsCache.keys.iterator()
-                while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
-            }
+            val toRemove = fsStatsCache.size / 2
+            var removed = 0
+            val iter = fsStatsCache.keys.iterator()
+            while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
+        }
         return result
     }
 

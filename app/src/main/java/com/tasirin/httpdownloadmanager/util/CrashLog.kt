@@ -16,9 +16,10 @@ object CrashLog {
 
     private const val MAX_BYTES = 100_000
     private const val FILE_NAME = "crash.log"
-    /** Cache formatter (SimpleDateFormat tidak thread-safe, tapi append
-     *  hanya dipanggil dari crash handler — thread tunggal per crash). */
-    private val stampFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+    /** ThreadLocal formatter (SimpleDateFormat tidak thread-safe). */
+    private val stampFormat = ThreadLocal.withInitial {
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+    }
 
     fun append(context: Context, tag: String, t: Throwable) {
         runCatching {
@@ -26,7 +27,7 @@ object CrashLog {
             // (terlihat dari file manager tanpa root; otomatis dihapus saat uninstall).
             val dir = context.getExternalFilesDir(null) ?: context.filesDir
             val file = File(dir, FILE_NAME)
-            val stamp = stampFormat.format(Date())
+            val stamp = stampFormat.get().format(Date())
             val text = buildString {
                 appendLine("=== $stamp [$tag] ===")
                 appendLine(Log.getStackTraceString(t))
