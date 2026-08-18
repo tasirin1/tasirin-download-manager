@@ -1,3 +1,11 @@
+## [v1.0 — 2026-08-18] — Fix photo viewer black screen
+
+### Diperbaiki
+- **Penampil foto hanya gelap (hitam)** — MIME type wildcard `image/*`
+  dan `video/*` tidak valid untuk HTTP Content-Type; browser gagal
+  render gambar/video. Diganti MIME spesifik (`image/jpeg`,
+  `video/mp4`, dll).
+
 ## [v1.0 — 2026-08-18] — Reduce Play Protect flags
 
 ### Diubah

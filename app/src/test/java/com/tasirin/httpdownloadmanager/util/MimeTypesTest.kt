@@ -10,8 +10,8 @@ class MimeTypesTest {
     fun `forFile - ekstensi dikenal`() {
         assertEquals("application/vnd.android.package-archive", MimeTypes.forFile("app.apk"))
         assertEquals("application/pdf", MimeTypes.forFile("dokumen.pdf"))
-        assertEquals("video/*", MimeTypes.forFile("film.mkv"))
-        assertEquals("image/*", MimeTypes.forFile("foto.JPG"))
+        assertEquals("video/x-matroska", MimeTypes.forFile("film.mkv"))
+        assertEquals("image/jpeg", MimeTypes.forFile("foto.JPG"))
         assertEquals("text/plain", MimeTypes.forFile("catatan.txt"))
     }
 
