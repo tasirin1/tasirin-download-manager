@@ -1,3 +1,12 @@
+## [v1.0 — 2026-08-18] — Fix video sticky header: title/date now inside sticky container
+
+### Diperbaiki
+- **Judul & tanggal video tidak terkunci** — `mmDesc` (judul + tanggal)
+  berada di luar `mmVideoHeader` (sticky container), sehingga ter-scroll
+  menjauhi pemutar video. Pindahkan `mmDesc` ke dalam `mmVideoHeader`
+  supaya judul, ukuran, dan tanggal tetap terlihat di bawah pemutar
+  saat pengguna scroll saran video.
+
 ## [v1.0 — 2026-08-18] — Fix gallery pagination hasMore bug + code quality
 
 ### Diperbaiki
