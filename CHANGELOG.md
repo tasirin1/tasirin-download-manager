@@ -1,3 +1,10 @@
+## [v1.0 — 2026-08-18] — Fix statPool race condition causing File Manager HTTP 500
+
+### Diperbaiki
+- **File Manager HTTP 500 (RejectedExecutionException)** — `statPool` (thread pool untuk statistik subfolder) mengalami race condition TOCTOU: `liveStatPool()` mengecek `isShutdown` dan mengembalikan pool, tapi antara pengecekan dan `submit()`, `stopServer()` memanggil `shutdownNow()` yang mematikan pool. Pool tetap terminated selamanya karena tidak ada yang membuat pool baru, menyebabkan SEMUA request `/api/fs?path=<sdcard>` gagal dengan HTTP 500 dan `completed tasks = 169`. Fix: tambah `rejectedExecutionHandler` ke `ThreadPoolExecutor` yang auto-heal — bila pool di-shutdown, pool baru otomatis dibuat sehingga request berikutnya langsung pulih.
+
+### Ditambah
+- **Dokumentasi `stopServer()` upload finalization** — Jelaskan bahwa coroutine upload finalization di `serverScope` sengaja dibiarkan selesai natural (beberapa ms) saat server stop, bukan di-cancel, untuk mencegah operasi tulis file terpotong.
 ## [v1.0 — 2026-08-18] — Remove delete buttons from gallery
 
 ### Dihapus

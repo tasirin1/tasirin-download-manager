@@ -110,10 +110,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // bukan setiap request (16x per request file manager).
     @Volatile private var cachedFsRoots: List<File>? = null
 
-    private fun newStatPool(): ThreadPoolExecutor =
-        Executors.newFixedThreadPool(
+    private fun newStatPool(): ThreadPoolExecutor {
+        val pool = Executors.newFixedThreadPool(
             Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
         ) as ThreadPoolExecutor
+        // Auto-heal: bila pool di-shutdownNow() saat request sedang jalan
+        // (race antara liveStatPool() dan stopServer()), pool baru otomatis
+        // dibuat supaya request berikutnya tidak selalu gagal dengan
+        // RejectedExecutionException.
+        pool.rejectedExecutionHandler =
+            java.util.concurrent.RejectedExecutionHandler { _, _ ->
+                synchronized(this@HttpControlServer) {
+                    if (statPool.isShutdown) statPool = newStatPool()
+                }
+            }
+        return pool
+    }
 
     @Synchronized
     private fun liveStatPool(): ThreadPoolExecutor {
@@ -283,6 +295,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         appendLog("SERVER STOPPED (port $listeningPort)")
         sseJob?.cancel()
         sseJob = null
+        // upload finalization coroutine yang berjalan di serverScope akan
+        // selesai secara natural (beberapa ms saja) — jangan cancel scope
+        // karena bisa memutus operasi tulis file tengah jalan.
         val frame = "data: {\"shutdown\":true}\n\n"
         sseClients.forEach { it.push(frame) }
         sseClients.forEach { it.closeStream() }
