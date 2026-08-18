@@ -1,3 +1,11 @@
+## [v1.0 — 2026-08-18] — Sticky video header: title/date locked during scroll
+
+### Diperbaiki
+- **Judul & tanggal video terkunci** — Wrap `mmVideoWrap` + `mmDesc`
+  dalam container `mmVideoHeader` (`position: sticky`). Judul, ukuran,
+  dan tanggal sekarang tetap terlihat di bawah pemutar video saat
+  pengguna scroll saran video. Hanya daftar saran yang bisa di-scroll.
+
 ## [v1.0 — 2026-08-18] — Fix photo viewer: mmImage was inside hidden mmVideoWrap
 
 ### Diperbaiki
