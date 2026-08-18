@@ -140,7 +140,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     override fun serve(session: IHTTPSession): Response {
         // NanoHTTPD internal pool bisa terminated saat stop/start server;
         // tangkap RejectedExecutionException supaya tidak crash.
-        if (isStopped) return newFixedLengthResponse(
+        if (!isAlive) return newFixedLengthResponse(
             Response.Status.SERVICE_UNAVAILABLE,
             "text/plain; charset=utf-8", "Server restarting"
         )

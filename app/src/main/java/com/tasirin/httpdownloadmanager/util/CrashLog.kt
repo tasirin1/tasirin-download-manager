@@ -44,7 +44,7 @@ object CrashLog {
                     val buf = ByteArray(MAX_BYTES)
                     raf.seek(len - MAX_BYTES)
                     raf.readFully(buf)
-                    raf.setLength(MAX_BYTES)
+                    raf.setLength(MAX_BYTES.toLong())
                     raf.seek(0)
                     raf.write(buf)
                 }
