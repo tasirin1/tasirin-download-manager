@@ -1252,6 +1252,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val input: InputStream
         val total: Long
         val name: String
+        var resolvedMime: String? = null
         when {
             raw.startsWith("f:") -> {
                 val file = File(raw.substring(2))
@@ -1268,13 +1269,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
                 input = stream
                 total = len
-                name = DocumentFile.fromSingleUri(context, uri)?.name ?: "media"
+                // DocumentFile.fromSingleUri sering null di Android 6; fallback
+                // ke MediaStore DISPLAY_NAME lalu ContentResolver.getType().
+                name = DocumentFile.fromSingleUri(context, uri)?.name
+                    ?: mediaStoreName(uri)
+                    ?: "media"
+                resolvedMime = resolver.getType(uri)
             }
             else -> return notFound()
         }
         return streamMedia(
             name = name,
-            mime = MimeTypes.forFile(name),
+            mime = resolvedMime ?: MimeTypes.forFile(name),
             input = input,
             total = total,
             rangeHeader = session.headers["range"] ?: session.headers["Range"],

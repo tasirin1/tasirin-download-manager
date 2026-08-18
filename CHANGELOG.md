@@ -1,3 +1,12 @@
+## [v1.0 — 2026-08-18] — Fix photo viewer black screen (deeper)
+
+### Diperbaiki
+- **Penampil foto gelap (lanjutan)** — `DocumentFile.fromSingleUri()`
+  return null di Android 6 untuk MediaStore URI → name="media" →
+  MIME `application/octet-stream` → browser gagal render. Fix:
+  fallback ke `mediaStoreName()` + `ContentResolver.getType()` untuk
+  MIME yang benar.
+
 ## [v1.0 — 2026-08-18] — Fix photo viewer black screen
 
 ### Diperbaiki
