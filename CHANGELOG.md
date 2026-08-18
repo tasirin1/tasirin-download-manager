@@ -1,3 +1,11 @@
+## [v1.0 — 2026-08-18] — Remove delete buttons from gallery
+
+### Dihapus
+- **Tombol hapus di galeri** — Hapus ikon tempat sampah di setiap sel
+  galeri, tombol hapus di penampil foto, dan tombol batch delete di
+  mode select. Hanya tombol select, download ZIP, dan slideshow yang
+  tersisa.
+
 ## [v1.0 — 2026-08-18] — Fix gallery pagination hasMore bug + code quality
 
 ### Diperbaiki

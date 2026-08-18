@@ -669,8 +669,6 @@
   #mmImgCount {
  flex: 0 0 auto; font-size: 12px; color: rgba(255,255,255,.85); }
 
-  #mediaModal.mm-img #mmImgDelBtn {
- color: #ff8a80; }
 
   #mmImgPrev, #mmImgNext {
  position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(0,0,0,.35); color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -1234,7 +1232,6 @@
       <span id="galBatchSize"></span>
       <button id="galBatchAll" type="button">Select all</button>
       <button id="galBatchZip" type="button">Download ZIP</button>
-      <button id="galBatchDelete" type="button" class="danger">Delete</button>
       <button id="galBatchCancel" type="button">Cancel</button>
     </div>
     <div id="galleryGrid" class="gal-grid"></div>
@@ -1319,7 +1316,6 @@
     <span id="mmImgCount"></span>
     <button id="mmImgPlayBtn" type="button" title="Slideshow">&#9654;</button>
     <button id="mmImgDlBtn" type="button" title="Download photo">&#11015;</button>
-    <button id="mmImgDelBtn" type="button" title="Delete photo">&#128465;</button>
   </div>
   <button id="mmImgPrev" type="button" title="Previous photo">&#10094;</button>
   <button id="mmImgNext" type="button" title="Next photo">&#10095;</button>
@@ -1576,7 +1572,6 @@ const mmImgPrev = document.getElementById('mmImgPrev');
 const mmImgNext = document.getElementById('mmImgNext');
 const mmImgPlayBtn = document.getElementById('mmImgPlayBtn');
 const mmImgDlBtn = document.getElementById('mmImgDlBtn');
-const mmImgDelBtn = document.getElementById('mmImgDelBtn');
 const mmImgSpin = document.getElementById('mmImgSpin');
 const mmVideo = document.getElementById('mmVideo');
 const mmTitle = document.getElementById('mmTitle');
@@ -1937,7 +1932,6 @@ function renderGalleryCell(it) {
   const selOn = galSelected.indexOf(it) >= 0;
   cell.innerHTML =
     '<div class="gal-thumb" style="padding-top:' + ratio + '%">' +
-      '<button class="del" title="Delete" type="button">&#128465;</button>' +
       '<span class="gal-check' + (selOn ? ' on' : '') + '">' + (selOn ? '\u2713' : '') + '</span>' +
       '<div class="ext">' + escapeHtml(extOf(it.name)) + '</div>' +
       '<img loading="lazy" src="' + thumb + '" alt="' + escapeHtml(it.name) + '" onerror="this.remove()">' +
@@ -1953,20 +1947,6 @@ function renderGalleryCell(it) {
     if (galSelectMode) { toggleGalSelect(it, cell); return; }
     openMedia(it, media);
   });
-  const delBtn = cell.querySelector('.del');
-  if (delBtn) {
-    delBtn.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      if (!confirm('Delete this file?\n' + it.name)) return;
-      doDeleteMedia(it.token, function () {
-        cell.remove();
-        const gi = galleryItems.indexOf(it);
-        if (gi >= 0) galleryItems.splice(gi, 1);
-        // Reload galeri supaya count total sinkron dengan server.
-        loadGallery(true);
-      });
-    });
-  }
   const img = cell.querySelector('img');
   if (img) {
     img.addEventListener('load', function () {
@@ -2034,17 +2014,6 @@ document.getElementById('galBatchAll').addEventListener('click', function () {
     }
   });
   updateGalBatch();
-});
-document.getElementById('galBatchDelete').addEventListener('click', function () {
-  if (!galSelected.length) return;
-  if (!confirm('Delete ' + galSelected.length + ' files?')) return;
-  (async function () {
-    for (const it of galSelected.slice()) {
-      await doDeleteMedia(it.token, function () {});
-    }
-    galSetSelectMode(false);
-    loadGallery(true);
-  })();
 });
 document.getElementById('galBatchZip').addEventListener('click', function () {
   if (!galSelected.length) return;
@@ -3603,28 +3572,6 @@ mmImgDlBtn.addEventListener('click', function () {
   fsDownloadUrl(API + '/api/media?token=' + encodeURIComponent(it.token) + '&dl=1');
   mmShowToast('Download started');
 });
-mmImgDelBtn.addEventListener('click', function () {
-  const it = mmImgCurrent();
-  if (!it) return;
-  if (!confirm('Delete this photo?\n' + it.name)) return;
-  mmStopSlide();
-  doDeleteMedia(it.token, function () {
-    const li = mmImageList.indexOf(it);
-    if (li >= 0) mmImageList.splice(li, 1);
-    const gi = galleryItems.indexOf(it);
-    if (gi >= 0) galleryItems.splice(gi, 1);
-    galleryGrid.querySelectorAll('.gal-cell').forEach(function (cell) {
-      const img = cell.querySelector('img');
-      if (img && img.src && img.src.indexOf(encodeURIComponent(it.token)) >= 0) cell.remove();
-    });
-    // Reload galeri supaya count total sinkron dengan server.
-    loadGallery(true);
-    if (!mmImageList.length) { closeMedia(); return; }
-    const next = mmImageList[Math.min(li, mmImageList.length - 1)];
-    openMedia(next, API + '/api/media?token=' + encodeURIComponent(next.token));
-  });
-});
-
 mmImage.addEventListener('click', function (e) {
   if (mmType !== 'image') return;
   if (mmImgDragged) { mmImgDragged = false; return; }
