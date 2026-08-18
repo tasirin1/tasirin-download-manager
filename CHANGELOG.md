@@ -5,6 +5,13 @@ Semua perubahan penting dicatat di sini. Format mengikuti
 alur CI: `versionName` tetap `1.0`, `versionCode` = `100000 + run_number`.
 APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-download-manager/releases).
 
+## [v1.0 — 2026-08-18] — Video player sticky title + scrollable suggestions
+
+### Diubah
+- **Judul & tanggal video sticky** — wrapper `mmVideoWrap` mempertahankan
+  pemutar video + deskripsi (judul/tanggal) di posisi atas saat
+  menggulir daftar saran video di bawahnya.
+
 ## [v1.0 — 2026-08-17] — Hapus dialog crash + pindah crash log ke folder eksternal
 
 ### Diubah

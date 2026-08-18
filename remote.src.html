@@ -629,9 +629,12 @@
   #mmBody {
  flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
+  #mmVideoWrap {
+ position: sticky; top: 0; z-index: 2; background: var(--bg);
+ box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+
   #mmPlayer {
- position: sticky; top: 0; z-index: 2; width: 100%; background: #000;
- box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+ width: 100%; background: #000; }
 
   #mmPlayer::before {
     content: ''; display: block; padding-top: 56.25%; }
@@ -684,7 +687,7 @@
   #mediaModal.mm-img #mmImage {
  max-width: 100%; max-height: 100%; margin: 0; }
 
-  #mediaModal.mm-img #mmDesc, #mediaModal.mm-img #mmRelated {
+  #mediaModal.mm-img #mmVideoWrap, #mediaModal.mm-img #mmDesc, #mediaModal.mm-img #mmRelated {
  display: none; }
 
   #mediaModal.mm-img.mm-chrome-hidden #mmImgTop,
@@ -693,7 +696,7 @@
  opacity: 0; pointer-events: none; }
 
   #mmDesc {
- padding: 12px 16px 4px; }
+ padding: 12px 16px 8px; border-bottom: 1px solid var(--line); }
 
   #mmTitle {
  color: #0f0f0f; font-size: 14.5px; font-weight: 500; line-height: 1.4; word-break: break-word; }
@@ -1318,6 +1321,7 @@
   <button id="mmImgPrev" type="button" title="Previous photo">&#10094;</button>
   <button id="mmImgNext" type="button" title="Next photo">&#10095;</button>
   <div id="mmBody">
+    <div id="mmVideoWrap" class="hidden">
     <div id="mmPlayer" class="hidden">
       <video id="mmVideo" playsinline preload="metadata"></video>
       <div id="mmPlayerTop" class="hidden">
@@ -1352,6 +1356,7 @@
     <div id="mmDesc" class="hidden">
       <div id="mmTitle"></div>
       <div id="mmSub"></div>
+    </div>
     </div>
     <div id="mmRelated" class="hidden"></div>
   </div>
@@ -1648,6 +1653,7 @@ function mmShowToast(text, ms) {
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
   mmOverlayTitle.classList.remove('hide');
+  document.getElementById('mmVideoWrap').classList.remove('hidden');
   mmPlayerTop.classList.remove('hide');
   mmPlayer.classList.remove('mm-hide-cursor');
   clearTimeout(mmTimer);
@@ -1728,6 +1734,7 @@ function closeMedia() {
   mmImage.classList.add('hidden');
   mmImage.removeAttribute('src');
   mmPlayer.classList.add('hidden');
+  document.getElementById('mmVideoWrap').classList.add('hidden');
   mmBigPlay.classList.add('hidden');
   mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
   mmSpinner.classList.add('hidden');
@@ -3765,6 +3772,7 @@ function openMedia(it, src) {
   mmImgSpin.classList.add('hidden');
   mediaModal.classList.remove('mm-img');
   mmPlayer.classList.add('hidden');
+  document.getElementById('mmVideoWrap').classList.add('hidden');
   mmVideo.pause();
   mmVideo.removeAttribute('src');
   mmBuf.style.width = '0%';
