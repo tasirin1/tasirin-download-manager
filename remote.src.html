@@ -629,9 +629,12 @@
   #mmBody {
  flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-  #mmVideoWrap {
+  #mmVideoHeader {
  position: sticky; top: 0; z-index: 2; background: var(--bg);
  box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+
+  #mmVideoWrap {
+ background: var(--bg); }
 
   #mmPlayer {
  width: 100%; background: #000; }
@@ -687,7 +690,7 @@
   #mediaModal.mm-img #mmImage {
  max-width: 100%; max-height: 100%; margin: 0; }
 
-  #mediaModal.mm-img #mmVideoWrap, #mediaModal.mm-img #mmDesc, #mediaModal.mm-img #mmRelated {
+  #mediaModal.mm-img #mmVideoHeader, #mediaModal.mm-img #mmVideoWrap, #mediaModal.mm-img #mmDesc, #mediaModal.mm-img #mmRelated {
  display: none; }
 
   #mediaModal.mm-img.mm-chrome-hidden #mmImgTop,
@@ -1321,6 +1324,7 @@
   <button id="mmImgPrev" type="button" title="Previous photo">&#10094;</button>
   <button id="mmImgNext" type="button" title="Next photo">&#10095;</button>
   <div id="mmBody">
+    <div id="mmVideoHeader" class="hidden">
     <div id="mmVideoWrap" class="hidden">
     <div id="mmPlayer" class="hidden">
       <video id="mmVideo" playsinline preload="metadata"></video>
@@ -1357,6 +1361,7 @@
     <div id="mmDesc" class="hidden">
       <div id="mmTitle"></div>
       <div id="mmSub"></div>
+    </div>
     </div>
     <div id="mmRelated" class="hidden"></div>
   </div>
@@ -1653,6 +1658,7 @@ function mmShowToast(text, ms) {
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
   mmOverlayTitle.classList.remove('hide');
+  document.getElementById('mmVideoHeader').classList.remove('hidden');
   document.getElementById('mmVideoWrap').classList.remove('hidden');
   mmPlayerTop.classList.remove('hide');
   mmPlayer.classList.remove('mm-hide-cursor');
@@ -1734,6 +1740,7 @@ function closeMedia() {
   mmImage.classList.add('hidden');
   mmImage.removeAttribute('src');
   mmPlayer.classList.add('hidden');
+  document.getElementById('mmVideoHeader').classList.add('hidden');
   document.getElementById('mmVideoWrap').classList.add('hidden');
   mmBigPlay.classList.add('hidden');
   mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
@@ -3787,6 +3794,7 @@ function openMedia(it, src) {
   mmImgSpin.classList.add('hidden');
   mediaModal.classList.remove('mm-img');
   mmPlayer.classList.add('hidden');
+  document.getElementById('mmVideoHeader').classList.add('hidden');
   document.getElementById('mmVideoWrap').classList.add('hidden');
   mmVideo.pause();
   mmVideo.removeAttribute('src');
@@ -3795,6 +3803,7 @@ function openMedia(it, src) {
   mmSeek.style.setProperty('--fill', '0%');
   mmTime.textContent = '0:00 / 0:00';
   if (mmType === 'video') {
+    document.getElementById('mmVideoHeader').classList.remove('hidden');
     mmPlayer.classList.remove('hidden');
     mmBigPlay.classList.remove('hidden');
     mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
