@@ -1,3 +1,11 @@
+## [v1.0 — 2026-08-19] — Gallery: remove search/filter + 3-column grid
+
+### Dihapus
+- **Search & filter galeri** — Hapus bar search, tombol filter, dan related JS. Galeri hanya menampilkan video tanpa pencarian/filter.
+
+### Diubah
+- **Grid galeri 3 kolom** — Ubah dari `auto-fill, minmax(170px)` ke `repeat(3, 1fr)` untuk tampilan lebih luas.
+
 ## [v1.0 — 2026-08-19] — Fix video title sticky + gallery toolbar leak
 
 ### Diperbaiki

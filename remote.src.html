@@ -222,8 +222,7 @@
   .gal-toolbar {
  display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 
-  .gal-search {
- margin-bottom: 10px; }
+
 
   .gal-toolbar h2 {
  margin: 0; font-size: 16px; }
@@ -232,7 +231,7 @@
  font-size: 12px; color: var(--muted); }
 
   .gal-grid {
- display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px 14px; grid-auto-flow: dense; }
+ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 8px; grid-auto-flow: dense; }
 
   .gal-grid.gal-selecting .gal-cell .del {
  display: none; }
@@ -1008,7 +1007,7 @@
  font-size: 16px; padding: 12px; }
 
     .gal-grid {
- grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px 10px; }
+ grid-template-columns: repeat(3, 1fr); gap: 8px 6px; }
 
     .sk-grid {
  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px 10px; }
@@ -1155,10 +1154,7 @@
     <div class="gal-toolbar"><h2>Device Gallery</h2><span class="count" id="galleryCount"></span>
       <button id="galSelectBtn" type="button" class="btn-ghost" style="margin-left:auto">Select</button>
     </div>
-    <div class="gal-search"><input id="gallerySearch" type="search" placeholder="Search videos…" autocomplete="off"></div>
-    <div class="seg" id="galleryFilters">
-      <button type="button" class="on" data-gal="video">Videos</button>
-    </div>
+
     <div id="galleryStatus"></div>
     <div id="galBatch" class="fs-batch hidden">
       <span id="galBatchCount"></span>
@@ -1467,23 +1463,11 @@ let galleryHasMore = false;
 // pencarian saat request sebelumnya belum selesai) diabaikan supaya tidak
 // menimpa data terbaru dan reset tidak ter-skip oleh flag boolean.
 let gallerySeq = 0;
-const gallerySearch = document.getElementById('gallerySearch');
 let galleryFilter = 'video';
 let galSelectMode = false;
 const galSelected = [];
 const galBatch = document.getElementById('galBatch');
-const galleryFilters = document.getElementById('galleryFilters');
-if (galleryFilters) {
-  galleryFilters.addEventListener('click', function (e) {
-    const btn = e.target.closest('button[data-gal]');
-    if (!btn) return;
-    galleryFilter = btn.getAttribute('data-gal');
-    galleryFilters.querySelectorAll('button').forEach(function (b) {
-      b.classList.toggle('on', b === btn);
-    });
-    loadGallery(true);
-  });
-}
+
 const mediaModal = document.getElementById('mediaModal');
 const mmBody = document.getElementById('mmBody');
 const mmVideo = document.getElementById('mmVideo');
@@ -1706,11 +1690,9 @@ async function loadGallery(reset) {
   const seq = ++gallerySeq;
   if (reset) showGallerySkeleton();
   try {
-    const q = gallerySearch ? gallerySearch.value.trim() : '';
     const params = new URLSearchParams();
     params.set('page', reset ? 0 : galleryPage);
-    if (q) params.set('q', q);
-    if (galleryFilter && galleryFilter !== 'all') params.set('type', galleryFilter);
+    params.set('type', 'video');
     const res = await fetch(API + '/api/gallery?' + params.toString());
     if (seq !== gallerySeq) return;
     if (res.status === 401) {
@@ -1737,11 +1719,11 @@ async function loadGallery(reset) {
       galleryGrid.innerHTML = '';
       galleryCount.textContent = (data.total || items.length) + ' file';
       if (!items.length) {
-        const filtered = galleryFilter !== 'all';
+
         galleryGrid.innerHTML = emptyHtml(
           'search',
-          q ? 'No results' : 'No videos yet',
-          q ? 'Try a different keyword.' : (filtered ? 'Try a different filter or change the keyword.' : 'Files in the download folder will appear here.')
+          'No videos yet',
+          'Files in the download folder will appear here.'
         );
         if (!q && !filtered) {
           const cta = document.createElement('div');
@@ -1814,13 +1796,7 @@ function loadMoreGallery() {
   }
 }
 
-let gallerySearchTimer = null;
-if (gallerySearch) {
-  gallerySearch.addEventListener('input', function () {
-    clearTimeout(gallerySearchTimer);
-    gallerySearchTimer = setTimeout(function () { loadGallery(true); }, 350);
-  });
-}
+
 
 function renderGalleryCell(it) {
   const cell = document.createElement('div');
