@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-19] — Fix photo viewer blank screen + video player title overlap
+
+### Diperbaiki
+- **Penampil foto hanya hitam kosong** — `#mmImage` di mode foto memakai `max-height: 100%` yang tidak resolve di flex container tanpa tinggi eksplisit, menyebabkan gambar kolaps ke nol piksel. Fix: gunakan `width:100%; height:100%; object-fit:contain` supaya gambar mengisi area modal dengan benar.
+- **Pemutar video: judul tertutup kontrol** — `#mmPlayer` tidak punya batas tinggi, sehingga `::before` (padding-top 56.25% = rasio 16:9) bisa membuat player sangat tinggi di layar lebar, mendorong `#mmDesc` (judul) ke bawah hingga tertutup gradient kontrol. Fix: tambah `max-height:56vh; overflow:hidden; position:relative` ke `#mmPlayer`.
 ## [v1.0 — 2026-08-18] — Fix statPool race condition causing File Manager HTTP 500
 
 ### Diperbaiki
