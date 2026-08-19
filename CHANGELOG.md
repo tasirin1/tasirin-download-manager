@@ -1,3 +1,10 @@
+## [v1.0 — 2026-08-19] — Fix HTML nesting + remove dead photo code
+
+### Diperbaiki
+- **HTML nesting mediaModal** — `</div>` ekstra setelah `mmDesc` menutup `mmBody` terlalu awal, mendorong `mmRelated` keluar dari modal. Fix: hapus `</div>` ekstra.
+- **Dead code foto** — Hapus referensi `mmType === 'image'` yang sudah tidak relevan (keyboard handler, mmBody click handler).
+- **Galeri video-only** — Hapus tombol "Photos" dari filter galeri, default `galleryFilter` ke `'video'`, perbarui placeholder search ke "Search videos…".
+
 ## [v1.0 — 2026-08-19] — Remove photo viewer + fix video player
 
 ### Dihapus

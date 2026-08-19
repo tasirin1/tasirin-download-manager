@@ -125,6 +125,11 @@ kuat dan tanpa diskusi:
 - **`fmtDate`** — hanya SATU definisi di `remote.src.html` (dua definisi
   saling menimpa karena hoisting).
 
+- **Penampil foto** — dihapus dari remote web (2026-08-14); galeri hanya
+  menampilkan video. Jangan tambahkan kembali penampil foto tanpa alasan kuat:
+  struktur HTML modal (`mmVideoHeader`/ `mmVideoWrap`/ `mmDesc`) rentan
+  terhadap bug nesting div yang menyebabkan blank hitam atau pemutar video
+  hilang.
 ## Pola bug yang pernah terjadi & guard-nya
 
 | Pola bug | Penyebab | Guard |
@@ -133,13 +138,13 @@ kuat dan tanpa diskusi:
 | Tanggal file tampil format salah | dua `fmtDate` (hoisting, definisi kedua menang) | aturan satu definisi (lihat keputusan historis) |
 | Kata Indonesia lolos ke UI remote | kata pendek tidak ada di daftar larangan | `BANNED_ID` di `scripts/prepare_remote.py` — tambahkan kata baru saat ketemu |
 | Upload gagal diam-diam "listEl.appendChild is not a function" | argumen `uploadFiles()` tertukar | `check_upload_call` di `prepare_remote.py` + smoke test 4 chunk |
-| Tombol penampil foto tidak hilang saat zoom | class `mm-chrome-hidden` tidak diset | smoke test zoom (`+mm-chrome-hidden`/`-mm-chrome-hidden`) |
+| ~~Tombol penampil foto tidak hilang saat zoom~~ | ~~Dihapus bersama penampil foto~~ | ~~Tidak relevan~~ |
 | Path traversal / PIN bypass | logika keamanan bocor ke endpoint | unit test `ServerSecurity` — jangan pindahkan logika ke `HttpControlServer` |
 | File Manager HTTP 500 setelah stop/start server | `stopServer()` men-shutdown `statPool`, tapi toggle server memakai instance yang sama → pool tetap `Terminated`, semua `statPool.submit()` lempar `RejectedExecutionException` (PR #91) | `liveStatPool()` membuat pool baru otomatis saat pool lama shutdown — jangan balikkan ke `statPool` langsung |
 | `GALLERY SCAN` berulang tiap request galeri | cache scan dianggap "belum lengkap" karena `items.size >= limit` gagal saat total file < limit → scan MediaStore penuh berulang dalam masa TTL | kondisi cache juga menerima scan tuntas: `items.size == total` (di `MediaLibrary.scanCached` + `scannedGallery`) |
 | Checksum dari header server salah di-parse (Digest/Content-MD5/X-Checksum-*) | base64 vs hex, huruf besar/kecil, preferensi sha-256 | unit test `ChecksumsTest` — format output wajib "algo:hex" huruf kecil (dipahami `parseChecksum` engine) |
-| Penampil foto blank hitam (hanya tombol) | `mmVideoHeader`/`mmVideoWrap` tidak ditutup `</div>` di HTML → `mmImage` berada di dalam `mmVideoHeader` (auto-close browser); saat kode menyembunyikan `mmVideoHeader` untuk mode foto, `mmImage` ikut tersembunyi | pastikan semua `<div id="mm...` ditutup `</div>` dengan benar — jangan mengandalkan auto-close browser |
-| Pemain video hilang setelah fix foto | `mmVideoWrap` disembunyikan saat reset `openMedia()` tapi tidak pernah di-unhide di jalur video → `mmPlayer` (child `mmVideoWrap`) tetap tersembunyi | di jalur video `openMedia()`, wajib `mmVideoWrap.classList.remove("hidden")` bersama `mmVideoHeader` |
+| ~~Penampil foto blank hitam~~ | ~~Dihapus bersama penampil foto~~ | ~~Tidak relevan~~ |
+| ~~Pemain video hilang setelah fix foto~~ | ~~Dihapus bersama penampil foto~~ | ~~Tidak relevan~~ |
 
 ## Aturan pengembangan
 

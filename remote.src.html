@@ -1123,11 +1123,9 @@
     <div class="gal-toolbar"><h2>Device Gallery</h2><span class="count" id="galleryCount"></span>
       <button id="galSelectBtn" type="button" class="btn-ghost" style="margin-left:auto">Select</button>
     </div>
-    <div class="gal-search"><input id="gallerySearch" type="search" placeholder="Search photos/videos…" autocomplete="off"></div>
+    <div class="gal-search"><input id="gallerySearch" type="search" placeholder="Search videos…" autocomplete="off"></div>
     <div class="seg" id="galleryFilters">
-      <button type="button" class="on" data-gal="all">All</button>
-      <button type="button" data-gal="image">Photos</button>
-      <button type="button" data-gal="video">Videos</button>
+      <button type="button" class="on" data-gal="video">Videos</button>
     </div>
     <div id="galleryStatus"></div>
     <div id="galBatch" class="fs-batch hidden">
@@ -1250,7 +1248,6 @@
     <div id="mmDesc" class="hidden">
       <div id="mmTitle"></div>
       <div id="mmSub"></div>
-    </div>
     </div>
     <div id="mmRelated" class="hidden"></div>
   </div>
@@ -1439,7 +1436,7 @@ let galleryHasMore = false;
 // menimpa data terbaru dan reset tidak ter-skip oleh flag boolean.
 let gallerySeq = 0;
 const gallerySearch = document.getElementById('gallerySearch');
-let galleryFilter = 'all';
+let galleryFilter = 'video';
 let galSelectMode = false;
 const galSelected = [];
 const galBatch = document.getElementById('galBatch');
@@ -1709,7 +1706,7 @@ async function loadGallery(reset) {
         const filtered = galleryFilter !== 'all';
         galleryGrid.innerHTML = emptyHtml(
           'search',
-          q ? 'No results' : (filtered ? 'No ' + (galleryFilter === 'video' ? 'videos' : 'photos') : 'No photos/videos yet'),
+          q ? 'No results' : 'No videos yet',
           q ? 'Try a different keyword.' : (filtered ? 'Try a different filter or change the keyword.' : 'Files in the download folder will appear here.')
         );
         if (!q && !filtered) {
@@ -3518,13 +3515,7 @@ document.addEventListener('keydown', function (e) {
   if (!mediaModal.classList.contains('open')) return;
   const tag = (e.target && e.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if (mmType !== 'video') {
-    if (mmType === 'image') {
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); }
-      else if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); }
-    }
-    return;
-  }
+  if (mmType !== 'video') return;
   const d = mmVideo.duration || 0;
   switch (e.code) {
     case 'Space': e.preventDefault(); mmTogglePlay(); break;
@@ -3768,9 +3759,7 @@ mmVideo.addEventListener('canplay', function () {
   mmSpinner.classList.add('hidden');
 });
 
-mmBody.addEventListener('click', function (e) {
-  if (mmType === 'image' && e.target === mmBody) closeMedia();
-});
+
 
 let hasLoadedItems = false;
 function showListSkeleton() {
