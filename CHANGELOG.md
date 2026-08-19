@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-19] — Fix video title sticky + gallery toolbar leak
+
+### Diperbaiki
+- **Judul/tanggal video ikut scroll** — `#mmDesc` berada di dalam `#mmBody` (scrollable). Fix: pindahkan `#mmDesc` ke luar `#mmBody` sehingga tetap terkunci di bawah pemutar video saat related videos di-scroll.
+- **Tombol toolbar muncul di galeri** — `render()` menampilkan `downloadsToolbar` berdasarkan jumlah download tanpa memeriksa route aktif. Fix: tambah pengecekan `currentRoute() === 'downloads'` sebelum menampilkan toolbar.
+
 ## [v1.0 — 2026-08-19] — Fix unhandled async errors in remote web
 
 ### Diperbaiki

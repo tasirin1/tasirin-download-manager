@@ -632,7 +632,7 @@
  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
   #mmDesc {
- padding: 12px 16px 8px; border-bottom: 1px solid var(--line); }
+ padding: 12px 16px 8px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
 
   #mmTitle {
  color: #0f0f0f; font-size: 14.5px; font-weight: 500; line-height: 1.4; word-break: break-word; }
@@ -1277,11 +1277,11 @@
     </div>
     </div>
     </div>
-    <div id="mmDesc" class="hidden">
-      <div id="mmTitle"></div>
-      <div id="mmSub"></div>
-    </div>
     <div id="mmRelated" class="hidden"></div>
+  </div>
+  <div id="mmDesc" class="hidden">
+    <div id="mmTitle"></div>
+    <div id="mmSub"></div>
   </div>
 </div>
 
@@ -3882,8 +3882,9 @@ function updateToolbar(items) {
   document.getElementById('resumeAllBtn').classList.toggle('hidden', pausedOrFailed === 0);
   document.getElementById('retryFailedBtn').classList.toggle('hidden', failed === 0);
   document.getElementById('clearCompletedBtn').classList.toggle('hidden', completed === 0);
+  const onDlRoute = currentRoute() === 'downloads';
   document.getElementById('downloadsToolbar').classList.toggle(
-    'hidden', active === 0 && pausedOrFailed === 0 && completed === 0
+    'hidden', !onDlRoute || (active === 0 && pausedOrFailed === 0 && completed === 0)
   );
   const badge = document.getElementById('navDlBadge');
   if (badge) {
