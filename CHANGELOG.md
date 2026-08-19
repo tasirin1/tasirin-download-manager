@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-19] — Fix video player layout: title/date sticky below player
+
+### Diperbaiki
+- **Judul/tanggal di bawah saran video** — `mmDesc` (judul/tanggal) dan `mmVideoWrap` (pemain video) dipindahkan ke luar `mmBody` sebagai sibling langsung `#mediaModal`. Struktur baru: `mmTop → mmVideoWrap → mmDesc → mmBody(related only)`. Pemain video + judul/tanggal tetap terkunci, hanya saran video yang bisa di-scroll.
+- **Hapus `mmVideoHeader`** — Wrapper yang tidak diperlukan lagi setelah restruktur.
+
 ## [v1.0 — 2026-08-19] — Gallery: remove search/filter + 3-column grid
 
 ### Dihapus

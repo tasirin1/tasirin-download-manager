@@ -613,10 +613,10 @@
  flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
   #mmVideoWrap {
- background: var(--bg); }
+ background: #000; flex: 0 0 auto; }
 
   #mmPlayer {
- position: relative; width: 100%; background: #000; }
+ position: relative; background: #000; }
 
   #mmPlayer::before {
  content: ''; display: block; padding-top: 56.25%; }
@@ -632,6 +632,9 @@
 
   #mmDesc {
  padding: 12px 16px 8px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+
+  #mmBody {
+ flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
   #mmTitle {
  color: #0f0f0f; font-size: 14.5px; font-weight: 500; line-height: 1.4; word-break: break-word; }
@@ -1239,9 +1242,7 @@
   <div id="mmTop">
     <button id="mmBack" type="button" title="Close">&#10005;</button>
   </div>
-  <div id="mmBody">
-    <div id="mmVideoHeader" class="hidden">
-    <div id="mmVideoWrap" class="hidden">
+  <div id="mmVideoWrap" class="hidden">
     <div id="mmPlayer" class="hidden">
       <video id="mmVideo" playsinline preload="metadata"></video>
       <div id="mmPlayerTop" class="hidden">
@@ -1271,13 +1272,13 @@
         </div>
       </div>
     </div>
-    </div>
-    </div>
-    <div id="mmRelated" class="hidden"></div>
   </div>
   <div id="mmDesc" class="hidden">
     <div id="mmTitle"></div>
     <div id="mmSub"></div>
+  </div>
+  <div id="mmBody">
+    <div id="mmRelated" class="hidden"></div>
   </div>
 </div>
 
@@ -1489,7 +1490,6 @@ const mmFsBtn = document.getElementById('mmFsBtn');
 const mmOverlayTitle = document.getElementById('mmOverlayTitle');
 const mmTop = document.getElementById('mmTop');
 const mmPlayerTop = document.getElementById('mmPlayerTop');
-const mmVideoHeader = document.getElementById('mmVideoHeader');
 const mmVideoWrap = document.getElementById('mmVideoWrap');
 const mmSeekTip = document.getElementById('mmSeekTip');
 const mmVol = document.getElementById('mmVol');
@@ -1551,7 +1551,6 @@ function mmShowToast(text, ms) {
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
   mmOverlayTitle.classList.remove('hide');
-  mmVideoHeader.classList.remove('hidden');
   mmVideoWrap.classList.remove('hidden');
   mmPlayerTop.classList.remove('hide');
   mmPlayer.classList.remove('mm-hide-cursor');
@@ -1623,7 +1622,6 @@ function closeMedia() {
   mmVideo.pause();
   mmVideo.removeAttribute('src');
   mmPlayer.classList.add('hidden');
-  mmVideoHeader.classList.add('hidden');
   mmVideoWrap.classList.add('hidden');
   mmBigPlay.classList.add('hidden');
   mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
@@ -3324,7 +3322,6 @@ function openMedia(it, src) {
   mmDesc.classList.remove('hidden');
   mmBody.scrollTop = 0;
   mmPlayer.classList.add('hidden');
-  mmVideoHeader.classList.add('hidden');
   mmVideoWrap.classList.add('hidden');
   mmVideo.pause();
   mmVideo.removeAttribute('src');
@@ -3332,7 +3329,6 @@ function openMedia(it, src) {
   mmSeek.value = 0;
   mmSeek.style.setProperty('--fill', '0%');
   mmTime.textContent = '0:00 / 0:00';
-  mmVideoHeader.classList.remove('hidden');
   mmVideoWrap.classList.remove('hidden');
   mmPlayer.classList.remove('hidden');
   mmBigPlay.classList.remove('hidden');
