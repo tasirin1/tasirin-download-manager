@@ -3,6 +3,7 @@
 ### Diperbaiki
 - **Penampil foto hanya hitam kosong** — `mmImage`, `mmImgSpin`, `mmDesc` berada di dalam `mmVideoHeader` karena tag `</div>` tidak ditutup dengan benar di HTML. Saat kode menyembunyikan `mmVideoHeader` untuk mode foto, semua elemen di dalamnya (termasuk `mmImage`) ikut tersembunyi. Fix: tutup `mmVideoHeader` dan `mmVideoWrap` dengan benar sehingga `mmImage` menjadi sibling, bukan child dari `mmVideoHeader`.
 - **Pemutar video: judul tertutup kontrol** — `#mmPlayer` tidak punya batas tinggi, sehingga `::before` (padding-top 56.25% = rasio 16:9) bisa membuat player sangat tinggi di layar lebar, mendorong `#mmDesc` (judul) ke bawah hingga tertutup gradient kontrol. Fix: tambah `max-height:56vh; overflow:hidden; position:relative` ke `#mmPlayer`.
+- **Pemutar video hilang** — `mmVideoWrap` disembunyikan saat reset tapi tidak pernah di-unhide di jalur video `openMedia()`. Fix: tambah `mmVideoWrap.classList.remove("hidden")` di jalur video.
 ## [v1.0 — 2026-08-18] — Fix statPool race condition causing File Manager HTTP 500
 
 ### Diperbaiki

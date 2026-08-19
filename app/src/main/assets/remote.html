@@ -2186,6 +2186,7 @@ mmSeek.style.setProperty('--fill', '0%');
 mmTime.textContent = '0:00 / 0:00';
 if (mmType === 'video') {
 document.getElementById('mmVideoHeader').classList.remove('hidden');
+document.getElementById('mmVideoWrap').classList.remove('hidden');
 mmPlayer.classList.remove('hidden');
 mmBigPlay.classList.remove('hidden');
 mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
