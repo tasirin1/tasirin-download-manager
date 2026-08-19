@@ -138,6 +138,8 @@ kuat dan tanpa diskusi:
 | File Manager HTTP 500 setelah stop/start server | `stopServer()` men-shutdown `statPool`, tapi toggle server memakai instance yang sama → pool tetap `Terminated`, semua `statPool.submit()` lempar `RejectedExecutionException` (PR #91) | `liveStatPool()` membuat pool baru otomatis saat pool lama shutdown — jangan balikkan ke `statPool` langsung |
 | `GALLERY SCAN` berulang tiap request galeri | cache scan dianggap "belum lengkap" karena `items.size >= limit` gagal saat total file < limit → scan MediaStore penuh berulang dalam masa TTL | kondisi cache juga menerima scan tuntas: `items.size == total` (di `MediaLibrary.scanCached` + `scannedGallery`) |
 | Checksum dari header server salah di-parse (Digest/Content-MD5/X-Checksum-*) | base64 vs hex, huruf besar/kecil, preferensi sha-256 | unit test `ChecksumsTest` — format output wajib "algo:hex" huruf kecil (dipahami `parseChecksum` engine) |
+| Penampil foto blank hitam (hanya tombol) | `mmVideoHeader`/`mmVideoWrap` tidak ditutup `</div>` di HTML → `mmImage` berada di dalam `mmVideoHeader` (auto-close browser); saat kode menyembunyikan `mmVideoHeader` untuk mode foto, `mmImage` ikut tersembunyi | pastikan semua `<div id="mm...` ditutup `</div>` dengan benar — jangan mengandalkan auto-close browser |
+| Pemain video hilang setelah fix foto | `mmVideoWrap` disembunyikan saat reset `openMedia()` tapi tidak pernah di-unhide di jalur video → `mmPlayer` (child `mmVideoWrap`) tetap tersembunyi | di jalur video `openMedia()`, wajib `mmVideoWrap.classList.remove("hidden")` bersama `mmVideoHeader` |
 
 ## Aturan pengembangan
 
