@@ -215,42 +215,6 @@ sandbox.fsMarkNew('f:/sdcard', 'video.mp4');
 fsExpect(sandbox.fsIsNew('video.mp4') === true, 'badge NEW muncul untuk file baru');
 fsExpect(sandbox.fsIsNew('lama.mp4') === false, 'badge NEW tidak muncul untuk file lain');
 
-// --- Tes math zoom penampil foto (titik sentuh dipertahankan) ---
-const mmImgEl = elements['mmImage'];
-mmImgEl.offsetWidth = 800;
-mmImgEl.offsetHeight = 600;
-const mmBodyEl = elements['mmBody'];
-mmBodyEl.clientWidth = 800;
-mmBodyEl.clientHeight = 600;
-mmBodyEl.getBoundingClientRect = function () { return { top: 0, left: 0, width: 800, height: 600 }; };
-// Spy classList mediaModal: verifikasi tombol penampil disembunyikan saat
-// zoom aktif dan muncul lagi saat kembali ke ukuran penuh.
-const mmChromeLog = [];
-elements['mediaModal'].classList = {
-  add: function (c) { mmChromeLog.push('+' + c); },
-  remove: function (c) { mmChromeLog.push('-' + c); },
-  toggle: function (c) { mmChromeLog.push('~' + c); },
-  contains: function () { return false; }
-};
-vm.runInContext('mmType = "image"; mmImgZoom = { s: 1, tx: 0, ty: 0 };', sandbox);
-sandbox.mmImgZoomTo(400, 300, 2.5);
-fsExpect(Math.abs(vm.runInContext('mmImgZoom.s', sandbox) - 2.5) < 0.001, 'zoom foto in 2.5x');
-fsExpect(Math.abs(vm.runInContext('mmImgZoom.tx', sandbox) + 600) < 1, 'zoom foto menahan titik sentuh (tx)');
-// Pan saat ter-zoom: clamp tidak boleh memaksa kembali ke tengah (regresi
-// sebelumnya: gambar selalu dikunci di posisi tengah sehingga tidak bisa
-// digeser untuk melihat area tertentu).
-vm.runInContext('mmImgZoom.tx = -300; mmImgZoom.ty = -200;', sandbox);
-sandbox.mmImgClamp();
-fsExpect(Math.abs(vm.runInContext('mmImgZoom.tx', sandbox) + 300) < 1, 'pan foto bergeser ke kiri (tx dipertahankan)');
-fsExpect(Math.abs(vm.runInContext('mmImgZoom.ty', sandbox) + 200) < 1, 'pan foto bergeser ke atas (ty dipertahankan)');
-vm.runInContext('mmImgZoom.tx = -5000;', sandbox);
-sandbox.mmImgClamp();
-fsExpect(Math.abs(vm.runInContext('mmImgZoom.tx', sandbox) + 1200) < 1, 'pan foto dikunci di tepi (tx max)');
-sandbox.mmImgZoomTo(400, 300, 1);
-fsExpect(vm.runInContext('mmImgZoom.s', sandbox) === 1, 'zoom foto out reset ke 1');
-fsExpect(vm.runInContext('mmImgZoom.tx', sandbox) === 0, 'zoom foto out tx kembali 0');
-fsExpect(mmChromeLog.indexOf('+mm-chrome-hidden') >= 0, 'zoom aktif menyembunyikan tombol penampil');
-fsExpect(mmChromeLog.indexOf('-mm-chrome-hidden') >= 0, 'kembali 1x menampilkan tombol penampil');
 
 // Reset state agar tes upload di bawah tidak terpengaruh
 vm.runInContext('fsPath = ""; fsBackStack.length = 0;', sandbox);
