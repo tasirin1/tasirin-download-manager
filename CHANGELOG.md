@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-19] — Fix unhandled Promise rejections in doFsOp
+
+### Diperbaiki
+- **Unhandled Promise rejection** — `postFsAction().then(loadFs)` di `doFsOp()` tidak punya `.catch()`. Saat network error atau server down, error tidak ditangkap. Fix: tambah `.catch()` dengan `fsMsg()` error display.
+
 ## [v1.0 — 2026-08-19] — Fix video player layout: title/date sticky below player
 
 ### Diperbaiki

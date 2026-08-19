@@ -1313,19 +1313,19 @@ showConfirm('Delete ' + (it.kind === 'dir' ? 'folder' : 'file') + '?',
 'Delete \"' + it.name + '\" from the device? The folder will be deleted along with its contents.',
 'Delete',
 function () {
-postFsAction({action: 'delete', path: it.path}).then(loadFs);
+postFsAction({action: 'delete', path: it.path}).then(loadFs).catch(function(e) { fsMsg('Delete failed: ' + e, true); });
 });
 } else if (op === 'rename') {
 showInput('Rename', it.name, 'New name for \"' + it.name + '\"', 'Rename',
 function (name) {
 if (!name) return;
-postFsAction({action: 'rename', path: it.path, name: name}).then(loadFs);
+postFsAction({action: 'rename', path: it.path, name: name}).then(loadFs).catch(function(e) { fsMsg('Rename failed: ' + e, true); });
 });
 } else if (op === 'move') {
 showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move',
 function (dest) {
 if (!dest) return;
-postFsAction({action: 'move', path: it.path, dest: dest}).then(loadFs);
+postFsAction({action: 'move', path: it.path, dest: dest}).then(loadFs).catch(function(e) { fsMsg('Move failed: ' + e, true); });
 });
 }
 }
