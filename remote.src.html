@@ -2780,11 +2780,15 @@ async function doFsOp(it, op) {
 }
 
 async function postFsAction(params) {
-  const body = new URLSearchParams();
-  Object.entries(params).forEach(function (e) { body.append(e[0], e[1]); });
-  const res = await fetch(API + '/api/fs_action', {method: 'POST', body});
-  const data = await res.json();
-  if (!data.ok) fsMsg('Operation failed', true);
+  try {
+    const body = new URLSearchParams();
+    Object.entries(params).forEach(function (e) { body.append(e[0], e[1]); });
+    const res = await fetch(API + '/api/fs_action', {method: 'POST', body});
+    const data = await res.json();
+    if (!data.ok) fsMsg('Operation failed', true);
+  } catch (e) {
+    fsMsg('Operation failed: ' + e, true);
+  }
 }
 
 document.getElementById('fsMkdirBtn').addEventListener('click', async function () {
@@ -4138,12 +4142,16 @@ function doAction(id, action) {
   doActionNow(id, action);
 }
 async function doActionNow(id, action, extra) {
-  const body = new URLSearchParams({id: id, action: action});
-  if (extra) {
-    Object.entries(extra).forEach(function (e) { body.append(e[0], e[1]); });
+  try {
+    const body = new URLSearchParams({id: id, action: action});
+    if (extra) {
+      Object.entries(extra).forEach(function (e) { body.append(e[0], e[1]); });
+    }
+    await fetch(API + '/api/action', {method: 'POST', body});
+    refresh();
+  } catch (e) {
+    fsMsg('Action failed: ' + e, true);
   }
-  await fetch(API + '/api/action', {method: 'POST', body});
-  refresh();
 }
 
 const shareModal = document.getElementById('shareModal');

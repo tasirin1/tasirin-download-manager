@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-19] — Fix unhandled async errors in remote web
+
+### Diperbaiki
+- **Async error handling** — `postFsAction()` dan `doActionNow()` tidak punya try-catch. Saat network error atau server down, unhandled rejection terjadi tanpa feedback ke user. Fix: tambah try-catch + `fsMsg()` error display.
+
 ## [v1.0 — 2026-08-19] — Fix video player layout: restore missing CSS
 
 ### Diperbaiki
