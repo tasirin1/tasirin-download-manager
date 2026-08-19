@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-19] — Fix video player layout: restore missing CSS
+
+### Diperbaiki
+- **Pemain video berantakan** — CSS untuk `#mmTop`, `#mmBack`, `#mmBody` (flex layout), dan `position: relative` pada `#mmPlayer` tidak sengaja terhapus saat penghapusan penampil foto. Tanpa flex layout, pemutar video tidak terkontrol ukurannya. Fix: kembalikan CSS layout modal.
+
 ## [v1.0 — 2026-08-19] — Fix video player zoom: restore missing player CSS
 
 ### Diperbaiki
