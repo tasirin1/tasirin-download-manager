@@ -1,3 +1,15 @@
+## [v1.0 — 2026-08-19] — Remove all gestures except double-tap
+
+### Dihapus
+- **Swipe gesture** — Geser kiri/kanan untuk ganti video dihapus.
+- **Brightness/volume gesture** — Sudah dihapus sebelumnya, sekarang variable `mmGesture` juga dihapus.
+- **`mmLastTapX`** — Variable tracking posisi X untuk swipe dihapus.
+
+### Dipertahankan
+- **Double-tap** — Kiri: -10s, Kanan: +10s, Tengah: toggle play.
+- **Single-tap** — Tengah: toggle play/pause, Samping: show/hide controls.
+- **Mouse double-click** — Fullscreen.
+
 ## [v1.0 — 2026-08-19] — Fix unhandled Promise rejections in doFsOp
 
 ### Diperbaiki

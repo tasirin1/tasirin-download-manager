@@ -222,8 +222,6 @@
   .gal-toolbar {
  display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 
-
-
   .gal-toolbar h2 {
  margin: 0; font-size: 16px; }
 
@@ -414,7 +412,6 @@
   .fs-search-row input {
  flex: 1; min-width: 0; padding: 8px 12px; font-size: 13px; border-radius: 999px;
  border: 1px solid var(--line); background: var(--card); color: var(--ink); }
-
 
   .fs-tools button {
  width: 100%; min-width: 0; padding: 8px 12px; font-size: 12.5px; font-weight: 600; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; transition: all .15s ease; }
@@ -1517,12 +1514,10 @@ let mmType = 'video';
 let mmTimer = null;
 let mmTapTimer = null;
 let mmLastTap = 0;
-let mmLastTapX = 0;
 let mmCurrentToken = '';
 let mmLastSave = 0;
 let mmActiveToken = '';
 let mmSeekDrag = false;
-let mmGesture = null;
 
 document.getElementById('tabDownloads').addEventListener('click', function () {
   location.hash = '#/';
@@ -1546,7 +1541,6 @@ function mmShowToast(text, ms) {
   clearTimeout(mmToast._t);
   mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, ms || 700);
 }
-
 
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
@@ -1616,7 +1610,6 @@ function mmUpdateBuffer() {
 function closeMedia() {
   saveVideoPos(mmCurrentToken);
   mmPlayer.style.filter = '';
-  mmGesture = null;
   mediaModal.classList.remove('open');
   document.body.style.overflow = '';
   mmVideo.pause();
@@ -1793,8 +1786,6 @@ function loadMoreGallery() {
     gallerySentinel = null;
   }
 }
-
-
 
 function renderGalleryCell(it) {
   const cell = document.createElement('div');
@@ -3300,10 +3291,6 @@ function mmStepVideo(delta) {
   openMedia(it, API + '/api/media?token=' + encodeURIComponent(it.token));
 }
 
-
-
-
-
 function openMedia(it, src) {
   const prevType = mmType;
   mmType = 'video';
@@ -3582,18 +3569,13 @@ mmFsBtn.addEventListener('click', function () {
 
 mmPlayer.addEventListener('click', function (e) {
   if (e.target.closest('#mmCtrl')) return;
-  // Sentuhan ditangani handler touchend (toggle play, double-tap seek, swipe);
-  // click sintetik Android menyusul dan membatalkan aksi bila tidak diabaikan.
   if (e.pointerType === 'touch') return;
   const now = Date.now();
   const dt = now - mmLastTap;
-  const prevX = mmLastTapX;
   mmLastTap = now;
-  mmLastTapX = e.clientX;
-  if (dt < 350 && Math.abs(e.clientX - prevX) < 80) {
+  if (dt < 350) {
     clearTimeout(mmTapTimer);
     if (e.pointerType === 'mouse') {
-
       mmFsBtn.click();
       return;
     }
@@ -3629,36 +3611,10 @@ mmPlayer.addEventListener('click', function (e) {
 mmPlayer.addEventListener('mousemove', mmShowCtrl);
 mmPlayer.addEventListener('touchstart', function () { mmShowCtrl(); }, { passive: true });
 
-mmPlayer.addEventListener('touchstart', function (e) {
-  // Catat titik awal sentuhan untuk deteksi geser kiri/kanan (ganti video)
-  // dan tap. Gesture kecerahan/volume dihapus: geser vertikal tidak lagi
-  // mengubah brightness/volume (rentan kepencet di layar sentuh).
-  if (e.touches.length !== 1) { mmGesture = null; return; }
-  if (e.target.closest && e.target.closest('#mmCtrl, #mmPlayerTop')) { mmGesture = null; return; }
-  mmGesture = {
-    startX: e.touches[0].clientX,
-    startY: e.touches[0].clientY,
-    active: false
-  };
-}, { passive: true });
 let mmTap = { x: 0, y: 0, t: 0 };
 mmPlayer.addEventListener('touchend', function (e) {
-  // Sentuhan pada kontrol (seek/volume/tombol) jangan sampai memicu toggle
-  // play/pause atau ganti video saat event membubble ke player.
   if (e.target.closest && e.target.closest('#mmCtrl, #mmPlayerTop')) return;
   const ch = e.changedTouches[0];
-  const gx = mmGesture ? mmGesture.startX : ch.clientX;
-  const gy = mmGesture ? mmGesture.startY : ch.clientY;
-  const dx = ch.clientX - gx;
-  const dy = ch.clientY - gy;
-  if (!(mmGesture && mmGesture.active) && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) {
-    mmGesture = null;
-    mmStepVideo(dx < 0 ? 1 : -1);
-    return;
-  }
-  const wasGesture = !!(mmGesture && mmGesture.active);
-  mmGesture = null;
-  if (wasGesture || Math.abs(dx) > 10 || Math.abs(dy) > 10) return;
   if (mmType !== 'video') return;
   const w = window.innerWidth;
   const now = Date.now();
@@ -3753,8 +3709,6 @@ mmVideo.addEventListener('playing', function () {
 mmVideo.addEventListener('canplay', function () {
   mmSpinner.classList.add('hidden');
 });
-
-
 
 let hasLoadedItems = false;
 function showListSkeleton() {
