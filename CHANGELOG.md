@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-19] — Fix video player: restore missing CSS rule
+
+### Diperbaiki
+- **Pemutar video tidak tampil** — Rule CSS `#mediaModal.open { display: flex; }` tidak sengaja terhapus saat penghapusan penampil foto (commit 65e648a). Tanpa rule ini, modal tetap `display: none` meskipun class `.open` ditambahkan. Fix: kembalikan rule CSS.
+
 ## [v1.0 — 2026-08-19] — Code cleanup: remove dead code + cache DOM elements
 
 ### Dihapus
