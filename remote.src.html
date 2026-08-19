@@ -1473,6 +1473,8 @@ const mmFsBtn = document.getElementById('mmFsBtn');
 const mmOverlayTitle = document.getElementById('mmOverlayTitle');
 const mmTop = document.getElementById('mmTop');
 const mmPlayerTop = document.getElementById('mmPlayerTop');
+const mmVideoHeader = document.getElementById('mmVideoHeader');
+const mmVideoWrap = document.getElementById('mmVideoWrap');
 const mmSeekTip = document.getElementById('mmSeekTip');
 const mmVol = document.getElementById('mmVol');
 const mmAutoBtn = document.getElementById('mmAutoBtn');
@@ -1533,8 +1535,8 @@ function mmShowToast(text, ms) {
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
   mmOverlayTitle.classList.remove('hide');
-  document.getElementById('mmVideoHeader').classList.remove('hidden');
-  document.getElementById('mmVideoWrap').classList.remove('hidden');
+  mmVideoHeader.classList.remove('hidden');
+  mmVideoWrap.classList.remove('hidden');
   mmPlayerTop.classList.remove('hide');
   mmPlayer.classList.remove('mm-hide-cursor');
   clearTimeout(mmTimer);
@@ -1605,8 +1607,8 @@ function closeMedia() {
   mmVideo.pause();
   mmVideo.removeAttribute('src');
   mmPlayer.classList.add('hidden');
-  document.getElementById('mmVideoHeader').classList.add('hidden');
-  document.getElementById('mmVideoWrap').classList.add('hidden');
+  mmVideoHeader.classList.add('hidden');
+  mmVideoWrap.classList.add('hidden');
   mmBigPlay.classList.add('hidden');
   mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
   mmSpinner.classList.add('hidden');
@@ -3270,21 +3272,6 @@ function extOf(name) {
   return i >= 0 ? name.slice(i + 1).slice(0, 6) : '\u2699';
 }
 
-async function doDeleteMedia(token, ok) {
-  const body = new URLSearchParams({token: token});
-  try {
-    const res = await fetch(API + '/api/delete_media', {method: 'POST', body});
-    const data = await res.json();
-    if (data.ok) {
-      if (ok) ok();
-    } else {
-      alert('Failed to delete: ' + (data.error || '?'));
-    }
-  } catch (e) {
-    alert('Failed to delete: ' + e);
-  }
-}
-
 function mmTokenIdx(list, token) {
   for (let i = 0; i < list.length; i++) if (list[i].token === token) return i;
   return -1;
@@ -3325,16 +3312,16 @@ function openMedia(it, src) {
   mmDesc.classList.remove('hidden');
   mmBody.scrollTop = 0;
   mmPlayer.classList.add('hidden');
-  document.getElementById('mmVideoHeader').classList.add('hidden');
-  document.getElementById('mmVideoWrap').classList.add('hidden');
+  mmVideoHeader.classList.add('hidden');
+  mmVideoWrap.classList.add('hidden');
   mmVideo.pause();
   mmVideo.removeAttribute('src');
   mmBuf.style.width = '0%';
   mmSeek.value = 0;
   mmSeek.style.setProperty('--fill', '0%');
   mmTime.textContent = '0:00 / 0:00';
-  document.getElementById('mmVideoHeader').classList.remove('hidden');
-  document.getElementById('mmVideoWrap').classList.remove('hidden');
+  mmVideoHeader.classList.remove('hidden');
+  mmVideoWrap.classList.remove('hidden');
   mmPlayer.classList.remove('hidden');
   mmBigPlay.classList.remove('hidden');
   mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';

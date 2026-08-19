@@ -1,3 +1,14 @@
+## [v1.0 — 2026-08-19] — Code cleanup: remove dead code + cache DOM elements
+
+### Dihapus
+- **Dead code `doDeleteMedia`** — Fungsi frontend yang tidak pernah dipanggil sejak tombol hapus galeri dihapus.
+- **Dead code `mmType === 'image'`** — Referensi keyboard handler dan click handler untuk mode foto yang sudah tidak ada.
+- **Unused imports** — `Intent` di `HttpControlServer.kt` dan `File` di `StorageCleanup.kt`.
+
+### Dioptimasi
+- **Cache DOM elements** — `mmVideoHeader` dan `mmVideoWrap` di-cache sebagai `const` (sebelumnya 4x `getElementById` per operasi).
+- **HTML nesting mediaModal** — Hapus `</div>` ekstra yang menyebabkan depth mismatch.
+
 ## [v1.0 — 2026-08-19] — Fix HTML nesting + remove dead photo code
 
 ### Diperbaiki

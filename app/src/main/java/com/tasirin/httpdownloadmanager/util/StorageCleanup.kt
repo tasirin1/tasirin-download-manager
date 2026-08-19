@@ -3,7 +3,6 @@ package com.tasirin.httpdownloadmanager.util
 import android.content.Context
 import com.tasirin.httpdownloadmanager.App
 import com.tasirin.httpdownloadmanager.data.DownloadItem
-import java.io.File
 
 /** Pembersihan otomatis saat storage menipis, supaya download tidak mati
  *  di tengah jalan karena "storage penuh". */
