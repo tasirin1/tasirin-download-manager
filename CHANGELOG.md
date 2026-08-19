@@ -1,3 +1,20 @@
+## [v1.0 — 2026-08-19] — Add Stream button to File Manager
+
+### Added
+- **Stream button** — Tombol ▶ di setiap baris file di File Manager. Sekali klik membuka file di tab baru: foto ditampilkan browser, video/audio pakai player. Hanya muncul untuk file (bukan folder), tersembunyi saat mode Select.
+- **CSS `.fs-stream-btn`** — Tombol bulat 36px, warna abu-abu, hover biru (konsisten dengan tombol actions).
+
+## [v1.0 — 2026-08-19] — Remove all dead code: photo viewer remnants, gallery settings, deleteMedia
+
+### Dihapus
+- **Gallery settings section** — Hapus `section_gallery.xml` + tombol nav Gallery di Settings. Gallery tidak punya pengaturan folder lagi.
+- **Gallery filter bar** — Hapus filter All/Photos/Videos dari `activity_gallery.xml` + `GalleryFilter` enum dari `GalleryActivity`.
+- **`confirmDelete`** — Hapus fungsi delete file dari galeri (tidak ada backend).
+- **`galleryDir` / `mediaInFolder`** — Hapus dari `MediaLibrary` (tidak dipanggil).
+- **String resources** — Hapus `filter_images`, `gallery_delete_*`, `settings_gallery_*`, `settings_section_gallery`.
+- **`onLongClick`** — Hapus dari `GalleryAdapter` (tidak ada aksi delete).
+- **Import `MediaStore`** — Hapus dari `DownloadEngine` (tidak dipakai).
+
 ## [v1.0 — 2026-08-19] — Remove dead code: photo folder settings, deleteMedia, IMAGE filter
 
 ### Dihapus

@@ -213,6 +213,12 @@
   .item-menu-btn:hover, .fs-more-btn:hover {
  color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
 
+  .fs-stream-btn {
+ display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; align-self: center; transition: color .15s ease, border-color .15s ease, background .15s ease; margin-right: 4px; }
+
+  .fs-stream-btn:hover {
+ color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+
   .conn-banner {
  position: sticky; top: 0; z-index: 60; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; background: #b00020; color: #fff; font-size: 13px; font-weight: 600; padding: 8px 14px; }
 
@@ -2297,7 +2303,7 @@ function fsAppendRow(box, it) {
       '<div class="fs-main"><div class="fs-name">' + escapeHtml(it.name) +
         (fsIsNew(it.name) ? '<span class="fs-new-badge">NEW</span>' : '') + '</div>' +
       (meta ? '<div class="fs-meta">' + meta + '</div>' : '') + '</div>' +
-      (!fsSelectMode ? '<button class="fs-more-btn" type="button" title="Actions">\u22EF</button>' : '');
+      (!fsSelectMode && it.kind === 'file' ? '<button class="fs-stream-btn" type="button" title="Stream">\u25B6</button>' : '') + (!fsSelectMode ? '<button class="fs-more-btn" type="button" title="Actions">\u22EF</button>' : '');
     row.addEventListener('click', function () {
       if (fsLpFired) { fsLpFired = false; return; }
       if (fsSelectMode) {
@@ -2309,6 +2315,13 @@ function fsAppendRow(box, it) {
       }
     });
     attachFsLongPress(row, it);
+    const streamBtn = row.querySelector('.fs-stream-btn');
+    if (streamBtn) {
+      streamBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        window.open(API + '/api/media?token=' + encodeURIComponent(it.token), '_blank');
+      });
+    }
     const moreBtn = row.querySelector('.fs-more-btn');
     if (moreBtn) {
       moreBtn.addEventListener('click', function (ev) {
