@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-19] — Fix video player zoom: restore missing player CSS
+
+### Diperbaiki
+- **Pemain video terlalu zoom** — CSS untuk `#mmVideoWrap`, `#mmPlayer`, `#mmVideo` (termasuk aspect-ratio 16:9 via `::before`, `object-fit: contain`, `position: absolute`) tidak sengaja terhapus saat penghapusan penampil foto. Tanpa CSS ini, video tampil tanpa batas ukuran. Fix: kembalikan CSS player.
+
 ## [v1.0 — 2026-08-19] — Fix video player: restore missing CSS rule
 
 ### Diperbaiki
