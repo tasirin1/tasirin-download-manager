@@ -181,7 +181,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     session.method == Method.POST && session.uri == "/api/upload" -> handleUpload(session)
                     session.method == Method.GET && session.uri == "/api/upload_verify" -> uploadVerify(session)
                     session.method == Method.POST && session.uri == "/api/action" -> runAction(session)
-                    session.method == Method.POST && session.uri == "/api/delete_media" -> deleteMedia(session)
                     session.method == Method.POST && session.uri == "/api/fs_action" -> fsAction(session)
                     session.method == Method.GET && session.uri == "/api/fs_zip" -> fsZip(session)
                     session.method == Method.GET && session.uri == "/api/media_zip" -> mediaZip(session)
@@ -990,37 +989,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
-    private fun deleteMedia(session: IHTTPSession): Response {
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
-        val params = readForm(session)
-        val token = params["token"].orEmpty()
-        if (token.isEmpty()) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "empty token"))
-        }
-        val raw = MediaLibrary.decodeToken(token)
-        if (raw.isNullOrEmpty()) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "invalid token"))
-        }
-        val allowed = when {
-            raw.startsWith(FS_PREFIX) -> isFsPathAllowed(raw.removePrefix(FS_PREFIX))
-            raw.startsWith("u:") -> runCatching {
-                isMediaUriAllowed(raw.removePrefix("u:").toUri())
-            }.getOrDefault(false)
-            else -> false
-        }
-        if (!allowed) {
-            return jsonResponse(JSONObject().put("ok", false).put("error", "not allowed"))
-        }
-        val deleted = App.engine.deleteMedia(raw)
-        if (deleted) {
-            invalidateGalleryCache()
-            videoDurationsCache = null
-            if (raw.startsWith(FS_PREFIX)) {
-                MediaLibrary.notifyMediaChanged(context, raw.removePrefix(FS_PREFIX))
-            }
-        }
-        return jsonResponse(JSONObject().put("ok", deleted))
-    }
 
     private fun runAction(session: IHTTPSession): Response {
         val params = readForm(session)

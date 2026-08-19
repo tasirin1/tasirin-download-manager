@@ -44,8 +44,6 @@ object StoragePrefs {
     private const val KEY_EXTRA_FOLDERS = "extra_folders"
     private const val KEY_CONNECT_TIMEOUT_SEC = "connect_timeout_sec"
     private const val KEY_READ_TIMEOUT_SEC = "read_timeout_sec"
-    private const val KEY_GALLERY_IMAGE_FOLDER = "gallery_image_folder"
-    private const val KEY_GALLERY_VIDEO_FOLDER = "gallery_video_folder"
     private const val KEY_COLLAPSED_SECTIONS = "collapsed_sections"
     private const val KEY_THUMB_CLEANUP_LAST = "thumb_cleanup_last"
 
@@ -342,26 +340,6 @@ object StoragePrefs {
     fun setReadTimeoutSec(context: Context, sec: Int) {
         prefs(context).edit {
             putInt(KEY_READ_TIMEOUT_SEC, sec.coerceIn(10, 300))
-        }
-    }
-
-    fun getGalleryImageFolder(context: Context): String? =
-        prefs(context)
-            .getString(KEY_GALLERY_IMAGE_FOLDER, null)?.takeIf { it.isNotBlank() }
-
-    fun setGalleryImageFolder(context: Context, path: String?) {
-        prefs(context).edit {
-            putString(KEY_GALLERY_IMAGE_FOLDER, path?.takeIf { it.isNotBlank() }?.trim())
-        }
-    }
-
-    fun getGalleryVideoFolder(context: Context): String? =
-        prefs(context)
-            .getString(KEY_GALLERY_VIDEO_FOLDER, null)?.takeIf { it.isNotBlank() }
-
-    fun setGalleryVideoFolder(context: Context, path: String?) {
-        prefs(context).edit {
-            putString(KEY_GALLERY_VIDEO_FOLDER, path?.takeIf { it.isNotBlank() }?.trim())
         }
     }
 

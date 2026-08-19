@@ -255,8 +255,6 @@ object MediaLibrary {
         // 4) Foto & video dari device lewat MediaStore. Bila folder galeri foto
         //    / video diatur, scan dibatasi ke folder itu saja (bukan seluruh
         //    penyimpanan). Kosong = semua storage. Urutan: gambar dulu, video.
-        val galleryImageFolder = StoragePrefs.getGalleryImageFolder(context)
-        val galleryVideoFolder = StoragePrefs.getGalleryVideoFolder(context)
         runCatching {
             val resolver = context.contentResolver
             val collections = listOf(
@@ -291,12 +289,6 @@ object MediaLibrary {
                         val iDur = c.getColumnIndex(MediaStore.Video.Media.DURATION)
                         while (c.moveToNext()) {
                             val name = c.getString(iName) ?: continue
-                            val folderCfg = if (isVideo) galleryVideoFolder else galleryImageFolder
-                            if (folderCfg != null) {
-                                val dataPath0 = c.getString(iData)?.takeIf { it.isNotBlank() }
-                                val relPath0 = if (iRel >= 0) c.getString(iRel) else null
-                                if (!mediaInFolder(dataPath0, relPath0, folderCfg)) continue
-                            }
                             val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
                             val dataPath = c.getString(iData)?.takeIf { it.isNotBlank() }
                             list.add(
@@ -317,20 +309,6 @@ object MediaLibrary {
             }
         }
 
-        // 4b) MediaStore Android lama (API < 29) sering tidak mengindeks file
-        //     baru yang ditulis lewat file manager/upload. Scan folder galeri
-        //     langsung dari filesystem biar file baru langsung terdeteksi.
-        if (Build.VERSION.SDK_INT < 29 || StoragePrefs.isFsFullAccessEnabled(context)) {
-            runCatching {
-                listOfNotNull(galleryImageFolder, galleryVideoFolder).forEach { cfg ->
-                    val dir = galleryDir(cfg)
-                    if (dir != null && dir.isDirectory) {
-                        dir.listFiles()?.forEach { addFile(it) }
-                    }
-                }
-            }
-        }
-
         // 5) Folder Download publik (lama, untuk Android < 10 bila MediaStore
         //    tidak mengembalikan apa pun karena izin belum diberikan).
         if (Build.VERSION.SDK_INT < 29) {
@@ -340,16 +318,6 @@ object MediaLibrary {
                 )
                 if (dir.isDirectory) dir.listFiles()?.forEach { addFile(it) }
             }
-        }
-
-        if (galleryImageFolder != null || galleryVideoFolder != null) {
-            var photoCount = 0
-            var videoCount = 0
-            list.forEach { if (it.isVideo) videoCount++ else photoCount++ }
-            App.logEvent(
-                "GALLERY SCAN: $photoCount photos, $videoCount videos " +
-                    "(photos: ${galleryImageFolder ?: "all"}, videos: ${galleryVideoFolder ?: "all"})"
-            )
         }
 
         // Hapus duplikat: file yang sama bisa muncul sebagai path (f:) dan
@@ -382,56 +350,4 @@ object MediaLibrary {
         return freed
     }
 
-    /** Cek apakah file media masuk folder galeri terpilih.
-     *  Format konfigurasi: "f:/path" (atau path polos) atau "m:RelativePath".
-     *  Kosong = semua storage. */
-    /** Resolve konfigurasi folder galeri ("f:/path" atau path polos) menjadi
-     *  File tujuan di filesystem; null untuk format "m:RelativePath". */
-    @SuppressLint("SdCardPath") // Normalisasi /sdcard sengaja: nama lama yang dipakai pengguna.
-    private fun galleryDir(config: String): File? {
-        val raw = config.trim().removePrefix("f:").trim()
-        if (raw.isEmpty()) return null
-        val norm = when {
-            raw == "sdcard" -> "/storage/emulated/0"
-            raw.startsWith("sdcard/") -> "/storage/emulated/0/" + raw.removePrefix("sdcard")
-            raw.startsWith("/sdcard") -> "/storage/emulated/0" + raw.removePrefix("/sdcard")
-            raw == "mnt/sdcard" -> "/storage/emulated/0"
-            raw.startsWith("mnt/sdcard/") -> "/storage/emulated/0/" + raw.removePrefix("mnt/sdcard")
-            raw.startsWith("/mnt/sdcard") -> "/storage/emulated/0" + raw.removePrefix("/mnt/sdcard")
-            raw.startsWith("/storage/emulated/0") -> raw
-            raw.startsWith("/") -> raw
-            raw == "storage/self/primary" -> "/storage/emulated/0"
-            raw.startsWith("storage/self/primary/") ->
-                "/storage/emulated/0/" + raw.removePrefix("storage/self/primary")
-            else -> "/" + raw.trim('/')
-        }
-        return File(norm)
-    }
-
-    private fun mediaInFolder(filePath: String?, relativePath: String?, config: String): Boolean {
-        val cfg = config.trim()
-        if (cfg.isEmpty()) return true
-        if (cfg.startsWith("m:") || cfg.startsWith("M:")) {
-            val rel = cfg.removePrefix("m:").removePrefix("M:").trim('/')
-            if (rel.isEmpty()) return true
-            if (relativePath != null) return relativePath.trim('/').startsWith(rel)
-            val fp = filePath?.replace('\\', '/') ?: return false
-            return fp.substringAfterLast("/storage/emulated/0/", fp).trim('/').startsWith(rel)
-        }
-        val dir = cfg.removePrefix("f:").trim('/')
-        if (dir.isEmpty()) return true
-        val fp = filePath?.replace('\\', '/') ?: return false
-        // MediaStore melaporkan path asli (/storage/emulated/0/...), sedangkan
-        // pengguna biasa menulis /sdcard/... — samakan dulu.
-        val norm = when {
-            dir == "sdcard" || dir.startsWith("sdcard/") ->
-                "storage/emulated/0/" + dir.removePrefix("sdcard").trim('/')
-            dir == "mnt/sdcard" || dir.startsWith("mnt/sdcard/") ->
-                "storage/emulated/0/" + dir.removePrefix("mnt/sdcard").trim('/')
-            dir == "storage/self/primary" || dir.startsWith("storage/self/primary/") ->
-                "storage/emulated/0/" + dir.removePrefix("storage/self/primary").trim('/')
-            else -> dir
-        }
-        return fp.removePrefix("/").startsWith("$norm/")
-    }
 }

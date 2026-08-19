@@ -72,21 +72,6 @@
                 android:textSize="13sp" />
 
             <TextView
-                android:id="@+id/nav_gallery"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_chip"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:layout_marginEnd="6dp"
-                android:minHeight="40dp"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="8dp"
-                android:text="@string/settings_section_gallery"
-                android:textSize="13sp" />
-
-            <TextView
                 android:id="@+id/nav_other"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -588,9 +573,6 @@
                     <include layout="@layout/view_storage_section" />
             </LinearLayout>
 
-            <!-- ===== SEKSI: GALERI (di layout terpisah supaya jumlah view
-                 activity_settings di bawah ambang lint) ===== -->
-            <include layout="@layout/section_gallery" />
 
             <!-- ===== SEKSI: LAINNYA ===== -->
             <LinearLayout

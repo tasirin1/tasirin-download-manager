@@ -1,3 +1,13 @@
+## [v1.0 — 2026-08-19] — Remove dead code: photo folder settings, deleteMedia, IMAGE filter
+
+### Dihapus
+- **Photo gallery folder setting** — Hapus `input_gallery_image` dari SettingsActivity + layout `section_gallery.xml`. Hapus `wireGallerySection()`, `applyGalleryFolders()`, `getGalleryImageFolder()`, `setGalleryImageFolder()`.
+- **Video gallery folder setting** — Hapus `input_gallery_video` dari SettingsActivity. Hapus `getGalleryVideoFolder()`, `setGalleryVideoFolder()`. Gallery scan tidak lagi difilter per folder.
+- **`/api/delete_media` endpoint** — Hapus endpoint + `deleteMedia()` function dari HttpControlServer.
+- **`deleteMedia()` di DownloadEngine** — Tidak dipanggil dari mana pun.
+- **`GalleryFilter.IMAGE`** — Hapus filter IMAGE dari GalleryActivity (hanya ALL + VIDEO).
+- **String resource** — Hapus `settings_gallery_image_label`.
+
 ## [v1.0 — 2026-08-19] — Remove all gestures except double-tap
 
 ### Dihapus

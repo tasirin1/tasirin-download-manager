@@ -153,14 +153,10 @@
     <string name="open_folder">Folder</string>
     <string name="open_folder_unavailable">No file-manager app available to open the folder</string>
     <string name="settings_auto_sort">Auto-move to type subfolder (Video/Photos)</string>
-    <string name="filter_images">Photos</string>
     <string name="filter_videos">Videos</string>
     <string name="hls_quality_title">Pick video quality</string>
     <string name="hls_direct">Download original playlist (no pick)</string>
-    <string name="gallery_delete_title">Delete file</string>
-    <string name="gallery_delete_message">Delete this file?\n%1$s</string>
-    <string name="gallery_delete_error">Failed to delete file</string>
-    <string name="gallery_empty">No photos/videos in the download folder yet.</string>
+    <string name="gallery_empty">No videos found yet.</string>
     <string name="gallery_open_error">No app found to open this file</string>
 
     <string name="speed_limit_per_label">Speed limit (per download)</string>
@@ -281,11 +277,6 @@
         <item quantity="one">%1$d line</item>
         <item quantity="other">%1$d lines</item>
     </plurals>
-    <string name="settings_section_gallery">Gallery</string>
-    <string name="settings_gallery_image_label">Photo gallery folder (optional)</string>
-    <string name="settings_gallery_video_label">Video gallery folder (optional)</string>
-    <string name="settings_gallery_folder_hint">Folder path, e.g. /storage/emulated/0/DCIM/Camera</string>
-    <string name="settings_gallery_hint">Leave empty to scan all storage. Format: f:path or m:RelativePath — /sdcard/… paths are recognized as /storage/emulated/0/…</string>
     <string name="cleanup_button">Clean up junk files</string>
     <plurals name="cleanup_done">
         <item quantity="one">Cleaned: %1$d file (%2$s) removed</item>

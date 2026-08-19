@@ -86,7 +86,6 @@ class SettingsActivity : AppCompatActivity() {
         }
         wireDownloadSettings()
         wireStorageSection()
-        wireGallerySection()
         wireSave()
         binding.btnCheckUpdate.setOnClickListener { checkForUpdate() }
         setupCollapsibleSections()
@@ -100,8 +99,6 @@ class SettingsActivity : AppCompatActivity() {
         renderServer()
     }
 
-
-
     /** Seksi kartu yang bisa dilipat (state disimpan di StoragePrefs). */
     private class SectionSpec(
         val sectionId: Int,
@@ -113,7 +110,6 @@ class SettingsActivity : AppCompatActivity() {
         SectionSpec(R.id.section_server, R.id.header_server, "server"),
         SectionSpec(R.id.section_download, R.id.header_download, "download"),
         SectionSpec(R.id.section_storage, R.id.header_storage, "storage"),
-        SectionSpec(R.id.section_gallery, R.id.header_gallery, "gallery"),
         SectionSpec(R.id.section_other, R.id.header_other, "other")
     )
 
@@ -121,8 +117,7 @@ class SettingsActivity : AppCompatActivity() {
         R.id.nav_server to sections[0],
         R.id.nav_download to sections[1],
         R.id.nav_storage to sections[2],
-        R.id.nav_gallery to sections[3],
-        R.id.nav_other to sections[4]
+        R.id.nav_other to sections[3]
     )
 
     private fun setupCollapsibleSections() {
@@ -570,25 +565,6 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun wireGallerySection() {
-        // View binding tidak mengekspos view dari <include>, jadi pakai
-        // findViewById (pola yang sama seperti wireStorageSection).
-        findViewById<EditText>(R.id.input_gallery_image)
-            .setText(StoragePrefs.getGalleryImageFolder(this).orEmpty())
-        findViewById<EditText>(R.id.input_gallery_video)
-            .setText(StoragePrefs.getGalleryVideoFolder(this).orEmpty())
-    }
-
-    private fun applyGalleryFolders() {
-        StoragePrefs.setGalleryImageFolder(
-            this, findViewById<EditText>(R.id.input_gallery_image).text?.toString()?.trim().orEmpty()
-        )
-        StoragePrefs.setGalleryVideoFolder(
-            this, findViewById<EditText>(R.id.input_gallery_video).text?.toString()?.trim().orEmpty()
-        )
-        App.logEvent("GALLERY FOLDERS: photos=${StoragePrefs.getGalleryImageFolder(this) ?: "all"} videos=${StoragePrefs.getGalleryVideoFolder(this) ?: "all"}")
-    }
-
     private fun addExtraFolderRow(box: LinearLayout, path: String) {
         val row = layoutInflater.inflate(R.layout.row_extra_folder, box, false)
         val input = row.findViewById<EditText>(R.id.extra_folder_path)
@@ -621,7 +597,6 @@ class SettingsActivity : AppCompatActivity() {
         binding.btnSave.setOnClickListener {
             applyStoragePath(findViewById<EditText>(R.id.input_storage_path))
             applyExtraFolders(binding.root)
-            applyGalleryFolders()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
             val oldPinHash = StoragePrefs.storedPinHash(this)
             if (newPin.isEmpty()) {
@@ -776,7 +751,6 @@ class SettingsActivity : AppCompatActivity() {
         val needed = Permissions.missingRuntime(this)
         if (needed.isNotEmpty()) permissionLauncher.launch(needed)
     }
-
 
     private fun defaultDownloadsPath(): String {
         if (Build.VERSION.SDK_INT >= 29) return "/storage/emulated/0/Download"

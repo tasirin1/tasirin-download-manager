@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
 import android.util.Base64
 import androidx.core.net.toUri
 import com.tasirin.httpdownloadmanager.App
@@ -255,60 +254,6 @@ class DownloadEngine(appContext: Context) {
         update(listOf(item) + _items.value)
         flushSave()
         return published
-    }
-
-    fun deleteMedia(raw: String): Boolean {
-        val path = if (raw.startsWith("f:")) raw.substring(2) else null
-        val uri = if (raw.startsWith("u:")) runCatching { raw.substring(2).toUri() }.getOrNull() else null
-        if (path == null && uri == null) return false
-        val deleted = if (path != null) {
-            val fileGone = runCatching { File(path).delete() }.getOrDefault(false)
-            // Hapus juga baris MediaStore yang menunjuk file ini (bila ada).
-            val rowGone = runCatching {
-                context.contentResolver.delete(
-                    MediaStore.Files.getContentUri("external"),
-                    "${MediaStore.MediaColumns.DATA}=?", arrayOf(path)
-                )
-            }.getOrDefault(0) > 0
-            fileGone || rowGone
-        } else {
-            // u: URI — Android 6-9: baris MediaStore bisa dihapus tanpa file fisik
-            // ikut hilang (atau sebaliknya), jadi hapus KEDUANYA. Android 10+:
-            // hapus baris MediaStore (cara resmi di scoped storage).
-            val data = runCatching {
-                context.contentResolver.query(
-                    uri!!, arrayOf(MediaStore.MediaColumns.DATA), null, null, null
-                )?.use { c ->
-                    if (c.moveToFirst()) {
-                        c.getString(c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA))
-                    } else {
-                        null
-                    }
-                }
-            }.getOrNull()
-            val rowGone = runCatching {
-                context.contentResolver.delete(uri!!, null, null) > 0
-            }.getOrDefault(false)
-            if (data.isNullOrBlank()) {
-                rowGone
-            } else if (Build.VERSION.SDK_INT >= 29) {
-                rowGone
-            } else {
-                runCatching { File(data).delete() }.getOrDefault(false) || rowGone
-            }
-        }
-        if (deleted) {
-            update(
-                _items.value.filterNot { item ->
-                    item.state == DownloadState.COMPLETED && (
-                        (path != null && item.filePath == path) ||
-                            (uri != null && item.contentUri == uri.toString())
-                        )
-                }
-            )
-            flushSave()
-        }
-        return deleted
     }
 
     fun probeHlsVariants(url: String): List<HlsVariant>? {

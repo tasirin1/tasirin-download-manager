@@ -16,9 +16,7 @@ import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
@@ -50,17 +48,13 @@ class GalleryActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityGalleryBinding
     private var fullList: List<MediaLibrary.MediaEntry> = emptyList()
-    private var filter = GalleryFilter.ALL
     private var loadedCount = GALLERY_PAGE
     private var loadingMore = false
     private var partialProgress: Map<String, Int> = emptyMap()
     private val adapter = GalleryAdapter(
         loader = { e -> loadThumb(this, e, THUMB_SIZE) },
-        onClick = { e -> openEntry(e) },
-        onLongClick = { e -> confirmDelete(e) }
+        onClick = { e -> openEntry(e) }
     )
-
-    private enum class GalleryFilter { ALL, IMAGE, VIDEO }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,8 +75,6 @@ class GalleryActivity : AppCompatActivity() {
             }
         })
 
-        setupFilters()
-
         lifecycleScope.launch {
             binding.progress.visibility = View.VISIBLE
             partialProgress = App.engine.items.value
@@ -92,51 +84,13 @@ class GalleryActivity : AppCompatActivity() {
                 MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount).items
             }
             binding.progress.visibility = View.GONE
-            applyFilterUi()
             loadMore() // halaman awal kurang dari satu layar -> isi otomatis
         }
     }
 
-    private fun setupFilters() {
-        val map = listOf(
-            R.id.gfilter_all to GalleryFilter.ALL,
-            R.id.gfilter_image to GalleryFilter.IMAGE,
-            R.id.gfilter_video to GalleryFilter.VIDEO
-        )
-        map.forEach { (id, f) ->
-            findViewById<TextView>(id)?.setOnClickListener {
-                filter = f
-                updateFilterColors()
-                applyFilterUi()
-                loadMore()
-            }
-        }
-        updateFilterColors()
-    }
-
-    private fun updateFilterColors() {
-        val map = listOf(
-            R.id.gfilter_all to GalleryFilter.ALL,
-            R.id.gfilter_image to GalleryFilter.IMAGE,
-            R.id.gfilter_video to GalleryFilter.VIDEO
-        )
-        map.forEach { (id, f) ->
-            val tv = findViewById<TextView>(id) ?: return@forEach
-            val selected = f == filter
-            tv.setTextColor(
-                androidx.core.content.ContextCompat.getColor(
-                    this,
-                    if (selected) R.color.primary else R.color.text_secondary
-                )
-            )
-            tv.typeface = if (selected) android.graphics.Typeface.DEFAULT_BOLD else null
-        }
-    }
-
     private fun applyFilterUi() {
-        val filtered = filter(fullList)
-        adapter.submit(filtered)
-        binding.emptyView.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+        adapter.submit(fullList)
+        binding.emptyView.visibility = if (fullList.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun canLoadMore(): Boolean =
@@ -149,7 +103,7 @@ class GalleryActivity : AppCompatActivity() {
         loadingMore = true
         lifecycleScope.launch {
             try {
-                while (canLoadMore() && filter(fullList).size < GALLERY_MIN_FILL) {
+                while (canLoadMore() && fullList.size < GALLERY_MIN_FILL) {
                     val next = minOf(loadedCount + GALLERY_PAGE, MediaLibrary.GALLERY_MAX_ENTRIES)
                     val had = fullList.size
                     fullList = withContext(Dispatchers.IO) {
@@ -163,31 +117,6 @@ class GalleryActivity : AppCompatActivity() {
             }
             applyFilterUi()
         }
-    }
-
-    private fun filter(list: List<MediaLibrary.MediaEntry>): List<MediaLibrary.MediaEntry> =
-        when (filter) {
-            GalleryFilter.ALL -> list
-            GalleryFilter.IMAGE -> list.filter { !it.isVideo }
-            GalleryFilter.VIDEO -> list.filter { it.isVideo }
-        }
-
-    private fun confirmDelete(e: MediaLibrary.MediaEntry) {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.gallery_delete_title)
-            .setMessage(getString(R.string.gallery_delete_message, e.name))
-            .setPositiveButton(R.string.delete) { _, _ ->
-                runCatching {
-                    val raw = MediaLibrary.decodeToken(e.token)
-                    if (raw != null) App.engine.deleteMedia(raw)
-                }.onFailure {
-                    Toast.makeText(this, R.string.gallery_delete_error, Toast.LENGTH_SHORT).show()
-                }
-                fullList = fullList.filterNot { it.token == e.token }
-                applyFilterUi()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     private fun openEntry(e: MediaLibrary.MediaEntry) {
@@ -424,7 +353,6 @@ class GalleryActivity : AppCompatActivity() {
 private class GalleryAdapter(
     private val loader: suspend (MediaLibrary.MediaEntry) -> Bitmap?,
     private val onClick: (MediaLibrary.MediaEntry) -> Unit,
-    private val onLongClick: (MediaLibrary.MediaEntry) -> Unit = {}
 ) : RecyclerView.Adapter<GalleryAdapter.Holder>() {
 
     private val items = mutableListOf<MediaLibrary.MediaEntry>()
@@ -490,10 +418,6 @@ private class GalleryAdapter(
         b.imageThumb.setImageDrawable(null)
         val pos = position
         holder.itemView.setOnClickListener { onClick(e) }
-        holder.itemView.setOnLongClickListener {
-            onLongClick(e)
-            true
-        }
         holder.job?.cancel()
         holder.job = scope.launch {
             val bmp = loader(e)
