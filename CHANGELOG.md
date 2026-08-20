@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-20] — Remove unused imports and dead string
+
+### Removed
+- Unused `SuppressLint` and `App` imports from `MediaLibrary.kt` (leftover from gallery folder removal).
+- Dead string resource `filter_videos` (gallery filter removed earlier).
+
 ## [v1.0 — 2026-08-19] — Add Stream button to File Manager
 
 ### Added
