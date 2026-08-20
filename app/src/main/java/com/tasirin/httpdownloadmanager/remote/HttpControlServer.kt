@@ -3,7 +3,6 @@ package com.tasirin.httpdownloadmanager.remote
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.annotation.SuppressLint
@@ -102,7 +101,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Pool bisa mati saat stopServer() lalu startServer() pada instance yang
     // sama (toggle server di Settings) — liveStatPool() membuat pool baru
     // otomatis supaya listing subfolder tidak gagal setelah restart server.
-    private var statPool: ThreadPoolExecutor = newStatPool()
+    @Volatile private var statPool: ThreadPoolExecutor = newStatPool()
     // Cache allowedFsRoots: dibangun ulang hanya saat settings berubah,
     // bukan setiap request (16x per request file manager).
     @Volatile private var cachedFsRoots: List<File>? = null
@@ -120,7 +119,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 synchronized(this@HttpControlServer) {
                     if (statPool.isShutdown) statPool = newStatPool()
                 }
-                liveStatPool().execute(cmd)
+                // Tangkap exception bila pool di-shutdown antara create & execute
+                // (race condition saat stopServer() dipanggil bersamaan).
+                runCatching { liveStatPool().execute(cmd) }.onFailure { e ->
+                    runCatching { logError(e) }
+                }
             }
         return pool
     }
@@ -237,6 +240,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // tunggu & coba lagi sampai 3x (total ~600ms) supaya tidak crash.
         invalidateFsRootsCache()
         invalidateStatusCache()
+        // Bila statPool terminated (stopServer() sebelumnya), buat baru supaya
+        // request pertama setelah restart tidak gagal dengan RejectedExecutionException.
+        if (statPool.isTerminated) statPool = newStatPool()
         var lastEx: IOException? = null
         for (attempt in 1..3) {
             try {

@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-20] — Fix statPool ThreadPoolExecutor crash + unused import cleanup
+
+### Fixed
+- **ThreadPoolExecutor crash** — Kembalikan `@Volatile` pada `statPool` (dihapus sebelumnya, padahal diperlukan untuk thread safety). Tambah `runCatching` di `RejectedExecutionHandler` supaya exception tidak crash app saat pool di-shutdown bersamaan. Tambah reset pool di `startServer()` bila pool terminated (stop/start server).
+- **Unused import** — Hapus `import android.graphics.BitmapFactory` dari `HttpControlServer.kt` (kode pakai FQN `android.graphics.BitmapFactory.Options()`).
+
 ## [v1.0 — 2026-08-20] — Fix compile errors in safeRun + ServerThumbnail
 
 ### Fixed
