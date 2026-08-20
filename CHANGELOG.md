@@ -1,3 +1,13 @@
+## [v1.0 — 2026-08-20] — Extract ServerThumbnail, safeRun logging, gallery progress, fsRoots cache fix
+
+### Refactored
+- **ServerThumbnail.kt** — Extract thumbnail functions (`getOrCreateThumb`, `generateThumb`, `videoThumb`, `imageThumb`) dari `HttpControlServer.kt` ke file terpisah.
+
+### Fixed
+- **silent runCatching** — Tambah `safeRun()` helper: error otomatis logged (sebelumnya hilang diam-diam).
+- **Gallery upload progress** — Gallery sekarang `collect` download flow → progress update real-time saat upload via remote web.
+- **cachedFsRoots invalidation** — Settings save sekarang panggil `invalidateFsRootsCache()` + `invalidateStatusCache()` (sebelumnya file manager pakai cache lama).
+
 ## [v1.0 — 2026-08-20] — Fix ThreadPool crash, video read-ahead, gallery scan efficiency
 
 ### Fixed
