@@ -1,6 +1,5 @@
 package com.tasirin.httpdownloadmanager.util
 
-import android.annotation.SuppressLint
 import android.content.ContentUris
 import android.content.Context
 import android.database.ContentObserver
@@ -13,7 +12,6 @@ import android.os.HandlerThread
 import android.provider.MediaStore
 import android.util.Base64
 import androidx.documentfile.provider.DocumentFile
-import com.tasirin.httpdownloadmanager.App
 import java.io.File
 
 object MediaLibrary {
