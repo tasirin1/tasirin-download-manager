@@ -1123,7 +1123,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     thumb.length()
                 ).also { it.addHeader("Cache-Control", "public, max-age=86400") }
             }
-        }.getOrElse { notFound() }
+        } ?: notFound()
     }
 
 
@@ -1291,13 +1291,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 when {
                     raw.startsWith("f:") -> mmr.setDataSource(File(raw.substring(2)).absolutePath)
                     raw.startsWith("u:") -> mmr.setDataSource(context, raw.substring(2).toUri())
-                    else -> return 0L
+                    else -> return@safeRun 0L
                 }
                 mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
             } finally {
                 runCatching { mmr.release() }
             }
-        }.getOrDefault(0L)
+        } ?: 0L
     }
 
     private val videoDurationLock = Any()
@@ -2110,7 +2110,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     fun clearLog() = serverLog.clear()
 
-    private fun logError(e: Exception) {
+    private fun logError(e: Throwable) {
         appendLog("ERROR ${e.message}")
         CrashLog.append(context, "serve", e)
     }
