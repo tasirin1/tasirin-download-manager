@@ -4,7 +4,10 @@
      Cleartext diizinkan secara umum (download manager memang butuh HTTP),
      tapi trust anchor TLS kustom tetap ditambah untuk server remote. -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config
+        xmlns:tools="http://schemas.android.com/tools"
+        tools:ignore="InsecureBaseConfiguration"
+        cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
             <certificates src="@raw/digicert_global_root_g2" />

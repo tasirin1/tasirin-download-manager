@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-20] — Fix lint warnings + update Gradle
+
+### Fixed
+- **Lint warnings** — `UnusedAttribute`: ubah `tools:targetApi` dari "23" ke "24" di manifest (networkSecurityConfig API 24+). `InsecureBaseConfiguration`: tambah `tools:ignore` di network_security_config.xml (cleartext memang diperlukan untuk download manager).
+- **Gradle wrapper** — Update dari 9.7.0 ke 9.7.1 (patch update).
+
 ## [v1.0 — 2026-08-20] — Fix statPool ThreadPoolExecutor crash + unused import cleanup
 
 ### Fixed
