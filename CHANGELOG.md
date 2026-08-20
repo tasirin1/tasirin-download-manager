@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-20] — Fix compile errors in safeRun + ServerThumbnail
+
+### Fixed
+- **Compile** — `logError` accepts `Throwable` (was `Exception`); `safeRun` callers use `?:` instead of `.getOrElse`; added `toUri` import to `ServerThumbnail.kt`; fixed `return@safeRun` in crossinline lambda.
+
 ## [v1.0 — 2026-08-20] — Extract ServerThumbnail, safeRun logging, gallery progress, fsRoots cache fix
 
 ### Refactored
