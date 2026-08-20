@@ -3,7 +3,6 @@ package com.tasirin.httpdownloadmanager.remote
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -19,7 +18,6 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
-import com.tasirin.httpdownloadmanager.util.scaleDown
 import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
@@ -1113,8 +1111,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val token = session.parms["token"].orEmpty()
         if (token.isEmpty()) return notFound()
         val raw = MediaLibrary.decodeToken(token) ?: return notFound()
-        return runCatching {
-            val thumb = getOrCreateThumb(raw)
+        return safeRun("serveThumb") {
+            val thumb = getOrCreateThumb(context, raw, ::isFsPathAllowed, ::isMediaUriAllowed)
             if (thumb == null) {
                 notFound()
             } else {
@@ -1128,104 +1126,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrElse { notFound() }
     }
 
-    private fun getOrCreateThumb(raw: String): File? {
-        val key = sha256Hex(raw).take(16)
-        val dir = File(context.cacheDir, "thumbs").apply { runCatching { mkdirs() } }
-        if (!dir.isDirectory) return null
-        val cached = File(dir, "$key.jpg")
-        if (cached.isFile && cached.length() > 0) return cached
-        val bmp = generateThumb(raw) ?: return null
-        return runCatching {
-            val out = FileOutputStream(cached)
-            try {
-                bmp.compress(Bitmap.CompressFormat.JPEG, 72, out)
-            } finally {
-                runCatching { out.close() }
-                runCatching { bmp.recycle() }
-            }
-            cached
-        }.getOrNull()
-    }
 
-    private fun generateThumb(raw: String): Bitmap? {
-        return runCatching {
-            when {
-                raw.startsWith("f:") -> {
-                    val file = File(raw.substring(2))
-                    if (!file.isFile || !isFsPathAllowed(file.absolutePath)) return null
-                    if (MediaLibrary.mediaKind(file.name) == "video") {
-                        videoThumb(path = file.absolutePath)
-                    } else {
-                        imageThumb(path = file.absolutePath)
-                    }
-                }
-                raw.startsWith("u:") -> {
-                    val uri = raw.substring(2).toUri()
-                    if (!isMediaUriAllowed(uri)) return null
-                    val name = DocumentFile.fromSingleUri(context, uri)?.name.orEmpty()
-                    if (MediaLibrary.mediaKind(name) == "video") {
-                        videoThumb(uri = uri)
-                    } else {
-                        imageThumb(uri = uri)
-                    }
-                }
-                else -> null
-            }
-        }.getOrNull()
-    }
 
-    private fun videoThumb(path: String? = null, uri: Uri? = null): Bitmap? {
-        if (path == null && uri == null) return null
-        val mmr = MediaMetadataRetriever()
-        return try {
-            if (path != null) {
-                mmr.setDataSource(path)
-            } else {
-                mmr.setDataSource(context, uri)
-            }
-            val frame = mmr.getFrameAtTime(
-                1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-            ) ?: return null
-            scaleDown(frame, 480)
-        } catch (_: Exception) {
-            null
-        } finally {
-            runCatching { mmr.release() }
-        }
-    }
 
-    private fun imageThumb(path: String? = null, uri: Uri? = null): Bitmap? {
-        return runCatching {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            if (path != null) {
-                BitmapFactory.decodeFile(path, bounds)
-            } else {
-                uri?.let {
-                    context.contentResolver.openInputStream(it)?.use { s ->
-                        BitmapFactory.decodeStream(s, null, bounds)
-                    }
-                }
-            }
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-            var sample = 1
-            while (bounds.outWidth / (sample * 2) >= 480 &&
-                bounds.outHeight / (sample * 2) >= 480
-            ) {
-                sample *= 2
-            }
-            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-            val bmp = if (path != null) {
-                BitmapFactory.decodeFile(path, opts)
-            } else {
-                uri?.let {
-                    context.contentResolver.openInputStream(it)?.use { s ->
-                        BitmapFactory.decodeStream(s, null, opts)
-                    }
-                }
-            } ?: return null
-            scaleDown(bmp, 480)
-        }.getOrNull()
-    }
 
     private fun serveMedia(session: IHTTPSession): Response {
         val token = session.parms["token"].orEmpty()
@@ -1382,7 +1285,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun videoDurationMs(token: String): Long {
         val raw = MediaLibrary.decodeToken(token) ?: return 0L
-        return runCatching {
+        return safeRun("videoDurationMs") {
             val mmr = MediaMetadataRetriever()
             try {
                 when {
@@ -2210,6 +2113,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun logError(e: Exception) {
         appendLog("ERROR ${e.message}")
         CrashLog.append(context, "serve", e)
+    }
+
+    /** Wrapper runCatching + logError: supaya error tidak hilang diam-diam. */
+    private inline fun <T> safeRun(tag: String = "", crossinline block: () -> T): T? {
+        return runCatching { block() }.onFailure { e ->
+            logError(e)
+            if (tag.isNotEmpty()) appendLog("  \u2193 $tag")
+        }.getOrNull()
     }
 
     private fun jsonResponse(obj: JSONObject): Response {

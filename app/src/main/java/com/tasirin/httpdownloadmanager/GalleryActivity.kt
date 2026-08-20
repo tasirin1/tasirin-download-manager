@@ -86,6 +86,22 @@ class GalleryActivity : AppCompatActivity() {
             binding.progress.visibility = View.GONE
             loadMore() // halaman awal kurang dari satu layar -> isi otomatis
         }
+
+        // Update gallery saat download progress berubah (upload via remote web).
+        lifecycleScope.launch {
+            App.engine.items.collect { items ->
+                val newPartial = items
+                    .filter { it.state != DownloadState.COMPLETED }
+                    .associate { it.fileName to it.progressPercent }
+                if (newPartial != partialProgress) {
+                    partialProgress = newPartial
+                    fullList = withContext(Dispatchers.IO) {
+                        MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount).items
+                    }
+                    applyFilterUi()
+                }
+            }
+        }
     }
 
     private fun applyFilterUi() {

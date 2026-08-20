@@ -597,6 +597,8 @@ class SettingsActivity : AppCompatActivity() {
         binding.btnSave.setOnClickListener {
             applyStoragePath(findViewById<EditText>(R.id.input_storage_path))
             applyExtraFolders(binding.root)
+            App.httpServer.invalidateFsRootsCache()
+            App.httpServer.invalidateStatusCache()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
             val oldPinHash = StoragePrefs.storedPinHash(this)
             if (newPin.isEmpty()) {
