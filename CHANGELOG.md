@@ -1,3 +1,13 @@
+## [v1.0 — 2026-08-20] — Fix ThreadPool crash, video read-ahead, gallery scan efficiency
+
+### Fixed
+- **ThreadPool crash** — `rejectedExecutionHandler` sekarang re-submit task gagal ke pool baru (sebelumnya task hilang → HTTP 500). Hapus `@Volatile` dari `statPool` (akses selalu via `@Synchronized`).
+- **Gallery scan berulang** — Tambah debounce ContentObserver dari 3 detik ke 10 detik supaya scan tidak berulang tiap perubahan media kecil.
+- **Video player boros request** — Tambah read-ahead buffering di server: chunk < 512 KB diperbesar otomatis (max 2 MB) supaya browser tidak langsung minta lagi → jumlah HTTP range request berkurang signifikan.
+
+### Existing
+- **Batch operations File Manager** — Tombol Download, Move, Delete sudah ada di mode Select.
+
 ## [v1.0 — 2026-08-20] — Remove unused imports and dead string
 
 ### Removed

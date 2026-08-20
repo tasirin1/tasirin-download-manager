@@ -104,7 +104,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Pool bisa mati saat stopServer() lalu startServer() pada instance yang
     // sama (toggle server di Settings) — liveStatPool() membuat pool baru
     // otomatis supaya listing subfolder tidak gagal setelah restart server.
-    @Volatile private var statPool: ThreadPoolExecutor = newStatPool()
+    private var statPool: ThreadPoolExecutor = newStatPool()
     // Cache allowedFsRoots: dibangun ulang hanya saat settings berubah,
     // bukan setiap request (16x per request file manager).
     @Volatile private var cachedFsRoots: List<File>? = null
@@ -118,10 +118,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // dibuat supaya request berikutnya tidak selalu gagal dengan
         // RejectedExecutionException.
         pool.rejectedExecutionHandler =
-            java.util.concurrent.RejectedExecutionHandler { _, _ ->
+            java.util.concurrent.RejectedExecutionHandler { cmd, _ ->
                 synchronized(this@HttpControlServer) {
                     if (statPool.isShutdown) statPool = newStatPool()
                 }
+                liveStatPool().execute(cmd)
             }
         return pool
     }

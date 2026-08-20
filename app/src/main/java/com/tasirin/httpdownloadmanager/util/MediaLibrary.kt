@@ -166,7 +166,7 @@ object MediaLibrary {
                     private var lastInvalidate = 0L
                     override fun onChange(selfChange: Boolean) {
                         val now = System.currentTimeMillis()
-                        if (now - lastInvalidate > 3_000L) {
+                        if (now - lastInvalidate > 10_000L) {
                             lastInvalidate = now
                             scanCache = null
                         }

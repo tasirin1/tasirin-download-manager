@@ -9,6 +9,13 @@ internal fun notFound(): NanoHTTPD.Response = NanoHTTPD.newFixedLengthResponse(
     "File not found"
 )
 
+/** Ukuran minimal read-ahead saat streaming video.
+ *  Browser sering minta range kecil (32-128 KB); dengan read-ahead
+ *  server melayani chunk lebih besar supaya request berikutnya tidak
+ *  langsung datang — mengurangi jumlah HTTP request saat playback. */
+private const val READAHEAD_MIN = 512L * 1024
+private const val READAHEAD_MAX = 2L * 1024 * 1024
+
 /** Respons media/streaming dengan dukungan HTTP Range (resume & seek). */
 internal fun streamMedia(
     name: String,
@@ -28,7 +35,14 @@ internal fun streamMedia(
         val range = if (total > 0) parseRange(rangeHeader, total) else null
         when {
             range != null -> {
-                val (start, end) = range
+                var (start, end) = range
+                val requestedLen = end - start + 1
+                if (!download && requestedLen < READAHEAD_MIN && total > 0) {
+                    val extra = (READAHEAD_MIN - requestedLen).coerceAtMost(
+                        READAHEAD_MAX - requestedLen
+                    ).coerceAtMost(total - 1 - end)
+                    end += extra
+                }
                 val partLen = end - start + 1
                 if (start > 0) skipFully(input, start)
                 NanoHTTPD.newFixedLengthResponse(
