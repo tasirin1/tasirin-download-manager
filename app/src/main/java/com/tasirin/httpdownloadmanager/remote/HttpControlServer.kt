@@ -10,6 +10,7 @@ import androidx.core.net.toUri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.util.Log
 import com.tasirin.httpdownloadmanager.App
 import com.tasirin.httpdownloadmanager.util.CrashLog
@@ -22,7 +23,6 @@ import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.sha256Hex
-import androidx.documentfile.provider.DocumentFile
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -86,11 +86,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val completedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
     private val finalizingUploads = ConcurrentHashMap<String, String>()
     private val failedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
-    // Cache durasi video & dimensi gambar galeri: file/dimensi tidak berubah,
-    // jadi cukup di-hold di memori (dibatasi jumlahnya) — tanpa cache, tiap
-    // request halaman galeri membaca ulang file & header gambar dari disk.
+    // Cache durasi video galeri: metadata tidak berubah, jadi cukup di-hold
+    // di memori agar tiap halaman tidak membuka file video berulang-ulang.
     @Volatile private var videoDurationsCache: JSONObject? = null
-    private val imageDimCache = ConcurrentHashMap<String, Triple<Long, Int, Int>>()
     // Cache itemsJson berdasarkan signature: hemat GC saat polling 2x/detik.
     @Volatile private var cachedItemsSignature = 0
     @Volatile private var cachedItemsJson: JSONArray? = null
@@ -146,6 +144,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrDefault(0)
     }
     private val serverLog = ServerLog()
+    private val mediaMetaCache = ConcurrentHashMap<String, Pair<Long, MediaMeta>>()
     // Cache QR PNG: /api/qr jarang berubah isinya (URL server + PIN),
     // render bitmap 520x520 tiap panggilan itu boros CPU/RAM.
     private val qrCache = ConcurrentHashMap<String, Pair<Long, ByteArray>>()
@@ -591,8 +590,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         var h = 0
         items.forEach { item ->
             h = h * 31 + item.id.hashCode() * 7 + item.state.hashCode() * 13 +
-                item.bytesDownloaded.hashCode() * 17 + item.speedBps.hashCode() * 19 +
-                item.etaSeconds.hashCode() * 23 + (item.error?.hashCode() ?: 0) * 29
+                item.fileName.hashCode() * 11 + item.totalBytes.hashCode() * 17 +
+                item.bytesDownloaded.hashCode() * 19 + item.progressPercent.hashCode() * 23 +
+                item.speedBps.hashCode() * 29 + item.etaSeconds.hashCode() * 31 +
+                item.speedLimitKbps.hashCode() * 37 + item.finishedAt.hashCode() * 41 +
+                item.checksumVerified.hashCode() * 43 + (item.error?.hashCode() ?: 0) * 47
         }
         return h
     }
@@ -1136,65 +1138,110 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
 
 
+    private data class MediaMeta(val name: String, val mime: String?)
+
+    /** Nama/MIME media stabil dalam sesi pemutaran; cache pendek menghindari
+     *  query ContentResolver/DocumentFile pada setiap permintaan HTTP 206. */
+    private fun cachedMediaMeta(raw: String): MediaMeta {
+        val now = System.currentTimeMillis()
+        mediaMetaCache[raw]?.let { (at, meta) ->
+            if (now - at < MEDIA_META_TTL_MS) return meta
+            mediaMetaCache.remove(raw)
+        }
+        val meta = when {
+            raw.startsWith("f:") -> {
+                val file = File(raw.substring(2))
+                MediaMeta(file.name, null)
+            }
+            raw.startsWith("u:") -> {
+                val uri = raw.substring(2).toUri()
+                val resolver = context.contentResolver
+                val name = runCatching {
+                    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                        ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                }.getOrNull()
+                MediaMeta(name ?: "media", runCatching { resolver.getType(uri) }.getOrNull())
+            }
+            else -> MediaMeta("media", null)
+        }
+        if (mediaMetaCache.size > MEDIA_META_CACHE_MAX) {
+            val toRemove = mediaMetaCache.size / 2
+            var removed = 0
+            val iter = mediaMetaCache.entries.iterator()
+            while (iter.hasNext() && removed < toRemove) {
+                iter.next(); iter.remove(); removed++
+            }
+        }
+        mediaMetaCache[raw] = now to meta
+        return meta
+    }
+
     private fun serveMedia(session: IHTTPSession): Response {
         val token = session.parms["token"].orEmpty()
         if (token.isEmpty()) return notFound()
         val raw = MediaLibrary.decodeToken(token) ?: return notFound()
         val download = session.parms["dl"] == "1"
+        val rangeHeader = session.headers["range"] ?: session.headers["Range"]
         val input: InputStream
         val total: Long
-        val name: String
-        var resolvedMime: String? = null
         when {
             raw.startsWith("f:") -> {
                 val file = File(raw.substring(2))
                 if (!file.isFile || !isFsPathAllowed(file.absolutePath)) return notFound()
-                input = FileInputStream(file)
                 total = file.length()
-                name = file.name
+                val range = parseRange(rangeHeader, total)
+                input = FileInputStream(file).apply {
+                    runCatching { channel.position(range?.first ?: 0L) }
+                }
+                val meta = cachedMediaMeta(raw)
+                return streamMedia(
+                    name = meta.name,
+                    mime = meta.mime ?: MimeTypes.forFile(meta.name),
+                    input = input,
+                    total = total,
+                    rangeHeader = rangeHeader,
+                    download = download,
+                    prepositioned = true
+                )
             }
             raw.startsWith("u:") -> {
                 val uri = raw.substring(2).toUri()
                 if (!isMediaUriAllowed(uri)) return notFound()
-                val resolver = context.contentResolver
-                val stream = resolver.openInputStream(uri) ?: return notFound()
-                val len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
-                input = stream
-                total = len
-                // DocumentFile.fromSingleUri sering null di Android 6; fallback
-                // ke MediaStore DISPLAY_NAME lalu ContentResolver.getType().
-                name = DocumentFile.fromSingleUri(context, uri)?.name
-                    ?: mediaStoreName(uri)
-                    ?: "media"
-                resolvedMime = resolver.getType(uri)
+                val descriptor = context.contentResolver.openAssetFileDescriptor(uri, "r")
+                    ?: return notFound()
+                total = descriptor.length
+                val range = parseRange(rangeHeader, total)
+                input = PositionedAssetInputStream(descriptor, range?.first ?: 0L)
+                val meta = cachedMediaMeta(raw)
+                return streamMedia(
+                    name = meta.name,
+                    mime = meta.mime ?: MimeTypes.forFile(meta.name),
+                    input = input,
+                    total = total,
+                    rangeHeader = rangeHeader,
+                    download = download,
+                    prepositioned = true
+                )
             }
             else -> return notFound()
         }
-        return streamMedia(
-            name = name,
-            mime = resolvedMime ?: MimeTypes.forFile(name),
-            input = input,
-            total = total,
-            rangeHeader = session.headers["range"] ?: session.headers["Range"],
-            download = download
-        )
     }
 
     private fun galleryJson(session: IHTTPSession): Response {
         val q = session.parms["q"]?.trim()?.lowercase().orEmpty()
         val type = session.parms["type"]?.trim().orEmpty()
+        // Penampil foto sudah dihapus; permintaan foto tidak perlu menyentuh disk.
+        if (type == "image") {
+            return jsonResponse(
+                JSONObject().put("items", JSONArray()).put("hasMore", false).put("total", 0)
+            )
+        }
         val page = (session.parms["page"]?.toIntOrNull() ?: 0).coerceAtLeast(0)
-        // Iterasi sekali tanpa membuat daftar hasil filter penuh di memori
-        // (hemat alokasi untuk galeri besar); hanya halaman aktif yang di-hold.
         val start = page * GALLERY_PAGE_SIZE
         val pageEnd = start + GALLERY_PAGE_SIZE
-        // Browsing biasa: cache scan dibatasi ke halaman aktif + 1 buffer
-        // (bukan 3000 entri penuh) supaya RAM server tetap rendah. Saat ada
-        // filter (q/type) hasil biasanya kecil, jadi scan penuh dipakai agar
-        // hasMore tetap akurat tanpa halaman kosong berulang.
-        val scanLimit = if (q.isNotEmpty() || type.isNotEmpty()) {
-            MediaLibrary.GALLERY_MAX_ENTRIES
-        } else {
+        // Scanner sudah video-only; type=video bukan filter tambahan. Pencarian
+        // nama tetap memakai batas penuh supaya jumlah hasil dan hasMore akurat.
+        val scanLimit = if (q.isNotEmpty()) MediaLibrary.GALLERY_MAX_ENTRIES else {
             (pageEnd + GALLERY_PAGE_SIZE).coerceAtMost(MediaLibrary.GALLERY_MAX_ENTRIES)
         }
         val arr = JSONArray()
@@ -1205,15 +1252,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val scan = scannedGallery(scanLimit)
         for (e in scan.items) {
             if (q.isNotEmpty() && e.name.indexOf(q, ignoreCase = true) < 0) continue
-            if ((type == "video" && !e.isVideo) || (type == "image" && e.isVideo)) continue
             if (matched >= start && matched < pageEnd) {
                 val o = JSONObject()
-                o.put("name", e.name)
-                o.put("size", e.size)
-                o.put("modified", e.modified)
-                o.put("isVideo", e.isVideo)
-                o.put("token", e.token)
-                if (e.isVideo && !e.isPartial) {
+                    .put("name", e.name)
+                    .put("size", e.size)
+                    .put("modified", e.modified)
+                    .put("isVideo", true)
+                    .put("token", e.token)
+                if (!e.isPartial) {
                     var d = videoDurationOf(cache, e.token)
                     if (d <= 0 && e.durationMs > 0) d = e.durationMs
                     if (d <= 0 && extracted < 20) {
@@ -1222,13 +1268,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         extracted++
                     }
                     o.put("durationMs", d)
-                } else {
-                    // Dimensi asli untuk galeri rasio asli (masonry) di remote web.
-                    val dim = imageDimensions(e)
-                    if (dim != null) {
-                        o.put("w", dim.first)
-                        o.put("h", dim.second)
-                    }
                 }
                 arr.put(o)
                 pageCount++
@@ -1236,14 +1275,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             matched++
         }
         if (extracted > 0) saveVideoDurations(cache)
-        val filtered = q.isNotEmpty() || type.isNotEmpty()
         return jsonResponse(
             JSONObject()
                 .put("items", arr)
                 .put("hasMore", pageCount >= GALLERY_PAGE_SIZE && (matched < scan.total || scan.items.size < scan.total))
-                // total = jumlah hasil filter (bukan seluruh media) saat ada
-                // q/type; tanpa filter tetap total scan agar count akurat.
-                .put("total", if (filtered) matched else scan.total)
+                .put("total", if (q.isNotEmpty()) matched else scan.total)
         )
     }
 
@@ -1359,48 +1395,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             raw.startsWith(MS_PREFIX) -> fsListMedia(raw.removePrefix(MS_PREFIX), offset, limit)
             else -> fsListFiles(raw.removePrefix(FS_PREFIX), offset, limit)
         }
-    }
-
-    private fun imageDimensions(e: MediaLibrary.MediaEntry): Pair<Int, Int>? {
-        val now = System.currentTimeMillis()
-        // File .part masih berubah saat download berjalan — jangan di-cache.
-        if (!e.isPartial) {
-            val cached = imageDimCache[e.token]
-            if (cached != null && now - cached.first < IMAGE_DIM_CACHE_TTL_MS) {
-                return cached.second to cached.third
-            }
-        }
-        val result = runCatching {
-            val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            val path = e.filePath
-            if (path != null) {
-                android.graphics.BitmapFactory.decodeFile(path, opts)
-            } else if (e.contentUri != null) {
-                context.contentResolver.openInputStream(e.contentUri.toUri())?.use { s ->
-                    android.graphics.BitmapFactory.decodeStream(s, null, opts)
-                }
-            }
-            if (opts.outWidth > 0 && opts.outHeight > 0) opts.outWidth to opts.outHeight else null
-        }.getOrNull()
-        if (result != null && !e.isPartial) {
-            // Evict entries older than TTL atau jika cache terlalu besar.
-            if (imageDimCache.size > MediaLibrary.GALLERY_MAX_ENTRIES) {
-                val iter = imageDimCache.entries.iterator()
-                while (iter.hasNext()) {
-                    val entry = iter.next()
-                    if (now - entry.value.first > IMAGE_DIM_CACHE_TTL_MS) iter.remove()
-                }
-                // Jika masih terlalu besar, evict separuh yang paling lama.
-                if (imageDimCache.size > MediaLibrary.GALLERY_MAX_ENTRIES) {
-                    val half = imageDimCache.size / 2
-                    var removed = 0
-                    val iter2 = imageDimCache.keys.iterator()
-                    while (iter2.hasNext() && removed < half) { iter2.next(); iter2.remove(); removed++ }
-                }
-            }
-            imageDimCache[e.token] = Triple(now, result.first, result.second)
-        }
-        return result
     }
 
     private fun fsRoots(): Response {
@@ -2112,6 +2106,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     fun appendLog(message: String) = serverLog.append(message)
 
+    fun logVersion(): Long = serverLog.version()
+
     fun snapshotLog(): String = serverLog.snapshot()
 
     fun clearLog() = serverLog.clear()
@@ -2164,10 +2160,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SSE_MIN_INTERVAL_MS = 1_000L
         private const val QR_CACHE_MAX = 8
         private const val QR_CACHE_TTL_MS = 300_000L
-        private const val IMAGE_DIM_CACHE_TTL_MS = 120_000L
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu
         // koneksi hidup (dan fallback polling klien tidak ikut jalan).
         private const val SSE_HEARTBEAT_MS = 3_000L
+        private const val MEDIA_META_TTL_MS = 60_000L
+        private const val MEDIA_META_CACHE_MAX = 256
 
         fun ipv4Addresses(): List<String> = runCatching {
             NetworkInterface.getNetworkInterfaces().toList().flatMap { ni ->

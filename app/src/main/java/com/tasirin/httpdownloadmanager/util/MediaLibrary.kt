@@ -76,6 +76,9 @@ object MediaLibrary {
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
     private val VIDEO_EXTS = setOf("mp4", "mkv", "webm", "avi", "mov", "3gp", "m4v", "mpg", "mpeg")
 
+    private fun isGalleryVideo(name: String): Boolean =
+        VIDEO_EXTS.contains(name.substringAfterLast('.', "").lowercase())
+
     fun mediaKind(name: String): String? {
         val ext = name.substringAfterLast('.', "").lowercase()
         return when {
@@ -174,9 +177,6 @@ object MediaLibrary {
                 }
                 val resolver = appContext.contentResolver
                 resolver.registerContentObserver(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer
-                )
-                resolver.registerContentObserver(
                     MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true, observer
                 )
                 if (Build.VERSION.SDK_INT >= 29) {
@@ -194,13 +194,13 @@ object MediaLibrary {
         fun addFile(f: File, isPartial: Boolean = false) {
             if (!f.isFile) return
             val name = if (isPartial) f.name.removeSuffix(".part") else f.name
-            val kind = mediaKind(name) ?: return
+            if (!isGalleryVideo(name)) return
             list.add(
                 MediaEntry(
                     name = name,
                     size = f.length(),
                     modified = f.lastModified(),
-                    isVideo = kind == "video",
+                    isVideo = true,
                     token = tokenForPath(f.absolutePath),
                     filePath = f.absolutePath,
                     isPartial = isPartial,
@@ -212,14 +212,14 @@ object MediaLibrary {
         fun addDoc(df: DocumentFile) {
             if (!df.isFile) return
             val name = df.name ?: return
-            val kind = mediaKind(name) ?: return
+            if (!isGalleryVideo(name)) return
             val uri = df.uri.toString()
             list.add(
                 MediaEntry(
                     name = name,
                     size = runCatching { df.length() }.getOrDefault(0L),
                     modified = runCatching { df.lastModified() }.getOrDefault(0L),
-                    isVideo = kind == "video",
+                    isVideo = true,
                     token = tokenForUri(uri),
                     contentUri = uri
                 )
@@ -250,59 +250,45 @@ object MediaLibrary {
             }
         }
 
-        // 4) Foto & video dari device lewat MediaStore. Bila folder galeri foto
-        //    / video diatur, scan dibatasi ke folder itu saja (bukan seluruh
-        //    penyimpanan). Kosong = semua storage. Urutan: gambar dulu, video.
+        // 4) Hanya video dari MediaStore. Penampil foto sengaja dihapus, jadi
+        //    query Images tidak perlu dan hanya memboroskan RAM/CPU.
         runCatching {
             val resolver = context.contentResolver
-            val collections = listOf(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI to false,
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI to true
-            )
-            for ((collection, isVideo) in collections) {
-                runCatching {
-                    // DURATION hanya ada di tabel Video; projection gambar yang
-                    // memuat kolom ini bisa bikin query gagal di sebagian device.
-                    // RELATIVE_PATH baru ada di Android 10+; di bawah itu query
-                    // dengan kolom ini akan error dan seluruh scan gagal.
-                    val projection = buildList {
-                        add(MediaStore.MediaColumns._ID)
-                        add(MediaStore.MediaColumns.DISPLAY_NAME)
-                        add(MediaStore.MediaColumns.SIZE)
-                        add(MediaStore.MediaColumns.DATE_MODIFIED)
-                        add(MediaStore.MediaColumns.DATA)
-                        if (Build.VERSION.SDK_INT >= 29) add(MediaStore.MediaColumns.RELATIVE_PATH)
-                        if (isVideo) add(MediaStore.Video.Media.DURATION)
-                    }.toTypedArray()
-                    resolver.query(
-                        collection, projection, null, null,
-                        "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
-                    )?.use { c ->
-                        val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-                        val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-                        val iSize = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-                        val iMod = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
-                        val iData = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
-                        val iRel = c.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
-                        val iDur = c.getColumnIndex(MediaStore.Video.Media.DURATION)
-                        while (c.moveToNext()) {
-                            val name = c.getString(iName) ?: continue
-                            val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
-                            val dataPath = c.getString(iData)?.takeIf { it.isNotBlank() }
-                            list.add(
-                                MediaEntry(
-                                    name = name,
-                                    size = c.getLong(iSize),
-                                    modified = c.getLong(iMod) * 1000L,
-                                    isVideo = isVideo,
-                                    token = tokenForUri(uri),
-                                    filePath = dataPath,
-                                    contentUri = uri,
-                                    durationMs = if (isVideo && iDur >= 0) c.getLong(iDur) else 0L
-                                )
-                            )
-                        }
-                    }
+            val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            val projection = buildList {
+                add(MediaStore.MediaColumns._ID)
+                add(MediaStore.MediaColumns.DISPLAY_NAME)
+                add(MediaStore.MediaColumns.SIZE)
+                add(MediaStore.MediaColumns.DATE_MODIFIED)
+                add(MediaStore.MediaColumns.DATA)
+                if (Build.VERSION.SDK_INT >= 29) add(MediaStore.MediaColumns.RELATIVE_PATH)
+                add(MediaStore.Video.Media.DURATION)
+            }.toTypedArray()
+            resolver.query(
+                collection, projection, null, null,
+                "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
+            )?.use { c ->
+                val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                val iSize = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                val iMod = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+                val iData = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
+                val iDur = c.getColumnIndex(MediaStore.Video.Media.DURATION)
+                while (c.moveToNext()) {
+                    val name = c.getString(iName) ?: continue
+                    val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
+                    list.add(
+                        MediaEntry(
+                            name = name,
+                            size = c.getLong(iSize),
+                            modified = c.getLong(iMod) * 1000L,
+                            isVideo = true,
+                            token = tokenForUri(uri),
+                            filePath = c.getString(iData)?.takeIf { it.isNotBlank() },
+                            contentUri = uri,
+                            durationMs = if (iDur >= 0) c.getLong(iDur) else 0L
+                        )
+                    )
                 }
             }
         }

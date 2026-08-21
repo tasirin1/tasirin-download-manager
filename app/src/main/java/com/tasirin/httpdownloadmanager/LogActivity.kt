@@ -39,7 +39,8 @@ class LogActivity : AppCompatActivity() {
     }
     private var logAutoScroll = false
     private var logSearch = ""
-    private var lastLogKey: String? = null
+    private var lastLogVersion = -1L
+    private var lastLogSearch: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -165,13 +166,12 @@ class LogActivity : AppCompatActivity() {
     }
 
     private fun refreshLog() {
+        val version = App.httpServer.logVersion()
+        if (version == lastLogVersion && logSearch == lastLogSearch) return
         val text = App.httpServer.snapshotLog()
             .ifEmpty { getString(R.string.remote_log_empty) }
-        // Kunci render = isi log + kata kunci: teks sama tapi kata kunci
-        // berubah tetap harus di-highlight ulang.
-        val key = text + "\u0000" + logSearch
-        if (key == lastLogKey) return
-        lastLogKey = key
+        lastLogVersion = version
+        lastLogSearch = logSearch
         // Hitung baris non-kosong tanpa mengalokasikan daftar String (sebelumnya
         // text.lines() membangun array baru setiap tick 1 dtk).
         var lines = 0

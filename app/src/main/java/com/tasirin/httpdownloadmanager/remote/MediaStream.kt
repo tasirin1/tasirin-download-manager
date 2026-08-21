@@ -23,7 +23,8 @@ internal fun streamMedia(
     input: InputStream,
     total: Long,
     rangeHeader: String?,
-    download: Boolean
+    download: Boolean,
+    prepositioned: Boolean = false
 ): NanoHTTPD.Response {
     val safeName = name.replace("\"", "_").replace("\\", "_")
     val disposition = if (download) {
@@ -44,7 +45,7 @@ internal fun streamMedia(
                     end += extra
                 }
                 val partLen = end - start + 1
-                if (start > 0) skipFully(input, start)
+                if (start > 0 && !prepositioned) skipFully(input, start)
                 NanoHTTPD.newFixedLengthResponse(
                     NanoHTTPD.Response.Status.PARTIAL_CONTENT, mime, input, partLen
                 ).also {

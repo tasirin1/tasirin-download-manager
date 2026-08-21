@@ -1368,7 +1368,7 @@ let galleryHasMore = false;
 let gallerySeq = 0;
 let galleryFilter = 'video';
 let galSelectMode = false;
-const galSelected = [];
+const galSelected = new Set();
 const galBatch = document.getElementById('galBatch');
 
 const mediaModal = document.getElementById('mediaModal');
@@ -1610,7 +1610,7 @@ async function loadGallery(reset) {
       }
       galleryPage = 1;
       galleryLoaded = 0;
-      galSelected.length = 0;
+      galSelected.clear();
       if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
       galleryGrid.innerHTML = '';
       galleryCount.textContent = (data.total || items.length) + ' file';
@@ -1700,7 +1700,7 @@ function renderGalleryCell(it) {
   const media = API + '/api/media?token=' + encodeURIComponent(it.token);
   const ratio = (it.w && it.h && !it.isVideo) ? (it.h * 100 / it.w).toFixed(2) : 56.25;
   const resume = it.isVideo ? (galleryVideoPos[it.token] || 0) : 0;
-  const selOn = galSelected.indexOf(it) >= 0;
+  const selOn = galSelected.has(it);
   cell.innerHTML =
     '<div class="gal-thumb" style="padding-top:' + ratio + '%">' +
       '<span class="gal-check' + (selOn ? ' on' : '') + '">' + (selOn ? '\u2713' : '') + '</span>' +
@@ -1730,7 +1730,7 @@ function renderGalleryCell(it) {
 
 function galSetSelectMode(on) {
   galSelectMode = on;
-  galSelected.length = 0;
+  galSelected.clear();
   document.getElementById('galSelectBtn').textContent = on ? 'Cancel selection' : 'Select';
   galleryGrid.classList.toggle('gal-selecting', on);
   galBatch.classList.add('hidden');
@@ -1745,24 +1745,24 @@ function reRenderGalleryLoaded() {
 }
 
 function toggleGalSelect(it, cell) {
-  const idx = galSelected.indexOf(it);
-  if (idx >= 0) galSelected.splice(idx, 1); else galSelected.push(it);
+  const selected = galSelected.has(it);
+  if (selected) galSelected.delete(it); else galSelected.add(it);
   const check = cell.querySelector('.gal-check');
   if (check) {
-    check.classList.toggle('on', idx < 0);
-    check.textContent = idx < 0 ? '\u2713' : '';
+    check.classList.toggle('on', !selected);
+    check.textContent = !selected ? '\u2713' : '';
   }
   updateGalBatch();
 }
 
 function updateGalBatch() {
-  galBatch.classList.toggle('hidden', galSelected.length === 0);
-  document.getElementById('galBatchCount').textContent = galSelected.length + ' selected';
+  galBatch.classList.toggle('hidden', galSelected.size === 0);
+  document.getElementById('galBatchCount').textContent = galSelected.size + ' selected';
   let total = 0;
   galSelected.forEach(function (it) { total += it.size || 0; });
   document.getElementById('galBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt(total) : '';
   document.getElementById('galBatchAll').textContent =
-    galleryItems.length > 0 && galSelected.length === galleryItems.length ? 'Cancel all' : 'Select all';
+    galleryItems.length > 0 && galSelected.size === galleryItems.length ? 'Cancel all' : 'Select all';
 }
 
 document.getElementById('galSelectBtn').addEventListener('click', function () {
@@ -1772,11 +1772,9 @@ document.getElementById('galBatchCancel').addEventListener('click', function () 
   galSetSelectMode(false);
 });
 document.getElementById('galBatchAll').addEventListener('click', function () {
-  const allSel = galleryItems.length > 0 && galSelected.length === galleryItems.length;
-  galSelected.length = 0;
-  if (!allSel) {
-    for (let i = 0; i < galleryItems.length; i++) galSelected.push(galleryItems[i]);
-  }
+  const allSel = galleryItems.length > 0 && galSelected.size === galleryItems.length;
+  galSelected.clear();
+  if (!allSel) galleryItems.forEach(function (it) { galSelected.add(it); });
   galleryGrid.querySelectorAll('.gal-cell').forEach(function (cell) {
     const check = cell.querySelector('.gal-check');
     if (check) {
@@ -1786,9 +1784,10 @@ document.getElementById('galBatchAll').addEventListener('click', function () {
   });
   updateGalBatch();
 });
+
 document.getElementById('galBatchZip').addEventListener('click', function () {
-  if (!galSelected.length) return;
-  const tokens = galSelected.map(function (it) { return it.token; }).join(',');
+  if (!galSelected.size) return;
+  const tokens = Array.from(galSelected, function (it) { return it.token; }).join(',');
   fsDownloadUrl(API + '/api/media_zip?tokens=' + encodeURIComponent(tokens));
   galSetSelectMode(false);
 });
@@ -2796,10 +2795,21 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
       }
 
       xhr.timeout = 120000;
-      xhr.upload.onprogress = function (e) {
-        if (!e.lengthComputable) return;
+      let lastUiAt = 0;
+      function renderUploadProgress() {
+        const filePct = Math.min(99, Math.round((start + chunkBest) * 100 / file.size));
+        const pct = totalBytes > 0 ? Math.round(bestDone * 100 / totalBytes) : 0;
+        progressBar.style.width = pct + '%';
+        const etaSec = speed > 0 && totalBytes > bestDone
+          ? Math.round((totalBytes - bestDone) / speed) : 0;
+        progressPct.textContent = pct + '% \u00b7 ' + fmtSpeed(speed) +
+          (etaSec > 0 ? ' \u00b7 ETA ~' + fmtEta(etaSec) : '');
+        ulSet(job.id, filePct + '%', 'run');
+        fsRowUploadProgress(file.name, filePct);
+      }
 
-        if (e.loaded < chunkBest) return;
+      xhr.upload.onprogress = function (e) {
+        if (!e.lengthComputable || e.loaded < chunkBest) return;
         chunkBest = e.loaded;
         if (lastTime === 0) { lastTime = Date.now(); lastBytes = e.loaded; }
         const dt = (Date.now() - lastTime) / 1000;
@@ -2811,14 +2821,10 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         }
         const doneNow = sentBytes + start + chunkBest;
         if (doneNow > bestDone) bestDone = doneNow;
-        const pct = totalBytes > 0 ? Math.round(bestDone * 100 / totalBytes) : 0;
-        progressBar.style.width = pct + '%';
-        const etaSec = speed > 0 && totalBytes > bestDone
-          ? Math.round((totalBytes - bestDone) / speed) : 0;
-        progressPct.textContent = pct + '% \u00b7 ' + fmtSpeed(speed) +
-          (etaSec > 0 ? ' \u00b7 ETA ~' + fmtEta(etaSec) : '');
-        ulSet(job.id, Math.min(99, Math.round((start + chunkBest) * 100 / file.size)) + '%', 'run');
-        fsRowUploadProgress(file.name, Math.min(99, Math.round((start + chunkBest) * 100 / file.size)));
+        const now = Date.now();
+        if (now - lastUiAt < 100) return;
+        lastUiAt = now;
+        renderUploadProgress();
       };
       xhr.onload = function () {
         let ok = false;
@@ -3808,6 +3814,48 @@ function fmtDate(ms) {
 }
 
 let rowNodes = new Map();
+function rowMetaText(it) {
+  const done = it.state === 'COMPLETED';
+  if (done) {
+    let meta = fmt(it.totalBytes || it.bytesDownloaded);
+    if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
+    return meta;
+  }
+  return it.totalBytes > 0
+    ? fmt(it.bytesDownloaded) + ' / ' + fmt(it.totalBytes)
+    : fmt(it.bytesDownloaded);
+}
+
+function patchRowSub(li, it) {
+  const sub = li._sub || li.querySelector('.item-sub');
+  if (!sub) return;
+  li._sub = sub;
+  const done = it.state === 'COMPLETED';
+  const prog = done ? 100 : (it.totalBytes > 0 ? Math.round(it.bytesDownloaded * 100 / it.totalBytes) : 0);
+  let meta = rowMetaText(it);
+  if (it.state === 'DOWNLOADING' && it.speedBps > 0) {
+    meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
+    if (it.etaSeconds > 0) meta += ' \u00b7 ETA ' + fmtEta(it.etaSeconds);
+  }
+  const text = sub._text || (sub._text = sub.querySelector('.meta span:not(.badge)'));
+  if (text) text.textContent = meta;
+  const badge = sub._badge || (sub._badge = sub.querySelector('.badge'));
+  if (badge) {
+    const label = stateLabel(it.state);
+    if (badge.textContent !== label) badge.textContent = label;
+    const map = {PENDING:'b-paused', DOWNLOADING:'b-active', PAUSED:'b-paused', COMPLETED:'b-done', FAILED:'b-fail', CANCELLED:'b-fail'};
+    const cls = map[it.state] || 'b-paused';
+    if (!badge.classList.contains(cls)) badge.className = 'badge ' + cls;
+  }
+  const fill = sub._fill || (sub._fill = sub.querySelector('.fill'));
+  if (fill) {
+    fill.style.width = prog + '%';
+    fill.classList.toggle('done', done);
+  }
+  const pct = sub._pct || (sub._pct = sub.querySelector('.bar-pct'));
+  if (pct) pct.textContent = prog + '%';
+}
+
 function updateRows(items) {
   if (!rowNodes.size || !rowNodes.values().next().value.isConnected) {
     rebuildList(items);
@@ -3819,11 +3867,7 @@ function updateRows(items) {
     const sig = it.state + '|' + it.bytesDownloaded + '|' + it.speedBps + '|' + it.etaSeconds;
     if (lastRowSig[it.id] === sig) return;
     lastRowSig[it.id] = sig;
-    const sub = li._sub || li.querySelector('.item-sub');
-    if (sub) {
-      sub.outerHTML = rowSubHtml(it);
-      li._sub = li.querySelector('.item-sub');
-    }
+    patchRowSub(li, it);
   });
   updateToolbar(items);
 }

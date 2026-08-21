@@ -4,6 +4,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
 import java.io.RandomAccessFile
+import android.content.res.AssetFileDescriptor
 
 /** Gabungkan beberapa file partial menjadi satu stream (streaming resume
  *  multi-segmen tanpa menyusun file utuh di memori). */
@@ -42,6 +43,27 @@ internal class ChainInputStream(private val files: List<File>) : InputStream() {
     override fun close() {
         current?.let { runCatching { it.close() } }
         current = null
+    }
+}
+
+/** Stream AssetFileDescriptor yang mulai dari posisi Range tanpa membaca
+ *  dan membuang byte awal. Descriptor ditutup bersama stream-nya. */
+internal class PositionedAssetInputStream(
+    private val assetDescriptor: AssetFileDescriptor,
+    startPosition: Long
+) : InputStream() {
+    private val stream = FileInputStream(assetDescriptor.fileDescriptor).apply {
+        runCatching { channel.position(assetDescriptor.startOffset + startPosition) }
+    }
+
+    override fun read(): Int = stream.read()
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int =
+        stream.read(b, off, len)
+
+    override fun close() {
+        runCatching { stream.close() }
+        runCatching { assetDescriptor.close() }
     }
 }
 

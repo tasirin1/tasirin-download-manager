@@ -1,3 +1,15 @@
+## [v1.0 — 2026-08-21] — Optimasi galeri, streaming, dan realtime
+
+### Changed
+- **Video-only gallery** — Scan native/remote hanya memuat video; permintaan foto langsung kosong tanpa query MediaStore.
+- **Media range seek** — Metadata nama/MIME di-cache dan stream file/MediaStore diposisikan langsung ke offset Range, tanpa membaca ulang byte awal.
+- **Thumbnail dedup** — Permintaan thumbnail untuk media sama berbagi lock sehingga tidak decode paralel berulang.
+- **Gallery progress** — Perubahan persentase cukup merge di memori; scan ulang hanya saat daftar download aktif berubah.
+- **Remote DOM** — Upload progress dibatasi ~100 ms, baris download di-patch langsung, dan seleksi galeri memakai `Set`.
+- **Speed limiter** — Total byte multi-segmen disimpan pada atomic counter, bukan dijumlahkan ulang tiap chunk.
+- **Server log** — Tambah revision cache agar polling log tidak join ulang 300 baris bila tidak ada log baru.
+- **SSE signature** — Sertakan nama, total, progress, limit, waktu selesai, checksum, dan error agar cache JSON tidak menyajikan kolom basi.
+
 ## [v1.0 — 2026-08-21] — Optimasi ukuran APK
 
 ### Changed

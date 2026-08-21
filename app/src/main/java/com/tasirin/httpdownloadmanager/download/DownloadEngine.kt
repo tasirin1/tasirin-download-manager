@@ -53,6 +53,7 @@ import java.util.Locale
 import java.util.UUID
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 class DownloadEngine(appContext: Context) {
     // Engine hidup seumur proses (disimpan statis di App.engine): simpan
@@ -103,6 +104,9 @@ class DownloadEngine(appContext: Context) {
     // segmen per detik) — hemat CPU/GC saat banyak segmen paralel.
     private val segProgress = ConcurrentHashMap<String, LongArray>()
     private val segFlushJobs = ConcurrentHashMap<String, Job>()
+    // Total byte bersama untuk speed limiter multi-segmen; menghindari pencarian
+    // item + penjumlahan segmen di setiap chunk saat batas kecepatan aktif.
+    private val throttleTotals = ConcurrentHashMap<String, AtomicLong>()
 
     init {
         startBackgroundLoops()
@@ -955,11 +959,13 @@ class DownloadEngine(appContext: Context) {
             }
         }
 
-        throttle.reset(segments.sumOf { it.downloaded })
         // Sisa penyangga/flush dari percobaan sebelumnya dibuang: segmen baru
         // menulis ulang dari state item saat ini (nilai basi tidak boleh
         // menimpa progres percobaan baru).
         clearSegProgress(item.id)
+        val initialDone = segments.sumOf { it.downloaded }
+        resetThrottleTotal(item.id, initialDone)
+        throttle.reset(initialDone)
         try {
             coroutineScope {
                 segments.forEach { seg ->
@@ -1064,12 +1070,14 @@ class DownloadEngine(appContext: Context) {
                     true
                 }.getOrDefault(false)
                 if (!truncated) {
+                    addThrottleTotal(id, -downloaded)
                     downloaded = 0
                     partial.delete()
                     updateSegment(id, segment.index, 0)
                 }
             }
             ResumeAction.RESTART -> {
+                addThrottleTotal(id, -downloaded)
                 downloaded = 0
                 partial.delete()
                 updateSegment(id, segment.index, 0)
@@ -1101,7 +1109,8 @@ class DownloadEngine(appContext: Context) {
                     if (read == -1) break
                     output.write(buffer, 0, read)
                     downloaded += read
-                    throttle.sleepIfNeeded { totalDownloaded(id) }
+                    val sharedTotal = addThrottleTotal(id, read)
+                    throttle.sleepIfNeeded { sharedTotal }
                     val now = System.currentTimeMillis()
                     if (now - lastNotify >= 1000) {
                         lastNotify = now
@@ -1150,10 +1159,6 @@ class DownloadEngine(appContext: Context) {
             )
         }
         scheduleProgressSave()
-    }
-
-    private fun totalDownloaded(id: String): Long {
-        return _items.value.find { it.id == id }?.segments?.sumOf { it.downloaded } ?: 0L
     }
 
     /** Tulis progres segmen ke penyangga (tanpa emisi StateFlow). Setiap indeks
@@ -1213,8 +1218,19 @@ class DownloadEngine(appContext: Context) {
 
     /** Buang penyangga progres + batalkan flush job (download selesai/gagal/
      *  ulang dari awal). Nilai final tetap sudah ditulis via updateSegment. */
+    private fun resetThrottleTotal(id: String, value: Long) {
+        throttleTotals[id] = AtomicLong(value)
+    }
+
+    private fun addThrottleTotal(id: String, delta: Long): Long =
+        throttleTotals.getOrPut(id) {
+            val current = _items.value.find { it.id == id }?.bytesDownloaded ?: 0L
+            AtomicLong(current)
+        }.addAndGet(delta)
+
     private fun clearSegProgress(id: String) {
         segProgress.remove(id)
+        throttleTotals.remove(id)
         segFlushJobs.remove(id)?.cancel()
     }
 

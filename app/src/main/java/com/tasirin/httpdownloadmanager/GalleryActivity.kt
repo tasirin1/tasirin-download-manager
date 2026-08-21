@@ -77,9 +77,7 @@ class GalleryActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             binding.progress.visibility = View.VISIBLE
-            partialProgress = App.engine.items.value
-                    .filter { it.state != DownloadState.COMPLETED }
-                    .associate { it.fileName to it.progressPercent }
+            partialProgress = activeDownloadProgress()
             fullList = withContext(Dispatchers.IO) {
                 MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount).items
             }
@@ -87,21 +85,36 @@ class GalleryActivity : AppCompatActivity() {
             loadMore() // halaman awal kurang dari satu layar -> isi otomatis
         }
 
-        // Update gallery saat download progress berubah (upload via remote web).
+        // Update progres tanpa scan ulang MediaStore. Scan hanya saat daftar file
+        // aktif berubah (mulai/selesai), bukan tiap tick persentase.
         lifecycleScope.launch {
             App.engine.items.collect { items ->
-                val newPartial = items
-                    .filter { it.state != DownloadState.COMPLETED }
-                    .associate { it.fileName to it.progressPercent }
-                if (newPartial != partialProgress) {
-                    partialProgress = newPartial
+                val newPartial = activeDownloadProgress(items)
+                val filesChanged = newPartial.keys != partialProgress.keys
+                partialProgress = newPartial
+                if (filesChanged) {
                     fullList = withContext(Dispatchers.IO) {
                         MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount).items
                     }
-                    applyFilterUi()
+                } else {
+                    fullList = mergedProgress(fullList)
                 }
+                applyFilterUi()
             }
         }
+    }
+
+    private fun activeDownloadProgress(
+        items: List<DownloadItem> = App.engine.items.value
+    ): Map<String, Int> = items
+        .filter { it.state != DownloadState.COMPLETED }
+        .associate { it.fileName to it.progressPercent }
+
+    private fun mergedProgress(
+        items: List<MediaLibrary.MediaEntry>
+    ): List<MediaLibrary.MediaEntry> = items.map { entry ->
+        if (!entry.isPartial) entry
+        else entry.copy(progressPercent = partialProgress[entry.name] ?: -1)
     }
 
     private fun applyFilterUi() {
@@ -273,36 +286,22 @@ class GalleryActivity : AppCompatActivity() {
                     runCatching {
                         context.contentResolver.loadThumbnail(uri, Size(req, req), null)
                     }.getOrNull()
-                } else if (e.isVideo) {
+                } else {
                     runCatching {
                         MediaStore.Video.Thumbnails.getThumbnail(
                             context.contentResolver, id,
                             MediaStore.Video.Thumbnails.MINI_KIND, null
                         )
                     }.getOrNull()
-                } else {
-                    runCatching {
-                        MediaStore.Images.Thumbnails.getThumbnail(
-                            context.contentResolver, id,
-                            MediaStore.Images.Thumbnails.MINI_KIND, null
-                        )
-                    }.getOrNull()
                 }
                 if (native != null) return scaleDown(native, req)
             }
             if (!e.filePath.isNullOrEmpty()) {
-                return if (e.isVideo) {
-                    runCatching {
-                        ThumbnailUtils.createVideoThumbnail(
-                            e.filePath, MediaStore.Images.Thumbnails.MINI_KIND
-                        )
-                    }.getOrNull()?.let { scaleDown(it, req) }
-                } else {
-                    decodeFile(context, e.filePath, req)
-                }
-            }
-            if (!e.contentUri.isNullOrEmpty()) {
-                return decodeUri(context, e.contentUri, req)
+                return runCatching {
+                    ThumbnailUtils.createVideoThumbnail(
+                        e.filePath, MediaStore.Video.Thumbnails.MINI_KIND
+                    )
+                }.getOrNull()?.let { scaleDown(it, req) }
             }
             return null
         }
@@ -328,41 +327,6 @@ class GalleryActivity : AppCompatActivity() {
             }
         }
 
-        private fun decodeFile(context: Context, path: String, req: Int): Bitmap? =
-            runCatching {
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(path, bounds)
-                val opts = BitmapFactory.Options().apply {
-                    inSampleSize = computeSample(bounds, req)
-                }
-                BitmapFactory.decodeFile(path, opts)
-            }.getOrNull()
-
-        private fun decodeUri(context: Context, uri: String, req: Int): Bitmap? =
-            runCatching {
-                val resolver = context.contentResolver
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                resolver.openInputStream(uri.toUri())?.use {
-                    BitmapFactory.decodeStream(it, null, bounds)
-                }
-                val opts = BitmapFactory.Options().apply {
-                    inSampleSize = computeSample(bounds, req)
-                }
-                resolver.openInputStream(uri.toUri())?.use {
-                    BitmapFactory.decodeStream(it, null, opts)
-                }
-            }.getOrNull()
-
-        private fun computeSample(bounds: BitmapFactory.Options, req: Int): Int {
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return 1
-            var sample = 1
-            while (bounds.outWidth / (sample * 2) >= req &&
-                bounds.outHeight / (sample * 2) >= req
-            ) {
-                sample *= 2
-            }
-            return sample
-        }
     }
 }
 
