@@ -154,11 +154,12 @@ class LogActivity : AppCompatActivity() {
                     }
                 }.getOrDefault(false)
             }
-            Toast.makeText(
-                this,
-                if (exported) R.string.log_exported else R.string.log_export_failed,
-                Toast.LENGTH_LONG
-            ).show()
+            val messageRes = if (exported) {
+                R.string.log_exported
+            } else {
+                R.string.log_export_failed
+            }
+            Toast.makeText(this, messageRes, Toast.LENGTH_LONG).show()
             binding.logExport.isEnabled = true
         }
     }
