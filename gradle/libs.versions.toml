@@ -2,10 +2,10 @@
 # Dependabot membaca grup dari sini; update versi cukup di satu tempat.
 [versions]
 agp = "9.3.1"
-coreKtx = "1.13.1"
+coreKtx = "1.19.0"
 documentfile = "1.1.0"
 nanohttpd = "2.3.1"
-appcompat = "1.7.0"
+appcompat = "1.8.0"
 recyclerview = "1.4.0"
 activityKtx = "1.9.0"
 coroutinesAndroid = "1.11.0"
