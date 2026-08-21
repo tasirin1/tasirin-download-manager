@@ -159,7 +159,7 @@ class LogActivity : AppCompatActivity() {
             } else {
                 R.string.log_export_failed
             }
-            Toast.makeText(this, messageRes, Toast.LENGTH_LONG).show()
+            Toast.makeText(this@LogActivity, messageRes, Toast.LENGTH_LONG).show()
             binding.logExport.isEnabled = true
         }
     }
