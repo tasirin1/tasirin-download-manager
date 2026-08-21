@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-21] — Fix open folder untuk file selesai
+
+### Fixed
+- **Open Folder** — Tambah fallback chain: DocumentsContract → File URI → Downloads app bawaan. Sebelumnya hanya 1 intent tanpa `resolveActivity()` check, jadi gagal di Android TV box yang tidak punya DocumentsUI.
+
 ## [v1.0 — 2026-08-20] — Fix lint warnings + update Gradle
 
 ### Fixed

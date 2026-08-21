@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.app.DownloadManager
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.Settings
@@ -993,62 +994,73 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     private fun openFolder(item: DownloadItem) {
-        val intent = folderIntent(item)
-        if (intent == null) {
-            Toast.makeText(this, R.string.open_folder_unavailable, Toast.LENGTH_LONG)
-                .show()
-            return
+        val intents = folderIntents(item)
+        for (intent in intents) {
+            if (intent.resolveActivity(packageManager) != null) {
+                runCatching { startActivity(intent) }.onSuccess { return }
+            }
         }
-        runCatching { startActivity(intent) }.onFailure {
-            Toast.makeText(this, R.string.open_folder_unavailable, Toast.LENGTH_LONG)
-                .show()
+        // Fallback terakhir: buka app Downloads bawaan sistem.
+        val downloads = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (downloads.resolveActivity(packageManager) != null) {
+            runCatching { startActivity(downloads) }.onSuccess { return }
         }
+        Toast.makeText(this, R.string.open_folder_unavailable, Toast.LENGTH_LONG)
+            .show()
     }
 
-    private fun folderIntent(item: DownloadItem): Intent? {
-        return when {
-            !item.filePath.isNullOrEmpty() -> {
-                val parent = File(item.filePath).parentFile ?: return null
+    /** Kembalikan daftar intent fallback untuk membuka folder download.
+     *  Urutan: DocumentsContract → File URI → Downloads app bawaan. */
+    private fun folderIntents(item: DownloadItem): List<Intent> {
+        val list = mutableListOf<Intent>()
+        if (!item.filePath.isNullOrEmpty()) {
+            val parent = File(item.filePath).parentFile
+            if (parent != null && parent.isDirectory) {
                 val rel = parent.absolutePath.removePrefix("/storage/emulated/0/")
                 if (rel != parent.absolutePath) {
-                    Intent(Intent.ACTION_VIEW).setDataAndType(
-                        DocumentsContract.buildDocumentUri(
-                            "com.android.externalstorage.documents", "primary:$rel"
-                        ),
-                        "vnd.android.document/directory"
+                    list.add(
+                        Intent(Intent.ACTION_VIEW).setDataAndType(
+                            DocumentsContract.buildDocumentUri(
+                                "com.android.externalstorage.documents", "primary:$rel"
+                            ),
+                            "vnd.android.document/directory"
+                        )
                     )
-                } else if (Build.VERSION.SDK_INT < 24) {
-                    Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(Uri.fromFile(parent), "resource/folder")
-                } else {
-                    null
+                }
+                // Fallback File URI (Android 5-6 TV box sering tidak punya DocumentsUI).
+                if (Build.VERSION.SDK_INT < 24) {
+                    list.add(
+                        Intent(Intent.ACTION_VIEW)
+                            .setDataAndType(Uri.fromFile(parent), "resource/folder")
+                    )
                 }
             }
-            !item.contentUri.isNullOrEmpty() -> {
-                val uri = item.contentUri.toUri()
-                val rel = runCatching {
-                    if (Build.VERSION.SDK_INT >= 29 && uri.authority == MediaStore.AUTHORITY) {
-                        contentResolver.query(
-                            uri,
-                            arrayOf(MediaStore.MediaColumns.RELATIVE_PATH),
-                            null, null, null
-                        )?.use { c ->
-                            if (c.moveToFirst()) {
-                                c.getString(c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH))
-                            } else null
-                        }
+        }
+        if (!item.contentUri.isNullOrEmpty() && Build.VERSION.SDK_INT >= 29) {
+            val uri = item.contentUri.toUri()
+            val rel = runCatching {
+                contentResolver.query(
+                    uri,
+                    arrayOf(MediaStore.MediaColumns.RELATIVE_PATH),
+                    null, null, null
+                )?.use { c ->
+                    if (c.moveToFirst()) {
+                        c.getString(c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH))
                     } else null
-                }.getOrNull()?.trim('/')
-                val targetRel = rel?.takeIf { it.isNotBlank() } ?: "Download"
+                }
+            }.getOrNull()?.trim('/')
+            val targetRel = rel?.takeIf { it.isNotBlank() } ?: "Download"
+            list.add(
                 Intent(Intent.ACTION_VIEW).setDataAndType(
                     DocumentsContract.buildDocumentUri(
                         "com.android.externalstorage.documents", "primary:$targetRel"
                     ),
                     "vnd.android.document/directory"
                 )
-            }
-            else -> null
+            )
         }
+        return list
     }
 
     companion object {
