@@ -9,6 +9,7 @@
 - **Speed limiter** — Total byte multi-segmen disimpan pada atomic counter, bukan dijumlahkan ulang tiap chunk.
 - **Server log** — Tambah revision cache agar polling log tidak join ulang 300 baris bila tidak ada log baru.
 - **SSE signature** — Sertakan nama, total, progress, limit, waktu selesai, checksum, dan error agar cache JSON tidak menyajikan kolom basi.
+- **Compile fix** — Tambah import `DownloadItem` dan konversi byte segmen ke `Long` untuk counter speed limiter.
 
 ## [v1.0 — 2026-08-21] — Optimasi ukuran APK
 

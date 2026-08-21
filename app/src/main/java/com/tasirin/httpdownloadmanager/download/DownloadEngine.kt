@@ -1109,7 +1109,7 @@ class DownloadEngine(appContext: Context) {
                     if (read == -1) break
                     output.write(buffer, 0, read)
                     downloaded += read
-                    val sharedTotal = addThrottleTotal(id, read)
+                    val sharedTotal = addThrottleTotal(id, read.toLong())
                     throttle.sleepIfNeeded { sharedTotal }
                     val now = System.currentTimeMillis()
                     if (now - lastNotify >= 1000) {
