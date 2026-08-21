@@ -524,79 +524,6 @@
   .fs-check.on {
  background: var(--primary); border-color: var(--primary); }
 
-  html[data-theme="dark"] {
-
-    --bg: #0e1117;
-    --bg-soft: #171c26;
-    --card: #1a202b;
-    --ink: #e6ebf4;
-    --muted: #93a1b5;
-    --primary: #6d7dff;
-    --primary-2: #5564f0;
-    --primary-soft: #232b45;
-    --accent: #ff8f2b;
-    --green: #3fbf77;
-    --green-bg: #123524;
-    --red: #ff7a7a;
-    --red-bg: #3a1717;
-    --amber: #f5a623;
-    --amber-bg: #3a2c0e;
-    --blue-bg: #1d2c4d;
-    --line: #262e3c;
-  }
-
-  html[data-theme="dark"] .topbar {
- background: rgba(14,17,23,.85); border-bottom-color: #232b38; }
-
-  html[data-theme="dark"] .tabbar {
- background: rgba(14,17,23,.9); border-top-color: #232b38; }
-
-  html[data-theme="dark"] .seg {
- background: #141924; }
-
-  html[data-theme="dark"] .seg button.on {
- background: #232c3c; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
-
-  html[data-theme="dark"] input, html[data-theme="dark"] select {
- background: #141924; color: var(--ink); border-color: var(--line); }
-
-  html[data-theme="dark"] input:focus, html[data-theme="dark"] select:focus {
- box-shadow: 0 0 0 3px var(--primary-soft); }
-
-  html[data-theme="dark"] .bar {
- background: #232b38; }
-
-  html[data-theme="dark"] .gal-cell {
- background: #0e1116; }
-
-  html[data-theme="dark"] .btn-ghost {
- background: #232b38; color: var(--ink); }
-
-  html[data-theme="dark"] .btn-ghost:hover {
- background: #2a3345; }
-
-  html[data-theme="dark"] #mediaModal {
- background: #10141b; }
-
-  html[data-theme="dark"] #mmBack {
- color: var(--ink); }
-
-  html[data-theme="dark"] #mmBack:hover {
- background: rgba(255,255,255,.08); }
-
-  html[data-theme="dark"] #mmTitle,
-  html[data-theme="dark"] .mm-rel-title,
-  html[data-theme="dark"] .mm-rel-name {
- color: #e6ebf4; }
-
-  html[data-theme="dark"] #mmSub,
-  html[data-theme="dark"] .mm-rel-meta,
-  html[data-theme="dark"] .mm-rel-empty {
- color: #93a1b5; }
-
-  html[data-theme="dark"] .mm-rel-thumb {
- background: #232b38; }
-
   #mediaModal {
  position: fixed; inset: 0; background: #f9f9f9; z-index: 60; display: none; flex-direction: column; }
 
@@ -1100,7 +1027,6 @@
   <div class="topbar-in">
     <div class="brand"><span>Tasirin Download Manager<small>Remote Control</small></span></div>
     <button id="newBtn" class="pill primary" type="button">+ New Download</button>
-    <button id="themeBtn" class="pill" type="button">&#127769;</button>
   </div>
 </div>
 
@@ -1362,34 +1288,7 @@ connReloadBtn.addEventListener('click', function () {
   if (connReloadTarget) window.location.href = connReloadTarget;
   else window.location.reload();
 });
-const themeBtn = document.getElementById('themeBtn');
-const THEME_ORDER = ['auto', 'light', 'dark'];
-function systemDark() {
-  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-}
-function applyTheme(theme) {
-  const resolved = (theme === 'dark' || (theme === 'auto' && systemDark())) ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', resolved);
-  const m = document.querySelector('meta[name="theme-color"]');
-  if (m) m.setAttribute('content', resolved === 'dark' ? '#0e1116' : '#4353e6');
-  localStorage.setItem('dm_theme', theme);
-  themeBtn.textContent = theme === 'light' ? '\u{1F31E}' : (theme === 'dark' ? '\u{1F319}' : '\u{1F317}');
-  themeBtn.title = theme === 'auto' ? 'Theme: auto' : (theme === 'dark' ? 'Theme: dark' : 'Theme: light');
-}
-applyTheme(localStorage.getItem('dm_theme') || 'auto');
-themeBtn.addEventListener('click', function () {
-  const cur = localStorage.getItem('dm_theme') || 'auto';
-  applyTheme(THEME_ORDER[(THEME_ORDER.indexOf(cur) + 1) % THEME_ORDER.length]);
-});
-(function () {
-  const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
-  if (!mq) return;
-  const on = function () {
-    if ((localStorage.getItem('dm_theme') || 'auto') === 'auto') applyTheme('auto');
-  };
-  if (mq.addEventListener) mq.addEventListener('change', on);
-  else if (mq.addListener) mq.addListener(on);
-})();
+try { localStorage.removeItem('dm_theme'); } catch (e) {}
 
 let failCount = 0;
 let currentItems = [];
@@ -2856,8 +2755,8 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
     const target = job.path;
     statusEl.style.color = '';
     statusEl.textContent = 'Uploading ' + file.name + ' (' + (idx + 1) + '/' + total + ')' +
-      (attempt > 1 ? ' \u00b7 coba ke-' + attempt : '') + ' \u2026';
-    progressText.textContent = file.name + (attempt > 1 ? ' (coba ' + attempt + ')' : '');
+      (attempt > 1 ? ' \u00b7 attempt ' + attempt : '') + ' \u2026';
+    progressText.textContent = file.name + (attempt > 1 ? ' (attempt ' + attempt + ')' : '');
     const id = job.id;
     const chunks = Math.max(1, Math.ceil(file.size / UPLOAD_CHUNK));
     let chunkIdx = 0;
@@ -4199,7 +4098,7 @@ function connectEvents() {
       const items = data.items || [];
       lastItems = items;
       if (data.status) applyServerStatus(data.status);
-      render(items);
+      if (currentRoute() === 'downloads') render(items); else updateToolbar(items);
     } catch (e) {}
   };
   sse.onerror = function () {

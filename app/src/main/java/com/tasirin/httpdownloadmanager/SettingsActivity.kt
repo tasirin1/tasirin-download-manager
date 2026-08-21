@@ -32,6 +32,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import androidx.core.widget.TextViewCompat
+import androidx.lifecycle.lifecycleScope
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
@@ -46,6 +47,9 @@ import com.tasirin.httpdownloadmanager.util.QrEncoder
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Halaman pengaturan: server remote, keamanan, log, unduhan, dan penyimpanan. */
 class SettingsActivity : AppCompatActivity() {
@@ -75,13 +79,18 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, LogActivity::class.java))
         }
         binding.btnCleanup.setOnClickListener {
-            val (files, bytes) = cleanupJunkFiles()
-            binding.cleanupResult.text = if (files > 0) {
-                resources.getQuantityString(
-                    R.plurals.cleanup_done, files, files, Formats.bytes(bytes)
-                )
-            } else {
-                getString(R.string.cleanup_empty)
+            binding.btnCleanup.isEnabled = false
+            binding.cleanupResult.setText(R.string.cleanup_running)
+            lifecycleScope.launch {
+                val (files, bytes) = withContext(Dispatchers.IO) { cleanupJunkFiles() }
+                binding.cleanupResult.text = if (files > 0) {
+                    resources.getQuantityString(
+                        R.plurals.cleanup_done, files, files, Formats.bytes(bytes)
+                    )
+                } else {
+                    getString(R.string.cleanup_empty)
+                }
+                binding.btnCleanup.isEnabled = true
             }
         }
         wireDownloadSettings()
@@ -634,40 +643,38 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun checkForUpdate() {
         binding.updateStatus.text = getString(R.string.update_checking)
-        Thread {
-            val info = Updater.checkLatest(this)
-            runOnUiThread {
-                if (info == null) {
-                    binding.updateStatus.text = getString(R.string.update_failed)
-                    return@runOnUiThread
-                }
-                val current = runCatching {
-                    packageManager.getPackageInfo(packageName, 0).versionCode
-                }.getOrDefault(0)
-                if (info.versionCode <= current) {
-                    binding.updateStatus.text = getString(R.string.update_latest)
-                } else {
-                    binding.updateStatus.text = getString(
-                        R.string.update_available, info.versionName, info.versionCode
-                    )
-                    AlertDialog.Builder(this)
-                        .setTitle(R.string.update_title)
-                        .setMessage(
-                            getString(
-                                R.string.update_message,
-                                info.versionName,
-                                info.versionCode,
-                                Formats.bytes(info.apkSize)
-                            )
-                        )
-                        .setNegativeButton(R.string.cancel, null)
-                        .setPositiveButton(R.string.update_download) { _, _ ->
-                            downloadUpdate(info)
-                        }
-                        .show()
-                }
+        lifecycleScope.launch {
+            val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@SettingsActivity) }
+            if (info == null) {
+                binding.updateStatus.text = getString(R.string.update_failed)
+                return@launch
             }
-        }.start()
+            val current = runCatching {
+                packageManager.getPackageInfo(packageName, 0).versionCode
+            }.getOrDefault(0)
+            if (info.versionCode <= current) {
+                binding.updateStatus.text = getString(R.string.update_latest)
+            } else {
+                binding.updateStatus.text = getString(
+                    R.string.update_available, info.versionName, info.versionCode
+                )
+                AlertDialog.Builder(this@SettingsActivity)
+                    .setTitle(R.string.update_title)
+                    .setMessage(
+                        getString(
+                            R.string.update_message,
+                            info.versionName,
+                            info.versionCode,
+                            Formats.bytes(info.apkSize)
+                        )
+                    )
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.update_download) { _, _ ->
+                        downloadUpdate(info)
+                    }
+                    .show()
+            }
+        }
     }
 
     @SuppressLint("InflateParams") // Inflate dialog progres dengan root null adalah pola standar.
@@ -680,26 +687,31 @@ class SettingsActivity : AppCompatActivity() {
             .setView(view)
             .setNegativeButton(R.string.cancel, null)
             .show()
-        Thread {
-            val file = Updater.download(this, info) { done, total ->
-                runOnUiThread {
-                    if (total > 0) {
-                        bar.progress = (done * 100 / total).toInt()
-                        txt.text = getString(
-                            R.string.update_progress_detail,
-                            Formats.bytes(done),
-                            Formats.bytes(total)
-                        )
-                    } else {
-                        txt.text = getString(R.string.update_progress_unknown, Formats.bytes(done))
+        var lastProgressUi = 0L
+        lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                Updater.download(this@SettingsActivity, info) { done, total ->
+                    val now = System.currentTimeMillis()
+                    if (now - lastProgressUi < 100) return@download
+                    lastProgressUi = now
+                    runOnUiThread {
+                        if (total > 0) {
+                            bar.progress = (done * 100 / total).toInt()
+                            txt.text = getString(
+                                R.string.update_progress_detail,
+                                Formats.bytes(done),
+                                Formats.bytes(total)
+                            )
+                        } else {
+                            txt.text = getString(R.string.update_progress_unknown, Formats.bytes(done))
+                        }
                     }
                 }
             }
-            runOnUiThread {
-                runCatching { if (dialog.isShowing) dialog.dismiss() }
-                binding.updateStatus.text = saveDownloadedUpdate(file, info)
-            }
-        }.start()
+            val status = withContext(Dispatchers.IO) { saveDownloadedUpdate(file, info) }
+            runCatching { if (dialog.isShowing) dialog.dismiss() }
+            binding.updateStatus.text = status
+        }
     }
 
     /** Simpan APK hasil unduhan ke folder Downloads publik (tanpa pasang

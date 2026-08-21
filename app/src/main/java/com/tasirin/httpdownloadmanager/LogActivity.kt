@@ -17,9 +17,13 @@ import android.text.TextWatcher
 import android.widget.Toast
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.tasirin.httpdownloadmanager.databinding.ActivityLogBinding
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -93,65 +97,70 @@ class LogActivity : AppCompatActivity() {
     }
 
     private fun exportLogTxt() {
-        val log = App.httpServer.snapshotLog()
-        val header = buildString {
-            appendLine("=== Tasirin Download Manager - Log Server (realtime) ===")
-            appendLine("Time: ${EXPORT_TIME.format(Date())}")
-            appendLine(
-                "App version: " + runCatching {
-                    val info = packageManager.getPackageInfo(packageName, 0)
-                    info.versionName + " (build " + info.versionCode + ")"
-                }.getOrDefault("?")
-            )
-            appendLine("Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-            appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
-            appendLine()
-            append(if (log.isBlank()) "(No server activity yet)\n" else log)
-            val crashText = runCatching {
-                // Baca dari folder data eksternal (sinkron dengan CrashLog).
-                val dir = getExternalFilesDir(null) ?: filesDir
-                val f = File(dir, App.CRASH_LOG_FILE)
-                if (f.exists()) f.readText().trim() else ""
-            }.getOrDefault("")
-            if (crashText.isNotEmpty()) {
-                appendLine()
-                appendLine("=== Crash log (previous launches) ===")
-                appendLine(crashText)
-            }
-            appendLine()
-        }
-        val stamp = EXPORT_STAMP.format(Date())
-        val ok = runCatching {
-            if (Build.VERSION.SDK_INT >= 29) {
-                val resolver = contentResolver
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, "httpdm-serverlog-$stamp.txt")
-                    put(MediaStore.Downloads.MIME_TYPE, "text/plain")
-                    put(MediaStore.Downloads.RELATIVE_PATH, "Download/")
-                    put(MediaStore.Downloads.IS_PENDING, 1)
+        binding.logExport.isEnabled = false
+        lifecycleScope.launch {
+            val exported = withContext(Dispatchers.IO) {
+                val log = App.httpServer.snapshotLog()
+                val header = buildString {
+                    appendLine("=== Tasirin Download Manager - Log Server (realtime) ===")
+                    appendLine("Time: ${EXPORT_TIME.format(Date())}")
+                    appendLine(
+                        "App version: " + runCatching {
+                            val info = packageManager.getPackageInfo(packageName, 0)
+                            info.versionName + " (build " + info.versionCode + ")"
+                        }.getOrDefault("?")
+                    )
+                    appendLine("Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+                    appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
+                    appendLine()
+                    append(if (log.isBlank()) "(No server activity yet)\n" else log)
+                    val crashText = runCatching {
+                        // Baca dari folder data eksternal (sinkron dengan CrashLog).
+                        val dir = getExternalFilesDir(null) ?: filesDir
+                        val f = File(dir, App.CRASH_LOG_FILE)
+                        if (f.exists()) f.readText().trim() else ""
+                    }.getOrDefault("")
+                    if (crashText.isNotEmpty()) {
+                        appendLine()
+                        appendLine("=== Crash log (previous launches) ===")
+                        appendLine(crashText)
+                    }
+                    appendLine()
                 }
-                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                    ?: return@runCatching false
+                val stamp = EXPORT_STAMP.format(Date())
                 runCatching {
-                    resolver.openOutputStream(uri)?.use { it.write(header.toByteArray()) }
-                }.onFailure { resolver.delete(uri, null, null) }
-                val done = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
-                resolver.update(uri, done, null, null) > 0
-            } else {
-                val dir = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS
-                )
-                if (dir == null) return@runCatching false
-                if (!dir.isDirectory && !dir.mkdirs()) return@runCatching false
-                File(dir, "httpdm-serverlog-$stamp.txt").writeText(header)
-                true
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        val resolver = contentResolver
+                        val values = ContentValues().apply {
+                            put(MediaStore.Downloads.DISPLAY_NAME, "httpdm-serverlog-$stamp.txt")
+                            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                            put(MediaStore.Downloads.RELATIVE_PATH, "Download/")
+                            put(MediaStore.Downloads.IS_PENDING, 1)
+                        }
+                        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                            ?: return@runCatching false
+                        runCatching {
+                            resolver.openOutputStream(uri)?.use { it.write(header.toByteArray()) }
+                        }.onFailure { resolver.delete(uri, null, null) }
+                        val done = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
+                        resolver.update(uri, done, null, null) > 0
+                    } else {
+                        val dir = Environment.getExternalStoragePublicDirectory(
+                            Environment.DIRECTORY_DOWNLOADS
+                        )
+                        if (!dir.isDirectory && !dir.mkdirs()) return@runCatching false
+                        File(dir, "httpdm-serverlog-$stamp.txt").writeText(header)
+                        true
+                    }
+                }.getOrDefault(false)
             }
-        }.getOrDefault(false)
-        Toast.makeText(
-            this,
-            if (ok) R.string.log_exported else R.string.log_export_failed,
-            Toast.LENGTH_LONG
-        ).show()
+            Toast.makeText(
+                this,
+                if (exported) R.string.log_exported else R.string.log_export_failed,
+                Toast.LENGTH_LONG
+            ).show()
+            binding.logExport.isEnabled = true
+        }
     }
 
     private fun refreshLog() {

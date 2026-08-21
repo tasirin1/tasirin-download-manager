@@ -1,3 +1,12 @@
+## [v1.0 — 2026-08-21] — Efisiensi remote & I/O background
+
+### Fixed
+- **Remote theme cleanup** — Hapus sisa tema gelap, tombol tema, dan state `dm_theme` agar UI selalu terang sesuai keputusan desain.
+- **Realtime route** — SSE kini hanya rebuild daftar download saat tab Downloads aktif; tab lain cukup update toolbar/selection.
+- **Main-thread I/O** — Pindahkan cleanup junk, export log, cek update, unduh update, verifikasi APK, dan simpan APK ke background thread.
+- **Update progress** — Throttle refresh progress minimal 100 ms untuk mengurangi update UI berlebihan.
+- **Upload text** — Samakan teks status retry upload ke Bahasa Inggris.
+
 ## [v1.0 — 2026-08-21] — Fix open folder untuk file selesai
 
 ### Fixed

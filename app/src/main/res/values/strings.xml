@@ -282,6 +282,7 @@
         <item quantity="other">Cleaned: %1$d files (%2$s) removed</item>
     </plurals>
     <string name="cleanup_empty">No junk files found</string>
+    <string name="cleanup_running">Cleaning…</string>
     <string name="label_value">%1$s: %2$s</string>
     <string name="gallery_thumb_desc">Media preview</string>
 </resources>
