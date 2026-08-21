@@ -77,7 +77,12 @@ android {
     }
 
     packaging {
-        resources.excludes += "META-INF/**"
+        resources.excludes += setOf(
+            "META-INF/**",
+            // Metadata developer/reflection ini tidak dibaca saat runtime APK.
+            "**/*.kotlin_builtins",
+            "DebugProbesKt.bin"
+        )
     }
 
     lint {

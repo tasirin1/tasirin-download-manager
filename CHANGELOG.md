@@ -1,3 +1,8 @@
+## [v1.0 — 2026-08-21] — Optimasi ukuran APK
+
+### Changed
+- **APK size** — Kecualikan metadata `.kotlin_builtins` dan `DebugProbesKt.bin`, matikan metadata VCS, serta aktifkan repackage/access optimization R8 untuk mengurangi ukuran APK tanpa mengubah fitur.
+
 ## [v1.0 — 2026-08-21] — Efisiensi remote & I/O background
 
 ### Fixed
