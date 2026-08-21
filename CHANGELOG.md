@@ -1,3 +1,14 @@
+## [v1.0 — 2026-08-21] — Stabilkan tombol pemutar video
+
+### Fixed
+- **Player controls** — Cegah klik close membocorkan event play ke player, duplikasi sentuhan di WebView lama, dan konflik shortcut keyboard saat tombol pemutar sedang fokus.
+- **Playlist konteks** — Pisahkan urutan video Gallery dan File Manager sehingga next/prev serta auto-next tidak melompat ke galeri yang tidak berhubungan.
+- **Mute state** — Perbaiki ikon mute dan sinkronkan tampilannya dengan volume nol.
+- **Navigasi video** — Nonaktifkan prev/next di batas playlist dan tambahkan fallback fullscreen untuk browser terbatas.
+
+### Changed
+- **Control layout** — Perbesar target seek, cegah overflow kontrol di layar sempit, tampilkan fokus D-pad dengan jelas, stabilkan lebar tombol speed, dan hormati safe-area.
+
 ## [v1.0 — 2026-08-21] — Optimasi galeri, streaming, dan realtime
 
 ### Changed

@@ -554,6 +554,9 @@
   #mmPlayer:fullscreen {
  width: 100%; height: 100%; }
 
+  #mmPlayer:-webkit-full-screen {
+ width: 100%; height: 100%; }
+
   #mmPlayer:fullscreen::before, #mmPlayer:-webkit-full-screen::before {
  padding-top: 0; }
 
@@ -626,16 +629,16 @@
  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,.72); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; pointer-events: none; }
 
   #mmPlayerTop {
- position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 4px; padding: 6px 8px 26px; background: linear-gradient(rgba(0,0,0,.78), transparent); pointer-events: none; transition: opacity .25s ease; }
+ position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 4px; padding: 6px 8px 26px; background: linear-gradient(rgba(0,0,0,.78), transparent); pointer-events: none; transition: opacity .25s ease, visibility .25s ease; }
 
   #mmPlayerTop.hide {
- opacity: 0; }
+ opacity: 0; visibility: hidden; }
 
   #mmPlayerTop.hide button {
  pointer-events: none; }
 
   #mmPlayerTop button {
- pointer-events: auto; flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(0,0,0,.42); color: #fff; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+ pointer-events: auto; flex: 0 0 auto; width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(0,0,0,.42); color: #fff; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
   #mmPlayerTop button:hover {
  background: rgba(255,255,255,.18); }
@@ -644,19 +647,19 @@
  flex: 1; min-width: 0; color: #fff; font-size: 13px; font-weight: 600; line-height: 1.35; text-shadow: 0 1px 4px rgba(0,0,0,.6); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
   #mmCtrl {
- position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 6px 0; background: linear-gradient(transparent, rgba(0,0,0,.82)); transition: opacity .25s ease; }
+ position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 8px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, rgba(0,0,0,.82)); transition: opacity .25s ease, visibility .25s ease; }
 
   #mmCtrl.hide {
- opacity: 0; pointer-events: none; }
+ opacity: 0; visibility: hidden; pointer-events: none; }
 
   #mmSeekWrap {
- position: relative; height: 14px; display: flex; align-items: center; }
+ position: relative; height: 24px; display: flex; align-items: center; }
 
   #mmBuf {
  position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 4px; border-radius: 999px; background: rgba(255,255,255,.3); pointer-events: none; }
 
   #mmSeek {
- -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 14px; margin: 0; background: transparent; }
+ -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 24px; margin: 0; background: transparent; }
 
   #mmSeek::-webkit-slider-runnable-track {
  height: 4px; border-radius: 999px; background: linear-gradient(to right, #f00 var(--fill, 0%), rgba(255,255,255,.25) var(--fill, 0%)); }
@@ -665,13 +668,19 @@
  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #f00; border: 0; margin-top: -5px; }
 
   #mmCtrlRow {
- display: flex; align-items: center; gap: 2px; color: #fff; }
+ min-width: 0; display: flex; align-items: center; gap: 3px; color: #fff; }
 
   #mmCtrlRow button {
- flex: 0 0 auto; width: 32px; height: 32px; border: 0; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+ flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  #mmCtrlRow button:focus-visible, #mmPlayerTop button:focus-visible {
+ outline: 2px solid #fff; outline-offset: 1px; }
+
+  #mmCtrlRow button[disabled] {
+ opacity: .35; pointer-events: none; }
 
   #mmTime {
- font-size: 11.5px; font-variant-numeric: tabular-nums; }
+ min-width: 0; overflow: hidden; white-space: nowrap; font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
   #mmSeekWrap:hover #mmSeek::-webkit-slider-runnable-track {
  height: 5px; }
@@ -686,25 +695,33 @@
  position: absolute; bottom: 9px; left: 0; transform: translateX(-50%); background: rgba(0,0,0,.82); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; pointer-events: none; white-space: nowrap; z-index: 3; }
 
   .mm-vol {
- -webkit-appearance: none; appearance: none; width: 48px; height: 4px; border-radius: 999px; background: rgba(255,255,255,.35); outline: none; flex: 0 0 auto; }
+ -webkit-appearance: none; appearance: none; width: 48px; height: 24px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; }
+
+  .mm-vol::-webkit-slider-runnable-track {
+ height: 4px; border-radius: 999px; background: rgba(255,255,255,.35); }
 
   .mm-vol::-webkit-slider-thumb {
  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; margin-top: -4px; }
 
   #mmSpeedBtn {
- font-size: 12px; font-weight: 600; }
+ min-width: 32px; height: auto; padding: 0 2px; font-size: 12px; font-weight: 600; }
 
   #mmAutoBtn {
- font-size: 10.5px; font-weight: 700; letter-spacing: .3px; color: rgba(255,255,255,.6); }
+ width: auto; padding: 0 4px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: .3px; color: rgba(255,255,255,.72); }
 
   #mmAutoBtn.on {
- color: #f00; }
+ background: rgba(255,0,0,.16); color: #ff5252; }
 
   #mmPlayer.mm-hide-cursor {
  cursor: none; }
 
   .mm-flex {
  flex: 1; }
+
+  @media (max-width: 430px), (max-height: 380px) {
+ .mm-vol { display: none; }
+ #mmCtrlRow { gap: 2px; }
+  }
 
   .hidden {
  display: none !important; }
@@ -1188,13 +1205,13 @@
           <input id="mmSeek" type="range" min="0" max="1000" value="0" step="1">
         </div>
         <div id="mmCtrlRow">
-          <button id="mmPlayBtn" type="button"></button>
+          <button id="mmPlayBtn" type="button" title="Play or pause"></button>
           <button id="mmPrevBtn" type="button" title="Previous video"></button>
           <button id="mmNextBtn" type="button" title="Next video"></button>
           <span id="mmTime">0:00 / 0:00</span>
           <span class="mm-flex"></span>
           <button id="mmSpeedBtn" type="button" title="Playback speed">1&#215;</button>
-          <button id="mmAutoBtn" type="button" title="Auto-play next video">AUTO</button>
+          <button id="mmAutoBtn" type="button" title="Auto-play next video" aria-pressed="true">AUTO</button>
           <button id="mmMuteBtn" type="button"></button>
           <input id="mmVol" class="mm-vol" type="range" min="0" max="100" value="100" title="Volume">
           <button id="mmFsBtn" type="button"></button>
@@ -1418,6 +1435,7 @@ const ICONS = {
 let mmType = 'video';
 let mmTimer = null;
 let mmTapTimer = null;
+let mmLastTouchEnd = 0;
 let mmLastTap = 0;
 let mmCurrentToken = '';
 let mmLastSave = 0;
@@ -1580,6 +1598,17 @@ document.addEventListener('fullscreenchange', function () {
 document.addEventListener('webkitfullscreenchange', function () {
   mmFsBtn.innerHTML = document.webkitFullscreenElement ? ICONS.fsx : ICONS.fs;
   if (!document.webkitFullscreenElement) mmUnlockOrientation();
+});
+mmVideo.addEventListener('webkitendfullscreen', function () {
+  mmFsBtn.innerHTML = ICONS.fs;
+  mmUnlockOrientation();
+});
+mmVideo.addEventListener('webkitpresentationmodechanged', function () {
+  const mode = mmVideo.webkitPresentationMode;
+  if (mode !== 'fullscreen') {
+    mmFsBtn.innerHTML = ICONS.fs;
+    mmUnlockOrientation();
+  }
 });
 
 async function loadGallery(reset) {
@@ -2620,16 +2649,28 @@ function fsOpenMedia(it) {
   const token = encodeURIComponent(it.token);
   const media = API + '/api/media?token=' + token;
   const ext = extOf(it.name).toLowerCase();
-  const audio = FILE_ICON_AUD.indexOf(ext) >= 0;
-  const isVideo = audio || FILE_ICON_VIDEO.indexOf(ext) >= 0;
-  if (!isVideo) return;
-  const base = {name: it.name, size: it.size, modified: it.modified, token: it.token};
-  openMedia(
-    audio
-      ? Object.assign({}, base, {isVideo: true, kind: 'audio'})
-      : Object.assign({}, base, {isVideo: true}),
-    media
-  );
+  const isMedia = FILE_ICON_AUD.indexOf(ext) >= 0 || FILE_ICON_VIDEO.indexOf(ext) >= 0;
+  if (!isMedia) return;
+  const toItem = function (file) {
+    const fileExt = extOf(file.name).toLowerCase();
+    const fileAudio = FILE_ICON_AUD.indexOf(fileExt) >= 0;
+    return {
+      name: file.name,
+      size: file.size,
+      modified: file.modified,
+      token: file.token,
+      isVideo: true,
+      kind: fileAudio ? 'audio' : 'video'
+    };
+  };
+  const playlist = (fsItems || []).filter(function (file) {
+    const fileExt = extOf(file.name).toLowerCase();
+    return file.kind === 'file' && (
+      FILE_ICON_AUD.indexOf(fileExt) >= 0 || FILE_ICON_VIDEO.indexOf(fileExt) >= 0
+    );
+  }).map(toItem);
+  const base = toItem(it);
+  openMedia(base, media, playlist.length ? playlist : [base]);
 }
 
 async function doFsOp(it, op) {
@@ -3196,20 +3237,26 @@ function mmTokenIdx(list, token) {
   return -1;
 }
 
+function mmUpdateNavButtons() {
+  const idx = mmTokenIdx(mmVideoList, mmCurrentToken);
+  mmPrevBtn.disabled = idx <= 0;
+  mmNextBtn.disabled = idx < 0 || idx >= mmVideoList.length - 1;
+}
+
 function mmStepVideo(delta) {
   if (mmType !== 'video' || !mmVideoList.length) return;
-  let idx = mmTokenIdx(mmVideoList, mmCurrentToken);
-  if (idx < 0) idx = delta > 0 ? -1 : mmVideoList.length;
+  const idx = mmTokenIdx(mmVideoList, mmCurrentToken);
+  if (idx < 0) return;
   const next = idx + delta;
   if (next < 0 || next >= mmVideoList.length) {
     mmShowToast(delta > 0 ? 'Last video' : 'First video');
     return;
   }
   const it = mmVideoList[next];
-  openMedia(it, API + '/api/media?token=' + encodeURIComponent(it.token));
+  openMedia(it, API + '/api/media?token=' + encodeURIComponent(it.token), mmVideoList);
 }
 
-function openMedia(it, src) {
+function openMedia(it, src, playlist) {
   const prevType = mmType;
   mmType = 'video';
   if (prevType === 'video' && mmCurrentToken && mmCurrentToken !== it.token) {
@@ -3218,8 +3265,11 @@ function openMedia(it, src) {
   mmCurrentToken = it.token;
   mmLastSave = 0;
   mmEnded = false;
-  mmVideoList = (galleryItems || []).filter(function (v) { return v.isVideo; });
+  mmVideoList = Array.isArray(playlist) && playlist.length
+    ? playlist
+    : (galleryItems || []).filter(function (v) { return v.isVideo; });
   if (mmTokenIdx(mmVideoList, it.token) < 0) mmVideoList.push(it);
+  mmUpdateNavButtons();
   mmOverlayTitle.textContent = it.name;
   mmTitle.textContent = it.name;
   const kindLabel = it.kind === 'audio' ? ' \u00b7 audio' : ' \u00b7 video';
@@ -3247,7 +3297,6 @@ function openMedia(it, src) {
   mmPlayerTop.classList.remove('hide');
   mmResetSpeed();
   mmPlayBtn.innerHTML = ICONS.play;
-  mmMuteBtn.innerHTML = mmVideo.muted ? ICONS.muted : ICONS.sound;
   mmSyncVol();
   mmFsBtn.innerHTML = (document.fullscreenElement || document.webkitFullscreenElement) ? ICONS.fsx : ICONS.fs;
   mmVideo.src = src;
@@ -3287,12 +3336,12 @@ function renderRelated(current) {
   }
   mmRelated.classList.remove('hidden');
   if (!others.length) {
-    mmRelated.innerHTML = '<div class="mm-rel-empty">No other videos in the gallery.</div>';
+    mmRelated.innerHTML = '<div class="mm-rel-empty">No other videos in this playlist.</div>';
     return;
   }
   const head = document.createElement('div');
   head.className = 'mm-rel-title';
-  head.textContent = 'Video suggestions';
+  head.textContent = 'Up next';
   mmRelated.appendChild(head);
   for (const v of others) {
     const row = document.createElement('div');
@@ -3345,9 +3394,11 @@ function mmVolBy(d) {
 }
 function mmSyncVol() {
   mmVol.value = Math.round((mmVideo.muted ? 0 : mmVideo.volume) * 100);
+  mmMuteBtn.innerHTML = (mmVideo.muted || mmVideo.volume === 0) ? ICONS.mute : ICONS.sound;
 }
 function mmUpdateAutoBtn() {
   mmAutoBtn.classList.toggle('on', mmAutoNext);
+  mmAutoBtn.setAttribute('aria-pressed', mmAutoNext ? 'true' : 'false');
 }
 
 mmPlayBtn.addEventListener('click', mmTogglePlay);
@@ -3402,7 +3453,7 @@ mmSeekWrap.addEventListener('mousemove', function (e) {
   const rect = mmSeekWrap.getBoundingClientRect();
   const d = mmVideo.duration || 0;
   if (!d) return;
-  const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+  const x = Math.max(28, Math.min(e.clientX - rect.left, rect.width - 28));
   mmSeekTip.textContent = mmFmtTime((x / rect.width) * d);
   mmSeekTip.style.left = x + 'px';
   mmSeekTip.classList.remove('hidden');
@@ -3415,6 +3466,7 @@ document.addEventListener('keydown', function (e) {
   if (!mediaModal.classList.contains('open')) return;
   const tag = (e.target && e.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.target && e.target.closest && e.target.closest('#mmCtrl, #mmPlayerTop')) return;
   if (mmType !== 'video') return;
   const d = mmVideo.duration || 0;
   switch (e.code) {
@@ -3482,17 +3534,24 @@ mmFsBtn.addEventListener('click', function () {
     } else {
       mmLockLandscape();
     }
+  } else if (mmVideo.webkitEnterFullscreen) {
+    mmVideo.webkitEnterFullscreen();
+    mmFsBtn.innerHTML = ICONS.fsx;
+  } else {
+    mmShowToast('Fullscreen is not supported');
   }
 });
 
 mmPlayer.addEventListener('click', function (e) {
-  if (e.target.closest('#mmCtrl')) return;
-  if (e.pointerType === 'touch') return;
+  if (e.target.closest('#mmCtrl, #mmPlayerTop')) return;
+  if (e.pointerType === 'touch' || Date.now() - mmLastTouchEnd < 700) return;
   const now = Date.now();
   const dt = now - mmLastTap;
   mmLastTap = now;
   if (dt < 350) {
     clearTimeout(mmTapTimer);
+    mmTapTimer = null;
+    mmLastTap = 0;
     if (e.pointerType === 'mouse') {
       mmFsBtn.click();
       return;
@@ -3522,7 +3581,9 @@ mmPlayer.addEventListener('click', function (e) {
     mmTapTimer = setTimeout(function () {
       mmVideo.pause();
       mmShowCtrl();
-    }, 220);
+      mmTapTimer = null;
+      mmLastTap = 0;
+    }, 340);
   }
 });
 
@@ -3531,6 +3592,7 @@ mmPlayer.addEventListener('touchstart', function () { mmShowCtrl(); }, { passive
 
 let mmTap = { x: 0, y: 0, t: 0 };
 mmPlayer.addEventListener('touchend', function (e) {
+  mmLastTouchEnd = Date.now();
   if (e.target.closest && e.target.closest('#mmCtrl, #mmPlayerTop')) return;
   const ch = e.changedTouches[0];
   if (mmType !== 'video') return;
