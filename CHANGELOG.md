@@ -6,6 +6,7 @@
 - **Main-thread I/O** — Pindahkan cleanup junk, export log, cek update, unduh update, verifikasi APK, dan simpan APK ke background thread.
 - **Update progress** — Throttle refresh progress minimal 100 ms untuk mengurangi update UI berlebihan.
 - **Upload text** — Samakan teks status retry upload ke Bahasa Inggris.
+- **Compile fix** — Perjelas tipe resource pesan hasil ekspor log agar `Toast.makeText` valid.
 
 ## [v1.0 — 2026-08-21] — Fix open folder untuk file selesai
 
