@@ -41,6 +41,7 @@ object ServerSecurity {
         if (clean.isEmpty()) return true
         if (clean.startsWith("m:")) {
             val relative = clean.removePrefix("m:")
+            if (relative.isEmpty()) return true
             if (relative.contains('\\')) return false
             return relative.split('/').none { it.isEmpty() || it == "." || it == ".." }
         }

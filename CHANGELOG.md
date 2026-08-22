@@ -1,7 +1,7 @@
 ## [v1.0 — 2026-08-22] — Perbaikan keamanan, sinkronisasi, dan lifecycle
 
 ### Fixed
-- **Remote destination** — Validasi semua tujuan download/upload terhadap root yang diizinkan, termasuk path `f:` dan `m:`.
+- **Remote destination** — Validasi semua tujuan download/upload terhadap root yang diizinkan, termasuk path `f:`, root `m:`, dan relative path `m:`.
 - **Segment connections** — Pause/cancel/hapus kini menutup semua koneksi segmen aktif, bukan hanya koneksi terakhir.
 - **Merge safety** — Gabungan segmen ditulis ke file staging dulu, lalu bagian parsial dihapus setelah finalisasi berhasil.
 - **Resume validation** — Resume di-reset bila ETag resource berubah agar file tidak tercampur versi lama dan baru.

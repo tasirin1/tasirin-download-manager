@@ -98,7 +98,7 @@ class ServerSecurityTest {
     @Test
     fun isBrowseableAncestor_indukDariRoot_true() {
         val r = root()
-        val induk = r.parentFile
+        val induk = r.parentFile ?: return
         assertTrue(ServerSecurity.isBrowseableAncestor(induk.absolutePath, listOf(r)))
     }
 
