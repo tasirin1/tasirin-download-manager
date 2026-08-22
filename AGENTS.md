@@ -37,7 +37,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │   └── java/com/tasirin/httpdownloadmanager/
 │       ├── App.kt                    # Application — inisialisasi engine download
 │       ├── MainActivity.kt           # UI utama: daftar download, dialog tambah URL, About
-│       ├── GalleryActivity.kt        # Galeri perangkat (foto/video lokal)
+│       ├── GalleryActivity.kt        # Galeri video perangkat (video-only)
 │       ├── SettingsActivity.kt       # Pengaturan lengkap + self-update APK
 │       ├── LogActivity.kt            # Log server realtime + ekspor TXT
 │       ├── data/
@@ -57,7 +57,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │       └── util/
 │           ├── Updater.kt            # Cek & unduh APK update (tanpa auto-install) + verifikasi tanda tangan
 │           ├── FileSaver.kt          # Simpan file (MediaStore / folder, auto-sort)
-│           ├── MediaLibrary.kt       # Scan galeri + thumbnail (kondisional API 29+)
+│           ├── MediaLibrary.kt       # Scan video + thumbnail (kondisional API 29+)
 │           ├── StoragePrefs.kt       # Semua kunci SharedPreferences ("storage_settings")
 │           ├── StorageCleanup.kt     # Auto-cleanup saat storage menipis (partial, thumbs, upload tmp)
 │           ├── QrEncoder.kt          # Encoder QR mandiri (tanpa zxing di APK)
@@ -65,16 +65,14 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │           ├── Spinners.kt, Streams.kt  # Helper spinner + baca stream terbatas
 │           ├── MimeTypes.kt, Crypto.kt, Formats.kt, FileNames.kt,
 │           ├── NotificationHelper.kt, TlsCompat.kt            # Pendukung
-├── app/src/test/                     # Unit test JVM (junit4): Formats, FileNames,
-│                                     # MimeTypes, DownloadItem, QrEncoder (decode
-│                                     # via zxing test-scope) — jalan di CI
+├── app/src/test/                     # Unit test JVM (junit4): download queue/HLS/resume/speed,
+│                                     # item codec, formats/names/mime/hex/pin/QR,
+│                                     # checksums, streams, scan cache, server log/security/stream
 ├── gradle/verification-metadata.xml  # Checksum sha256 semua dependensi (verifikasi strict di CI)
 └── gradle wrapper                    # build via ./gradlew (CI saja untuk rilis)
 ```
 
-Catatan: daftar struktur lama menyebut `widget/SpeedChartView.kt` — file itu sudah
-tidak ada (grafik kecepatan digambar inline di `remote.html`); dokumentasi ini sudah
-diperbarui.
+Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebagai teks pada item aktif/upload; jangan tambahkan grafik tanpa kebutuhan nyata.
 
 ## Arsitektur ringkas
 
@@ -87,20 +85,23 @@ diperbarui.
 - **DownloadService** menjalankan engine di *foreground service*; `NetworkCallback`
   (Android 7+) / broadcast (5–6) untuk melanjutkan download saat koneksi pulih.
 - **HttpControlServer** (nanohttpd, port default `8080`): endpoint JSON + SSE
-  (`/api/events`), sesi PIN dengan auto-lock 10 menit, upload chunk 2 MB, ZIP
-  folder, streaming dengan Range, galeri & thumbnail.
-- **MediaLibrary** memindai MediaStore (kolom `DURATION` untuk durasi; `RELATIVE_PATH`
-  hanya bila API ≥ 29), TTL 15 detik, thumbnail 16:9 di-cache.
+  (`/api/events`), login PIN per-IP dengan throttle/lock, upload chunk 2 MB yang
+  wajib punya ID dan diserialisasi per-ID, ZIP folder, streaming Range, galeri
+  video-only, thumbnail, serta stream parsial bertoken.
+- **MediaLibrary** memindai **video saja** dari MediaStore/file (kolom `DURATION`
+  bila tersedia; `RELATIVE_PATH` hanya API ≥ 29), TTL 15 detik, thumbnail 16:9
+  di-cache, dan akses cache scan dilindungi lock agar tidak scan paralel duplikat.
 - **Updater** membaca release GitHub, memilih asset APK dengan kode tertinggi,
-  memverifikasi tanda tangan (SHA-256 sertifikat release), lalu install via
-  FileProvider.
-- **Kunci SharedPreferences** (`storage_settings`): `folder_uri`, `folder_name`,
+  memverifikasi SHA-256 sertifikat release, lalu **hanya mengunduh APK**. Instalasi
+  tetap manual oleh pengguna.
+- **Kunci SharedPreferences aktif** (`storage_settings`): `folder_uri`, `folder_name`,
   `text_folder_path`, `extra_folders`, `background_download`, `auto_start_boot`,
   `server_background`, `server_autostart_boot`, `server_port`, `server_pin`,
   `pin_enforced`, `fs_full_access`, `server_read_only`, `max_concurrent`, `segments`,
   `speed_limit_kbps`, `max_retries`, `connect_timeout_sec`, `read_timeout_sec`,
   `small_first`, `delete_partial_on_cancel`, `recent_urls`, `sort_mode`,
-  `auto_sort`, `battery_exempt`, `gallery_image_folder`, `gallery_video_folder`.
+  `auto_sort`, `battery_exempt`, `collapsed_sections`, `thumb_cleanup_last`.
+  Kunci galeri foto/video terpisah sudah tidak dipakai; scanner galeri sekarang video-only.
 
 ## Keputusan & larangan historis
 
@@ -125,11 +126,19 @@ kuat dan tanpa diskusi:
 - **`fmtDate`** — hanya SATU definisi di `remote.src.html` (dua definisi
   saling menimpa karena hoisting).
 
-- **Penampil foto** — dihapus dari remote web (2026-08-14); galeri hanya
-  menampilkan video. Jangan tambahkan kembali penampil foto tanpa alasan kuat:
-  struktur HTML modal (`mmVideoHeader`/ `mmVideoWrap`/ `mmDesc`) rentan
-  terhadap bug nesting div yang menyebabkan blank hitam atau pemutar video
-  hilang.
+- **Penampil foto & galeri foto remote** — dihapus (2026-08-14); galeri remote dan
+  native hanya menampilkan/memindai video. Jangan tambahkan kembali penampil foto
+  atau filter All/Photos/Videos tanpa alasan kuat dan diskusi.
+- **Pencarian/filter galeri remote** — dihapus supaya area video maksimal. Endpoint
+  boleh menerima parameter legacy untuk kompatibilitas klien lama, tapi UI baru
+  jangan menampilkannya.
+- **Gesture brightness/volume player** — dihapus; interaksi pemutar memakai tombol,
+  seekbar, double-tap ±10 detik, dan kontrol ramah D-pad.
+- **Endpoint `/api/delete_media`** — tidak ada lagi; penghapusan media galeri remote
+  dihapus bersama fitur foto.
+- **Stream parsial tanpa token** — dilarang. `/stream_part/<id>` wajib lewat
+  `createPartialStreamUrl()` dan tervalidasi oleh `ServerSecurity.isPartialTokenValid()`.
+
 ## Pola bug yang pernah terjadi & guard-nya
 
 | Pola bug | Penyebab | Guard |
@@ -138,13 +147,18 @@ kuat dan tanpa diskusi:
 | Tanggal file tampil format salah | dua `fmtDate` (hoisting, definisi kedua menang) | aturan satu definisi (lihat keputusan historis) |
 | Kata Indonesia lolos ke UI remote | kata pendek tidak ada di daftar larangan | `BANNED_ID` di `scripts/prepare_remote.py` — tambahkan kata baru saat ketemu |
 | Upload gagal diam-diam "listEl.appendChild is not a function" | argumen `uploadFiles()` tertukar | `check_upload_call` di `prepare_remote.py` + smoke test 4 chunk |
-| ~~Tombol penampil foto tidak hilang saat zoom~~ | ~~Dihapus bersama penampil foto~~ | ~~Tidak relevan~~ |
 | Path traversal / PIN bypass | logika keamanan bocor ke endpoint | unit test `ServerSecurity` — jangan pindahkan logika ke `HttpControlServer` |
 | File Manager HTTP 500 setelah stop/start server | `stopServer()` men-shutdown `statPool`, tapi toggle server memakai instance yang sama → pool tetap `Terminated`, semua `statPool.submit()` lempar `RejectedExecutionException` (PR #91) | `liveStatPool()` membuat pool baru otomatis saat pool lama shutdown — jangan balikkan ke `statPool` langsung |
 | `GALLERY SCAN` berulang tiap request galeri | cache scan dianggap "belum lengkap" karena `items.size >= limit` gagal saat total file < limit → scan MediaStore penuh berulang dalam masa TTL | kondisi cache juga menerima scan tuntas: `items.size == total` (di `MediaLibrary.scanCached` + `scannedGallery`) |
 | Checksum dari header server salah di-parse (Digest/Content-MD5/X-Checksum-*) | base64 vs hex, huruf besar/kecil, preferensi sha-256 | unit test `ChecksumsTest` — format output wajib "algo:hex" huruf kecil (dipahami `parseChecksum` engine) |
-| ~~Penampil foto blank hitam~~ | ~~Dihapus bersama penampil foto~~ | ~~Tidak relevan~~ |
-| ~~Pemain video hilang setelah fix foto~~ | ~~Dihapus bersama penampil foto~~ | ~~Tidak relevan~~ |
+| Tujuan tulis remote keluar root | validasi lama hanya cek prefix `f:` | gunakan `ServerSecurity.isRemoteDestinationAllowed(folderPath, allowedFsRoots())` untuk semua tujuan download/upload |
+| Koneksi segmen bocor saat pause/cancel | satu ID hanya menyimpan koneksi terakhir sehingga segmen lain tetap hidup | semua koneksi disimpan di set per-ID melalui `trackConnection()`/`disconnectActive()`; jangan tulis langsung ke `activeConns` |
+| File hasil merge korup saat gagal | bagian `.part.*` dihapus di tengah merge | merge ke staging dulu, finalisasi via rename, hapus parts hanya setelah sukses (`FileSaver.mergeSegments`) |
+| Resume mencampur resource lama/baru | server mengganti file tanpa URL berubah | reset partial bila ETag tersimpan berubah (`invalidateChangedResume`) |
+| Upload chunk dobel/race finalisasi | fallback ID dari nama/path dan penulisan paralel | client wajib ID eksplisit; server mengunci penulisan per-ID (`uploadLockFor`) |
+| Login throttle global bisa diblokir IP lain / boros memori | counter volatile global | state gagal per-IP di `loginAttempts`, map dibatasi dan dibersihkan |
+| Token media bocor di log request | query string dicetak mentah | `appendRequestLog()` redact `token` dan `pin`; pertahankan regex redaction |
+| Scan galeri duplikat saat load-more | request paralel melewati cache | scan/cache invalidation harus tetap di dalam `MediaLibrary.scanLock` |
 
 ## Aturan pengembangan
 
@@ -198,15 +212,15 @@ kuat dan tanpa diskusi:
     versi sekaligus; tiap langkah lewat CI dulu. Versi dipusatkan di
     `gradle/libs.versions.toml` (version catalog) — update cukup di satu
     tempat, Dependabot ikut membacanya.
-14. **Changelog wajib per PR** — setiap PR menambah entri `CHANGELOG.md`
-    (judul `## [v1.0 — tanggal] — ringkasan`) dan menyebut nomor PR pada isi
-    entri setelah PR dibuat. **Dijaga otomatis CI**: PR yang mengubah
-    `app/src/main`, `remote.src.html`, `app/build.gradle.kts`, atau `scripts/`
-    tanpa update `CHANGELOG.md` langsung gagal. Satu PR = satu tujuan kecil;
-    jangan campur fitur + refactor + docs dalam satu PR.
-15. **Jangan berhenti di tengah alur rilis** — setelah PR merge, pantau build
-    `main` sampai sukses dan release punya asset APK terbaru (lihat
-    "Cara cek rilis terbaru").
+14. **Changelog wajib per perubahan kode** — commit yang mengubah `app/src/main`,
+    `remote.src.html`, `app/build.gradle.kts`, atau `scripts/` wajib menyertakan
+    entri `CHANGELOG.md`. Untuk PR, sebut nomor PR di isi entri setelah dibuat.
+    **Dijaga otomatis CI** berdasarkan diff push/PR. Satu commit/PR = satu tujuan;
+    jangan campur fitur + refactor besar + docs.
+15. **Jangan berhenti di tengah alur rilis** — setiap push rilis ke `main` wajib
+    dipantau sampai workflow Build APK sukses dan asset APK terbaru ada di release
+    `v1.0` (lihat "Cara cek rilis terbaru"). Normal flow adalah PR; owner boleh push
+    hotfix/docs langsung hanya jika CI tetap dipantau penuh.
 16. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
     .githooks` (jalankan `prepare_remote.py --check` + unit test cepat).
     Hook tidak wajib; CI tetap penentu.
@@ -217,10 +231,12 @@ kuat dan tanpa diskusi:
 
 ## Cara memicu build & release
 
-- **Push ke `main`** → workflow `build.yml` jalan → release `v1.0` di-*refresh*
-  (dihapus & dibuat ulang, `--latest`) berisi APK
-  `tasirin-download-manager-v1.0-<code>.apk`.
-- **Pull request** → build saja (verifikasi), **tidak** publish release.
+- **Normal flow**: PR → build verifikasi tanpa publish → merge ke `main`.
+- **Hotfix owner**: push langsung ke `main` diperbolehkan bila memang disengaja,
+  tapi workflow tetap wajib dipantau sampai sukses dan release ter-refresh.
+- **Push sukses ke `main`** → workflow `build.yml` menjalankan guard, test,
+  build/release, lalu me-refresh release `v1.0` dengan APK
+  `tasirin-download-manager-v1.0-<code>.apk` (`code = 100000 + run_number`).
 - **Dependabot** → update dikelompokkan (`androidx`, `kotlinx`,
   `gradle-tools`, `actions`). PR yang TIDAK menyentuh dependensi Gradle
   (mis. update GitHub Actions) di-**auto-merge** setelah CI hijau (workflow
@@ -298,9 +314,10 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
   (+ `DownloadService.kt` bila menyangkut foreground service/notifikasi).
 - **Endpoint API / halaman remote** → `HttpControlServer.kt` (endpoint) +
   `remote.src.html` (lalu jalankan `scripts/prepare_remote.py`).
-- **Keamanan server (path FS, lock PIN, offset upload, token share)** →
-  `remote/ServerSecurity.kt` (fungsi murni + unit test, jangan taruh logika
-  baru langsung di `HttpControlServer`).
+- **Keamanan server (path/tujuan FS, lock PIN, throttle login, offset upload,
+  token share/stream parsial)** → `remote/ServerSecurity.kt` (fungsi murni +
+  unit test). Orkestrasi endpoint boleh di `HttpControlServer.kt`, tapi keputusan
+  keamanan jangan didupkan/dipindah keluar helper ini.
 - **Pembersihan storage otomatis** → `util/StorageCleanup.kt` (partial file,
   thumbnail lama, sisa upload).
 - **Galeri / thumbnail** → `MediaLibrary.kt` + `GalleryActivity.kt`.
@@ -326,9 +343,9 @@ gh run view <run-id> --json status,conclusion
 gh release view v1.0 --json assets -q '.assets[].name'
 ```
 
-Pastikan conclusion `success` dan release punya asset APK dengan nama
-`tasirin-download-manager-v1.0-<code>.apk`. Verifikasi manual: pasang APK di HP,
-buka remote web dari browser, tes tambah URL, dan buka Galeri.
+Pastikan conclusion `success`, CodeQL/Gitleaks tidak gagal, dan release punya APK
++ `mapping.txt`. Verifikasi manual: pasang APK di HP, buka remote web dari browser,
+tes tambah URL/upload ringan, dan buka galeri video.
 
 ## Peta jalan: targetSdk 36/37 (Android 16/17)
 

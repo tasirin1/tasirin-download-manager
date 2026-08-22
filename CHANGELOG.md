@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-22] — Perbarui panduan repo
+
+### Changed
+- **AI guide** — Sinkronkan `AGENTS.md` dengan perilaku aktif: galeri video-only, updater download-only, kunci settings terkini, token stream parsial, throttle login per-IP, upload serial per-ID, keamanan tujuan tulis, merge staging, reset resume ETag, dan lock scan galeri.
+- **Documentation** — Rapikan README Indonesia/Inggris, kontribusi, dan panduan screenshot dari fitur yang sudah dihapus (filter foto, status baterai/kecepatan global, folder galeri terpisah, gesture brightness/volume).
+
 ## [v1.0 — 2026-08-22] — Perbarui profil aplikasi
 
 ### Changed

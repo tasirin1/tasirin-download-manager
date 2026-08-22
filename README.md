@@ -127,15 +127,15 @@ Fitur halaman remote:
 
 - **Realtime via SSE**: progress & status datang langsung dari device tanpa refresh manual; fallback polling otomatis bila jaringan memblokir streaming
 - **Polling adaptif**: 2 detik saat ada aktivitas, 10 detik saat idle — hemat baterai
-- **Item aktif otomatis di urutan atas** + total kecepatan live di bar atas
+- **Item aktif otomatis di urutan atas**, dengan kecepatan/ETA pada tiap item aktif
 - **Tampilan mobile**: FAB "+", menu aksi ala bottom-sheet, filter sticky, skeleton loading, empty state informatif
 - **Indikator koneksi**: "diperbarui X dtk lalu", titik status berkedip merah saat koneksi putus, refresh otomatis saat tab kembali fokus
 - **Upload file & folder** dari browser: chunk 2 MB dengan retry (putus tidak mulai dari nol), drag & drop, nama duplikat otomatis, konfirmasi sebelum tab ditutup
 - **File manager remote**: jelajah, buat folder, rename, pindah, hapus massal, **download folder sebagai ZIP**, breadcrumb, pratinjau media langsung
-- **Galeri remote ala YouTube**: thumbnail 16:9, badge durasi asli (cache di device), load bertahap, **filter Semua/Foto/Video**
+- **Galeri video ala YouTube**: thumbnail 16:9, durasi asli (cache di device), load bertahap, dan saran video
 - **Bagikan file via tautan sementara** (berlaku 24 jam, tanpa PIN) + QR code
 - **Streaming** file selesai (HTTP Range untuk video/audio) atau download langsung
-- Status baterai & penyimpanan, pilihan port, server background + auto-start
+- Pilihan port, server background, dan auto-start saat boot
 - **Auto-lock**: halaman remote minta PIN lagi setelah 10 menit tanpa aktivitas
 
 ### Endpoint API (HttpControlServer)
@@ -182,7 +182,7 @@ Menu **⋮ → Pengaturan**:
 - **Unduhan**: resume otomatis, auto-start saat boot, unduhan bersamaan (1–5), jumlah segmen, batas kecepatan, percobaan ulang (0–5), unduh file kecil dulu, **timeout connect (5–60 dtk) & read (10–120 dtk)** untuk jaringan lambat/WISP
 - **Server**: port, PIN, QR code, background + auto-start saat boot
 - **Penyimpanan**: folder tujuan + folder tambahan
-- **Galeri**: folder foto & video terpisah
+- **Galeri**: otomatis video-only; tidak ada konfigurasi folder foto/video terpisah
 - **Pembersihan**: hapus log/download yang sudah selesai
 - **Log Server realtime**: log aktivitas seluruh sistem (request HTTP, download, galeri, kesalahan) bisa di-cari, di-sorot, dan **diekspor ke file TXT** — mudah untuk lapor bug
 

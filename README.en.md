@@ -127,15 +127,15 @@ Remote page features:
 
 - **Realtime via SSE**: progress & status come straight from the device without manual refresh; automatic polling fallback when the network blocks streaming
 - **Adaptive polling**: 2 seconds when active, 10 seconds when idle — battery friendly
-- **Active items pinned to the top** + live total speed in the top bar
+- **Active items pinned to the top**, with per-item speed/ETA while downloading
 - **Mobile-first UI**: "+" FAB, bottom-sheet action menus, sticky filters, skeleton loading, informative empty states
 - **Connection indicator**: "updated Xs ago", status dot blinks red when disconnected, auto-refresh when the tab regains focus
 - **Upload files & folders from the browser**: 2 MB chunks with retry (an interruption does not restart from zero), drag & drop, automatic duplicate names, confirmation before closing the tab
 - **Remote file manager**: browse, create folders, rename, move, bulk delete, **download folders as ZIP**, breadcrumbs, instant media preview
-- **YouTube-style remote gallery**: 16:9 thumbnails, real duration badge (cached on device), progressive loading, **All/Photos/Videos filter**
+- **YouTube-style video gallery**: 16:9 thumbnails, real duration badge (cached on device), progressive loading, and video suggestions
 - **Share files via temporary link** (valid 24 hours, no PIN) + QR code
 - **Streaming** of completed files (HTTP Range for video/audio) or direct download
-- Battery & storage status, port selection, background server + auto-start
+- Port selection, background server, and auto-start on boot
 - **Auto-lock**: the remote page asks for the PIN again after 10 minutes without activity
 
 ### API endpoints (HttpControlServer)
@@ -182,7 +182,7 @@ Menu **⋮ → Settings**:
 - **Downloads**: auto-resume, auto-start on boot, concurrent downloads (1–5), segment count, speed limit, retries (0–5), small files first, **connect (5–60s) & read (10–120s) timeouts** for slow networks/WISPs
 - **Server**: port, PIN, QR code, background + auto-start on boot
 - **Storage**: destination folder + extra folders
-- **Gallery**: separate photo & video folders
+- **Gallery**: automatically video-only; separate photo/video folder settings no longer exist
 - **Cleanup**: delete logs/completed downloads
 - **Realtime Server Log**: activity log of the whole system (HTTP requests, downloads, gallery, errors) — searchable, highlighted, and **exportable to a TXT file** for easy bug reports
 

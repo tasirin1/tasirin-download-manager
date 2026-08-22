@@ -6,12 +6,12 @@ rapi, APK kecil, dan rilis selalu hijau. **Untuk AI yang mengelola repo: baca
 
 ## Alur kerja
 
-1. **Semua perubahan lewat Pull Request** — branch `main` dilindungi
-   (branch protection): wajib PR + status check `Build APK` hijau.
-   Push langsung ke `main` akan ditolak.
+1. **Normal flow lewat Pull Request** — branch `main` dilindungi dan wajib
+   lolos `Build APK`. Owner boleh push hotfix/docs langsung saat darurat,
+   tetapi workflow rilis tetap wajib dipantau sampai sukses.
 2. **Satu PR, satu tujuan.** PR besar yang mencampur banyak hal sulit
    di-review dan sulit di-rollback.
-3. **Wajib update `CHANGELOG.md`** di PR yang menyentuh kode aplikasi
+3. **Wajib update `CHANGELOG.md`** pada commit/PR yang menyentuh kode aplikasi
    (`app/src/main`, `remote.src.html`, `app/build.gradle.kts`, `scripts/`) —
    dijamin otomatis oleh CI (guard CHANGELOG).
 4. **Jangan build lokal untuk rilis.** Rilis resmi hanya lewat GitHub
@@ -64,8 +64,11 @@ cepat (kalau Java tersedia).
 ## Menjalankan guard lokal
 
 ```bash
-python3 scripts/prepare_remote.py --check   # sinkron remote web + node --check + i18n
-./gradlew testDebugUnitTest                 # unit test JVM (butuh Java)
+python3 scripts/prepare_remote.py --check    # sinkron remote web + node --check + i18n
+node scripts/upload_smoke_test.js            # alur upload klien
+python3 scripts/check_readme_sync.py         # struktur README ID/EN
+./gradlew lintDebug testDebugUnitTest        # butuh Android SDK; wajib hijau di CI
+git diff --check                             # whitespace/error diff dasar
 ```
 
 ## Keamanan
