@@ -177,4 +177,5 @@ class ServerSecurityTest {
         assertFalse(
             ServerSecurity.isRemoteDestinationAllowed(luar.absolutePath, listOf(r))
         )
+    }
 }
