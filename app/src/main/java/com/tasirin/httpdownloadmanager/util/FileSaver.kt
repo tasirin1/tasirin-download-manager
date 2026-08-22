@@ -15,6 +15,9 @@ import java.io.File
 import java.io.IOException
 import java.io.BufferedOutputStream
 import java.io.OutputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 class FileSaver(context: Context) {
     private val WHITESPACE_RE = Regex("\\s+")
@@ -43,14 +46,31 @@ class FileSaver(context: Context) {
 
     fun mergeSegments(fileName: String, segmentCount: Int): File {
         val target = partialFile(fileName)
-        BufferedOutputStream(target.outputStream()).use { out ->
-            for (i in 0 until segmentCount) {
-                val part = partialFile(fileName, i)
-                if (!part.exists()) throw IOException("Segment $i not found")
-                part.inputStream().use { input -> input.copyTo(out) }
-                part.delete()
+        val staging = File(target.parentFile, target.name + ".merge")
+        try {
+            BufferedOutputStream(staging.outputStream()).use { out ->
+                for (index in 0 until segmentCount) {
+                    val part = partialFile(fileName, index)
+                    if (!part.exists()) throw IOException("Segment $index not found")
+                    part.inputStream().use { input -> input.copyTo(out) }
+                }
             }
+            try {
+                Files.move(
+                    staging.toPath(), target.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(
+                    staging.toPath(), target.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING
+                )
+            }
+        } finally {
+            if (staging.exists()) runCatching { staging.delete() }
         }
+        (0 until segmentCount).map { partialFile(fileName, it) }.forEach { part -> runCatching { part.delete() } }
         return target
     }
 

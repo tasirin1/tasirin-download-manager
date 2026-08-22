@@ -177,7 +177,7 @@ class GalleryActivity : AppCompatActivity() {
     private fun partialPlayIntent(e: MediaLibrary.MediaEntry, mime: String): Intent? {
         val item = App.engine.items.value.find { it.fileName == e.name }
         if (item != null && App.httpServer.isAlive) {
-            val url = "http://127.0.0.1:${App.httpServer.listeningPort}/stream_part/${item.id}"
+            val url = "http://127.0.0.1:${App.httpServer.listeningPort}${App.httpServer.createPartialStreamUrl(item.id)}"
             return Intent(Intent.ACTION_VIEW).setDataAndType(url.toUri(), mime)
         }
         if (!e.filePath.isNullOrEmpty()) {

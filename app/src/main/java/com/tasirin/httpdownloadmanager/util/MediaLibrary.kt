@@ -23,7 +23,8 @@ object MediaLibrary {
 
     @Volatile
     private var scanCache: Triple<Long, List<MediaEntry>, Int>? = null
-    private var observerRegistered = false
+    private val scanLock = Any()
+    @Volatile private var observerRegistered = false
 
     /** Hasil scan galeri: [items] dibatasi sesuai [maxEntries] (halaman aktif +
      *  buffer, bukan 3000 entri penuh), [total] = jumlah entry unik sebenarnya
@@ -126,7 +127,7 @@ object MediaLibrary {
      *  supaya galeri langsung mendeteksi file yang baru ditulis aplikasi
      *  (download selesai, upload, pindah/rename dari file manager). */
     fun notifyMediaChanged(context: Context, vararg paths: String) {
-        scanCache = null
+        synchronized(scanLock) { scanCache = null }
         val valid = paths.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (valid.isEmpty()) return
         runCatching {
@@ -144,16 +145,18 @@ object MediaLibrary {
 
     private fun scanCached(context: Context, maxEntries: Int): MediaScanResult {
         ensureObserver(context)
-        val now = System.currentTimeMillis()
-        val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
-        scanCache?.let { (ts, items, total) ->
-            if (scanCacheUsable(now - ts, SCAN_TTL_MS, items.size, total, limit)) {
-                return MediaScanResult(items.take(limit), total)
+        synchronized(scanLock) {
+            val now = System.currentTimeMillis()
+            val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
+            scanCache?.let { (ts, items, total) ->
+                if (scanCacheUsable(now - ts, SCAN_TTL_MS, items.size, total, limit)) {
+                    return MediaScanResult(items.take(limit), total)
+                }
             }
+            val result = scanUncached(context, limit)
+            scanCache = Triple(now, result.items, result.total)
+            return result
         }
-        val result = scanUncached(context, limit)
-        scanCache = Triple(now, result.items, result.total)
-        return result
     }
 
     /** Invalidasi cache saat ada foto/video/file baru atau terhapus. */
@@ -171,7 +174,7 @@ object MediaLibrary {
                         val now = System.currentTimeMillis()
                         if (now - lastInvalidate > 10_000L) {
                             lastInvalidate = now
-                            scanCache = null
+                            synchronized(scanLock) { scanCache = null }
                         }
                     }
                 }
@@ -184,6 +187,8 @@ object MediaLibrary {
                         MediaStore.Downloads.EXTERNAL_CONTENT_URI, true, observer
                     )
                 }
+            }.onFailure {
+                observerRegistered = false
             }
         }
     }

@@ -74,7 +74,7 @@ class DownloadEngine(appContext: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
-    private val activeConns = ConcurrentHashMap<String, HttpURLConnection>()
+    private val activeConns = ConcurrentHashMap<String, MutableSet<HttpURLConnection>>()
     private val speedTracker = SpeedTracker()
     private var saveJob: Job? = null
     private var progressSaveJob: Job? = null
@@ -114,6 +114,23 @@ class DownloadEngine(appContext: Context) {
 
     private fun startBackgroundLoops() {
         scope.launch { monitorLoop() }
+    }
+
+    private fun disconnectActive(id: String) {
+        activeConns.remove(id)?.forEach { connection ->
+            runCatching { connection.disconnect() }
+        }
+    }
+
+    private fun trackConnection(id: String, connection: HttpURLConnection): HttpURLConnection {
+        activeConns.getOrPut(id) { Collections.newSetFromMap(ConcurrentHashMap()) }.add(connection)
+        return connection
+    }
+
+    private fun untrackConnection(id: String, connection: HttpURLConnection) {
+        activeConns[id]?.remove(connection)
+        activeConns.remove(id, emptySet())
+        runCatching { connection.disconnect() }
     }
 
     fun addDownload(
@@ -167,7 +184,7 @@ class DownloadEngine(appContext: Context) {
         retryAttempts.remove(id)
         speedTracker.reset(id)
         jobs.remove(id)?.cancel()
-        activeConns.remove(id)?.disconnect()
+        disconnectActive(id)
         updateItem(id) {
             it.copy(state = DownloadState.PAUSED, autoResume = false, speedBps = 0, etaSeconds = 0)
         }
@@ -200,7 +217,7 @@ class DownloadEngine(appContext: Context) {
         speedTracker.reset(id)
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
-        activeConns.remove(id)?.disconnect()
+        disconnectActive(id)
         if (StoragePrefs.isDeletePartialOnCancel(context)) {
             _items.value.find { it.id == id }?.let { item ->
                 FileSaver(context).partialFiles(item).forEach { runCatching { it.delete() } }
@@ -218,7 +235,7 @@ class DownloadEngine(appContext: Context) {
         speedTracker.reset(id)
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
-        activeConns.remove(id)?.disconnect()
+        disconnectActive(id)
         _items.value.find { it.id == id }?.let { FileSaver(context).deleteFiles(it) }
         update(_items.value.filterNot { it.id == id })
         flushSave()
@@ -373,6 +390,28 @@ class DownloadEngine(appContext: Context) {
         val item = _items.value.find { it.id == id } ?: return
         updateItem(id) { it.copy(monitor = enabled && item.state == DownloadState.COMPLETED) }
         flushSave()
+    }
+
+    private fun shouldInvalidateResume(item: DownloadItem, currentEtag: String?): Boolean {
+        return item.bytesDownloaded > 0 && item.etag.isNotBlank() &&
+            !currentEtag.isNullOrBlank() && currentEtag != item.etag
+    }
+
+    private suspend fun invalidateChangedResume(item: DownloadItem, etag: String?) {
+        if (!shouldInvalidateResume(item, etag)) return
+        val saver = FileSaver(context)
+        saver.partialFiles(item).forEach { runCatching { it.delete() } }
+        updateItem(item.id) {
+            it.copy(
+                bytesDownloaded = 0,
+                totalBytes = 0,
+                segments = emptyList(),
+                speedBps = 0,
+                etaSeconds = 0,
+                etag = ""
+            )
+        }
+        clearSegProgress(item.id)
     }
 
     private suspend fun monitorLoop() {
@@ -731,6 +770,7 @@ class DownloadEngine(appContext: Context) {
             if (code in 200..299) {
                 captureHeaderChecksum(item, probe)
                 probeHeaders = headersOf(probe)
+                invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, probeHeaders.etag)
                 val total = contentLength(probe)
                 val ranges = probe.getHeaderField("Accept-Ranges") == "bytes"
                 // Mirror (proxy GitHub) umumnya tidak mendukung Range, jadi
@@ -806,7 +846,7 @@ class DownloadEngine(appContext: Context) {
             ResumeAction.KEEP -> Unit
         }
         coroutineContext.ensureActive()
-        activeConns[item.id] = conn
+        trackConnection(item.id, conn)
         try {
         if (downloaded > 0) conn.setRequestProperty("Range", "bytes=$downloaded-")
         conn.connect()
@@ -923,7 +963,7 @@ class DownloadEngine(appContext: Context) {
             if (!coroutineContext.isActive) throw CancellationException()
             throw e
         } finally {
-            activeConns.remove(item.id)
+            untrackConnection(item.id, conn)
         }
     }
 
@@ -1086,7 +1126,7 @@ class DownloadEngine(appContext: Context) {
         }
         coroutineContext.ensureActive()
         val conn = openConn(item.url)
-        activeConns[id] = conn
+        trackConnection(id, conn)
         try {
             conn.requestMethod = "GET"
             conn.connectTimeout = connectTimeoutMs
@@ -1140,8 +1180,7 @@ class DownloadEngine(appContext: Context) {
             if (!coroutineContext.isActive) throw CancellationException()
             throw e
         } finally {
-            activeConns.remove(id)
-            conn.disconnect()
+            untrackConnection(id, conn)
         }
     }
 

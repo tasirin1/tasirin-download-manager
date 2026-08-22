@@ -994,18 +994,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     private fun openFolder(item: DownloadItem) {
-        val intents = folderIntents(item)
-        for (intent in intents) {
-            if (intent.resolveActivity(packageManager) != null) {
-                runCatching { startActivity(intent) }.onSuccess { return }
-            }
+        // Beberapa file manager tidak mengikuti activity resolution standar,
+        // jadi intent dicoba langsung sebelum jatuh ke app Downloads.
+        folderIntents(item).forEach { intent ->
+            if (runCatching { startActivity(intent) }.isSuccess) return
         }
-        // Fallback terakhir: buka app Downloads bawaan sistem.
         val downloads = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (downloads.resolveActivity(packageManager) != null) {
-            runCatching { startActivity(downloads) }.onSuccess { return }
-        }
+        if (runCatching { startActivity(downloads) }.isSuccess) return
         Toast.makeText(this, R.string.open_folder_unavailable, Toast.LENGTH_LONG)
             .show()
     }

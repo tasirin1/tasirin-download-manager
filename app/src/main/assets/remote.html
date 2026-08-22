@@ -351,7 +351,7 @@ galleryGrid.innerHTML = emptyHtml(
 'No videos yet',
 'Files in the download folder will appear here.'
 );
-if (!q && !filtered) {
+{
 const cta = document.createElement('div');
 cta.className = 'empty-cta';
 const b = document.createElement('button');
@@ -1336,8 +1336,11 @@ try {
 const body = new URLSearchParams();
 Object.entries(params).forEach(function (e) { body.append(e[0], e[1]); });
 const res = await fetch(API + '/api/fs_action', {method: 'POST', body});
-const data = await res.json();
-if (!data.ok) fsMsg('Operation failed', true);
+const data = await res.json().catch(function () { return null; });
+if (!res.ok || !data || !data.ok) {
+const message = (data && data.error) ? data.error : ('HTTP ' + res.status);
+throw new Error(message);
+}
 } catch (e) {
 fsMsg('Operation failed: ' + e, true);
 }
@@ -1365,6 +1368,10 @@ if (file.mozSlice) return file.mozSlice(start, end);
 throw new Error('this browser cannot read file content (Blob.slice unsupported)');
 }
 function uploadFiles(files, path, statusEl, progressBox, progressText, progressPct, progressBar, done, listEl) {
+if (fsUploading) {
+if (statusEl) statusEl.textContent = 'Another upload is still running.';
+return;
+}
 const jobs = Array.from(files).map(function (f) {
 const j = (f && f.file) ? f : { file: f, path: path };
 j.id = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -1656,7 +1663,9 @@ let lastMove = 0;
 function arm() {
 clearTimeout(timer);
 timer = setTimeout(function () {
-window.location.href = API + '/api/logout';
+fetch(API + '/api/logout', {method: 'POST'}).finally(function () {
+window.location.href = API + '/';
+});
 }, LOCK_MS);
 }
 fetch(API + '/api/pin_enabled').then(function (r) { return r.json(); }).then(function (d) {
@@ -2632,10 +2641,14 @@ const body = new URLSearchParams({id: id, action: action});
 if (extra) {
 Object.entries(extra).forEach(function (e) { body.append(e[0], e[1]); });
 }
-await fetch(API + '/api/action', {method: 'POST', body});
+const res = await fetch(API + '/api/action', {method: 'POST', body});
+const data = await res.json().catch(function () { return null; });
+if (!res.ok || !data || !data.ok) {
+throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
+}
 refresh();
 } catch (e) {
-fsMsg('Action failed: ' + e, true);
+fsMsg('Action failed: ' + e.message, true);
 }
 }
 const shareModal = document.getElementById('shareModal');
@@ -2701,11 +2714,19 @@ body.append('priority', document.getElementById('priority').value);
 const checksum = document.getElementById('checksum').value.trim();
 if (checksum) body.append('checksum', checksum);
 body.append('path', document.getElementById('storage').value.trim());
-await fetch(API + '/api/add', {method: 'POST', body});
+try {
+const res = await fetch(API + '/api/add', {method: 'POST', body});
+const data = await res.json().catch(function () { return null; });
+if (!res.ok || !data || !data.ok) {
+throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
+}
 document.getElementById('url').value = '';
 document.getElementById('name').value = '';
 toggleAddForm(false);
 refresh();
+} catch (err) {
+alert('Failed to add download: ' + err.message);
+}
 });
 window.addEventListener('hashchange', applyRoute);
 window.addEventListener('popstate', function () {

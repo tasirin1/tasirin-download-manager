@@ -1,3 +1,19 @@
+## [v1.0 — 2026-08-22] — Perbaikan keamanan, sinkronisasi, dan lifecycle
+
+### Fixed
+- **Remote destination** — Validasi semua tujuan download/upload terhadap root yang diizinkan, termasuk path `f:` dan `m:`.
+- **Segment connections** — Pause/cancel/hapus kini menutup semua koneksi segmen aktif, bukan hanya koneksi terakhir.
+- **Merge safety** — Gabungan segmen ditulis ke file staging dulu, lalu bagian parsial dihapus setelah finalisasi berhasil.
+- **Resume validation** — Resume di-reset bila ETag resource berubah agar file tidak tercampur versi lama dan baru.
+- **Upload integrity** — Chunk upload wajib memakai ID, diserialisasi per-ID, dan rentang offset+ukuran divalidasi.
+- **Login/session hardening** — Throttle login per IP dengan map terbatas; cookie PIN memakai `HttpOnly`/`SameSite`; logout jadi POST.
+- **Server responses** — Sembunyikan pesan exception internal dari HTTP 500 dan redact token/PIN pada log request.
+- **Partial stream access** — Endpoint `/stream_part/` kini memakai token lokal bertanda tangan berumur pendek.
+- **Gallery & actions** — CTA galeri kosong selalu aktif, aksi remote menampilkan error nyata, dan form tidak dibersihkan saat gagal.
+- **Media scan race** — Cache scan MediaStore dan invalidasinya disinkronkan untuk mencegah scan paralel duplikat.
+- **Settings lifecycle** — Port tidak valid menghentikan penyimpanan lebih awal, port pembanding memakai nilai tersimpan, dan operasi server keluar dari main thread.
+- **Open folder fallback** — Coba intent file manager secara langsung sebelum membuka aplikasi Downloads sistem.
+
 ## [v1.0 — 2026-08-22] — Perbaiki tampilan pemutar video
 
 ### Fixed

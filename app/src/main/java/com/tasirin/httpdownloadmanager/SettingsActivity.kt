@@ -307,33 +307,62 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun wireServerSwitch() {
         binding.serverSwitch.setOnClickListener {
-            if (App.httpServer.isAlive) {
-                StoragePrefs.setServerBackgroundEnabled(this, false)
-                StoragePrefs.setServerAutoStartEnabled(this, false)
-                App.httpServer.stopServer()
-                stopServiceIfIdle()
-                Toast.makeText(this, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
-            } else {
-                if (StoragePrefs.isPinEnforced(this) &&
-                    StoragePrefs.getServerPin(this).isNullOrEmpty()
-                ) {
-                    Toast.makeText(this, R.string.remote_pin_required, Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
-                StoragePrefs.setServerBackgroundEnabled(this, true)
-                val result = runCatching { App.httpServer.startServer() }
-                if (result.isFailure) {
-                    StoragePrefs.setServerBackgroundEnabled(this, false)
-                    Toast.makeText(this, getString(
-                            R.string.remote_start_failed,
-                            App.httpServer.lastError ?: result.exceptionOrNull()?.message ?: "?"
-                        ), Toast.LENGTH_LONG).show()
+            if (binding.serverSwitch.isEnabled.not()) return@setOnClickListener
+            if (!started &&
+                StoragePrefs.isPinEnforced(this) &&
+                StoragePrefs.getServerPin(this).isNullOrEmpty()
+            ) {
+                Toast.makeText(this, R.string.remote_pin_required, Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            binding.serverSwitch.isEnabled = false
+            lifecycleScope.launch {
+                val started = App.httpServer.isAlive
+                val operation = if (started) {
+                    withContext(Dispatchers.IO) { runCatching { App.httpServer.stopServer() }.isSuccess }
                 } else {
-                    Toast.makeText(this, getString(R.string.remote_started, App.httpServer.listeningPort), Toast.LENGTH_SHORT).show()
+                    withContext(Dispatchers.IO) { runCatching { App.httpServer.startServer() }.isSuccess }
+                }
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (!operation) {
+                        if (started) {
+                            Toast.makeText(
+                                this@SettingsActivity,
+                                getString(R.string.remote_start_failed, "stop failed"),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            StoragePrefs.setServerBackgroundEnabled(this@SettingsActivity, false)
+                            Toast.makeText(
+                                this@SettingsActivity,
+                                getString(
+                                    R.string.remote_start_failed,
+                                    App.httpServer.lastError ?: "start failed"
+                                ),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    } else if (!started) {
+                        StoragePrefs.setServerBackgroundEnabled(this@SettingsActivity, true)
+                        Toast.makeText(
+                            this@SettingsActivity,
+                            getString(R.string.remote_started, App.httpServer.listeningPort),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        StoragePrefs.setServerBackgroundEnabled(this@SettingsActivity, false)
+                        StoragePrefs.setServerAutoStartEnabled(this@SettingsActivity, false)
+                        stopServiceIfIdle()
+                        Toast.makeText(
+                            this@SettingsActivity,
+                            R.string.remote_stopped,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    binding.serverSwitch.isEnabled = true
+                    renderServer()
                 }
             }
-            renderServer()
-            renderChecks()
         }
     }
 
@@ -417,9 +446,13 @@ class SettingsActivity : AppCompatActivity() {
             if (next && StoragePrefs.getServerPin(this).isNullOrEmpty()) {
                 StoragePrefs.setServerBackgroundEnabled(this, false)
                 StoragePrefs.setServerAutoStartEnabled(this, false)
-                runCatching { App.httpServer.stopServer() }
-                stopServiceIfIdle()
-                renderServer()
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) { runCatching { App.httpServer.stopServer() } }
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        stopServiceIfIdle()
+                        renderServer()
+                    }
+                }
             }
             renderChecks()
         }
@@ -604,6 +637,12 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun wireSave() {
         binding.btnSave.setOnClickListener {
+            val requestedPort = binding.inputPort.text?.toString()?.trim()?.toIntOrNull()
+            if (requestedPort == null || requestedPort !in 1024..65535) {
+                Toast.makeText(this, R.string.settings_port_invalid, Toast.LENGTH_LONG).show()
+                renderServer()
+                return@setOnClickListener
+            }
             applyStoragePath(findViewById<EditText>(R.id.input_storage_path))
             applyExtraFolders(binding.root)
             App.httpServer.invalidateFsRootsCache()
@@ -625,15 +664,13 @@ class SettingsActivity : AppCompatActivity() {
                 stopServiceIfIdle()
                 renderServer()
             }
-            val newPort = binding.inputPort.text?.toString()?.trim()?.toIntOrNull()
-            if (newPort == null || newPort !in 1024..65535) {
-                Toast.makeText(this, R.string.settings_port_invalid, Toast.LENGTH_LONG).show()
-            } else {
-                val oldPort = App.httpServer.listeningPort
-                StoragePrefs.setServerPort(this, newPort)
-                if (newPort != oldPort) {
-                    App.logEvent("PORT CHANGED: $oldPort -> $newPort")
-                    App.restartHttpServer(this)
+            val newPort = requestedPort
+            val oldPort = StoragePrefs.serverPort(this)
+            StoragePrefs.setServerPort(this, newPort)
+            if (newPort != oldPort) {
+                App.logEvent("PORT CHANGED: $oldPort -> $newPort")
+                lifecycleScope.launch(Dispatchers.IO) {
+                    App.restartHttpServer(applicationContext)
                 }
             }
             renderServer()

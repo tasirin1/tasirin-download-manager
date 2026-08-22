@@ -138,4 +138,43 @@ class ServerSecurityTest {
         val mirip = File(r.parentFile, r.name + "x")
         assertFalse(ServerSecurity.isBrowseableAncestor(mirip.absolutePath, listOf(r)))
     }
+
+    @Test
+    fun isRemoteDestinationAllowed_blank_dan_mediaStore_true() {
+        val r = root()
+        assertTrue(ServerSecurity.isRemoteDestinationAllowed("", listOf(r)))
+        assertTrue(ServerSecurity.isRemoteDestinationAllowed("m:", listOf(r)))
+        assertTrue(ServerSecurity.isRemoteDestinationAllowed("m:Download/APK", listOf(r)))
+    }
+
+    @Test
+    fun isRemoteDestinationAllowed_pathDiDalamRoot_true() {
+        val r = root()
+        assertTrue(
+            ServerSecurity.isRemoteDestinationAllowed("f:${r.absolutePath}/sub", listOf(r))
+        )
+        assertTrue(ServerSecurity.isRemoteDestinationAllowed(r.absolutePath, listOf(r)))
+    }
+
+    @Test
+    fun partialToken_validDanKedaluwarsa() {
+        val token = ServerSecurity.createPartialToken("abc", 1000L, "secret")
+        assertTrue(ServerSecurity.isPartialTokenValid(token, "abc", 999L, "secret"))
+        assertFalse(ServerSecurity.isPartialTokenValid(token, "other", 999L, "secret"))
+        assertFalse(ServerSecurity.isPartialTokenValid(token, "abc", 1000L, "wrong"))
+        assertFalse(ServerSecurity.isPartialTokenValid(token, "abc", 1001L, "secret"))
+    }
+
+    @Test
+    fun isRemoteDestinationAllowed_traversal_atau_luarRoot_false() {
+        val r = root()
+        val luar = tmp.newFolder("luar")
+        assertFalse(ServerSecurity.isRemoteDestinationAllowed("m:Download/../Rahasia", listOf(r)))
+        assertFalse(ServerSecurity.isRemoteDestinationAllowed("m:Download\\APK", listOf(r)))
+        assertFalse(
+            ServerSecurity.isRemoteDestinationAllowed("/data/data/other/app/files", listOf(r))
+        )
+        assertFalse(
+            ServerSecurity.isRemoteDestinationAllowed(luar.absolutePath, listOf(r))
+        )
 }

@@ -45,6 +45,7 @@ import java.io.BufferedOutputStream
 import java.net.Inet4Address
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
@@ -75,8 +76,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var sseLastPushAt = 0L
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
     @Volatile private var galleryCache: Pair<Long, MediaLibrary.MediaScanResult>? = null
-    @Volatile private var loginFailures = 0
-    @Volatile private var loginLockUntil = 0L
+    private val loginAttempts = ConcurrentHashMap<String, LoginAttempt>()
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Pair<Int, Long>>>()
     private val fsStatsCacheTtlMs = 60_000L
     // Cache listing folder media per root (MediaStore): membrowse halaman demi
@@ -86,6 +86,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val completedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
     private val finalizingUploads = ConcurrentHashMap<String, String>()
     private val failedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
+    private val uploadLocks = ConcurrentHashMap<String, UploadLock>()
     // Cache durasi video galeri: metadata tidak berubah, jadi cukup di-hold
     // di memori agar tiap halaman tidak membuka file video berulang-ulang.
     @Volatile private var videoDurationsCache: JSONObject? = null
@@ -160,7 +161,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val response = try {
             when {
                 session.method == Method.POST && session.uri == "/api/login" -> login(session)
-                session.method == Method.GET && session.uri == "/api/logout" -> logout()
+                session.method == Method.POST && session.uri == "/api/logout" -> logout()
                 session.method == Method.GET && session.uri.startsWith("/share/") ->
                     serveShare(session)
                 session.method == Method.GET && session.uri.startsWith("/stream_part/") ->
@@ -207,7 +208,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             newFixedLengthResponse(
                 Response.Status.INTERNAL_ERROR,
                 "text/plain; charset=utf-8",
-                "Error: ${e.message}"
+                "Internal server error"
             )
         }
         appendRequestLog(session, response, System.currentTimeMillis() - startedAt)
@@ -227,7 +228,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 )
         if (isPolling) return
         val remote = session.remoteIpAddress.orEmpty()
-        val query = session.queryParameterString?.take(160)?.let { "?$it" }.orEmpty()
+        val query = session.queryParameterString?.take(160)
+            ?.replace(REQUEST_SECRET_RE, "$1<redacted>")
+            ?.let { "?$it" }
+            .orEmpty()
         appendLog(
             "${session.method.name} ${session.uri}$query -> HTTP ${response.status.requestStatus} " +
                 "(${elapsedMs}ms) $remote"
@@ -349,37 +353,66 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return MessageDigest.isEqual(pin.toByteArray(Charsets.UTF_8), expectedBytes)
     }
 
+    private fun loginAttempt(ip: String): LoginAttempt =
+        loginAttempts.getOrPut(ip.ifEmpty { "unknown" }) { LoginAttempt() }
+
+    private fun pruneLoginAttempts(now: Long) {
+        if (loginAttempts.size <= 512) return
+        loginAttempts.entries.removeIf {
+            it.value.lockedUntil < now &&
+                now - it.value.updatedAt > LOGIN_LOCK_MS
+        }
+    }
+
     private fun login(session: IHTTPSession): Response {
+        val ip = session.remoteIpAddress.ifEmpty { "unknown" }
         val now = System.currentTimeMillis()
-        if (ServerSecurity.isPinLocked(now, loginLockUntil)) {
-            val waitSec = ((loginLockUntil - now) / 1000) + 1
+        pruneLoginAttempts(now)
+        val attempt = loginAttempt(ip).also { attempt ->
+            synchronized(attempt) { if (now < attempt.lockedUntil) attempt.lockedUntil else 0L }
+        }
+        if (ServerSecurity.isPinLocked(now, attempt.lockedUntil)) {
+            val waitSec = ((attempt.lockedUntil - now) / 1000) + 1
             return loginPage("Too many attempts. Try again in $waitSec seconds.")
         }
         val params = readForm(session)
         val pin = params["pin"].orEmpty()
         val stored = storedPinHash()
         return if (stored != null && StoragePrefs.pinMatches(context, pin)) {
-            loginFailures = 0
-            appendLog("LOGIN OK (${session.remoteIpAddress})")
+            synchronized(attempt) {
+                attempt.failures = 0
+                attempt.lockedUntil = 0L
+                attempt.updatedAt = now
+            }
+            appendLog("LOGIN OK ($ip)")
             val r = newFixedLengthResponse(
                 Response.Status.REDIRECT,
                 "text/html",
                 "<html><body>OK</body></html>"
             )
-            r.addHeader("Set-Cookie", "dm_pin=$stored; Max-Age=2592000; Path=/")
+            r.addHeader(
+                "Set-Cookie",
+                "dm_pin=$stored; Max-Age=2592000; Path=/; HttpOnly; SameSite=Strict"
+            )
             r.addHeader("Location", "/")
             r
         } else {
-            loginFailures++
-            val lockUntil = ServerSecurity.pinLockUntilAfter(
-                loginFailures, MAX_LOGIN_ATTEMPTS, LOGIN_LOCK_MS, now
-            )
-            if (lockUntil > 0) {
-                loginLockUntil = lockUntil
-                loginFailures = 0
-                appendLog("LOGIN LOCKED $LOGIN_LOCK_MS ms (too many attempts, from ${session.remoteIpAddress})")
+            val failures = synchronized(attempt) {
+                attempt.failures += 1
+                attempt.updatedAt = now
+                val lockUntil = ServerSecurity.pinLockUntilAfter(
+                    attempt.failures, MAX_LOGIN_ATTEMPTS, LOGIN_LOCK_MS, now
+                )
+                if (lockUntil > 0) {
+                    attempt.lockedUntil = lockUntil
+                    attempt.failures = 0
+                }
+                attempt.failures
+            }
+            if (attempt.lockedUntil > now) {
+                appendLog("LOGIN LOCKED $LOGIN_LOCK_MS ms (too many attempts, from $ip)")
             } else {
-                appendLog("LOGIN FAILED: wrong PIN (attempt $loginFailures, from ${session.remoteIpAddress})")
+                appendLog("LOGIN FAILED: wrong PIN (attempt $failures, from $ip)")
             }
             loginPage("Wrong PIN, try again.")
         }
@@ -392,7 +425,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             "text/html",
             "<html><body>OK</body></html>"
         )
-        r.addHeader("Set-Cookie", "dm_pin=; Max-Age=0; Path=/")
+        r.addHeader("Set-Cookie", "dm_pin=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict")
         r.addHeader("Location", "/")
         return r
     }
@@ -637,9 +670,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val checksum = params["checksum"]?.trim().orEmpty()
         val storage = params["storage"]?.trim().orEmpty()
         val folderPath = params["path"]?.trim().orEmpty()
-        if (folderPath.startsWith(FS_PREFIX) &&
-            !isFsPathAllowed(folderPath.removePrefix(FS_PREFIX))
-        ) {
+        if (!ServerSecurity.isRemoteDestinationAllowed(folderPath, allowedFsRoots())) {
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
             )
@@ -663,9 +694,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             ?: "upload_${System.currentTimeMillis()}"
         val storage = session.parms["storage"]?.trim().orEmpty()
         val folderPath = session.parms["path"]?.trim().orEmpty()
-        if (folderPath.startsWith(FS_PREFIX) &&
-            !isFsPathAllowed(folderPath.removePrefix(FS_PREFIX))
-        ) {
+        if (!ServerSecurity.isRemoteDestinationAllowed(folderPath, allowedFsRoots())) {
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
             )
@@ -754,8 +783,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         chunks: Int,
         length: Long
     ): Response {
-        val id = session.parms["id"]?.trim()?.take(64)
-            ?: sha256Hex("$name|$folderPath").take(16)
+        val id = session.parms["id"]?.trim()?.take(64)?.takeIf { it.isNotEmpty() }
+            ?: run {
+                drainBody(session)
+                return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id"))
+            }
         // Upload sudah selesai / sedang difinalisasi: balas cepat. Body tetap
         // dibaca & dibuang supaya koneksi keep-alive tidak rusak dan browser
         // tidak menganggap permintaan gagal (menutup koneksi saat body masih
@@ -790,7 +822,41 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid offset")
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid offset"))
         }
+        if (length > 0 && offset + length > MAX_UPLOAD_BYTES) {
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid upload range")
+            return jsonResponse(JSONObject().put("ok", false).put("error", "invalid upload range"))
+        }
         appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks received: $name (${length}B offset=$offset)")
+        val lock = uploadLockFor(id)
+        synchronized(lock.lock) {
+            return@handleUploadChunk writeUploadChunk(
+                session, id, name, storage, folderPath,
+                chunkIdx, chunks, length, offset
+            )
+        }
+    }
+
+    private fun uploadLockFor(id: String): UploadLock {
+        val now = System.currentTimeMillis()
+        if (uploadLocks.size > 256) {
+            uploadLocks.entries.removeIf {
+                now - it.value.lastUse.get() > 30 * 60 * 1000L
+            }
+        }
+        return uploadLocks.getOrPut(id) { UploadLock() }.also { it.lastUse.set(now) }
+    }
+
+    private fun writeUploadChunk(
+        session: IHTTPSession,
+        id: String,
+        name: String,
+        storage: String,
+        folderPath: String,
+        chunkIdx: Int,
+        chunks: Int,
+        length: Long,
+        offset: Long
+    ): Response {
         val tmp = File(context.cacheDir, "up_$id.tmp")
         var resultName = name
         return runCatching {
@@ -1078,8 +1144,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
+    fun createPartialStreamUrl(itemId: String): String {
+        val expiresAt = System.currentTimeMillis() + PARTIAL_STREAM_TTL_MS
+        val secret = partialStreamSecret()
+        val token = ServerSecurity.createPartialToken(itemId, expiresAt, secret)
+        return "/stream_part/$itemId?token=$token&expires=$expiresAt"
+    }
+
+    private fun partialStreamSecret(): String =
+        StoragePrefs.storedPinHash(context).orEmpty().ifEmpty { context.packageName }
+
     private fun servePartial(session: IHTTPSession): Response {
         val id = session.uri.removePrefix("/stream_part/")
+        val now = System.currentTimeMillis()
+        val secret = partialStreamSecret()
+        val token = session.parms["token"].orEmpty()
+        if (!ServerSecurity.isPartialTokenValid(token, id, now, secret)) return notFound()
         val item = App.engine.items.value.find { it.id == id } ?: return notFound()
         if (item.state == DownloadState.COMPLETED) return notFound()
         // Stream file parsial (.part) yang masih berjalan; dukung Range biar
@@ -1139,6 +1219,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
 
     private data class MediaMeta(val name: String, val mime: String?)
+
 
     /** Nama/MIME media stabil dalam sesi pemutaran; cache pendek menghindari
      *  query ContentResolver/DocumentFile pada setiap permintaan HTTP 206. */
@@ -2133,13 +2214,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
+    private class UploadLock {
+        val lock = Any()
+        val lastUse = AtomicLong(System.currentTimeMillis())
+    }
+
+    private class LoginAttempt {
+        var failures = 0
+        var lockedUntil = 0L
+        var updatedAt = 0L
+    }
+
     companion object {
+        private val REQUEST_SECRET_RE = Regex("([?&]?(?:token|pin)=)[^&]+")
         private const val SERVER_SOCKET_TIMEOUT_MS = 60_000
         private const val FS_PREFIX = "f:"
         private const val MS_PREFIX = "m:"
         private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024
         private const val MAX_UPLOAD_MB = 2048
         private const val SHARE_TTL_HOURS = 24
+        private const val PARTIAL_STREAM_TTL_MS = 60 * 60 * 1000L
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100

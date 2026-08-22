@@ -22,6 +22,7 @@ class MediaStreamTest {
         assertNull(parseRange(null, 1000))
         assertNull(parseRange("", 1000))
         assertNull(parseRange("bytes=x-y", 1000))
+        assertNull(parseRange("bytes=0-99,200-299", 1000))
         assertNull(parseRange("bytes=0-99", 0))
     }
 }

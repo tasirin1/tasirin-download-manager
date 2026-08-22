@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.remote
 
 import fi.iki.elonen.NanoHTTPD
+import java.io.IOException
 import java.io.InputStream
 
 internal fun notFound(): NanoHTTPD.Response = NanoHTTPD.newFixedLengthResponse(
@@ -45,7 +46,9 @@ internal fun streamMedia(
                     end += extra
                 }
                 val partLen = end - start + 1
-                if (start > 0 && !prepositioned) skipFully(input, start)
+                if (start > 0 && !prepositioned && !skipFully(input, start)) {
+                    throw IOException("Unexpected end of stream")
+                }
                 NanoHTTPD.newFixedLengthResponse(
                     NanoHTTPD.Response.Status.PARTIAL_CONTENT, mime, input, partLen
                 ).also {
@@ -62,7 +65,7 @@ internal fun streamMedia(
         return NanoHTTPD.newFixedLengthResponse(
             NanoHTTPD.Response.Status.INTERNAL_ERROR,
             "text/plain; charset=utf-8",
-            "Error: ${it.message}"
+            "Streaming error"
         )
     }
     response.addHeader("Accept-Ranges", "bytes")
@@ -73,8 +76,9 @@ internal fun streamMedia(
 private val RANGE_RE = Regex("bytes=(\\d*)-(\\d*)")
 
 internal fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
-    if (header.isNullOrBlank() || total <= 0) return null
-    val m = RANGE_RE.find(header) ?: return null
+    if (header.isNullOrBlank() || total <= 0 || header.contains(',')) return null
+    val match = RANGE_RE.matchEntire(header.trim()) ?: return null
+    val m = match
     val start = m.groupValues[1].toLongOrNull()
     val endRaw = m.groupValues[2].toLongOrNull()
     return when {
@@ -91,15 +95,17 @@ internal fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
     }
 }
 
-internal fun skipFully(input: InputStream, n: Long) {
-    var remaining = n
+internal fun skipFully(input: InputStream, requested: Long): Boolean {
+    if (requested <= 0) return true
+    var remaining = requested
     while (remaining > 0) {
         val skipped = input.skip(remaining)
         if (skipped <= 0) {
-            if (input.read() == -1) return
+            if (input.read() == -1) return false
             remaining--
         } else {
             remaining -= skipped
         }
     }
+    return true
 }
