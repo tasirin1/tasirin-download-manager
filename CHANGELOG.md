@@ -10,6 +10,7 @@
 - **List rendering** — Perbarui pesan error item bila teks error berubah tanpa mengubah state.
 - **Gallery freshness** — Validasi path fisik entri MediaStore agar video yang sudah dihapus atau dipindahkan tidak lagi muncul sebagai item mati.
 - **Server lifecycle** — Cegah start/stop ganda sehingga restart background tidak menimbulkan race pool/socket.
+- **Compile safety** — Hilangkan overload helper thumbnail dan perbaiki rethrow pembatalan coroutine.
 
 ### Changed
 - **Startup performance** — Pindahkan scan orphan dan start server dari main thread ke background.
