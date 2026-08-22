@@ -24,6 +24,7 @@ import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.sha256Hex
 import fi.iki.elonen.NanoHTTPD
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,6 +84,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // halaman tidak perlu me-query ulang seluruh koleksi tiap request. Dibatalkan
     // saat ada perubahan media (upload/aksi fs) atau kedaluwarsa 5 dtk.
     private val fsMediaCache = ConcurrentHashMap<String, Pair<Long, Pair<List<String>, List<FsMediaEntry>>>>()
+    // Cache listing folder biasa untuk pagination: tanpa ini, tiap offset
+    // membaca dan mengurutkan ulang folder besar. Satu slot saja agar RAM tetap
+    // kecil di Android 5; aksi tulis langsung membuangnya.
+    private class FsFileListing(val path: String, val entries: List<File>, val total: Int)
+    @Volatile private var fsFileListingCache: Pair<Long, FsFileListing>? = null
     private val completedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
     private val finalizingUploads = ConcurrentHashMap<String, String>()
     private val failedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
@@ -219,17 +225,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun appendRequestLog(session: IHTTPSession, response: Response, elapsedMs: Long) {
-        // Endpoint polling murni (snapshot/events/pin_enabled) dipanggil terus
-        // oleh halaman remote; tanpa pengecualian ini buffer 300 baris penuh
-        // hanya oleh polling dan kejadian penting (download, upload, aksi)
-        // cepat hilang dari log. Request gagal tetap dicatat.
-        val isPolling = response.status.requestStatus == 200 &&
-            session.method == Method.GET && (
-                session.uri == "/api/snapshot" ||
-                    session.uri == "/api/events" ||
-                    session.uri == "/api/pin_enabled"
-                )
-        if (isPolling) return
+        // Endpoint polling/media/thumb/listing dipanggil terus saat halaman
+        // aktif; tanpa filter ini buffer hanya berisi request rutin.
+        if (shouldSkipRequestLog(
+                session.method.name, response.status.requestStatus, session.uri
+            )
+        ) {
+            return
+        }
         val remote = session.remoteIpAddress.orEmpty()
         val query = session.queryParameterString?.take(160)
             ?.replace(REQUEST_SECRET_RE, "$1<redacted>")
@@ -241,7 +244,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
+    @Synchronized
     fun startServer() {
+        if (isAlive) return
         // Retry loop: NanoHTTPD internal pool bisa belum ready setelah stop();
         // tunggu & coba lagi sampai 3x (total ~600ms) supaya tidak crash.
         invalidateFsRootsCache()
@@ -301,7 +306,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     }
 
+    @Synchronized
     fun stopServer() {
+        if (!isAlive && statPool.isTerminated) return
         appendLog("SERVER STOPPED (port $listeningPort)")
         statPoolEnabled = false
         sseJob?.cancel()
@@ -916,6 +923,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         }
                         published.filePath?.let {
                             fsMediaCache.clear()
+                            invalidateFsListingCache()
                             invalidateGalleryCache()
                             videoDurationsCache = null
                             MediaLibrary.notifyMediaChanged(context, it)
@@ -1529,6 +1537,36 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return jsonResponse(JSONObject().put("items", items))
     }
 
+    /** Listing terurut untuk halaman aktif. Folder sangat besar tidak disimpan
+     *  di cache (cukup dipakai sekali) supaya slot cache tidak menahan RAM. */
+    private fun cachedDirectoryListing(path: String): Pair<Int, List<File>>? {
+        val normalized = File(path).absolutePath.trimEnd('/')
+        val now = System.currentTimeMillis()
+        fsFileListingCache?.let { (at, listing) ->
+            if (listing.path == normalized && now - at < FS_LISTING_TTL_MS) {
+                return listing.total to listing.entries
+            }
+        }
+        val dir = File(path)
+        if (!dir.isDirectory) return null
+        val entries = runCatching { dir.listFiles() }.getOrNull()
+            ?.sortedWith(
+                compareBy<File> { it.isFile }.thenComparator { a, b ->
+                    a.name.compareTo(b.name, ignoreCase = true)
+                }
+            ) ?: return null
+        if (entries.size <= FS_LISTING_CACHE_MAX) {
+            fsFileListingCache = now to FsFileListing(normalized, entries, entries.size)
+        } else {
+            fsFileListingCache = null
+        }
+        return entries.size to entries
+    }
+
+    private fun invalidateFsListingCache() {
+        fsFileListingCache = null
+    }
+
     private fun fsListFiles(path: String, offset: Int, limit: Int): Response {
         val items = JSONArray()
         val dir = File(path)
@@ -1540,16 +1578,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val allowed = isFsPathAllowed(path)
         val browseOnly = !allowed && isFsBrowseAncestor(path)
         if (dir.isDirectory && (allowed || browseOnly)) {
-            val entries = runCatching { dir.listFiles() }.getOrNull()
-                ?.sortedWith(
-                    compareBy<File> { it.isFile }.thenComparator { a, b ->
-                        a.name.compareTo(b.name, ignoreCase = true)
-                    }
-                ).orEmpty()
-            total = entries.size
+            val listing = cachedDirectoryListing(path)
+            total = listing?.first ?: 0
             // Hanya halaman aktif yang dibangun JSON-nya; statistik subfolder
             // (itemCount/totalSize) dihitung paralel untuk halaman itu saja.
-            val page = entries.drop(offset).take(limit)
+            val page = listing?.second?.drop(offset)?.take(limit).orEmpty()
             val statFutures = if (allowed) {
                 page.filter { it.isDirectory }.associateWith { f ->
                     runCatching { liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) } }
@@ -1739,6 +1772,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             path.startsWith(MS_PREFIX) -> fsActionMedia(action, path.removePrefix(MS_PREFIX), name, dest)
             else -> fsActionFiles(action, path.removePrefix(FS_PREFIX), name, dest)
         }
+        if (ok) invalidateFsListingCache()
         appendLog("FS ${action.uppercase()}: $path -> ${if (ok) "OK" else "FAILED"}")
         return jsonResponse(JSONObject().put("ok", ok))
     }
@@ -2052,53 +2086,31 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         }
                     }
                 }
-                var lastItemsSig = Int.MIN_VALUE
-                val collector = launch {
-                    runCatching {
-                        App.engine.items.collect { items ->
-                            // Hindari build JSON tiap tick: push hanya saat isi item
-                            // berubah (signature), tetap dengan throttle 1 dtk.
-                            val sig = itemsSignature(items)
-                            if (sig != lastItemsSig) {
-                                lastItemsSig = sig
-                                if (sseClients.isNotEmpty() &&
-                                    System.currentTimeMillis() - sseLastPushAt >= SSE_MIN_INTERVAL_MS
-                                ) {
-                                    pushFrame(buildPayload(false))
-                                }
-                            }
-                        }
-                    }
-                }
                 try {
-                    // Ticker status: tetap push walau tidak ada perubahan item,
-                    // supaya baterai/penyimpanan/port selalu segar. Interval 10 dtk:
-                    // client yang butuh data lebih sering memakai /api/snapshot.
-                    // Saat tidak ada klien sama sekali, pump (dan collector item)
-                    // dihentikan; ensureSsePump() memulai ulang saat klien baru masuk.
+                    // Tick 1 detik hanya membangun JSON setelah throttle terpenuhi.
+                    // Ini menutup celah lama: perubahan yang tertahan throttle tidak
+                    // perlu menunggu ticker status 10 dtk.
+                    var tick = 0
                     while (true) {
-                        delay(10_000)
-                        // Prune cache upload & fs stats tiap 10 detik (hemat RAM).
-                        runCatching { pruneCompletedUploads() }
-                        runCatching { pruneFsStats() }
+                        delay(1_000)
+                        tick++
+                        val pruneTick = tick % 10 == 0
+                        if (pruneTick) {
+                            runCatching { pruneCompletedUploads() }
+                            runCatching { pruneFsStats() }
+                        }
                         if (sseClients.isEmpty()) {
                             delay(1_000)
                             if (sseClients.isEmpty()) {
-                                // Jangan menimpa referensi pump yang lebih baru
-                                // bila sudah ada penggantinya.
                                 if (sseJob === me) sseJob = null
                                 return@launch
                             }
                         }
-                        runCatching { pushFrame(buildPayload(true)) }
+                        if (System.currentTimeMillis() - sseLastPushAt < SSE_MIN_INTERVAL_MS) continue
+                        pushFrame(buildPayload(pruneTick))
                     }
-                } finally {
-                    // Collector item adalah child pump: bila pump berhenti normal
-                    // (tanpa klien), cancel collector supaya tidak bocor — tanpa
-                    // ini, collect StateFlow yang tak pernah selesai membuat job
-                    // pump terjebak Completing dan collector menempel selamanya,
-                    // memakan CPU di setiap emisi item.
-                    collector.cancel()
+                } catch (_: CancellationException) {
+                    throw
                 }
             }
         }
@@ -2192,6 +2204,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         ).also { it.addHeader("Cache-Control", "no-store") }
     }
 
+    /** Jalur thumbnail bersama untuk remote dan galeri native agar decode,
+     * lock per-file, dan cache disk tidak diduplikasi dua implementasi. */
+    fun galleryThumbFile(raw: String): File? = safeRun("galleryThumb") {
+        getOrCreateThumb(context, raw, ::isFsPathAllowed, ::isMediaUriAllowed)
+    }
+
+    /** Jalur thumbnail bersama untuk remote dan galeri native agar decode,
+     * lock per-file, dan cache disk tidak diduplikasi dua implementasi. */
+    fun galleryThumbFile(raw: String): File? = safeRun("galleryThumb") {
+        getOrCreateThumb(context, raw, ::isFsPathAllowed, ::isMediaUriAllowed)
+    }
+
     fun appendLog(message: String) = serverLog.append(message)
 
     fun logVersion(): Long = serverLog.version()
@@ -2244,6 +2268,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
+        private const val FS_LISTING_TTL_MS = 3_000L
+        private const val FS_LISTING_CACHE_MAX = 5_000
         // Listing file manager di-paginate: maks 1000 entri per request, klien
         // memuat halaman berikutnya lewat tombol "Load more". Folder raksasa
         // tidak lagi membangun JSON semua entri + statistik semua subfolder

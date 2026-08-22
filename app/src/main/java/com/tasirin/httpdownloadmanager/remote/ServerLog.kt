@@ -7,6 +7,15 @@ import java.util.Locale
 
 /** Buffer log realtime server: aman multi-thread, baris terpotong, daftar
  *  dibatasi supaya snapshot tidak boros memori. */
+/** Endpoint polling/media sukses bisa ratusan request per menit; log hanya
+ *  bila gagal atau endpoint lain agar buffer tetap berisi kejadian penting. */
+internal fun shouldSkipRequestLog(httpMethod: String, statusCode: Int, uri: String): Boolean {
+    if (httpMethod != "GET" || statusCode != 200) return false
+    return uri == "/api/snapshot" || uri == "/api/events" ||
+        uri == "/api/pin_enabled" || uri == "/api/thumb" ||
+        uri == "/api/media" || uri == "/api/fs"
+}
+
 class ServerLog(
     private val maxLines: Int = 300,
     private val maxLineLength: Int = 400

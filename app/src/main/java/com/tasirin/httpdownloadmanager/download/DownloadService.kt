@@ -37,7 +37,9 @@ class DownloadService : Service() {
         if (StoragePrefs.isServerBackgroundEnabled(this) &&
             StoragePrefs.isServerStartAllowed(this) && !App.httpServer.isAlive
         ) {
-            runCatching { App.httpServer.startServer() }
+            scope.launch(Dispatchers.IO) {
+                runCatching { App.httpServer.startServer() }
+            }
         }
         scope.launch {
             App.engine.items.collect { items ->

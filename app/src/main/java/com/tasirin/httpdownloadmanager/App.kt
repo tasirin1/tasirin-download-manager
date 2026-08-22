@@ -20,7 +20,9 @@ class App : Application() {
         installCrashLogger()
         httpServer = HttpControlServer(this)
         engine = DownloadEngine(this)
-        runCatching { engine.cleanupOrphans() }
+        Thread {
+            runCatching { engine.cleanupOrphans() }
+        }.start()
         // Bersihkan thumbnail disk lama maksimal sekali per 7 hari (RAM tidak
         // terpengaruh; disk cache tidak menumpuk tanpa menunggu server remote
         // menyala, tapi start aplikasi tidak membayar scan folder thumb tiap kali).
@@ -36,7 +38,9 @@ class App : Application() {
         if (StoragePrefs.isServerBackgroundEnabled(this) &&
             StoragePrefs.isServerStartAllowed(this)
         ) {
-            runCatching { httpServer.startServer() }
+            Thread {
+                runCatching { httpServer.startServer() }
+            }.start()
         }
         registerNetworkCallback()
         logEvent(

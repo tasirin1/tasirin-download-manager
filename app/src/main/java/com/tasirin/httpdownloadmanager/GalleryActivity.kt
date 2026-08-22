@@ -7,11 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import android.content.ComponentCallbacks2
-import android.media.ThumbnailUtils
-import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
-import android.util.Size
 import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
@@ -28,7 +24,6 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivityGalleryBinding
 import com.tasirin.httpdownloadmanager.databinding.ItemGalleryBinding
-import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.scaleDown
@@ -42,8 +37,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
-import java.security.MessageDigest
 
 class GalleryActivity : AppCompatActivity() {
 
@@ -203,6 +196,7 @@ class GalleryActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         adapter.release()
+        clearThumbCache()
         super.onDestroy()
     }
 
@@ -261,73 +255,31 @@ class GalleryActivity : AppCompatActivity() {
             withContext(Dispatchers.IO) {
                 val cache = cacheFor(context)
                 cache.get(e.token)?.let { return@withContext it }
-                val key = thumbKey(e.token)
-                diskThumb(context, key)?.let {
-                    cache.put(e.token, it)
-                    return@withContext it
+
+                // Satu generator/cache disk dipakai remote web & galeri native;
+                // ini menghindari dua file thumbnail berbeda untuk video sama.
+                val thumb = runCatching {
+                    App.httpServer.galleryThumbFile(e.token)
+                }.getOrNull() ?: return@withContext null
+
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(thumb.absolutePath, bounds)
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
+                var sample = 1
+                while (bounds.outWidth / (sample * 2) >= req &&
+                    bounds.outHeight / (sample * 2) >= req
+                ) {
+                    sample *= 2
                 }
-                val bmp = generateThumb(context, e, req)
-                if (bmp != null) {
-                    cache.put(e.token, bmp)
-                    saveDiskThumb(context, key, bmp)
-                }
-                bmp
+                val decoded = BitmapFactory.decodeFile(
+                    thumb.absolutePath,
+                    BitmapFactory.Options().apply { inSampleSize = sample }
+                ) ?: return@withContext null
+                val bitmap = scaleDown(decoded, req)
+                if (bitmap !== decoded) decoded.recycle()
+                cache.put(e.token, bitmap)
+                bitmap
             }
-
-        /** Pakai thumbnail bawaan MediaStore (cepat) dulu, lalu fallback decode. */
-        private fun generateThumb(
-            context: Context,
-            e: MediaLibrary.MediaEntry,
-            req: Int
-        ): Bitmap? {
-            val uri = e.contentUri?.let { runCatching { it.toUri() }.getOrNull() }
-            val id = uri?.lastPathSegment?.toLongOrNull()
-            if (uri != null && id != null) {
-                val native = if (Build.VERSION.SDK_INT >= 29) {
-                    runCatching {
-                        context.contentResolver.loadThumbnail(uri, Size(req, req), null)
-                    }.getOrNull()
-                } else {
-                    runCatching {
-                        MediaStore.Video.Thumbnails.getThumbnail(
-                            context.contentResolver, id,
-                            MediaStore.Video.Thumbnails.MINI_KIND, null
-                        )
-                    }.getOrNull()
-                }
-                if (native != null) return scaleDown(native, req)
-            }
-            if (!e.filePath.isNullOrEmpty()) {
-                return runCatching {
-                    ThumbnailUtils.createVideoThumbnail(
-                        e.filePath, MediaStore.Video.Thumbnails.MINI_KIND
-                    )
-                }.getOrNull()?.let { scaleDown(it, req) }
-            }
-            return null
-        }
-
-        private fun thumbDir(context: Context): File =
-            File(context.cacheDir, "thumbs").apply { runCatching { mkdirs() } }
-
-        private fun thumbKey(token: String): String = runCatching {
-            Hex.encode(MessageDigest.getInstance("SHA-256").digest(token.toByteArray()))
-        }.getOrDefault(token.hashCode().toString()) + ".jpg"
-
-        private fun diskThumb(context: Context, key: String): Bitmap? = runCatching {
-            val f = File(thumbDir(context), key)
-            if (f.isFile && f.length() > 0) BitmapFactory.decodeFile(f.absolutePath) else null
-        }.getOrNull()
-
-        private fun saveDiskThumb(context: Context, key: String, bmp: Bitmap) {
-            runCatching {
-                val f = File(thumbDir(context), key)
-                FileOutputStream(f).use { out ->
-                    bmp.compress(Bitmap.CompressFormat.JPEG, 78, out)
-                }
-            }
-        }
-
     }
 }
 

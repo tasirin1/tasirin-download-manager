@@ -9,6 +9,12 @@
 - **ZIP efficiency** — Serialisasi pembuatan ZIP per selection key untuk beberapa request Range paralel.
 - **List rendering** — Perbarui pesan error item bila teks error berubah tanpa mengubah state.
 - **Gallery freshness** — Validasi path fisik entri MediaStore agar video yang sudah dihapus atau dipindahkan tidak lagi muncul sebagai item mati.
+- **Server lifecycle** — Cegah start/stop ganda sehingga restart background tidak menimbulkan race pool/socket.
+
+### Changed
+- **Startup performance** — Pindahkan scan orphan dan start server dari main thread ke background.
+- **Batch actions** — Pause All kini satu update state/simpanan; delete/cancel file dari UI berjalan di IO dispatcher.
+- **Server efficiency** — Cache listing folder pagination, filter log request rutin media, buat SSE catch-up tiap detik, dan satukan generator thumbnail galeri/remote.
 
 ## [v1.0 — 2026-08-22] — Perbarui panduan repo
 

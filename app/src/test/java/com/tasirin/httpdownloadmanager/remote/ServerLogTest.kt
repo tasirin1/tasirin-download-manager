@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.remote
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,5 +44,23 @@ class ServerLogTest {
         log.append("halo")
         log.clear()
         assertEquals("", log.snapshot())
+    }
+
+    @Test
+    fun `request rutin media dan polling - tidak dicatat`() {
+        listOf(
+            "/api/snapshot", "/api/events", "/api/pin_enabled",
+            "/api/thumb", "/api/media", "/api/fs"
+        ).forEach { uri ->
+            assertTrue(shouldSkipRequestLog("GET", 200, uri))
+            assertFalse(shouldSkipRequestLog("GET", 500, uri))
+        }
+    }
+
+    @Test
+    fun `aksi penting dan request gagal - tetap dicatat`() {
+        assertFalse(shouldSkipRequestLog("POST", 200, "/api/action"))
+        assertFalse(shouldSkipRequestLog("GET", 404, "/api/media"))
+        assertFalse(shouldSkipRequestLog("GET", 200, "/api/downloads"))
     }
 }

@@ -331,9 +331,34 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun pauseAll() {
-        _items.value.filter {
+        val targets = _items.value.filter {
             it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-        }.forEach { pause(it.id) }
+        }
+        if (targets.isEmpty()) return
+
+        // Batch: satu salinan list + satu emisi StateFlow + satu penyimpanan,
+        // bukan N kali update/save saat pengguna menekan Pause All.
+        targets.forEach { item ->
+            App.logEvent("DOWNLOAD PAUSED: ${item.fileName}")
+            retryAttempts.remove(item.id)
+            speedTracker.reset(item.id)
+            jobs.remove(item.id)?.cancel()
+            disconnectActive(item.id)
+        }
+        val ids = targets.map { it.id }.toSet()
+        update(_items.value.map { item ->
+            if (item.id in ids) {
+                item.copy(
+                    state = DownloadState.PAUSED,
+                    autoResume = false,
+                    speedBps = 0,
+                    etaSeconds = 0
+                )
+            } else {
+                item
+            }
+        })
+        flushSave()
     }
 
     fun resumeAll() {

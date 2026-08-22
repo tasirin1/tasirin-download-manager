@@ -152,9 +152,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         if (StoragePrefs.isServerBackgroundEnabled(this) &&
             StoragePrefs.isServerStartAllowed(this) && !App.httpServer.isAlive
         ) {
-            runCatching { App.httpServer.startServer() }
+            lifecycleScope.launch(Dispatchers.IO) {
+                runCatching { App.httpServer.startServer() }
+            }
         }
-        runCatching { App.engine.cleanupOrphans() }
         if (StoragePrefs.isBatteryExemptEnabled(this)) {
             requestBatteryExemption()
         }
@@ -645,8 +646,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         when (action) {
             DownloadAdapter.Action.PAUSE -> App.engine.pause(item.id)
             DownloadAdapter.Action.RESUME -> App.engine.resume(item.id)
-            DownloadAdapter.Action.CANCEL -> App.engine.cancel(item.id)
-            DownloadAdapter.Action.DELETE -> App.engine.remove(item.id)
+            DownloadAdapter.Action.CANCEL -> lifecycleScope.launch(Dispatchers.IO) {
+                App.engine.cancel(item.id)
+            }
+            DownloadAdapter.Action.DELETE -> lifecycleScope.launch(Dispatchers.IO) {
+                App.engine.remove(item.id)
+            }
             DownloadAdapter.Action.OPEN -> openDownload(item)
             DownloadAdapter.Action.OPEN_FOLDER -> openFolder(item)
             DownloadAdapter.Action.MONITOR ->
@@ -698,13 +703,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             item.state == DownloadState.PENDING ||
             item.state == DownloadState.PAUSED
         ) {
-            options.add(getString(R.string.cancel) to { App.engine.cancel(item.id) })
+            options.add(getString(R.string.cancel) to {
+                lifecycleScope.launch(Dispatchers.IO) { App.engine.cancel(item.id) }
+            })
         }
         if (item.state == DownloadState.COMPLETED ||
             item.state == DownloadState.FAILED ||
             item.state == DownloadState.CANCELLED
         ) {
-            options.add(getString(R.string.delete) to { App.engine.remove(item.id) })
+            options.add(getString(R.string.delete) to {
+                lifecycleScope.launch(Dispatchers.IO) { App.engine.remove(item.id) }
+            })
         }
         val labels = options.map { it.first }.toTypedArray()
         AlertDialog.Builder(this)
