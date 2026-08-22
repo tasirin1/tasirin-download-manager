@@ -1,3 +1,14 @@
+## [v1.0 — 2026-08-22] — Perbaiki tampilan pemutar video
+
+### Fixed
+- **Adaptive player** — Video portrait/4:3 memakai rasio asli dan area player dibatasi di layar pendek agar judul serta saran video tetap terlihat.
+- **Viewport & safe-area** — Modal memakai dynamic viewport; overlay atas/bawah menghormati notch dan gesture bar.
+- **D-pad aksesibilitas** — Baris saran video menjadi tombol fokusabel dengan fokus terlihat, dan shortcut keyboard tidak menimpa aktivasi tombol.
+- **Playlist context** — Klik saran dan auto-next tetap memakai playlist Gallery/File Manager yang aktif.
+- **Up next order** — Saran dimulai dari video berikutnya sebelum melengkapi video sebelumnya.
+- **Control layout** — Waktu pemutar tidak menyusut sampai hilang pada layar sempit.
+- **Fullscreen orientation** — Lock landscape dipanggil setelah fullscreen benar-benar aktif.
+
 ## [v1.0 — 2026-08-21] — Stabilkan tombol pemutar video
 
 ### Fixed
