@@ -32,4 +32,12 @@ class ScanCacheTest {
         // Scan lama terpotong (100 dari 5000) dan limit minta lebih banyak.
         assertFalse(MediaLibrary.scanCacheUsable(1_000, ttl, 100, 5_000, 3_000))
     }
+
+    @Test
+    fun `entry media store basi - tidak ditampilkan`() {
+        assertFalse(MediaLibrary.isMediaEntryReadable("/sdcard/gone.mp4", "u:stale", { false }))
+        assertTrue(MediaLibrary.isMediaEntryReadable("/sdcard/live.mp4", "u:live", { true }))
+        assertTrue(MediaLibrary.isMediaEntryReadable(null, "u:saf-only", { false }))
+        assertFalse(MediaLibrary.isMediaEntryReadable(null, null, { true }))
+    }
 }

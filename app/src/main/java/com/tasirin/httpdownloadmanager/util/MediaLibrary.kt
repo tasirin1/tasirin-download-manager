@@ -143,6 +143,18 @@ object MediaLibrary {
     fun scanCacheUsable(ageMs: Long, ttlMs: Long, itemsSize: Int, total: Int, limit: Int): Boolean =
         ageMs < ttlMs && (itemsSize >= limit || itemsSize == total)
 
+    /** MediaStore bisa menyimpan baris lama setelah file dihapus/dipindah
+     *  langsung oleh filesystem. Galeri hanya percaya URI bila file fisiknya
+     *  tetap ada atau item memang hanya memiliki content URI. */
+    fun isMediaEntryReadable(
+        filePath: String?,
+        contentUri: String?,
+        fileExists: (String) -> Boolean = { path -> File(path).isFile }
+    ): Boolean = when {
+        filePath.isNullOrBlank() -> !contentUri.isNullOrBlank()
+        else -> fileExists(filePath)
+    }
+
     private fun scanCached(context: Context, maxEntries: Int): MediaScanResult {
         ensureObserver(context)
         synchronized(scanLock) {
@@ -281,7 +293,9 @@ object MediaLibrary {
                 val iDur = c.getColumnIndex(MediaStore.Video.Media.DURATION)
                 while (c.moveToNext()) {
                     val name = c.getString(iName) ?: continue
+                    val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
                     val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
+                    if (!isMediaEntryReadable(filePath, uri)) continue
                     list.add(
                         MediaEntry(
                             name = name,
@@ -289,7 +303,7 @@ object MediaLibrary {
                             modified = c.getLong(iMod) * 1000L,
                             isVideo = true,
                             token = tokenForUri(uri),
-                            filePath = c.getString(iData)?.takeIf { it.isNotBlank() },
+                            filePath = filePath,
                             contentUri = uri,
                             durationMs = if (iDur >= 0) c.getLong(iDur) else 0L
                         )

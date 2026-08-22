@@ -8,6 +8,7 @@
 - **Upload retry** — Reset baseline progres agregat saat file diulang dari awal agar persentase tidak macet/mundur palsu.
 - **ZIP efficiency** — Serialisasi pembuatan ZIP per selection key untuk beberapa request Range paralel.
 - **List rendering** — Perbarui pesan error item bila teks error berubah tanpa mengubah state.
+- **Gallery freshness** — Validasi path fisik entri MediaStore agar video yang sudah dihapus atau dipindahkan tidak lagi muncul sebagai item mati.
 
 ## [v1.0 — 2026-08-22] — Perbarui panduan repo
 
