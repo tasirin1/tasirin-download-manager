@@ -101,6 +101,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // sama (toggle server di Settings) — liveStatPool() membuat pool baru
     // otomatis supaya listing subfolder tidak gagal setelah restart server.
     @Volatile private var statPool: ThreadPoolExecutor = newStatPool()
+    @Volatile private var statPoolEnabled = true
     // Cache allowedFsRoots: dibangun ulang hanya saat settings berubah,
     // bukan setiap request (16x per request file manager).
     @Volatile private var cachedFsRoots: List<File>? = null
@@ -116,12 +117,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         pool.rejectedExecutionHandler =
             java.util.concurrent.RejectedExecutionHandler { cmd, _ ->
                 synchronized(this@HttpControlServer) {
-                    if (statPool.isShutdown) statPool = newStatPool()
+                    if (statPoolEnabled && statPool.isShutdown) statPool = newStatPool()
                 }
                 // Tangkap exception bila pool di-shutdown antara create & execute
                 // (race condition saat stopServer() dipanggil bersamaan).
-                runCatching { liveStatPool().execute(cmd) }.onFailure { e ->
-                    runCatching { logError(e) }
+                if (statPoolEnabled) {
+                    runCatching { liveStatPool().execute(cmd) }.onFailure { e ->
+                        runCatching { logError(e) }
+                    }
                 }
             }
         return pool
@@ -129,7 +132,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     @Synchronized
     private fun liveStatPool(): ThreadPoolExecutor {
-        if (statPool.isShutdown) statPool = newStatPool()
+        if (statPoolEnabled && statPool.isShutdown) statPool = newStatPool()
         return statPool
     }
     private var cachedHtml: String? = null
@@ -243,6 +246,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // tunggu & coba lagi sampai 3x (total ~600ms) supaya tidak crash.
         invalidateFsRootsCache()
         invalidateStatusCache()
+        statPoolEnabled = true
         // Bila statPool terminated (stopServer() sebelumnya), buat baru supaya
         // request pertama setelah restart tidak gagal dengan RejectedExecutionException.
         if (statPool.isTerminated) statPool = newStatPool()
@@ -299,6 +303,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     fun stopServer() {
         appendLog("SERVER STOPPED (port $listeningPort)")
+        statPoolEnabled = false
         sseJob?.cancel()
         sseJob = null
         // upload finalization coroutine yang berjalan di serverScope akan
@@ -368,9 +373,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val ip = session.remoteIpAddress.ifEmpty { "unknown" }
         val now = System.currentTimeMillis()
         pruneLoginAttempts(now)
-        val attempt = loginAttempt(ip).also { attempt ->
-            synchronized(attempt) { if (now < attempt.lockedUntil) attempt.lockedUntil else 0L }
-        }
+        val attempt = loginAttempt(ip)
         if (ServerSecurity.isPinLocked(now, attempt.lockedUntil)) {
             val waitSec = ((attempt.lockedUntil - now) / 1000) + 1
             return loginPage("Too many attempts. Try again in $waitSec seconds.")
@@ -985,34 +988,38 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  Browser mengunduh lewat beberapa request Range (206); tanpa cache ini
      *  folder di-zip ulang untuk tiap request (boros CPU + disk di Android TV). */
     private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, File>>()
+    private val zipLocks = Array(8) { Any() }
+
+    private fun zipLockFor(key: String): Any =
+        zipLocks[(key.hashCode() and Int.MAX_VALUE) % zipLocks.size]
 
     private fun zipCached(key: String, create: () -> File?): File? {
         val now = System.currentTimeMillis()
-        zipCache[key]?.let { (createdAt, file) ->
-            if (now - createdAt < ZIP_CACHE_TTL_MS && file.isFile && file.length() > 0) {
-                return file
+        synchronized(zipLockFor(key)) {
+            zipCache[key]?.let { (createdAt, file) ->
+                if (now - createdAt < ZIP_CACHE_TTL_MS && file.isFile && file.length() > 0) {
+                    return file
+                }
+                zipCache.remove(key)
+                runCatching { file.delete() }
             }
-            zipCache.remove(key)
-            runCatching { file.delete() }
-        }
-        val file = create() ?: return null
-        // Dua request bersamaan untuk key sama (browser mengunduh lewat
-        // beberapa request Range): putIfAbsent mencegah dua ZIP dibuat —
-        // file yang kalah dihapus supaya tidak bocor di cacheDir.
-        val prev = zipCache.putIfAbsent(key, now to file)
-        if (prev != null) {
-            runCatching { file.delete() }
-            return prev.second
-        }
-        val it = zipCache.entries.iterator()
-        while (it.hasNext()) {
-            val (k, v) = it.next()
-            if (k != key && now - v.first >= ZIP_CACHE_TTL_MS) {
-                it.remove()
-                runCatching { v.second.delete() }
+            val file = create() ?: return null
+            // Browser dapat membuka beberapa request Range sekaligus. Kunci per
+            // key benar-benar mencegah ZIP yang sama dibuat dua kali; cukup 8
+            // strip lock agar map kunci tidak tumbuh tanpa batas.
+            zipCache[key] = now to file
+            val it = zipCache.entries.iterator()
+            while (it.hasNext()) {
+                val entry = it.next()
+                val createdAt = entry.value.first
+                val cachedFile = entry.value.second
+                if (entry.key != key && now - createdAt >= ZIP_CACHE_TTL_MS) {
+                    it.remove()
+                    runCatching { cachedFile.delete() }
+                }
             }
+            return file
         }
-        return file
     }
 
     private fun createTempZip(fill: (ZipOutputStream) -> Unit): File? = try {

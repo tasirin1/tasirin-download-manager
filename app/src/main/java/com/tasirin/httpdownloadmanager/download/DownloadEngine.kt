@@ -519,30 +519,32 @@ class DownloadEngine(appContext: Context) {
         StorageCleanup.runIfLow(context, _items.value)
         for (item in pending) {
             if (active >= max) break
-            launchItem(item)
-            active++
+            if (launchItem(item)) active++
         }
     }
 
-    private fun launchItem(item: DownloadItem) {
-        if (jobs[item.id]?.isActive == true) return
-        val job = scope.launch {
-            try {
-                updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }
-                App.logEvent("DOWNLOAD STARTED: ${item.fileName}")
-                runDownload(item)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                // Error runtime (mis. NoSuchMethodError) diubah jadi status FAILED,
-                // bukan force close.
-                handleFailure(item.id, e.message)
+    private fun launchItem(item: DownloadItem): Boolean {
+        synchronized(jobs) {
+            if (jobs[item.id]?.isActive == true) return false
+            val job = scope.launch {
+                try {
+                    updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }
+                    App.logEvent("DOWNLOAD STARTED: ${item.fileName}")
+                    runDownload(item)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    // Error runtime (mis. NoSuchMethodError) diubah jadi status FAILED,
+                    // bukan force close.
+                    handleFailure(item.id, e.message)
+                }
             }
-        }
-        jobs[item.id] = job
-        job.invokeOnCompletion {
-            jobs.remove(item.id)
-            startQueued()
+            jobs[item.id] = job
+            job.invokeOnCompletion {
+                jobs.remove(item.id)
+                startQueued()
+            }
+            return true
         }
     }
 

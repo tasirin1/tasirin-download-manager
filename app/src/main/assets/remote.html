@@ -102,7 +102,6 @@ let gallerySentinel = null;
 let galleryPage = 0;
 let galleryHasMore = false;
 let gallerySeq = 0;
-let galleryFilter = 'video';
 let galSelectMode = false;
 const galSelected = new Set();
 const galBatch = document.getElementById('galBatch');
@@ -1105,8 +1104,13 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
 if (!fsSelected.size) return;
 showConfirm('Delete ' + fsSelected.size + ' item(s)?', 'The folder will be deleted along with its contents.', 'Delete', function () {
 (async function () {
+try {
 for (const it of fsSelected) {
 await postFsAction({action: 'delete', path: it.path});
+}
+} catch (e) {
+loadFs();
+return;
 }
 fsSelected.clear();
 loadFs();
@@ -1118,8 +1122,13 @@ if (!fsSelected.size) return;
 showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move', function (dest) {
 if (!dest) return;
 (async function () {
+try {
 for (const it of fsSelected) {
 await postFsAction({action: 'move', path: it.path, dest: dest});
+}
+} catch (e) {
+loadFs();
+return;
 }
 fsSelected.clear();
 loadFs();
@@ -1315,19 +1324,19 @@ showConfirm('Delete ' + (it.kind === 'dir' ? 'folder' : 'file') + '?',
 'Delete \"' + it.name + '\" from the device? The folder will be deleted along with its contents.',
 'Delete',
 function () {
-postFsAction({action: 'delete', path: it.path}).then(loadFs).catch(function(e) { fsMsg('Delete failed: ' + e, true); });
+postFsAction({action: 'delete', path: it.path}).then(loadFs).catch(function() {});
 });
 } else if (op === 'rename') {
 showInput('Rename', it.name, 'New name for \"' + it.name + '\"', 'Rename',
 function (name) {
 if (!name) return;
-postFsAction({action: 'rename', path: it.path, name: name}).then(loadFs).catch(function(e) { fsMsg('Rename failed: ' + e, true); });
+postFsAction({action: 'rename', path: it.path, name: name}).then(loadFs).catch(function() {});
 });
 } else if (op === 'move') {
 showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move',
 function (dest) {
 if (!dest) return;
-postFsAction({action: 'move', path: it.path, dest: dest}).then(loadFs).catch(function(e) { fsMsg('Move failed: ' + e, true); });
+postFsAction({action: 'move', path: it.path, dest: dest}).then(loadFs).catch(function() {});
 });
 }
 }
@@ -1343,6 +1352,7 @@ throw new Error(message);
 }
 } catch (e) {
 fsMsg('Operation failed: ' + e, true);
+throw e;
 }
 }
 document.getElementById('fsMkdirBtn').addEventListener('click', async function () {
@@ -1356,7 +1366,7 @@ return;
 }
 showInput('Create new folder', 'New Folder', 'New folder name in: ' + fsPath, 'Create', function (name) {
 if (!name) return;
-postFsAction({action: 'mkdir', path: fsPath, name: name}).then(loadFs);
+postFsAction({action: 'mkdir', path: fsPath, name: name}).then(loadFs).catch(function() {});
 });
 });
 const UPLOAD_CHUNK = 2 * 1024 * 1024;
@@ -1415,6 +1425,9 @@ for (const j of jobs) totalBytes += j.file.size;
 let bestDone = 0;
 let speed = 0;
 progressBox.classList.remove('hidden');
+function resetFileProgress() {
+bestDone = Math.min(bestDone, sentBytes);
+}
 function uploadOne(job, attempt) {
 const file = job.file;
 if (file.size === 0) {
@@ -1438,6 +1451,7 @@ let lastErr = '';
 let chunkBest = 0;
 let lastBytes = 0;
 let lastTime = 0;
+resetFileProgress();
 function failUpload(err) {
 const msg = (err && err.message) ? err.message : String(err);
 failed.push(file.name);
@@ -1553,6 +1567,7 @@ name = d.name || '';
 tries++;
 if (done) {
 sentBytes += file.size;
+bestDone = Math.max(bestDone, sentBytes);
 statusEl.textContent = 'Done: ' + (name || file.name);
 ulOk(job.id);
 finishOne();
@@ -1611,6 +1626,7 @@ name = d.name || '';
 } catch (e) {}
 if (done) {
 sentBytes += file.size;
+bestDone = Math.max(bestDone, sentBytes);
 statusEl.textContent = 'Done: ' + (name || file.name);
 ulOk(job.id);
 finishOne();
@@ -2369,7 +2385,7 @@ let lastIdListSig = '';
 let lastRowSig = {};
 function structSig(items) {
 return items.map(function (it) {
-return it.id + '|' + it.state + '|' + (it.error ? '|e' : '') + '|' + it.fileName + '|' + it.addedAt;
+return it.id + '|' + it.state + '|' + (it.error || '') + '|' + it.fileName + '|' + it.addedAt;
 }).join(';');
 }
 var EMPTY_ICONS = {
@@ -2448,6 +2464,8 @@ function patchRowSub(li, it) {
 const sub = li._sub || li.querySelector('.item-sub');
 if (!sub) return;
 li._sub = sub;
+const errBox = li._err || (li._err = li.querySelector('.err'));
+if (errBox && errBox.textContent !== it.error) errBox.textContent = it.error || '';
 const done = it.state === 'COMPLETED';
 const prog = done ? 100 : (it.totalBytes > 0 ? Math.round(it.bytesDownloaded * 100 / it.totalBytes) : 0);
 let meta = rowMetaText(it);
@@ -2481,7 +2499,8 @@ return;
 items.forEach(function (it) {
 const li = rowNodes.get(it.id);
 if (!li || !li.isConnected) return;
-const sig = it.state + '|' + it.bytesDownloaded + '|' + it.speedBps + '|' + it.etaSeconds;
+const sig = it.state + '|' + it.bytesDownloaded + '|' + it.speedBps + '|' +
+it.etaSeconds + '|' + (it.error || '');
 if (lastRowSig[it.id] === sig) return;
 lastRowSig[it.id] = sig;
 patchRowSub(li, it);
@@ -2741,6 +2760,7 @@ let sse = null;
 let sseFailCount = 0;
 let lastSseAt = 0;
 let sseGaveUp = false;
+let sseSilentReconnects = 0;
 let lastForcedReconnectAt = 0;
 function connectEvents() {
 if (sse) { try { sse.close(); } catch (e) {} }
@@ -2776,6 +2796,7 @@ const POLL_FAST_MS = 1000;
 const POLL_IDLE_MS = 10000;
 const SSE_SILENT_MS = 20000;
 const SSE_RECONNECT_COOLDOWN_MS = 10000;
+const SSE_RECONNECT_GRACE_MS = 5000;
 function anyActiveTransfer() {
 if (fsUploading) return true;
 for (let i = 0; i < lastItems.length; i++) {
@@ -2817,9 +2838,10 @@ statusLine.textContent = 'Cannot connect to the server. Check the server in the 
 function pollTick() {
 if (sse && sse.readyState === EventSource.OPEN &&
 Date.now() - lastSseAt > SSE_SILENT_MS) {
-if (!sseGaveUp && Date.now() - lastForcedReconnectAt > SSE_RECONNECT_COOLDOWN_MS) {
+if (!sseGaveUp && sseSilentReconnects < 1 &&
+Date.now() - lastForcedReconnectAt > SSE_RECONNECT_COOLDOWN_MS) {
 lastForcedReconnectAt = Date.now();
-sseGaveUp = true;
+sseSilentReconnects++;
 connectEvents();
 } else {
 sseGaveUp = true;
@@ -2827,7 +2849,8 @@ try { sse.close(); } catch (e) {}
 sse = null;
 }
 }
-if (sse && sse.readyState !== EventSource.OPEN && !sseGaveUp) {
+if (sse && sse.readyState !== EventSource.OPEN && !sseGaveUp &&
+Date.now() - lastSseAt > SSE_RECONNECT_GRACE_MS) {
 try { sse.close(); } catch (e) {}
 sse = null;
 sseGaveUp = true;

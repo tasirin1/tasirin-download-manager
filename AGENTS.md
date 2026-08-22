@@ -159,6 +159,10 @@ kuat dan tanpa diskusi:
 | Login throttle global bisa diblokir IP lain / boros memori | counter volatile global | state gagal per-IP di `loginAttempts`, map dibatasi dan dibersihkan |
 | Token media bocor di log request | query string dicetak mentah | `appendRequestLog()` redact `token` dan `pin`; pertahankan regex redaction |
 | Scan galeri duplikat saat load-more | request paralel melewati cache | scan/cache invalidation harus tetap di dalam `MediaLibrary.scanLock` |
+| ZIP folder dibuat berulang oleh Range paralel | `putIfAbsent` hanya mencegah duplikasi cache, bukan proses create | serialisasi `zipCached()` per key dengan strip lock; recheck cache di dalam lock |
+| Upload progress mundur/macet saat retry | baseline progres global tidak direset ketika file dimulai ulang dari chunk 0 | reset kontribusi file via `resetFileProgress()` sebelum attempt |
+| Batch fs action tetap lanjut setelah gagal | `postFsAction()` menelan error sehingga promise selalu resolved | helper melaporkan error lalu rethrow; caller berhenti dan refresh state |
+| SSE reconnect diam bisa gagal masuk state "give up" | flag diberi nilai `true` sebelum reconnect manual | pakai counter percobaan sekali + grace window sebelum menutup EventSource |
 
 ## Aturan pengembangan
 

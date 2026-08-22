@@ -1,3 +1,14 @@
+## [v1.0 — 2026-08-22] — Perbaikan hasil audit
+
+### Fixed
+- **Download queue** — Cegah race kecil pada start/complete job sehingga slot antre tidak bisa tergantung atau dobel.
+- **Server lifecycle** — Hentikan auto-heal pool statistik saat server sedang di-stop agar thread tidak hidup ulang tanpa perlu.
+- **Remote actions** — Aksi batch File Manager berhenti saat satu operasi gagal dan menyegarkan daftar sesuai kondisi nyata.
+- **SSE fallback** — Perbaiki state reconnect sekali saat stream diam, termasuk grace window sebelum EventSource ditutup.
+- **Upload retry** — Reset baseline progres agregat saat file diulang dari awal agar persentase tidak macet/mundur palsu.
+- **ZIP efficiency** — Serialisasi pembuatan ZIP per selection key untuk beberapa request Range paralel.
+- **List rendering** — Perbarui pesan error item bila teks error berubah tanpa mengubah state.
+
 ## [v1.0 — 2026-08-22] — Perbarui panduan repo
 
 ### Changed

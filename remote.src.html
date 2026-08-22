@@ -1396,7 +1396,6 @@ let galleryHasMore = false;
 // pencarian saat request sebelumnya belum selesai) diabaikan supaya tidak
 // menimpa data terbaru dan reset tidak ter-skip oleh flag boolean.
 let gallerySeq = 0;
-let galleryFilter = 'video';
 let galSelectMode = false;
 const galSelected = new Set();
 const galBatch = document.getElementById('galBatch');
@@ -2476,8 +2475,13 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
   if (!fsSelected.size) return;
   showConfirm('Delete ' + fsSelected.size + ' item(s)?', 'The folder will be deleted along with its contents.', 'Delete', function () {
     (async function () {
-      for (const it of fsSelected) {
-        await postFsAction({action: 'delete', path: it.path});
+      try {
+        for (const it of fsSelected) {
+          await postFsAction({action: 'delete', path: it.path});
+        }
+      } catch (e) {
+        loadFs();
+        return;
       }
       fsSelected.clear();
       loadFs();
@@ -2490,8 +2494,13 @@ document.getElementById('fsBatchMove').addEventListener('click', function () {
   showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move', function (dest) {
     if (!dest) return;
     (async function () {
-      for (const it of fsSelected) {
-        await postFsAction({action: 'move', path: it.path, dest: dest});
+      try {
+        for (const it of fsSelected) {
+          await postFsAction({action: 'move', path: it.path, dest: dest});
+        }
+      } catch (e) {
+        loadFs();
+        return;
       }
       fsSelected.clear();
       loadFs();
@@ -2695,19 +2704,19 @@ async function doFsOp(it, op) {
       'Delete \"' + it.name + '\" from the device? The folder will be deleted along with its contents.',
       'Delete',
       function () {
-        postFsAction({action: 'delete', path: it.path}).then(loadFs).catch(function(e) { fsMsg('Delete failed: ' + e, true); });
+        postFsAction({action: 'delete', path: it.path}).then(loadFs).catch(function() {});
       });
   } else if (op === 'rename') {
     showInput('Rename', it.name, 'New name for \"' + it.name + '\"', 'Rename',
       function (name) {
         if (!name) return;
-        postFsAction({action: 'rename', path: it.path, name: name}).then(loadFs).catch(function(e) { fsMsg('Rename failed: ' + e, true); });
+        postFsAction({action: 'rename', path: it.path, name: name}).then(loadFs).catch(function() {});
       });
   } else if (op === 'move') {
     showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move',
       function (dest) {
         if (!dest) return;
-        postFsAction({action: 'move', path: it.path, dest: dest}).then(loadFs).catch(function(e) { fsMsg('Move failed: ' + e, true); });
+        postFsAction({action: 'move', path: it.path, dest: dest}).then(loadFs).catch(function() {});
       });
   }
 }
@@ -2724,6 +2733,7 @@ async function postFsAction(params) {
     }
   } catch (e) {
     fsMsg('Operation failed: ' + e, true);
+    throw e;
   }
 }
 
@@ -2738,7 +2748,7 @@ document.getElementById('fsMkdirBtn').addEventListener('click', async function (
   }
   showInput('Create new folder', 'New Folder', 'New folder name in: ' + fsPath, 'Create', function (name) {
     if (!name) return;
-    postFsAction({action: 'mkdir', path: fsPath, name: name}).then(loadFs);
+    postFsAction({action: 'mkdir', path: fsPath, name: name}).then(loadFs).catch(function() {});
   });
 });
 
@@ -2805,6 +2815,10 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
   let speed = 0;
   progressBox.classList.remove('hidden');
 
+  function resetFileProgress() {
+    bestDone = Math.min(bestDone, sentBytes);
+  }
+
   function uploadOne(job, attempt) {
     const file = job.file;
     if (file.size === 0) {
@@ -2828,6 +2842,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
     let chunkBest = 0;
     let lastBytes = 0;
     let lastTime = 0;
+    resetFileProgress();
 
     function failUpload(err) {
       const msg = (err && err.message) ? err.message : String(err);
@@ -2949,6 +2964,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
           tries++;
           if (done) {
             sentBytes += file.size;
+            bestDone = Math.max(bestDone, sentBytes);
             statusEl.textContent = 'Done: ' + (name || file.name);
             ulOk(job.id);
             finishOne();
@@ -3009,6 +3025,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         } catch (e) {}
         if (done) {
           sentBytes += file.size;
+          bestDone = Math.max(bestDone, sentBytes);
           statusEl.textContent = 'Done: ' + (name || file.name);
           ulOk(job.id);
           finishOne();
@@ -3826,7 +3843,7 @@ let lastRowSig = {};
 
 function structSig(items) {
   return items.map(function (it) {
-    return it.id + '|' + it.state + '|' + (it.error ? '|e' : '') + '|' + it.fileName + '|' + it.addedAt;
+    return it.id + '|' + it.state + '|' + (it.error || '') + '|' + it.fileName + '|' + it.addedAt;
   }).join(';');
 }
 
@@ -3913,6 +3930,8 @@ function patchRowSub(li, it) {
   const sub = li._sub || li.querySelector('.item-sub');
   if (!sub) return;
   li._sub = sub;
+  const errBox = li._err || (li._err = li.querySelector('.err'));
+  if (errBox && errBox.textContent !== it.error) errBox.textContent = it.error || '';
   const done = it.state === 'COMPLETED';
   const prog = done ? 100 : (it.totalBytes > 0 ? Math.round(it.bytesDownloaded * 100 / it.totalBytes) : 0);
   let meta = rowMetaText(it);
@@ -3947,7 +3966,8 @@ function updateRows(items) {
   items.forEach(function (it) {
     const li = rowNodes.get(it.id);
     if (!li || !li.isConnected) return;
-    const sig = it.state + '|' + it.bytesDownloaded + '|' + it.speedBps + '|' + it.etaSeconds;
+    const sig = it.state + '|' + it.bytesDownloaded + '|' + it.speedBps + '|' +
+      it.etaSeconds + '|' + (it.error || '');
     if (lastRowSig[it.id] === sig) return;
     lastRowSig[it.id] = sig;
     patchRowSub(li, it);
@@ -4218,6 +4238,7 @@ let sse = null;
 let sseFailCount = 0;
 let lastSseAt = 0;
 let sseGaveUp = false;
+let sseSilentReconnects = 0;
 let lastForcedReconnectAt = 0;
 function connectEvents() {
   if (sse) { try { sse.close(); } catch (e) {} }
@@ -4262,6 +4283,7 @@ const POLL_FAST_MS = 1000;
 const POLL_IDLE_MS = 10000;
 const SSE_SILENT_MS = 20000;
 const SSE_RECONNECT_COOLDOWN_MS = 10000;
+const SSE_RECONNECT_GRACE_MS = 5000;
 
 function anyActiveTransfer() {
   if (fsUploading) return true;
@@ -4312,9 +4334,10 @@ function pollTick() {
   // untuk sesi ini dan pakai polling adaptif saja (tidak ada reconnect storm).
   if (sse && sse.readyState === EventSource.OPEN &&
       Date.now() - lastSseAt > SSE_SILENT_MS) {
-    if (!sseGaveUp && Date.now() - lastForcedReconnectAt > SSE_RECONNECT_COOLDOWN_MS) {
+    if (!sseGaveUp && sseSilentReconnects < 1 &&
+        Date.now() - lastForcedReconnectAt > SSE_RECONNECT_COOLDOWN_MS) {
       lastForcedReconnectAt = Date.now();
-      sseGaveUp = true;
+      sseSilentReconnects++;
       connectEvents();
     } else {
       sseGaveUp = true;
@@ -4322,7 +4345,8 @@ function pollTick() {
       sse = null;
     }
   }
-  if (sse && sse.readyState !== EventSource.OPEN && !sseGaveUp) {
+  if (sse && sse.readyState !== EventSource.OPEN && !sseGaveUp &&
+      Date.now() - lastSseAt > SSE_RECONNECT_GRACE_MS) {
     // EventSource reconnect internal gagal terus: berhenti mencoba.
     try { sse.close(); } catch (e) {}
     sse = null;
