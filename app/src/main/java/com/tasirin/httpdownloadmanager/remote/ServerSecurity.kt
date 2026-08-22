@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager.remote
 
+import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.sha256Hex
 import java.io.File
 

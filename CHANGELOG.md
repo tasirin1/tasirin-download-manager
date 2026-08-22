@@ -13,7 +13,7 @@
 - **Media scan race** — Cache scan MediaStore dan invalidasinya disinkronkan untuk mencegah scan paralel duplikat.
 - **Settings lifecycle** — Port tidak valid menghentikan penyimpanan lebih awal, port pembanding memakai nilai tersimpan, dan operasi server keluar dari main thread.
 - **Open folder fallback** — Coba intent file manager secara langsung sebelum membuka aplikasi Downloads sistem.
-- **Compile follow-up** — Perbaiki urutan status server pada toggle Settings dan pemanggilan pembanding token konstan.
+- **Compile follow-up** — Perbaiki urutan status server pada toggle Settings serta referensi utilitas pembanding token konstan.
 
 ## [v1.0 — 2026-08-22] — Perbaiki tampilan pemutar video
 
