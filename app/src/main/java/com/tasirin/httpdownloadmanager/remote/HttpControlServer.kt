@@ -2109,8 +2109,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         if (System.currentTimeMillis() - sseLastPushAt < SSE_MIN_INTERVAL_MS) continue
                         pushFrame(buildPayload(pruneTick))
                     }
-                } catch (_: CancellationException) {
-                    throw
+                } catch (e: CancellationException) {
+                    throw e
                 }
             }
         }
@@ -2202,12 +2202,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             ByteArrayInputStream(bytes),
             bytes.size.toLong()
         ).also { it.addHeader("Cache-Control", "no-store") }
-    }
-
-    /** Jalur thumbnail bersama untuk remote dan galeri native agar decode,
-     * lock per-file, dan cache disk tidak diduplikasi dua implementasi. */
-    fun galleryThumbFile(raw: String): File? = safeRun("galleryThumb") {
-        getOrCreateThumb(context, raw, ::isFsPathAllowed, ::isMediaUriAllowed)
     }
 
     /** Jalur thumbnail bersama untuk remote dan galeri native agar decode,
