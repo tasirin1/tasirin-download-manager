@@ -3,7 +3,7 @@
 ### Fixed
 - **Remote destination** — Validasi semua tujuan download/upload terhadap root yang diizinkan, termasuk path `f:`, root `m:`, dan relative path `m:`.
 - **Segment connections** — Pause/cancel/hapus kini menutup semua koneksi segmen aktif, bukan hanya koneksi terakhir.
-- **Merge safety** — Gabungan segmen ditulis ke file staging dulu, lalu bagian parsial dihapus setelah finalisasi berhasil.
+- **Merge safety** — Gabungan segmen ditulis ke file staging dulu, difinalisasi kompatibel Android 5, lalu bagian parsial dihapus setelah berhasil.
 - **Resume validation** — Resume di-reset bila ETag resource berubah agar file tidak tercampur versi lama dan baru.
 - **Upload integrity** — Chunk upload wajib memakai ID, diserialisasi per-ID, dan rentang offset+ukuran divalidasi.
 - **Login/session hardening** — Throttle login per IP dengan map terbatas; cookie PIN memakai `HttpOnly`/`SameSite`; logout jadi POST.

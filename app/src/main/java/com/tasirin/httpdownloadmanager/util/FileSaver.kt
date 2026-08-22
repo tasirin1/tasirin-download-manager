@@ -15,9 +15,6 @@ import java.io.File
 import java.io.IOException
 import java.io.BufferedOutputStream
 import java.io.OutputStream
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 class FileSaver(context: Context) {
     private val WHITESPACE_RE = Regex("\\s+")
@@ -55,17 +52,12 @@ class FileSaver(context: Context) {
                     part.inputStream().use { input -> input.copyTo(out) }
                 }
             }
-            try {
-                Files.move(
-                    staging.toPath(), target.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(
-                    staging.toPath(), target.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING
-                )
+            // renameTo memakai rename(2) di Linux dan menggantikan target lama;
+            // fallback menjaga perangkat yang menolak replace otomatis.
+            if (!staging.renameTo(target) && target.exists()) {
+                if (!target.delete() || !staging.renameTo(target)) {
+                    throw IOException("Failed to finalize merged file")
+                }
             }
         } finally {
             if (staging.exists()) runCatching { staging.delete() }
