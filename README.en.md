@@ -53,15 +53,15 @@ Built with **Kotlin + Jetpack**, no ads, no account. Open source on GitHub; ever
 |---|---|
 | 🚀 **Full download manager** | multi-segment, Range resume, smart queue, speed limit, auto-retry |
 | 📡 **Realtime remote web (SSE)** | control from another device's browser, instant updates without manual refresh |
-| 🖥️ **YouTube-style video player** | red seekbar, double-tap ±10s, volume/brightness gestures, auto-next |
+| 🖥️ **YouTube-style video player** | red seekbar, double-tap ±10s, auto-next, D-pad-friendly controls |
 | 🗂️ **Remote file manager** | browse, upload, bulk delete, folder ZIP, instant media preview |
-| 🖼️ **Device media gallery** | 16:9 thumbnails, real duration, photo/video filters, separate photo & video folders |
+| 🎬 **Device video gallery** | 16:9 thumbnails, real duration, resume playback, video suggestions |
 | 📶 **Ready for slow networks** | adjustable connect/read timeouts, automatic mirrors, adaptive polling |
 | 🔋 **TV box ready** | D-pad/remote support, background server, auto-start on boot |
 
 Download features:
 
-- **Realtime progress**: percentage, size, KB/s–MB/s speed, **stable ETA** (moving average, no jumps) + speed graph
+- **Realtime progress**: percentage, size, KB/s–MB/s speed, **stable ETA** (moving average, no jumps)
 - **Multi-segment** for large files that support Range, parallel downloads with a queue (max configurable)
 - **Smart queue**: small files first (optional) + manual priority per download
 - Pause, resume (HTTP Range), cancel, delete, retry failed — everything is persisted automatically
@@ -75,7 +75,7 @@ Download features:
 - **Full auto-sort** after completion: `Videos/`, `Photos/`, `Music/`, `Documents/`, `APK/` (in settings)
 - **Smart fallback when Range is rejected**: servers that don't support Range are downloaded in a single pass automatically, no total failure
 - **Automatic mirrors** for slow/failed servers; failed URLs are blacklisted to avoid endless retries
-- Theme follows the system (auto / light / dark); UI language is English
+- Consistent light interface; UI language is English
 
 ## Download
 
@@ -152,13 +152,12 @@ Remote page features:
 | `/api/fs`, `/api/fs_action` | File browsing & actions (create/delete/rename/move) |
 | `/api/fs_zip` | Download folder as ZIP |
 | `/api/upload`, `/api/upload_verify` | 2 MB chunk upload + verification |
-| `/api/gallery`, `/api/media`, `/api/media_zip`, `/api/thumb` | Gallery, streaming (Range), batch ZIP download, thumbnails |
-| `/api/delete_media` | Delete gallery media |
+| `/api/gallery`, `/api/media`, `/api/media_zip`, `/api/thumb` | Video gallery, streaming (Range), batch ZIP download, thumbnails |
 | `/api/qr`, `/api/share` | QR code, temporary share link (24 hours) |
 
 ## YouTube-style video player
 
-- Red seekbar + buffered, **double-tap ±10 seconds**, brightness/volume gestures
+- Red seekbar with buffered progress, **double-tap ±10 seconds**, D-pad-friendly controls
 - Playback speed 0.5×–2×, resume from last position
 - **Video suggestions** below the player, **AUTO (auto-next)** turns on automatically
 
@@ -172,9 +171,9 @@ Files are saved to the **Downloads folder** by default. `minSdk 21` is kept (And
 
 ## Gallery
 
-- **Photo & video folders configured separately** in Settings: set a photo gallery folder and a video gallery folder each (e.g. videos only in `/sdcard/Movies/Files`, photos left to scan everything)
-- Leave empty to scan all storage; `/sdcard/...` paths are automatically recognized as `/storage/emulated/0/...`
-- Shows video duration, fast thumbnails, direct playback, file deletion
+- The remote gallery focuses on **videos**, giving more screen space and lighter scans
+- Shows video duration, fast thumbnails, the built-in player, and video suggestions
+- In-progress downloads can still be played progressively from the gallery
 
 ## Settings
 

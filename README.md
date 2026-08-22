@@ -54,15 +54,15 @@ Dibangun dengan **Kotlin + Jetpack**, tanpa iklan, tanpa akun. Kode terbuka di G
 |---|---|
 | 🚀 **Manajer unduhan lengkap** | multi-segmen, resume dengan Range, antrean pintar, batas kecepatan, auto-retry |
 | 📡 **Remote web realtime (SSE)** | kontrol dari browser perangkat lain, update langsung tanpa refresh manual |
-| 🖥️ **Player video ala YouTube** | seekbar merah, double-tap ±10 detik, gesture volume/kecerahan, auto-next |
+| 🖥️ **Player video ala YouTube** | seekbar merah, double-tap ±10 detik, auto-next, tampilan ramah D-pad |
 | 🗂️ **File manager remote** | jelajah, upload, hapus massal, ZIP folder, pratinjau media langsung |
-| 🖼️ **Galeri media device** | thumbnail 16:9, durasi asli, filter foto/video, folder foto & video terpisah |
+| 🎬 **Galeri video perangkat** | thumbnail 16:9, durasi asli, lanjut putar, saran video |
 | 📶 **Siap untuk jaringan pelan** | timeout connect/read bisa diatur, mirror otomatis, polling adaptif |
 | 🔋 **Siap untuk TV box** | dukungan D-pad/remote, server jalan di background, auto-start saat boot |
 
 Fitur unduhan:
 
-- **Progress realtime**: persentase, ukuran, kecepatan KB/s–MB/s, **ETA stabil** (rata-rata bergerak, tidak melompat-lompat) + grafik kecepatan
+- **Progress realtime**: persentase, ukuran, kecepatan KB/s–MB/s, **ETA stabil** (rata-rata bergerak, tidak melompat-lompat)
 - **Multi-segmen** untuk file besar yang mendukung Range, unduhan paralel dengan antrean (jumlah maks. bisa diatur)
 - **Antrean pintar**: file kecil didahulukan (opsional) + prioritas manual per download
 - Jeda, lanjutkan (resume HTTP Range), batalkan, hapus, ulangi gagal — semua tersimpan otomatis
@@ -76,7 +76,7 @@ Fitur unduhan:
 - **Auto-sort lengkap** setelah selesai: `Videos/`, `Photos/`, `Music/`, `Documents/`, `APK/` (pengaturan)
 - **Fallback cerdas saat Range ditolak**: server yang tidak mendukung Range otomatis diunduh sekali jalan (single-stream), tanpa gagal total
 - **Mirror otomatis** untuk server yang lambat/gagal, URL gagal di-blacklist agar tidak dicoba ulang tanpa henti
-- Tema ikuti sistem (otomatis / terang / gelap); bahasa UI: Inggris
+- Antarmuka terang yang konsisten; bahasa UI: Inggris
 
 ## Unduh
 
@@ -152,13 +152,12 @@ Fitur halaman remote:
 | `/api/fs`, `/api/fs_action` | Jelajah file & aksi (buat/hapus/rename/pindah) |
 | `/api/fs_zip` | Unduh folder sebagai ZIP |
 | `/api/upload`, `/api/upload_verify` | Upload chunk 2 MB + verifikasi |
-| `/api/gallery`, `/api/media`, `/api/media_zip`, `/api/thumb` | Galeri, streaming (Range), unduh batch ZIP, thumbnail |
-| `/api/delete_media` | Hapus media galeri |
+| `/api/gallery`, `/api/media`, `/api/media_zip`, `/api/thumb` | Galeri video, streaming (Range), unduh batch ZIP, thumbnail |
 | `/api/qr`, `/api/share` | Kode QR, tautan berbagi sementara (24 jam) |
 
 ## Player video ala YouTube
 
-- Seekbar merah + buffered, **double-tap ±10 detik**, gesture kecerahan/volume
+- Seekbar merah dengan status buffer, **double-tap ±10 detik**, kontrol ramah D-pad
 - Kecepatan putar 0.5×–2×, lanjut dari posisi terakhir
 - **Saran video** di bawah player, **AUTO (auto-next)** menyala otomatis
 
@@ -172,9 +171,9 @@ Default file disimpan ke **Folder Downloads**. `minSdk 21` dipertahankan (Androi
 
 ## Galeri
 
-- **Folder foto & video diatur terpisah** di Pengaturan: tentukan folder galeri foto dan folder galeri video masing-masing (mis. video saja di `/sdcard/Movies/Files`, foto dibiarkan scan semua)
-- Kosongkan untuk scan seluruh storage; path `/sdcard/...` otomatis dikenali sebagai `/storage/emulated/0/...`
-- Tampilkan durasi video, thumbnail cepat, putar langsung, hapus file
+- Galeri remote difokuskan untuk **video**, sehingga layar lebih luas dan scan lebih hemat resource
+- Tampilkan durasi video, thumbnail cepat, pemutar bawaan, dan saran video
+- File yang masih diunduh tetap bisa diputar progresif dari daftar galeri
 
 ## Pengaturan
 

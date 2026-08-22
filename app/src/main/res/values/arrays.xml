@@ -1,25 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="about_icons">
-        <item>&#128104;&#8205;&#128187;</item>
+        <item>&#128100;</item>
+        <item>&#127919;</item>
         <item>&#128241;</item>
-        <item>&#129302;</item>
-        <item>&#128736;&#65039;</item>
-        <item>&#128483;&#65039;</item>
-        <item>&#128250;</item>
         <item>&#127760;</item>
-        <item>&#9749;</item>
-        <item>&#9888;&#65039;</item>
+        <item>&#128274;</item>
+        <item>&#9889;</item>
+        <item>&#128190;</item>
+        <item>&#9878;&#65039;</item>
     </string-array>
     <string-array name="about_rows">
-        <item>Maker: Julius Rudi Tasirin</item>
-        <item>Built with: Samsung A05 (4 GB RAM, 64 GB ROM)</item>
-        <item>Coded by: AnyClaw AI — powered by good AI prompting</item>
-        <item>Supported by: deep IT understanding</item>
-        <item>Language: English (app &amp; remote web)</item>
-        <item>For: Android — phones, STB &amp; TV boxes</item>
-        <item>Package: full-featured, only ~1.7 MB</item>
-        <item>Fuel: a cup of coffee + spare time</item>
-        <item>Play Protect may warn on sideload (All Files Access) — VirusTotal scan is clean 0/75</item>
+        <item>Developer: Julius Rudi Tasirin</item>
+        <item>Purpose: fast downloads and complete remote device control</item>
+        <item>Platform: Android phones, TV boxes &amp; STBs (Android 5+)</item>
+        <item>Remote web: manage downloads, files and videos from a browser</item>
+        <item>Security: PIN protection, signed updates and local-first access</item>
+        <item>Performance: lightweight build optimized for low-memory devices</item>
+        <item>Storage: download manager, file manager and video gallery</item>
+        <item>Transparency: sideloaded apps may trigger a Play Protect warning</item>
     </string-array>
 </resources>

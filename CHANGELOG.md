@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-22] — Perbarui profil aplikasi
+
+### Changed
+- **About screen** — Ganti teks informal dengan ringkasan profesional: developer, tujuan produk, platform, kontrol remote, keamanan, performa, penyimpanan, dan transparansi sideload.
+- **Documentation** — Sinkronkan fitur aktif di README Indonesia/Inggris: galeri kini video-only, player tanpa gesture brightness/volume, tema terang konsisten, dan endpoint hapus media galeri tidak lagi disebut.
+
 ## [v1.0 — 2026-08-22] — Perbaikan keamanan, sinkronisasi, dan lifecycle
 
 ### Fixed
