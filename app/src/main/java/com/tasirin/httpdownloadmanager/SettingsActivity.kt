@@ -308,6 +308,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun wireServerSwitch() {
         binding.serverSwitch.setOnClickListener {
             if (binding.serverSwitch.isEnabled.not()) return@setOnClickListener
+            val started = App.httpServer.isAlive
             if (!started &&
                 StoragePrefs.isPinEnforced(this) &&
                 StoragePrefs.getServerPin(this).isNullOrEmpty()
@@ -317,7 +318,6 @@ class SettingsActivity : AppCompatActivity() {
             }
             binding.serverSwitch.isEnabled = false
             lifecycleScope.launch {
-                val started = App.httpServer.isAlive
                 val operation = if (started) {
                     withContext(Dispatchers.IO) { runCatching { App.httpServer.stopServer() }.isSuccess }
                 } else {

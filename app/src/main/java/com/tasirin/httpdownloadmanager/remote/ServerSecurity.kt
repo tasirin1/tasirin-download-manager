@@ -1,6 +1,5 @@
 package com.tasirin.httpdownloadmanager.remote
 
-import com.tasirin.httpdownloadmanager.util.constantEquals
 import com.tasirin.httpdownloadmanager.util.sha256Hex
 import java.io.File
 
@@ -60,7 +59,7 @@ object ServerSecurity {
         val expiresAt = parts[1].toLongOrNull() ?: return false
         if (expiresAt < now) return false
         val expected = sha256Hex("${parts[0]}.${parts[1]}:$secret")
-        return constantEquals(parts[2], expected)
+        return StoragePrefs.constantEquals(parts[2], expected)
     }
 
     /** Lock PIN masih aktif: percobaan login ditolak. */
