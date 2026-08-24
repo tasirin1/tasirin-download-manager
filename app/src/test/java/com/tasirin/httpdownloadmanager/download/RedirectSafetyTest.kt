@@ -10,7 +10,7 @@ class RedirectSafetyTest {
     @Test
     fun `redirect target resolves relative location and blocks non-http`() {
         assertEquals(
-            "https://cdn.example.com/file.bin",
+            "https://example.com/file.bin",
             redirectTarget("https://example.com/a", "/file.bin")
         )
         assertNull(redirectTarget("https://example.com/a", "ftp://example.com/file"))
