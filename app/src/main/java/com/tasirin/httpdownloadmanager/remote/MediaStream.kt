@@ -3,6 +3,7 @@ package com.tasirin.httpdownloadmanager.remote
 import fi.iki.elonen.NanoHTTPD
 import java.io.IOException
 import java.io.InputStream
+import java.net.URLEncoder
 
 internal fun notFound(): NanoHTTPD.Response = NanoHTTPD.newFixedLengthResponse(
     NanoHTTPD.Response.Status.NOT_FOUND,
@@ -27,11 +28,18 @@ internal fun streamMedia(
     download: Boolean,
     prepositioned: Boolean = false
 ): NanoHTTPD.Response {
-    val safeName = name.replace("\"", "_").replace("\\", "_")
+    val fallbackName = buildString {
+        name.forEach { char ->
+            if (char.code in 32..126 && char != '"' && char != '\\') append(char) else append('_')
+        }
+    }.take(180).ifEmpty { "download" }
+    val encodedName = URLEncoder
+        .encode(name.take(180), "UTF-8")
+        .replace("+", "%20")
     val disposition = if (download) {
-        "attachment; filename=\"$safeName\""
+        "attachment; filename=\"$fallbackName\"; filename*=UTF-8''$encodedName"
     } else {
-        "inline; filename=\"$safeName\""
+        "inline; filename=\"$fallbackName\"; filename*=UTF-8''$encodedName"
     }
     val response = runCatching {
         val range = if (total > 0) parseRange(rangeHeader, total) else null

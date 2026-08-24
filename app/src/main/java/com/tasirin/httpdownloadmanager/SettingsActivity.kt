@@ -660,9 +660,11 @@ class SettingsActivity : AppCompatActivity() {
             ) {
                 StoragePrefs.setServerBackgroundEnabled(this, false)
                 StoragePrefs.setServerAutoStartEnabled(this, false)
-                runCatching { App.httpServer.stopServer() }
-                stopServiceIfIdle()
-                renderServer()
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) { runCatching { App.httpServer.stopServer() } }
+                    stopServiceIfIdle()
+                    renderServer()
+                }
             }
             val newPort = requestedPort
             val oldPort = StoragePrefs.serverPort(this)

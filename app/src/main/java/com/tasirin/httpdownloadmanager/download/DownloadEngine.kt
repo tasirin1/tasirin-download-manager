@@ -189,7 +189,7 @@ class DownloadEngine(appContext: Context) {
         updateItem(id) {
             it.copy(state = DownloadState.PAUSED, autoResume = false, speedBps = 0, etaSeconds = 0)
         }
-        flushSave()
+        scheduleSave()
     }
 
     fun resume(id: String) {
@@ -227,25 +227,26 @@ class DownloadEngine(appContext: Context) {
         updateItem(id) {
             it.copy(state = DownloadState.CANCELLED, speedBps = 0, etaSeconds = 0)
         }
-        flushSave()
+        scheduleSave()
     }
 
     fun remove(id: String) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD DELETED: ${it.fileName}") }
+        val item = _items.value.find { it.id == id }
         retryAttempts.remove(id)
         speedTracker.reset(id)
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
-        _items.value.find { it.id == id }?.let { FileSaver(context).deleteFiles(it) }
         update(_items.value.filterNot { it.id == id })
-        flushSave()
+        item?.let { FileSaver(context).deleteFiles(it) }
+        scheduleSave()
     }
 
     fun clearCompleted() {
         // Hanya membersihkan daftar; file hasil download TIDAK dihapus.
         update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
-        flushSave()
+        scheduleSave()
     }
 
     fun importStream(
@@ -359,7 +360,7 @@ class DownloadEngine(appContext: Context) {
                 item
             }
         })
-        flushSave()
+        scheduleSave()
     }
 
     fun resumeAll() {
@@ -415,7 +416,7 @@ class DownloadEngine(appContext: Context) {
     fun setMonitor(id: String, enabled: Boolean) {
         val item = _items.value.find { it.id == id } ?: return
         updateItem(id) { it.copy(monitor = enabled && item.state == DownloadState.COMPLETED) }
-        flushSave()
+        scheduleSave()
     }
 
     private fun shouldInvalidateResume(item: DownloadItem, currentEtag: String?): Boolean {

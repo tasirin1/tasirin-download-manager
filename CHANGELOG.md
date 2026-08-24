@@ -1,3 +1,13 @@
+## [v1.0 — 2026-08-24] — Perbaikan efisiensi dan audit lanjutan
+
+### Fixed
+- **Remote disk safety** — Batasi cache ZIP folder berdasarkan jumlah dan total ukuran agar browsing folder tidak menumpuk file sementara.
+- **Download header** — Tambahkan fallback RFC 5987 pada nama file non-ASCII supaya unduhan tidak rusak namanya di browser.
+- **QR endpoint** — Batasi panjang teks QR untuk mencegah pemakaian CPU/memori berlebih dari input eksternal.
+- **UI thread** — Pindahkan rename download dan pemberhentian server saat PIN dihapus ke background thread.
+- **Persistensi** — Debounce penyimpanan status pause/clear agar tombol batch tidak menulis disk berkali-kali.
+- **Video resume storage** — Batasi jumlah posisi video yang disimpan di browser dan gunakan ID upload acak dengan fallback WebView lama.
+
 ## [v1.0 — 2026-08-24] — Penguatan audit keamanan lanjutan
 
 ### Fixed

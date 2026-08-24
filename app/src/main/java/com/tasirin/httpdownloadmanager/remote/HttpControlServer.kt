@@ -1036,6 +1036,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  folder di-zip ulang untuk tiap request (boros CPU + disk di Android TV). */
     private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, File>>()
     private val zipLocks = Array(8) { Any() }
+    private val zipEvictionLock = Any()
 
     private fun zipLockFor(key: String): Any =
         zipLocks[(key.hashCode() and Int.MAX_VALUE) % zipLocks.size]
@@ -1055,17 +1056,31 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // key benar-benar mencegah ZIP yang sama dibuat dua kali; cukup 8
             // strip lock agar map kunci tidak tumbuh tanpa batas.
             zipCache[key] = now to file
-            val it = zipCache.entries.iterator()
-            while (it.hasNext()) {
-                val entry = it.next()
-                val createdAt = entry.value.first
-                val cachedFile = entry.value.second
-                if (entry.key != key && now - createdAt >= ZIP_CACHE_TTL_MS) {
-                    it.remove()
-                    runCatching { cachedFile.delete() }
-                }
-            }
+            pruneZipCache(now, key)
             return file
+        }
+    }
+
+    private fun pruneZipCache(now: Long, keepKey: String) {
+        synchronized(zipEvictionLock) {
+            zipCache.entries.removeIf { (_, value) ->
+                val expired = now - value.first >= ZIP_CACHE_TTL_MS
+                if (expired) runCatching { value.second.delete() }
+                expired
+            }
+            var totalBytes = zipCache.values.sumOf { it.second.length() }
+            val oldest = zipCache.entries.sortedBy { it.value.first }.iterator()
+            while (oldest.hasNext() &&
+                (zipCache.size > ZIP_CACHE_MAX || totalBytes > ZIP_CACHE_MAX_BYTES)
+            ) {
+                val entry = oldest.next()
+                if (entry.key == keepKey && zipCache.size == 1) continue
+                val file = entry.value.second
+                val size = file.length()
+                oldest.remove()
+                runCatching { file.delete() }
+                totalBytes -= size
+            }
         }
     }
 
@@ -2244,7 +2259,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun qrPngResponse(session: IHTTPSession): Response {
         val text = session.parms["text"].orEmpty()
-        if (text.isEmpty()) return notFound()
+        if (text.isEmpty() || text.length > MAX_QR_TEXT_LENGTH) return notFound()
         val now = System.currentTimeMillis()
         val cached = qrCache[text]
         val bytes = if (cached != null && now - cached.first < QR_CACHE_TTL_MS) {
@@ -2340,12 +2355,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val FS_MEDIA_CACHE_MAX_ENTRIES = 50
         private const val DEFAULT_CHUNK_BYTES = 2L * 1024 * 1024
         private const val ZIP_CACHE_TTL_MS = 60_000L
+        private const val ZIP_CACHE_MAX = 8
+        private const val ZIP_CACHE_MAX_BYTES = 256L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
         private const val FS_STATS_TTL_MS = 10_000L
         private const val SSE_MIN_INTERVAL_MS = 1_000L
         private const val QR_CACHE_MAX = 8
         private const val QR_CACHE_TTL_MS = 300_000L
+        private const val MAX_QR_TEXT_LENGTH = 2_000
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu
         // koneksi hidup (dan fallback polling klien tidak ikut jalan).
         private const val SSE_HEARTBEAT_MS = 3_000L

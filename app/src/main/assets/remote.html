@@ -158,6 +158,7 @@ let mmCurrentToken = '';
 let mmLastSave = 0;
 let mmActiveToken = '';
 let mmSeekDrag = false;
+const MAX_VIDEO_POSITIONS = 100;
 document.getElementById('tabDownloads').addEventListener('click', function () {
 location.hash = '#/';
 });
@@ -209,7 +210,18 @@ try { localStorage.removeItem(vposKey(token)); } catch (e) {}
 delete galleryVideoPos[token];
 return;
 }
-try { localStorage.setItem(vposKey(token), JSON.stringify({ t: t, d: d })); } catch (e) {}
+try {
+if (localStorage.length >= MAX_VIDEO_POSITIONS) {
+for (let i = localStorage.length - 1; i >= 0; i--) {
+const key = localStorage.key(i);
+if (key && key !== vposKey(token) && key.indexOf('dm_vpos_') === 0 &&
+localStorage.length >= MAX_VIDEO_POSITIONS) {
+localStorage.removeItem(key);
+}
+}
+}
+localStorage.setItem(vposKey(token), JSON.stringify({ t: t, d: d }));
+} catch (e) {}
 galleryVideoPos[token] = t;
 }
 function loadVideoPos(token) {
@@ -1377,6 +1389,15 @@ if (file.webkitSlice) return file.webkitSlice(start, end);
 if (file.mozSlice) return file.mozSlice(start, end);
 throw new Error('this browser cannot read file content (Blob.slice unsupported)');
 }
+function randomUploadId() {
+const source = window.crypto || window.msCrypto;
+if (source && source.getRandomValues) {
+const bytes = new Uint8Array(16);
+source.getRandomValues(bytes);
+return Array.from(bytes, function (byte) { return byte.toString(36); }).join('');
+}
+return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
 function uploadFiles(files, path, statusEl, progressBox, progressText, progressPct, progressBar, done, listEl) {
 if (fsUploading) {
 if (statusEl) statusEl.textContent = 'Another upload is still running.';
@@ -1384,7 +1405,7 @@ return;
 }
 const jobs = Array.from(files).map(function (f) {
 const j = (f && f.file) ? f : { file: f, path: path };
-j.id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+j.id = randomUploadId();
 return j;
 });
 const total = jobs.length;

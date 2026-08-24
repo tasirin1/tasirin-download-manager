@@ -735,7 +735,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .setPositiveButton(R.string.save) { _, _ ->
                 val newName = input.text?.toString()?.trim().orEmpty()
                 if (newName.isNotEmpty() && newName != item.fileName) {
-                    App.engine.rename(item.id, newName)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        App.engine.rename(item.id, newName)
+                    }
                 }
             }
             .show()
