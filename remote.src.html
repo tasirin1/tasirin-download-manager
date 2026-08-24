@@ -680,6 +680,12 @@
   #mmCtrlRow {
  min-width: 0; position: relative; z-index: 1; display: flex; align-items: center; gap: 3px; color: #fff; }
 
+ #mmCtrl,
+ #mmCtrlRow,
+ #mmSeekWrap,
+ .mm-vol-group {
+ background: transparent !important; border: 0 !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
+
  #mmTimePanel {
  order: -1; flex: 1 1 auto; min-width: 0; padding-left: 6px; }
 
@@ -691,6 +697,10 @@
 
   #mmSeek {
  -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 24px; margin: 0; background: transparent; outline: none; }
+
+  #mmSeek,
+  .mm-vol {
+ border: 0 !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
 
   #mmSeek::-webkit-slider-runnable-track {
  height: 4px; border-radius: 999px; background: rgba(255,255,255,.28); }
