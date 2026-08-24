@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-24] — Rapikan kontrol pemutar video
+
+### Changed
+- **Control layout** — Jadikan tombol dan bar progress panel bawah yang lebih terstruktur, dengan target sentuh lebih stabil dan waktu video memakai ruang fleksibel.
+- **Progress slider** — Perbesar area geser, pertegas posisi putar, dan tambahkan gaya Firefox tanpa mengubah perilaku pemutar.
+
 ## [v1.0 — 2026-08-22] — Perbaikan hasil audit
 
 ### Fixed
