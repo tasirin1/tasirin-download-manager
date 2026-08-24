@@ -2,7 +2,6 @@ package com.tasirin.httpdownloadmanager.remote
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.core.net.toUri
@@ -82,21 +81,15 @@ internal fun generateThumb(
             raw.startsWith("f:") -> {
                 val file = File(raw.substring(2))
                 if (!file.isFile || !isFsPathAllowed(file.absolutePath)) return null
-                if (MediaLibrary.mediaKind(file.name) == "video") {
-                    videoThumb(ctx, path = file.absolutePath)
-                } else {
-                    imageThumb(ctx, path = file.absolutePath)
-                }
+                if (MediaLibrary.mediaKind(file.name) != "video") return null
+                videoThumb(ctx, path = file.absolutePath)
             }
             raw.startsWith("u:") -> {
                 val uri = raw.substring(2).toUri()
                 if (!isMediaUriAllowed(uri)) return null
                 val name = DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()
-                if (MediaLibrary.mediaKind(name) == "video") {
-                    videoThumb(ctx, uri = uri)
-                } else {
-                    imageThumb(ctx, uri = uri)
-                }
+                if (MediaLibrary.mediaKind(name) != "video") return null
+                videoThumb(ctx, uri = uri)
             }
             else -> null
         }
@@ -125,41 +118,4 @@ internal fun videoThumb(
     } finally {
         runCatching { mmr.release() }
     }
-}
-
-internal fun imageThumb(
-    ctx: Context,
-    path: String? = null,
-    uri: Uri? = null
-): Bitmap? {
-    return runCatching {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        if (path != null) {
-            BitmapFactory.decodeFile(path, bounds)
-        } else {
-            uri?.let {
-                ctx.contentResolver.openInputStream(it)?.use { s ->
-                    BitmapFactory.decodeStream(s, null, bounds)
-                }
-            }
-        }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= 480 &&
-            bounds.outHeight / (sample * 2) >= 480
-        ) {
-            sample *= 2
-        }
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        val bmp = if (path != null) {
-            BitmapFactory.decodeFile(path, opts)
-        } else {
-            uri?.let {
-                ctx.contentResolver.openInputStream(it)?.use { s ->
-                    BitmapFactory.decodeStream(s, null, opts)
-                }
-            }
-        } ?: return null
-        scaleDown(bmp, 480)
-    }.getOrNull()
 }

@@ -101,9 +101,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Cache durasi video galeri: metadata tidak berubah, jadi cukup di-hold
     // di memori agar tiap halaman tidak membuka file video berulang-ulang.
     @Volatile private var videoDurationsCache: JSONObject? = null
-    // Cache itemsJson berdasarkan signature: hemat GC saat polling 2x/detik.
-    @Volatile private var cachedItemsSignature = 0
-    @Volatile private var cachedItemsJson: JSONArray? = null
+    // Cache itemsJson berdasarkan signature; satu Pair agar sig & JSON tidak
+    // pernah terbaca sebagai versi campuran saat request server paralel.
+    @Volatile private var cachedItems: Pair<Int, JSONArray>? = null
     // Cache statusObject: jarang berubah (port, readOnly, versi).
     @Volatile private var cachedStatusJson: JSONObject? = null
     // Statistik folder dihitung paralel: listing folder dengan banyak subfolder
@@ -676,7 +676,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun itemsJson(): JSONArray {
         val items = App.engine.items.value
         val sig = itemsSignature(items)
-        cachedItemsJson?.let { if (cachedItemsSignature == sig) return it }
+        cachedItems?.let { (cachedSig, json) -> if (cachedSig == sig) return json }
         val arr = JSONArray()
         items.forEach { item ->
             val o = JSONObject()
@@ -695,8 +695,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             item.error?.let { o.put("error", it) }
             arr.put(o)
         }
-        cachedItemsSignature = sig
-        cachedItemsJson = arr
+        cachedItems = sig to arr
         return arr
     }
 
@@ -1520,17 +1519,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         galleryCache = null
     }
 
-    /** Hapus cache fsMedia hanya untuk path terkait (hemat RAM vs clear semua). */
-    private fun invalidateFsMediaCacheFor(path: String?) {
-        if (path == null) { fsMediaCache.clear(); return }
-        val normalized = path.trimEnd('/')
-        fsMediaCache.keys.removeAll { k -> k.isEmpty() || normalized.startsWith(k) || k.startsWith(normalized) }
+    /** Hapus cache MediaStore setelah perubahan file; cache kecil dan event
+     *  jarang, sementara pemetaan path fisik ke key relatif rawan salah. */
+    private fun invalidateFsMediaCache() {
+        fsMediaCache.clear()
     }
 
     /** Invalidate itemsJson cache saat daftar download berubah. */
     fun invalidateItemsCache() {
-        cachedItemsSignature = 0
-        cachedItemsJson = null
+        cachedItems = null
     }
 
     /** Invalidate fsRoots cache saat settings berubah. */
@@ -1922,7 +1919,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             "delete" -> runCatching {
                 val gone = if (file.isDirectory) file.deleteRecursively() else file.delete()
                 if (gone) {
-                    invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
+                    invalidateFsMediaCache()
                     invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath)
                 }
@@ -1934,7 +1931,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val target = File(file.parentFile, name)
                     val ok = file.renameTo(target)
                     if (ok) {
-                        invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
+                        invalidateFsMediaCache()
                         invalidateGalleryCache()
                         MediaLibrary.notifyMediaChanged(
                             context, file.absolutePath, target.absolutePath
@@ -1956,8 +1953,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val target = File(destDir, FileNames.safe(file.name))
                 if (target.exists()) return false
                 if (file.renameTo(target)) {
-                    invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
-                    invalidateFsMediaCacheFor(destDir.absolutePath)
+                    invalidateFsMediaCache()
                     invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     return true
@@ -1966,8 +1962,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 runCatching {
                     file.copyTo(target, overwrite = false)
                     file.delete()
-                    invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
-                    invalidateFsMediaCacheFor(destDir.absolutePath)
+                    invalidateFsMediaCache()
                     invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     true
@@ -1977,7 +1972,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (name.isBlank() || name.contains('/') || name.contains('\\') || name == ".." || name.contains("../") || name.contains("..\\")) return false
                 val created = runCatching { File(file, name).mkdirs() }.getOrDefault(false)
                 if (created) {
-                    invalidateFsMediaCacheFor(file.absolutePath)
+                    invalidateFsMediaCache()
                     invalidateGalleryCache()
                 }
                 created
@@ -2419,7 +2414,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     companion object {
-        private val REQUEST_SECRET_RE = Regex("([?&]?(?:token|pin)=)[^&]+")
+        private val REQUEST_SECRET_RE = Regex("([?&]?(?:token|pin|id)=)[^&]+")
         private const val SERVER_SOCKET_TIMEOUT_MS = 60_000
         private const val FS_PREFIX = "f:"
         private const val MS_PREFIX = "m:"

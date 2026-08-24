@@ -1528,7 +1528,6 @@ const ICONS = {
   next: '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M8 5v14l11-7z"/><path d="M17 4h2v16h-2z"/></svg>',
   replay: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>'
 };
-let mmType = 'video';
 let mmTimer = null;
 let mmTapTimer = null;
 let mmLastTouchEnd = 0;
@@ -1569,7 +1568,7 @@ function mmShowCtrl() {
   mmPlayerTop.classList.remove('hide');
   mmPlayer.classList.remove('mm-hide-cursor');
   clearTimeout(mmTimer);
-  if (mmType === 'video' && !mmVideo.paused && !mmEnded) {
+  if (!mmVideo.paused && !mmEnded) {
     mmTimer = setTimeout(mmHideCtrl, 3200);
   }
 }
@@ -1586,7 +1585,7 @@ function vposKey(token) {
 }
 
 function saveVideoPos(token) {
-  if (!token || mmType !== 'video') return;
+  if (!token) return;
   const d = mmVideo.duration || 0;
   const t = mmVideo.currentTime || 0;
   if (d <= 0) return;
@@ -3427,7 +3426,7 @@ function mmUpdateNavButtons() {
 }
 
 function mmStepVideo(delta) {
-  if (mmType !== 'video' || !mmVideoList.length) return;
+  if (!mmVideoList.length) return;
   const idx = mmTokenIdx(mmVideoList, mmCurrentToken);
   if (idx < 0) return;
   const next = idx + delta;
@@ -3440,9 +3439,7 @@ function mmStepVideo(delta) {
 }
 
 function openMedia(it, src, playlist) {
-  const prevType = mmType;
-  mmType = 'video';
-  if (prevType === 'video' && mmCurrentToken && mmCurrentToken !== it.token) {
+  if (mmCurrentToken && mmCurrentToken !== it.token) {
     saveVideoPos(mmCurrentToken);
   }
   mmCurrentToken = it.token;
@@ -3495,10 +3492,6 @@ function openMedia(it, src, playlist) {
 
 function renderRelated(current) {
   mmRelated.innerHTML = '';
-  if (mmType !== 'video') {
-    mmRelated.classList.add('hidden');
-    return;
-  }
   const idx = mmTokenIdx(mmVideoList, current.token);
   let others = [];
   if (idx >= 0) {
@@ -3610,13 +3603,12 @@ mmVol.addEventListener('input', function () {
 });
 
 mmSeekWrap.addEventListener('mousemove', function (e) {
-  if (mmType !== 'video') return;
   const rect = mmSeekWrap.getBoundingClientRect();
   const d = mmVideo.duration || 0;
   if (!d) return;
-  const usable = Math.max(0, rect.width - 12);
-  const x = Math.max(6, Math.min(e.clientX - rect.left, rect.width - 6));
-  mmSeekTip.textContent = mmFmtTime(((x - 6) / usable) * d);
+  const usable = Math.max(0, rect.width - 14);
+  const x = Math.max(7, Math.min(e.clientX - rect.left, rect.width - 7));
+  mmSeekTip.textContent = mmFmtTime(((x - 7) / usable) * d);
   mmSeekTip.style.left = x + 'px';
   mmSeekTip.classList.remove('hidden');
 });
@@ -3629,7 +3621,6 @@ document.addEventListener('keydown', function (e) {
   const tag = (e.target && e.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (e.target && e.target.closest && e.target.closest('button, input, select, textarea, a[href], [tabindex]')) return;
-  if (mmType !== 'video') return;
   const d = mmVideo.duration || 0;
   switch (e.code) {
     case 'Space': e.preventDefault(); mmTogglePlay(); break;
@@ -3737,7 +3728,6 @@ mmPlayer.addEventListener('touchend', function (e) {
   mmLastTouchEnd = Date.now();
   if (e.target.closest && e.target.closest('#mmCtrl, #mmTransport, #mmPlayerTop')) return;
   const ch = e.changedTouches[0];
-  if (mmType !== 'video') return;
   const w = window.innerWidth;
   const now = Date.now();
   const isDbl = now - mmTap.t < 320 &&

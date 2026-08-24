@@ -3,6 +3,11 @@
 ### Fixed
 - **CSRF guard** — Wajibkan header khusus pada seluruh POST remote kecuali login agar form lintas situs tidak bisa memicu aksi unduhan/upload/file.
 - **Video control surface** — Hapus latar pill, border, dan bayangan pada lapisan kontrol volume/durasi tanpa memindahkan tombol pemutar.
+- **Seek preview** — Samakan geometri preview durasi dengan ukuran titik pemutar yang baru.
+- **Thumbnail surface** — Batasi endpoint thumbnail ke video saja dan hapus decoder gambar sisa fitur foto.
+- **Cache race** — Satukan pasangan signature/JSON unduhan agar request paralel tidak bisa membaca versi campuran.
+- **Media cache invalidation** — Bersihkan cache MediaStore secara konsisten setelah file dipindah, dibuat, atau dihapus.
+- **Log hygiene** — Redaksi ID upload pada log permintaan agar ID sementara tidak tersalin sebagai capability.
 - **Video control size** — Perbesar tombol, bar durasi, dan bar volume secara proporsional agar target sentuh lebih nyaman.
 - **Form POST besar** — Tolak body di atas 4 MB sebelum dibaca dan paksa koneksi ditutup agar sisa body tidak meracuni request berikutnya.
 - **Login state** — Bersihkan entri throttle kedaluwarsa lebih awal agar percobaan login dari banyak IP tidak menetap sampai batas 512 entri.
