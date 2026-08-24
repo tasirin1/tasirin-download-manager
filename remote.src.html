@@ -2285,7 +2285,7 @@ function fsAppendRow(box, it) {
     if (streamBtn) {
       streamBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        window.open(API + '/api/media?token=' + encodeURIComponent(it.token), '_blank');
+        window.open(API + '/api/media?token=' + encodeURIComponent(it.token), '_blank', 'noopener,noreferrer');
       });
     }
     const moreBtn = row.querySelector('.fs-more-btn');
@@ -2605,7 +2605,7 @@ function openFsSheet(it) {
     b.textContent = a.label;
     b.addEventListener('click', function () {
       closeFsSheet();
-      if (a.stream) { window.open(a.stream, '_blank'); return; }
+      if (a.stream) { window.open(a.stream, '_blank', 'noopener,noreferrer'); return; }
       if (a.dl) { fsDownloadUrl(a.dl); return; }
       doFsOp(it, a.op);
     });
@@ -2652,7 +2652,7 @@ function openItemSheet(it) {
     b.textContent = a.label;
     b.addEventListener('click', function () {
       closeItemSheet();
-      if (a.stream) { window.open(a.stream, '_blank'); return; }
+      if (a.stream) { window.open(a.stream, '_blank', 'noopener,noreferrer'); return; }
       if (a.dl) { fsDownloadUrl(a.dl); return; }
       if (a.op === 'rename') {
         showInput('Rename', it.fileName, 'New name for this file', 'Save', function (name) {
@@ -3885,9 +3885,9 @@ var EMPTY_ICONS = {
 function emptyHtml(kind, title, sub, cta) {
   const ico = EMPTY_ICONS[kind] || EMPTY_ICONS.folder;
   return '<div class="empty"><span class="ico">' + ico + '</span>' +
-    '<div class="t">' + title + '</div>' +
-    (sub ? '<div class="s">' + sub + '</div>' : '') +
-    (cta ? '<div class="cta"><button type="button" class="pill primary">' + cta + '</button></div>' : '') +
+    '<div class="t">' + escapeHtml(title) + '</div>' +
+    (sub ? '<div class="s">' + escapeHtml(sub) + '</div>' : '') +
+    (cta ? '<div class="cta"><button type="button" class="pill primary">' + escapeHtml(cta) + '</button></div>' : '') +
     '</div>';
 }
 
@@ -4212,7 +4212,7 @@ document.getElementById('shareCopy').addEventListener('click', function () {
 });
 document.getElementById('shareOpen').addEventListener('click', function () {
   const link = document.getElementById('shareLink').value;
-  if (link) window.open(link, '_blank');
+  if (link) window.open(link, '_blank', 'noopener,noreferrer');
 });
 
 function globalAction(action) {

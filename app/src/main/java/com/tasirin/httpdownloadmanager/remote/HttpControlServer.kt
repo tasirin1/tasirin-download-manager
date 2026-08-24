@@ -793,7 +793,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         chunks: Int,
         length: Long
     ): Response {
-        val id = session.parms["id"]?.trim()?.take(64)?.takeIf { it.isNotEmpty() }
+        val id = session.parms["id"]?.trim()?.take(64)
+            ?.takeIf { ServerSecurity.isUploadIdAllowed(it) }
             ?: run {
                 drainBody(session)
                 return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id"))
@@ -819,11 +820,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     .put("error", "Chunk too large (max ${MAX_UPLOAD_MB} MB)")
             )
         }
-        if (App.engine.freeSpaceBytes() < length) {
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: not enough storage")
+        val bufferedUploadBytes = context.cacheDir.listFiles()
+            ?.filter { it.isFile && it.name.startsWith("up_") }
+            ?.sumOf { it.length() } ?: 0L
+        if (bufferedUploadBytes + length > MAX_UPLOAD_BUFFER_BYTES ||
+            App.engine.freeSpaceBytes() < bufferedUploadBytes + length
+        ) {
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: upload buffer/storage limit")
             return jsonResponse(
                 JSONObject().put("ok", false)
-                    .put("error", "Not enough storage for upload")
+                    .put("error", "Upload buffer or storage limit reached")
             )
         }
         val offset = session.parms["offset"]?.toLongOrNull()
@@ -1167,7 +1173,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun partialStreamSecret(): String =
-        StoragePrefs.storedPinHash(context).orEmpty().ifEmpty { context.packageName }
+        StoragePrefs.partialStreamSecret(context)
 
     private fun servePartial(session: IHTTPSession): Response {
         val id = session.uri.removePrefix("/stream_part/")
@@ -1183,8 +1189,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (item.segments.isNotEmpty()) {
             // Download segmen: gabungkan potongan yang sudah terunduh secara
             // berurutan agar tetap bisa distream (Range relatif ke gabungan).
+            val cleanName = FileNames.safe(item.fileName)
             val parts = item.segments.sortedBy { it.index }.mapNotNull { seg ->
-                File(File(context.filesDir, "downloads"), "${item.fileName}.part.${seg.index}")
+                File(File(context.filesDir, "downloads"), "$cleanName.part.${seg.index}")
                     .takeIf { it.isFile }
             }
             if (parts.isEmpty()) return notFound()
@@ -1198,7 +1205,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 download = false
             )
         }
-        val partial = File(File(context.filesDir, "downloads"), item.fileName + ".part")
+        val cleanName = FileNames.safe(item.fileName)
+        val partial = File(File(context.filesDir, "downloads"), "$cleanName.part")
         if (!partial.exists() || !partial.isFile) return notFound()
         return streamMedia(
             name = item.fileName,
@@ -1815,7 +1823,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val destDir = File(dest.removePrefix(FS_PREFIX))
                 if (!destDir.isDirectory || !isFsPathAllowed(destDir.absolutePath)) return false
                 if (file.parentFile?.absolutePath == destDir.absolutePath) return true
-                val target = File(destDir, file.name)
+                val target = File(destDir, FileNames.safe(file.name))
                 if (target.exists()) return false
                 if (file.renameTo(target)) {
                     invalidateFsMediaCacheFor(file.parentFile?.absolutePath)
@@ -2210,7 +2218,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         getOrCreateThumb(context, raw, ::isFsPathAllowed, ::isMediaUriAllowed)
     }
 
-    fun appendLog(message: String) = serverLog.append(message)
+    fun appendLog(message: String) = serverLog.append(message.replace(Regex("[\r\n\t]+"), " "))
 
     fun logVersion(): Long = serverLog.version()
 
@@ -2256,6 +2264,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val FS_PREFIX = "f:"
         private const val MS_PREFIX = "m:"
         private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024
+        private const val MAX_UPLOAD_BUFFER_BYTES = 2L * 1024 * 1024 * 1024
         private const val MAX_UPLOAD_MB = 2048
         private const val SHARE_TTL_HOURS = 24
         private const val PARTIAL_STREAM_TTL_MS = 60 * 60 * 1000L

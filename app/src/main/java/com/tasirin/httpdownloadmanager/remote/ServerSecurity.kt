@@ -7,6 +7,11 @@ import java.io.File
 /** Logika keamanan & validasi server remote yang murni (bisa diuji tanpa Android). */
 object ServerSecurity {
 
+    private val UPLOAD_ID_RE = Regex("^[A-Za-z0-9_-]{8,64}$")
+
+    /** ID internal upload hanya boleh token aman; larang separator dan traversal. */
+    fun isUploadIdAllowed(id: String): Boolean = UPLOAD_ID_RE.matches(id)
+
     /** Path dalam jangkauan root yang diizinkan (menangkal path traversal). */
     fun isPathAllowed(path: String, roots: List<File>): Boolean {
         if (path.isBlank()) return false

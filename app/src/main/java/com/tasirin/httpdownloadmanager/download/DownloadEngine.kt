@@ -150,7 +150,7 @@ class DownloadEngine(appContext: Context) {
         val cleanUrl = url.trim()
         if (cleanUrl.isEmpty()) return
         val customName = fileName?.trim().orEmpty()
-        val name = customName.ifEmpty { guessFileName(cleanUrl) }
+        val name = FileNames.safe(customName.ifEmpty { guessFileName(cleanUrl) })
         val item = DownloadItem(
             id = UUID.randomUUID().toString(),
             url = cleanUrl,
@@ -579,11 +579,12 @@ class DownloadEngine(appContext: Context) {
         fileName: String,
         item: DownloadItem
     ): FileSaver.PublishResult {
+        val cleanName = FileNames.safe(fileName)
         if (item.folderPath.isNotBlank()) {
-            return saver.publishToPath(partial, fileName, item.folderPath)
+            return saver.publishToPath(partial, cleanName, item.folderPath)
                 ?: throw IOException("Destination folder is invalid or not writable: ${item.folderPath}")
         }
-        return saver.publish(partial, fileName, item.destination)
+        return saver.publish(partial, cleanName, item.destination)
     }
 
     private fun organizeIfEnabled(
@@ -1481,12 +1482,7 @@ class DownloadEngine(appContext: Context) {
         return plain?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
     }
 
-    private fun sanitizeFileName(name: String): String {
-        // Pakai replace karakter, bukan regex [/\] yang error di regex ICU
-        // Android ("Missing closing bracket in character class").
-        val clean = name.replace('/', '_').replace('\\', '_').trim()
-        return clean.ifEmpty { "download" }
-    }
+    private fun sanitizeFileName(name: String): String = FileNames.safe(name)
 
     private fun ensureServiceRunning() {
         runCatching {

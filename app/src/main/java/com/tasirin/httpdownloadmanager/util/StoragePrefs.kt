@@ -2,7 +2,9 @@ package com.tasirin.httpdownloadmanager.util
 
 import android.content.Context
 import android.net.Uri
+import android.util.Base64
 import java.security.MessageDigest
+import java.security.SecureRandom
 import androidx.core.content.edit
 import androidx.core.net.toUri
 
@@ -46,6 +48,7 @@ object StoragePrefs {
     private const val KEY_READ_TIMEOUT_SEC = "read_timeout_sec"
     private const val KEY_COLLAPSED_SECTIONS = "collapsed_sections"
     private const val KEY_THUMB_CLEANUP_LAST = "thumb_cleanup_last"
+    private const val KEY_PARTIAL_STREAM_SECRET = "partial_stream_secret"
 
     /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
     fun isSectionCollapsed(context: Context, key: String): Boolean =
@@ -168,6 +171,20 @@ object StoragePrefs {
     fun pinMatches(context: Context, pin: String): Boolean {
         val expected = storedPinHash(context) ?: return false
         return constantEquals(sha256Hex(pin), expected)
+    }
+
+    /** Secret acak untuk tanda tangan URL stream parsial; tidak memakai nama package. */
+    @Synchronized
+    fun partialStreamSecret(context: Context): String {
+        prefs(context).getString(KEY_PARTIAL_STREAM_SECRET, null)?.takeIf { it.isNotEmpty() }?.let { return it }
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        val value = Base64.encodeToString(
+            bytes,
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+        )
+        prefs(context).edit { putString(KEY_PARTIAL_STREAM_SECRET, value) }
+        return value
     }
 
     fun isPinEnforced(context: Context): Boolean =

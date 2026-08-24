@@ -30,8 +30,9 @@ class FileSaver(context: Context) {
     )
 
     fun partialFile(fileName: String, segment: Int? = null): File {
+        val cleanName = FileNames.safe(fileName)
         val suffix = if (segment != null) ".part.$segment" else ".part"
-        return File(downloadDir, "$fileName$suffix")
+        return File(downloadDir, "$cleanName$suffix")
     }
 
     fun partialFiles(item: DownloadItem): List<File> {

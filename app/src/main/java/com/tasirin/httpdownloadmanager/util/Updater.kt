@@ -60,6 +60,7 @@ object Updater {
         val target = File(dir, "update-${info.versionCode}.apk")
         if (target.exists() && target.length() == info.apkSize) return target
 
+        if (!info.apkUrl.startsWith("https://", ignoreCase = true)) return null
         var url = info.apkUrl
         var redirects = 0
         while (redirects <= MAX_REDIRECTS) {
@@ -73,6 +74,7 @@ object Updater {
             if (code in 300..399) {
                 val loc = conn.getHeaderField("Location") ?: return null
                 conn.disconnect()
+                if (!loc.startsWith("https://", ignoreCase = true)) return null
                 url = loc
                 redirects++
                 continue

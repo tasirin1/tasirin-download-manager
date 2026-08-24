@@ -100,7 +100,7 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
   `pin_enforced`, `fs_full_access`, `server_read_only`, `max_concurrent`, `segments`,
   `speed_limit_kbps`, `max_retries`, `connect_timeout_sec`, `read_timeout_sec`,
   `small_first`, `delete_partial_on_cancel`, `recent_urls`, `sort_mode`,
-  `auto_sort`, `battery_exempt`, `collapsed_sections`, `thumb_cleanup_last`.
+  `auto_sort`, `battery_exempt`, `collapsed_sections`, `thumb_cleanup_last`, `partial_stream_secret`.
   Kunci galeri foto/video terpisah sudah tidak dipakai; scanner galeri sekarang video-only.
 
 ## Keputusan & larangan historis
@@ -151,6 +151,8 @@ kuat dan tanpa diskusi:
 | File Manager HTTP 500 setelah stop/start server | `stopServer()` men-shutdown `statPool`, tapi toggle server memakai instance yang sama → pool tetap `Terminated`, semua `statPool.submit()` lempar `RejectedExecutionException` (PR #91) | `liveStatPool()` membuat pool baru otomatis saat pool lama shutdown — jangan balikkan ke `statPool` langsung |
 | Video terhapus/terpindah masih muncul di galeri | MediaStore/API 5-9 dapat mempertahankan baris basi setelah perubahan langsung pada file fisik | `MediaLibrary.isMediaEntryReadable` wajib memvalidasi `DATA` sebelum entry MediaStore ditampilkan |
 | Startup jank / server race saat Application dimulai | scan orphan, cache cleanup, bind/retry socket, atau stop-start dipanggil serentak dari main thread | I/O startup lewat background; `startServer`/`stopServer` synchronized-idempotent — jangan panggil langsung di `onCreate` UI |
+| Upload temporary file traversal | ID upload dari query dipakai langsung pada nama file cache | `ServerSecurity.isUploadIdAllowed()` wajib memvalidasi ID sebelum peta status/file tmp dipakai |
+| Token stream parsial bisa ditebak | secret memakai hash PIN/package name | Secret parsial wajib acak 256-bit dan persisten lewat `StoragePrefs.partialStreamSecret()` |
 | `GALLERY SCAN` berulang tiap request galeri | cache scan dianggap "belum lengkap" karena `items.size >= limit` gagal saat total file < limit → scan MediaStore penuh berulang dalam masa TTL | kondisi cache juga menerima scan tuntas: `items.size == total` (di `MediaLibrary.scanCached` + `scannedGallery`) |
 | Checksum dari header server salah di-parse (Digest/Content-MD5/X-Checksum-*) | base64 vs hex, huruf besar/kecil, preferensi sha-256 | unit test `ChecksumsTest` — format output wajib "algo:hex" huruf kecil (dipahami `parseChecksum` engine) |
 | Tujuan tulis remote keluar root | validasi lama hanya cek prefix `f:` | gunakan `ServerSecurity.isRemoteDestinationAllowed(folderPath, allowedFsRoots())` untuk semua tujuan download/upload |

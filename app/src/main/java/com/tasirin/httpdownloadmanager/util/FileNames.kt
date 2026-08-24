@@ -11,4 +11,8 @@ object FileNames {
         while (taken("$base ($i)$ext")) i++
         return "$base ($i)$ext"
     }
+
+    fun safe(fileName: String): String {
+        return fileName.replace('/', '_').replace('\\', '_').trim().ifEmpty { "download" }
+    }
 }

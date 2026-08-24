@@ -1,3 +1,15 @@
+## [v1.0 — 2026-08-24] — Perbaikan audit keamanan
+
+### Fixed
+- **Upload path traversal** — Validasi ID upload menjadi token ketat agar file sementara tidak bisa ditulis keluar cache melalui `../`.
+- **Partial stream secret** — Ganti secret token yang bisa ditebak dengan secret acak 256-bit yang disimpan lokal.
+- **Download filename** — Sanitasi nama kustom sejak item dibuat dan validasi ulang file parsial sebagai defense in depth.
+- **Log injection** — Normalisasi control character pada log server agar parameter tidak bisa membuat baris log palsu.
+- **Updater transport** — Wajibkan HTTPS pada URL APK dan redirect update.
+- **Remote XSS hardening** — Escape teks empty-state dan tambahkan `noopener,noreferrer` pada tab eksternal.
+- **Upload exhaustion** — Batasi total file upload sementara berdasarkan buffer dan ruang kosong yang tersedia.
+- **Legacy filename safety** — Validasi ulang nama lama pada stream parsial dan operasi pindah file.
+
 ## [v1.0 — 2026-08-24] — Samakan gaya pemutar dengan YouTube
 
 ### Changed

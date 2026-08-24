@@ -6,6 +6,12 @@ import org.junit.Test
 class FileNamesTest {
 
     @Test
+    fun `safe - membuang traversal dan separator`() {
+        assertEquals("___rahasia.txt", FileNames.safe("../..\\rahasia.txt"))
+        assertEquals("download", FileNames.safe("   "))
+    }
+
+    @Test
     fun `unique - nama bebas tidak diubah`() {
         val result = FileNames.unique("video.mp4") { false }
         assertEquals("video.mp4", result)

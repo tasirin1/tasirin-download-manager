@@ -80,6 +80,17 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun isUploadIdAllowed_menolakSeparatorDanTraversal() {
+        assertTrue(ServerSecurity.isUploadIdAllowed("Abcdef1234567890"))
+        assertTrue(ServerSecurity.isUploadIdAllowed("safe-upload_id-123"))
+        assertFalse(ServerSecurity.isUploadIdAllowed("../../etc/passwd"))
+        assertFalse(ServerSecurity.isUploadIdAllowed("a/b/c"))
+        assertFalse(ServerSecurity.isUploadIdAllowed("a\\b"))
+        assertFalse(ServerSecurity.isUploadIdAllowed("short"))
+        assertFalse(ServerSecurity.isUploadIdAllowed(""))
+    }
+
+    @Test
     fun isChunkOffsetAllowed_boundary() {
         val max = 50L * 1024 * 1024
         assertTrue(ServerSecurity.isChunkOffsetAllowed(0, max))
