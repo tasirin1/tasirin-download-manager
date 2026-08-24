@@ -623,20 +623,20 @@
  }
 
   #mmToast {
- position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,.72); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; pointer-events: none; }
+ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: transparent; color: #fff; padding: 0; border-radius: 8px; font-size: 12.5px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.75); pointer-events: none; }
 
   #mmTransport {
- position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 18px; pointer-events: none; transition: opacity .22s ease, visibility .22s ease; }
+ position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 14px; pointer-events: none; transition: opacity .22s ease, visibility .22s ease; }
 
   #mmCtrl.hidden ~ #mmTransport,
   #mmCtrl.hide ~ #mmTransport {
  opacity: 0; visibility: hidden; }
 
   #mmTransport button {
- pointer-events: auto; width: 48px; height: 48px; border: 0; border-radius: 50%; background: rgba(18,18,20,.56); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); transition: background-color .15s ease, transform .15s ease, opacity .15s ease; }
+ pointer-events: auto; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color .15s ease, transform .15s ease, opacity .15s ease; }
 
   #mmTransport button:hover {
- background: rgba(37,150,255,.82); transform: scale(1.05); }
+ background: rgba(37,150,255,.25); transform: scale(1.04); }
 
   #mmTransport button:focus-visible {
  outline: 2px solid #fff; outline-offset: -2px; }
@@ -645,16 +645,16 @@
  opacity: .35; pointer-events: none; }
 
   #mmPlayBtn {
- width: 62px !important; height: 62px !important; background: rgba(18,18,20,.66) !important; box-shadow: 0 10px 28px rgba(0,0,0,.34); }
+ width: 52px !important; height: 52px !important; }
 
   #mmTransport button svg {
- width: 22px; height: 22px; }
+ width: 18px; height: 18px; filter: drop-shadow(0 1px 4px rgba(0,0,0,.65)); }
 
   #mmPlayBtn svg {
- width: 27px; height: 27px; }
+ width: 22px; height: 22px; }
 
   #mmPlayerTop {
- position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: 10px 14px 34px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); background: linear-gradient(rgba(0,0,0,.72), transparent); pointer-events: none; transition: opacity .22s ease, visibility .22s ease; }
+ position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 7px; padding: 8px 12px 30px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); background: transparent; pointer-events: none; transition: opacity .22s ease, visibility .22s ease; }
 
   #mmPlayerTop.hide {
  opacity: 0; visibility: hidden; }
@@ -663,16 +663,16 @@
  pointer-events: none; }
 
  #mmPlayerTop button {
- pointer-events: auto; flex: 0 0 auto; width: 38px; height: 38px; border: 0; border-radius: 50%; background: rgba(18,18,20,.58); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+ pointer-events: auto; flex: 0 0 auto; width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
   #mmPlayerTop button:hover {
  background: rgba(255,255,255,.18); }
 
  #mmOverlayTitle {
- flex: 1; min-width: 0; color: #fff; font-size: 13.5px; font-weight: 600; line-height: 1.3; text-shadow: 0 1px 4px rgba(0,0,0,.5); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+ flex: 1; min-width: 0; color: #fff; font-size: 12px; font-weight: 600; line-height: 1.3; text-shadow: 0 1px 5px rgba(0,0,0,.7); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
   #mmCtrl {
- position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column-reverse; padding: 46px 10px calc(7px + env(safe-area-inset-bottom, 0px)); padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.68) 42%, rgba(0,0,0,.9)); transition: opacity .22s ease, visibility .22s ease; }
+ position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column-reverse; padding: 38px 8px calc(5px + env(safe-area-inset-bottom, 0px)); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); background: transparent; transition: opacity .22s ease, visibility .22s ease; }
 
   #mmCtrl.hide {
  opacity: 0; visibility: hidden; pointer-events: none; }
@@ -684,13 +684,13 @@
  order: -1; flex: 1 1 auto; min-width: 0; padding-left: 6px; }
 
   #mmSeekWrap {
- position: relative; z-index: 0; width: auto; height: 28px; margin: -3px 0 -1px; display: flex; align-items: center; }
+ position: relative; z-index: 0; width: auto; height: 24px; margin: -2px 0 -1px; display: flex; align-items: center; }
 
   #mmBuf {
  position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 4px; border-radius: 999px; background: rgba(255,255,255,.26); pointer-events: none; transition: height .16s ease; }
 
   #mmSeek {
- -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 26px; margin: 0; background: transparent; }
+ -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 24px; margin: 0; background: transparent; }
 
   #mmSeek::-webkit-slider-runnable-track {
  height: 4px; border-radius: 999px; background: linear-gradient(to right, #2596ff var(--fill, 0%), rgba(255,255,255,.24) var(--fill, 0%)); }
@@ -708,10 +708,10 @@
  width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(37,150,255,.32), 0 2px 8px rgba(0,0,0,.38); }
 
   #mmCtrlRow button {
- flex: 0 0 auto; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color .15s ease, opacity .15s ease; }
+ flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color .15s ease, opacity .15s ease; }
 
   #mmCtrlRow button:focus-visible, #mmPlayerTop button:focus-visible {
- outline: 2px solid #fff; outline-offset: -2px; background: rgba(0,0,0,.72); box-shadow: 0 0 0 2px rgba(0,0,0,.85); }
+ outline: 2px solid #fff; outline-offset: -2px; background: rgba(255,255,255,.16); }
 
  #mmCtrlRow button:hover {
  background: rgba(255,255,255,.15); }
@@ -720,7 +720,7 @@
  opacity: .35; pointer-events: none; }
 
   #mmTime {
- display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12.5px; font-weight: 500; letter-spacing: .2px; color: #fff; font-variant-numeric: tabular-nums; }
+ display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 500; letter-spacing: .2px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.65); font-variant-numeric: tabular-nums; }
 
  .mm-side {
  min-width: 0; display: flex; align-items: center; gap: 2px; margin-left: auto; }
@@ -740,13 +740,13 @@
  box-shadow: 0 0 0 7px rgba(37,150,255,.24), 0 3px 10px rgba(0,0,0,.42); }
 
   #mmSeekTip {
- position: absolute; bottom: 27px; left: 0; transform: translateX(-50%); background: rgba(18,18,20,.88); color: #fff; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 7px; pointer-events: none; white-space: nowrap; z-index: 3; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+ position: absolute; bottom: 24px; left: 0; transform: translateX(-50%); background: transparent; color: #fff; font-size: 10.5px; font-weight: 700; padding: 0; border-radius: 7px; pointer-events: none; white-space: nowrap; z-index: 3; text-shadow: 0 1px 5px rgba(0,0,0,.75); }
 
   .mm-vol-group {
- display: flex; align-items: center; flex: 0 0 auto; border-radius: 999px; background: rgba(255,255,255,.08); }
+ display: flex; align-items: center; flex: 0 0 auto; border-radius: 999px; background: transparent; }
 
   .mm-vol {
- -webkit-appearance: none; appearance: none; width: 52px; height: 30px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
+ -webkit-appearance: none; appearance: none; width: 64px; height: 24px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
 
   @media (hover: hover) {
     .mm-vol {
@@ -759,7 +759,7 @@
 
     .mm-vol-group:hover .mm-vol,
     .mm-vol-group:focus-within .mm-vol {
-      width: 68px;
+      width: 96px;
       margin-left: 2px;
       opacity: 1;
       overflow: visible;
@@ -767,10 +767,10 @@
   }
 
   .mm-vol::-webkit-slider-runnable-track {
- height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.32) var(--vol, 100%)); }
+ height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.34) var(--vol, 100%)); }
 
   .mm-vol::-webkit-slider-thumb {
- -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.45); margin-top: -4px; transition: transform .12s ease; }
+ -webkit-appearance: none; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); margin-top: -3px; transition: transform .12s ease; }
 
   .mm-vol-group:hover .mm-vol::-webkit-slider-thumb,
   .mm-vol-group:focus-within .mm-vol::-webkit-slider-thumb {
@@ -787,27 +787,27 @@
  height: 3px; border-radius: 999px; background: #fff; }
 
   .mm-vol::-moz-range-thumb {
- width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+ width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
 
   #mmPlayer.mm-hide-cursor {
  cursor: none; }
 
  @media (max-width: 430px), (max-height: 380px) {
- #mmCtrlRow { gap: 1px; }
+ #mmCtrlRow { gap: 0; }
  #mmCtrl { padding-left: 7px; padding-right: 7px; }
- .mm-vol { width: 44px; margin-left: 0; opacity: 1; overflow: visible; }
+ .mm-vol { width: 56px; height: 22px; margin-left: 0; opacity: 1; overflow: visible; }
   }
 
  @media (max-width: 360px) {
- #mmCtrlRow button { width: 36px; height: 36px; }
- #mmPlayerTop button { width: 33px; height: 33px; }
- #mmMuteBtn { width: 33px; height: 33px; }
- #mmFsBtn { width: 33px; height: 33px; }
- #mmTransport { gap: 12px; }
- #mmTransport button { width: 42px; height: 42px; }
- #mmPlayBtn { width: 54px !important; height: 54px !important; }
- .mm-vol { width: 38px; height: 28px; margin-left: 0; opacity: 1; overflow: visible; }
- #mmTime { font-size: 10.5px; }
+ #mmCtrlRow button { width: 30px; height: 30px; }
+ #mmPlayerTop button { width: 28px; height: 28px; }
+ #mmMuteBtn { width: 30px; height: 30px; }
+ #mmFsBtn { width: 30px; height: 30px; }
+ #mmTransport { gap: 10px; }
+ #mmTransport button { width: 34px; height: 34px; }
+ #mmPlayBtn { width: 44px !important; height: 44px !important; }
+ .mm-vol { width: 48px; height: 20px; margin-left: 0; opacity: 1; overflow: visible; }
+ #mmTime { font-size: 9.5px; }
   }
 
   .hidden {
