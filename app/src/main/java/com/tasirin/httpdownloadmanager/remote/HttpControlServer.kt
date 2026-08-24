@@ -1069,15 +1069,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 expired
             }
             var totalBytes = zipCache.values.sumOf { it.second.length() }
-            val oldest = zipCache.entries.sortedBy { it.value.first }.iterator()
-            while (oldest.hasNext() &&
-                (zipCache.size > ZIP_CACHE_MAX || totalBytes > ZIP_CACHE_MAX_BYTES)
-            ) {
-                val entry = oldest.next()
+            val oldest = zipCache.entries.sortedBy { it.value.first }
+            for (entry in oldest) {
+                if (zipCache.size <= ZIP_CACHE_MAX && totalBytes <= ZIP_CACHE_MAX_BYTES) break
                 if (entry.key == keepKey && zipCache.size == 1) continue
+                if (!zipCache.remove(entry.key, entry.value)) continue
                 val file = entry.value.second
                 val size = file.length()
-                oldest.remove()
                 runCatching { file.delete() }
                 totalBytes -= size
             }
