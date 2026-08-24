@@ -13,14 +13,32 @@ import com.tasirin.httpdownloadmanager.util.scaleDown
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /** Thumbnail generation & caching — di-extract dari HttpControlServer supaya
  *  file utama tidak terlalu panjang. Semua fungsi menerima [ctx] (app context)
  *  dan lambdas untuk mengecek izin akses file/URI. */
 
+private class ThumbLock {
+    val lastUse = AtomicLong(System.currentTimeMillis())
+}
+
 /** Satu lock per media mencegah banyak permintaan thumbnail awal men-decode
- *  video yang sama secara paralel (hemat CPU/RAM di device Android 5+). */
-private val thumbLocks = ConcurrentHashMap<String, Any>()
+ *  video yang sama secara paralel (hemat CPU/RAM di device Android 5+).
+ *  Lock tidak aktif dibuang agar browsing ribuan media tidak menumpuk RAM. */
+private val thumbLocks = ConcurrentHashMap<String, ThumbLock>()
+
+private fun thumbLockFor(key: String): ThumbLock {
+    val now = System.currentTimeMillis()
+    if (thumbLocks.size > 512) {
+        val cutoff = thumbLocks.values
+            .map { it.lastUse.get() }
+            .sorted()
+            .getOrNull(thumbLocks.size / 2) ?: now
+        thumbLocks.entries.removeIf { it.value.lastUse.get() < cutoff }
+    }
+    return thumbLocks.getOrPut(key) { ThumbLock() }.also { it.lastUse.set(now) }
+}
 
 internal fun getOrCreateThumb(
     ctx: Context,
@@ -32,7 +50,7 @@ internal fun getOrCreateThumb(
     val dir = File(ctx.cacheDir, "thumbs").apply { runCatching { mkdirs() } }
     if (!dir.isDirectory) return null
     val cached = File(dir, "$key.jpg")
-    val lock = thumbLocks.getOrPut(key) { Any() }
+    val lock = thumbLockFor(key)
     return synchronized(lock) {
         if (cached.isFile && cached.length() > 0) {
             cached
@@ -50,7 +68,7 @@ internal fun getOrCreateThumb(
                 cached
             }.getOrNull()
         }
-    }
+    }.also { lock.lastUse.set(System.currentTimeMillis()) }
 }
 
 internal fun generateThumb(

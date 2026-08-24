@@ -76,6 +76,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var sseLastPayload = ""
     @Volatile private var sseLastPushAt = 0L
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
+    private val shareLock = Any()
     @Volatile private var galleryCache: Pair<Long, MediaLibrary.MediaScanResult>? = null
     private val loginAttempts = ConcurrentHashMap<String, LoginAttempt>()
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Pair<Int, Long>>>()
@@ -708,7 +709,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun handleUpload(session: IHTTPSession): Response {
         if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
-        val name = session.parms["name"]?.trim()
+        val name = session.parms["name"]?.trim()?.filterNot { it.isISOControl() }?.take(180)
             ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")?.replace("..", "_")
             ?.takeIf { it.isNotEmpty() }
             ?: "upload_${System.currentTimeMillis()}"
@@ -1101,9 +1102,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         null
     }
 
+    /** Token media wajib melewati validasi yang sama dengan endpoint stream:
+     * client tidak boleh membungkus path/URI sembarang menjadi token ZIP. */
+    private fun isMediaTokenAllowed(token: String): Boolean {
+        val raw = MediaLibrary.decodeToken(token) ?: return false
+        return when {
+            raw.startsWith(FS_PREFIX) -> isFsPathAllowed(raw.removePrefix(FS_PREFIX))
+            raw.startsWith("u:") -> isMediaUriAllowed(raw.substring(2).toUri())
+            else -> false
+        }
+    }
+
     private fun mediaZip(session: IHTTPSession): Response {
-        val tokens = session.parms["tokens"].orEmpty().split(",").filter { it.isNotBlank() }.toMutableList()
+        val requestedTokens = session.parms["tokens"].orEmpty()
+            .split(",").filter { it.isNotBlank() }.distinct()
         val paths = session.parms["paths"].orEmpty().split(",").filter { it.isNotBlank() }
+        if (requestedTokens.size + paths.size > MAX_MEDIA_ZIP_TOKENS) return notFound()
+        val tokens = requestedTokens.filter(::isMediaTokenAllowed).toMutableList()
         if (tokens.isEmpty() && paths.isEmpty()) return notFound()
         paths.forEach { p ->
             if (p.startsWith(FS_PREFIX)) {
@@ -1113,6 +1128,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
             }
         }
+        val uniqueTokens = tokens.distinct()
+        tokens.clear()
+        tokens.addAll(uniqueTokens)
         if (tokens.isEmpty()) return notFound()
         val key = "tokens:" + tokens.sorted().joinToString(",")
         val tmp = zipCached(key) {
@@ -2205,9 +2223,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val item = App.engine.items.value.find {
             it.id == id && it.state == DownloadState.COMPLETED
         } ?: return jsonResponse(JSONObject().put("ok", false).put("error", "file not found"))
-        pruneShares()
+        synchronized(shareLock) { pruneShares() }
         val token = UUID.randomUUID().toString().replace("-", "")
-        shareTokens[token] = ShareEntry(item.id, System.currentTimeMillis() + SHARE_TTL_MS)
+        val expiresAt = System.currentTimeMillis() + SHARE_TTL_MS
+        synchronized(shareLock) {
+            while (shareTokens.size >= MAX_SHARE_TOKENS) {
+                val oldest = shareTokens.entries.minByOrNull { it.value.expiresAt } ?: break
+                shareTokens.remove(oldest.key)
+            }
+            shareTokens[token] = ShareEntry(item.id, expiresAt)
+        }
         appendLog("SHARE CREATED: ${item.fileName} (valid for $SHARE_TTL_HOURS hours)")
         return jsonResponse(
             JSONObject().put("ok", true)
@@ -2223,6 +2248,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (ServerSecurity.isShareExpired(iter.next().value.expiresAt, now)) iter.remove()
         }
     }
+
 
     private fun serveShare(session: IHTTPSession): Response {
         val token = session.uri.removePrefix("/share/").trim()
@@ -2362,6 +2388,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val ZIP_CACHE_MAX_BYTES = 256L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
+        private const val MAX_SHARE_TOKENS = 256
+        private const val MAX_MEDIA_ZIP_TOKENS = 256
         private const val FS_STATS_TTL_MS = 10_000L
         private const val SSE_MIN_INTERVAL_MS = 1_000L
         private const val QR_CACHE_MAX = 8

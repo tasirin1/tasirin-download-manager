@@ -102,6 +102,8 @@ let gallerySentinel = null;
 let galleryPage = 0;
 let galleryHasMore = false;
 let gallerySeq = 0;
+let galleryLoading = false;
+let galleryLoadTicket = 0;
 let galSelectMode = false;
 const galSelected = new Set();
 const galBatch = document.getElementById('galBatch');
@@ -325,6 +327,16 @@ mmUnlockOrientation();
 }
 });
 async function loadGallery(reset) {
+const ticket = ++galleryLoadTicket;
+if (!reset && galleryLoading) return;
+galleryLoading = true;
+try {
+await loadGalleryRequest(reset);
+} finally {
+if (ticket === galleryLoadTicket) galleryLoading = false;
+}
+}
+async function loadGalleryRequest(reset) {
 const seq = ++gallerySeq;
 if (reset) showGallerySkeleton();
 try {

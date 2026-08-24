@@ -85,6 +85,16 @@ class DownloadEngine(appContext: Context) {
     // newKeySet() baru ada API 24; pakai setFromMap agar aman di Android 5 (API 21).
     private val failedUrls = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
 
+    private fun rememberFailedUrl(url: String) {
+        failedUrls.add(url)
+        if (failedUrls.size <= 256) return
+        val iterator = failedUrls.iterator()
+        if (iterator.hasNext()) {
+            iterator.next()
+            iterator.remove()
+        }
+    }
+
     private val connectTimeoutMs: Int
         get() = StoragePrefs.getConnectTimeoutSec(context) * 1000
 
@@ -608,7 +618,7 @@ class DownloadEngine(appContext: Context) {
         val attempts = (retryAttempts[id] ?: 0) + 1
         val rangeRejected = message?.contains("does not support Range") == true
         val slowRejected = isSlowError(message)
-        failedUrls.add(item.url)
+        rememberFailedUrl(item.url)
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
         // Bila host GitHub tak terjangkau, buat mirror proxy otomatis.
         val autoMirrors = if (item.mirrors.isEmpty() &&
@@ -1050,7 +1060,7 @@ class DownloadEngine(appContext: Context) {
                 // Server/proxy menolak Range (mis. proxy transparan ISP): semua
                 // percobaan Range akan gagal selamanya, jadi buang segmen lalu
                 // unduh sekali jalan tanpa Range (partial lama ikut dibuang).
-                failedUrls.add(item.url)
+                rememberFailedUrl(item.url)
                 App.logEvent(
                     "DOWNLOAD ${item.fileName}: Range rejected (${e.message}), " +
                         "downloading again in one pass"

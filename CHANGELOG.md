@@ -1,3 +1,12 @@
+## [v1.0 — 2026-08-24] — Audit resource dan ZIP token
+
+### Fixed
+- **ZIP authorization** — Validasi ulang semua token media pada endpoint batch ZIP agar path/URI buatan tidak bisa melewati root yang diizinkan.
+- **Share limits** — Batasi jumlah tautan berbagi aktif dan kunci pembaruannya untuk mencegah penumpukan token.
+- **Thumbnail locks** — Evict lock thumbnail yang tidak aktif supaya browsing galeri besar tidak menambah penggunaan RAM terus-menerus.
+- **Gallery requests** — Cegah scroll memicu banyak request load-more paralel di remote web.
+- **Failed URL cache** — Batasi daftar URL gagal per sesi agar banyak item gagal tidak tumbuh tanpa batas.
+
 ## [v1.0 — 2026-08-24] — System audit bug dan keamanan
 
 ### Added
