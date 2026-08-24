@@ -1,3 +1,12 @@
+## [v1.0 — 2026-08-24] — Tampilkan volume pemutar biasa
+
+### Fixed
+- **Player volume** — Slider volume tidak lagi hilang pada mode non-fullscreen dan kini selalu tersedia di samping bar progress.
+- **Volume feedback** — Tambahkan indikator isi slider dan dukungan gaya Firefox tanpa mengubah kontrol keyboard.
+
+### Changed
+- **Control hierarchy** — Pisahkan volume dari tombol utama agar baris kontrol lebih lega di layar kecil dan TV.
+
 ## [v1.0 — 2026-08-24] — Rapikan kontrol pemutar video
 
 ### Changed

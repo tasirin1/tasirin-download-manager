@@ -658,8 +658,11 @@
   #mmCtrl.hide {
  opacity: 0; visibility: hidden; pointer-events: none; }
 
+  #mmSeekRow {
+ display: flex; align-items: center; gap: 6px; }
+
   #mmSeekWrap {
- position: relative; height: 28px; margin: 0 1px 2px; display: flex; align-items: center; }
+ position: relative; flex: 1 1 auto; min-width: 0; height: 28px; margin: 0; display: flex; align-items: center; }
 
   #mmBuf {
  position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 5px; border-radius: 999px; background: rgba(255,255,255,.42); pointer-events: none; }
@@ -716,13 +719,22 @@
  position: absolute; bottom: 9px; left: 0; transform: translateX(-50%); background: rgba(0,0,0,.82); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; pointer-events: none; white-space: nowrap; z-index: 3; }
 
   .mm-vol {
- -webkit-appearance: none; appearance: none; width: 54px; height: 26px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; }
+ -webkit-appearance: none; appearance: none; width: 58px; height: 28px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
 
   .mm-vol::-webkit-slider-runnable-track {
- height: 4px; border-radius: 999px; background: rgba(255,255,255,.35); }
+ height: 5px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.32) var(--vol, 100%)); }
 
   .mm-vol::-webkit-slider-thumb {
- -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; margin-top: -4px; }
+ -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.35); margin-top: -4px; }
+
+  .mm-vol::-moz-range-track {
+ height: 5px; border-radius: 999px; background: rgba(255,255,255,.32); }
+
+  .mm-vol::-moz-range-progress {
+ height: 5px; border-radius: 999px; background: #fff; }
+
+  .mm-vol::-moz-range-thumb {
+ width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
 
   #mmSpeedBtn {
  min-width: 38px; height: 38px; padding: 0 3px; font-size: 12px; font-weight: 700; }
@@ -740,7 +752,6 @@
  flex: 1; }
 
   @media (max-width: 430px), (max-height: 380px) {
- .mm-vol { display: none; }
  #mmCtrlRow { gap: 3px; }
   }
 
@@ -750,6 +761,7 @@
  #mmCtrlRow button { width: 34px; height: 34px; border-radius: 10px; }
  #mmSpeedBtn { min-width: 34px; height: 34px; }
  #mmAutoBtn { height: 34px; padding: 0 5px; }
+ .mm-vol { width: 44px; }
  #mmTime { font-size: 10px; }
   }
 
@@ -1230,9 +1242,12 @@
       <div id="mmToast" class="hidden"></div>
       <div id="mmSeekTip" class="hidden"></div>
       <div id="mmCtrl" class="hidden">
-        <div id="mmSeekWrap">
-          <div id="mmBuf"></div>
-          <input id="mmSeek" type="range" min="0" max="1000" value="0" step="1">
+        <div id="mmSeekRow">
+          <div id="mmSeekWrap">
+            <div id="mmBuf"></div>
+            <input id="mmSeek" type="range" min="0" max="1000" value="0" step="1">
+          </div>
+          <input id="mmVol" class="mm-vol" type="range" min="0" max="100" value="100" title="Volume">
         </div>
         <div id="mmCtrlRow">
           <button id="mmPlayBtn" type="button" title="Play or pause"></button>
@@ -1243,7 +1258,6 @@
           <button id="mmSpeedBtn" type="button" title="Playback speed">1&#215;</button>
           <button id="mmAutoBtn" type="button" title="Auto-play next video" aria-pressed="true">AUTO</button>
           <button id="mmMuteBtn" type="button"></button>
-          <input id="mmVol" class="mm-vol" type="range" min="0" max="100" value="100" title="Volume">
           <button id="mmFsBtn" type="button"></button>
         </div>
       </div>
@@ -3449,7 +3463,9 @@ function mmVolBy(d) {
   mmShowCtrl();
 }
 function mmSyncVol() {
-  mmVol.value = Math.round((mmVideo.muted ? 0 : mmVideo.volume) * 100);
+  const percent = Math.round((mmVideo.muted ? 0 : mmVideo.volume) * 100);
+  mmVol.value = percent;
+  mmVol.style.setProperty('--vol', percent + '%');
   mmMuteBtn.innerHTML = (mmVideo.muted || mmVideo.volume === 0) ? ICONS.mute : ICONS.sound;
 }
 function mmUpdateAutoBtn() {
