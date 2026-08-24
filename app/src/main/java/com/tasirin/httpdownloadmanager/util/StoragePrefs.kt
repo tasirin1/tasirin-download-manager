@@ -49,6 +49,7 @@ object StoragePrefs {
     private const val KEY_COLLAPSED_SECTIONS = "collapsed_sections"
     private const val KEY_THUMB_CLEANUP_LAST = "thumb_cleanup_last"
     private const val KEY_PARTIAL_STREAM_SECRET = "partial_stream_secret"
+    private const val KEY_SERVER_SESSION_SECRET = "server_session_secret"
 
     /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
     fun isSectionCollapsed(context: Context, key: String): Boolean =
@@ -153,6 +154,7 @@ object StoragePrefs {
     /** Simpan PIN sebagai hash SHA-256; nilai kosong menghapus PIN. */
     fun setServerPin(context: Context, pin: String?) {
         val hash = pin?.trim()?.takeIf { it.isNotEmpty() }?.let { sha256Hex(it) }
+        rotateServerSessionSecret(context)
         prefs(context).edit {
             putString(KEY_SERVER_PIN, hash)
         }
@@ -184,6 +186,25 @@ object StoragePrefs {
             Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
         )
         prefs(context).edit { putString(KEY_PARTIAL_STREAM_SECRET, value) }
+        return value
+    }
+
+    /** Cookie sesi remote harus token acak, bukan turunan langsung dari PIN. */
+    @Synchronized
+    fun serverSessionSecret(context: Context): String {
+        prefs(context).getString(KEY_SERVER_SESSION_SECRET, null)?.takeIf { it.isNotEmpty() }?.let { return it }
+        return rotateServerSessionSecret(context)
+    }
+
+    @Synchronized
+    fun rotateServerSessionSecret(context: Context): String {
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        val value = Base64.encodeToString(
+            bytes,
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+        )
+        prefs(context).edit { putString(KEY_SERVER_SESSION_SECRET, value) }
         return value
     }
 

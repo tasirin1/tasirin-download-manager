@@ -62,6 +62,7 @@ object NotificationHelper {
             it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
         }
         val intent = Intent(context, MainActivity::class.java)
+            .setPackage(context.packageName)
         val pending = PendingIntent.getActivity(
             context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -80,6 +81,7 @@ object NotificationHelper {
         if (active.isNotEmpty()) {
             val pauseIntent = Intent(context, DownloadService::class.java)
                 .setAction(ACTION_PAUSE_ALL)
+                .setPackage(context.packageName)
             val pausePending = PendingIntent.getService(
                 context, 1, pauseIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -93,6 +95,7 @@ object NotificationHelper {
         if (hasResumable) {
             val resumeIntent = Intent(context, DownloadService::class.java)
                 .setAction(ACTION_RESUME_ALL)
+                .setPackage(context.packageName)
             val resumePending = PendingIntent.getService(
                 context, 2, resumeIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

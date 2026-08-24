@@ -1,3 +1,15 @@
+## [v1.0 — 2026-08-24] — Penguatan audit keamanan lanjutan
+
+### Fixed
+- **Remote session** — Ganti cookie login dari hash PIN menjadi token sesi acak 256-bit, dengan rotasi saat logout atau PIN berubah.
+- **MediaStore boundary** — Listing, ZIP, upload/download, dan pemindahan `m:` kini tunduk pada root folder serta mode akses penuh.
+- **Upload buffer race** — Reservasi byte chunk secara global agar banyak upload paralel tidak melewati batas disk/cache.
+- **Upload chunk validation** — Tolak nomor chunk/jumlah chunk di luar rentang yang sah.
+- **Share token entropy** — Naikkan token berbagi menjadi 128-bit penuh.
+- **Update hardening** — Wajibkan ukuran APK yang valid, batas 100 MB, dan hentikan unduhan bila byte meluber.
+- **Backup surface** — Matikan Android backup karena prefs menyimpan konfigurasi server dan secret lokal.
+- **CodeQL PendingIntent** — Kunci semua notification intent ke package aplikasi.
+
 ## [v1.0 — 2026-08-24] — Perbaikan audit keamanan
 
 ### Fixed

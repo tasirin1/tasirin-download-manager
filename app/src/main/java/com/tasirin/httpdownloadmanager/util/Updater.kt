@@ -26,6 +26,7 @@ object Updater {
     private const val LATEST_API =
         "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest"
     private const val MAX_REDIRECTS = 5
+    private const val MAX_UPDATE_BYTES = 100L * 1024 * 1024
     private const val UA = "TasirinDownloadManager"
     /** SHA-256 fingerprint sertifikat release resmi (alias `tasirin`), huruf kecil tanpa titik dua.
      *  Didapat dari `keytool -list -v` keystore rilis; APK dengan tanda tangan lain ditolak. */
@@ -58,6 +59,7 @@ object Updater {
     ): File? = runCatching {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(dir, "update-${info.versionCode}.apk")
+        if (info.apkSize <= 0 || info.apkSize > MAX_UPDATE_BYTES) return null
         if (target.exists() && target.length() == info.apkSize) return target
 
         if (!info.apkUrl.startsWith("https://", ignoreCase = true)) return null
@@ -93,6 +95,7 @@ object Updater {
                         if (n < 0) break
                         out.write(buf, 0, n)
                         done += n
+                        if (done > info.apkSize) throw SecurityException("Update size mismatch")
                         onProgress(done, total)
                     }
                 }

@@ -54,6 +54,23 @@ object ServerSecurity {
         return isPathAllowed(filePath, roots)
     }
 
+    /** Path relatif MediaStore hanya boleh dipakai bila berada di bawah root
+     *  file yang sama; mode akses penuh tetap memvalidasi bentuk path. */
+    fun isMediaStorePathAllowed(
+        relativePath: String,
+        roots: List<File>,
+        fullAccess: Boolean
+    ): Boolean {
+        val clean = relativePath.trim().trim('/')
+        if (clean.isEmpty()) return fullAccess
+        if (clean.contains('\\') || clean.split('/').any { it.isEmpty() || it == "." || it == ".." }) {
+            return false
+        }
+        if (fullAccess) return true
+        val virtualPath = "/storage/emulated/0/$clean"
+        return isPathAllowed(virtualPath, roots)
+    }
+
     /** Token stream parsial berumur pendek (id.expiry.signature). */
     fun createPartialToken(itemId: String, expiresAt: Long, secret: String): String {
         val payload = "$itemId.$expiresAt"
