@@ -9,6 +9,7 @@
 - **Share token entropy** — Naikkan token berbagi menjadi 128-bit penuh.
 - **Update hardening** — Wajibkan ukuran APK yang valid, batas 100 MB, dan hentikan unduhan bila byte meluber.
 - **Backup surface** — Matikan Android backup karena prefs menyimpan konfigurasi server dan secret lokal.
+- **Legacy backup** — Matikan backup content di Android 5–11 dan transfer/cloud extraction di Android 12+.
 - **CodeQL PendingIntent** — Kunci semua notification intent ke package aplikasi.
 - **Audit test** — Jadikan base MediaStore dapat diinjeksi agar guard bisa diuji lintas lingkungan.
 
