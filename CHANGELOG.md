@@ -10,6 +10,7 @@
 - **ZIP entry names** — Normalisasi nama entri ZIP untuk menahan Zip Slip di extractor pihak ketiga.
 - **Observer thread** — Ganti HandlerThread permanen dengan handler utama untuk invalidasi scan galeri.
 - **Documentation** — Ringkas README Indonesia/Inggris menjadi panduan pengguna yang profesional.
+- **Lint hygiene** — Perjelas blok kondisi pembuatan entri ZIP tanpa mengubah perilaku.
 
 ## [v1.0 — 2026-08-24] — Audit agresif traversal dan race
 
