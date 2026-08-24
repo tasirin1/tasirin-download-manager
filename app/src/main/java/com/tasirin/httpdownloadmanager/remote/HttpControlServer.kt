@@ -172,6 +172,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             "text/plain; charset=utf-8", "Server restarting"
         )
         val startedAt = System.currentTimeMillis()
+        if (!ServerSecurity.isStateChangeAllowed(
+                session.method.name, session.uri, session.headers["x-requested-with"]
+            )
+        ) {
+            val denied = newFixedLengthResponse(
+                Response.Status.FORBIDDEN,
+                "text/plain; charset=utf-8",
+                "Forbidden"
+            )
+            appendRequestLog(session, denied, System.currentTimeMillis() - startedAt)
+            return denied
+        }
         val response = try {
             when {
                 session.method == Method.POST && session.uri == "/api/login" -> login(session)

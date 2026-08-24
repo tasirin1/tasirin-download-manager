@@ -1,6 +1,7 @@
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 
 ### Fixed
+- **CSRF guard** — Wajibkan header khusus pada seluruh POST remote kecuali login agar form lintas situs tidak bisa memicu aksi unduhan/upload/file.
 - **Form POST besar** — Tolak body di atas 4 MB sebelum dibaca dan paksa koneksi ditutup agar sisa body tidak meracuni request berikutnya.
 - **Login state** — Bersihkan entri throttle kedaluwarsa lebih awal agar percobaan login dari banyak IP tidak menetap sampai batas 512 entri.
 - **Download memory** — Hapus data pelacak kecepatan saat daftar unduhan selesai dibersihkan.

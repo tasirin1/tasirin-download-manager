@@ -2835,7 +2835,11 @@ async function postFsAction(params) {
   try {
     const body = new URLSearchParams();
     Object.entries(params).forEach(function (e) { body.append(e[0], e[1]); });
-    const res = await fetch(API + '/api/fs_action', {method: 'POST', body});
+    const res = await fetch(API + '/api/fs_action', {
+      method: 'POST',
+      body,
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
     const data = await res.json().catch(function () { return null; });
     if (!res.ok || !data || !data.ok) {
       const message = (data && data.error) ? data.error : ('HTTP ' + res.status);
@@ -2992,6 +2996,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
         failUpload(err);
         return;
       }
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
       xhr.timeout = 120000;
       let lastUiAt = 0;
@@ -3203,7 +3208,10 @@ window.addEventListener('beforeunload', function (e) {
   function arm() {
     clearTimeout(timer);
     timer = setTimeout(function () {
-      fetch(API + '/api/logout', {method: 'POST'}).finally(function () {
+      fetch(API + '/api/logout', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      }).finally(function () {
         window.location.href = API + '/';
       });
     }, LOCK_MS);
@@ -4202,7 +4210,11 @@ async function doActionNow(id, action, extra) {
     if (extra) {
       Object.entries(extra).forEach(function (e) { body.append(e[0], e[1]); });
     }
-    const res = await fetch(API + '/api/action', {method: 'POST', body});
+    const res = await fetch(API + '/api/action', {
+      method: 'POST',
+      body,
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
     const data = await res.json().catch(function () { return null; });
     if (!res.ok || !data || !data.ok) {
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
@@ -4217,7 +4229,11 @@ const shareModal = document.getElementById('shareModal');
 async function shareItem(id) {
   const body = new URLSearchParams({id: id});
   try {
-    const res = await fetch(API + '/api/share', {method: 'POST', body});
+    const res = await fetch(API + '/api/share', {
+      method: 'POST',
+      body,
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
     const data = await res.json();
     if (!data || !data.ok) {
       showConfirm('Failed to create link', (data && data.error) || 'File not found.', 'OK', function () {});
@@ -4280,7 +4296,11 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   if (checksum) body.append('checksum', checksum);
   body.append('path', document.getElementById('storage').value.trim());
   try {
-    const res = await fetch(API + '/api/add', {method: 'POST', body});
+    const res = await fetch(API + '/api/add', {
+      method: 'POST',
+      body,
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
     const data = await res.json().catch(function () { return null; });
     if (!res.ok || !data || !data.ok) {
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));

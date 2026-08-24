@@ -9,6 +9,14 @@ object ServerSecurity {
 
     private val UPLOAD_ID_RE = Regex("^[A-Za-z0-9_-]{8,64}$")
 
+    /** Aksi POST dari remote wajib lewat fetch/XHR; header ini memaksa
+     *  request lintas situs melewati preflight CORS sebelum sampai server. */
+    fun isStateChangeAllowed(method: String, uri: String, requestedWith: String?): Boolean {
+        if (!method.equals("POST", ignoreCase = true)) return true
+        if (uri == "/api/login") return true
+        return requestedWith == "XMLHttpRequest"
+    }
+
     /** ID internal upload hanya boleh token aman; larang separator dan traversal. */
     fun isUploadIdAllowed(id: String): Boolean = UPLOAD_ID_RE.matches(id)
 

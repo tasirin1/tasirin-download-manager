@@ -52,11 +52,16 @@ const elements = {};
 const requests = [];
 
 class FakeXHR {
-  constructor() { this.upload = {}; }
+  constructor() { this.upload = {}; this.headers = {}; }
   open(m, u) { this.method = m; this.url = u; }
-  setRequestHeader() {}
+  setRequestHeader(name, value) { this.headers[name] = value; }
   send(body) {
-    requests.push({ method: this.method, url: this.url, bodySize: body && body.size ? body.size : 0 });
+    requests.push({
+      method: this.method,
+      url: this.url,
+      bodySize: body && body.size ? body.size : 0,
+      headers: this.headers
+    });
     const u = new URL(this.url, 'http://x');
     const id = u.searchParams.get('id');
     const self = this;
@@ -234,6 +239,7 @@ try {
 
 setTimeout(() => {
   const uploads = requests.filter((r) => r.method === 'POST' && r.url.includes('/api/upload'));
+  const csrfReady = uploads.every((r) => r.headers['X-Requested-With'] === 'XMLHttpRequest');
   const okDone = msgs.some((m) => m.text.indexOf('Done: 2 files uploaded') === 0);
   const failMsg = msgs.find((m) => m.text.indexOf('Upload failed to start') === 0);
   if (!uploads.length) {
@@ -244,6 +250,10 @@ setTimeout(() => {
     console.error('FAIL: upload tidak selesai (tidak ada pesan Done)');
     process.exit(1);
   }
-  console.log('SMOKE OK: upload 2 file selesai (' + uploads.length + ' chunk POST)');
+  if (!csrfReady) {
+    console.error('FAIL: upload POST tidak membawa header anti-CSRF');
+    process.exit(1);
+  }
+  console.log('SMOKE OK: upload 2 file selesai (' + uploads.length + ' chunk POST terlindungi)');
   process.exit(0);
 }, 200);

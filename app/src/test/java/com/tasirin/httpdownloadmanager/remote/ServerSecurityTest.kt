@@ -16,6 +16,15 @@ class ServerSecurityTest {
     private fun root(): File = tmp.newFolder("root")
 
     @Test
+    fun isStateChangeAllowed_postWajibHeaderKhusus() {
+        assertTrue(ServerSecurity.isStateChangeAllowed("GET", "/api/downloads", null))
+        assertTrue(ServerSecurity.isStateChangeAllowed("POST", "/api/login", null))
+        assertTrue(ServerSecurity.isStateChangeAllowed("post", "/api/action", "XMLHttpRequest"))
+        assertFalse(ServerSecurity.isStateChangeAllowed("POST", "/api/action", null))
+        assertFalse(ServerSecurity.isStateChangeAllowed("POST", "/api/upload", "form-data"))
+    }
+
+    @Test
     fun isPathAllowed_diDalamRoot_true() {
         val r = root()
         val child = File(r, "sub/file.txt")
