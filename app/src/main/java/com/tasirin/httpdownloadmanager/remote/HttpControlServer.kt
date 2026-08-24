@@ -94,6 +94,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val finalizingUploads = ConcurrentHashMap<String, String>()
     private val failedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
     private val uploadLocks = ConcurrentHashMap<String, UploadLock>()
+    private val finalizingGate = Any()
+    private val uploadLockGate = Any()
     private val reservedUploadBytes = java.util.concurrent.atomic.AtomicLong()
     private val uploadBufferReservation = Any()
     // Cache durasi video galeri: metadata tidak berubah, jadi cukup di-hold
@@ -173,7 +175,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val response = try {
             when {
                 session.method == Method.POST && session.uri == "/api/login" -> login(session)
-                session.method == Method.POST && session.uri == "/api/logout" -> logout()
                 session.method == Method.GET && session.uri.startsWith("/share/") ->
                     serveShare(session)
                 session.method == Method.GET && session.uri.startsWith("/stream_part/") ->
@@ -199,6 +200,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     session.method == Method.GET && session.uri == "/api/fs_zip" -> fsZip(session)
                     session.method == Method.GET && session.uri == "/api/media_zip" -> mediaZip(session)
                     session.method == Method.GET && session.uri.startsWith("/file/") -> serveFile(session)
+                    session.method == Method.POST && session.uri == "/api/logout" -> logout()
                     else -> newFixedLengthResponse(
                         Response.Status.NOT_FOUND,
                         "text/plain; charset=utf-8",
@@ -810,6 +812,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 drainBody(session)
                 return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id"))
             }
+        if (!canAcceptUploadLock(id)) {
+            drainBody(session)
+            appendLog("UPLOAD #$id REJECTED: too many active upload locks")
+            return jsonResponse(JSONObject().put("ok", false).put("error", "Too many uploads in progress"))
+        }
         if (chunkIdx < 0 || chunkIdx >= chunks || chunks > MAX_UPLOAD_CHUNKS) {
             drainBody(session)
             return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid chunk range"))
@@ -892,13 +899,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun uploadLockFor(id: String): UploadLock {
-        val now = System.currentTimeMillis()
-        if (uploadLocks.size > 256) {
-            uploadLocks.entries.removeIf {
-                now - it.value.lastUse.get() > 30 * 60 * 1000L
+        synchronized(uploadLockGate) {
+            val now = System.currentTimeMillis()
+            if (uploadLocks.size > 256) {
+                uploadLocks.entries.removeIf {
+                    now - it.value.lastUse.get() > 30 * 60 * 1000L
+                }
             }
+            return uploadLocks.getOrPut(id) { UploadLock() }.also { it.lastUse.set(now) }
         }
-        return uploadLocks.getOrPut(id) { UploadLock() }.also { it.lastUse.set(now) }
+    }
+
+    private fun canAcceptUploadLock(id: String): Boolean {
+        synchronized(uploadLockGate) {
+            if (uploadLocks.containsKey(id)) return true
+            val now = System.currentTimeMillis()
+            if (uploadLocks.size >= MAX_UPLOAD_LOCKS) {
+                uploadLocks.entries.removeIf { now - it.value.lastUse.get() > 30 * 60 * 1000L }
+            }
+            return uploadLocks.size < MAX_UPLOAD_LOCKS
+        }
     }
 
     private fun writeUploadChunk(
@@ -953,7 +973,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 val finalName = uploadUniqueName(name, folderPath)
                 pruneCompletedUploads()
-                finalizingUploads[id] = finalName
+                val accepted = synchronized(finalizingGate) {
+                    if (finalizingUploads.size >= MAX_UPLOAD_FINALIZING) {
+                        false
+                    } else {
+                        finalizingUploads[id] = finalName
+                        true
+                    }
+                }
+                if (!accepted) {
+                    return jsonResponse(
+                        JSONObject().put("ok", false)
+                            .put("error", "Server busy finalizing uploads")
+                    )
+                }
                 // Data sudah diterima semua. Balas instan, lalu salin file ke
                 // tujuan di background supaya client tidak menunggu lama dan
                 // tidak memicu retry (sebelumnya: potongan terakhir lambat ->
@@ -1017,7 +1050,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (raw.startsWith(MS_PREFIX)) {
                     ZipCreator.zipMedia(zos, raw.removePrefix(MS_PREFIX), context)
                 } else {
-                    ZipCreator.zipFile(zos, File(raw.removePrefix(FS_PREFIX)), "")
+                    ZipCreator.zipFile(
+                        zos, File(raw.removePrefix(FS_PREFIX)), "", ::isFsPathAllowed
+                    )
                 }
             }
         } ?: return notFound()
@@ -1134,7 +1169,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (tokens.isEmpty()) return notFound()
         val key = "tokens:" + tokens.sorted().joinToString(",")
         val tmp = zipCached(key) {
-            createTempZip { zos -> ZipCreator.zipTokens(zos, tokens, context) }
+            createTempZip { zos ->
+                ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed)
+            }
         } ?: return notFound()
         if (tmp.length() == 0L) {
             zipCache.remove(key)
@@ -1210,11 +1247,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val total: Long
         if (!item.filePath.isNullOrEmpty()) {
             val file = File(item.filePath)
-            if (!file.exists() || !file.isFile) return notFound()
+            if (!file.exists() || !file.isFile || !isFsPathAllowed(file.absolutePath)) {
+                return notFound()
+            }
             input = FileInputStream(file)
             total = file.length()
         } else if (!item.contentUri.isNullOrEmpty()) {
             val uri = item.contentUri.toUri()
+            if (!isMediaUriAllowed(uri)) return notFound()
             val resolver = context.contentResolver
             val stream = resolver.openInputStream(uri) ?: return notFound()
             val len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
@@ -2262,11 +2302,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val total: Long
         if (!item.filePath.isNullOrEmpty()) {
             val file = File(item.filePath)
-            if (!file.exists() || !file.isFile) return notFound()
+            if (!file.exists() || !file.isFile || !isFsPathAllowed(file.absolutePath)) {
+                return notFound()
+            }
             input = FileInputStream(file)
             total = file.length()
         } else if (!item.contentUri.isNullOrEmpty()) {
             val uri = item.contentUri.toUri()
+            if (!isMediaUriAllowed(uri)) return notFound()
             val resolver = context.contentResolver
             val stream = resolver.openInputStream(uri) ?: return notFound()
             total = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
@@ -2366,6 +2409,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_UPLOAD_BUFFER_BYTES = 2L * 1024 * 1024 * 1024
         private const val MAX_UPLOAD_MB = 2048
         private const val MAX_UPLOAD_CHUNKS = 1024
+        private const val MAX_UPLOAD_LOCKS = 512
+        private const val MAX_UPLOAD_FINALIZING = 8
         private const val SHARE_TTL_HOURS = 24
         private const val PARTIAL_STREAM_TTL_MS = 60 * 60 * 1000L
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000

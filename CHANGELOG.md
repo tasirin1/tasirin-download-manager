@@ -1,3 +1,14 @@
+## [v1.0 — 2026-08-24] — Audit agresif traversal dan race
+
+### Fixed
+- **ZIP symlink traversal** — Rekursi folder kini memvalidasi ulang setiap child terhadap root sah sehingga symlink keluar root tidak ikut diarsipkan.
+- **Stale file access** — Endpoint file dan share memvalidasi ulang path/URI lama setelah konfigurasi akses storage berubah.
+- **Logout DoS** — Logout hanya bisa dijalankan sesi ber-PIN yang valid; pengunjung tanpa sesi tidak lagi bisa memaksa rotasi cookie.
+- **Upload resource cap** — Batasi jumlah lock upload aktif dan finalisasi paralel untuk menahan lonjakan request di perangkat RAM kecil.
+- **Download queue race** — Pemeriksaan batas unduhan paralel dipindah ke dalam sinkronisasi peluncuran job.
+- **Segment progress leak** — Progres segmen dibersihkan saat pause/resume agar tidak menyisa atau menulis status basi.
+- **File Manager ordering** — Respons navigasi/load-more lama dibuang bila pengguna sudah berpindah folder.
+
 ## [v1.0 — 2026-08-24] — Audit resource dan ZIP token
 
 ### Fixed

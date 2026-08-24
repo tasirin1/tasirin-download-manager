@@ -1900,6 +1900,7 @@ let fsItems = [];
 let fsTotal = 0;
 let fsOffset = 0;
 let fsLoadingMore = false;
+let fsLoadSeq = 0;
 const FS_PAGE = 250;
 let fsScrollPos = {};
 let fsSelectMode = false;
@@ -2142,6 +2143,7 @@ let fsLocationsLoaded = false;
 let fsLocationsLoading = false;
 
 async function loadFs() {
+  const seq = ++fsLoadSeq;
   showFsSkeleton();
   fsOffset = 0;
   fsTotal = 0;
@@ -2150,6 +2152,7 @@ async function loadFs() {
       '&offset=0&limit=' + FS_PAGE);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    if (seq !== fsLoadSeq) return;
     fsStatus.textContent = '';
     renderFsCrumbs(fsPath);
     fsUpBtn.disabled = !fsPath;
@@ -2166,6 +2169,7 @@ async function loadFs() {
     renderFs(fsItems);
     fsRestoreScroll();
   } catch (e) {
+    if (seq !== fsLoadSeq) return;
     if (fsRestoredOnce && fsPath) {
       fsPath = '';
       fsRestoredOnce = false;
@@ -2328,6 +2332,7 @@ function fsAppendRow(box, it) {
 
 async function fsLoadMore() {
   if (fsLoadingMore || !fsPath) return;
+  const seq = fsLoadSeq;
   fsLoadingMore = true;
   const btn = document.getElementById('fsLoadMoreBtn');
   if (btn) {
@@ -2340,6 +2345,7 @@ async function fsLoadMore() {
       '&offset=' + fsOffset + '&limit=' + FS_PAGE);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    if (seq !== fsLoadSeq) return;
     const more = data.items || [];
     fsItems = fsItems.concat(more);
     fsOffset = fsItems.length;

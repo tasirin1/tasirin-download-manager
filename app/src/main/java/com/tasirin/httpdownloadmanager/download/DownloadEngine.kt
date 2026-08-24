@@ -199,6 +199,7 @@ class DownloadEngine(appContext: Context) {
         updateItem(id) {
             it.copy(state = DownloadState.PAUSED, autoResume = false, speedBps = 0, etaSeconds = 0)
         }
+        clearSegProgress(id)
         scheduleSave()
     }
 
@@ -207,6 +208,7 @@ class DownloadEngine(appContext: Context) {
         if (item.state != DownloadState.PAUSED && item.state != DownloadState.FAILED) return
         App.logEvent("DOWNLOAD RESUMED: ${item.fileName}")
         retryAttempts.remove(id)
+        clearSegProgress(id)
         updateItem(id) { it.copy(state = DownloadState.PENDING, autoResume = true) }
         attemptStart(id)
     }
@@ -563,6 +565,9 @@ class DownloadEngine(appContext: Context) {
     private fun launchItem(item: DownloadItem): Boolean {
         synchronized(jobs) {
             if (jobs[item.id]?.isActive == true) return false
+            if (jobs.values.count { it.isActive } >= StoragePrefs.maxConcurrent(context)) {
+                return false
+            }
             val job = scope.launch {
                 try {
                     updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }

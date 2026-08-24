@@ -13,7 +13,13 @@ import java.util.zip.ZipOutputStream
 /** Pembuat arsip ZIP (folder filesystem + folder media Android 10+). */
 object ZipCreator {
 
-    fun zipFile(zos: ZipOutputStream, file: File, prefix: String) {
+    fun zipFile(
+        zos: ZipOutputStream,
+        file: File,
+        prefix: String,
+        isFileAllowed: (String) -> Boolean
+    ) {
+        if (!isFileAllowed(file.absolutePath)) return
         val entryPath = if (prefix.isEmpty()) file.name else "$prefix/${file.name}"
         if (file.isDirectory) {
             val children = runCatching { file.listFiles() }.getOrNull()
@@ -25,7 +31,7 @@ object ZipCreator {
             children.sortedWith(
                 Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
             ).forEach { child ->
-                zipFile(zos, child, entryPath)
+                zipFile(zos, child, entryPath, isFileAllowed)
             }
         } else if (file.isFile) {
             zos.putNextEntry(ZipEntry(entryPath))
@@ -36,7 +42,12 @@ object ZipCreator {
 
     /** ZIP daftar token media (dipakai /api/media_zip: unduh banyak foto/video,
      *  file, atau folder filesystem secara rekursif). */
-    fun zipTokens(zos: ZipOutputStream, tokens: List<String>, context: Context) {
+    fun zipTokens(
+        zos: ZipOutputStream,
+        tokens: List<String>,
+        context: Context,
+        isFileAllowed: (String) -> Boolean
+    ) {
         val used = mutableMapOf<String, Int>()
         tokens.forEach { token ->
             val raw = MediaLibrary.decodeToken(token) ?: return@forEach
@@ -50,7 +61,7 @@ object ZipCreator {
                         val children = runCatching { f.listFiles() }.getOrNull() ?: return@runCatching
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-                        ).forEach { child -> zipFile(zos, child, root) }
+                        ).forEach { child -> zipFile(zos, child, root, isFileAllowed) }
                         return@runCatching
                     }
                     name = f.name
