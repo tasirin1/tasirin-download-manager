@@ -1,6 +1,7 @@
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 
 ### Fixed
+- **Browser detection** — Hapus tes `new Function` yang diblokir CSP sehingga browser modern tidak lagi salah ditandai terlalu tua.
 - **Thumbnail authorization** — Validasi path/URI sebelum membaca cache thumbnail agar thumbnail lama tetap terkunci setelah konfigurasi akses storage berubah.
 - **Remote hardening** — Tambah header `nosniff`, referrer, permissions, dan CSP pada halaman remote tanpa mengubah perilaku UI.
 - **CSRF guard** — Wajibkan header khusus pada seluruh POST remote kecuali login agar form lintas situs tidak bisa memicu aksi unduhan/upload/file.
