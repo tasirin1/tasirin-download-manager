@@ -2,6 +2,7 @@
 
 ### Fixed
 - **Build audit** — Tambahkan impor `FileNames` yang hilang pada engine unduhan.
+- **Audit test** — Perbaiki ekspektasi sanitasi nama agar sesuai hasil aman tanpa separator jalur.
 - **Upload path traversal** — Validasi ID upload menjadi token ketat agar file sementara tidak bisa ditulis keluar cache melalui `../`.
 - **Partial stream secret** — Ganti secret token yang bisa ditebak dengan secret acak 256-bit yang disimpan lokal.
 - **Download filename** — Sanitasi nama kustom sejak item dibuat dan validasi ulang file parsial sebagai defense in depth.

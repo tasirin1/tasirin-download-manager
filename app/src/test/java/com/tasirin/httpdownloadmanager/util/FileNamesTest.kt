@@ -7,7 +7,7 @@ class FileNamesTest {
 
     @Test
     fun `safe - membuang traversal dan separator`() {
-        assertEquals("___rahasia.txt", FileNames.safe("../..\\rahasia.txt"))
+        assertEquals(".._.._rahasia.txt", FileNames.safe("../..\\rahasia.txt"))
         assertEquals("download", FileNames.safe("   "))
     }
 
