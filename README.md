@@ -243,6 +243,18 @@ diunggah ke release, bukan APK debug.
 Build lokal **hanya untuk debugging cepat** — tidak pernah menjadi sumber rilis
 resmi. Seluruh perubahan dikirim sebagai commit + push, lalu CI yang membangun.
 
+### Pemindaian bug & keamanan
+
+```bash
+python3 scripts/security_audit.py --self-test
+python3 scripts/security_audit.py
+```
+
+Audit statis ini berjalan di CI sebelum build Android. Mode `--json` tersedia
+untuk hasil mesin, sedangkan `--strict` membuat warning juga menggagalkan
+perintah. Gunakan komentar `audit-ignore: <id-aturan>` hanya untuk pengecualian
+yang benar-benar aman dan selalu sertakan alasannya.
+
 **Persyaratan**: Android 5.0+ (minSdk 21), Java 17 + Android SDK.
 
 ## Panduan pengelolaan untuk AI (AGENTS.md)

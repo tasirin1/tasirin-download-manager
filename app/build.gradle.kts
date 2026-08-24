@@ -58,7 +58,8 @@ android {
                 "proguard-rules.pro"
             )
             val signing = signingConfigs.getByName("release")
-            if (signing.storeFile != null && signing.storeFile!!.exists()) {
+            val storeFile = signing.storeFile
+            if (storeFile != null && storeFile.exists()) {
                 signingConfig = signing
             }
         }

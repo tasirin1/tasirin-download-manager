@@ -64,6 +64,11 @@ jobs:
       - name: Cek sinkron README & README.en (struktur heading)
         run: python3 scripts/check_readme_sync.py
 
+      - name: Pindai bug, error, dan celah keamanan
+        run: |
+          python3 scripts/security_audit.py --self-test
+          python3 scripts/security_audit.py
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:

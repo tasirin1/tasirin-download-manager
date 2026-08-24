@@ -244,6 +244,18 @@ is uploaded to the release, not the debug APK.
 Local builds are **for quick debugging only** — never the official release
 source. All changes go through commits + push, then CI builds.
 
+### Bug and security scanning
+
+```bash
+python3 scripts/security_audit.py --self-test
+python3 scripts/security_audit.py
+```
+
+This static audit runs in CI before the Android build. Use `--json` for
+machine-readable output, or `--strict` to make warnings fail too. Add an
+`audit-ignore: <rule-id>` comment only for genuinely safe exceptions and always
+explain why.
+
 **Requirements**: Android 5.0+ (minSdk 21), Java 17 + Android SDK.
 
 ## AI maintenance guide (AGENTS.md)

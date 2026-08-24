@@ -1068,7 +1068,7 @@
     var ok = typeof fetch === 'function' && typeof Promise !== 'undefined' &&
       typeof URLSearchParams !== 'undefined' && typeof Object.assign === 'function';
     if (ok) {
-      try { new Function('a => a'); } catch (e) { ok = false; }
+      try { new Function('a => a'); } catch (e) { ok = false; } // audit-ignore: js_dynamic_exec
     }
     if (!ok) {
       var el = document.getElementById('oldBrowser');

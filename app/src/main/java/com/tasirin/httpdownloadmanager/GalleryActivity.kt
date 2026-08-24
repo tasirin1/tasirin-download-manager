@@ -228,27 +228,23 @@ class GalleryActivity : AppCompatActivity() {
         }
 
         private fun cacheFor(context: Context): LruCache<String, Bitmap> {
-            var cache = thumbCache
-            if (cache == null) {
-                synchronized(cacheLock) {
-                    cache = thumbCache
-                    if (cache == null) {
-                        val memoryClass = runCatching {
-                            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-                            am.memoryClass
-                        }.getOrDefault(128)
-                        // Cap absolut: memoryClass/8 bagus, tapi jangan lebih dari
-                        // 24 MB agar device RAM kecil (Android 5+) tetap lega.
-                        val maxKb = minOf((memoryClass / 8) * 1024, MAX_THUMB_CACHE_KB)
-                        cache = object : LruCache<String, Bitmap>(maxKb) {
-                            override fun sizeOf(key: String, value: Bitmap): Int =
-                                runCatching { value.byteCount / 1024 }.getOrDefault(256)
-                        }
-                        thumbCache = cache
-                    }
+            thumbCache?.let { return it }
+            synchronized(cacheLock) {
+                thumbCache?.let { return it }
+                val memoryClass = runCatching {
+                    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    am.memoryClass
+                }.getOrDefault(128)
+                // Cap absolut: memoryClass/8 bagus, tapi jangan lebih dari
+                // 24 MB agar device RAM kecil (Android 5+) tetap lega.
+                val maxKb = minOf((memoryClass / 8) * 1024, MAX_THUMB_CACHE_KB)
+                val cache = object : LruCache<String, Bitmap>(maxKb) {
+                    override fun sizeOf(key: String, value: Bitmap): Int =
+                        runCatching { value.byteCount / 1024 }.getOrDefault(256)
                 }
+                thumbCache = cache
+                return cache
             }
-            return cache!!
         }
 
         suspend fun loadThumb(context: Context, e: MediaLibrary.MediaEntry, req: Int): Bitmap? =

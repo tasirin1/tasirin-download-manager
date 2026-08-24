@@ -1,3 +1,13 @@
+## [v1.0 — 2026-08-24] — System audit bug dan keamanan
+
+### Added
+- **Security/error scanner** — Tambahkan audit statis internal dengan self-test, output JSON/CI, suppression eksplisit, dan aturan untuk secret, logging sensitif, WebView, SQL/path sink, JavaScript berbahaya, dan penanda maintenance.
+- **CI guard** — Jalankan scanner otomatis pada push/PR sebelum build Android, serta di optional pre-commit hook.
+
+### Fixed
+- **Thread interruption** — Kembalikan status interrupt setelah retry server tertidur dan dibatalkan.
+- **Null safety** — Hilangkan assertion tidak perlu pada cache thumbnail, keystore signing, secret sesi, storage prefs, dan startup exception.
+
 ## [v1.0 — 2026-08-24] — Perbaikan efisiensi dan audit lanjutan
 
 ### Fixed

@@ -12,6 +12,17 @@ if ! python3 scripts/prepare_remote.py --check; then
 fi
 echo "[pre-commit] remote web OK."
 
+echo "[pre-commit] memindai bug/error/celah keamanan..."
+if ! python3 scripts/security_audit.py --self-test; then
+  echo "[pre-commit] GAGAL: mesin aturan audit tidak sehat."
+  exit 1
+fi
+if ! python3 scripts/security_audit.py; then
+  echo "[pre-commit] GAGAL: audit menemukan masalah ber-level error."
+  exit 1
+fi
+echo "[pre-commit] audit keamanan OK."
+
 echo "[pre-commit] memeriksa sinkron README/README.en..."
 if ! python3 scripts/check_readme_sync.py; then
   echo "[pre-commit] GAGAL: struktur heading README tidak sinkron. Perbaiki sebelum commit."

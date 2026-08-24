@@ -273,13 +273,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 lastEx = e
                 if (attempt < 3) {
                     appendLog("SERVER START RETRY $attempt/3: ${e.message}")
-                    try { Thread.sleep(200) } catch (_: InterruptedException) {}
+                    try { Thread.sleep(200) } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                    }
                 }
             }
         }
         lastError = lastEx?.message
         appendLog("SERVER FAILED TO START: ${lastEx?.message}")
-        throw lastEx!!
+        throw lastEx ?: IOException("Unknown server startup failure")
     }
 
     private fun cleanupCache() {
@@ -330,7 +332,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         super.stop()
         // Tunggu sebentar supaya NanoHTTPD internal pool benar-benar terminated
         // sebelum client request berikutnya datang (cegah RejectedExecutionException).
-        try { Thread.sleep(200) } catch (_: InterruptedException) {}
+        try { Thread.sleep(200) } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     private fun pinEnabled(): Boolean =
@@ -347,8 +351,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun pinOk(session: IHTTPSession): Boolean {
         if (storedPinHash() == null) return true
         val expected = StoragePrefs.serverSessionSecret(context)
-        val expectedBytes = if (cachedSessionSecret == expected && cachedSessionSecretBytes != null) {
-            cachedSessionSecretBytes!!
+        val cachedSessionBytes = cachedSessionSecretBytes
+        val expectedBytes = if (cachedSessionSecret == expected && cachedSessionBytes != null) {
+            cachedSessionBytes
         } else {
             expected.toByteArray(Charsets.UTF_8).also {
                 cachedSessionSecret = expected

@@ -58,8 +58,8 @@ object StoragePrefs {
             ?.contains(key) == true
 
     fun setSectionCollapsed(context: Context, key: String, collapsed: Boolean) {
-        val set = prefs(context)
-            .getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())!!.toMutableSet()
+        val stored = prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
+        val set = (stored ?: emptySet()).toMutableSet()
         if (collapsed) set.add(key) else set.remove(key)
         prefs(context)
             .edit {

@@ -28,6 +28,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
 ├── scripts/check_readme_sync.py      # Guard CI: struktur heading README.md vs README.en.md sinkron
+├── scripts/security_audit.py        # Audit statis bug/error/keamanan + self-test
 ├── scripts/upload_smoke_test.js      # Smoke test alur upload (stub DOM/XHR, tanpa dependensi)
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
@@ -208,7 +209,9 @@ kuat dan tanpa diskusi:
    sinkron `remote.src.html` ↔ `remote.html`, `node --check` pada semua `<script>`,
    larangan kata Indonesia di string UI (remote.html, values/*.xml, Kotlin), dan
    smoke test alur upload klien (`scripts/upload_smoke_test.js`). Jalankan juga
-   sebelum commit.
+   sebelum commit. Jalankan `python3 scripts/security_audit.py --self-test`
+   sebagai audit statis bug/error/keamanan; temuan ber-level error wajib diperbaiki,
+   sedangkan warning harus ditinjau atau diberi suppression eksplisit beserta alasan.
 9. **Jaringan jangan di main thread**; polling adaptif (2s aktif / 10s idle);
    SSE wajib punya fallback polling & reconnect.
 10. **Jangan commit keystore** (`*.jks`, `keystore.b64` sudah di-`.gitignore`).
@@ -272,7 +275,8 @@ kuat dan tanpa diskusi:
 1. Checkout → **guard CHANGELOG** (perubahan kode wajib update `CHANGELOG.md`;
    dikecualikan untuk PR Dependabot) → **`scripts/prepare_remote.py --check`**
    (sinkron remote.html, node --check, guard i18n) + **cek sinkron
-   README/README.en** (struktur heading) → JDK 17 → **cek kesehatan
+   README/README.en** (struktur heading) → **audit statis
+   bug/error/keamanan (`security_audit.py --self-test`)** → JDK 17 → **cek kesehatan
    keystore** (fingerprint `c2785a61...` + **masa berlaku**: error < 90 hari,
    warning < 180 hari) → Android SDK → Gradle (cache + verifikasi wrapper +
    **verifikasi dependensi strict** lewat `gradle/verification-metadata.xml`).
