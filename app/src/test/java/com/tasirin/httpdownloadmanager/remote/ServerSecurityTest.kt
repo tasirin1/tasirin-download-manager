@@ -109,6 +109,35 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun safUri_hanyaDiDalamTreeBerizin() {
+        val roots = listOf(
+            "com.android.externalstorage.documents" to "/tree/primary%3ADownload"
+        )
+        assertTrue(
+            ServerSecurity.isSafUriAllowed(
+                "com.android.externalstorage.documents",
+                "/tree/primary%3ADownload/document/primary%3ADownload/video.mp4",
+                roots
+            )
+        )
+        assertFalse(
+            ServerSecurity.isSafUriAllowed(
+                "com.android.externalstorage.documents",
+                "/tree/primary%3ADocuments/video.mp4",
+                roots
+            )
+        )
+        assertFalse(
+            ServerSecurity.isSafUriAllowed(
+                "com.android.providers.downloads.documents",
+                "/tree/downloads/document/video.mp4",
+                roots
+            )
+        )
+        assertFalse(ServerSecurity.isSafUriAllowed("com.android.externalstorage.documents", null, roots))
+    }
+
+    @Test
     fun isShareExpired_tepatWaktu_masihValid() {
         assertFalse(ServerSecurity.isShareExpired(5_000, 5_000))
         assertTrue(ServerSecurity.isShareExpired(4_999, 5_000))

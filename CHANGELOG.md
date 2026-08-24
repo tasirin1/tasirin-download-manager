@@ -1,6 +1,10 @@
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 
 ### Fixed
+- **MediaStore authorization** — Pisahkan izin baca galeri dari izin tulis/hapus dan wajibkan URI SAF masih berasal dari tree berizin.
+- **Stale media access** — Validasi ulang path/URI saat membaca durasi video agar cache galeri lama tidak mengakses storage yang sudah tidak diizinkan.
+- **Upload keep-alive** — Tutup koneksi saat upload ditolak sebelum body dibaca agar body besar tidak menahan thread atau meracuni koneksi.
+- **ZIP disk limit** — Hentikan pembuatan ZIP melewati batas 256 MB dan bersihkan cache akses ketika root storage berubah.
 - **Upload verification** — Wajibkan token bertanda tangan pada cek status upload dan redaksi token tersebut dari log agar ID upload tidak bisa dienumerasi.
 - **Rename overwrite** — Tolak rename file/folder remote bila nama target sudah ada.
 - **Browser detection** — Hapus tes `new Function` yang diblokir CSP sehingga browser modern tidak lagi salah ditandai terlalu tua.

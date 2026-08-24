@@ -128,6 +128,23 @@ object ServerSecurity {
     /** Offset chunk upload valid: non-negatif dan tidak melebihi batas file. */
     fun isChunkOffsetAllowed(offset: Long, maxFileBytes: Long): Boolean = offset in 0..maxFileBytes
 
+    /** URI dokumen hanya sah bila masih berada di tree berizin yang dipersistenkan.
+     *  Tanpa ini, authority SAF tidak boleh dipakai sebagai izin otomatis. */
+    fun isSafUriAllowed(
+        authority: String?,
+        uriPath: String?,
+        permittedRoots: List<Pair<String, String>>
+    ): Boolean {
+        val cleanAuthority = authority?.takeIf { it.isNotEmpty() } ?: return false
+        val cleanPath = uriPath?.takeIf { it.isNotEmpty() } ?: return false
+        return permittedRoots.any { (rootAuthority, rootPath) ->
+            val cleanRoot = rootPath.trimEnd('/')
+            cleanAuthority == rootAuthority && cleanRoot.isNotEmpty() && (
+                cleanPath == cleanRoot || cleanPath.startsWith("$cleanRoot/")
+            )
+        }
+    }
+
     /** Token share kedaluwarsa (expiresAt == now masih dianggap valid). */
     fun isShareExpired(expiresAt: Long, now: Long): Boolean = expiresAt < now
 }

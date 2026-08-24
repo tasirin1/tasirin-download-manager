@@ -718,7 +718,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (!isRemoteDestinationAllowed(folderPath)) {
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
-            )
+            ).also { it.addHeader("Connection", "close") }
         }
         App.engine.addDownload(
             url, params["name"],
@@ -732,7 +732,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun handleUpload(session: IHTTPSession): Response {
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        if (StoragePrefs.isServerReadOnly(context)) {
+            return readOnlyDenied().also { it.addHeader("Connection", "close") }
+        }
         val name = session.parms["name"]?.trim()?.filterNot { it.isISOControl() }?.take(180)
             ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")?.replace("..", "_")
             ?.takeIf { it.isNotEmpty() }
@@ -756,13 +758,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return jsonResponse(
                 JSONObject().put("ok", false)
                     .put("error", "Invalid size (max ${MAX_UPLOAD_MB} MB)")
-            )
+            ).also { it.addHeader("Connection", "close") }
         }
         if (App.engine.freeSpaceBytes() < length) {
             return jsonResponse(
                 JSONObject().put("ok", false)
                     .put("error", "Not enough storage for upload")
-            )
+            ).also { it.addHeader("Connection", "close") }
         }
         val finalName = uploadUniqueName(name, folderPath)
         return runCatching {
@@ -872,7 +874,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return jsonResponse(
                 JSONObject().put("ok", false)
                     .put("error", "Chunk too large (max ${MAX_UPLOAD_MB} MB)")
-            )
+            ).also { it.addHeader("Connection", "close") }
         }
         synchronized(uploadBufferReservation) {
             val bufferedUploadBytes = context.cacheDir.listFiles()
@@ -886,7 +888,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 return jsonResponse(
                     JSONObject().put("ok", false)
                         .put("error", "Upload buffer or storage limit reached")
-                )
+                ).also { it.addHeader("Connection", "close") }
             }
             reservedUploadBytes.addAndGet(length)
         }
@@ -915,10 +917,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (!ServerSecurity.isChunkOffsetAllowed(offset, MAX_UPLOAD_BYTES)) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid offset")
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid offset"))
+                .also { it.addHeader("Connection", "close") }
         }
         if (length > 0 && offset + length > MAX_UPLOAD_BYTES) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid upload range")
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid upload range"))
+                .also { it.addHeader("Connection", "close") }
         }
         appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks received: $name (${length}B offset=$offset)")
         val lock = uploadLockFor(id)
@@ -980,7 +984,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks FAILED: must start from the first chunk")
                     return jsonResponse(
                         JSONObject().put("ok", false).put("error", "Upload must start from the first chunk")
-                    )
+                    ).also { it.addHeader("Connection", "close") }
                 }
                 else -> {
                     // Tulis di offset persis: retry potongan sama tidak menggandakan data.
@@ -1146,6 +1150,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 runCatching { file.delete() }
             }
             val file = create() ?: return null
+            if (file.length() > ZIP_CACHE_MAX_BYTES) {
+                runCatching { file.delete() }
+                return null
+            }
             // Browser dapat membuka beberapa request Range sekaligus. Kunci per
             // key benar-benar mencegah ZIP yang sama dibuat dua kali; cukup 8
             // strip lock agar map kunci tidak tumbuh tanpa batas.
@@ -1179,7 +1187,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun createTempZip(fill: (ZipOutputStream) -> Unit): File? = try {
         File.createTempFile("fszip", ".zip", context.cacheDir).also { tmpFile ->
             try {
-                ZipOutputStream(BufferedOutputStream(FileOutputStream(tmpFile))).use(fill)
+                FileOutputStream(tmpFile).use { raw ->
+                    BoundedOutputStream(
+                        BufferedOutputStream(raw),
+                        ZIP_CACHE_MAX_BYTES
+                    ).use { bounded ->
+                        ZipOutputStream(bounded).use(fill)
+                    }
+                }
             } catch (e: Exception) {
                 runCatching { tmpFile.delete() }
                 throw e
@@ -1188,6 +1203,29 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     } catch (e: Exception) {
         logError(e)
         null
+    }
+
+    private class BoundedOutputStream(
+        private val delegate: java.io.OutputStream,
+        private val maxBytes: Long
+    ) : java.io.OutputStream() {
+        private var written = 0L
+
+        override fun write(byte: Int) {
+            if (written + 1 > maxBytes) throw IOException("ZIP exceeds cache limit")
+            delegate.write(byte)
+            written += 1
+        }
+
+        override fun write(buffer: ByteArray, offset: Int, length: Int) {
+            if (written + length > maxBytes) throw IOException("ZIP exceeds cache limit")
+            delegate.write(buffer, offset, length)
+            written += length
+        }
+
+        override fun flush() = delegate.flush()
+
+        override fun close() = delegate.close()
     }
 
     /** Token media wajib melewati validasi yang sama dengan endpoint stream:
@@ -1569,6 +1607,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Invalidate fsRoots cache saat settings berubah. */
     fun invalidateFsRootsCache() {
         cachedFsRoots = null
+        fsFileListingCache = null
+        fsMediaCache.clear()
+        galleryCache = null
+        synchronized(zipEvictionLock) {
+            zipCache.values.forEach { (_, file) -> runCatching { file.delete() } }
+            zipCache.clear()
+        }
     }
 
     /** Invalidate statusObject cache saat port/readOnly berubah. */
@@ -1595,8 +1640,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val mmr = MediaMetadataRetriever()
             try {
                 when {
-                    raw.startsWith("f:") -> mmr.setDataSource(File(raw.substring(2)).absolutePath)
-                    raw.startsWith("u:") -> mmr.setDataSource(context, raw.substring(2).toUri())
+                    raw.startsWith("f:") -> {
+                        val file = File(raw.substring(2))
+                        if (!file.isFile || !isFsPathAllowed(file.absolutePath)) {
+                            return@safeRun 0L
+                        }
+                        mmr.setDataSource(file.absolutePath)
+                    }
+                    raw.startsWith("u:") -> {
+                        val uri = raw.substring(2).toUri()
+                        if (!isMediaUriAllowed(uri)) return@safeRun 0L
+                        mmr.setDataSource(context, uri)
+                    }
                     else -> return@safeRun 0L
                 }
                 mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
@@ -2022,7 +2077,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val resolver = context.contentResolver
         return runCatching {
             val uri = uriStr.toUri()
-            if (!isMediaUriAllowed(uri)) return@runCatching false
+            if (!isMediaUriWritable(uri)) return@runCatching false
             val ok = when (action) {
                 "delete" -> resolver.delete(uri, null, null) > 0
                 "rename" -> {
@@ -2200,7 +2255,43 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
                 "com.android.externalstorage.documents",
-                "com.android.providers.downloads.documents" -> true
+                "com.android.providers.downloads.documents" -> ServerSecurity.isSafUriAllowed(
+                    uri.authority,
+                    uri.encodedPath,
+                    context.contentResolver.persistedUriPermissions
+                        .filter { it.isReadPermission }
+                        .map { it.uri.authority.orEmpty() to it.uri.encodedPath.orEmpty() }
+                )
+                else -> false
+            }
+        }.getOrDefault(false)
+    }
+
+    /** Aksi destruktif MediaStore memakai batas root yang sama dengan FS;
+     *  galeri boleh membaca koleksi umum, tapi tidak otomatis boleh menghapusnya. */
+    private fun isMediaUriWritable(uri: Uri): Boolean {
+        return runCatching {
+            when (uri.authority) {
+                MediaStore.AUTHORITY -> {
+                    val fullAccess = StoragePrefs.isFsFullAccessEnabled(context)
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        val relative = mediaStoreRelativePath(uri) ?: return@runCatching false
+                        ServerSecurity.isMediaStorePathAllowed(
+                            relative.trim('/'), allowedFsRoots(), fullAccess
+                        )
+                    } else {
+                        val data = mediaStoreData(uri) ?: return@runCatching false
+                        isFsPathAllowed(data)
+                    }
+                }
+                "com.android.externalstorage.documents",
+                "com.android.providers.downloads.documents" -> ServerSecurity.isSafUriAllowed(
+                    uri.authority,
+                    uri.encodedPath,
+                    context.contentResolver.persistedUriPermissions
+                        .filter { it.isWritePermission }
+                        .map { it.uri.authority.orEmpty() to it.uri.encodedPath.orEmpty() }
+                )
                 else -> false
             }
         }.getOrDefault(false)
