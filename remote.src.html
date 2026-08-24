@@ -611,15 +611,6 @@
   .mm-rel-empty {
  color: #606060; font-size: 12.5px; padding: 6px 0 18px; }
 
-  .mm-big {
- position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.22); cursor: pointer; }
-
-  .mm-big .icon {
- width: 56px; height: 56px; flex: 0 0 56px; border-radius: 50%; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; }
-
-  .mm-big .icon svg {
- width: 24px; height: 24px; color: #fff; margin-left: 3px; }
-
   .mm-spin {
  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 
@@ -633,6 +624,34 @@
 
   #mmToast {
  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,.72); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; pointer-events: none; }
+
+  #mmTransport {
+ position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 18px; pointer-events: none; transition: opacity .22s ease, visibility .22s ease; }
+
+  #mmCtrl.hidden ~ #mmTransport,
+  #mmCtrl.hide ~ #mmTransport {
+ opacity: 0; visibility: hidden; }
+
+  #mmTransport button {
+ pointer-events: auto; width: 48px; height: 48px; border: 0; border-radius: 50%; background: rgba(18,18,20,.56); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); transition: background-color .15s ease, transform .15s ease, opacity .15s ease; }
+
+  #mmTransport button:hover {
+ background: rgba(37,150,255,.82); transform: scale(1.05); }
+
+  #mmTransport button:focus-visible {
+ outline: 2px solid #fff; outline-offset: -2px; }
+
+  #mmTransport button[disabled] {
+ opacity: .35; pointer-events: none; }
+
+  #mmPlayBtn {
+ width: 62px !important; height: 62px !important; background: rgba(18,18,20,.66) !important; box-shadow: 0 10px 28px rgba(0,0,0,.34); }
+
+  #mmTransport button svg {
+ width: 22px; height: 22px; }
+
+  #mmPlayBtn svg {
+ width: 27px; height: 27px; }
 
   #mmPlayerTop {
  position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: 10px 14px 34px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); background: linear-gradient(rgba(0,0,0,.72), transparent); pointer-events: none; transition: opacity .22s ease, visibility .22s ease; }
@@ -770,15 +789,6 @@
   .mm-vol::-moz-range-thumb {
  width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
 
-  #mmSpeedBtn {
- min-width: 40px; height: 40px; padding: 0 3px; font-size: 11.5px; font-weight: 700; }
-
-  #mmAutoBtn {
- width: auto; height: 30px; padding: 0 9px; border-radius: 999px; background: rgba(255,255,255,.08); font-size: 10px; font-weight: 700; letter-spacing: .5px; color: rgba(255,255,255,.78); }
-
-  #mmAutoBtn.on {
- background: rgba(37,150,255,.18); color: #63b2ff; }
-
   #mmPlayer.mm-hide-cursor {
  cursor: none; }
 
@@ -788,13 +798,14 @@
  .mm-vol { width: 44px; margin-left: 0; opacity: 1; overflow: visible; }
   }
 
-  @media (max-width: 360px) {
- #mmCtrlRow button { width: 33px; height: 33px; }
+ @media (max-width: 360px) {
+ #mmCtrlRow button { width: 36px; height: 36px; }
  #mmPlayerTop button { width: 33px; height: 33px; }
- #mmSpeedBtn { min-width: 33px; height: 33px; }
  #mmMuteBtn { width: 33px; height: 33px; }
  #mmFsBtn { width: 33px; height: 33px; }
- #mmAutoBtn { height: 26px; padding: 0 7px; }
+ #mmTransport { gap: 12px; }
+ #mmTransport button { width: 42px; height: 42px; }
+ #mmPlayBtn { width: 54px !important; height: 54px !important; }
  .mm-vol { width: 38px; height: 28px; margin-left: 0; opacity: 1; overflow: visible; }
  #mmTime { font-size: 10.5px; }
   }
@@ -1271,19 +1282,13 @@
         <button id="mmPlayerBack" type="button" title="Close">&#10094;</button>
         <div id="mmOverlayTitle"></div>
       </div>
-      <div id="mmBigPlay" class="mm-big hidden"><div class="icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>
       <div id="mmSpinner" class="mm-spin hidden"></div>
       <div id="mmToast" class="hidden"></div>
       <div id="mmSeekTip" class="hidden"></div>
       <div id="mmCtrl" class="hidden">
         <div id="mmCtrlRow">
-          <button id="mmPlayBtn" type="button" title="Play or pause"></button>
-          <button id="mmPrevBtn" type="button" title="Previous video"></button>
-          <button id="mmNextBtn" type="button" title="Next video"></button>
           <div id="mmTimePanel"><span id="mmTime">0:00 / 0:00</span></div>
           <div class="mm-side">
-          <button id="mmSpeedBtn" type="button" title="Playback speed">1&#215;</button>
-          <button id="mmAutoBtn" type="button" title="Auto-play next video" aria-pressed="true">AUTO</button>
           <div class="mm-vol-group">
             <button id="mmMuteBtn" type="button"></button>
             <input id="mmVol" class="mm-vol" type="range" min="0" max="100" value="100" title="Volume" aria-label="Volume">
@@ -1295,6 +1300,11 @@
           <div id="mmBuf"></div>
           <input id="mmSeek" type="range" min="0" max="1000" value="0" step="1">
         </div>
+      </div>
+      <div id="mmTransport">
+        <button id="mmPrevBtn" type="button" title="Previous video"></button>
+        <button id="mmPlayBtn" type="button" title="Play or pause"></button>
+        <button id="mmNextBtn" type="button" title="Next video"></button>
       </div>
     </div>
   </div>
@@ -1476,7 +1486,6 @@ const mmSub = document.getElementById('mmSub');
 const mmDesc = document.getElementById('mmDesc');
 const mmRelated = document.getElementById('mmRelated');
 const mmPlayer = document.getElementById('mmPlayer');
-const mmBigPlay = document.getElementById('mmBigPlay');
 const mmSpinner = document.getElementById('mmSpinner');
 const mmToast = document.getElementById('mmToast');
 const mmCtrl = document.getElementById('mmCtrl');
@@ -1492,15 +1501,11 @@ const mmPlayerTop = document.getElementById('mmPlayerTop');
 const mmVideoWrap = document.getElementById('mmVideoWrap');
 const mmSeekTip = document.getElementById('mmSeekTip');
 const mmVol = document.getElementById('mmVol');
-const mmAutoBtn = document.getElementById('mmAutoBtn');
 const mmSeekWrap = document.getElementById('mmSeekWrap');
 const mmPrevBtn = document.getElementById('mmPrevBtn');
 const mmNextBtn = document.getElementById('mmNextBtn');
 let mmVideoList = [];
 let mmEnded = false;
-let mmAutoNext = true;
-let mmNextList = [];
-try { mmAutoNext = localStorage.getItem('dm_auto_next') !== '0'; } catch (e) {}
 const ICONS = {
   play: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
   pause: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
@@ -1632,8 +1637,6 @@ function closeMedia() {
   mmVideo.removeAttribute('src');
   mmPlayer.classList.add('hidden');
   mmVideoWrap.classList.add('hidden');
-  mmBigPlay.classList.add('hidden');
-  mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
   mmSpinner.classList.add('hidden');
   mmCtrl.classList.add('hidden');
   mmCtrl.classList.remove('hide');
@@ -1647,7 +1650,6 @@ function closeMedia() {
   mmRelated.classList.add('hidden');
   mmRelated.innerHTML = '';
   clearTimeout(mmTimer);
-  mmResetSpeed();
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {}
   }
@@ -3450,8 +3452,6 @@ function openMedia(it, src, playlist) {
   mmTime.textContent = '0:00 / 0:00';
   mmVideoWrap.classList.remove('hidden');
   mmPlayer.classList.remove('hidden');
-  mmBigPlay.classList.remove('hidden');
-  mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
   mmSpinner.classList.add('hidden');
   mmCtrl.classList.remove('hidden');
   mmCtrl.classList.remove('hide');
@@ -3459,7 +3459,6 @@ function openMedia(it, src, playlist) {
   mmTop.classList.add('hidden');
   mmPlayerTop.classList.remove('hidden');
   mmPlayerTop.classList.remove('hide');
-  mmResetSpeed();
   mmPlayBtn.innerHTML = ICONS.play;
   mmSyncVol();
   mmFsBtn.innerHTML = (document.fullscreenElement || document.webkitFullscreenElement) ? ICONS.fsx : ICONS.fs;
@@ -3469,7 +3468,7 @@ function openMedia(it, src, playlist) {
   mmNextBtn.innerHTML = ICONS.next;
   var p = mmVideo.play();
   if (p && p.catch) {
-    p.catch(function () { mmBigPlay.classList.remove('hidden'); mmShowCtrl(); });
+    p.catch(function () { mmShowCtrl(); });
   }
   renderRelated(it);
   mediaModal.classList.add('open');
@@ -3486,11 +3485,8 @@ function renderRelated(current) {
   const idx = mmTokenIdx(mmVideoList, current.token);
   let others = [];
   if (idx >= 0) {
-    // Auto-next hanya maju; saran melengkapi daftar dengan video sebelumnya.
-    mmNextList = mmVideoList.slice(idx + 1);
     others = mmVideoList.slice(idx + 1).concat(mmVideoList.slice(0, idx)).slice(0, 8);
   } else {
-    mmNextList = [];
     others = mmVideoList.filter(function (v) { return v.token !== current.token; }).slice(0, 8);
   }
   mmRelated.classList.remove('hidden');
@@ -3532,7 +3528,6 @@ function mmTogglePlay() {
   if (mmEnded) {
     mmEnded = false;
     mmVideo.currentTime = 0;
-    mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
   }
   if (mmVideo.paused) mmVideo.play(); else mmVideo.pause();
   mmShowCtrl();
@@ -3558,11 +3553,6 @@ function mmSyncVol() {
   mmVol.style.setProperty('--vol', percent + '%');
   mmMuteBtn.innerHTML = (mmVideo.muted || mmVideo.volume === 0) ? ICONS.mute : ICONS.sound;
 }
-function mmUpdateAutoBtn() {
-  mmAutoBtn.classList.toggle('on', mmAutoNext);
-  mmAutoBtn.setAttribute('aria-pressed', mmAutoNext ? 'true' : 'false');
-}
-
 mmPlayBtn.addEventListener('click', mmTogglePlay);
 mmPrevBtn.addEventListener('click', function () { mmStepVideo(-1); });
 mmNextBtn.addEventListener('click', function () { mmStepVideo(1); });
@@ -3601,14 +3591,6 @@ mmVol.addEventListener('input', function () {
   mmMuteBtn.innerHTML = (mmVideo.muted || mmVideo.volume === 0) ? ICONS.mute : ICONS.sound;
   mmShowCtrl();
 });
-
-mmAutoBtn.addEventListener('click', function () {
-  mmAutoNext = !mmAutoNext;
-  try { localStorage.setItem('dm_auto_next', mmAutoNext ? '1' : '0'); } catch (e) {}
-  mmUpdateAutoBtn();
-  mmShowCtrl();
-});
-mmUpdateAutoBtn();
 
 mmSeekWrap.addEventListener('mousemove', function (e) {
   if (mmType !== 'video') return;
@@ -3651,21 +3633,6 @@ function mmSeekTo(t) {
   mmShowCtrl();
 }
 
-const mmSpeedBtn = document.getElementById('mmSpeedBtn');
-const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-let mmSpeedIdx = 2;
-function mmResetSpeed() {
-  mmSpeedIdx = 2;
-  mmVideo.playbackRate = 1;
-  mmSpeedBtn.textContent = '1\u00D7';
-}
-mmSpeedBtn.addEventListener('click', function () {
-  mmSpeedIdx = (mmSpeedIdx + 1) % SPEEDS.length;
-  mmVideo.playbackRate = SPEEDS[mmSpeedIdx];
-  mmSpeedBtn.textContent = SPEEDS[mmSpeedIdx].toString() + '\u00D7';
-  mmShowCtrl();
-});
-
 function mmLockLandscape() {
   try {
     if (screen.orientation && screen.orientation.lock) {
@@ -3701,7 +3668,7 @@ mmFsBtn.addEventListener('click', function () {
 });
 
 mmPlayer.addEventListener('click', function (e) {
-  if (e.target.closest('#mmCtrl, #mmPlayerTop')) return;
+  if (e.target.closest('#mmCtrl, #mmTransport, #mmPlayerTop')) return;
   if (e.pointerType === 'touch' || Date.now() - mmLastTouchEnd < 700) return;
   const now = Date.now();
   const dt = now - mmLastTap;
@@ -3730,7 +3697,6 @@ mmPlayer.addEventListener('click', function (e) {
     if (mmEnded) {
       mmEnded = false;
       mmVideo.currentTime = 0;
-      mmBigPlay.innerHTML = '<div class="icon">' + ICONS.play + '</div>';
     }
     mmVideo.play();
     mmShowCtrl();
@@ -3751,7 +3717,7 @@ mmPlayer.addEventListener('touchstart', function () { mmShowCtrl(); }, { passive
 let mmTap = { x: 0, y: 0, t: 0 };
 mmPlayer.addEventListener('touchend', function (e) {
   mmLastTouchEnd = Date.now();
-  if (e.target.closest && e.target.closest('#mmCtrl, #mmPlayerTop')) return;
+  if (e.target.closest && e.target.closest('#mmCtrl, #mmTransport, #mmPlayerTop')) return;
   const ch = e.changedTouches[0];
   if (mmType !== 'video') return;
   const w = window.innerWidth;
@@ -3779,19 +3745,16 @@ mmVideo.addEventListener('play', function () {
   mmActiveToken = mmCurrentToken;
   mmEnded = false;
   mmPlayBtn.innerHTML = ICONS.pause;
-  mmBigPlay.classList.add('hidden');
   mmShowCtrl();
 });
 mmVideo.addEventListener('volumechange', mmSyncVol);
 mmVideo.addEventListener('error', function () {
   mmSpinner.classList.add('hidden');
-  mmBigPlay.classList.remove('hidden');
   mmShowToast('Failed to load video \u2014 format may not be supported on this device', 2600);
   mmShowCtrl();
 });
 mmVideo.addEventListener('pause', function () {
   mmPlayBtn.innerHTML = ICONS.play;
-  mmBigPlay.classList.remove('hidden');
   // mmActiveToken = token video yang benar-benar sedang diputar; event pause
   // async saat pindah video tidak boleh menimpa posisi ke token video baru.
   saveVideoPos(mmActiveToken || mmCurrentToken);
@@ -3799,22 +3762,12 @@ mmVideo.addEventListener('pause', function () {
 });
 mmVideo.addEventListener('ended', function () {
   mmEnded = true;
-  mmPlayBtn.innerHTML = ICONS.play;
-  mmBigPlay.classList.remove('hidden');
-  mmBigPlay.innerHTML = '<div class="icon">' + ICONS.replay + '</div>';
+  mmPlayBtn.innerHTML = ICONS.replay;
   if (mmCurrentToken) {
     try { localStorage.removeItem(vposKey(mmCurrentToken)); } catch (e) {}
   }
   mmSeekUI();
   mmShowCtrl();
-  if (mmAutoNext && mmNextList.length) {
-    const nxt = mmNextList[0];
-    const src = API + '/api/media?token=' + encodeURIComponent(nxt.token);
-    openMedia(nxt, src, mmVideoList);
-    setTimeout(function () {
-      mmShowToast('Playing next: ' + nxt.name);
-    }, 250);
-  }
 });
 mmVideo.addEventListener('timeupdate', function () {
   mmSeekUI();
