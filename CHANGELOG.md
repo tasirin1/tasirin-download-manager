@@ -18,6 +18,7 @@
 - **Seek accuracy** — Samakan lebar progres/buffer dengan lintasan thumb durasi, perbaiki offset preview waktu, dan tambah panjang bar volume.
 - **Clean sliders** — Hapus jejak putih pada track sisa bar durasi, hilangkan indikator buffer putih, dan buat track sisa volume transparan.
 - **Maintenance system** — Tambahkan pintu pemeriksaan repo terpusat, CODEOWNERS, kebijakan keamanan, standar editor, dan audit otomatis asset rilis di CI.
+- **Slider clarity** — Kembalikan track putih durasi/volume dan hapus lapisan glow atau ring tambahan yang tampak sebagai garis pembatas tipis.
 
 ## [v1.0 — 2026-08-24] — Audit agresif traversal dan race
 

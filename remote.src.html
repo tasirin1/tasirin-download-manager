@@ -693,19 +693,19 @@
  -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 24px; margin: 0; background: transparent; }
 
   #mmSeek::-webkit-slider-runnable-track {
- height: 4px; border-radius: 999px; background: transparent; }
+ height: 4px; border-radius: 999px; background: rgba(255,255,255,.28); }
 
   #mmSeek::-webkit-slider-thumb {
- -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(37,150,255,.32), 0 2px 8px rgba(0,0,0,.38); margin-top: -4px; transition: transform .14s ease, box-shadow .14s ease; }
+ -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: none; margin-top: -4px; transition: transform .14s ease; }
 
 #mmSeek::-moz-range-track {
- height: 4px; border-radius: 999px; background: transparent; }
+ height: 4px; border-radius: 999px; background: rgba(255,255,255,.28); }
 
  #mmSeek::-moz-range-progress {
  height: 4px; border-radius: 999px; background: transparent; }
 
- #mmSeek::-moz-range-thumb {
- width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(37,150,255,.32), 0 2px 8px rgba(0,0,0,.38); }
+#mmSeek::-moz-range-thumb {
+ width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: none; }
 
   #mmCtrlRow button {
  flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color .15s ease, opacity .15s ease; }
@@ -737,7 +737,7 @@
  #mmSeekWrap:hover #mmSeek::-webkit-slider-thumb,
  #mmSeekWrap:focus-within #mmSeek::-webkit-slider-thumb {
  transform: scale(1.22);
- box-shadow: 0 0 0 7px rgba(37,150,255,.24), 0 3px 10px rgba(0,0,0,.42); }
+ box-shadow: none; }
 
   #mmSeekTip {
  position: absolute; bottom: 24px; left: 0; transform: translateX(-50%); background: transparent; color: #fff; font-size: 10.5px; font-weight: 700; padding: 0; border-radius: 7px; pointer-events: none; white-space: nowrap; z-index: 3; text-shadow: 0 1px 5px rgba(0,0,0,.75); }
@@ -767,10 +767,10 @@
   }
 
   .mm-vol::-webkit-slider-runnable-track {
- height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), transparent var(--vol, 100%)); }
+ height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.32) var(--vol, 100%)); }
 
   .mm-vol::-webkit-slider-thumb {
- -webkit-appearance: none; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); margin-top: -3px; transition: transform .12s ease; }
+ -webkit-appearance: none; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: none; margin-top: -3px; transition: transform .12s ease; }
 
   .mm-vol-group:hover .mm-vol::-webkit-slider-thumb,
   .mm-vol-group:focus-within .mm-vol::-webkit-slider-thumb {
@@ -781,13 +781,13 @@
  transform: scale(1.18); }
 
   .mm-vol::-moz-range-track {
- height: 3px; border-radius: 999px; background: transparent; }
+ height: 3px; border-radius: 999px; background: rgba(255,255,255,.32); }
 
   .mm-vol::-moz-range-progress {
  height: 3px; border-radius: 999px; background: #fff; }
 
   .mm-vol::-moz-range-thumb {
- width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
+ width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: none; }
 
   #mmPlayer.mm-hide-cursor {
  cursor: none; }
