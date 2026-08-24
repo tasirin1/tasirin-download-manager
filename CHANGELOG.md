@@ -1,3 +1,9 @@
+## [v1.0 — 2026-08-24] — Samakan gaya pemutar dengan YouTube
+
+### Changed
+- **Player controls** — Ganti panel membulat menjadi overlay gradien transparan dengan tombol bulat ala YouTube.
+- **Progress layout** — Pindahkan bar progress merah ke tepi bawah secara full-width, sementara volume kembali berdampingan dengan tombol suara.
+
 ## [v1.0 — 2026-08-24] — Tampilkan volume pemutar biasa
 
 ### Fixed
