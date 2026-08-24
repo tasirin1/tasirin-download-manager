@@ -1,43 +1,7 @@
 #!/usr/bin/env bash
 # Pre-commit hook opsional — aktifkan dengan:
 #   git config core.hooksPath .githooks
-# Wajib: remote web sinkron & valid. Opsional: unit test cepat (butuh Java).
+# Satu pintu pemeriksaan cepat; unit test otomatis bila Java/Gradle tersedia.
 set -u
 
-echo "[pre-commit] memeriksa remote web (sinkron + node --check + i18n)..."
-if ! python3 scripts/prepare_remote.py --check; then
-  echo "[pre-commit] GAGAL: remote web tidak sinkron/valid."
-  echo "  Perbaiki: ubah remote.src.html lalu jalankan  python3 scripts/prepare_remote.py"
-  exit 1
-fi
-echo "[pre-commit] remote web OK."
-
-echo "[pre-commit] memindai bug/error/celah keamanan..."
-if ! python3 scripts/security_audit.py --self-test; then
-  echo "[pre-commit] GAGAL: mesin aturan audit tidak sehat."
-  exit 1
-fi
-if ! python3 scripts/security_audit.py; then
-  echo "[pre-commit] GAGAL: audit menemukan masalah ber-level error."
-  exit 1
-fi
-echo "[pre-commit] audit keamanan OK."
-
-echo "[pre-commit] memeriksa sinkron README/README.en..."
-if ! python3 scripts/check_readme_sync.py; then
-  echo "[pre-commit] GAGAL: struktur heading README tidak sinkron. Perbaiki sebelum commit."
-  exit 1
-fi
-
-if command -v java >/dev/null 2>&1 && [ -x ./gradlew ]; then
-  echo "[pre-commit] menjalankan unit test cepat..."
-  if ! ./gradlew :app:testDebugUnitTest -q; then
-    echo "[pre-commit] GAGAL: unit test tidak hijau. Perbaiki sebelum commit (CI juga memeriksanya)."
-    exit 1
-  fi
-  echo "[pre-commit] unit test OK."
-else
-  echo "[pre-commit] Java/gradle tidak tersedia — unit test dilewati (CI yang memeriksa)."
-fi
-
-exit 0
+exec python3 scripts/check_repo.py --pre-commit

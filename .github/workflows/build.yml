@@ -316,3 +316,36 @@ jobs:
             echo "- Deteksi: **$MALICIOUS/$TOTAL** engine"
             echo "- Report: https://www.virustotal.com/gui/file/$SHA"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Audit rilis terbaru
+        # Push/manual mem-publish rilis lebih dulu; schedule memeriksa bahwa
+        # rilis lama tetap sehat dan tidak kehilangan asset resmi.
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          CODE=$((100000 + ${{ github.run_number }}))
+          EXPECTED_APK="tasirin-download-manager-v${VER}-${CODE}.apk"
+          LATEST_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name')
+          RELEASE=$(gh release view "v${VER}" --json name,assets)
+
+          [ "${LATEST_TAG}" = "v${VER}" ] \
+            || { echo "::error::Release v${VER} bukan release terbaru (latest: ${LATEST_TAG})"; exit 1; }
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "$RELEASE" | jq -e \
+              '[.assets[] | select(.name | test("^tasirin-download-manager-v[0-9.]+-[0-9]+\\.apk$"))] |
+               length >= 1 and all(.[]; .size > 0 and .size <= 3670016)' >/dev/null \
+              || { echo "::error::Tidak ada APK rilis yang sehat pada release v${VER}"; exit 1; }
+          else
+            EXPECTED_NAME="Tasirin Download Manager v${VER} (build ${CODE})"
+            echo "$RELEASE" | jq -e --arg name "${EXPECTED_NAME}" '.name == $name' >/dev/null \
+              || { echo "::error::Judul release v${VER} tidak sesuai build ${CODE}"; exit 1; }
+            echo "$RELEASE" | jq -e --arg apk "${EXPECTED_APK}" \
+              '[.assets[] | select(.name == $apk)] | length == 1 and .[0].size > 0 and .[0].size <= 3670016' >/dev/null \
+              || { echo "::error::Asset ${EXPECTED_APK} tidak ada, duplikat, kosong, atau melebihi batas"; exit 1; }
+          fi
+          echo "$RELEASE" | jq -e '.assets[] | select(.name == "mapping.txt") | .size > 0' >/dev/null \
+            || { echo "::error::mapping.txt tidak ada atau kosong pada release v${VER}"; exit 1; }
+          echo "Rilis v${VER}: asset ${EXPECTED_APK} + mapping.txt sehat."

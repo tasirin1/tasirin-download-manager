@@ -17,10 +17,13 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── .github/workflows/labeler.yml     # Label otomatis per path (config: .github/labeler.yml)
 ├── .github/dependabot.yml            # Update dependensi terjadwal (grouped, auto-merge aman)
 ├── .github/labeler.yml               # Mapping path → label untuk labeler.yml
+├── .github/CODEOWNERS               # Pemilik review default repository
 ├── .github/PULL_REQUEST_TEMPLATE.md  # Template PR (wajib ringkasan + verifikasi)
 ├── .github/ISSUE_TEMPLATE/           # Template issue (bug report & feature request)
+├── SECURITY.md                       # Kebijakan pelaporan kerentanan privat
+├── .editorconfig                     # Standar dasar whitespace & encoding lintas file
 ├── CONTRIBUTING.md                   # Panduan kontribusi singkat (baca juga AGENTS.md)
-├── .githooks/pre-commit              # Hook opsional: prepare_remote --check + unit test cepat
+├── .githooks/pre-commit              # Hook opsional: check_repo.py --pre-commit
 ├── gradle/libs.versions.toml          # Version catalog — pusat versi dependensi & plugin
 ├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
@@ -30,6 +33,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── scripts/check_readme_sync.py      # Guard CI: struktur heading README.md vs README.en.md sinkron
 ├── scripts/security_audit.py        # Audit statis bug/error/keamanan + self-test
 ├── scripts/upload_smoke_test.js      # Smoke test alur upload (stub DOM/XHR, tanpa dependensi)
+├── scripts/check_repo.py             # Satu pintu guard cepat repo (opsional Android)
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
 │   ├── assets/
@@ -205,7 +209,10 @@ kuat dan tanpa diskusi:
    ubah di sana, lalu jalankan `python3 scripts/prepare_remote.py` dan commit
    KEDUA file (CI memverifikasi sinkron lewat `--check`; jangan edit
    `assets/remote.html` manual).
-8. **Guard remote web**: step CI `scripts/prepare_remote.py --check` memverifikasi
+8. **Guard terpusat**: jalankan `python3 scripts/check_repo.py` sebagai satu
+   pintu pemeriksaan struktur repo, remote web, smoke upload, README, audit
+   keamanan, dan whitespace. Step CI `scripts/prepare_remote.py --check`
+   memverifikasi
    sinkron `remote.src.html` ↔ `remote.html`, `node --check` pada semua `<script>`,
    larangan kata Indonesia di string UI (remote.html, values/*.xml, Kotlin), dan
    smoke test alur upload klien (`scripts/upload_smoke_test.js`). Jalankan juga
@@ -238,8 +245,8 @@ kuat dan tanpa diskusi:
     `v1.0` (lihat "Cara cek rilis terbaru"). Normal flow adalah PR; owner boleh push
     hotfix/docs langsung hanya jika CI tetap dipantau penuh.
 16. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
-    .githooks` (jalankan `prepare_remote.py --check` + unit test cepat).
-    Hook tidak wajib; CI tetap penentu.
+    .githooks` (memanggil `scripts/check_repo.py --pre-commit`; unit test
+    otomatis hanya bila Java/Gradle tersedia). Hook tidak wajib; CI tetap penentu.
 17. **Cek kesehatan keystore otomatis di CI** — workflow membandingkan
     fingerprint sertifikat signing dari `KEYSTORE_BASE64` dengan
     `c2785a61...`; mismatch = build gagal (keystore salah/korup terdeteksi
@@ -292,10 +299,14 @@ kuat dan tanpa diskusi:
    rilis/debug, polling sampai analisis selesai, lalu ringkasan deteksi (X/Y
    engine) dicetak di log + job summary; jalan di push `main` DAN di PR
    (repositori sama) supaya APK yang mau di-merge sudah di-scan.
+10. **Audit rilis** — setelah publish pada push/manual, dan pada build mingguan,
+    CI memvalidasi judul/status latest, APK sesuai versionCode, batas ukuran,
+    serta `mapping.txt`.
 
 Catatan: workflow memakai `concurrency` (run lama di ref sama dibatalkan) dan
 ada **build terjadwal mingguan** (Senin 03:00 UTC) yang hanya memverifikasi
-build — tidak mem-publish release. **CodeQL** (Java/Kotlin) dan **gitleaks**
+build sekaligus mengaudit kesehatan asset release `v1.0` — tidak mem-publish
+release. **CodeQL** (Java/Kotlin) dan **gitleaks**
 (deteksi secret) berjalan di tiap push/PR; temuan CodeQL muncul di tab
 Security & alerts repositori.
 

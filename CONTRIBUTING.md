@@ -41,8 +41,9 @@ Pasang pre-commit hook sekali:
 git config core.hooksPath .githooks
 ```
 
-Hook menjalankan `scripts/prepare_remote.py --check` (wajib) dan unit test
-cepat (kalau Java tersedia).
+Hook menjalankan `python3 scripts/check_repo.py --pre-commit`: struktur
+repository, remote web, smoke upload, README, audit keamanan, whitespace, dan
+unit test bila Java/Gradle tersedia.
 
 ## PR Dependabot
 
@@ -64,12 +65,12 @@ cepat (kalau Java tersedia).
 ## Menjalankan guard lokal
 
 ```bash
-python3 scripts/prepare_remote.py --check    # sinkron remote web + node --check + i18n
-node scripts/upload_smoke_test.js            # alur upload klien
-python3 scripts/check_readme_sync.py         # struktur README ID/EN
-./gradlew lintDebug testDebugUnitTest        # butuh Android SDK; wajib hijau di CI
-git diff --check                             # whitespace/error diff dasar
+python3 scripts/check_repo.py                # semua guard cepat repo
+python3 scripts/check_repo.py --android      # tambah lint + unit test Android
 ```
+
+Kerentanan keamanan tidak boleh dibuat sebagai issue publik; ikuti
+[SECURITY.md](SECURITY.md).
 
 ## Keamanan
 

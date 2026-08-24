@@ -17,6 +17,7 @@
 - **Transparent controls** — Hapus latar gelap kontrol pemutar, perkecil ukuran tombol, dan lebarkan bar volume pada desktop maupun layar sentuh.
 - **Seek accuracy** — Samakan lebar progres/buffer dengan lintasan thumb durasi, perbaiki offset preview waktu, dan tambah panjang bar volume.
 - **Clean sliders** — Hapus jejak putih pada track sisa bar durasi, hilangkan indikator buffer putih, dan buat track sisa volume transparan.
+- **Maintenance system** — Tambahkan pintu pemeriksaan repo terpusat, CODEOWNERS, kebijakan keamanan, standar editor, dan audit otomatis asset rilis di CI.
 
 ## [v1.0 — 2026-08-24] — Audit agresif traversal dan race
 
