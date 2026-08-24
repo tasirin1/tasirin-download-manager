@@ -1,6 +1,8 @@
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 
 ### Fixed
+- **Thumbnail authorization** — Validasi path/URI sebelum membaca cache thumbnail agar thumbnail lama tetap terkunci setelah konfigurasi akses storage berubah.
+- **Remote hardening** — Tambah header `nosniff`, referrer, permissions, dan CSP pada halaman remote tanpa mengubah perilaku UI.
 - **CSRF guard** — Wajibkan header khusus pada seluruh POST remote kecuali login agar form lintas situs tidak bisa memicu aksi unduhan/upload/file.
 - **Video control surface** — Hapus latar pill, border, dan bayangan pada lapisan kontrol volume/durasi tanpa memindahkan tombol pemutar.
 - **Seek preview** — Samakan geometri preview durasi dengan ukuran titik pemutar yang baru.

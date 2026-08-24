@@ -243,6 +243,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 "Internal server error"
             )
         }
+        secureHeaders(session.uri, response)
         appendRequestLog(session, response, System.currentTimeMillis() - startedAt)
         return response
     }
@@ -400,6 +401,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         loginAttempts.entries.removeIf {
             it.value.lockedUntil < now &&
                 now - it.value.updatedAt > LOGIN_LOCK_MS
+        }
+        while (loginAttempts.size > MAX_LOGIN_ATTEMPT_ENTRIES) {
+            val oldest = loginAttempts.entries.minByOrNull { it.value.updatedAt } ?: break
+            loginAttempts.remove(oldest.key)
         }
     }
 
@@ -2402,6 +2407,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
+    private fun secureHeaders(uri: String, response: Response) {
+        response.addHeader("X-Content-Type-Options", "nosniff")
+        response.addHeader("Referrer-Policy", "no-referrer")
+        response.addHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        if (uri == "/") {
+            response.addHeader(
+                "Content-Security-Policy",
+                "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; " +
+                    "script-src 'unsafe-inline'; media-src 'self'; connect-src 'self'; " +
+                    "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+            )
+        }
+    }
+
     private class UploadLock {
         val lock = Any()
         val lastUse = AtomicLong(System.currentTimeMillis())
@@ -2446,6 +2465,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val ZIP_CACHE_MAX_BYTES = 256L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
+        private const val MAX_LOGIN_ATTEMPT_ENTRIES = 512
         private const val MAX_SHARE_TOKENS = 256
         private const val MAX_MEDIA_ZIP_TOKENS = 256
         private const val FS_STATS_TTL_MS = 10_000L

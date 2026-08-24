@@ -45,6 +45,7 @@ internal fun getOrCreateThumb(
     isFsPathAllowed: (String) -> Boolean,
     isMediaUriAllowed: (Uri) -> Boolean
 ): File? {
+    if (!isThumbSourceAllowed(ctx, raw, isFsPathAllowed, isMediaUriAllowed)) return null
     val key = sha256Hex(raw).take(16)
     val dir = File(ctx.cacheDir, "thumbs").apply { runCatching { mkdirs() } }
     if (!dir.isDirectory) return null
@@ -68,6 +69,27 @@ internal fun getOrCreateThumb(
             }.getOrNull()
         }
     }.also { lock.lastUse.set(System.currentTimeMillis()) }
+}
+
+private fun isThumbSourceAllowed(
+    ctx: Context,
+    raw: String,
+    isFsPathAllowed: (String) -> Boolean,
+    isMediaUriAllowed: (Uri) -> Boolean
+): Boolean {
+    return when {
+        raw.startsWith("f:") -> {
+            val file = File(raw.substring(2))
+            file.isFile && isFsPathAllowed(file.absolutePath) &&
+                MediaLibrary.mediaKind(file.name) == "video"
+        }
+        raw.startsWith("u:") -> {
+            val uri = raw.substring(2).toUri()
+            isMediaUriAllowed(uri) &&
+                MediaLibrary.mediaKind(DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()) == "video"
+        }
+        else -> false
+    }
 }
 
 internal fun generateThumb(
