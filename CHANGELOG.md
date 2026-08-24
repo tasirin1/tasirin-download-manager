@@ -12,6 +12,7 @@
 - **Documentation** — Ringkas README Indonesia/Inggris menjadi panduan pengguna yang profesional.
 - **Lint hygiene** — Rapikan blok dan indentasi pembuatan entri ZIP tanpa mengubah perilaku.
 - **Volume control** — Perbarui bar volume pemutar video agar melebar halus saat hover/fokus dan tetap terlihat di layar sentuh.
+- **Video controls** — Rombak tata letak pemutar ke gaya panel One UI dengan seekbar terangkat, waktu terpisah, aksi sekunder rapi, dan aksen biru Samsung.
 
 ## [v1.0 — 2026-08-24] — Audit agresif traversal dan race
 
