@@ -80,7 +80,9 @@ object ZipCreator {
                     name = displayNameFor(context, uri)
                     input = context.contentResolver.openInputStream(uri)
                 }
-                if (input == null) return@runCatching
+                if (input == null) {
+                    return@runCatching
+                }
                 val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
                 zos.putNextEntry(ZipEntry(entry))
                 input.use { it.copyTo(zos) }
