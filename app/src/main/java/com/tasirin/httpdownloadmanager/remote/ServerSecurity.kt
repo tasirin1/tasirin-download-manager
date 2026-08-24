@@ -59,7 +59,8 @@ object ServerSecurity {
     fun isMediaStorePathAllowed(
         relativePath: String,
         roots: List<File>,
-        fullAccess: Boolean
+        fullAccess: Boolean,
+        mediaRoot: String = "/storage/emulated/0"
     ): Boolean {
         val clean = relativePath.trim().trim('/')
         if (clean.isEmpty()) return fullAccess
@@ -67,7 +68,7 @@ object ServerSecurity {
             return false
         }
         if (fullAccess) return true
-        val virtualPath = "/storage/emulated/0/$clean"
+        val virtualPath = "$mediaRoot/$clean"
         return isPathAllowed(virtualPath, roots)
     }
 

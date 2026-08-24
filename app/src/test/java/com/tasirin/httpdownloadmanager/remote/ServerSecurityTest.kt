@@ -193,11 +193,12 @@ class ServerSecurityTest {
     @Test
     fun isMediaStorePathAllowed_hanya_diDalamRoot() {
         val root = tmp.newFolder("storage", "emulated", "0", "Download")
-        assertTrue(ServerSecurity.isMediaStorePathAllowed("Download/sub", listOf(root), false))
-        assertFalse(ServerSecurity.isMediaStorePathAllowed("Movies/private.mp4", listOf(root), false))
-        assertFalse(ServerSecurity.isMediaStorePathAllowed("", listOf(root), false))
-        assertFalse(ServerSecurity.isMediaStorePathAllowed("../Rahasia", listOf(root), false))
-        assertFalse(ServerSecurity.isMediaStorePathAllowed("Download//x", listOf(root), false))
-        assertTrue(ServerSecurity.isMediaStorePathAllowed("Movies/private.mp4", listOf(root), true))
+        val mediaRoot = tmp.root.resolve("storage/emulated/0").absolutePath
+        assertTrue(ServerSecurity.isMediaStorePathAllowed("Download/sub", listOf(root), false, mediaRoot))
+        assertFalse(ServerSecurity.isMediaStorePathAllowed("Movies/private.mp4", listOf(root), false, mediaRoot))
+        assertFalse(ServerSecurity.isMediaStorePathAllowed("", listOf(root), false, mediaRoot))
+        assertFalse(ServerSecurity.isMediaStorePathAllowed("../Rahasia", listOf(root), false, mediaRoot))
+        assertFalse(ServerSecurity.isMediaStorePathAllowed("Download//x", listOf(root), false, mediaRoot))
+        assertTrue(ServerSecurity.isMediaStorePathAllowed("Movies/private.mp4", listOf(root), true, mediaRoot))
     }
 }

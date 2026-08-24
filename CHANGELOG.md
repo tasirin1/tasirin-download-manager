@@ -9,6 +9,7 @@
 - **Update hardening** — Wajibkan ukuran APK yang valid, batas 100 MB, dan hentikan unduhan bila byte meluber.
 - **Backup surface** — Matikan Android backup karena prefs menyimpan konfigurasi server dan secret lokal.
 - **CodeQL PendingIntent** — Kunci semua notification intent ke package aplikasi.
+- **Audit test** — Jadikan base MediaStore dapat diinjeksi agar guard bisa diuji lintas lingkungan.
 
 ## [v1.0 — 2026-08-24] — Perbaikan audit keamanan
 
