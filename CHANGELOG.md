@@ -15,6 +15,7 @@
 - **Video controls** — Rombak tata letak pemutar ke gaya panel One UI dengan seekbar terangkat, waktu terpisah, aksi sekunder rapi, dan aksen biru Samsung.
 - **Playback controls** — Pindahkan tombol sebelumnya/pause/berikutnya ke tengah video, hapus overlay besar duplikat, dan bersihkan fitur kecepatan serta auto-play.
 - **Transparent controls** — Hapus latar gelap kontrol pemutar, perkecil ukuran tombol, dan lebarkan bar volume pada desktop maupun layar sentuh.
+- **Seek accuracy** — Samakan lebar progres/buffer dengan lintasan thumb durasi, perbaiki offset preview waktu, dan tambah panjang bar volume.
 
 ## [v1.0 — 2026-08-24] — Audit agresif traversal dan race
 

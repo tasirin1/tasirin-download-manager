@@ -687,13 +687,16 @@
  position: relative; z-index: 0; width: auto; height: 24px; margin: -2px 0 -1px; display: flex; align-items: center; }
 
   #mmBuf {
- position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 4px; border-radius: 999px; background: rgba(255,255,255,.26); pointer-events: none; transition: height .16s ease; }
+ position: absolute; z-index: 1; left: 6px; top: 50%; transform: translateY(-50%); height: 4px; border-radius: 999px; background: rgba(255,255,255,.26); pointer-events: none; transition: height .16s ease; }
+
+  #mmFill {
+ position: absolute; z-index: 1; left: 6px; top: 50%; transform: translateY(-50%); width: 0; height: 4px; border-radius: 999px; background: #2596ff; pointer-events: none; transition: height .16s ease; }
 
   #mmSeek {
  -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 24px; margin: 0; background: transparent; }
 
   #mmSeek::-webkit-slider-runnable-track {
- height: 4px; border-radius: 999px; background: linear-gradient(to right, #2596ff var(--fill, 0%), rgba(255,255,255,.24) var(--fill, 0%)); }
+ height: 4px; border-radius: 999px; background: rgba(255,255,255,.24); }
 
   #mmSeek::-webkit-slider-thumb {
  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(37,150,255,.32), 0 2px 8px rgba(0,0,0,.38); margin-top: -4px; transition: transform .14s ease, box-shadow .14s ease; }
@@ -702,7 +705,7 @@
  height: 4px; border-radius: 999px; background: rgba(255,255,255,.24); }
 
  #mmSeek::-moz-range-progress {
- height: 4px; border-radius: 999px; background: #2596ff; }
+ height: 4px; border-radius: 999px; background: transparent; }
 
  #mmSeek::-moz-range-thumb {
  width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(37,150,255,.32), 0 2px 8px rgba(0,0,0,.38); }
@@ -728,7 +731,9 @@
  #mmSeekWrap:hover #mmSeek::-webkit-slider-runnable-track,
  #mmSeekWrap:focus-within #mmSeek::-webkit-slider-runnable-track,
  #mmSeekWrap:hover #mmBuf,
- #mmSeekWrap:focus-within #mmBuf {
+ #mmSeekWrap:focus-within #mmBuf,
+ #mmSeekWrap:hover #mmFill,
+ #mmSeekWrap:focus-within #mmFill {
  height: 5px; }
 
   #mmSeek::-webkit-slider-thumb {
@@ -746,7 +751,7 @@
  display: flex; align-items: center; flex: 0 0 auto; border-radius: 999px; background: transparent; }
 
   .mm-vol {
- -webkit-appearance: none; appearance: none; width: 64px; height: 24px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
+ -webkit-appearance: none; appearance: none; width: 80px; height: 24px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
 
   @media (hover: hover) {
     .mm-vol {
@@ -759,7 +764,7 @@
 
     .mm-vol-group:hover .mm-vol,
     .mm-vol-group:focus-within .mm-vol {
-      width: 96px;
+      width: 112px;
       margin-left: 2px;
       opacity: 1;
       overflow: visible;
@@ -795,7 +800,7 @@
  @media (max-width: 430px), (max-height: 380px) {
  #mmCtrlRow { gap: 0; }
  #mmCtrl { padding-left: 7px; padding-right: 7px; }
- .mm-vol { width: 56px; height: 22px; margin-left: 0; opacity: 1; overflow: visible; }
+ .mm-vol { width: 72px; height: 22px; margin-left: 0; opacity: 1; overflow: visible; }
   }
 
  @media (max-width: 360px) {
@@ -806,7 +811,7 @@
  #mmTransport { gap: 10px; }
  #mmTransport button { width: 34px; height: 34px; }
  #mmPlayBtn { width: 44px !important; height: 44px !important; }
- .mm-vol { width: 48px; height: 20px; margin-left: 0; opacity: 1; overflow: visible; }
+ .mm-vol { width: 60px; height: 20px; margin-left: 0; opacity: 1; overflow: visible; }
  #mmTime { font-size: 9.5px; }
   }
 
@@ -1298,6 +1303,7 @@
         </div>
         <div id="mmSeekWrap">
           <div id="mmBuf"></div>
+          <div id="mmFill"></div>
           <input id="mmSeek" type="range" min="0" max="1000" value="0" step="1">
         </div>
       </div>
@@ -1491,6 +1497,7 @@ const mmToast = document.getElementById('mmToast');
 const mmCtrl = document.getElementById('mmCtrl');
 const mmSeek = document.getElementById('mmSeek');
 const mmBuf = document.getElementById('mmBuf');
+const mmFill = document.getElementById('mmFill');
 const mmPlayBtn = document.getElementById('mmPlayBtn');
 const mmTime = document.getElementById('mmTime');
 const mmMuteBtn = document.getElementById('mmMuteBtn');
@@ -1615,7 +1622,7 @@ function mmSeekUI() {
   // Saat slider digeser, jangan biarkan timeupdate menimpa posisi jempol.
   if (!mmSeekDrag) {
     mmSeek.value = Math.round(pct);
-    mmSeek.style.setProperty('--fill', (pct / 10).toFixed(1) + '%');
+    mmFill.style.width = 'calc((100% - 12px) * ' + (d ? t / d : 0).toFixed(6) + ')';
   }
   mmTime.textContent = mmFmtTime(t) + ' / ' + mmFmtTime(d);
 }
@@ -1624,7 +1631,7 @@ function mmUpdateBuffer() {
   const d = mmVideo.duration || 0;
   if (!d || !mmVideo.buffered || !mmVideo.buffered.length) return;
   const end = mmVideo.buffered.end(mmVideo.buffered.length - 1);
-  mmBuf.style.width = Math.min(100, (end / d) * 100).toFixed(1) + '%';
+  mmBuf.style.width = 'calc((100% - 12px) * ' + Math.min(1, end / d).toFixed(6) + ')';
 }
 
 function closeMedia() {
@@ -3446,9 +3453,9 @@ function openMedia(it, src, playlist) {
   mmVideoWrap.classList.add('hidden');
   mmVideo.pause();
   mmVideo.removeAttribute('src');
-  mmBuf.style.width = '0%';
+  mmBuf.style.width = '0';
+  mmFill.style.width = '0';
   mmSeek.value = 0;
-  mmSeek.style.setProperty('--fill', '0%');
   mmTime.textContent = '0:00 / 0:00';
   mmVideoWrap.classList.remove('hidden');
   mmPlayer.classList.remove('hidden');
@@ -3573,7 +3580,7 @@ mmSeek.addEventListener('input', function () {
   if (!d) return;
   const t = (mmSeek.value / 1000) * d;
   mmVideo.currentTime = t;
-  mmSeek.style.setProperty('--fill', (mmSeek.value / 10).toFixed(1) + '%');
+  mmFill.style.width = 'calc((100% - 12px) * ' + (mmSeek.value / 1000).toFixed(6) + ')';
   mmTime.textContent = mmFmtTime(t) + ' / ' + mmFmtTime(d);
   mmShowCtrl();
 });
@@ -3597,8 +3604,9 @@ mmSeekWrap.addEventListener('mousemove', function (e) {
   const rect = mmSeekWrap.getBoundingClientRect();
   const d = mmVideo.duration || 0;
   if (!d) return;
-  const x = Math.max(28, Math.min(e.clientX - rect.left, rect.width - 28));
-  mmSeekTip.textContent = mmFmtTime((x / rect.width) * d);
+  const usable = Math.max(0, rect.width - 12);
+  const x = Math.max(6, Math.min(e.clientX - rect.left, rect.width - 6));
+  mmSeekTip.textContent = mmFmtTime(((x - 6) / usable) * d);
   mmSeekTip.style.left = x + 'px';
   mmSeekTip.classList.remove('hidden');
 });
