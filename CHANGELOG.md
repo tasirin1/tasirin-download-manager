@@ -7,6 +7,7 @@
 - **UI thread** — Pindahkan rename download dan pemberhentian server saat PIN dihapus ke background thread.
 - **Persistensi** — Debounce penyimpanan status pause/clear agar tombol batch tidak menulis disk berkali-kali.
 - **Video resume storage** — Batasi jumlah posisi video yang disimpan di browser dan gunakan ID upload acak dengan fallback WebView lama.
+- **Cache eviction** — Perbaiki penghapusan ZIP tertua agar kompatibel dengan compiler Kotlin yang dipakai CI.
 
 ## [v1.0 — 2026-08-24] — Penguatan audit keamanan lanjutan
 
