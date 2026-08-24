@@ -686,9 +686,6 @@
   #mmSeekWrap {
  position: relative; z-index: 0; width: auto; height: 24px; margin: -2px 0 -1px; display: flex; align-items: center; }
 
-  #mmBuf {
- position: absolute; z-index: 1; left: 6px; top: 50%; transform: translateY(-50%); height: 4px; border-radius: 999px; background: rgba(255,255,255,.26); pointer-events: none; transition: height .16s ease; }
-
   #mmFill {
  position: absolute; z-index: 1; left: 6px; top: 50%; transform: translateY(-50%); width: 0; height: 4px; border-radius: 999px; background: #2596ff; pointer-events: none; transition: height .16s ease; }
 
@@ -696,13 +693,13 @@
  -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 24px; margin: 0; background: transparent; }
 
   #mmSeek::-webkit-slider-runnable-track {
- height: 4px; border-radius: 999px; background: rgba(255,255,255,.24); }
+ height: 4px; border-radius: 999px; background: transparent; }
 
   #mmSeek::-webkit-slider-thumb {
  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(37,150,255,.32), 0 2px 8px rgba(0,0,0,.38); margin-top: -4px; transition: transform .14s ease, box-shadow .14s ease; }
 
- #mmSeek::-moz-range-track {
- height: 4px; border-radius: 999px; background: rgba(255,255,255,.24); }
+#mmSeek::-moz-range-track {
+ height: 4px; border-radius: 999px; background: transparent; }
 
  #mmSeek::-moz-range-progress {
  height: 4px; border-radius: 999px; background: transparent; }
@@ -730,8 +727,6 @@
 
  #mmSeekWrap:hover #mmSeek::-webkit-slider-runnable-track,
  #mmSeekWrap:focus-within #mmSeek::-webkit-slider-runnable-track,
- #mmSeekWrap:hover #mmBuf,
- #mmSeekWrap:focus-within #mmBuf,
  #mmSeekWrap:hover #mmFill,
  #mmSeekWrap:focus-within #mmFill {
  height: 5px; }
@@ -772,7 +767,7 @@
   }
 
   .mm-vol::-webkit-slider-runnable-track {
- height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.34) var(--vol, 100%)); }
+ height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), transparent var(--vol, 100%)); }
 
   .mm-vol::-webkit-slider-thumb {
  -webkit-appearance: none; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); margin-top: -3px; transition: transform .12s ease; }
@@ -786,7 +781,7 @@
  transform: scale(1.18); }
 
   .mm-vol::-moz-range-track {
- height: 3px; border-radius: 999px; background: rgba(255,255,255,.38); }
+ height: 3px; border-radius: 999px; background: transparent; }
 
   .mm-vol::-moz-range-progress {
  height: 3px; border-radius: 999px; background: #fff; }
@@ -1302,7 +1297,6 @@
           </div>
         </div>
         <div id="mmSeekWrap">
-          <div id="mmBuf"></div>
           <div id="mmFill"></div>
           <input id="mmSeek" type="range" min="0" max="1000" value="0" step="1">
         </div>
@@ -1496,7 +1490,6 @@ const mmSpinner = document.getElementById('mmSpinner');
 const mmToast = document.getElementById('mmToast');
 const mmCtrl = document.getElementById('mmCtrl');
 const mmSeek = document.getElementById('mmSeek');
-const mmBuf = document.getElementById('mmBuf');
 const mmFill = document.getElementById('mmFill');
 const mmPlayBtn = document.getElementById('mmPlayBtn');
 const mmTime = document.getElementById('mmTime');
@@ -1625,13 +1618,6 @@ function mmSeekUI() {
     mmFill.style.width = 'calc((100% - 12px) * ' + (d ? t / d : 0).toFixed(6) + ')';
   }
   mmTime.textContent = mmFmtTime(t) + ' / ' + mmFmtTime(d);
-}
-
-function mmUpdateBuffer() {
-  const d = mmVideo.duration || 0;
-  if (!d || !mmVideo.buffered || !mmVideo.buffered.length) return;
-  const end = mmVideo.buffered.end(mmVideo.buffered.length - 1);
-  mmBuf.style.width = 'calc((100% - 12px) * ' + Math.min(1, end / d).toFixed(6) + ')';
 }
 
 function closeMedia() {
@@ -3453,7 +3439,6 @@ function openMedia(it, src, playlist) {
   mmVideoWrap.classList.add('hidden');
   mmVideo.pause();
   mmVideo.removeAttribute('src');
-  mmBuf.style.width = '0';
   mmFill.style.width = '0';
   mmSeek.value = 0;
   mmTime.textContent = '0:00 / 0:00';
@@ -3785,12 +3770,8 @@ mmVideo.addEventListener('timeupdate', function () {
     saveVideoPos(mmCurrentToken);
   }
 });
-mmVideo.addEventListener('progress', function () {
-  mmUpdateBuffer();
-});
 mmVideo.addEventListener('loadedmetadata', function () {
   mmSeekUI();
-  mmUpdateBuffer();
   if (mmVideo.videoWidth > 0 && mmVideo.videoHeight > 0) {
     mmPlayer.style.setProperty('--mm-aspect', ((mmVideo.videoHeight * 100) / mmVideo.videoWidth).toFixed(3) + '%');
   }
