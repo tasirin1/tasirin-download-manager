@@ -187,7 +187,7 @@ RULES = [
         "maintenance_marker",
         "warning",
         "Unresolved maintenance marker",
-        r"\b(?:TODO|FIXME|HACK|XXX)\b",
+        r"\b(?:TODO|FIXME|HACK|XXX)\b",  # audit-ignore: maintenance_marker
         frozenset({"text"}),
     ),
 ]
@@ -400,7 +400,7 @@ def run_self_test() -> int:
         ],
         Path("sample.txt"): [
             f"GITHUB_TOKEN={github_token}",
-            "TODO: validate this flow",
+            "TODO: validate this flow",  # audit-ignore: maintenance_marker
         ],
     }
     with tempfile.TemporaryDirectory() as directory:

@@ -2,6 +2,7 @@
 
 ### Added
 - **Security/error scanner** — Tambahkan audit statis internal dengan self-test, output JSON/CI, suppression eksplisit, dan aturan untuk secret, logging sensitif, WebView, SQL/path sink, JavaScript berbahaya, dan penanda maintenance.
+- **Scanner hygiene** — Tandai contoh aturan dan fixture self-test sebagai pengecualian agar scanner tidak melaporkan dirinya sendiri.
 - **CI guard** — Jalankan scanner otomatis pada push/PR sebelum build Android, serta di optional pre-commit hook.
 
 ### Fixed
