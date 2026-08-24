@@ -633,7 +633,7 @@
  opacity: 0; visibility: hidden; }
 
   #mmTransport button {
- pointer-events: auto; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color .15s ease, transform .15s ease, opacity .15s ease; }
+ pointer-events: auto; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color .15s ease, transform .15s ease, opacity .15s ease; }
 
   #mmTransport button:hover {
  background: rgba(37,150,255,.25); transform: scale(1.04); }
@@ -645,13 +645,13 @@
  opacity: .35; pointer-events: none; }
 
   #mmPlayBtn {
- width: 52px !important; height: 52px !important; }
+ width: 58px !important; height: 58px !important; }
 
   #mmTransport button svg {
- width: 18px; height: 18px; filter: drop-shadow(0 1px 4px rgba(0,0,0,.65)); }
+ width: 20px; height: 20px; filter: drop-shadow(0 1px 4px rgba(0,0,0,.65)); }
 
   #mmPlayBtn svg {
- width: 22px; height: 22px; }
+ width: 26px; height: 26px; }
 
   #mmPlayerTop {
  position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 7px; padding: 8px 12px 30px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); background: transparent; pointer-events: none; transition: opacity .22s ease, visibility .22s ease; }
@@ -663,7 +663,7 @@
  pointer-events: none; }
 
  #mmPlayerTop button {
- pointer-events: auto; flex: 0 0 auto; width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+ pointer-events: auto; flex: 0 0 auto; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
   #mmPlayerTop button:hover {
  background: rgba(255,255,255,.18); }
@@ -690,38 +690,41 @@
  order: -1; flex: 1 1 auto; min-width: 0; padding-left: 6px; }
 
   #mmSeekWrap {
- position: relative; z-index: 0; width: auto; height: 24px; margin: -2px 0 -1px; display: flex; align-items: center; --seek-ratio: 0; }
+ position: relative; z-index: 0; width: auto; height: 26px; margin: -2px 0 -1px; display: flex; align-items: center; --seek-ratio: 0; }
 
   #mmFill {
- position: absolute; z-index: 1; left: 6px; top: 50%; transform: translateY(-50%); width: calc((100% - 12px) * var(--seek-ratio)); height: 4px; border-radius: 999px; background: #2596ff; pointer-events: none; transition: height .16s ease; }
+ position: absolute; z-index: 1; left: 7px; top: 50%; transform: translateY(-50%); width: calc((100% - 14px) * var(--seek-ratio)); height: 5px; border-radius: 999px; background: #2596ff; pointer-events: none; transition: height .16s ease; }
 
   #mmSeek {
- -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 24px; margin: 0; background: transparent; outline: none; }
+ -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 26px; margin: 0; background: transparent; outline: none; }
 
   #mmSeek,
   .mm-vol {
  border: 0 !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
 
   #mmSeek::-webkit-slider-runnable-track {
- height: 4px; border-radius: 999px; background: rgba(255,255,255,.28); }
+ height: 5px; border-radius: 999px; background: rgba(255,255,255,.28); }
 
   #mmSeek::-webkit-slider-thumb {
- -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: transparent; border: 0; box-shadow: none; margin-top: -4px; }
+ -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: transparent; border: 0; box-shadow: none; margin-top: -4.5px; }
 
 #mmSeek::-moz-range-track {
- height: 4px; border-radius: 999px; background: rgba(255,255,255,.28); }
+ height: 5px; border-radius: 999px; background: rgba(255,255,255,.28); }
 
  #mmSeek::-moz-range-progress {
- height: 4px; border-radius: 999px; background: transparent; }
+ height: 5px; border-radius: 999px; background: transparent; }
 
 #mmSeek::-moz-range-thumb {
- width: 12px; height: 12px; border-radius: 50%; background: transparent; border: 0; box-shadow: none; }
+ width: 14px; height: 14px; border-radius: 50%; background: transparent; border: 0; box-shadow: none; }
 
   #mmDot {
- position: absolute; z-index: 3; left: calc(6px + (100% - 12px) * var(--seek-ratio)); top: 50%; width: 12px; height: 12px; border-radius: 50%; background: #fff; pointer-events: none; transform: translate(-50%, -50%) scale(1); transition: transform .14s ease, height .16s ease; }
+ position: absolute; z-index: 3; left: calc(7px + (100% - 14px) * var(--seek-ratio)); top: 50%; width: 14px; height: 14px; border-radius: 50%; background: #fff; pointer-events: none; transform: translate(-50%, -50%) scale(1); transition: transform .14s ease, height .16s ease; }
 
   #mmCtrlRow button {
- flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color .15s ease, opacity .15s ease; }
+ flex: 0 0 auto; width: 38px; height: 38px; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color .15s ease, opacity .15s ease; }
+
+  #mmCtrlRow button svg {
+ width: 20px; height: 20px; }
 
   #mmCtrlRow button:focus-visible, #mmPlayerTop button:focus-visible {
  outline: 2px solid #fff; outline-offset: -2px; background: rgba(255,255,255,.16); }
@@ -733,7 +736,7 @@
  opacity: .35; pointer-events: none; }
 
   #mmTime {
- display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 500; letter-spacing: .2px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.65); font-variant-numeric: tabular-nums; }
+ display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; font-weight: 500; letter-spacing: .2px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.65); font-variant-numeric: tabular-nums; }
 
  .mm-side {
  min-width: 0; display: flex; align-items: center; gap: 2px; margin-left: auto; }
@@ -742,19 +745,19 @@
  #mmSeekWrap:focus-within #mmSeek::-webkit-slider-runnable-track,
  #mmSeekWrap:hover #mmFill,
  #mmSeekWrap:focus-within #mmFill {
- height: 5px; }
+ height: 6px; }
 
  #mmSeekWrap:focus-within #mmDot {
  transform: translate(-50%, -50%) scale(1.22); }
 
   #mmSeekTip {
- position: absolute; bottom: 24px; left: 0; transform: translateX(-50%); background: transparent; color: #fff; font-size: 10.5px; font-weight: 700; padding: 0; border-radius: 7px; pointer-events: none; white-space: nowrap; z-index: 3; text-shadow: 0 1px 5px rgba(0,0,0,.75); }
+ position: absolute; bottom: 26px; left: 0; transform: translateX(-50%); background: transparent; color: #fff; font-size: 11.5px; font-weight: 700; padding: 0; border-radius: 7px; pointer-events: none; white-space: nowrap; z-index: 3; text-shadow: 0 1px 5px rgba(0,0,0,.75); }
 
   .mm-vol-group {
  display: flex; align-items: center; flex: 0 0 auto; border-radius: 999px; background: transparent; }
 
   .mm-vol {
- -webkit-appearance: none; appearance: none; width: 80px; height: 24px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
+ -webkit-appearance: none; appearance: none; width: 88px; height: 26px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
 
   @media (hover: hover) {
     .mm-vol {
@@ -767,7 +770,7 @@
 
     .mm-vol-group:hover .mm-vol,
     .mm-vol-group:focus-within .mm-vol {
-      width: 112px;
+      width: 120px;
       margin-left: 2px;
       opacity: 1;
       overflow: visible;
@@ -775,10 +778,10 @@
   }
 
   .mm-vol::-webkit-slider-runnable-track {
- height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.32) var(--vol, 100%)); }
+ height: 4px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.32) var(--vol, 100%)); }
 
   .mm-vol::-webkit-slider-thumb {
- -webkit-appearance: none; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: none; margin-top: -3px; transition: transform .12s ease; }
+ -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 0; filter: none; margin-top: -3px; transition: transform .12s ease; }
 
   .mm-vol-group:hover .mm-vol::-webkit-slider-thumb,
   .mm-vol-group:focus-within .mm-vol::-webkit-slider-thumb {
@@ -789,13 +792,13 @@
  transform: scale(1.18); }
 
   .mm-vol::-moz-range-track {
- height: 3px; border-radius: 999px; background: rgba(255,255,255,.32); }
+ height: 4px; border-radius: 999px; background: rgba(255,255,255,.32); }
 
   .mm-vol::-moz-range-progress {
- height: 3px; border-radius: 999px; background: #fff; }
+ height: 4px; border-radius: 999px; background: #fff; }
 
   .mm-vol::-moz-range-thumb {
- width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 0; filter: none; }
+ width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 0; filter: none; }
 
   #mmPlayer.mm-hide-cursor {
  cursor: none; }
@@ -803,19 +806,19 @@
  @media (max-width: 430px), (max-height: 380px) {
  #mmCtrlRow { gap: 0; }
  #mmCtrl { padding-left: 7px; padding-right: 7px; }
- .mm-vol { width: 72px; height: 22px; margin-left: 0; opacity: 1; overflow: visible; }
+ .mm-vol { width: 80px; height: 24px; margin-left: 0; opacity: 1; overflow: visible; }
   }
 
  @media (max-width: 360px) {
- #mmCtrlRow button { width: 30px; height: 30px; }
- #mmPlayerTop button { width: 28px; height: 28px; }
- #mmMuteBtn { width: 30px; height: 30px; }
- #mmFsBtn { width: 30px; height: 30px; }
+ #mmCtrlRow button { width: 34px; height: 34px; }
+ #mmPlayerTop button { width: 32px; height: 32px; }
+ #mmMuteBtn { width: 34px; height: 34px; }
+ #mmFsBtn { width: 34px; height: 34px; }
  #mmTransport { gap: 10px; }
- #mmTransport button { width: 34px; height: 34px; }
- #mmPlayBtn { width: 44px !important; height: 44px !important; }
- .mm-vol { width: 60px; height: 20px; margin-left: 0; opacity: 1; overflow: visible; }
- #mmTime { font-size: 9.5px; }
+ #mmTransport button { width: 38px; height: 38px; }
+ #mmPlayBtn { width: 50px !important; height: 50px !important; }
+ .mm-vol { width: 66px; height: 22px; margin-left: 0; opacity: 1; overflow: visible; }
+ #mmTime { font-size: 10.5px; }
   }
 
   .hidden {
