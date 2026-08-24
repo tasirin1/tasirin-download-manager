@@ -151,28 +151,31 @@ object StoragePrefs {
         prefs(context)
             .getString(KEY_SERVER_PIN, null)?.takeIf { it.isNotBlank() }
 
-    /** Simpan PIN sebagai hash SHA-256; nilai kosong menghapus PIN. */
+    /** Simpan PIN sebagai PBKDF2-SHA256; nilai kosong menghapus PIN. */
     fun setServerPin(context: Context, pin: String?) {
-        val hash = pin?.trim()?.takeIf { it.isNotEmpty() }?.let { sha256Hex(it) }
+        val hash = pin?.trim()?.takeIf { it.isNotEmpty() }?.let { PinHash.hash(it) }
         rotateServerSessionSecret(context)
         prefs(context).edit {
             putString(KEY_SERVER_PIN, hash)
         }
     }
 
-    /** Normalisasi PIN tersimpan menjadi hash SHA-256. Nilai lama dari versi
-     *  sebelum hash berupa plaintext — di-hash sekali supaya cookie lama tetap
-     *  berlaku tanpa memaksa login ulang. */
+    /** Nilai kredensial tersimpan; cukup untuk cek ada/tidaknya PIN. */
     fun storedPinHash(context: Context): String? {
-        val stored = getServerPin(context).orEmpty()
-        return normalizePinHash(stored)
+        return getServerPin(context)
     }
 
     /** Cek PIN yang dimasukkan terhadap yang tersimpan dengan pembandingan
      *  constant-time (anti timing attack lewat perbedaan panjang loop). */
     fun pinMatches(context: Context, pin: String): Boolean {
-        val expected = storedPinHash(context) ?: return false
-        return constantEquals(sha256Hex(pin), expected)
+        val stored = getServerPin(context) ?: return false
+        if (PinHash.isModern(stored)) return PinHash.verify(pin, stored)
+
+        // Nilai lama dimigrasikan sekali setelah PIN benar, tanpa memaksa logout.
+        val expected = normalizePinHash(stored) ?: return false
+        if (!constantEquals(sha256Hex(pin), expected)) return false
+        prefs(context).edit { putString(KEY_SERVER_PIN, PinHash.hash(pin)) }
+        return true
     }
 
     /** Secret acak untuk tanda tangan URL stream parsial; tidak memakai nama package. */

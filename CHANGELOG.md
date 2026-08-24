@@ -1,6 +1,7 @@
 ## [v1.0 — 2026-08-24] — Penguatan audit keamanan lanjutan
 
 ### Fixed
+- **PIN hardening** — Simpan PIN baru sebagai PBKDF2-SHA1 bersalt dengan 100.000 iterasi, dan migrasikan hash lama setelah login berhasil.
 - **Remote session** — Ganti cookie login dari hash PIN menjadi token sesi acak 256-bit, dengan rotasi saat logout atau PIN berubah.
 - **MediaStore boundary** — Listing, ZIP, upload/download, dan pemindahan `m:` kini tunduk pada root folder serta mode akses penuh.
 - **Upload buffer race** — Reservasi byte chunk secara global agar banyak upload paralel tidak melewati batas disk/cache.

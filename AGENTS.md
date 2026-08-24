@@ -155,6 +155,7 @@ kuat dan tanpa diskusi:
 | Upload temporary file traversal | ID upload dari query dipakai langsung pada nama file cache | `ServerSecurity.isUploadIdAllowed()` wajib memvalidasi ID sebelum peta status/file tmp dipakai |
 | Token stream parsial bisa ditebak | secret memakai hash PIN/package name | Secret parsial wajib acak 256-bit dan persisten lewat `StoragePrefs.partialStreamSecret()` |
 | Cookie login setara hash PIN | cookie memakai SHA-256 PIN sehingga bocornya bisa brute-force offline | Cookie remote wajib token sesi acak dari `StoragePrefs.serverSessionSecret()`; rotate saat logout/ubah PIN |
+| Hash PIN cepat ditebak | nilai lama hanya SHA-256 tanpa salt | PIN baru wajib `PinHash` PBKDF2 bersalt; hash/plaintext lama dimigrasi hanya setelah PIN benar |
 | File Manager MediaStore bypass | endpoint menerima semua path `m:` meski root FS dibatasi | Listing/ZIP/move/upload MediaStore wajib lewat `ServerSecurity.isMediaStorePathAllowed()` |
 | Batas buffer upload dilompati request paralel | pengecekan disk dilakukan sebelum write tanpa reservasi global | Reservasi byte chunk di bawah `uploadBufferReservation`, lalu lepaskan setelah chunk selesai/gagal |
 | `GALLERY SCAN` berulang tiap request galeri | cache scan dianggap "belum lengkap" karena `items.size >= limit` gagal saat total file < limit → scan MediaStore penuh berulang dalam masa TTL | kondisi cache juga menerima scan tuntas: `items.size == total` (di `MediaLibrary.scanCached` + `scannedGallery`) |

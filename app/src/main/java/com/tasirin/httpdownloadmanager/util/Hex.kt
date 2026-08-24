@@ -19,8 +19,8 @@ object Hex {
     }
 }
 
-/** Hash SHA-256 dalam bentuk hex huruf kecil — dipakai untuk menyimpan PIN
- *  server sebagai hash (plaintext tidak pernah ditulis ke disk). */
+/** Hash SHA-256 dalam bentuk hex huruf kecil — dipakai untuk normalisasi nilai
+ *  PIN lama dan kebutuhan checksum; plaintext tetap tidak pernah ditambahkan. */
 fun sha256Hex(input: String): String {
     val digest = MessageDigest.getInstance("SHA-256")
         .digest(input.toByteArray(Charsets.UTF_8))
