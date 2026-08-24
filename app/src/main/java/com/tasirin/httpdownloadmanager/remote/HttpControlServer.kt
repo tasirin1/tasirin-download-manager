@@ -217,6 +217,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 "text/plain; charset=utf-8",
                 "Server restarting, try again"
             )
+        } catch (_: BodyTooLargeException) {
+            newFixedLengthResponse(
+                Response.Status.PAYLOAD_TOO_LARGE,
+                "text/plain; charset=utf-8",
+                "Request body too large"
+            ).also { it.addHeader("Connection", "close") }
         } catch (e: Exception) {
             logError(e)
             newFixedLengthResponse(
@@ -378,7 +384,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         loginAttempts.getOrPut(ip.ifEmpty { "unknown" }) { LoginAttempt() }
 
     private fun pruneLoginAttempts(now: Long) {
-        if (loginAttempts.size <= 512) return
+        if (loginAttempts.isEmpty()) return
         loginAttempts.entries.removeIf {
             it.value.lockedUntil < now &&
                 now - it.value.updatedAt > LOGIN_LOCK_MS

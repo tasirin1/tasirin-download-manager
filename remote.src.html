@@ -1902,6 +1902,7 @@ let fsOffset = 0;
 let fsLoadingMore = false;
 let fsLoadSeq = 0;
 const FS_PAGE = 250;
+const FS_MAX_SCROLL_POSITIONS = 128;
 let fsScrollPos = {};
 let fsSelectMode = false;
 const fsSelected = new Set();
@@ -2025,7 +2026,14 @@ document.getElementById('fsHomeBtn').addEventListener('click', function () {
 });
 
 function fsSaveScroll() {
-  try { fsScrollPos[fsPath] = window.scrollY || 0; } catch (e) {}
+  try {
+    fsScrollPos[fsPath] = window.scrollY || 0;
+    while (Object.keys(fsScrollPos).length > FS_MAX_SCROLL_POSITIONS) {
+      const oldest = Object.keys(fsScrollPos).find(function (key) { return key !== fsPath; });
+      if (!oldest) break;
+      delete fsScrollPos[oldest];
+    }
+  } catch (e) {}
 }
 function fsRestoreScroll() {
   try { window.scrollTo(0, fsScrollPos[fsPath] || 0); } catch (e) {}
@@ -2401,10 +2409,16 @@ fsSearchInput.addEventListener('input', function () {
 });
 
 let fsNewBadges = {};
+const FS_MAX_NEW_BADGES = 128;
 function fsMarkNew(path, name) {
   if (!path) return;
   fsNewBadges[path] = fsNewBadges[path] || [];
   if (fsNewBadges[path].indexOf(name) < 0) fsNewBadges[path].push(name);
+  while (Object.keys(fsNewBadges).length > FS_MAX_NEW_BADGES) {
+    const oldest = Object.keys(fsNewBadges).find(function (key) { return key !== path; });
+    if (!oldest) break;
+    delete fsNewBadges[oldest];
+  }
 }
 function fsIsNew(name) {
   const arr = fsNewBadges[fsPath];

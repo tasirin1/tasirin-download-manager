@@ -257,6 +257,8 @@ class DownloadEngine(appContext: Context) {
 
     fun clearCompleted() {
         // Hanya membersihkan daftar; file hasil download TIDAK dihapus.
+        val removed = _items.value.filter { it.state == DownloadState.COMPLETED }
+        removed.forEach { speedTracker.reset(it.id) }
         update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
         scheduleSave()
     }

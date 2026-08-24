@@ -8,13 +8,18 @@ import java.net.URLDecoder
 private const val MAX_BODY_SIZE = 4L * 1024 * 1024
 private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024
 
+/** Body POST melebihi batas; koneksi harus ditutup agar sisa body tidak
+ * terbaca sebagai request HTTP berikutnya pada keep-alive. */
+internal class BodyTooLargeException : IOException("Request body too large")
+
 /** Baca form POST (x-www-form-urlencoded) dari body sesi NanoHTTPD,
  *  gabung dengan parameter query. Dibatasi 4 MB. */
 internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
     val map = mutableMapOf<String, String>()
     session.parms.forEach { (k, v) -> map[k] = v }
-    val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
-        .coerceIn(0L, MAX_BODY_SIZE).toInt()
+    val rawLength = session.headers["content-length"]?.toLongOrNull() ?: 0L
+    if (rawLength > MAX_BODY_SIZE) throw BodyTooLargeException()
+    val length = rawLength.toInt()
     if (length > 0) {
         // Baca per-baris tanpa alokasi ByteArray(length) penuh — hemats memori
         // untuk form kecil (100 byte) yang sebelumnya alokasi 4MB.
