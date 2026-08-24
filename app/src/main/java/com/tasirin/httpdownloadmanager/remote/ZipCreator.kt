@@ -13,6 +13,15 @@ import java.util.zip.ZipOutputStream
 /** Pembuat arsip ZIP (folder filesystem + folder media Android 10+). */
 object ZipCreator {
 
+    /** Nama dari filesystem/MediaStore tidak boleh dipakai mentah sebagai
+     *  path ZIP; normalisasi mencegah Zip Slip di extractor pihak ketiga. */
+    internal fun safeEntryPath(path: String): String =
+        path.replace('\\', '/')
+            .split('/')
+            .map { part -> part.replace(Regex("[\\u0000-\\u001f]"), "_") }
+            .filter { it.isNotEmpty() && it != "." && it != ".." }
+            .joinToString("/")
+
     fun zipFile(
         zos: ZipOutputStream,
         file: File,
@@ -20,7 +29,7 @@ object ZipCreator {
         isFileAllowed: (String) -> Boolean
     ) {
         if (!isFileAllowed(file.absolutePath)) return
-        val entryPath = if (prefix.isEmpty()) file.name else "$prefix/${file.name}"
+        val entryPath = safeEntryPath(if (prefix.isEmpty()) file.name else "$prefix/${file.name}")
         if (file.isDirectory) {
             val children = runCatching { file.listFiles() }.getOrNull()
             if (children.isNullOrEmpty()) {
@@ -72,7 +81,7 @@ object ZipCreator {
                     input = context.contentResolver.openInputStream(uri)
                 }
                 if (input == null) return@runCatching
-                val entry = uniqueZipName(name, used)
+                val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
                 zos.putNextEntry(ZipEntry(entry))
                 input.use { it.copyTo(zos) }
                 zos.closeEntry()
@@ -130,7 +139,7 @@ object ZipCreator {
                     val relPath = c.getString(iRel) ?: continue
                     val name = c.getString(iName) ?: continue
                     if (!relPath.startsWith(folder)) continue
-                    val entry = relPath.removePrefix(folder) + name
+                val entry = safeEntryPath(relPath.removePrefix(folder) + name)
                     resolver.openInputStream(
                         ContentUris.withAppendedId(collection, c.getLong(iId))
                     )?.use { input ->

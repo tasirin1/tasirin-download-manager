@@ -8,7 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.Handler
-import android.os.HandlerThread
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Base64
 import androidx.documentfile.provider.DocumentFile
@@ -179,8 +179,7 @@ object MediaLibrary {
             observerRegistered = true
             runCatching {
                 val appContext = context.applicationContext
-                val thread = HandlerThread("media-scan-observer").apply { start() }
-                val observer = object : ContentObserver(Handler(thread.looper)) {
+                val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
                     private var lastInvalidate = 0L
                     override fun onChange(selfChange: Boolean) {
                         val now = System.currentTimeMillis()

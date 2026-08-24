@@ -2144,7 +2144,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             when (uri.authority) {
                 MediaStore.AUTHORITY -> {
                     if (Build.VERSION.SDK_INT >= 29) {
-                        val rel = mediaStoreRelativePath(uri) ?: return@runCatching true
+                        val rel = mediaStoreRelativePath(uri) ?: return@runCatching false
                         val top = rel.trim('/').substringBefore('/')
                         top == "Download" || top == "Pictures" || top == "Movies" || top == "DCIM"
                     } else {

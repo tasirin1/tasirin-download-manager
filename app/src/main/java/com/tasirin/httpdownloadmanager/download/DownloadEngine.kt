@@ -295,19 +295,16 @@ class DownloadEngine(appContext: Context) {
 
     fun probeHlsVariants(url: String): List<HlsVariant>? {
         return runCatching {
-            val conn = openConn(url)
+            val conn = openAuthenticatedConnection(
+                url, method = "GET", username = "", password = "", headers = ""
+            )
             try {
-                conn.requestMethod = "GET"
-                conn.connectTimeout = connectTimeoutMs
-                conn.readTimeout = readTimeoutMs
-                conn.setRequestProperty("User-Agent", "HttpDownloadManager/1.0")
-                conn.connect()
                 val code = conn.responseCode
                 if (code !in 200..299) return null
                 // Baca terbatas: master playlist normal kecil; body raksasa dari
                 // URL nakal tidak boleh dimuat penuh ke memori.
                 val body = conn.inputStream.use { readBounded(it, HLS_PROBE_MAX_BYTES) }
-                HlsParser.parseMaster(body, url)
+                HlsParser.parseMaster(body, conn.url.toString())
             } finally {
                 conn.disconnect()
             }
@@ -324,14 +321,11 @@ class DownloadEngine(appContext: Context) {
         if (clean.isEmpty()) return null
         if (!clean.startsWith("http://") && !clean.startsWith("https://")) return null
         return runCatching {
-            val conn = openConn(clean)
+            val conn = openAuthenticatedConnection(
+                clean, method = "HEAD",
+                username = username, password = password, headers = headers
+            )
             try {
-                conn.requestMethod = "HEAD"
-                conn.connectTimeout = 8_000
-                conn.readTimeout = 8_000
-                conn.setRequestProperty("User-Agent", "HttpDownloadManager/1.0")
-                applyAuthHeaders(conn, username, password, headers)
-                conn.connect()
                 val code = conn.responseCode
                 if (code !in 200..299) return null
                 UrlProbe(
@@ -344,6 +338,41 @@ class DownloadEngine(appContext: Context) {
                 conn.disconnect()
             }
         }.getOrNull()
+    }
+
+    /** Buka koneksi dengan redirect manual. Kredensial dan header sensitif
+     *  hanya dikirim ulang bila target tetap satu origin dengan URL awal. */
+    private fun openAuthenticatedConnection(
+        url: String,
+        method: String,
+        username: String,
+        password: String,
+        headers: String,
+        configure: (HttpURLConnection, String) -> Unit = { _, _ -> }
+    ): HttpURLConnection {
+        var current = url
+        repeat(MAX_REDIRECTS) {
+            val conn = openConn(current)
+            conn.instanceFollowRedirects = false
+            conn.requestMethod = method
+            conn.connectTimeout = if (method == "HEAD") 8_000 else connectTimeoutMs
+            conn.readTimeout = if (method == "HEAD") 8_000 else readTimeoutMs
+            conn.setRequestProperty("User-Agent", "HttpDownloadManager/1.0")
+            if (method == "GET") conn.setRequestProperty("Accept-Encoding", "identity")
+            if (current == url || isSameOrigin(url, current)) {
+                applyAuthHeaders(conn, username, password, headers)
+            }
+            configure(conn, current)
+            val code = conn.responseCode
+            if (code !in 301..308) return conn
+
+            val location = conn.getHeaderField("Location")
+            conn.disconnect()
+            val next = redirectTarget(current, location)
+                ?: throw IOException("Invalid redirect")
+            current = next
+        }
+        throw IOException("Too many redirects")
     }
 
     fun pauseAll() {
@@ -805,14 +834,13 @@ class DownloadEngine(appContext: Context) {
         var useSegments = false
         var segmentedTotal = 0L
         var probeHeaders: ServerHeaders? = null
-        val probe = openConn(item.url)
+        val probe = openAuthenticatedConnection(
+            item.url, method = "HEAD",
+            username = item.username,
+            password = item.password,
+            headers = item.headers
+        )
         try {
-            probe.requestMethod = "HEAD"
-            probe.connectTimeout = connectTimeoutMs
-            probe.readTimeout = readTimeoutMs
-            probe.setRequestProperty("User-Agent", "HttpDownloadManager/1.0")
-            applyAuthHeaders(probe, item)
-            probe.connect()
             val code = probe.responseCode
             if (code in 200..299) {
                 captureHeaderChecksum(item, probe)
@@ -841,14 +869,13 @@ class DownloadEngine(appContext: Context) {
             return
         }
 
-        val conn = openConn(item.url)
+        val conn = openAuthenticatedConnection(
+            item.url, method = "GET",
+            username = item.username,
+            password = item.password,
+            headers = item.headers
+        )
         try {
-            conn.requestMethod = "GET"
-            conn.connectTimeout = connectTimeoutMs
-            conn.readTimeout = readTimeoutMs
-            conn.setRequestProperty("User-Agent", "HttpDownloadManager/1.0")
-            conn.setRequestProperty("Accept-Encoding", "identity")
-            applyAuthHeaders(conn, item)
             runSingle(item, conn, saver, throttle)
         } finally {
             conn.disconnect()
@@ -1172,17 +1199,16 @@ class DownloadEngine(appContext: Context) {
             ResumeAction.KEEP -> Unit
         }
         coroutineContext.ensureActive()
-        val conn = openConn(item.url)
+        val conn = openAuthenticatedConnection(
+            item.url, method = "GET",
+            username = item.username,
+            password = item.password,
+            headers = item.headers
+        ) { connection, _ ->
+            connection.setRequestProperty("Range", "bytes=${segment.start + downloaded}-${segment.end}")
+        }
         trackConnection(id, conn)
         try {
-            conn.requestMethod = "GET"
-            conn.connectTimeout = connectTimeoutMs
-            conn.readTimeout = readTimeoutMs
-            conn.setRequestProperty("User-Agent", "HttpDownloadManager/1.0")
-            conn.setRequestProperty("Accept-Encoding", "identity")
-            applyAuthHeaders(conn, item)
-            conn.setRequestProperty("Range", "bytes=${segment.start + downloaded}-${segment.end}")
-            conn.connect()
             val code = conn.responseCode
             if (code != 206) throw IOException("Server does not support Range (HTTP $code)")
 
@@ -1575,6 +1601,7 @@ class DownloadEngine(appContext: Context) {
         private val DEFAULT_NAME_FORMAT = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
         private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")
         private const val BUFFER_SIZE = 64 * 1024
+        private const val MAX_REDIRECTS = 5
         private const val HLS_PROBE_MAX_BYTES = 1_000_000
         private const val SEGMENT_MIN_BYTES = 5L * 1024 * 1024
         private const val RETRY_DELAY_1_MS = 5_000L
@@ -1586,6 +1613,26 @@ class DownloadEngine(appContext: Context) {
         private const val MONITOR_INTERVAL_MS = 30 * 60 * 1000L
     }
 }
+
+internal fun redirectTarget(base: String, location: String?): String? {
+    if (location.isNullOrBlank()) return null
+    return runCatching {
+        val target = URL(URL(base), location)
+        if (target.protocol != "http" && target.protocol != "https") return null
+        target.toString()
+    }.getOrNull()
+}
+
+internal fun isSameOrigin(first: String, second: String): Boolean = runCatching {
+    val firstUrl = URL(first)
+    val secondUrl = URL(second)
+    firstUrl.protocol == secondUrl.protocol &&
+        firstUrl.host.equals(secondUrl.host, ignoreCase = true) &&
+        firstUrl.effectivePort() == secondUrl.effectivePort()
+}.getOrDefault(false)
+
+private fun URL.effectivePort(): Int =
+    port.takeIf { it >= 0 } ?: if (protocol == "https") 443 else 80
 
 /** Keputusan resume anti-korup: apa yang dilakukan terhadap file parsial
  *  sebelum melanjutkan unduhan. Dipisah jadi fungsi murni agar bisa

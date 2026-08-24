@@ -5,6 +5,11 @@
 - **Login state** — Bersihkan entri throttle kedaluwarsa lebih awal agar percobaan login dari banyak IP tidak menetap sampai batas 512 entri.
 - **Download memory** — Hapus data pelacak kecepatan saat daftar unduhan selesai dibersihkan.
 - **Remote session cache** — Batasi posisi scroll dan tanda file baru agar sesi panjang tidak menumpuk objek DOM state.
+- **Redirect credentials** — Gunakan redirect manual dan hanya kirim ulang kredensial pada origin yang sama.
+- **MediaStore access** — Tolak URI MediaStore tanpa relative path di Android 10+ sebagai kegagalan aman.
+- **ZIP entry names** — Normalisasi nama entri ZIP untuk menahan Zip Slip di extractor pihak ketiga.
+- **Observer thread** — Ganti HandlerThread permanen dengan handler utama untuk invalidasi scan galeri.
+- **Documentation** — Ringkas README Indonesia/Inggris menjadi panduan pengguna yang profesional.
 
 ## [v1.0 — 2026-08-24] — Audit agresif traversal dan race
 

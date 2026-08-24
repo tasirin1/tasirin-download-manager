@@ -9,6 +9,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.writeText
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -54,5 +55,13 @@ class ZipCreatorTest {
 
         assertTrue(names.contains("allowed/safe.txt"))
         assertFalse(names.any { it.startsWith("link") })
+    }
+
+    @Test
+    fun `entry path blocks traversal separators and control chars`() {
+        assertEquals("folder/file.txt", ZipCreator.safeEntryPath("../folder/..\\file.txt"))
+        assertEquals("file.txt", ZipCreator.safeEntryPath("/../../file.txt"))
+        assertEquals("bad_name.txt", ZipCreator.safeEntryPath("bad\u0000name.txt"))
+        assertEquals("", ZipCreator.safeEntryPath(".."))
     }
 }
