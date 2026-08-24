@@ -12,6 +12,7 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadRepository
 import com.tasirin.httpdownloadmanager.data.DownloadSegment
 import com.tasirin.httpdownloadmanager.data.DownloadState
+import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.Checksums
