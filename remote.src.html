@@ -713,14 +713,43 @@
   #mmSeekTip {
  position: absolute; bottom: 24px; left: 0; transform: translateX(-50%); background: rgba(0,0,0,.82); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; pointer-events: none; white-space: nowrap; z-index: 3; }
 
+  .mm-vol-group {
+ display: flex; align-items: center; flex: 0 0 auto; border-radius: 999px; }
+
   .mm-vol {
  -webkit-appearance: none; appearance: none; width: 52px; height: 30px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
 
+  @media (hover: hover) {
+    .mm-vol {
+      width: 0;
+      margin-left: -4px;
+      opacity: 0;
+      overflow: hidden;
+      transition: width .18s ease, margin-left .18s ease, opacity .14s ease;
+    }
+
+    .mm-vol-group:hover .mm-vol,
+    .mm-vol-group:focus-within .mm-vol {
+      width: 68px;
+      margin-left: 2px;
+      opacity: 1;
+      overflow: visible;
+    }
+  }
+
   .mm-vol::-webkit-slider-runnable-track {
- height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.38) var(--vol, 100%)); }
+ height: 3px; border-radius: 999px; background: linear-gradient(to right, #fff var(--vol, 100%), rgba(255,255,255,.32) var(--vol, 100%)); }
 
   .mm-vol::-webkit-slider-thumb {
- -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.35); margin-top: -4px; }
+ -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.45); margin-top: -4px; transition: transform .12s ease; }
+
+  .mm-vol-group:hover .mm-vol::-webkit-slider-thumb,
+  .mm-vol-group:focus-within .mm-vol::-webkit-slider-thumb {
+ transform: scale(1.18); }
+
+  .mm-vol-group:hover .mm-vol::-moz-range-thumb,
+  .mm-vol-group:focus-within .mm-vol::-moz-range-thumb {
+ transform: scale(1.18); }
 
   .mm-vol::-moz-range-track {
  height: 3px; border-radius: 999px; background: rgba(255,255,255,.38); }
@@ -748,7 +777,7 @@
 
   @media (max-width: 430px), (max-height: 380px) {
  #mmCtrlRow { gap: 1px; }
- .mm-vol { width: 42px; }
+ .mm-vol { width: 44px; margin-left: 0; opacity: 1; overflow: visible; }
   }
 
   @media (max-width: 360px) {
@@ -756,7 +785,7 @@
  #mmCtrlRow button { width: 32px; height: 32px; }
  #mmSpeedBtn { min-width: 32px; height: 32px; }
  #mmAutoBtn { height: 32px; padding: 0 4px; }
- .mm-vol { width: 36px; height: 28px; }
+ .mm-vol { width: 38px; height: 28px; margin-left: 0; opacity: 1; overflow: visible; }
  #mmTime { font-size: 10px; }
   }
 
@@ -1245,8 +1274,10 @@
           <span class="mm-flex"></span>
           <button id="mmSpeedBtn" type="button" title="Playback speed">1&#215;</button>
           <button id="mmAutoBtn" type="button" title="Auto-play next video" aria-pressed="true">AUTO</button>
-          <button id="mmMuteBtn" type="button"></button>
-          <input id="mmVol" class="mm-vol" type="range" min="0" max="100" value="100" title="Volume">
+          <div class="mm-vol-group">
+            <button id="mmMuteBtn" type="button"></button>
+            <input id="mmVol" class="mm-vol" type="range" min="0" max="100" value="100" title="Volume" aria-label="Volume">
+          </div>
           <button id="mmFsBtn" type="button"></button>
         </div>
         <div id="mmSeekWrap">
