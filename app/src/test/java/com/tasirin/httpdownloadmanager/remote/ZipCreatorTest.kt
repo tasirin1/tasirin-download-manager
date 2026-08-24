@@ -43,7 +43,7 @@ class ZipCreatorTest {
                 while (true) {
                     val entry: ZipEntry = zip.nextEntry ?: break
                     names.add(entry.name)
-                    if (entry.name == "safe.txt") {
+                    if (entry.name == "allowed/safe.txt") {
                         val content = zip.readBytes().toString(StandardCharsets.UTF_8)
                         assertTrue(content.contains("safe"))
                     }
@@ -52,7 +52,7 @@ class ZipCreatorTest {
             }
         }
 
-        assertTrue(names.contains("safe.txt"))
+        assertTrue(names.contains("allowed/safe.txt"))
         assertFalse(names.any { it.startsWith("link") })
     }
 }
