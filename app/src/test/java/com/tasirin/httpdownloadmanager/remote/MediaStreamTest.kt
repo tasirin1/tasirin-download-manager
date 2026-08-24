@@ -20,7 +20,7 @@ class MediaStreamTest {
                 download = true
             )
             val header = response.getHeader("Content-Disposition")
-            assertTrue(header!!.startsWith("attachment; filename=\"video __baru__ _.mp4\""))
+            assertTrue(header!!.startsWith("attachment; filename=\"video _baru_ _.mp4\""))
             assertTrue(header.contains("filename*=UTF-8''video%20%22baru%22%20%C3%A9.mp4"))
         }
     }
