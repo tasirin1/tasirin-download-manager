@@ -95,6 +95,27 @@ object ServerSecurity {
         return StoragePrefs.constantEquals(parts[2], expected)
     }
 
+    /** Token status upload mencegah enumerasi ID oleh klien lain di LAN. */
+    fun createUploadVerifyToken(uploadId: String, expiresAt: Long, secret: String): String {
+        val payload = "$uploadId.$expiresAt"
+        return "$payload.${sha256Hex(payload + ":" + secret)}"
+    }
+
+    fun isUploadVerifyTokenValid(
+        token: String?,
+        uploadId: String,
+        now: Long,
+        secret: String
+    ): Boolean {
+        val cleanToken = token?.trim().orEmpty()
+        val parts = cleanToken.split('.')
+        if (parts.size != 3 || parts[0] != uploadId) return false
+        val expiresAt = parts[1].toLongOrNull() ?: return false
+        if (expiresAt < now) return false
+        val expected = sha256Hex("${parts[0]}.${parts[1]}:$secret")
+        return StoragePrefs.constantEquals(parts[2], expected)
+    }
+
     /** Lock PIN masih aktif: percobaan login ditolak. */
     fun isPinLocked(now: Long, lockUntil: Long): Boolean = now < lockUntil
 

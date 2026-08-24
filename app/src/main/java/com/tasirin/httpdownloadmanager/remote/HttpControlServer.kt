@@ -777,6 +777,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun uploadVerify(session: IHTTPSession): Response {
         val id = session.parms["id"]?.trim().orEmpty()
+        val token = session.parms["verify"]?.trim()
+        if (!ServerSecurity.isUploadVerifyTokenValid(
+                token,
+                id,
+                System.currentTimeMillis(),
+                StoragePrefs.partialStreamSecret(context)
+            )
+        ) {
+            return jsonResponse(JSONObject().put("ok", false))
+        }
         completedUploads[id]?.let {
             return jsonResponse(JSONObject().put("ok", true).put("name", it.first))
         }
@@ -995,6 +1005,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 val finalName = uploadUniqueName(name, folderPath)
                 pruneCompletedUploads()
+                val verifyToken = ServerSecurity.createUploadVerifyToken(
+                    id,
+                    System.currentTimeMillis() + 24L * 60 * 60 * 1000L,
+                    StoragePrefs.partialStreamSecret(context)
+                )
                 val accepted = synchronized(finalizingGate) {
                     if (finalizingUploads.size >= MAX_UPLOAD_FINALIZING) {
                         false
@@ -1040,11 +1055,27 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
                 return jsonResponse(
-                    JSONObject().put("ok", true).put("pending", true).put("name", finalName)
+                    JSONObject()
+                        .put("ok", true)
+                        .put("pending", true)
+                        .put("name", finalName)
+                        .put("verify", verifyToken)
                 )
             }
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks OK ($resultName)")
-            jsonResponse(JSONObject().put("ok", true).put("name", resultName))
+            jsonResponse(
+                JSONObject()
+                    .put("ok", true)
+                    .put("name", resultName)
+                    .put(
+                        "verify",
+                        ServerSecurity.createUploadVerifyToken(
+                            id,
+                            System.currentTimeMillis() + 24L * 60 * 60 * 1000L,
+                            StoragePrefs.partialStreamSecret(context)
+                        )
+                    )
+            )
         }.getOrElse {
             // Simpan jejak biar bisa dicek lewat Ekspor Log Error.
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks FAILED: ${it.message}")
@@ -1934,6 +1965,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (name.isBlank() || name.contains('/') || name.contains('\\') || name == ".." || name.contains("../") || name.contains("..\\")) return false
                 runCatching {
                     val target = File(file.parentFile, name)
+                    if (target.exists()) return@runCatching false
                     val ok = file.renameTo(target)
                     if (ok) {
                         invalidateFsMediaCache()
@@ -2433,7 +2465,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     companion object {
-        private val REQUEST_SECRET_RE = Regex("([?&]?(?:token|pin|id)=)[^&]+")
+        private val REQUEST_SECRET_RE = Regex("([?&]?(?:token|pin|id|verify)=)[^&]+")
         private const val SERVER_SOCKET_TIMEOUT_MS = 60_000
         private const val FS_PREFIX = "f:"
         private const val MS_PREFIX = "m:"

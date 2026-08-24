@@ -64,9 +64,16 @@ class FakeXHR {
     });
     const u = new URL(this.url, 'http://x');
     const id = u.searchParams.get('id');
+    const verify = u.searchParams.get('verify');
     const self = this;
     if (this.method === 'GET') {
-      // upload_verify: langsung "selesai".
+      // upload_verify wajib membawa tanda tangan status dari respons chunk.
+      if (!verify) {
+        this.status = 200;
+        this.responseText = JSON.stringify({ ok: false });
+        queueMicrotask(() => self.onload && self.onload());
+        return;
+      }
       this.status = 200;
       this.responseText = JSON.stringify({ ok: true, name: 'test.bin' });
       queueMicrotask(() => self.onload && self.onload());
@@ -74,12 +81,15 @@ class FakeXHR {
     }
     const chunk = parseInt(u.searchParams.get('chunk'), 10);
     const chunks = parseInt(u.searchParams.get('chunks'), 10);
+    const verifyToken = 'verify-' + id + '-' + chunk;
     if (chunk === chunks - 1) {
       this.status = 200;
-      this.responseText = JSON.stringify({ ok: true, pending: true, name: 'test.bin' });
+      this.responseText = JSON.stringify({
+        ok: true, pending: true, name: 'test.bin', verify: verifyToken
+      });
     } else {
       this.status = 200;
-      this.responseText = JSON.stringify({ ok: true, name: 'test.bin' });
+      this.responseText = JSON.stringify({ ok: true, name: 'test.bin', verify: verifyToken });
     }
     queueMicrotask(() => self.onload && self.onload());
   }

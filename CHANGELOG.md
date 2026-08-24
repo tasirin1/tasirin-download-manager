@@ -1,6 +1,8 @@
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 
 ### Fixed
+- **Upload verification** — Wajibkan token bertanda tangan pada cek status upload dan redaksi token tersebut dari log agar ID upload tidak bisa dienumerasi.
+- **Rename overwrite** — Tolak rename file/folder remote bila nama target sudah ada.
 - **Browser detection** — Hapus tes `new Function` yang diblokir CSP sehingga browser modern tidak lagi salah ditandai terlalu tua.
 - **AGP update** — Naikkan Android Gradle Plugin ke `9.3.2` dan segarkan metadata verifikasi dependensi.
 - **Thumbnail authorization** — Validasi path/URI sebelum membaca cache thumbnail agar thumbnail lama tetap terkunci setelah konfigurasi akses storage berubah.

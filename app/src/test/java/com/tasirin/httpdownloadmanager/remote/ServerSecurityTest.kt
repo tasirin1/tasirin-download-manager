@@ -186,6 +186,26 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun uploadVerifyToken_terikatIdDanWaktu() {
+        val token = ServerSecurity.createUploadVerifyToken("upload-id", 1000L, "secret")
+        assertTrue(
+            ServerSecurity.isUploadVerifyTokenValid(token, "upload-id", 1000L, "secret")
+        )
+        assertFalse(
+            ServerSecurity.isUploadVerifyTokenValid(token, "other-id", 1000L, "secret")
+        )
+        assertFalse(
+            ServerSecurity.isUploadVerifyTokenValid(token, "upload-id", 1000L, "wrong")
+        )
+        assertFalse(
+            ServerSecurity.isUploadVerifyTokenValid(token, "upload-id", 1001L, "secret")
+        )
+        assertFalse(
+            ServerSecurity.isUploadVerifyTokenValid(null, "upload-id", 1000L, "secret")
+        )
+    }
+
+    @Test
     fun isRemoteDestinationAllowed_traversal_atau_luarRoot_false() {
         val r = root()
         val luar = tmp.newFolder("luar")
