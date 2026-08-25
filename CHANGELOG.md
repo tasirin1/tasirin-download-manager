@@ -1,6 +1,7 @@
 ## [Unreleased]
 
-- **Seek zen controls** — Sembunyikan seluruh overlay tombol pemutar selama seek dua-tap.
+- **Seek feedback rollback** - Kembalikan perilaku dua-tap yang stabil tanpa mode penyembunyian kontrol sementara.
+- **Seek indicator cleanup** - Hapus indikator angka 10 detik agar tidak menutupi tombol play.
 
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 

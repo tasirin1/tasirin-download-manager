@@ -803,18 +803,6 @@
   #mmPlayer.mm-hide-cursor {
  cursor: none; }
 
-  #mediaModal.mm-seek-zen #mmTop,
-  #mediaModal.mm-seek-zen #mmRelated,
-  #mediaModal.mm-seek-zen #mmCtrl,
-  #mediaModal.mm-seek-zen #mmTransport,
-  #mediaModal.mm-seek-zen #mmPlayerTop {
- opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
-
-  #mediaModal.mm-seek-zen #mmCtrl *,
-  #mediaModal.mm-seek-zen #mmTransport *,
-  #mediaModal.mm-seek-zen #mmPlayerTop * {
- pointer-events: none !important; }
-
  @media (max-width: 430px), (max-height: 380px) {
  #mmCtrlRow { gap: 0; }
  #mmCtrl { padding-left: 7px; padding-right: 7px; }
@@ -1568,16 +1556,6 @@ function mmShowToast(text, ms) {
   mmToast.classList.remove('hidden');
   clearTimeout(mmToast._t);
   mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, ms || 700);
-}
-
-let mmSeekZenTimer = null;
-function mmShowSeekZen() {
-  mediaModal.classList.add('mm-seek-zen');
-  clearTimeout(mmSeekZenTimer);
-  mmSeekZenTimer = setTimeout(function () {
-    mediaModal.classList.remove('mm-seek-zen');
-    mmSeekZenTimer = null;
-  }, 750);
 }
 
 function mmShowCtrl() {
@@ -3565,17 +3543,12 @@ function mmTogglePlay() {
   if (mmVideo.paused) mmVideo.play(); else mmVideo.pause();
   mmShowCtrl();
 }
-function mmSeekBy(delta, hideControls) {
+function mmSeekBy(delta) {
   const d = mmVideo.duration || 0;
   if (!d) return;
   mmVideo.currentTime = Math.min(Math.max(mmVideo.currentTime + delta, 0), d);
-  mmShowToast((delta > 0 ? '+' : '') + delta + ' s');
   mmSeekUI();
-  if (hideControls) {
-    mmHideCtrl();
-    mmShowSeekZen();
-  }
-  else mmShowCtrl();
+  mmShowCtrl();
 }
 function mmVolBy(d) {
   mmVideo.volume = Math.min(1, Math.max(0, mmVideo.volume + d));
@@ -3722,7 +3695,6 @@ mmPlayer.addEventListener('click', function (e) {
       if (d) {
         const delta = e.clientX < window.innerWidth / 2 ? -10 : 10;
         mmVideo.currentTime = Math.min(Math.max(mmVideo.currentTime + delta, 0), d);
-        mmShowToast((delta > 0 ? '+10' : '-10') + ' s');
         mmSeekUI();
       }
       mmShowCtrl();
@@ -3748,9 +3720,7 @@ mmPlayer.addEventListener('click', function (e) {
 });
 
 mmPlayer.addEventListener('mousemove', mmShowCtrl);
-mmPlayer.addEventListener('touchstart', function () {
-  if (!mediaModal.classList.contains('mm-seek-zen')) mmShowCtrl();
-}, { passive: true });
+mmPlayer.addEventListener('touchstart', function () { mmShowCtrl(); }, { passive: true });
 
 let mmTap = { x: 0, y: 0, t: 0 };
 mmPlayer.addEventListener('touchend', function (e) {
@@ -3763,8 +3733,8 @@ mmPlayer.addEventListener('touchend', function (e) {
     Math.abs(ch.clientX - mmTap.x) < 44 && Math.abs(ch.clientY - mmTap.y) < 44;
   mmTap = { x: ch.clientX, y: ch.clientY, t: now };
   if (isDbl) {
-    if (ch.clientX < w / 3) mmSeekBy(-10, true);
-    else if (ch.clientX > w * 2 / 3) mmSeekBy(10, true);
+    if (ch.clientX < w / 3) mmSeekBy(-10);
+    else if (ch.clientX > w * 2 / 3) mmSeekBy(10);
     else mmTogglePlay();
     mmTap.t = 0;
     return;
