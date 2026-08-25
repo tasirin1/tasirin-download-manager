@@ -2021,13 +2021,14 @@ mmVideo.currentTime = 0;
 if (mmVideo.paused) mmVideo.play(); else mmVideo.pause();
 mmShowCtrl();
 }
-function mmSeekBy(delta) {
+function mmSeekBy(delta, hideControls) {
 const d = mmVideo.duration || 0;
 if (!d) return;
 mmVideo.currentTime = Math.min(Math.max(mmVideo.currentTime + delta, 0), d);
 mmShowToast((delta > 0 ? '+' : '') + delta + ' s');
 mmSeekUI();
-mmShowCtrl();
+if (hideControls) mmHideCtrl();
+else mmShowCtrl();
 }
 function mmVolBy(d) {
 mmVideo.volume = Math.min(1, Math.max(0, mmVideo.volume + d));
@@ -2204,8 +2205,8 @@ const isDbl = now - mmTap.t < 320 &&
 Math.abs(ch.clientX - mmTap.x) < 44 && Math.abs(ch.clientY - mmTap.y) < 44;
 mmTap = { x: ch.clientX, y: ch.clientY, t: now };
 if (isDbl) {
-if (ch.clientX < w / 3) mmSeekBy(-10);
-else if (ch.clientX > w * 2 / 3) mmSeekBy(10);
+if (ch.clientX < w / 3) mmSeekBy(-10, true);
+else if (ch.clientX > w * 2 / 3) mmSeekBy(10, true);
 else mmTogglePlay();
 mmTap.t = 0;
 return;
