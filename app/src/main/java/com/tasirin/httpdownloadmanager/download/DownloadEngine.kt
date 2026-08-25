@@ -1843,7 +1843,7 @@ private class GlobalRateLimiter(private val limitKbps: Int) {
             }
             val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
             prefs.edit().putString("cookies", arr.toString()).apply()
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* cookie persist is best-effort */ }
     }
 
     /** Muat cookie dari SharedPreferences. */
@@ -1859,5 +1859,5 @@ private class GlobalRateLimiter(private val limitKbps: Int) {
                 cookie.path = obj.getString("path")
                 cookieManager.cookieStore.add(null, cookie)
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) { /* cookie persist is best-effort */ }
     }
