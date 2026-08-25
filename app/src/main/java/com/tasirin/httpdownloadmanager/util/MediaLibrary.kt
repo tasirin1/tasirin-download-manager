@@ -16,7 +16,7 @@ import java.io.File
 
 object MediaLibrary {
 
-    private const val SCAN_TTL_MS = 15_000L
+    private const val SCAN_TTL_MS = 30_000L
     /** Batas absolut entry yang di-hold di memori (galeri + remote web). */
     const val GALLERY_MAX_ENTRIES = 3000
     private const val THUMB_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000

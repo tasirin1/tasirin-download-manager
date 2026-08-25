@@ -323,9 +323,14 @@ class FileSaver(context: Context) {
             downloadDir.listFiles()?.forEach { f ->
                 val name = f.name
                 if ((name.endsWith(".part") || name.contains(".part.")) && name !in expected) {
-                    runCatching {
-                        val size = f.length()
-                        if (f.delete()) freed += size
+                    // Hapus file .part yang sudah tua (>2jam) supaya tidak menghapus
+                    // file .part yang sedang aktif di-download.
+                    val age = System.currentTimeMillis() - f.lastModified()
+                    if (age > 2L * 60 * 60 * 1000) {
+                        runCatching {
+                            val size = f.length()
+                            if (f.delete()) freed += size
+                        }
                     }
                 }
             }

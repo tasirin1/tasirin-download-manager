@@ -130,10 +130,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 synchronized(this@HttpControlServer) {
                     if (statPoolEnabled && statPool.isShutdown) statPool = newStatPool()
                 }
-                // Tangkap exception bila pool di-shutdown antara create & execute
-                // (race condition saat stopServer() dipanggil bersamaan).
                 if (statPoolEnabled) {
-                    runCatching { liveStatPool().execute(cmd) }.onFailure { e ->
+                    // Pakai referensi lokal agar tidak race dengan stopServer().
+                    val active = statPool
+                    if (!active.isShutdown) runCatching { active.execute(cmd) }.onFailure { e ->
                         runCatching { logError(e) }
                     }
                 }

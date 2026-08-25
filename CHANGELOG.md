@@ -2,6 +2,12 @@
 
 - **Seek feedback rollback** - Kembalikan perilaku dua-tap yang stabil tanpa mode penyembunyian kontrol sementara.
 - **Seek indicator cleanup** - Hapus indikator angka 10 detik agar tidak menutupi tombol play.
+- **Thumbnail concurrency** - Batasi jumlah thumbnail yang dimuat serentak agar tidak boros RAM.
+- **ZIP size warning** - Peringatan sebelum membuat ZIP lebih dari 200 MB.
+- **Gallery auto-retry** - Muat ulang galeri sekali setelah 2 detik jika permintaan pertama gagal.
+- **statPool race fix** - Tangkap referensi lokal pool di rejection handler agar tidak race dengan stopServer.
+- **Gallery scan cache** - Naikkan TTL dari 15s ke 30s supaya tidak scan berulang terlalu sering.
+- **Part file cleanup** - Hapus file .part orphans hanya jika sudah tua lebih dari 2 jam.
 
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 
