@@ -1633,6 +1633,39 @@ class DownloadEngine(appContext: Context) {
         return "download_${DEFAULT_NAME_FORMAT.format(Date())}"
     }
 
+    /** Simpan cookie ke SharedPreferences agar persist antar restart. */
+    private fun persistCookies() {
+        try {
+            val arr = JSONArray()
+            cookieManager.cookieStore.cookies.forEach { c ->
+                arr.put(JSONObject().apply {
+                    put("name", c.name)
+                    put("value", c.value)
+                    put("domain", c.domain.orEmpty())
+                    put("path", c.path.orEmpty())
+                })
+            }
+            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putString("cookies", arr.toString()).apply()
+        } catch (_: Exception) { /* cookie persist is best-effort */ }
+    }
+
+    /** Muat cookie dari SharedPreferences. */
+    private fun loadPersistedCookies() {
+        try {
+            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
+            val raw = prefs.getString("cookies", null) ?: return
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val cookie = HttpCookie(obj.getString("name"), obj.getString("value"))
+                cookie.domain = obj.getString("domain")
+                cookie.path = obj.getString("path")
+                cookieManager.cookieStore.add(null, cookie)
+            }
+        } catch (_: Exception) { /* cookie persist is best-effort */ }
+    }
+
     companion object {
         private val CONTENT_DISPOSITION_STAR = Regex("filename\\*=([^;]+)")
         private val DEFAULT_NAME_FORMAT = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
@@ -1750,39 +1783,6 @@ private class SpeedThrottle(
             }
         }
         if (delayMs > 0) delay(delayMs)
-    }
-
-    /** Simpan cookie ke SharedPreferences agar persist antar restart. */
-    private fun persistCookies() {
-        try {
-            val arr = JSONArray()
-            cookieManager.cookieStore.cookies.forEach { c ->
-                arr.put(JSONObject().apply {
-                    put("name", c.name)
-                    put("value", c.value)
-                    put("domain", c.domain.orEmpty())
-                    put("path", c.path.orEmpty())
-                })
-            }
-            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
-            prefs.edit().putString("cookies", arr.toString()).apply()
-        } catch (_: Exception) { /* cookie persist is best-effort */ }
-    }
-
-    /** Muat cookie dari SharedPreferences. */
-    private fun loadPersistedCookies() {
-        try {
-            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
-            val raw = prefs.getString("cookies", null) ?: return
-            val arr = JSONArray(raw)
-            for (i in 0 until arr.length()) {
-                val obj = arr.getJSONObject(i)
-                val cookie = HttpCookie(obj.getString("name"), obj.getString("value"))
-                cookie.domain = obj.getString("domain")
-                cookie.path = obj.getString("path")
-                cookieManager.cookieStore.add(null, cookie)
-            }
-        } catch (_: Exception) { /* cookie persist is best-effort */ }
     }
 }
 
