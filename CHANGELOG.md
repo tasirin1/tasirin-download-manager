@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- **Browser-like headers** - Kirim User-Agent Chrome, Referer, dan Accept agar situs download tidak memblokir koneksi.
+
 - **Seek feedback rollback** - Kembalikan perilaku dua-tap yang stabil tanpa mode penyembunyian kontrol sementara.
 - **Seek indicator cleanup** - Hapus indikator angka 10 detik agar tidak menutupi tombol play.
 - **Thumbnail concurrency** - Batasi jumlah thumbnail yang dimuat serentak agar tidak boros RAM.

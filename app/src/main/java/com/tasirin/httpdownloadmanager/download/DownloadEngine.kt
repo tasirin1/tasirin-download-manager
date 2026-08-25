@@ -357,8 +357,12 @@ class DownloadEngine(appContext: Context) {
             conn.requestMethod = method
             conn.connectTimeout = if (method == "HEAD") 8_000 else connectTimeoutMs
             conn.readTimeout = if (method == "HEAD") 8_000 else readTimeoutMs
-            conn.setRequestProperty("User-Agent", "HttpDownloadManager/1.0")
-            if (method == "GET") conn.setRequestProperty("Accept-Encoding", "identity")
+            conn.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
+            conn.setRequestProperty("Accept", "*/*")
+            try {
+                val origin = java.net.URL(current).let { "${it.protocol}://${it.host}" }
+                conn.setRequestProperty("Referer", "$origin/")
+            } catch (_: Exception) {}
             if (current == url || isSameOrigin(url, current)) {
                 applyAuthHeaders(conn, username, password, headers)
             }
@@ -1114,8 +1118,12 @@ class DownloadEngine(appContext: Context) {
                     fallbackConn.requestMethod = "GET"
                     fallbackConn.connectTimeout = connectTimeoutMs
                     fallbackConn.readTimeout = readTimeoutMs
-                    fallbackConn.setRequestProperty("User-Agent", "HttpDownloadManager/1.0")
-                    fallbackConn.setRequestProperty("Accept-Encoding", "identity")
+                    fallbackConn.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
+                    fallbackConn.setRequestProperty("Accept", "*/*")
+                    try {
+                        val origin = java.net.URL(item.url).let { "${it.protocol}://${it.host}" }
+                        fallbackConn.setRequestProperty("Referer", "$origin/")
+                    } catch (_: Exception) {}
                     applyAuthHeaders(fallbackConn, item)
                     runSingle(item, fallbackConn, saver, throttle)
                 } finally {
@@ -1611,6 +1619,9 @@ class DownloadEngine(appContext: Context) {
         private const val PROGRESS_SAVE_INTERVAL_MS = 2_000L
         private const val SEG_FLUSH_INTERVAL_MS = 500L
         private const val MONITOR_INTERVAL_MS = 30 * 60 * 1000L
+        // User-Agent realistis agar situs download tidak memblokir koneksi.
+        private const val DEFAULT_USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     }
 }
 
