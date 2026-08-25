@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- **UI video player** - Tambah bayangan pada tombol mute dan fullscreen; perpanjang bar volume (105px default, 135px hover).
 - **Fix CrashLog race condition** - Tambah synchronized lock pada trim CrashLog mencegah corrupt saat dua thread crash bersamaan.
 - **Fix resource leak** - Bungkus `serveMedia()` dan `serveFile()` dalam try-finally supaya InputStream tertutup bila `streamMedia()` lempar exception tak terduga.
 - **Fix ZipCreator path** - `zipMedia()` pakai `trimEnd('/')` pada `relPath` supaya path entry ZIP tetap benar walau MediaStore berubah.
