@@ -1,3 +1,7 @@
+## [Unreleased]
+
+- **Seek zen controls** — Sembunyikan seluruh overlay tombol pemutar selama seek dua-tap.
+
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 
 ### Fixed

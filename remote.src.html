@@ -804,8 +804,16 @@
  cursor: none; }
 
   #mediaModal.mm-seek-zen #mmTop,
-  #mediaModal.mm-seek-zen #mmRelated {
- opacity: 0; visibility: hidden; pointer-events: none; }
+  #mediaModal.mm-seek-zen #mmRelated,
+  #mediaModal.mm-seek-zen #mmCtrl,
+  #mediaModal.mm-seek-zen #mmTransport,
+  #mediaModal.mm-seek-zen #mmPlayerTop {
+ opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+
+  #mediaModal.mm-seek-zen #mmCtrl *,
+  #mediaModal.mm-seek-zen #mmTransport *,
+  #mediaModal.mm-seek-zen #mmPlayerTop * {
+ pointer-events: none !important; }
 
  @media (max-width: 430px), (max-height: 380px) {
  #mmCtrlRow { gap: 0; }
@@ -3740,7 +3748,9 @@ mmPlayer.addEventListener('click', function (e) {
 });
 
 mmPlayer.addEventListener('mousemove', mmShowCtrl);
-mmPlayer.addEventListener('touchstart', function () { mmShowCtrl(); }, { passive: true });
+mmPlayer.addEventListener('touchstart', function () {
+  if (!mediaModal.classList.contains('mm-seek-zen')) mmShowCtrl();
+}, { passive: true });
 
 let mmTap = { x: 0, y: 0, t: 0 };
 mmPlayer.addEventListener('touchend', function (e) {
