@@ -428,14 +428,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         ) {
             urls.forEachIndexed { index, url ->
                 App.engine.addDownload(
-                    url,
-                    if (index == 0) name else null,
-                    username,
-                    password,
-                    headers,
-                    perSpeed,
-                    priority,
-                    if (index == 0) checksum else "",
+                    url = url,
+                    fileName = if (index == 0) name else null,
+                    username = username,
+                    password = password,
+                    headers = headers,
+                    speedLimitKbps = perSpeed,
+                    priority = priority,
+                    checksum = if (index == 0) checksum else "",
                     mirrors = if (index == 0) mirrors else emptyList()
                 )
             }
@@ -513,14 +513,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     name
                 }
                 App.engine.addDownload(
-                    target,
-                    chosenName,
-                    username,
-                    password,
-                    headers,
-                    perSpeed,
-                    priority,
-                    checksum,
+                    url = target,
+                    fileName = chosenName,
+                    username = username,
+                    password = password,
+                    headers = headers,
+                    speedLimitKbps = perSpeed,
+                    priority = priority,
+                    checksum = checksum,
                     mirrors = mirrors
                 )
             }

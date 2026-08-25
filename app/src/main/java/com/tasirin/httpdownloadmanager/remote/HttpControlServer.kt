@@ -725,7 +725,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             ).also { it.addHeader("Connection", "close") }
         }
         App.engine.addDownload(
-            url, params["name"],
+            url = url,
+            fileName = params["name"],
             headers = headers,
             method = method,
             postBody = postBody,

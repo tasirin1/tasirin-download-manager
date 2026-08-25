@@ -539,16 +539,18 @@ class DownloadEngine(appContext: Context) {
                             "(${Formats.bytes(probe.sizeBytes)})"
                     )
                     addDownload(
-                        item.url,
-                        item.fileName,
-                        item.username,
-                        item.password,
-                        item.headers,
-                        item.speedLimitKbps,
-                        item.priority,
-                        item.checksum,
-                        item.destination,
-                        item.folderPath
+                        url = item.url,
+                        fileName = item.fileName,
+                        username = item.username,
+                        password = item.password,
+                        headers = item.headers,
+                        method = item.method,
+                        postBody = item.postBody,
+                        speedLimitKbps = item.speedLimitKbps,
+                        priority = item.priority,
+                        checksum = item.checksum,
+                        destination = item.destination,
+                        folderPath = item.folderPath
                     )
                 }
             }
