@@ -362,7 +362,7 @@ class DownloadEngine(appContext: Context) {
             try {
                 val origin = java.net.URL(current).let { "${it.protocol}://${it.host}" }
                 conn.setRequestProperty("Referer", "$origin/")
-            } catch (_: Exception) {}
+            } catch (_: Exception) { /* Referer opsional, tidak wajib */ }
             if (current == url || isSameOrigin(url, current)) {
                 applyAuthHeaders(conn, username, password, headers)
             }
@@ -1123,7 +1123,7 @@ class DownloadEngine(appContext: Context) {
                     try {
                         val origin = java.net.URL(item.url).let { "${it.protocol}://${it.host}" }
                         fallbackConn.setRequestProperty("Referer", "$origin/")
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) { /* Referer opsional, tidak wajib */ }
                     applyAuthHeaders(fallbackConn, item)
                     runSingle(item, fallbackConn, saver, throttle)
                 } finally {
