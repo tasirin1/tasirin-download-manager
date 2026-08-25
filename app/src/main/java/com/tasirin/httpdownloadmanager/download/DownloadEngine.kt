@@ -56,11 +56,21 @@ import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
+import java.net.HttpCookie
+import java.net.CookieManager
+import java.net.CookiePolicy
 class DownloadEngine(appContext: Context) {
     // Engine hidup seumur proses (disimpan statis di App.engine): simpan
     // Application context saja, jangan pernah Activity (anti-leak).
     @SuppressLint("StaticFieldLeak")
     private val context: Context = appContext.applicationContext
+
+    // Cookie manager in-memory: store per-host cookies so subsequent requests
+    // can carry server-set session cookies (helps sites that require cookies,
+    // but does not bypass Cloudflare JS challenges).
+    private val cookieManager = CookieManager(null, CookiePolicy.ACCEPT_ALL).also {
+        java.net.CookieHandler.setDefault(it)
+    }
 
     /** Buka koneksi; untuk https tambahkan trust anchor CA lama (Android 6-7). */
     private fun openConn(url: String): HttpURLConnection {
@@ -515,7 +525,7 @@ class DownloadEngine(appContext: Context) {
                     probe.etag != item.etag
                 if (sizeChanged || etagChanged) {
                     App.logEvent(
-                        "MONITOR: versi baru terdeteksi untuk ${item.fileName} " +
+                        "MONITOR: new version detected for ${item.fileName} " +
                             "(${Formats.bytes(probe.sizeBytes)})"
                     )
                     addDownload(
