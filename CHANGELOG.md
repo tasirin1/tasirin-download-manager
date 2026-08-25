@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 - **Fix compile error** - Perbaiki normalizePinHash + pindahkan cookie methods ke dalam class.
+- **Fix compile error v2** - Pindahkan persistCookies/loadPersistedCookies ke scope DownloadEngine yang benar (sebelumnya terpasang di SpeedThrottle).
 
 - **Cookie persistence** - Simpan cookie ke SharedPreferences agar session tetap hidup antar restart.
 
