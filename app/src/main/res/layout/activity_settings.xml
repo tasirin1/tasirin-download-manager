@@ -505,8 +505,16 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Custom User-Agent (optional)"
+                        android:text="User-Agent"
                         android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                    <Spinner
+                        android:id="@+id/spinner_user_agent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_tv"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="12dp" />
 
                     <EditText
                         android:id="@+id/edit_user_agent"
@@ -514,12 +522,14 @@
                         android:focusableInTouchMode="true"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:background="@drawable/bg_input_tv"
-                        android:hint="Leave empty for default Chrome UA"
+                        android:hint="Or type custom User-Agent"
                         android:inputType="textUri"
                         android:minHeight="48dp"
                         android:paddingHorizontal="12dp"
-                        android:singleLine="true" />
+                        android:singleLine="true"
+                        android:visibility="gone" />
 
                     <TextView
                         android:layout_width="match_parent"

@@ -19,6 +19,7 @@ import android.text.TextWatcher
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -584,14 +585,47 @@ class SettingsActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // Custom User-Agent
-        val userAgentInput = findViewById<EditText>(R.id.edit_user_agent)
-        userAgentInput.setText(StoragePrefs.getUserAgent(this))
-        userAgentInput.addTextChangedListener(object : TextWatcher {
+        // User-Agent: preset spinner + optional custom input
+        val uaPresets = listOf(
+            "Default (Chrome Mobile)" to "",
+            "Chrome Desktop" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Firefox Desktop" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+            "Safari (iPhone)" to "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+            "Chrome (Android)" to "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+            "curl" to "curl/8.5.0",
+            "Wget" to "Wget/1.21.4",
+            "Custom..." to "CUSTOM"
+        )
+        val spinnerUA = findViewById<Spinner>(R.id.spinner_user_agent)
+        val customUAInput = findViewById<EditText>(R.id.edit_user_agent)
+        val uaLabels = uaPresets.map { it.first }
+        spinnerUA.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, uaLabels)
+        val savedUA = StoragePrefs.getUserAgent(this)
+        val savedIdx = uaPresets.indexOfFirst { it.second == savedUA }
+            .coerceAtLeast(0)
+        spinnerUA.setSelection(savedIdx)
+        customUAInput.setText(savedUA)
+        customUAInput.visibility = if (savedIdx == uaPresets.size - 1) View.VISIBLE else View.GONE
+        spinnerUA.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val value = uaPresets[position].second
+                if (value == "CUSTOM") {
+                    customUAInput.visibility = View.VISIBLE
+                    customUAInput.requestFocus()
+                } else {
+                    customUAInput.visibility = View.GONE
+                    StoragePrefs.setUserAgent(this@SettingsActivity, value)
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        customUAInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
-                StoragePrefs.setUserAgent(this@SettingsActivity, s?.toString().orEmpty())
+                if (spinnerUA.selectedItemPosition == uaPresets.size - 1) {
+                    StoragePrefs.setUserAgent(this@SettingsActivity, s?.toString().orEmpty())
+                }
             }
         })
     }
