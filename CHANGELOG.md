@@ -4,6 +4,7 @@
 - **Fix compile error v2** - Pindahkan persistCookies/loadPersistedCookies ke scope DownloadEngine yang benar (sebelumnya terpasang di SpeedThrottle).
 - **Fix compile error v3** - Gunakan named args untuk addDownload agar kompatibel dengan parameter method/postBody baru.
 - **Fix bug & optimasi** - rememberFailedUrl hapus cukup entri, globalRateLimiter invalidate saat limit=0, cookie prefs di-cache.
+- **Fix settings** - User-Agent EditText ditambah focusable agar bisa diakses via D-pad di TV box.
 
 - **Cookie persistence** - Simpan cookie ke SharedPreferences agar session tetap hidup antar restart.
 
