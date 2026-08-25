@@ -59,9 +59,6 @@ import java.util.concurrent.atomic.AtomicLong
 import java.net.HttpCookie
 import java.net.CookieManager
 import java.net.CookiePolicy
-import java.net.HttpCookie
-import java.net.CookieManager
-import java.net.CookiePolicy
 import org.json.JSONArray
 import org.json.JSONObject
 class DownloadEngine(appContext: Context) {
@@ -75,6 +72,7 @@ class DownloadEngine(appContext: Context) {
     // but does not bypass Cloudflare JS challenges).
     private val cookieManager = CookieManager(null, CookiePolicy.ACCEPT_ALL).also {
         java.net.CookieHandler.setDefault(it)
+        loadPersistedCookies()
     }
 
     /** Buka koneksi; untuk https tambahkan trust anchor CA lama (Android 6-7). */
@@ -1753,6 +1751,39 @@ private class SpeedThrottle(
         }
         if (delayMs > 0) delay(delayMs)
     }
+
+    /** Simpan cookie ke SharedPreferences agar persist antar restart. */
+    private fun persistCookies() {
+        try {
+            val arr = JSONArray()
+            cookieManager.cookieStore.cookies.forEach { c ->
+                arr.put(JSONObject().apply {
+                    put("name", c.name)
+                    put("value", c.value)
+                    put("domain", c.domain.orEmpty())
+                    put("path", c.path.orEmpty())
+                })
+            }
+            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putString("cookies", arr.toString()).apply()
+        } catch (_: Exception) { /* cookie persist is best-effort */ }
+    }
+
+    /** Muat cookie dari SharedPreferences. */
+    private fun loadPersistedCookies() {
+        try {
+            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
+            val raw = prefs.getString("cookies", null) ?: return
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val cookie = HttpCookie(obj.getString("name"), obj.getString("value"))
+                cookie.domain = obj.getString("domain")
+                cookie.path = obj.getString("path")
+                cookieManager.cookieStore.add(null, cookie)
+            }
+        } catch (_: Exception) { /* cookie persist is best-effort */ }
+    }
 }
 
 /** Watchdog per-unduhan: mendeteksi koneksi macet (tanpa byte baru) atau
@@ -1821,43 +1852,3 @@ private class GlobalRateLimiter(private val limitKbps: Int) {
         private const val GLOBAL_WINDOW_MS = 10_000L
     }
 }
-    // Cookie manager in-memory: store per-host cookies so subsequent requests
-    // can carry server-set session cookies (helps sites that require cookies,
-    // but does not bypass Cloudflare JS challenges).
-    private val cookieManager = CookieManager(null, CookiePolicy.ACCEPT_ALL).also {
-        java.net.CookieHandler.setDefault(it)
-        loadPersistedCookies()
-    }
-
-    /** Simpan cookie ke SharedPreferences agar persist antar restart. */
-    private fun persistCookies() {
-        try {
-            val arr = JSONArray()
-            cookieManager.cookieStore.cookies.forEach { c ->
-                arr.put(JSONObject().apply {
-                    put("name", c.name)
-                    put("value", c.value)
-                    put("domain", c.domain.orEmpty())
-                    put("path", c.path.orEmpty())
-                })
-            }
-            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
-            prefs.edit().putString("cookies", arr.toString()).apply()
-        } catch (_: Exception) { /* cookie persist is best-effort */ }
-    }
-
-    /** Muat cookie dari SharedPreferences. */
-    private fun loadPersistedCookies() {
-        try {
-            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
-            val raw = prefs.getString("cookies", null) ?: return
-            val arr = JSONArray(raw)
-            for (i in 0 until arr.length()) {
-                val obj = arr.getJSONObject(i)
-                val cookie = HttpCookie(obj.getString("name"), obj.getString("value"))
-                cookie.domain = obj.getString("domain")
-                cookie.path = obj.getString("path")
-                cookieManager.cookieStore.add(null, cookie)
-            }
-        } catch (_: Exception) { /* cookie persist is best-effort */ }
-    }

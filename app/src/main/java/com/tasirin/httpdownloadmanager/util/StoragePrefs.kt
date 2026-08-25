@@ -406,6 +406,7 @@ object StoragePrefs {
     internal fun normalizePinHash(stored: String): String? {
         if (stored.isEmpty()) return null
         return if (stored.length == 64 && stored.all { it in HEX_CHARS }) stored
+        else sha256Hex(stored)
     }
 
     fun getUserAgent(context: Context): String =
@@ -413,7 +414,6 @@ object StoragePrefs {
 
     fun setUserAgent(context: Context, value: String) {
         prefs(context).edit { putString(KEY_USER_AGENT, value) }
-        else sha256Hex(stored)
     }
 
     /** Bandingkan dua string tanpa short-circuit (constant-time). */
