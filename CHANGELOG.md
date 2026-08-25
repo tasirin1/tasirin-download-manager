@@ -1,6 +1,7 @@
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 
 ### Fixed
+- **Player slider depth** — Tambahkan bayangan halus pada bar durasi dan volume agar terlihat jelas di atas video tanpa mengubah posisi kontrol.
 - **MediaStore authorization** — Pisahkan izin baca galeri dari izin tulis/hapus dan wajibkan URI SAF masih berasal dari tree berizin.
 - **Stale media access** — Validasi ulang path/URI saat membaca durasi video agar cache galeri lama tidak mengakses storage yang sudah tidak diizinkan.
 - **Upload keep-alive** — Tutup koneksi saat upload ditolak sebelum body dibaca agar body besar tidak menahan thread atau meracuni koneksi.
