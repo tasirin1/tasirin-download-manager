@@ -13,7 +13,7 @@ object StoragePrefs {
     const val DEFAULT_PORT = 8080
 
     private const val PREFS = "storage_settings"
-    private var cachedPrefs: android.content.SharedPreferences? = null
+    @Volatile private var cachedPrefs: android.content.SharedPreferences? = null
 
     /** Cache SharedPreferences instance untuk menghindari 58x getSharedPreferences call. */
     private fun prefs(context: Context): android.content.SharedPreferences {

@@ -1163,6 +1163,19 @@ class DownloadEngine(appContext: Context) {
                         val origin = java.net.URL(item.url).let { "${it.protocol}://${it.host}" }
                         fallbackConn.setRequestProperty("Referer", "$origin/")
                     } catch (_: Exception) { /* Referer opsional, tidak wajib */ }
+                    // Terapkan cookie dari CookieManager (situs yang butuh session)
+                    try {
+                        val cookieHeader = cookieManager.cookieStore.cookies
+                            .filter { c ->
+                                c.domain?.let { d ->
+                                    item.url.contains(d.removePrefix("."), ignoreCase = true)
+                                } ?: false
+                            }
+                            .joinToString("; ") { "${it.name}=${it.value}" }
+                        if (cookieHeader.isNotEmpty()) {
+                            fallbackConn.setRequestProperty("Cookie", cookieHeader)
+                        }
+                    } catch (_: Exception) { /* Cookie opsional */ }
                     applyAuthHeaders(fallbackConn, item)
                     runSingle(item, fallbackConn, saver, throttle)
                 } finally {

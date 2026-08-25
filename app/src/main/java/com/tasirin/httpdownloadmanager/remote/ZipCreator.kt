@@ -141,7 +141,8 @@ object ZipCreator {
                     val relPath = c.getString(iRel) ?: continue
                     val name = c.getString(iName) ?: continue
                     if (!relPath.startsWith(folder)) continue
-                    val entry = safeEntryPath(relPath.removePrefix(folder) + name)
+                    val dirPart = relPath.removePrefix(folder).trimEnd('/')
+                    val entry = safeEntryPath(if (dirPart.isEmpty()) name else "$dirPart/$name")
                     resolver.openInputStream(
                         ContentUris.withAppendedId(collection, c.getLong(iId))
                     )?.use { input ->

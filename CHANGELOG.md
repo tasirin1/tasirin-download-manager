@@ -1,30 +1,12 @@
 ## [Unreleased]
 
-- **Fix compile error** - Perbaiki normalizePinHash + pindahkan cookie methods ke dalam class.
-- **Fix compile error v2** - Pindahkan persistCookies/loadPersistedCookies ke scope DownloadEngine yang benar (sebelumnya terpasang di SpeedThrottle).
-- **Fix compile error v3** - Gunakan named args untuk addDownload agar kompatibel dengan parameter method/postBody baru.
-- **Fix bug & optimasi** - rememberFailedUrl hapus cukup entri, globalRateLimiter invalidate saat limit=0, cookie prefs di-cache.
-- **Fix settings** - User-Agent diganti Spinner preset (Chrome, Firefox, Safari, curl, dll) + Custom input, ramah D-pad TV box. (+ import Spinner)
+- **Fix CrashLog race condition** - Tambah synchronized lock pada trim CrashLog mencegah corrupt saat dua thread crash bersamaan.
+- **Fix resource leak** - Bungkus `serveMedia()` dan `serveFile()` dalam try-finally supaya InputStream tertutup bila `streamMedia()` lempar exception tak terduga.
+- **Fix ZipCreator path** - `zipMedia()` pakai `trimEnd('/')` pada `relPath` supaya path entry ZIP tetap benar walau MediaStore berubah.
+- **Fix cookie fallback** - `fallbackConn` di DownloadEngine sekarang menerapkan cookie dari CookieManager ke koneksi fallback (situs yang butuh session cookie).
+- **Fix thread-safe prefs** - `cachedPrefs` di StoragePrefs ditambah `@Volatile` supaya aman diakses dari multiple thread di Android 5.
 
-- **Cookie persistence** - Simpan cookie ke SharedPreferences agar session tetap hidup antar restart.
 
-- **Accept-Language header** - Kirim en-US,id agar situs internasional tidak memblokir.
-- **User-Agent settingable** - Opsi custom User-Agent di Pengaturan untuk bypass anti-bot.
-- **Cookie persistence** - Simpan cookie ke SharedPreferences agar session tetap hidup antar restart.
-- **Custom headers per-download** - Tambah header kustom per unduhan di dialog Advanced.
-- **POST download support** - Support download via POST dengan body kustom.
-- **Advanced download options** - Dialog tambah unduhan sekarang punya opsi method, headers, dan POST body.
-
-- **Browser-like headers** - Kirim User-Agent Chrome, Referer, dan Accept agar situs download tidak memblokir koneksi.
-- **Cookie handling** - Tambahkan cookie manager in-memory agar request berikutnya bisa membawa cookie sesi dari server.
-- **Seek feedback rollback** - Kembalikan perilaku dua-tap yang stabil tanpa mode penyembunyian kontrol sementara.
-- **Seek indicator cleanup** - Hapus indikator angka 10 detik agar tidak menutupi tombol play.
-- **Thumbnail concurrency** - Batasi jumlah thumbnail yang dimuat serentak agar tidak boros RAM.
-- **ZIP size warning** - Peringatan sebelum membuat ZIP lebih dari 200 MB.
-- **Gallery auto-retry** - Muat ulang galeri sekali setelah 2 detik jika permintaan pertama gagal.
-- **statPool race fix** - Tangkap referensi lokal pool di rejection handler agar tidak race dengan stopServer.
-- **Gallery scan cache** - Naikkan TTL dari 15s ke 30s supaya tidak scan berulang terlalu sering.
-- **Part file cleanup** - Hapus file .part orphans hanya jika sudah tua lebih dari 2 jam.
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 ### Fixed
 - **Seek zen mode** — Sembunyikan tombol modal dan daftar video berikutnya selama dua-tap lompatan durasi.

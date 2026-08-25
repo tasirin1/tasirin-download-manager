@@ -14,6 +14,7 @@ import java.util.Locale
  *  duplikat di dua tempat dengan format sama). */
 object CrashLog {
 
+    private val trimLock = Any()
     private const val MAX_BYTES = 100_000
     private const val FILE_NAME = "crash.log"
     /** ThreadLocal formatter (SimpleDateFormat tidak thread-safe). */
@@ -39,15 +40,18 @@ object CrashLog {
             ).use { it.write(text) }
             // Trim bila melebihi batas: baca dari akhir file (RandomAccessFile)
             // supaya tidak perlu load seluruh file ke memori.
-            if (file.length() > MAX_BYTES * 1.5) {
-                java.io.RandomAccessFile(file, "rw").use { raf ->
-                    val len = raf.length()
-                    val buf = ByteArray(MAX_BYTES)
-                    raf.seek(len - MAX_BYTES)
-                    raf.readFully(buf)
-                    raf.setLength(MAX_BYTES.toLong())
-                    raf.seek(0)
-                    raf.write(buf)
+            // synchronized: mencegah race condition saat dua thread crash bersamaan.
+            synchronized(trimLock) {
+                if (file.length() > MAX_BYTES * 1.5) {
+                    java.io.RandomAccessFile(file, "rw").use { raf ->
+                        val len = raf.length()
+                        val buf = ByteArray(MAX_BYTES)
+                        raf.seek(len - MAX_BYTES)
+                        raf.readFully(buf)
+                        raf.setLength(MAX_BYTES.toLong())
+                        raf.seek(0)
+                        raf.write(buf)
+                    }
                 }
             }
         }

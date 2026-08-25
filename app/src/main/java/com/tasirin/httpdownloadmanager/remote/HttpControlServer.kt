@@ -1344,33 +1344,39 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val mime = MimeTypes.forFile(item.fileName)
         val input: InputStream
         val total: Long
+        val stream: InputStream
         if (!item.filePath.isNullOrEmpty()) {
             val file = File(item.filePath)
             if (!file.exists() || !file.isFile || !isFsPathAllowed(file.absolutePath)) {
                 return notFound()
             }
-            input = FileInputStream(file)
+            stream = FileInputStream(file)
             total = file.length()
         } else if (!item.contentUri.isNullOrEmpty()) {
             val uri = item.contentUri.toUri()
             if (!isMediaUriAllowed(uri)) return notFound()
             val resolver = context.contentResolver
-            val stream = resolver.openInputStream(uri) ?: return notFound()
+            val rawStream = resolver.openInputStream(uri) ?: return notFound()
             val len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
-            input = stream
+            stream = rawStream
             total = len
         } else {
             return notFound()
         }
 
-        return streamMedia(
-            name = item.fileName,
-            mime = mime,
-            input = input,
-            total = total,
-            rangeHeader = session.headers["range"] ?: session.headers["Range"],
-            download = download
-        )
+        return try {
+            streamMedia(
+                name = item.fileName,
+                mime = mime,
+                input = stream,
+                total = total,
+                rangeHeader = session.headers["range"] ?: session.headers["Range"],
+                download = download
+            )
+        } catch (e: Exception) {
+            runCatching { stream.close() }
+            throw e
+        }
     }
 
     fun createPartialStreamUrl(itemId: String): String {
@@ -1502,19 +1508,24 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (!file.isFile || !isFsPathAllowed(file.absolutePath)) return notFound()
                 total = file.length()
                 val range = parseRange(rangeHeader, total)
-                input = FileInputStream(file).apply {
+                val stream = FileInputStream(file).apply {
                     runCatching { channel.position(range?.first ?: 0L) }
                 }
                 val meta = cachedMediaMeta(raw)
-                return streamMedia(
-                    name = meta.name,
-                    mime = meta.mime ?: MimeTypes.forFile(meta.name),
-                    input = input,
-                    total = total,
-                    rangeHeader = rangeHeader,
-                    download = download,
-                    prepositioned = true
-                )
+                return try {
+                    streamMedia(
+                        name = meta.name,
+                        mime = meta.mime ?: MimeTypes.forFile(meta.name),
+                        input = stream,
+                        total = total,
+                        rangeHeader = rangeHeader,
+                        download = download,
+                        prepositioned = true
+                    )
+                } catch (e: Exception) {
+                    runCatching { stream.close() }
+                    throw e
+                }
             }
             raw.startsWith("u:") -> {
                 val uri = raw.substring(2).toUri()
@@ -1523,17 +1534,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     ?: return notFound()
                 total = descriptor.length
                 val range = parseRange(rangeHeader, total)
-                input = PositionedAssetInputStream(descriptor, range?.first ?: 0L)
+                val stream = PositionedAssetInputStream(descriptor, range?.first ?: 0L)
                 val meta = cachedMediaMeta(raw)
-                return streamMedia(
-                    name = meta.name,
-                    mime = meta.mime ?: MimeTypes.forFile(meta.name),
-                    input = input,
-                    total = total,
-                    rangeHeader = rangeHeader,
-                    download = download,
-                    prepositioned = true
-                )
+                return try {
+                    streamMedia(
+                        name = meta.name,
+                        mime = meta.mime ?: MimeTypes.forFile(meta.name),
+                        input = stream,
+                        total = total,
+                        rangeHeader = rangeHeader,
+                        download = download,
+                        prepositioned = true
+                    )
+                } catch (e: Exception) {
+                    runCatching { stream.close() }
+                    throw e
+                }
             }
             else -> return notFound()
         }
