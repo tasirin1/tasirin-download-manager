@@ -803,6 +803,10 @@
   #mmPlayer.mm-hide-cursor {
  cursor: none; }
 
+  #mediaModal.mm-seek-zen #mmTop,
+  #mediaModal.mm-seek-zen #mmRelated {
+ opacity: 0; visibility: hidden; pointer-events: none; }
+
  @media (max-width: 430px), (max-height: 380px) {
  #mmCtrlRow { gap: 0; }
  #mmCtrl { padding-left: 7px; padding-right: 7px; }
@@ -1556,6 +1560,16 @@ function mmShowToast(text, ms) {
   mmToast.classList.remove('hidden');
   clearTimeout(mmToast._t);
   mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, ms || 700);
+}
+
+let mmSeekZenTimer = null;
+function mmShowSeekZen() {
+  mediaModal.classList.add('mm-seek-zen');
+  clearTimeout(mmSeekZenTimer);
+  mmSeekZenTimer = setTimeout(function () {
+    mediaModal.classList.remove('mm-seek-zen');
+    mmSeekZenTimer = null;
+  }, 750);
 }
 
 function mmShowCtrl() {
@@ -3549,7 +3563,10 @@ function mmSeekBy(delta, hideControls) {
   mmVideo.currentTime = Math.min(Math.max(mmVideo.currentTime + delta, 0), d);
   mmShowToast((delta > 0 ? '+' : '') + delta + ' s');
   mmSeekUI();
-  if (hideControls) mmHideCtrl();
+  if (hideControls) {
+    mmHideCtrl();
+    mmShowSeekZen();
+  }
   else mmShowCtrl();
 }
 function mmVolBy(d) {
