@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- **Fix compile error** - Perbaiki normalizePinHash + pindahkan cookie methods ke dalam class.
+
 - **Cookie persistence** - Simpan cookie ke SharedPreferences agar session tetap hidup antar restart.
 
 - **Accept-Language header** - Kirim en-US,id agar situs internasional tidak memblokir.
