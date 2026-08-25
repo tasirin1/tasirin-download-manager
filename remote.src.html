@@ -1187,6 +1187,15 @@
         </select>
       </div>
       <input id="storage" type="text" placeholder="Destination folder path on device (empty = default)" value="">
+      <details id="advancedAdd">
+        <summary>Advanced options</summary>
+        <select id="dlMethod">
+          <option value="GET" selected>GET</option>
+          <option value="POST">POST</option>
+        </select>
+        <textarea id="dlHeaders" rows="2" placeholder="Custom headers (one per line: Key: Value)"></textarea>
+        <textarea id="dlPostBody" rows="2" placeholder="POST body (key=value&amp;key2=value2)" class="hidden"></textarea>
+      </details>
       <div class="form-row">
         <button type="submit" class="btn-main">Add Download</button>
         <button id="cancelAdd" type="button" class="btn-ghost">Cancel</button>
@@ -1442,6 +1451,10 @@ document.getElementById('fabNewBtn').addEventListener('click', onNewDownloadClic
 
 document.getElementById('cancelAdd').addEventListener('click', function () {
   toggleAddForm(false);
+});
+document.getElementById('dlMethod').addEventListener('change', function () {
+  var isPost = this.value === 'POST';
+  document.getElementById('dlPostBody').classList.toggle('hidden', !isPost);
 });
 addSheet.addEventListener('click', function (e) {
   if (e.target === addSheet) toggleAddForm(false);
@@ -4335,6 +4348,9 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   const checksum = document.getElementById('checksum').value.trim();
   if (checksum) body.append('checksum', checksum);
   body.append('path', document.getElementById('storage').value.trim());
+  body.append('method', document.getElementById('dlMethod').value);
+  body.append('headers', document.getElementById('dlHeaders').value.trim());
+  body.append('postBody', document.getElementById('dlPostBody').value.trim());
   try {
     const res = await fetch(API + '/api/add', {
       method: 'POST',

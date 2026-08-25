@@ -583,6 +583,17 @@ class SettingsActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
+
+        // Custom User-Agent
+        val userAgentInput = findViewById<EditText>(R.id.edit_user_agent)
+        userAgentInput.setText(StoragePrefs.getUserAgent(this))
+        userAgentInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                StoragePrefs.setUserAgent(this@SettingsActivity, s?.toString().orEmpty())
+            }
+        })
     }
 
     private fun wireStorageSection() {

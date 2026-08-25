@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+- **Accept-Language header** - Kirim en-US,id agar situs internasional tidak memblokir.
+- **User-Agent settingable** - Opsi custom User-Agent di Pengaturan untuk bypass anti-bot.
+- **Cookie persistence** - Simpan cookie ke SharedPreferences agar session tetap hidup antar restart.
+- **Custom headers per-download** - Tambah header kustom per unduhan di dialog Advanced.
+- **POST download support** - Support download via POST dengan body kustom.
+- **Advanced download options** - Dialog tambah unduhan sekarang punya opsi method, headers, dan POST body.
+
 - **Browser-like headers** - Kirim User-Agent Chrome, Referer, dan Accept agar situs download tidak memblokir koneksi.
 - **Cookie handling** - Tambahkan cookie manager in-memory agar request berikutnya bisa membawa cookie sesi dari server.
 - **Seek feedback rollback** - Kembalikan perilaku dua-tap yang stabil tanpa mode penyembunyian kontrol sementara.

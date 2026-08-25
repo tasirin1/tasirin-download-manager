@@ -50,6 +50,7 @@ object StoragePrefs {
     private const val KEY_THUMB_CLEANUP_LAST = "thumb_cleanup_last"
     private const val KEY_PARTIAL_STREAM_SECRET = "partial_stream_secret"
     private const val KEY_SERVER_SESSION_SECRET = "server_session_secret"
+    private const val KEY_USER_AGENT = "user_agent"
 
     /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
     fun isSectionCollapsed(context: Context, key: String): Boolean =
@@ -405,6 +406,13 @@ object StoragePrefs {
     internal fun normalizePinHash(stored: String): String? {
         if (stored.isEmpty()) return null
         return if (stored.length == 64 && stored.all { it in HEX_CHARS }) stored
+    }
+
+    fun getUserAgent(context: Context): String =
+        prefs(context).getString(KEY_USER_AGENT, "").orEmpty()
+
+    fun setUserAgent(context: Context, value: String) {
+        prefs(context).edit { putString(KEY_USER_AGENT, value) }
         else sha256Hex(stored)
     }
 

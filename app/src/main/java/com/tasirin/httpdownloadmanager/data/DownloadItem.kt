@@ -37,6 +37,8 @@ data class DownloadItem(
     val mirrors: List<String> = emptyList(),
     val monitor: Boolean = false,
     val etag: String = "",
+    val method: String = "GET",
+    val postBody: String = "",
     val segments: List<DownloadSegment> = emptyList(),
     val speedBps: Long = 0,
     val etaSeconds: Long = 0

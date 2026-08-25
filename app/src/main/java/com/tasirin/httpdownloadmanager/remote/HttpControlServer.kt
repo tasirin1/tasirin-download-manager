@@ -715,6 +715,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val checksum = params["checksum"]?.trim().orEmpty()
         val storage = params["storage"]?.trim().orEmpty()
         val folderPath = params["path"]?.trim().orEmpty()
+        val method = params["method"]?.trim()?.uppercase().orEmpty()
+            .let { if (it == "POST") "POST" else "GET" }
+        val postBody = params["postBody"]?.trim().orEmpty()
+        val headers = params["headers"]?.trim().orEmpty()
         if (!isRemoteDestinationAllowed(folderPath)) {
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
@@ -722,6 +726,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         App.engine.addDownload(
             url, params["name"],
+            headers = headers,
+            method = method,
+            postBody = postBody,
             speedLimitKbps = speed,
             priority = priority,
             checksum = checksum,

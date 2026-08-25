@@ -59,6 +59,11 @@ import java.util.concurrent.atomic.AtomicLong
 import java.net.HttpCookie
 import java.net.CookieManager
 import java.net.CookiePolicy
+import java.net.HttpCookie
+import java.net.CookieManager
+import java.net.CookiePolicy
+import org.json.JSONArray
+import org.json.JSONObject
 class DownloadEngine(appContext: Context) {
     // Engine hidup seumur proses (disimpan statis di App.engine): simpan
     // Application context saja, jangan pernah Activity (anti-leak).
@@ -160,6 +165,8 @@ class DownloadEngine(appContext: Context) {
         username: String = "",
         password: String = "",
         headers: String = "",
+        method: String = "GET",
+        postBody: String = "",
         speedLimitKbps: Int = 0,
         priority: Int = 0,
         checksum: String = "",
@@ -184,6 +191,8 @@ class DownloadEngine(appContext: Context) {
             username = username,
             password = password,
             headers = headers,
+            method = method,
+            postBody = postBody,
             destination = destination,
             folderPath = folderPath,
             speedLimitKbps = speedLimitKbps,
@@ -369,6 +378,9 @@ class DownloadEngine(appContext: Context) {
             conn.readTimeout = if (method == "HEAD") 8_000 else readTimeoutMs
             conn.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
             conn.setRequestProperty("Accept", "*/*")
+            conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
+            val ua = StoragePrefs.getUserAgent(context)
+            if (ua.isNotEmpty()) conn.setRequestProperty("User-Agent", ua)
             try {
                 val origin = java.net.URL(current).let { "${it.protocol}://${it.host}" }
                 conn.setRequestProperty("Referer", "$origin/")
@@ -884,11 +896,16 @@ class DownloadEngine(appContext: Context) {
         }
 
         val conn = openAuthenticatedConnection(
-            item.url, method = "GET",
+            item.url, method = if (item.method == "POST") "POST" else "GET",
             username = item.username,
             password = item.password,
             headers = item.headers
-        )
+        ) { connection, _ ->
+            if (item.method == "POST" && item.postBody.isNotEmpty()) {
+                connection.doOutput = true
+                connection.outputStream.use { it.write(item.postBody.toByteArray(Charsets.UTF_8)) }
+            }
+        }
         try {
             runSingle(item, conn, saver, throttle)
         } finally {
@@ -1046,6 +1063,7 @@ class DownloadEngine(appContext: Context) {
             )
         }
         flushSave()
+        persistCookies()
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
         } catch (e: IOException) {
             if (!coroutineContext.isActive) throw CancellationException()
@@ -1130,6 +1148,9 @@ class DownloadEngine(appContext: Context) {
                     fallbackConn.readTimeout = readTimeoutMs
                     fallbackConn.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
                     fallbackConn.setRequestProperty("Accept", "*/*")
+                    fallbackConn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
+                    val ua = StoragePrefs.getUserAgent(context)
+                    if (ua.isNotEmpty()) fallbackConn.setRequestProperty("User-Agent", ua)
                     try {
                         val origin = java.net.URL(item.url).let { "${it.protocol}://${it.host}" }
                         fallbackConn.setRequestProperty("Referer", "$origin/")
@@ -1800,3 +1821,43 @@ private class GlobalRateLimiter(private val limitKbps: Int) {
         private const val GLOBAL_WINDOW_MS = 10_000L
     }
 }
+    // Cookie manager in-memory: store per-host cookies so subsequent requests
+    // can carry server-set session cookies (helps sites that require cookies,
+    // but does not bypass Cloudflare JS challenges).
+    private val cookieManager = CookieManager(null, CookiePolicy.ACCEPT_ALL).also {
+        java.net.CookieHandler.setDefault(it)
+        loadPersistedCookies()
+    }
+
+    /** Simpan cookie ke SharedPreferences agar persist antar restart. */
+    private fun persistCookies() {
+        try {
+            val arr = JSONArray()
+            cookieManager.cookieStore.cookies.forEach { c ->
+                arr.put(JSONObject().apply {
+                    put("name", c.name)
+                    put("value", c.value)
+                    put("domain", c.domain.orEmpty())
+                    put("path", c.path.orEmpty())
+                })
+            }
+            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putString("cookies", arr.toString()).apply()
+        } catch (_: Exception) {}
+    }
+
+    /** Muat cookie dari SharedPreferences. */
+    private fun loadPersistedCookies() {
+        try {
+            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
+            val raw = prefs.getString("cookies", null) ?: return
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val cookie = HttpCookie(obj.getString("name"), obj.getString("value"))
+                cookie.domain = obj.getString("domain")
+                cookie.path = obj.getString("path")
+                cookieManager.cookieStore.add(null, cookie)
+            }
+        } catch (_: Exception) {}
+    }
