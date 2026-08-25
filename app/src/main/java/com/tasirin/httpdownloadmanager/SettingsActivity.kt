@@ -24,6 +24,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -599,7 +600,7 @@ class SettingsActivity : AppCompatActivity() {
         val spinnerUA = findViewById<Spinner>(R.id.spinner_user_agent)
         val customUAInput = findViewById<EditText>(R.id.edit_user_agent)
         val uaLabels = uaPresets.map { it.first }
-        spinnerUA.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, uaLabels)
+        setupSpinner(this, spinnerUA, uaLabels)
         val savedUA = StoragePrefs.getUserAgent(this)
         val savedIdx = uaPresets.indexOfFirst { it.second == savedUA }
             .coerceAtLeast(0)
