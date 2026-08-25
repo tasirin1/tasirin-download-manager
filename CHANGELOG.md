@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- **Cookie persistence** - Simpan cookie ke SharedPreferences agar session tetap hidup antar restart.
+
 - **Accept-Language header** - Kirim en-US,id agar situs internasional tidak memblokir.
 - **User-Agent settingable** - Opsi custom User-Agent di Pengaturan untuk bypass anti-bot.
 - **Cookie persistence** - Simpan cookie ke SharedPreferences agar session tetap hidup antar restart.
