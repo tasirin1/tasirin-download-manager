@@ -100,11 +100,14 @@ class DownloadEngine(appContext: Context) {
 
     private fun rememberFailedUrl(url: String) {
         failedUrls.add(url)
-        if (failedUrls.size <= 256) return
-        val iterator = failedUrls.iterator()
-        if (iterator.hasNext()) {
-            iterator.next()
-            iterator.remove()
+        // Hapus cukup entri supaya ukuran kembali di bawah batas;
+        // sebelumnya hanya menghapus 1 entri -> set bisa tumbuh tak terbatas.
+        while (failedUrls.size > 256) {
+            val iterator = failedUrls.iterator()
+            if (iterator.hasNext()) {
+                iterator.next()
+                iterator.remove()
+            } else break
         }
     }
 
@@ -561,7 +564,12 @@ class DownloadEngine(appContext: Context) {
 
     private fun globalRateLimiter(): GlobalRateLimiter? {
         val limit = StoragePrefs.speedLimitKbps(context)
-        if (limit <= 0) return null
+        if (limit <= 0) {
+            // Batalkan throttle global bila pengguna mematikan limit
+            // supaya download baru tidak terkena throttle sisa sesi lama.
+            synchronized(this) { sharedLimiter = null }
+            return null
+        }
         synchronized(this) {
             val current = sharedLimiter
             if (current != null) return current
@@ -1635,6 +1643,10 @@ class DownloadEngine(appContext: Context) {
         return "download_${DEFAULT_NAME_FORMAT.format(Date())}"
     }
 
+    private val cookiePrefs by lazy {
+        context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
+    }
+
     /** Simpan cookie ke SharedPreferences agar persist antar restart. */
     private fun persistCookies() {
         try {
@@ -1647,16 +1659,14 @@ class DownloadEngine(appContext: Context) {
                     put("path", c.path.orEmpty())
                 })
             }
-            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
-            prefs.edit().putString("cookies", arr.toString()).apply()
+            cookiePrefs.edit().putString("cookies", arr.toString()).apply()
         } catch (_: Exception) { /* cookie persist is best-effort */ }
     }
 
     /** Muat cookie dari SharedPreferences. */
     private fun loadPersistedCookies() {
         try {
-            val prefs = context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
-            val raw = prefs.getString("cookies", null) ?: return
+            val raw = cookiePrefs.getString("cookies", null) ?: return
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
