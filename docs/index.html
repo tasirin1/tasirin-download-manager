@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tasirin Download Manager</title>
 <meta name="description" content="Lightweight download manager for Android with remote control, video player, and file manager.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📥</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230D47A1'/><circle cx='50' cy='50' r='30' stroke='white' stroke-width='3' fill='none'/><rect x='44' y='32' width='12' height='16' fill='white'/><polygon points='50,56 38,44 62,44' fill='white'/><rect x='32' y='64' width='36' height='5' rx='2' fill='%23FF6F00'/></svg>">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0f1117;--card:#1a1d27;--accent:#4f8cff;--accent2:#6c5ce7;--text:#e4e6eb;--dim:#8b8d97;--green:#00c853;--radius:12px}
@@ -14,7 +14,7 @@ a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
 
 .hero{text-align:center;padding:80px 20px 60px;background:linear-gradient(135deg,#0f1117 0%,#1a1040 50%,#0f1117 100%)}
-.hero-icon{font-size:64px;margin-bottom:16px}
+.hero-icon{margin-bottom:16px}
 .hero h1{font-size:2.2rem;font-weight:700;margin-bottom:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero .tagline{color:var(--dim);font-size:1.1rem;margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto}
 .hero .version{display:inline-block;background:var(--card);border:1px solid #2a2d3a;border-radius:20px;padding:4px 14px;font-size:0.85rem;color:var(--dim);margin-bottom:24px}
@@ -69,7 +69,12 @@ footer a{color:var(--accent)}
 <body>
 
 <div class="hero">
-  <div class="hero-icon">📥</div>
+  <div class="hero-icon"><svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="40" cy="40" r="34" stroke="white" stroke-width="3" fill="none"/>
+  <rect x="34" y="26" width="12" height="16" rx="1" fill="white"/>
+  <polygon points="40,54 28,42 52,42" fill="white"/>
+  <rect x="26" y="60" width="28" height="4" rx="2" fill="#FF6F00"/>
+</svg></div>
   <h1>Tasirin Download Manager</h1>
   <p class="tagline">Lightweight download manager for Android with remote web control, built-in video player, and file manager.</p>
   <div class="version" id="version-badge">v1.0</div>
