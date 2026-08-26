@@ -1,5 +1,5 @@
 ## [Unreleased]
-- **Social media download** — Deteksi URL Instagram/Facebook/TikTok/Twitter/YouTube/Reddit otomatis; ekstrak direct media URL dari meta tags (`og:video`, `og:image`) dan JSON embedded (`video_url`, `display_url`) sebelum download dimulai.
+- **Social media download** — Deteksi URL Instagram/Facebook/TikTok/Twitter/YouTube/Reddit otomatis; Instagram pakai endpoint `/embed/` untuk ekstrak direct media URL dari CDN (`scontent*.cdninstagram.com`); fallback ke meta tags (`og:video`, `og:image`) dan JSON embedded. (`og:video`, `og:image`) dan JSON embedded (`video_url`, `display_url`) sebelum download dimulai.
 
 - **Fix unused import** — Hapus import `RedirectStrategy` yang tidak terpakai di `SocialMediaExtractor.kt`.
 

@@ -44,7 +44,7 @@ object SocialMediaExtractor {
             "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
     /** Batas ukuran halaman yang diunduh (512 KB cukup untuk meta tags). */
-    private const val MAX_PAGE_BYTES = 512 * 1024
+    private const val MAX_PAGE_BYTES = 2 * 1024 * 1024
 
     /** Apakah URL ini dari situs social media yang dikenal? */
     fun isSocialMediaUrl(url: String): Boolean = runCatching {
@@ -67,7 +67,15 @@ object SocialMediaExtractor {
         if (!isSocialMediaUrl(url)) return null
 
         return try {
-            val conn = openPageConnection(url, connectTimeoutMs)
+            // Instagram: gunakan /embed/ endpoint yang menyertakan URL media
+            // langsung (halaman biasa butuh JavaScript rendering).
+            val fetchUrl = if (isInstagramUrl(url)) {
+                buildInstagramEmbedUrl(url)
+            } else {
+                url
+            }
+
+            val conn = openPageConnection(fetchUrl, connectTimeoutMs)
             try {
                 val code = conn.responseCode
                 if (code !in 200..399) return null
@@ -83,12 +91,54 @@ object SocialMediaExtractor {
                     ?: extractFromJsonDisplayUrl(html)
                     ?: extractFromHtmlVideo(html)
                     ?: extractFromHtmlSource(html)
+                    ?: extractFromCdninstagram(html)
             } finally {
                 conn.disconnect()
             }
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun isInstagramUrl(url: String): Boolean = runCatching {
+        val host = java.net.URL(url).host?.lowercase() ?: false
+        host.contains("instagram.com")
+    }.getOrDefault(false)
+
+    private fun buildInstagramEmbedUrl(url: String): String {
+        val clean = url.trimEnd('/')
+        if (clean.endsWith("/embed")) return url
+        return "$clean/embed/"
+    }
+
+    private fun extractFromCdninstagram(html: String): String? {
+        // Cari URL mp4 dari scontent CDN (video)
+        val mp4Pattern = """(https?://scontent[^"\s]*cdninstagram\.com[^"\s]*\.mp4[^"\s]*)"""
+        val mp4Matcher = Pattern.compile(mp4Pattern).matcher(html)
+        if (mp4Matcher.find()) return cleanUrl(mp4Matcher.group(1))
+
+        // Cari gambar terbesar dari srcset (resolusi tertinggi)
+        val srcsetPattern = """(https?://scontent[^"\s]*cdninstagram\.com[^"\s]*\.(?:jpg|jpeg|png|webp)[^"\s]*\s+\d+w)"""
+        val srcsetMatcher = Pattern.compile(srcsetPattern).matcher(html)
+        var bestUrl: String? = null
+        var bestWidth = 0
+        while (srcsetMatcher.find()) {
+            val full = srcsetMatcher.group(1) ?: continue
+            val widthMatch = Regex("(\\d+)w$").find(full)
+            val width = widthMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            if (width > bestWidth) {
+                bestWidth = width
+                bestUrl = full.substringBeforeLast(" ").trim()
+            }
+        }
+        if (bestUrl != null) return cleanUrl(bestUrl)
+
+        // Fallback: ambil URL jpg pertama dari scontent CDN
+        val jpgPattern = """(https?://scontent[^"\s]*cdninstagram\.com[^"\s]*\.(?:jpg|jpeg|png|webp)[^"\s]*)"""
+        val jpgMatcher = Pattern.compile(jpgPattern).matcher(html)
+        if (jpgMatcher.find()) return cleanUrl(jpgMatcher.group(1))
+
+        return null
     }
 
     /** Buka koneksi ke halaman dengan User-Agent browser. */
