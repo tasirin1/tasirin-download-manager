@@ -83,31 +83,32 @@ object SocialMediaExtractor {
         val shortcode = Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)").find(url)
             ?.groupValues?.get(1) ?: return null
 
-        // parse img_index dari URL untuk carousel (mis. img_index=2)
-        val imgIndex = Regex("""img_index=(\\d+)""").find(url)?.groupValues?.get(1)?.toIntOrNull()?.minus(1)
+        val imgIndex = Regex("""img_index=(\d+)""").find(url)?.groupValues?.get(1)?.toIntOrNull()?.minus(1)
 
-        // Strategi 1: embed contextJSON (paling lengkap — ada video_url, display_url, children)
-        val embedHtml = httpGet(
-            "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
+        // Googlebot UA — halaman utama berisi video_versions + display_url di escaped JSON
+        val googlebotHeaders = mapOf(
+            "User-Agent" to "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            "Accept" to "text/html"
         )
-        if (embedHtml != null) {
-            App.logEvent("IG DEBUG: embed page ${embedHtml.length} chars, shortcode=$shortcode")
-            val media = extractContextJson(embedHtml)
-            if (media != null) {
-                App.logEvent("IG DEBUG: contextJSON parsed OK, keys=${media.keys().asSequence().toList().take(15)}")
-                val result = extractFromMedia(media, shortcode, imgIndex)
-                if (result != null) return result
-                App.logEvent("IG DEBUG: extractFromMedia returned null")
-            } else {
-                App.logEvent("IG DEBUG: contextJSON NOT found in embed page")
-            }
-        } else {
-            App.logEvent("IG DEBUG: embed page fetch FAILED")
-        }
 
-        // Strategi 2: og:tags dari halaman utama (fallback saat contextJSON null)
-        val pageHtml = httpGet("https://www.instagram.com/p/$shortcode/", IG_HEADERS)
+        // Strategi 1: halaman utama via Googlebot — cari video_versions atau display_url
+        val pageHtml = httpGet("https://www.instagram.com/p/$shortcode/", googlebotHeaders)
         if (pageHtml != null && pageHtml.length > 1000) {
+            App.logEvent("IG DEBUG: main page ${pageHtml.length} chars")
+
+            val videoUrl = extractVideoFromPage(pageHtml)
+            if (videoUrl != null) {
+                App.logEvent("IG DEBUG: found video URL from page")
+                return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
+            }
+
+            val displayUrl = extractDisplayUrlFromPage(pageHtml)
+            if (displayUrl != null) {
+                App.logEvent("IG DEBUG: found display_url from page")
+                return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
+            }
+
+            // Fallback: og:tags
             val ogVideo = extractOgContent(pageHtml, "og:video")
             if (ogVideo != null && ogVideo.startsWith("http")) {
                 return Result(ogVideo, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
@@ -118,8 +119,59 @@ object SocialMediaExtractor {
             }
         }
 
+        // Strategi 2: embed page (contextJSON legacy)
+        val embedHtml = httpGet(
+            "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
+        )
+        if (embedHtml != null) {
+            val media = extractContextJson(embedHtml)
+            if (media != null) {
+                val result = extractFromMedia(media, shortcode, imgIndex)
+                if (result != null) return result
+            }
+        }
+
         return null
     }
+
+    /** Extract video URL dari escaped JSON di halaman Instagram (Googlebot UA). */
+    private fun extractVideoFromPage(html: String): String? {
+        val idx = html.indexOf("video_versions")
+        if (idx < 0) return null
+        val raw = html.substring(idx, minOf(idx + 5000, html.length))
+        // Unescape JSON: \\u002F -> /, \\u0026 -> &
+        val unescaped = raw
+            .replace("\\u002F", "/")
+            .replace("\\u0026", "&")
+            .replace("\\/", "/")
+        val pattern = Regex(""""url":"(https://[^"]+)"""")
+        for (match in pattern.findAll(unescaped)) {
+            val url = match.groupValues[1]
+            if (url.contains(".mp4")) return url
+        }
+        return null
+    }
+
+    private fun extractDisplayUrlFromPage(html: String): String? {
+        // Unescape JSON: \\u002F -> /, \\u0026 -> &, &amp; -> &
+        val unescaped = html
+            .replace("\\u002F", "/")
+            .replace("\\u0026", "&")
+            .replace("\\/", "/")
+            .replace("&amp;", "&")
+        val pattern = Regex(""""display_url":"(https://[^"]+)"""")
+        var bestUrl: String? = null
+        for (match in pattern.findAll(unescaped)) {
+            val url = match.groupValues[1]
+            if (url.startsWith("http") && (url.contains("scontent") || url.contains("instagram"))) {
+                if (bestUrl == null || url.length > bestUrl.length) {
+                    bestUrl = url
+                }
+            }
+        }
+        return bestUrl
+    }
+
 
     /** Ekstrak URL media dari object contextJSON — tangani single video, carousel/sidecar, dan image. */
     private fun extractFromMedia(media: JSONObject, shortcode: String, imgIndex: Int?): Result? {
