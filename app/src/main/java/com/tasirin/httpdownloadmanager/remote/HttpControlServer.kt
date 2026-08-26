@@ -1879,7 +1879,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Validasi nama file: tidak kosong, tidak ada separator path, tidak traversal. */
     private fun isNameValid(name: String): Boolean =
-        name.isNotBlank() && '/' !in name && '\' !in name &&
+        name.isNotBlank() && '/' !in name && '\\' !in name &&
         name != ".." && !name.startsWith("../") && !name.startsWith("..\\")
 
     private fun isFsBrowseAncestor(path: String): Boolean =
