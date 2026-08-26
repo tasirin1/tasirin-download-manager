@@ -175,6 +175,7 @@ object SocialMediaExtractor {
         return null
     }
 
+    @Suppress("EmptyCatchBlock")
     private fun extractContextJson(html: String): JSONObject? {
         val key = "\"contextJSON\":"
         var searchFrom = 0
