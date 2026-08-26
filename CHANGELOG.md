@@ -1,6 +1,8 @@
 ## [Unreleased]
 - **Social media download** — Deteksi URL Instagram/Facebook/TikTok/Twitter/YouTube/Reddit otomatis; Instagram pakai endpoint `/embed/` untuk ekstrak direct media URL dari CDN (`scontent*.cdninstagram.com`); fallback ke meta tags (`og:video`, `og:image`) dan JSON embedded. (`og:video`, `og:image`) dan JSON embedded (`video_url`, `display_url`) sebelum download dimulai.
 
+- **Fix type error** — Perbaiki tipe return `isInstagramUrl()` (String vs Boolean) yang menyebabkan build gagal.
+
 - **Fix unused import** — Hapus import `RedirectStrategy` yang tidak terpakai di `SocialMediaExtractor.kt`.
 
 - **Fix syntax error** — Perbaiki char literal invalid `'\\'` di `isNameValid()` (`HttpControlServer.kt`) yang menyebabkan build gagal.
