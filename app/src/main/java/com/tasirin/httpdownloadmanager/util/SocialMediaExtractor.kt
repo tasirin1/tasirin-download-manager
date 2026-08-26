@@ -1,6 +1,5 @@
 package com.tasirin.httpdownloadmanager.util
 
-import com.tasirin.httpdownloadmanager.download.RedirectStrategy
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
