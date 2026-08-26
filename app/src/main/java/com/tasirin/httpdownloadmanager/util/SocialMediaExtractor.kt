@@ -83,7 +83,7 @@ object SocialMediaExtractor {
             ?.groupValues?.get(1) ?: return null
 
         // parse img_index dari URL untuk carousel (mis. img_index=2)
-        val imgIndex = Regex("img_index=(\d+)").find(url)?.groupValues?.get(1)?.toIntOrNull()?.minus(1)
+        val imgIndex = Regex("""img_index=(\\d+)""").find(url)?.groupValues?.get(1)?.toIntOrNull()?.minus(1)
 
         // Strategi 1: embed contextJSON (paling lengkap — ada video_url, display_url, children)
         val embedHtml = httpGet(
