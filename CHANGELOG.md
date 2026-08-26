@@ -1,4 +1,8 @@
 ## [Unreleased]
+- **Fix MIME type mp4** - Ganti MIME type `.mp4` dari `audio/mp4` ke `video/mp4` di `MimeTypes.kt` — mencegah player video salah render di browser remote.
+- **Hapus unused import** - Hapus `kotlinx.coroutines.flow.collect` yang tidak terpakai di `HttpControlServer.kt`.
+
+- **Fix thread-safety bug** - Ganti `SimpleDateFormat` (tidak thread-safe) dengan `DateTimeFormatter` di `DownloadEngine` dan `LogActivity` — mencegah corrupt nama file saat download paralel.
 
 - **UI video player** - Tambah bayangan pada tombol mute dan fullscreen; perpanjang bar volume (105px default, 135px hover).
 - **Fix CrashLog race condition** - Tambah synchronized lock pada trim CrashLog mencegah corrupt saat dua thread crash bersamaan.

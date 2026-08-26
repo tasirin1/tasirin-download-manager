@@ -48,9 +48,8 @@ import javax.net.ssl.HttpsURLConnection
 import java.net.URL
 import java.net.URLDecoder
 import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -1653,7 +1652,7 @@ class DownloadEngine(appContext: Context) {
         val path = noQuery.toUri().lastPathSegment.orEmpty()
         val candidate = path.trim()
         if (candidate.isNotEmpty() && !candidate.contains('=')) return candidate
-        return "download_${DEFAULT_NAME_FORMAT.format(Date())}"
+        return "download_${DEFAULT_NAME_FORMAT.format(LocalDateTime.now())}"
     }
 
     private val cookiePrefs by lazy {
@@ -1693,7 +1692,7 @@ class DownloadEngine(appContext: Context) {
 
     companion object {
         private val CONTENT_DISPOSITION_STAR = Regex("filename\\*=([^;]+)")
-        private val DEFAULT_NAME_FORMAT = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+        private val DEFAULT_NAME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
         private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")
         private const val BUFFER_SIZE = 64 * 1024
         private const val MAX_REDIRECTS = 5
