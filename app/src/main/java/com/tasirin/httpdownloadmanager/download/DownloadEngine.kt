@@ -20,7 +20,6 @@ import com.tasirin.httpdownloadmanager.util.Checksums
 import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StorageCleanup
-import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.readBounded
@@ -843,17 +842,6 @@ class DownloadEngine(appContext: Context) {
     }
 
     private suspend fun runDownload(item: DownloadItem) {
-        // Social media: coba ekstrak URL media langsung dari halaman
-        // (Instagram embed, Facebook, TikTok, dll) sebelum download dimulai.
-        if (SocialMediaExtractor.isSocialMediaUrl(item.url)) {
-            val directUrl = SocialMediaExtractor.extractMediaUrl(item.url)
-            if (directUrl != null && directUrl != item.url) {
-                val host = runCatching { java.net.URL(item.url).host }.getOrDefault("?")
-                App.logEvent("SOCIAL: extracted direct URL from $host")
-                updateItem(item.id) { it.copy(url = directUrl) }
-                return runDownload(item.copy(url = directUrl))
-            }
-        }
         val saver = FileSaver(context)
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) {
