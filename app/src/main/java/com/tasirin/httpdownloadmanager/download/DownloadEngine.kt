@@ -842,7 +842,7 @@ class DownloadEngine(appContext: Context) {
             m.contains("socket")
     }
 
-    private suspend fun runDownload(item: DownloadItem) {
+    private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
         // Social media: ekstrak direct URL menggunakan API publik
         // (tikwm.com untuk TikTok, embed page JSON untuk Instagram, vxtwitter untuk Twitter)
         if (SocialMediaExtractor.isSocialMediaUrl(item.url)) {
@@ -856,7 +856,7 @@ class DownloadEngine(appContext: Context) {
                     url = result.directUrl,
                     fileName = if (!item.nameIsCustom) newName else item.fileName
                 ) }
-                return runDownload(item.copy(url = result.directUrl, fileName = newName))
+                return runDownload(item.copy(url = result.directUrl, fileName = newName), skipSocial = true)
             }
             // Ekstraksi gagal — jangan download URL asli (hasilnya HTML)
             throw IOException(

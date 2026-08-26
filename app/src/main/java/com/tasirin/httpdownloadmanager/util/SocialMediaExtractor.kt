@@ -19,9 +19,15 @@ object SocialMediaExtractor {
 
     fun isSocialMediaUrl(url: String): Boolean {
         val lower = url.lowercase()
+        // CDN URLs (scontent-*.cdninstagram.com) bukan halaman post — skip
+        if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
+        if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
         return lower.contains("tiktok.com/") ||
-                lower.contains("instagram.com/") ||
-                lower.contains("instagr.am/") ||
+                lower.contains("instagram.com/p/") ||
+                lower.contains("instagram.com/reel/") ||
+                lower.contains("instagram.com/tv/") ||
+                lower.contains("instagr.am/p/") ||
+                lower.contains("instagr.am/reel/") ||
                 lower.contains("twitter.com/") ||
                 lower.contains("x.com/")
     }
