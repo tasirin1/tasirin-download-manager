@@ -1,5 +1,5 @@
 ## [Unreleased]
-- **Social media download (v2)** — Ekstrak direct URL dari TikTok (tikwm.com API), Instagram (embed contextJSON), Twitter/X (vxtwitter API). Hanya API publik JSON — tidak ada scraping HTML kompleks. Gagal ekstraksi = error jelas (bukan download halaman HTML). Aktif otomatis saat paste URL media sosial.
+- **Social media download (v2)** — Ekstrak direct URL dari TikTok (tikwm.com API), Instagram (embed contextJSON), Twitter/X (vxtwitter API). Hanya API publik JSON — Instagram fallback ke og:tags. Gagal ekstraksi = error jelas (bukan download halaman HTML). Aktif otomatis saat paste URL media sosial.
 
 
 
