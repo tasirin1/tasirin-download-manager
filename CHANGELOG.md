@@ -1,4 +1,6 @@
 ## [Unreleased]
+- **Optimasi kode** - Cache upload buffer size per 10 detik; ekstrak helper `isNameValid()` dan `closeConnection()`; hapus duplikat `.map{}.sorted()` di `pruneCompletedUploads`/`thumbLocks`; iterasi langsung di `videoDurationOf` prune.
+
 - **Landing page** - Tambah website download di `docs/index.html` untuk GitHub Pages: download button, fitur, FAQ, QR code, dark theme.
 
 - **Perbaikan lint warning** - Tambah import KTX `SharedPreferences.edit` di `DownloadEngine`; ganti hardcoded string "User-Agent" dan "Or type custom User-Agent" dengan `@string` resource; gunakan KTX `SharedPreferences.edit` extension di `DownloadEngine`.

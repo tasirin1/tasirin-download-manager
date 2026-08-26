@@ -30,10 +30,9 @@ private val thumbLocks = ConcurrentHashMap<String, ThumbLock>()
 private fun thumbLockFor(key: String): ThumbLock {
     val now = System.currentTimeMillis()
     if (thumbLocks.size > 512) {
-        val cutoff = thumbLocks.values
-            .map { it.lastUse.get() }
-            .sorted()
-            .getOrNull(thumbLocks.size / 2) ?: now
+        val allTimes = LongArray(thumbLocks.size) { thumbLocks.values.elementAt(it).lastUse.get() }
+        allTimes.sort()
+        val cutoff = allTimes.getOrNull(allTimes.size / 2) ?: now
         thumbLocks.entries.removeIf { it.value.lastUse.get() < cutoff }
     }
     return thumbLocks.getOrPut(key) { ThumbLock() }.also { it.lastUse.set(now) }

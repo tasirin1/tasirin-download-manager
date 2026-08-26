@@ -96,6 +96,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val uploadLockGate = Any()
     private val reservedUploadBytes = java.util.concurrent.atomic.AtomicLong()
     private val uploadBufferReservation = Any()
+    @Volatile private var cachedUploadBufferBytes = 0L
+    @Volatile private var cachedUploadBufferAt = 0L
     // Cache durasi video galeri: metadata tidak berubah, jadi cukup di-hold
     // di memori agar tiap halaman tidak membuka file video berulang-ulang.
     @Volatile private var videoDurationsCache: JSONObject? = null
@@ -232,7 +234,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 Response.Status.PAYLOAD_TOO_LARGE,
                 "text/plain; charset=utf-8",
                 "Request body too large"
-            ).also { it.addHeader("Connection", "close") }
+            ).closeConnection()
         } catch (e: Exception) {
             logError(e)
             newFixedLengthResponse(
@@ -720,7 +722,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (!isRemoteDestinationAllowed(folderPath)) {
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
-            ).also { it.addHeader("Connection", "close") }
+            ).closeConnection()
         }
         App.engine.addDownload(
             url = url,
@@ -739,7 +741,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun handleUpload(session: IHTTPSession): Response {
         if (StoragePrefs.isServerReadOnly(context)) {
-            return readOnlyDenied().also { it.addHeader("Connection", "close") }
+            return readOnlyDenied().closeConnection()
         }
         val name = session.parms["name"]?.trim()?.filterNot { it.isISOControl() }?.take(180)
             ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")?.replace("..", "_")
@@ -764,13 +766,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return jsonResponse(
                 JSONObject().put("ok", false)
                     .put("error", "Invalid size (max ${MAX_UPLOAD_MB} MB)")
-            ).also { it.addHeader("Connection", "close") }
+            ).closeConnection()
         }
         if (App.engine.freeSpaceBytes() < length) {
             return jsonResponse(
                 JSONObject().put("ok", false)
                     .put("error", "Not enough storage for upload")
-            ).also { it.addHeader("Connection", "close") }
+            ).closeConnection()
         }
         val finalName = uploadUniqueName(name, folderPath)
         return runCatching {
@@ -818,11 +820,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         failedUploads.entries.removeIf { it.value.second < cutoff }
         // Bila masih melebihi batas, buang yang paling lama.
         if (completedUploads.size > 400) {
-            val cutoff2 = completedUploads.values.map { it.second }.sorted().getOrNull(200) ?: cutoff
+            val cutoff2 = completedUploads.values.map { it.second }.sortedDescending().getOrNull(completedUploads.size - 200) ?: cutoff
             completedUploads.entries.removeIf { it.value.second < cutoff2 }
         }
         if (failedUploads.size > 400) {
-            val cutoff2 = failedUploads.values.map { it.second }.sorted().getOrNull(200) ?: cutoff
+            val cutoff2 = failedUploads.values.map { it.second }.sortedDescending().getOrNull(failedUploads.size - 200) ?: cutoff
             failedUploads.entries.removeIf { it.value.second < cutoff2 }
         }
     }
@@ -880,13 +882,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return jsonResponse(
                 JSONObject().put("ok", false)
                     .put("error", "Chunk too large (max ${MAX_UPLOAD_MB} MB)")
-            ).also { it.addHeader("Connection", "close") }
+            ).closeConnection()
         }
         synchronized(uploadBufferReservation) {
-            val bufferedUploadBytes = context.cacheDir.listFiles()
-                ?.filter { it.isFile && it.name.startsWith("up_") }
-                ?.sumOf { it.length() } ?: 0L
-            val totalUploadBytes = bufferedUploadBytes + reservedUploadBytes.get() + length
+            val now = System.currentTimeMillis()
+            if (now - cachedUploadBufferAt > 10_000 || cachedUploadBufferBytes <= 0) {
+                cachedUploadBufferBytes = context.cacheDir.listFiles()
+                    ?.filter { it.isFile && it.name.startsWith("up_") }
+                    ?.sumOf { it.length() } ?: 0L
+                cachedUploadBufferAt = now
+            }
+            val totalUploadBytes = cachedUploadBufferBytes + reservedUploadBytes.get() + length
             if (totalUploadBytes > MAX_UPLOAD_BUFFER_BYTES ||
                 App.engine.freeSpaceBytes() < totalUploadBytes
             ) {
@@ -894,7 +900,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 return jsonResponse(
                     JSONObject().put("ok", false)
                         .put("error", "Upload buffer or storage limit reached")
-                ).also { it.addHeader("Connection", "close") }
+                ).closeConnection()
             }
             reservedUploadBytes.addAndGet(length)
         }
@@ -923,12 +929,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (!ServerSecurity.isChunkOffsetAllowed(offset, MAX_UPLOAD_BYTES)) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid offset")
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid offset"))
-                .also { it.addHeader("Connection", "close") }
+                .closeConnection()
         }
         if (length > 0 && offset + length > MAX_UPLOAD_BYTES) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid upload range")
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid upload range"))
-                .also { it.addHeader("Connection", "close") }
+                .closeConnection()
         }
         appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks received: $name (${length}B offset=$offset)")
         val lock = uploadLockFor(id)
@@ -990,7 +996,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks FAILED: must start from the first chunk")
                     return jsonResponse(
                         JSONObject().put("ok", false).put("error", "Upload must start from the first chunk")
-                    ).also { it.addHeader("Connection", "close") }
+                    ).closeConnection()
                 }
                 else -> {
                     // Tulis di offset persis: retry potongan sama tidak menggandakan data.
@@ -1704,8 +1710,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         synchronized(videoDurationLock) {
             // Prune cache bila terlalu besar (>2000 entries) saat dibaca.
             if (cache.length() > 2000) {
-                val keys = cache.keys().asSequence().toList().take(cache.length() - 1500)
-                keys.forEach { cache.remove(it) }
+                val iter = cache.keys()
+                var removed = 0
+                val toRemove = cache.length() - 1500
+                while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
             }
             cache.optLong(token, 0L)
         }
@@ -1864,6 +1872,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Path berada di atas (induk dari) salah satu root yang sah? Hanya untuk
      *  listing browse-only — aksi tulis tetap butuh isFsPathAllowed. */
+    /** Tambah header Connection: close (dipakai saat response error). */
+    private fun Response.closeConnection(): Response = this.closeConnection()
+
+    /** Validasi nama file: tidak kosong, tidak ada separator path, tidak traversal. */
+    private fun isNameValid(name: String): Boolean =
+        name.isNotBlank() && '/' !in name && '\' !in name &&
+        name != ".." && !name.startsWith("../") && !name.startsWith("..\\")
+
     private fun isFsBrowseAncestor(path: String): Boolean =
         ServerSecurity.isBrowseableAncestor(path, allowedFsRoots())
 
@@ -2039,7 +2055,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 gone
             }.getOrDefault(false)
             "rename" -> {
-                if (name.isBlank() || name.contains('/') || name.contains('\\') || name == ".." || name.contains("../") || name.contains("..\\")) return false
+                if (!isNameValid(name)) return false
                 runCatching {
                     val target = File(file.parentFile, name)
                     if (target.exists()) return@runCatching false
@@ -2083,7 +2099,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }.getOrDefault(false)
             }
             "mkdir" -> {
-                if (name.isBlank() || name.contains('/') || name.contains('\\') || name == ".." || name.contains("../") || name.contains("..\\")) return false
+                if (!isNameValid(name)) return false
                 val created = runCatching { File(file, name).mkdirs() }.getOrDefault(false)
                 if (created) {
                     invalidateFsMediaCache()
@@ -2103,7 +2119,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val ok = when (action) {
                 "delete" -> resolver.delete(uri, null, null) > 0
                 "rename" -> {
-                    if (name.isBlank() || name.contains('/') || name.contains('\\')) return false
+                    if (!isNameValid(name)) return false
                     val rel = mediaStoreRelativePath(uri)?.trim('/')
                     val finalName = if (rel != null) {
                         val collection = MediaLibrary.mediaCollectionFor(rel, MimeTypes.forFile(name))
