@@ -1,6 +1,8 @@
 ## [Unreleased]
 - **Social media download** — Deteksi URL Instagram/Facebook/TikTok/Twitter/YouTube/Reddit otomatis; ekstrak direct media URL dari meta tags (`og:video`, `og:image`) dan JSON embedded (`video_url`, `display_url`) sebelum download dimulai.
 
+- **Fix unused import** — Hapus import `RedirectStrategy` yang tidak terpakai di `SocialMediaExtractor.kt`.
+
 - **Fix syntax error** — Perbaiki char literal invalid `'\\'` di `isNameValid()` (`HttpControlServer.kt`) yang menyebabkan build gagal.
 
 - **Optimasi kode** — Cache upload buffer per 10 detik; ekstrak helper `isNameValid()` & `closeConnection()`; `pruneCompletedUploads` pakai `minOrNull()` alih-alih `sortedDescending()` (hemat alokasi); `SseStream` pakai konstanta `TIMEOUT_SECONDS` (25 dtk); eliminasi assignment `User-Agent` redundan di `openAuthenticatedConnection`.
