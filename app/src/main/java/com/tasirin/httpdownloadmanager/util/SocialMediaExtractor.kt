@@ -101,7 +101,7 @@ object SocialMediaExtractor {
     }
 
     private fun isInstagramUrl(url: String): Boolean = runCatching {
-        val host = java.net.URL(url).host?.lowercase() ?: false
+        val host = java.net.URL(url).host?.lowercase() ?: ""
         host.contains("instagram.com")
     }.getOrDefault(false)
 
