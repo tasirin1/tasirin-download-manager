@@ -1,5 +1,5 @@
 ## [Unreleased]
-- **Optimasi kode** - Cache upload buffer size per 10 detik; ekstrak helper `isNameValid()` dan `closeConnection()`; hapus duplikat `.map{}.sorted()` di `pruneCompletedUploads`/`thumbLocks`; iterasi langsung di `videoDurationOf` prune.
+- **Optimasi kode** — Cache upload buffer per 10 detik; ekstrak helper `isNameValid()` & `closeConnection()`; `pruneCompletedUploads` pakai `minOrNull()` alih-alih `sortedDescending()` (hemat alokasi); `SseStream` pakai konstanta `TIMEOUT_SECONDS` (25 dtk); eliminasi assignment `User-Agent` redundan di `openAuthenticatedConnection`.
 
 - **Landing page** - Tambah website download di `docs/index.html` untuk GitHub Pages: download button, fitur, FAQ, QR code, dark theme.
 

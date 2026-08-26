@@ -377,11 +377,11 @@ class DownloadEngine(appContext: Context) {
             conn.requestMethod = method
             conn.connectTimeout = if (method == "HEAD") 8_000 else connectTimeoutMs
             conn.readTimeout = if (method == "HEAD") 8_000 else readTimeoutMs
-            conn.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
+            val ua = StoragePrefs.getUserAgent(context)
+                .ifEmpty { DEFAULT_USER_AGENT }
+            conn.setRequestProperty("User-Agent", ua)
             conn.setRequestProperty("Accept", "*/*")
             conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
-            val ua = StoragePrefs.getUserAgent(context)
-            if (ua.isNotEmpty()) conn.setRequestProperty("User-Agent", ua)
             try {
                 val origin = java.net.URL(current).let { "${it.protocol}://${it.host}" }
                 conn.setRequestProperty("Referer", "$origin/")

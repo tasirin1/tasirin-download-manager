@@ -819,13 +819,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         completedUploads.entries.removeIf { it.value.second < cutoff }
         failedUploads.entries.removeIf { it.value.second < cutoff }
         // Bila masih melebihi batas, buang yang paling lama.
+        // Pakai minOrNull() alih-alih sortedDescending() supaya tidak
+        // mengalokasi List sementara tiap kali dipanggil.
         if (completedUploads.size > 400) {
-            val cutoff2 = completedUploads.values.map { it.second }.sortedDescending().getOrNull(completedUploads.size - 200) ?: cutoff
-            completedUploads.entries.removeIf { it.value.second < cutoff2 }
+            val cutoff2 = completedUploads.values.map { it.second }.minOrNull() ?: cutoff
+            completedUploads.entries.removeIf { it.value.second <= cutoff2 }
         }
         if (failedUploads.size > 400) {
-            val cutoff2 = failedUploads.values.map { it.second }.sortedDescending().getOrNull(failedUploads.size - 200) ?: cutoff
-            failedUploads.entries.removeIf { it.value.second < cutoff2 }
+            val cutoff2 = failedUploads.values.map { it.second }.minOrNull() ?: cutoff
+            failedUploads.entries.removeIf { it.value.second <= cutoff2 }
         }
     }
 

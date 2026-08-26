@@ -4,9 +4,14 @@ import java.io.InputStream
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
-/** Stream respons SSE: antrean terbatas + heartbeat tiap 20 detik agar
- *  koneksi tidak diputus proxy; menutup diri bila antrean penuh. */
+/** Stream respons SSE: antrean terbatas + heartbeat tiap [TIMEOUT_SECONDS] detik
+ *  agar koneksi tidak diputus proxy; menutup diri bila antrean penuh. */
 internal class SseStream : InputStream() {
+    private companion object {
+        /** Waktu tunggu polling (detik): harus lebih besar dari interval pump
+         *  di HttpControlServer (1 dtk) supaya data selalu ada sebelum timeout. */
+        const val TIMEOUT_SECONDS = 25L
+    }
     private val queue = LinkedBlockingQueue<ByteArray>(32)
 
     @Volatile
@@ -38,7 +43,7 @@ internal class SseStream : InputStream() {
             if (cur != null && pos < cur.size) return cur[pos++].toInt() and 0xff
             if (isClosed) return -1
             val next = try {
-                queue.poll(20, TimeUnit.SECONDS)
+                queue.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
                 return -1
@@ -47,8 +52,8 @@ internal class SseStream : InputStream() {
                 current = next
                 pos = 0
             } else {
-                // Tidak ada data selama 20 detik: kirim komentar heartbeat
-                // supaya koneksi tidak diputus proxy/timout.
+                // Tidak ada data selama timeout: kirim komentar heartbeat
+                // supaya koneksi tidak diputus proxy/timeout.
                 current = ": ping\n\n".toByteArray(Charsets.UTF_8)
                 pos = 0
             }
