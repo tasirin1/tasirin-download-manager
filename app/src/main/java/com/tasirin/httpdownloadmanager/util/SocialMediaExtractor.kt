@@ -153,24 +153,36 @@ object SocialMediaExtractor {
     }
 
     private fun extractDisplayUrlFromPage(html: String): String? {
-        // Unescape JSON: \\u002F -> /, \\u0026 -> &, &amp; -> &
-        val unescaped = html
-            .replace("\\u002F", "/")
-            .replace("\\u0026", "&")
-            .replace("\\/", "/")
-            .replace("&amp;", "&")
-        val pattern = Regex(""""display_url":"(https://[^"]+)"""")
-        var bestUrl: String? = null
-        for (match in pattern.findAll(unescaped)) {
-            val url = match.groupValues[1]
-            if (url.startsWith("http") && (url.contains("scontent") || url.contains("instagram"))) {
-                if (bestUrl == null || url.length > bestUrl.length) {
-                    bestUrl = url
-                }
+        // Cari semua scontent image URLs dari halaman
+        val pattern = Regex("""https?://scontent[^"\\]+(?:\.jpg|\.webp|\.png)""")
+        val candidates = mutableListOf<String>()
+        for (match in pattern.findAll(html)) {
+            var url = match.groupValues[0]
+                .replace("\\u0026", "&")
+                .replace("\\/", "/")
+                .replace("&amp;", "&")
+            if (url.startsWith("http")) {
+                candidates.add(url)
             }
         }
-        return bestUrl
+        if (candidates.isEmpty()) return null
+
+        // Prioritas: URL dengan ig_cache_key (resolusi tinggi) > tanpa resize > s640x640
+        val withCacheKey = candidates.filter { it.contains("ig_cache_key") }
+        if (withCacheKey.isNotEmpty()) {
+            // Ambil URL terpanjang (biasanya resolusi lebih tinggi)
+            return withCacheKey.maxByOrNull { it.length }
+        }
+
+        val withoutResize = candidates.filter { !it.contains("s640x640") && !it.contains("s150x150") }
+        if (withoutResize.isNotEmpty()) {
+            return withoutResize.maxByOrNull { it.length }
+        }
+
+        // Fallback: s640x640
+        return candidates.maxByOrNull { it.length }
     }
+
 
 
     /** Ekstrak URL media dari object contextJSON — tangani single video, carousel/sidecar, dan image. */
