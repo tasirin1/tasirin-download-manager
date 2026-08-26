@@ -844,7 +844,7 @@ class DownloadEngine(appContext: Context) {
 
     private suspend fun runDownload(item: DownloadItem) {
         // Social media: ekstrak direct URL menggunakan API publik
-        // (tikwm.com untuk TikTok, embed page untuk Instagram, vxtwitter untuk Twitter)
+        // (tikwm.com untuk TikTok, embed page JSON untuk Instagram, vxtwitter untuk Twitter)
         if (SocialMediaExtractor.isSocialMediaUrl(item.url)) {
             val host = runCatching { java.net.URL(item.url).host }.getOrDefault("?")
             App.logEvent("SOCIAL: extracting direct URL from $host ...")
@@ -856,10 +856,14 @@ class DownloadEngine(appContext: Context) {
                     url = result.directUrl,
                     fileName = if (!item.nameIsCustom) newName else item.fileName
                 ) }
-                // Lanjut download dengan direct URL yang baru
                 return runDownload(item.copy(url = result.directUrl, fileName = newName))
             }
-            App.logEvent("SOCIAL: no direct URL found, downloading original")
+            // Ekstraksi gagal — jangan download URL asli (hasilnya HTML)
+            throw IOException(
+                "Could not extract media from $host. " +
+                "The post may be private, deleted, or the platform blocked extraction. " +
+                "Try copying the direct video/image URL from your browser."
+            )
         }
         val saver = FileSaver(context)
         val freeNow = saver.freeBytes()

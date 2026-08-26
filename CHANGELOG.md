@@ -1,5 +1,5 @@
 ## [Unreleased]
-- **Social media download (v2)** — Ekstrak direct URL dari TikTok (tikwm.com API), Instagram (embed JSON), Twitter/X (vxtwitter API), dan Facebook (cobalt API). Hanya API publik JSON — tidak ada parsing HTML, aman dari Play Protect. Aktif otomatis saat user paste URL media sosial ke add download.
+- **Social media download (v2)** — Ekstrak direct URL dari TikTok (tikwm.com API), Instagram (embed contextJSON), Twitter/X (vxtwitter API). Hanya API publik JSON — tidak ada scraping HTML kompleks. Gagal ekstraksi = error jelas (bukan download halaman HTML). Aktif otomatis saat paste URL media sosial.
 
 
 
