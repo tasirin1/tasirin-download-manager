@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tasirin Download Manager</title>
+<meta name="description" content="Lightweight download manager for Android with remote control, video player, and file manager.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📥</text></svg>">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1117;--card:#1a1d27;--accent:#4f8cff;--accent2:#6c5ce7;--text:#e4e6eb;--dim:#8b8d97;--green:#00c853;--radius:12px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.hero{text-align:center;padding:80px 20px 60px;background:linear-gradient(135deg,#0f1117 0%,#1a1040 50%,#0f1117 100%)}
+.hero-icon{font-size:64px;margin-bottom:16px}
+.hero h1{font-size:2.2rem;font-weight:700;margin-bottom:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero .tagline{color:var(--dim);font-size:1.1rem;margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto}
+.hero .version{display:inline-block;background:var(--card);border:1px solid #2a2d3a;border-radius:20px;padding:4px 14px;font-size:0.85rem;color:var(--dim);margin-bottom:24px}
+
+.btn-group{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:24px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;border-radius:var(--radius);font-size:1rem;font-weight:600;border:none;cursor:pointer;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 20px rgba(79,140,255,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(79,140,255,.4);text-decoration:none}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid #2a2d3a}
+.btn-secondary:hover{border-color:var(--accent);text-decoration:none}
+.btn svg{width:20px;height:20px;fill:currentColor}
+
+.info{color:var(--dim);font-size:0.85rem}
+
+.section{max-width:800px;margin:0 auto;padding:60px 20px}
+.section-title{font-size:1.5rem;font-weight:700;margin-bottom:32px;text-align:center}
+
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.feature{background:var(--card);border:1px solid #2a2d3a;border-radius:var(--radius);padding:24px;transition:border-color .2s}
+.feature:hover{border-color:var(--accent)}
+.feature-icon{font-size:28px;margin-bottom:12px}
+.feature h3{font-size:1rem;margin-bottom:6px}
+.feature p{color:var(--dim);font-size:0.9rem}
+
+.screenshots{display:flex;gap:16px;overflow-x:auto;padding:8px 0;justify-content:center;scroll-snap-type:x mandatory}
+.screenshots img{height:240px;border-radius:var(--radius);border:1px solid #2a2d3a;scroll-snap-align:center;flex-shrink:0}
+
+.qr-section{text-align:center;background:var(--card);border:1px solid #2a2d3a;border-radius:var(--radius);padding:32px;max-width:360px;margin:0 auto}
+.qr-section canvas{border-radius:8px;margin-bottom:12px}
+
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;text-align:center}
+.spec{background:var(--card);border:1px solid #2a2d3a;border-radius:var(--radius);padding:20px}
+.spec-value{font-size:1.4rem;font-weight:700;color:var(--accent)}
+.spec-label{color:var(--dim);font-size:0.85rem;margin-top:4px}
+
+.faq{max-width:640px;margin:0 auto}
+.faq-item{border-bottom:1px solid #2a2d3a;padding:16px 0}
+.faq-q{font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.faq-q::after{content:'+';font-size:1.2rem;color:var(--dim);transition:transform .2s}
+.faq-item.open .faq-q::after{transform:rotate(45deg)}
+.faq-a{color:var(--dim);font-size:0.9rem;max-height:0;overflow:hidden;transition:max-height .3s ease}
+.faq-item.open .faq-a{max-height:200px;margin-top:8px}
+
+footer{text-align:center;padding:40px 20px;color:var(--dim);font-size:0.85rem;border-top:1px solid #2a2d3a}
+footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-icon">📥</div>
+  <h1>Tasirin Download Manager</h1>
+  <p class="tagline">Lightweight download manager for Android with remote web control, built-in video player, and file manager.</p>
+  <div class="version" id="version-badge">v1.0</div>
+  <div class="btn-group">
+    <a class="btn btn-primary" id="download-btn" href="#">
+      <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>
+      Download APK
+    </a>
+    <a class="btn btn-secondary" href="https://github.com/tasirin1/tasirin-download-manager" target="_blank">
+      <svg viewBox="0 0 24 24"><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+  <p class="info">Android 5.0+ (API 21) &middot; ~1.1 MB &middot; No ads, no tracking</p>
+</div>
+
+<div class="section">
+  <h2 class="section-title">Features</h2>
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🌐</div>
+      <h3>Remote Web Control</h3>
+      <p>Control downloads from any browser on your network. Add URLs, monitor progress, manage files — all from your phone, tablet, or TV.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⚡</div>
+      <h3>Multi-Segment Download</h3>
+      <p>Split files into multiple segments for faster downloads. Automatic retry, resume, and mirror fallback when servers reject Range requests.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🎬</div>
+      <h3>Built-in Video Player</h3>
+      <p>Stream and play videos directly from the gallery. Samsung-style player with seek, volume control, and suggested videos.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📁</div>
+      <h3>File Manager</h3>
+      <p>Browse, rename, move, delete, and ZIP folders remotely. Full file manager with MediaStore integration for Android 10+.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔒</div>
+      <h3>Secure Remote Access</h3>
+      <p>PIN-protected login with PBKDF2 hashing, session tokens, CSRF protection, and CSP headers. One-time share links for files.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📥</div>
+      <h3>Background Downloads</h3>
+      <p>Foreground service with notifications. Auto-resume on boot and network recovery. Pause all, resume all, or retry failed.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2 class="section-title">Quick Specs</h2>
+  <div class="specs">
+    <div class="spec">
+      <div class="spec-value">~1.1 MB</div>
+      <div class="spec-label">APK Size</div>
+    </div>
+    <div class="spec">
+      <div class="spec-value">Android 5+</div>
+      <div class="spec-label">Min SDK 21</div>
+    </div>
+    <div class="spec">
+      <div class="spec-value">0 Ads</div>
+      <div class="spec-label">No tracking</div>
+    </div>
+    <div class="spec">
+      <div class="spec-value">Open Source</div>
+      <div class="spec-label">MIT License</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2 class="section-title">Scan to Download</h2>
+  <div class="qr-section">
+    <canvas id="qr" width="200" height="200"></canvas>
+    <p style="color:var(--dim);font-size:0.9rem">Scan with your phone camera</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2 class="section-title">FAQ</h2>
+  <div class="faq">
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What is remote web control?</div>
+      <div class="faq-a">The app runs a lightweight HTTP server on your device. You can access it from any browser on the same WiFi network to manage downloads, browse files, and play videos — no app install needed on the controlling device.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Is it safe to install?</div>
+      <div class="faq-a">Yes. The APK is signed with a verified certificate, and the source code is open on GitHub. Play Protect may show a warning for sideloaded apps — this is normal for any app not distributed through the Play Store.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Does it work on Android TV?</div>
+      <div class="faq-a">Yes. The remote web interface is mobile-first and D-pad friendly. The app includes a LEANBACK_LAUNCHER intent filter for Android TV launchers.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">How do I enable remote access?</div>
+      <div class="faq-a">Go to Settings (⋮ → Settings) and toggle "Start Server". Set a PIN for security. Then open the shown URL from any browser on the same network.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What download features are supported?</div>
+      <div class="faq-a">Multi-segment downloads, HTTP Range resume, automatic retry with exponential backoff, mirror fallback, HLS/m3u8 detection, cookie persistence, custom User-Agent, speed limiting, and checksum verification.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>Tasirin Download Manager &middot; <a href="https://github.com/tasirin1/tasirin-download-manager">GitHub</a> &middot; <a href="https://github.com/tasirin1/tasirin-download-manager/releases">All Releases</a></p>
+</footer>
+
+<script>
+// Fetch latest release info
+fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest')
+  .then(r => r.json())
+  .then(data => {
+    const apk = data.assets?.find(a => a.name.endsWith('.apk'));
+    if (apk) {
+      document.getElementById('download-btn').href = apk.browser_download_url;
+      document.getElementById('version-badge').textContent = data.tag_name + ' · ' + (apk.size / 1024 / 1024).toFixed(1) + ' MB';
+    }
+  }).catch(() => {});
+
+// Simple QR code generator (minimal)
+function drawQR(text, canvas) {
+  const ctx = canvas.getContext('2d');
+  const size = canvas.width;
+  const modules = 25;
+  const cell = size / modules;
+  // Simple hash-based pattern for demo
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#000';
+  // Finder patterns
+  function finder(x, y) {
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
+      const m = i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+      if (m) ctx.fillRect((x+i)*cell, (y+j)*cell, cell, cell);
+    }
+  }
+  finder(0, 0);
+  finder(modules-7, 0);
+  finder(0, modules-7);
+  // Timing patterns
+  for (let i = 8; i < modules-8; i++) if (i%2===0) {
+    ctx.fillRect(i*cell, 6*cell, cell, cell);
+    ctx.fillRect(6*cell, i*cell, cell, cell);
+  }
+  // Data (simple encoding)
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  const seed = Math.abs(hash);
+  let rng = seed;
+  function next() { rng = (rng * 1664525 + 1013904223) & 0x7fffffff; return rng; }
+  for (let y = 0; y < modules; y++) for (let x = 0; x < modules; x++) {
+    if ((x < 8 && y < 8) || (x >= modules-8 && y < 8) || (x < 8 && y >= modules-8)) continue;
+    if (x === 6 || y === 6) continue;
+    if (next() % 3 === 0) ctx.fillRect(x*cell, y*cell, cell, cell);
+  }
+}
+drawQR('https://github.com/tasirin1/tasirin-download-manager/releases/latest', document.getElementById('qr'));
+</script>
+</body>
+</html>

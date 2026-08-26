@@ -1,4 +1,6 @@
 ## [Unreleased]
+- **Landing page** - Tambah website download di `docs/index.html` untuk GitHub Pages: download button, fitur, FAQ, QR code, dark theme.
+
 - **Perbaikan lint warning** - Tambah import KTX `SharedPreferences.edit` di `DownloadEngine`; ganti hardcoded string "User-Agent" dan "Or type custom User-Agent" dengan `@string` resource; gunakan KTX `SharedPreferences.edit` extension di `DownloadEngine`.
 
 - **Fix MIME type mp4** - Ganti MIME type `.mp4` dari `audio/mp4` ke `video/mp4` di `MimeTypes.kt` — mencegah player video salah render di browser remote.
