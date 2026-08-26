@@ -9,10 +9,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-/**
- * Ekstrak direct media URL dari platform sosial media.
- * Hanya API publik — TikTok (tikwm), Instagram (embed+og:tags), Twitter (vxtwitter).
- */
 object SocialMediaExtractor {
 
     data class Result(
@@ -27,9 +23,7 @@ object SocialMediaExtractor {
                 lower.contains("instagram.com/") ||
                 lower.contains("instagr.am/") ||
                 lower.contains("twitter.com/") ||
-                lower.contains("x.com/") ||
-                lower.contains("facebook.com/") ||
-                lower.contains("fb.watch/")
+                lower.contains("x.com/")
     }
 
     suspend fun extract(url: String): Result? = withContext(Dispatchers.IO) {
@@ -67,19 +61,39 @@ object SocialMediaExtractor {
 
     // ── Instagram ────────────────────────────────────────────────────────
 
+    // Headers yang dibutuhkan Instagram agar tidak block
+    private val IG_HEADERS = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A055F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language" to "en-US,en;q=0.9",
+        "Sec-Fetch-Dest" to "document",
+        "Sec-Fetch-Mode" to "navigate",
+        "Sec-Fetch-Site" to "none",
+        "Sec-Fetch-User" to "?1"
+    )
+
     private fun extractInstagram(url: String): Result? {
         val shortcode = Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)").find(url)
             ?.groupValues?.get(1) ?: return null
 
-        // Strategi 1: embed page contextJSON (untuk video)
+        // Strategi 1: og:tags dari halaman utama (paling reliable)
+        val pageHtml = httpGet("https://www.instagram.com/p/$shortcode/", IG_HEADERS)
+        if (pageHtml != null && pageHtml.length > 1000) {
+            // Coba og:video dulu (post video/reel)
+            val ogVideo = extractOgContent(pageHtml, "og:video")
+            if (ogVideo != null && ogVideo.startsWith("http")) {
+                return Result(ogVideo, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
+            }
+            // Lalu og:image (post gambar/carousel)
+            val ogImage = extractOgContent(pageHtml, "og:image")
+            if (ogImage != null && ogImage.startsWith("http")) {
+                return Result(ogImage, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
+            }
+        }
+
+        // Strategi 2: embed contextJSON (untuk video yang contextJSON-nya null di og:tags)
         val embedHtml = httpGet(
-            "https://www.instagram.com/p/$shortcode/embed/captioned/",
-            mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Sec-Fetch-Dest" to "document",
-                "Sec-Fetch-Mode" to "navigate",
-                "Sec-Fetch-Site" to "none"
-            )
+            "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
         )
         if (embedHtml != null) {
             val media = extractContextJson(embedHtml)
@@ -88,41 +102,19 @@ object SocialMediaExtractor {
                 if (isVideo) {
                     val videoUrl = media.optString("video_url", "")
                     if (videoUrl.startsWith("http")) {
-                        return Result(videoUrl, "Instagram_${shortcode}.mp4",
-                            getCaption(media) ?: "Instagram $shortcode")
+                        return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
                     }
                 }
-                // Image dari contextJSON
                 val displayUrl = media.optString("display_url", "")
                 if (displayUrl.startsWith("http")) {
-                    return Result(displayUrl, "Instagram_${shortcode}.jpg",
-                        getCaption(media) ?: "Instagram $shortcode")
+                    return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
                 }
-            }
-        }
-
-        // Strategi 2: og:tags dari halaman utama (video ATAU gambar)
-        val pageHtml = httpGet(
-            "https://www.instagram.com/p/$shortcode/",
-            mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        )
-        if (pageHtml != null) {
-            // Coba og:video dulu (post video)
-            val ogVideo = extractOgTag(pageHtml, "og:video")
-            if (ogVideo != null && ogVideo.startsWith("http")) {
-                return Result(ogVideo, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
-            }
-            // Lalu og:image (post gambar)
-            val ogImage = extractOgTag(pageHtml, "og:image")
-            if (ogImage != null && ogImage.startsWith("http")) {
-                return Result(ogImage, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
             }
         }
 
         return null
     }
 
-    /** Ekstrak shortcode_media dari contextJSON (double-encoded JSON). */
     private fun extractContextJson(html: String): JSONObject? {
         val key = "\"contextJSON\":"
         var searchFrom = 0
@@ -160,31 +152,18 @@ object SocialMediaExtractor {
         return null
     }
 
-    /** Ekstrak nilai og:tag dari HTML. */
-    private fun extractOgTag(html: String, property: String): String? {
-        // Cari pattern: og:video" content="URL" atau property="og:video" content="URL"
-        val pattern1 = "$property\"\\s+content=\"([^\"]+)\""
-        val match1 = Regex(pattern1).find(html)
-        if (match1 != null) return unescapeJson(match1.groupValues[1])
-
-        val pattern2 = "property=\"$property\"\\s+content=\"([^\"]+)\""
-        val match2 = Regex(pattern2).find(html)
-        if (match2 != null) return unescapeJson(match2.groupValues[1])
-
+    /** Ekstrak content attribute dari og:tag. */
+    private fun extractOgContent(html: String, property: String): String? {
+        // Format: og:image" content="URL" atau property="og:image" content="URL"
+        val p1 = Regex("""$property"\s+content="([^"]+)""").find(html)
+        if (p1 != null) return unescape(p1.groupValues[1])
+        val p2 = Regex("""property="$property"\s+content="([^"]+)""").find(html)
+        if (p2 != null) return unescape(p2.groupValues[1])
         return null
     }
 
-    private fun getCaption(media: JSONObject): String? {
-        val caption = media.optJSONObject("edge_media_to_caption")
-            ?.optJSONArray("edges")
-            ?.optJSONObject(0)
-            ?.optJSONObject("node")
-            ?.optString("text", "")
-        return if (caption.isNullOrEmpty()) null else caption
-    }
-
-    private fun unescapeJson(s: String): String =
-        s.replace("\\u0026", "&").replace("\\/", "/").replace("\\u003C", "<")
+    private fun unescape(s: String): String =
+        s.replace("\\u0026", "&").replace("\\/", "/").replace("&amp;", "&")
 
     // ── Twitter/X ────────────────────────────────────────────────────────
 
@@ -208,18 +187,21 @@ object SocialMediaExtractor {
         return null
     }
 
-    // ── HTTP helper ──────────────────────────────────────────────────────
+    // ── HTTP ─────────────────────────────────────────────────────────────
 
     private fun httpGet(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): String? {
         val conn = URL(urlStr).openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = timeoutMs
             conn.readTimeout = timeoutMs
-            conn.setRequestProperty("User-Agent",
-                headers["User-Agent"] ?: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            headers.forEach { (k, v) -> if (k != "User-Agent") conn.setRequestProperty(k, v) }
             conn.instanceFollowRedirects = true
-            if (conn.responseCode !in 200..299) return null
+            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+            if (!headers.containsKey("User-Agent")) {
+                conn.setRequestProperty("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            }
+            val code = conn.responseCode
+            if (code !in 200..299) return null
             return BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
         } catch (_: Exception) { return null } finally { conn.disconnect() }
     }
