@@ -82,22 +82,7 @@ object SocialMediaExtractor {
         val shortcode = Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)").find(url)
             ?.groupValues?.get(1) ?: return null
 
-        // Strategi 1: og:tags dari halaman utama (paling reliable)
-        val pageHtml = httpGet("https://www.instagram.com/p/$shortcode/", IG_HEADERS)
-        if (pageHtml != null && pageHtml.length > 1000) {
-            // Coba og:video dulu (post video/reel)
-            val ogVideo = extractOgContent(pageHtml, "og:video")
-            if (ogVideo != null && ogVideo.startsWith("http")) {
-                return Result(ogVideo, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
-            }
-            // Lalu og:image (post gambar/carousel)
-            val ogImage = extractOgContent(pageHtml, "og:image")
-            if (ogImage != null && ogImage.startsWith("http")) {
-                return Result(ogImage, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
-            }
-        }
-
-        // Strategi 2: embed contextJSON (untuk video yang contextJSON-nya null di og:tags)
+        // Strategi 1: embed contextJSON (paling lengkap — ada video_url DAN display_url)
         val embedHtml = httpGet(
             "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
         )
@@ -111,10 +96,24 @@ object SocialMediaExtractor {
                         return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
                     }
                 }
+                // Image/carousel — ambil display_url (resolusi lebih tinggi dari og:image)
                 val displayUrl = media.optString("display_url", "")
                 if (displayUrl.startsWith("http")) {
                     return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
                 }
+            }
+        }
+
+        // Strategi 2: og:tags dari halaman utama (fallback saat contextJSON null)
+        val pageHtml = httpGet("https://www.instagram.com/p/$shortcode/", IG_HEADERS)
+        if (pageHtml != null && pageHtml.length > 1000) {
+            val ogVideo = extractOgContent(pageHtml, "og:video")
+            if (ogVideo != null && ogVideo.startsWith("http")) {
+                return Result(ogVideo, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
+            }
+            val ogImage = extractOgContent(pageHtml, "og:image")
+            if (ogImage != null && ogImage.startsWith("http")) {
+                return Result(ogImage, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
             }
         }
 
