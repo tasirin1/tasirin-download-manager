@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix Instagram carousel** — Post carousel (GraphSidecar) yang berisi video kini terdownload sebagai .mp4 (bukan gambar cover). Support `img_index` dari URL untuk memilih item spesifik di carousel. Scan semua children mencari video pertama bila index tidak ada.
 - **Social media download (v2)** — Ekstrak direct URL dari TikTok (tikwm.com API), Instagram (embed contextJSON), Twitter/X (vxtwitter API). Hanya API publik JSON — Instagram: contextJSON dicoba DULU (video_url + display_url resolusi tinggi), og:tags sebagai fallback. CDN URLs di-skip.. (bukan download halaman HTML). Aktif otomatis saat paste URL media sosial.
 
 

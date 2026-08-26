@@ -82,25 +82,18 @@ object SocialMediaExtractor {
         val shortcode = Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)").find(url)
             ?.groupValues?.get(1) ?: return null
 
-        // Strategi 1: embed contextJSON (paling lengkap — ada video_url DAN display_url)
+        // parse img_index dari URL untuk carousel (mis. img_index=2)
+        val imgIndex = Regex("img_index=(\d+)").find(url)?.groupValues?.get(1)?.toIntOrNull()?.minus(1)
+
+        // Strategi 1: embed contextJSON (paling lengkap — ada video_url, display_url, children)
         val embedHtml = httpGet(
             "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
         )
         if (embedHtml != null) {
             val media = extractContextJson(embedHtml)
             if (media != null) {
-                val isVideo = media.optBoolean("is_video", false)
-                if (isVideo) {
-                    val videoUrl = media.optString("video_url", "")
-                    if (videoUrl.startsWith("http")) {
-                        return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
-                    }
-                }
-                // Image/carousel — ambil display_url (resolusi lebih tinggi dari og:image)
-                val displayUrl = media.optString("display_url", "")
-                if (displayUrl.startsWith("http")) {
-                    return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
-                }
+                val result = extractFromMedia(media, shortcode, imgIndex)
+                if (result != null) return result
             }
         }
 
@@ -115,6 +108,68 @@ object SocialMediaExtractor {
             if (ogImage != null && ogImage.startsWith("http")) {
                 return Result(ogImage, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
             }
+        }
+
+        return null
+    }
+
+    /** Ekstrak URL media dari object contextJSON — tangani single video, carousel/sidecar, dan image. */
+    private fun extractFromMedia(media: JSONObject, shortcode: String, imgIndex: Int?): Result? {
+        val typename = media.optString("__typename", "")
+
+        // 1. Single video langsung
+        val videoUrl = media.optString("video_url", "")
+        if (videoUrl.startsWith("http")) {
+            return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
+        }
+
+        // 2. Carousel (GraphSidecar) — cek children
+        if (typename == "GraphSidecar" || media.has("edge_sidecar_to_children")) {
+            val sidecar = media.optJSONObject("edge_sidecar_to_children")
+            val edges = sidecar?.optJSONArray("edges")
+            if (edges != null && edges.length() > 0) {
+                // Tentukan index: imgIndex dari URL atau default 0 (item pertama)
+                val idx = (imgIndex ?: 0).coerceIn(0, edges.length() - 1)
+
+                // Cari video di index yang diminta
+                val targetNode = edges.optJSONObject(idx)?.optJSONObject("node")
+                if (targetNode != null) {
+                    val childVideo = targetNode.optString("video_url", "")
+                    if (childVideo.startsWith("http")) {
+                        return Result(childVideo, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
+                    }
+                    // Tidak ada video di index ini → ambil gambarnya
+                    val childImage = targetNode.optString("display_url", "")
+                    if (childImage.startsWith("http")) {
+                        return Result(childImage, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
+                    }
+                }
+
+                // Fallback: scan semua children cari video pertama
+                for (i in 0 until edges.length()) {
+                    val node = edges.optJSONObject(i)?.optJSONObject("node") ?: continue
+                    if (node.optBoolean("is_video", false)) {
+                        val cv = node.optString("video_url", "")
+                        if (cv.startsWith("http")) {
+                            return Result(cv, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
+                        }
+                    }
+                }
+
+                // Tidak ada video sama sekali → ambil display_url dari item pertama
+                val firstNode = edges.optJSONObject(0)?.optJSONObject("node")
+                val fallbackImage = firstNode?.optString("display_url", "")
+                    ?: media.optString("display_url", "")
+                if (fallbackImage.startsWith("http")) {
+                    return Result(fallbackImage, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
+                }
+            }
+        }
+
+        // 3. Single image — ambil display_url
+        val displayUrl = media.optString("display_url", "")
+        if (displayUrl.startsWith("http")) {
+            return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
         }
 
         return null
