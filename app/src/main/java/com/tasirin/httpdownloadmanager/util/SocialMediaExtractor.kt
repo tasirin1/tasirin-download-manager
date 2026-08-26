@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager.util
 
+import com.tasirin.httpdownloadmanager.App
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -194,7 +195,7 @@ object SocialMediaExtractor {
         return null
     }
 
-    @Suppress("EmptyCatchBlock")
+    @Suppress("EmptyCatchBlock", "kotlin_empty_catch")
     private fun extractContextJson(html: String): JSONObject? {
         val key = "\"contextJSON\":"
         var searchFrom = 0
