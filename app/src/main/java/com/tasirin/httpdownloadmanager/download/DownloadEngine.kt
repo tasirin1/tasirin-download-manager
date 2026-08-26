@@ -1671,7 +1671,7 @@ class DownloadEngine(appContext: Context) {
                     put("path", c.path.orEmpty())
                 })
             }
-            cookiePrefs.edit().putString("cookies", arr.toString()).apply()
+            cookiePrefs.edit { putString("cookies", arr.toString()) }
         } catch (_: Exception) { /* cookie persist is best-effort */ }
     }
 

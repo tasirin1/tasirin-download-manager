@@ -505,7 +505,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="User-Agent"
+                        android:text="@string/label_user_agent"
                         android:textAppearance="?android:attr/textAppearanceMedium" />
 
                     <Spinner
@@ -524,7 +524,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:background="@drawable/bg_input_tv"
-                        android:hint="Or type custom User-Agent"
+                        android:hint="@string/hint_custom_user_agent"
                         android:inputType="textUri"
                         android:minHeight="48dp"
                         android:paddingHorizontal="12dp"

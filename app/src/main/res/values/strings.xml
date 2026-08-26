@@ -285,4 +285,6 @@
     <string name="cleanup_running">Cleaning…</string>
     <string name="label_value">%1$s: %2$s</string>
     <string name="gallery_thumb_desc">Media preview</string>
+    <string name="label_user_agent">User-Agent</string>
+    <string name="hint_custom_user_agent">Or type custom User-Agent</string>
 </resources>
