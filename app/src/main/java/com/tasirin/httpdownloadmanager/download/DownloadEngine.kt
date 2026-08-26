@@ -22,6 +22,7 @@ import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StorageCleanup
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
+import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.readBounded
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -842,6 +843,24 @@ class DownloadEngine(appContext: Context) {
     }
 
     private suspend fun runDownload(item: DownloadItem) {
+        // Social media: ekstrak direct URL menggunakan API publik
+        // (tikwm.com untuk TikTok, embed page untuk Instagram, vxtwitter untuk Twitter)
+        if (SocialMediaExtractor.isSocialMediaUrl(item.url)) {
+            val host = runCatching { java.net.URL(item.url).host }.getOrDefault("?")
+            App.logEvent("SOCIAL: extracting direct URL from $host ...")
+            val result = SocialMediaExtractor.extract(item.url)
+            if (result != null && result.directUrl != item.url) {
+                App.logEvent("SOCIAL: extracted direct URL from $host")
+                val newName = result.fileName ?: item.fileName
+                updateItem(item.id) { it.copy(
+                    url = result.directUrl,
+                    fileName = if (!item.nameIsCustom) newName else item.fileName
+                ) }
+                // Lanjut download dengan direct URL yang baru
+                return runDownload(item.copy(url = result.directUrl, fileName = newName))
+            }
+            App.logEvent("SOCIAL: no direct URL found, downloading original")
+        }
         val saver = FileSaver(context)
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) {

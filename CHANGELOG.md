@@ -1,5 +1,5 @@
 ## [Unreleased]
-- **Hapus social media extractor** — Fitur download media sosial (Instagram/Facebook/TikTok) dihapus karena memicu warning Play Protect. Pengguna tetap bisa mengunduh URL langsung secara normal.
+- **Social media download (v2)** — Ekstrak direct URL dari TikTok (tikwm.com API), Instagram (embed JSON), Twitter/X (vxtwitter API), dan Facebook (cobalt API). Hanya API publik JSON — tidak ada parsing HTML, aman dari Play Protect. Aktif otomatis saat user paste URL media sosial ke add download.
 
 
 
