@@ -367,8 +367,6 @@ object StoragePrefs {
         }
     }
 
-    }
-
     /** Terakhir kali thumbnail cache dibersihkan otomatis (0 = belum pernah). */
     fun lastThumbCleanup(context: Context): Long =
         prefs(context)
