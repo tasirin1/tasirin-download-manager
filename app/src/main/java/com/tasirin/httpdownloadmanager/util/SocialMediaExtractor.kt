@@ -158,33 +158,27 @@ object SocialMediaExtractor {
     /** Extract display_url dari scontent URLs di halaman.
      *  Download engine akan pakai Googlebot UA untuk Instagram CDN. */
     private fun extractDisplayUrlFromPage(html: String): String? {
-        // Cari semua scontent image URLs dari halaman
-        val pattern = Regex("""https?://scontent[^"\\]+(?:\.jpg|\.webp|\.png)""")
-        val candidates = mutableListOf<String>()
-        for (match in pattern.findAll(html)) {
-            var url = match.groupValues[0]
-                .replace("\\u0026", "&")
-                .replace("\\/", "/")
-                .replace("&amp;", "&")
-            if (url.startsWith("http")) {
-                candidates.add(url)
+        // Unescape JSON escaping: \\/ -> /, \\u0026 -> &, &amp; -> &
+        // Termasuk \\" -> " agar regex bisa match full URL (termasuk query params)
+        val unescaped = html
+            .replace("\\u002F", "/")
+            .replace("\\u0026", "&")
+            .replace("\\/", "/")
+            .replace("\\\"", "\"")
+            .replace("&amp;", "&")
+        // Regex: scontent URLs — [^"]+ match sampai closing quote (termasuk query params)
+        val pattern = Regex("""https?://scontent[^"]+""")
+        var bestUrl: String? = null
+        for (match in pattern.findAll(unescaped)) {
+            val url = match.groupValues[0]
+            if (!url.endsWith(".jpg") && !url.endsWith(".webp") && !url.endsWith(".png")) continue
+            if (bestUrl == null || url.length > bestUrl.length) {
+                bestUrl = url
             }
         }
-        if (candidates.isEmpty()) return null
-
-        // Prioritas: URL dengan ig_cache_key (resolusi tinggi) > s640x640 > terpanjang
-        val withCacheKey = candidates.filter { it.contains("ig_cache_key") }
-        if (withCacheKey.isNotEmpty()) {
-            return withCacheKey.maxByOrNull { it.length }
-        }
-
-        val withStp = candidates.filter { it.contains("s640x640") }
-        if (withStp.isNotEmpty()) {
-            return withStp.first()
-        }
-
-        return candidates.maxByOrNull { it.length }
+        return bestUrl
     }
+
 
 
 

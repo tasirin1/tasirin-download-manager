@@ -380,11 +380,7 @@ class DownloadEngine(appContext: Context) {
             conn.readTimeout = if (method == "HEAD") 8_000 else readTimeoutMs
             val ua = StoragePrefs.getUserAgent(context)
                 .ifEmpty { DEFAULT_USER_AGENT }
-            // Instagram CDN images butuh Googlebot UA agar auth tokens valid
-            val effectiveUa = if (current.contains("scontent") && current.contains("cdninstagram")) {
-                "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
-            } else ua
-            conn.setRequestProperty("User-Agent", effectiveUa)
+            conn.setRequestProperty("User-Agent", ua)
             conn.setRequestProperty("Accept", "*/*")
             conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
             try {
@@ -1181,14 +1177,11 @@ class DownloadEngine(appContext: Context) {
                     fallbackConn.requestMethod = "GET"
                     fallbackConn.connectTimeout = connectTimeoutMs
                     fallbackConn.readTimeout = readTimeoutMs
-                    val fbDefaultUa = if (item.url.contains("scontent") && item.url.contains("cdninstagram")) {
-                        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
-                    } else DEFAULT_USER_AGENT
-                    fallbackConn.setRequestProperty("User-Agent", fbDefaultUa)
+                    fallbackConn.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
                     fallbackConn.setRequestProperty("Accept", "*/*")
                     fallbackConn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
                     val ua = StoragePrefs.getUserAgent(context)
-                    if (ua.isNotEmpty() && !item.url.contains("cdninstagram")) fallbackConn.setRequestProperty("User-Agent", ua)
+                    if (ua.isNotEmpty()) fallbackConn.setRequestProperty("User-Agent", ua)
                     try {
                         val origin = java.net.URL(item.url).let { "${it.protocol}://${it.host}" }
                         fallbackConn.setRequestProperty("Referer", "$origin/")
