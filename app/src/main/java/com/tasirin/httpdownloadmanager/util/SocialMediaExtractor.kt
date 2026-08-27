@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager.util
 
+import com.tasirin.httpdownloadmanager.App
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -112,7 +113,7 @@ object SocialMediaExtractor {
     // ── Instagram ────────────────────────────────────────────────────────
 
     private val GOOGLEBOT_HEADERS = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+        "User-Agent" to "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
         "Accept" to "text/html"
     )
 
@@ -135,9 +136,11 @@ object SocialMediaExtractor {
         val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", GOOGLEBOT_HEADERS)
         val igCookies = httpResult?.cookies.orEmpty()
         val pageHtml = httpResult?.body
+        App.logEvent("IG DEBUG: main page ${pageHtml?.length ?: 0} chars, shortcode=$shortcode")
         if (pageHtml != null && pageHtml.length > 1000) {
             // Cari semua gambar display_url
             val displayUrls = extractAllDisplayUrlsFromPage(pageHtml)
+            App.logEvent("IG DEBUG: found ${displayUrls.size} image URLs, video=${extractVideoFromPage(pageHtml) != null}")
             displayUrls.forEachIndexed { idx, imgUrl ->
                 options.add(Result(imgUrl, "Instagram_${shortcode}_${idx+1}.jpg",
                     "Instagram $shortcode", "Photo ${idx+1}", "image/jpeg", cookies = igCookies))
@@ -155,6 +158,7 @@ object SocialMediaExtractor {
             val embedHtml = httpGet(
                 "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
             )
+            App.logEvent("IG DEBUG: embed page ${embedHtml?.length ?: 0} chars (main page gagal/private)")
             if (embedHtml != null) {
                 val media = extractContextJson(embedHtml)
                 if (media != null) {
@@ -174,6 +178,7 @@ object SocialMediaExtractor {
             val raw = match.value
                 .replace("\\u002F", "/")
                 .replace("\\u0026", "&")
+                .replace("&amp;", "&")
             if (raw !in urls && !raw.contains("s640x640")) {
                 urls.add(raw)
             }
@@ -192,11 +197,13 @@ object SocialMediaExtractor {
             .replace("\\u002F", "/")
             .replace("\\u0026", "&")
             .replace("\\/", "/")
+            .replace("&amp;", "&")
         val videoRegex = Regex(""""url"\s*:\s*"(https?://[^"]+\\.mp4[^"]*)"""")
         val match = videoRegex.find(unescaped) ?: return null
         return match.groupValues[1]
             .replace("\\u002F", "/")
             .replace("\\u0026", "&")
+            .replace("&amp;", "&")
     }
 
     private fun extractDisplayUrlFromPage(html: String): String? {
@@ -286,11 +293,15 @@ object SocialMediaExtractor {
         ) ?: return emptyList()
         val pageHtml = httpResult.body
         val ytCookies = httpResult.cookies
+        App.logEvent("YT DEBUG: page ${pageHtml.length} chars, id=$videoId, cookies=${ytCookies.take(40)}")
 
         val match = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*(?:var\s|</script)""")
             .find(pageHtml)
             ?: Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""").find(pageHtml)
-            ?: return emptyList()
+            ?: run {
+                App.logEvent("YT DEBUG: ytInitialPlayerResponse tidak ditemukan")
+                return emptyList()
+            }
 
         try {
             val data = JSONObject(match.groupValues[1])
@@ -298,6 +309,7 @@ object SocialMediaExtractor {
             val streamingData = data.optJSONObject("streamingData") ?: return emptyList()
             val formats = streamingData.optJSONArray("formats") ?: return emptyList()
             val options = mutableListOf<Result>()
+            App.logEvent("YT DEBUG: formats=${formats.length()}")
 
             for (i in 0 until formats.length()) {
                 val fmt = formats.optJSONObject(i) ?: continue
