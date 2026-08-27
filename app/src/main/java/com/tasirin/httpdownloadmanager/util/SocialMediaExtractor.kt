@@ -103,7 +103,7 @@ object SocialMediaExtractor {
         }
         val wmUrl = data.optString("wmplay", "")
         if (wmUrl.startsWith("http") && wmUrl != sdUrl) {
-            options.add(Result(wmUrl, "$namePrefix_wm.mp4", title, "SD (watermark)", "video/mp4"))
+            options.add(Result(wmUrl, "${namePrefix}_wm.mp4", title, "SD (watermark)", "video/mp4"))
         }
         return options
     }
