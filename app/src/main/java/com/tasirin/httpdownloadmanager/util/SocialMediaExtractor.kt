@@ -423,7 +423,7 @@ object SocialMediaExtractor {
     private fun resolveInvidiousLatest(instance: String, videoId: String, itag: String): String? {
         val start = "https://$instance/latest_version?id=$videoId&itag=$itag"
         var current = start
-        repeat(6) {
+        for (i in 0 until 6) {
             val conn = runCatching {
                 val c = URL(current).openConnection() as HttpURLConnection
                 c.instanceFollowRedirects = false
