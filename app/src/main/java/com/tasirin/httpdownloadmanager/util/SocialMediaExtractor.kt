@@ -302,7 +302,7 @@ object SocialMediaExtractor {
                     val mimeType = fmt.optString("mimeType", "video/mp4")
                     val ext = if (mimeType.contains("webm")) "webm" else "mp4"
                     val safeName = sanitizeFileName(title)
-                    options.add(Result(videoUrl, "YouTube_${safeName}.$ext", title, quality, mimeType))
+                    options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType))
                 }
             }
             return options
