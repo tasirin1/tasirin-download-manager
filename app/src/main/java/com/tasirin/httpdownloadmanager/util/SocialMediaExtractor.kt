@@ -165,30 +165,37 @@ object SocialMediaExtractor {
             .replace("\\/", "/")
             .replace("\\\"", "\"")
             .replace("&amp;", "&")
-        // Cari semua scontent image URLs
+        // Cari semua scontent URLs dengan image extension (sebelum query params)
         val pattern = Regex("""https?://scontent[^"]+""")
         val candidates = mutableListOf<String>()
         for (match in pattern.findAll(unescaped)) {
             val url = match.groupValues[0]
-            if (url.endsWith(".jpg") || url.endsWith(".webp") || url.endsWith(".png")) {
+            // Cek image extension sebelum query params (bukan endswith)
+            val path = url.substringBefore("?")
+            if (path.endsWith(".jpg") || path.endsWith(".webp") || path.endsWith(".png")) {
                 candidates.add(url)
             }
         }
         if (candidates.isEmpty()) return null
 
-        // Prioritas: ig_cache_key (full resolusi, tanpa crop) > s640x640 > terpanjang
+        // Prioritas: ig_cache_key (full resolusi tanpa crop) > s640x640 > pertama
         val withCacheKey = candidates.filter { it.contains("ig_cache_key") }
         if (withCacheKey.isNotEmpty()) {
+            // Pilih URL tanpa stp crop (resolusi paling tinggi)
+            val noCrop = withCacheKey.filter { !it.contains("stp=") }
+            if (noCrop.isNotEmpty()) return noCrop.first()
+            // Atau yang p1080x1080 (resolusi tinggi)
+            val highRes = withCacheKey.filter { it.contains("p1080x1080") || it.contains("s1080x1080") }
+            if (highRes.isNotEmpty()) return highRes.first()
             return withCacheKey.first()
         }
 
         val withStp = candidates.filter { it.contains("s640x640") }
-        if (withStp.isNotEmpty()) {
-            return withStp.first()
-        }
+        if (withStp.isNotEmpty()) return withStp.first()
 
         return candidates.first()
     }
+
 
 
 
