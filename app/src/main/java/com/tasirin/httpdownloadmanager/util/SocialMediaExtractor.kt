@@ -330,6 +330,11 @@ object SocialMediaExtractor {
                     App.logEvent("YT DEBUG: using Piped fallback (${piped.size} stream)")
                     return piped
                 }
+                val invidious = extractYouTubeViaInvidious(videoId)
+                if (invidious != null) {
+                    App.logEvent("YT DEBUG: using Invidious fallback")
+                    return listOf(invidious)
+                }
             }
             return options
         } catch (_: Exception) { }
@@ -365,7 +370,7 @@ object SocialMediaExtractor {
                 val http = httpGetWithCookies(
                     "https://$instance$videoId",
                     mapOf("User-Agent" to "Mozilla/5.0", "Accept" to "application/json"),
-                    timeoutMs = 6000
+                    timeoutMs = 4000
                 ) ?: return@runCatching null
                 val obj = JSONObject(http.body)
                 val title = obj.optString("title", "YouTube_$videoId")
@@ -391,6 +396,61 @@ object SocialMediaExtractor {
             App.logEvent("YT DEBUG: piped $instance failed/unavailable")
         }
         return emptyList()
+    }
+
+    // Instance Invidious publik — /latest_version menyelesaikan transformasi
+    // n-signature di sisi server lalu me-redirect ke stream googlevideo.
+    private val INVIDIOUS_INSTANCES = listOf(
+        "invidious.tiekoetter.com",
+        "invidious.nerdvpn.de",
+        "invidious.f5.si",
+        "inv.nadeko.net"
+    )
+
+    private fun extractYouTubeViaInvidious(videoId: String): Result? {
+        for (instance in INVIDIOUS_INSTANCES) {
+            val resolved = resolveInvidiousLatest(instance, videoId, "18")
+            if (resolved != null) {
+                App.logEvent("YT DEBUG: invidious $instance resolved stream")
+                return Result(resolved, null, "YouTube_$videoId", "360p", "video/mp4")
+            }
+            App.logEvent("YT DEBUG: invidious $instance failed/unavailable")
+        }
+        return null
+    }
+
+    /** Ikuti redirect /latest_version dan kembalikan URL stream final non-HTML. */
+    private fun resolveInvidiousLatest(instance: String, videoId: String, itag: String): String? {
+        val start = "https://$instance/latest_version?id=$videoId&itag=$itag"
+        var current = start
+        repeat(6) {
+            val conn = runCatching {
+                val c = URL(current).openConnection() as HttpURLConnection
+                c.instanceFollowRedirects = false
+                c.connectTimeout = 4000
+                c.readTimeout = 4000
+                c.setRequestProperty("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0")
+                c.setRequestProperty("Accept", "video/mp4,*/*")
+                c
+            }.getOrNull() ?: return null
+            try {
+                val code = conn.responseCode
+                if (code in 301..308) {
+                    val loc = conn.getHeaderField("Location")
+                    conn.disconnect()
+                    if (loc.isNullOrBlank()) return null
+                    current = java.net.URI(current).resolve(loc).toString()
+                    continue
+                }
+                val type = conn.contentType ?: ""
+                if (code in 200..299 && type.contains("video", ignoreCase = true)) {
+                    return current
+                }
+                return null
+            } finally { runCatching { conn.disconnect() } }
+        }
+        return null
     }
 
     private fun extractYouTubeId(url: String): String? {
