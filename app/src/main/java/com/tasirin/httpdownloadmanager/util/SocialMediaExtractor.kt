@@ -152,37 +152,13 @@ object SocialMediaExtractor {
         return null
     }
 
+    /** Gambar dari scontent URLs di halaman membutuhkan auth tokens request spesifik.
+     *  Download engine pakai User-Agent berbeda → selalu 403.
+     *  Return null agar fallback ke og:image yang reliable. */
     private fun extractDisplayUrlFromPage(html: String): String? {
-        // Cari semua scontent image URLs dari halaman
-        val pattern = Regex("""https?://scontent[^"\\]+(?:\.jpg|\.webp|\.png)""")
-        val candidates = mutableListOf<String>()
-        for (match in pattern.findAll(html)) {
-            var url = match.groupValues[0]
-                .replace("\\u0026", "&")
-                .replace("\\/", "/")
-                .replace("&amp;", "&")
-            if (url.startsWith("http")) {
-                candidates.add(url)
-            }
-        }
-        if (candidates.isEmpty()) return null
-
-        // Prioritas: URL dengan stp=s640x640 (terbukti work dengan auth tokens lengkap)
-        // > URL dengan oh= dan oe= (auth tokens) > lainnya
-        val withStp = candidates.filter { it.contains("s640x640") }
-        if (withStp.isNotEmpty()) {
-            return withStp.first()
-        }
-
-        // URL dengan auth tokens lengkap (oh= + oe=)
-        val withAuth = candidates.filter { it.contains("oh=") && it.contains("oe=") }
-        if (withAuth.isNotEmpty()) {
-            return withAuth.first()
-        }
-
-        // Fallback: URL terpanjang (paling banyak params)
-        return candidates.maxByOrNull { it.length }
+        return null
     }
+
 
 
 
