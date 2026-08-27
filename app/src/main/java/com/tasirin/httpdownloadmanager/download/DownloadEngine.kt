@@ -386,9 +386,13 @@ class DownloadEngine(appContext: Context) {
                 val origin = java.net.URL(current).let { "${it.protocol}://${it.host}" }
                 conn.setRequestProperty("Referer", "$origin/")
             } catch (_: Exception) { /* Referer opsional, tidak wajib */ }
-            // YouTube: googlevideo.com butuh Referer youtube.com agar HTTP 403 tidak muncul
+            // YouTube/Instagram CDN butuh Referer + Origin agar HTTP 403 tidak muncul
             if (current.contains("googlevideo.com") || current.contains("youtube.com")) {
                 conn.setRequestProperty("Referer", "https://www.youtube.com/")
+                conn.setRequestProperty("Origin", "https://www.youtube.com")
+            } else if (current.contains("cdninstagram.com") || current.contains("scontent")) {
+                conn.setRequestProperty("Referer", "https://www.instagram.com/")
+                conn.setRequestProperty("Origin", "https://www.instagram.com")
             }
             if (current == url || isSameOrigin(url, current)) {
                 applyAuthHeaders(conn, username, password, headers)
