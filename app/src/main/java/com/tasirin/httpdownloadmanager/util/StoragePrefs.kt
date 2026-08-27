@@ -34,7 +34,6 @@ object StoragePrefs {
     private const val KEY_MAX_CONCURRENT = "max_concurrent"
     private const val KEY_SPEED_LIMIT = "speed_limit_kbps"
     private const val KEY_MAX_RETRIES = "max_retries"
-    private const val KEY_RECENT_URLS = "recent_urls"
     private const val KEY_SERVER_PORT = "server_port"
     private const val KEY_SEGMENTS = "segments"
     private const val KEY_SORT_MODE = "sort_mode"
@@ -317,23 +316,6 @@ object StoragePrefs {
         }
     }
 
-    fun recentUrls(context: Context): List<String> =
-        prefs(context)
-            .getString(KEY_RECENT_URLS, "")
-            .orEmpty()
-            .split('\n')
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-
-    fun addRecentUrl(context: Context, url: String) {
-        val clean = url.trim()
-        if (clean.isEmpty()) return
-        val current = recentUrls(context).filter { it != clean }
-        val updated = (listOf(clean) + current).take(20)
-        prefs(context).edit {
-            putString(KEY_RECENT_URLS, updated.joinToString("\n"))
-        }
-    }
 
     fun serverPort(context: Context): Int =
         prefs(context)
@@ -385,10 +367,6 @@ object StoragePrefs {
         }
     }
 
-    fun clearRecentUrls(context: Context) {
-        prefs(context).edit {
-            putString(KEY_RECENT_URLS, "")
-        }
     }
 
     /** Terakhir kali thumbnail cache dibersihkan otomatis (0 = belum pernah). */

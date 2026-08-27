@@ -37,54 +37,6 @@
         android:visibility="gone" />
 
     <TextView
-        android:id="@+id/recent_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/recent_urls"
-        android:textAppearance="?android:attr/textAppearanceMedium"
-        android:visibility="gone" />
-
-    <EditText
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:minHeight="48dp"
-        android:id="@+id/input_recent_search"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:hint="@string/recent_search_hint"
-        android:importantForAutofill="no"
-        android:inputType="textUri"
-        android:maxLines="1"
-        android:visibility="gone" />
-
-    <ScrollView
-        android:id="@+id/recent_scroll"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:maxHeight="180dp"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:id="@+id/recent_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
-    </ScrollView>
-
-    <TextView
-        android:id="@+id/clear_history"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/clear_history"
-        android:textColor="@color/status_off"
-        android:textSize="13sp"
-        android:visibility="gone" />
-
-    <TextView
         android:id="@+id/advanced_toggle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

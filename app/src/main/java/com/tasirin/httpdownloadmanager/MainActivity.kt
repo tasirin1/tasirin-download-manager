@@ -13,7 +13,6 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.Editable
-import android.text.TextUtils
 import android.text.TextWatcher
 import android.util.Log
 import android.view.Menu
@@ -286,62 +285,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             resources.getStringArray(R.array.priority_options).toList()
         )
         spinnerPriority.setSelection(1)
-        val recentTitle = view.findViewById<TextView>(R.id.recent_title)
-        val recentScroll = view.findViewById<View>(R.id.recent_scroll)
-        val recentSearch = view.findViewById<EditText>(R.id.input_recent_search)
-        val recentContainer = view.findViewById<LinearLayout>(R.id.recent_container)
-        val clearHistory = view.findViewById<TextView>(R.id.clear_history)
-
-        if (!prefillUrl.isNullOrBlank()) {
-            urlInput.setText(prefillUrl)
-        }
-
-        fun renderRecents(query: String) {
-            recentContainer.removeAllViews()
-            val density = resources.displayMetrics.density
-            val q = query.trim().lowercase()
-            val recents = StoragePrefs.recentUrls(this)
-                .filter { q.isEmpty() || it.indexOf(q, ignoreCase = true) >= 0 }
-                .take(10)
-            recents.forEach { u ->
-                val tv = TextView(this)
-                tv.text = u
-                tv.maxLines = 1
-                tv.ellipsize = TextUtils.TruncateAt.MIDDLE
-                tv.setTextColor(ContextCompat.getColor(this, R.color.primary))
-                tv.setPadding(0, (6 * density).toInt(), 0, (6 * density).toInt())
-                tv.setOnClickListener {
-                    urlInput.setText(u)
-                    urlInput.setSelection(urlInput.text?.length ?: 0)
-                }
-                recentContainer.addView(tv)
-            }
-        }
-
-        if (StoragePrefs.recentUrls(this).isNotEmpty()) {
-            recentTitle.visibility = View.VISIBLE
-            recentScroll.visibility = View.VISIBLE
-            recentSearch.visibility = View.VISIBLE
-            clearHistory.visibility = View.VISIBLE
-            renderRecents("")
-            recentSearch.addTextChangedListener(
-                object : TextWatcher {
-                    override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-                    override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
-                        renderRecents(s?.toString().orEmpty())
-                    }
-                    override fun afterTextChanged(s: Editable?) {}
-                }
-            )
-            clearHistory.setOnClickListener {
-                StoragePrefs.clearRecentUrls(this)
-                recentTitle.visibility = View.GONE
-                recentScroll.visibility = View.GONE
-                recentSearch.visibility = View.GONE
-                clearHistory.visibility = View.GONE
-                recentContainer.removeAllViews()
-            }
-        }
 
         /* Advanced options toggle */
         val advancedToggle = view.findViewById<TextView>(R.id.advanced_toggle)

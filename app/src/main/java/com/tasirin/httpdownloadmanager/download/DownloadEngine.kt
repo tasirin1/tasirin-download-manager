@@ -205,7 +205,6 @@ class DownloadEngine(appContext: Context) {
         )
         update(listOf(item) + _items.value)
         flushSave()
-        StoragePrefs.addRecentUrl(context, cleanUrl)
         val host = runCatching { URL(cleanUrl).host }.getOrDefault("")
         App.logEvent("DOWNLOAD ADDED: $name (${host.ifEmpty { "local/custom URL" }})")
         attemptStart(item.id)

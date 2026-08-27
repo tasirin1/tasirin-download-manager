@@ -8,7 +8,6 @@
     <string name="username_hint_optional">Username (optional)</string>
     <string name="password_hint_optional">Password (optional)</string>
     <string name="headers_hint_optional">Extra headers (optional)\nExample:\nReferer: https://&#8230;</string>
-    <string name="recent_urls">Recent URLs</string>
     <string name="download">Download</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
@@ -134,8 +133,6 @@
     <string name="retry_failed">Retry failed</string>
 
     <string name="sort_by">Sort</string>
-    <string name="recent_search_hint">Search history URLs&#8230;</string>
-    <string name="clear_history">Clear history</string>
     <string name="advanced_options">Advanced &#9656;</string>
     <string name="advanced_options_expanded">Advanced &#9662;</string>
     <string name="settings_port_label">Remote server port</string>
