@@ -857,13 +857,20 @@ class DownloadEngine(appContext: Context) {
             App.logEvent("SOCIAL: extracting direct URL from $host ...")
             val result = SocialMediaExtractor.extract(item.url)
             if (result != null && result.directUrl != item.url) {
-                App.logEvent("SOCIAL: extracted direct URL from $host")
+                App.logEvent("SOCIAL: extracted direct URL from $host → ${result.directUrl.take(80)}...")
+                App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.take(50)}...")
                 val newName = result.fileName ?: item.fileName
+                // Gabung cookies dari extraction ke headers untuk CDN download
+                val mergedHeaders = if (result.cookies.isNotEmpty()) {
+                    val existing = item.headers.trim()
+                    if (existing.isNotEmpty()) "${existing}\nCookie: ${result.cookies}" else "Cookie: ${result.cookies}"
+                } else item.headers
                 updateItem(item.id) { it.copy(
                     url = result.directUrl,
-                    fileName = if (!item.nameIsCustom) newName else item.fileName
+                    fileName = if (!item.nameIsCustom) newName else item.fileName,
+                    headers = mergedHeaders
                 ) }
-                return runDownload(item.copy(url = result.directUrl, fileName = newName), skipSocial = true)
+                return runDownload(item.copy(url = result.directUrl, fileName = newName, headers = mergedHeaders), skipSocial = true)
             }
             // Ekstraksi gagal — post mungkin private/deleted atau platform memblokir
             throw IOException(
