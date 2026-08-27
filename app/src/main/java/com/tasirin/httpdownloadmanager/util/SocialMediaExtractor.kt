@@ -155,9 +155,37 @@ object SocialMediaExtractor {
     /** Gambar dari scontent URLs di halaman membutuhkan auth tokens request spesifik.
      *  Download engine pakai User-Agent berbeda → selalu 403.
      *  Return null agar fallback ke og:image yang reliable. */
+    /** Extract display_url dari scontent URLs di halaman.
+     *  Download engine akan pakai Googlebot UA untuk Instagram CDN. */
     private fun extractDisplayUrlFromPage(html: String): String? {
-        return null
+        // Cari semua scontent image URLs dari halaman
+        val pattern = Regex("""https?://scontent[^"\\]+(?:\.jpg|\.webp|\.png)""")
+        val candidates = mutableListOf<String>()
+        for (match in pattern.findAll(html)) {
+            var url = match.groupValues[0]
+                .replace("\\u0026", "&")
+                .replace("\\/", "/")
+                .replace("&amp;", "&")
+            if (url.startsWith("http")) {
+                candidates.add(url)
+            }
+        }
+        if (candidates.isEmpty()) return null
+
+        // Prioritas: URL dengan ig_cache_key (resolusi tinggi) > s640x640 > terpanjang
+        val withCacheKey = candidates.filter { it.contains("ig_cache_key") }
+        if (withCacheKey.isNotEmpty()) {
+            return withCacheKey.maxByOrNull { it.length }
+        }
+
+        val withStp = candidates.filter { it.contains("s640x640") }
+        if (withStp.isNotEmpty()) {
+            return withStp.first()
+        }
+
+        return candidates.maxByOrNull { it.length }
     }
+
 
 
 
