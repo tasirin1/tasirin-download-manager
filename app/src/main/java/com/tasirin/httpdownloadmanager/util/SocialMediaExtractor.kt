@@ -167,21 +167,23 @@ object SocialMediaExtractor {
         }
         if (candidates.isEmpty()) return null
 
-        // Prioritas: URL dengan ig_cache_key (resolusi tinggi) > tanpa resize > s640x640
-        val withCacheKey = candidates.filter { it.contains("ig_cache_key") }
-        if (withCacheKey.isNotEmpty()) {
-            // Ambil URL terpanjang (biasanya resolusi lebih tinggi)
-            return withCacheKey.maxByOrNull { it.length }
+        // Prioritas: URL dengan stp=s640x640 (terbukti work dengan auth tokens lengkap)
+        // > URL dengan oh= dan oe= (auth tokens) > lainnya
+        val withStp = candidates.filter { it.contains("s640x640") }
+        if (withStp.isNotEmpty()) {
+            return withStp.first()
         }
 
-        val withoutResize = candidates.filter { !it.contains("s640x640") && !it.contains("s150x150") }
-        if (withoutResize.isNotEmpty()) {
-            return withoutResize.maxByOrNull { it.length }
+        // URL dengan auth tokens lengkap (oh= + oe=)
+        val withAuth = candidates.filter { it.contains("oh=") && it.contains("oe=") }
+        if (withAuth.isNotEmpty()) {
+            return withAuth.first()
         }
 
-        // Fallback: s640x640
+        // Fallback: URL terpanjang (paling banyak params)
         return candidates.maxByOrNull { it.length }
     }
+
 
 
 
