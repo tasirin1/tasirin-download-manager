@@ -28,7 +28,9 @@ object SocialMediaExtractor {
                 lower.contains("instagr.am/p/") ||
                 lower.contains("instagr.am/reel/") ||
                 lower.contains("twitter.com/") ||
-                lower.contains("x.com/")
+                lower.contains("x.com/") ||
+                lower.contains("youtube.com/") ||
+                lower.contains("youtu.be/")
     }
 
     suspend fun extract(url: String): Result? = withContext(Dispatchers.IO) {
@@ -41,6 +43,8 @@ object SocialMediaExtractor {
                     extractInstagram(url)
                 lower.contains("twitter.com/") || lower.contains("x.com/") ->
                     extractTwitter(url)
+                lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
+                    extractYouTube(url)
                 else -> null
             }
         } catch (_: Exception) { null }
@@ -244,6 +248,87 @@ object SocialMediaExtractor {
             return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
         }
         return null
+    }
+
+    // ── YouTube ────────────────────────────────────────────────────────
+
+    private fun extractYouTube(url: String): Result? {
+        // Extract video ID from URL
+        val videoId = extractYouTubeId(url) ?: return null
+
+        // Try Piped API instances (free, open-source YouTube proxy)
+        val pipedInstances = listOf(
+            "https://pipedapi.kavin.rocks",
+            "https://pipedapi.in.projectsegfau.lt",
+            "https://watchapi.whatever.social"
+        )
+        for (instance in pipedInstances) {
+            val json = httpGet("$instance/streams/$videoId", timeoutMs = 20000)
+            if (json != null) {
+                try {
+                    val obj = JSONObject(json)
+                    val title = obj.optString("title", "YouTube_$videoId")
+                    val duration = obj.optLong("duration", 0L)
+
+                    // Cari video stream terbaik
+                    val videoStreams = obj.optJSONArray("videoStreams")
+                    if (videoStreams != null) {
+                        var bestStream: JSONObject? = null
+                        var bestHeight = 0
+                        for (i in 0 until videoStreams.length()) {
+                            val stream = videoStreams.optJSONObject(i) ?: continue
+                            val height = stream.optInt("height", 0)
+                            val videoOnly = stream.optBoolean("videoOnly", false)
+                            val mime = stream.optString("mimeType", "")
+                            if (!videoOnly && height > bestHeight && mime.contains("video")) {
+                                bestHeight = height
+                                bestStream = stream
+                            }
+                        }
+                        // Fallback: video-only stream (perlu audio terpisah)
+                        if (bestStream == null) {
+                            for (i in 0 until videoStreams.length()) {
+                                val stream = videoStreams.optJSONObject(i) ?: continue
+                                val height = stream.optInt("height", 0)
+                                val mime = stream.optString("mimeType", "")
+                                if (height > bestHeight && mime.contains("video")) {
+                                    bestHeight = height
+                                    bestStream = stream
+                                }
+                            }
+                        }
+                        if (bestStream != null) {
+                            val videoUrl = bestStream.optString("url", "")
+                            if (videoUrl.startsWith("http")) {
+                                val ext = if (bestStream.optString("mimeType", "").contains("webm")) "webm" else "mp4"
+                                val safeName = sanitizeFileName(title)
+                                return Result(videoUrl, "YouTube_${safeName}.$ext", title)
+                            }
+                        }
+                    }
+                } catch (_: Exception) { }
+            }
+        }
+        return null
+    }
+
+    private fun extractYouTubeId(url: String): String? {
+        // youtube.com/shorts/VIDEO_ID
+        Regex("/shorts/([A-Za-z0-9_-]{11})").find(url)
+            ?.groupValues?.get(1)?.let { return it }
+        // youtube.com/watch?v=VIDEO_ID
+        Regex("[?&]v=([A-Za-z0-9_-]{11})").find(url)
+            ?.groupValues?.get(1)?.let { return it }
+        // youtu.be/VIDEO_ID
+        Regex("youtu\.be/([A-Za-z0-9_-]{11})").find(url)
+            ?.groupValues?.get(1)?.let { return it }
+        return null
+    }
+
+    private fun sanitizeFileName(name: String): String {
+        return name.replace(Regex("[^A-Za-z0-9_\-. ]"), "_")
+            .replace(Regex("\s+"), "_")
+            .take(80)
     }
 
     // ── Twitter/X ────────────────────────────────────────────────────────
