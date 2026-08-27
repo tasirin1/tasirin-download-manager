@@ -697,6 +697,29 @@ class DownloadEngine(appContext: Context) {
         val rangeRejected = message?.contains("does not support Range") == true
         val slowRejected = isSlowError(message)
         rememberFailedUrl(item.url)
+        // YouTube CDN (googlevideo.com) menolak URL yang butuh n-signature dengan
+        // HTTP 403 permanen — retry tidak akan pernah berhasil, jadi gagalkan
+        // segera dengan pesan yang jelas (mirror/URL lain juga sia-sia).
+        val ytSignatureBlocked = message?.contains("HTTP 403") == true &&
+            (item.url.contains("googlevideo.com") || item.url.contains("youtube.com"))
+        if (ytSignatureBlocked) {
+            retryAttempts.remove(id)
+            App.logEvent(
+                "DOWNLOAD FAILED: ${item.fileName} — YouTube blocked this URL (n-signature). " +
+                "Try again later or use another downloader."
+            )
+            updateItem(id) {
+                it.copy(
+                    state = DownloadState.FAILED,
+                    error = message,
+                    autoResume = false,
+                    speedBps = 0,
+                    etaSeconds = 0
+                )
+            }
+            flushSave()
+            return
+        }
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
         // Bila host GitHub tak terjangkau, buat mirror proxy otomatis.
         val autoMirrors = if (item.mirrors.isEmpty() &&

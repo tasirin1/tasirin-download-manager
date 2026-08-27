@@ -158,7 +158,7 @@ object SocialMediaExtractor {
             val embedHtml = httpGet(
                 "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
             )
-            App.logEvent("IG DEBUG: embed page ${embedHtml?.length ?: 0} chars (main page gagal/private)")
+            App.logEvent("IG DEBUG: embed page ${embedHtml?.length ?: 0} chars (main page failed/private)")
             if (embedHtml != null) {
                 val media = extractContextJson(embedHtml)
                 if (media != null) {
@@ -299,7 +299,7 @@ object SocialMediaExtractor {
             .find(pageHtml)
             ?: Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""").find(pageHtml)
             ?: run {
-                App.logEvent("YT DEBUG: ytInitialPlayerResponse tidak ditemukan")
+                App.logEvent("YT DEBUG: ytInitialPlayerResponse not found")
                 return emptyList()
             }
 
@@ -322,8 +322,74 @@ object SocialMediaExtractor {
                     options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
                 }
             }
+            // If the page-derived URLs are all n-transformed (403 on the CDN),
+            // fall back to Piped instances which return pre-resolved download URLs.
+            if (options.isEmpty() || options.firstOrNull()?.let { isUrlForbidden(it) } == true) {
+                val piped = extractYouTubeViaPiped(videoId)
+                if (piped.isNotEmpty()) {
+                    App.logEvent("YT DEBUG: using Piped fallback (${piped.size} stream)")
+                    return piped
+                }
+            }
             return options
         } catch (_: Exception) { }
+        return emptyList()
+    }
+
+    private fun isUrlForbidden(item: Result): Boolean {
+        return runCatching {
+            val conn = URL(item.directUrl).openConnection() as HttpURLConnection
+            try {
+                conn.requestMethod = "HEAD"
+                conn.connectTimeout = 6000
+                conn.readTimeout = 6000
+                conn.setRequestProperty("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0")
+                conn.setRequestProperty("Referer", "https://www.youtube.com/")
+                if (item.cookies.isNotEmpty()) conn.setRequestProperty("Cookie", item.cookies)
+                conn.responseCode == 403
+            } finally { conn.disconnect() }
+        }.getOrDefault(false)
+    }
+
+    private val PIPED_INSTANCES = listOf(
+        "pipedapi.adminforge.de/streams/",
+        "pipedapi.kavin.rocks/streams/",
+        "pipedapi.leptons.xyz/streams/",
+        "pipedapi.video.founderweb.com/streams/"
+    )
+
+    private fun extractYouTubeViaPiped(videoId: String): List<Result> {
+        for (instance in PIPED_INSTANCES) {
+            val result = runCatching {
+                val http = httpGetWithCookies(
+                    "https://$instance$videoId",
+                    mapOf("User-Agent" to "Mozilla/5.0", "Accept" to "application/json"),
+                    timeoutMs = 6000
+                ) ?: return@runCatching null
+                val obj = JSONObject(http.body)
+                val title = obj.optString("title", "YouTube_$videoId")
+                val streams = obj.optJSONArray("videoStreams") ?: return@runCatching null
+                val options = mutableListOf<Result>()
+                for (i in 0 until streams.length()) {
+                    val s = streams.optJSONObject(i) ?: continue
+                    val u = s.optString("url", "")
+                    if (u.startsWith("http")) {
+                        val mime = s.optString("mimeType", "video/mp4")
+                        val ext = if (mime.contains("webm")) "webm" else "mp4"
+                        val safeName = sanitizeFileName(title)
+                        val quality = s.optString("quality", "Unknown")
+                        options.add(Result(u, "${safeName}.$ext", title, quality, "video/mp4"))
+                    }
+                }
+                options
+            }.getOrNull()
+            if (!result.isNullOrEmpty()) {
+                App.logEvent("YT DEBUG: piped $instance OK (${result.size} stream)")
+                return result
+            }
+            App.logEvent("YT DEBUG: piped $instance failed/unavailable")
+        }
         return emptyList()
     }
 
