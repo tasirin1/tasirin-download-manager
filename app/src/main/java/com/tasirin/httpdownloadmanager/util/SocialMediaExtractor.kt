@@ -158,26 +158,38 @@ object SocialMediaExtractor {
     /** Extract display_url dari scontent URLs di halaman.
      *  Download engine akan pakai Googlebot UA untuk Instagram CDN. */
     private fun extractDisplayUrlFromPage(html: String): String? {
-        // Unescape JSON escaping: \\/ -> /, \\u0026 -> &, &amp; -> &
-        // Termasuk \\" -> " agar regex bisa match full URL (termasuk query params)
+        // Unescape JSON: \\/ -> /, \\u0026 -> &, \\" -> ", &amp; -> &
         val unescaped = html
             .replace("\\u002F", "/")
             .replace("\\u0026", "&")
             .replace("\\/", "/")
             .replace("\\\"", "\"")
             .replace("&amp;", "&")
-        // Regex: scontent URLs — [^"]+ match sampai closing quote (termasuk query params)
+        // Cari semua scontent image URLs
         val pattern = Regex("""https?://scontent[^"]+""")
-        var bestUrl: String? = null
+        val candidates = mutableListOf<String>()
         for (match in pattern.findAll(unescaped)) {
             val url = match.groupValues[0]
-            if (!url.endsWith(".jpg") && !url.endsWith(".webp") && !url.endsWith(".png")) continue
-            if (bestUrl == null || url.length > bestUrl.length) {
-                bestUrl = url
+            if (url.endsWith(".jpg") || url.endsWith(".webp") || url.endsWith(".png")) {
+                candidates.add(url)
             }
         }
-        return bestUrl
+        if (candidates.isEmpty()) return null
+
+        // Prioritas: ig_cache_key (full resolusi, tanpa crop) > s640x640 > terpanjang
+        val withCacheKey = candidates.filter { it.contains("ig_cache_key") }
+        if (withCacheKey.isNotEmpty()) {
+            return withCacheKey.first()
+        }
+
+        val withStp = candidates.filter { it.contains("s640x640") }
+        if (withStp.isNotEmpty()) {
+            return withStp.first()
+        }
+
+        return candidates.first()
     }
+
 
 
 
