@@ -17,6 +17,7 @@ object SocialMediaExtractor {
         val title: String?,
         val quality: String = "",
         val mimeType: String = "",
+        val cookies: String = ""
     )
 
     fun isSocialMediaUrl(url: String): Boolean {
