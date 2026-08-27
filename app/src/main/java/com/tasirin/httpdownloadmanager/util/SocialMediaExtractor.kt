@@ -16,7 +16,8 @@ object SocialMediaExtractor {
         val fileName: String?,
         val title: String?,
         val quality: String = "",
-        val mimeType: String = ""
+        val mimeType: String = "",
+        val cookies: String = ""
     )
 
     fun isSocialMediaUrl(url: String): Boolean {
@@ -131,19 +132,21 @@ object SocialMediaExtractor {
         val options = mutableListOf<Result>()
 
         // Strategi 1: halaman utama via Googlebot
-        val pageHtml = httpGet("https://www.instagram.com/p/$shortcode/", GOOGLEBOT_HEADERS)
+        val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", GOOGLEBOT_HEADERS)
+        val igCookies = httpResult?.cookies.orEmpty()
+        val pageHtml = httpResult?.body
         if (pageHtml != null && pageHtml.length > 1000) {
             // Cari semua gambar display_url
             val displayUrls = extractAllDisplayUrlsFromPage(pageHtml)
             displayUrls.forEachIndexed { idx, imgUrl ->
                 options.add(Result(imgUrl, "Instagram_${shortcode}_${idx+1}.jpg",
-                    "Instagram $shortcode", "Photo ${idx+1}", "image/jpeg"))
+                    "Instagram $shortcode", "Photo ${idx+1}", "image/jpeg", cookies = igCookies))
             }
             // Cari video
             val videoUrl = extractVideoFromPage(pageHtml)
             if (videoUrl != null) {
                 options.add(0, Result(videoUrl, "Instagram_${shortcode}.mp4",
-                    "Instagram $shortcode", "Video", "video/mp4"))
+                    "Instagram $shortcode", "Video", "video/mp4", cookies = igCookies))
             }
         }
 
@@ -273,7 +276,7 @@ object SocialMediaExtractor {
     private fun extractAllYouTube(url: String): List<Result> {
         val videoId = extractYouTubeId(url) ?: return emptyList()
 
-        val pageHtml = httpGet(
+        val httpResult = httpGetWithCookies(
             "https://www.youtube.com/shorts/$videoId",
             mapOf(
                 "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -281,6 +284,8 @@ object SocialMediaExtractor {
             ),
             timeoutMs = 20000
         ) ?: return emptyList()
+        val pageHtml = httpResult.body
+        val ytCookies = httpResult.cookies
 
         val match = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*(?:var\s|</script)""")
             .find(pageHtml)
@@ -302,7 +307,7 @@ object SocialMediaExtractor {
                     val mimeType = fmt.optString("mimeType", "video/mp4")
                     val ext = if (mimeType.contains("webm")) "webm" else "mp4"
                     val safeName = sanitizeFileName(title)
-                    options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType))
+                    options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
                 }
             }
             return options
@@ -366,7 +371,9 @@ object SocialMediaExtractor {
 
     // ── HTTP ─────────────────────────────────────────────────────────────
 
-    private fun httpGet(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): String? {
+    data class HttpResult(val body: String, val cookies: String = "")
+
+    private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
         val conn = URL(urlStr).openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = timeoutMs
@@ -379,7 +386,18 @@ object SocialMediaExtractor {
             }
             val code = conn.responseCode
             if (code !in 200..299) return null
-            return BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+            // Kumpulkan cookies dari response
+            val cookies = conn.headerFields.entries
+                .filter { it.key.equals("set-cookie", ignoreCase = true) }
+                .flatMap { it.value }
+                .map { it.substringBefore(';') }
+                .joinToString("; ")
+            val body = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+            return HttpResult(body, cookies)
         } catch (_: Exception) { return null } finally { conn.disconnect() }
+    }
+
+    private fun httpGet(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): String? {
+        return httpGetWithCookies(urlStr, headers, timeoutMs)?.body
     }
 }

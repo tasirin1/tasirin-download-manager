@@ -859,11 +859,17 @@ class DownloadEngine(appContext: Context) {
             if (result != null && result.directUrl != item.url) {
                 App.logEvent("SOCIAL: extracted direct URL from $host")
                 val newName = result.fileName ?: item.fileName
+                // Tambah cookies dari social media extraction ke headers
+                val mergedHeaders = if (result.cookies.isNotEmpty()) {
+                    val existing = item.headers.trim()
+                    if (existing.isNotEmpty()) "$existing\nCookie: ${result.cookies}" else "Cookie: ${result.cookies}"
+                } else item.headers
                 updateItem(item.id) { it.copy(
                     url = result.directUrl,
-                    fileName = if (!item.nameIsCustom) newName else item.fileName
+                    fileName = if (!item.nameIsCustom) newName else item.fileName,
+                    headers = mergedHeaders
                 ) }
-                return runDownload(item.copy(url = result.directUrl, fileName = newName), skipSocial = true)
+                return runDownload(item.copy(url = result.directUrl, fileName = newName, headers = mergedHeaders), skipSocial = true)
             }
             // Ekstraksi gagal — post mungkin private/deleted atau platform memblokir
             throw IOException(
