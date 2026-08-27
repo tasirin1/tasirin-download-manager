@@ -882,6 +882,18 @@ class DownloadEngine(appContext: Context) {
             if (result != null && result.directUrl != item.url) {
                 App.logEvent("SOCIAL: extracted direct URL from $host → ${result.directUrl.take(80)}...")
                 App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.take(50)}...")
+                // YouTube via HLS: segmen .ts digabung jadi satu file.
+                if (result.isHls) {
+                    val hlsName = result.fileName ?: item.fileName
+                    updateItem(item.id) {
+                        it.copy(url = result.directUrl, fileName = if (!item.nameIsCustom) hlsName else item.fileName)
+                    }
+                    downloadHls(
+                        item.copy(url = result.directUrl, fileName = hlsName, headers = item.headers),
+                        hlsName
+                    )
+                    return
+                }
                 val newName = result.fileName ?: item.fileName
                 // Gabung cookies dari extraction ke headers untuk CDN download
                 val mergedHeaders = if (result.cookies.isNotEmpty()) {
@@ -979,6 +991,156 @@ class DownloadEngine(appContext: Context) {
         } finally {
             conn.disconnect()
         }
+    }
+
+    /** Unduh HLS (m3u8): pilih varian terbaik, unduh semua segmen .ts lalu
+     *  gabung jadi satu file dapat diputar. Tidak butuh ffmpeg — segmen dari
+     *  YouTube HLS sudah berisi video+audio gabungan (MPEG-TS). */
+    private suspend fun downloadHls(item: DownloadItem, outName: String) {
+        val saver = FileSaver(context)
+        val freeNow = saver.freeBytes()
+        if (freeNow < MIN_FREE_BYTES) throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
+
+        val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES)
+            ?: throw IOException("Cannot fetch HLS manifest")
+        val segmentUrls = parseHlsSegments(master, item.url)
+        if (segmentUrls.isEmpty()) throw IOException("No HLS segments found")
+
+        val globalLimit = StoragePrefs.speedLimitKbps(context)
+        val limit = if (item.speedLimitKbps > 0) item.speedLimitKbps else globalLimit
+        val throttle = if (item.speedLimitKbps > 0) {
+            SpeedThrottle(limit, null)
+        } else {
+            SpeedThrottle(limit, globalRateLimiter())
+        }
+
+        val fileName = if (outName.lowercase().endsWith(".ts")) outName else "$outName.ts"
+        val partial = saver.partialFile(fileName)
+        partial.delete()
+        var downloaded = 0L
+        var lastNotify = 0L
+        val buffer = ByteArray(BUFFER_SIZE)
+        coroutineContext.ensureActive()
+
+        try {
+            BufferedOutputStream(FileOutputStream(partial)).use { out ->
+                for (url in segmentUrls) {
+                    coroutineContext.ensureActive()
+                    val segConn = trackConnection(
+                        item.id,
+                        openAuthenticatedConnection(
+                            url, method = "GET",
+                            username = item.username,
+                            password = item.password,
+                            headers = item.headers
+                        )
+                    )
+                    try {
+                        val code = segConn.responseCode
+                        if (code !in 200..299) throw IOException("HLS segment HTTP $code")
+                        val input = segConn.inputStream
+                        try {
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read == -1) break
+                                out.write(buffer, 0, read)
+                                downloaded += read
+                                throttle.sleepIfNeeded { downloaded }
+                                val now = System.currentTimeMillis()
+                                if (now - lastNotify >= 1000) {
+                                    lastNotify = now
+                                    coroutineContext.ensureActive()
+                                    val (speed, eta) = speedTracker.sample(item.id, downloaded, 0)
+                                    updateItem(item.id, persist = false) {
+                                        it.copy(
+                                            state = DownloadState.DOWNLOADING,
+                                            bytesDownloaded = downloaded,
+                                            totalBytes = 0,
+                                            speedBps = speed,
+                                            etaSeconds = eta
+                                        )
+                                    }
+                                    scheduleProgressSave()
+                                }
+                            }
+                        } finally {
+                            runCatching { input.close() }
+                        }
+                    } finally {
+                        untrackConnection(item.id, segConn)
+                    }
+                }
+            }
+            coroutineContext.ensureActive()
+            val published0 = publishItem(saver, partial, fileName, item)
+            val finalName = published0.fileName ?: fileName
+            val published = organizeIfEnabled(saver, published0, finalName)
+            speedTracker.reset(item.id)
+            updateItem(item.id) {
+                it.copy(
+                    state = DownloadState.COMPLETED,
+                    fileName = finalName,
+                    bytesDownloaded = downloaded,
+                    totalBytes = downloaded,
+                    contentUri = published.contentUri,
+                    filePath = published.filePath,
+                    autoResume = false,
+                    speedBps = 0,
+                    etaSeconds = 0,
+                    finishedAt = System.currentTimeMillis()
+                )
+            }
+            flushSave()
+        } catch (e: Exception) {
+            runCatching { partial.delete() }
+            throw e
+        }
+    }
+
+    private fun parseHlsSegments(body: String, baseUrl: String): List<String> {
+        // Master playlist berisi varian; ambil yang bandwidth tertinggi.
+        if (body.contains("#EXT-X-STREAM-INF")) {
+            val variants = HlsParser.parseMaster(body, baseUrl) ?: return emptyList()
+            // Hindari varian raksasa (4K/8K): pilih tertinggi yang ≤1080p,
+            // fallback ke bandwidth terkecil bila semua di atas 1080p.
+            val best = variants
+                .filter { variantHeight(it.name) in 1..1080 }
+                .maxByOrNull { it.bandwidth }
+                ?: variants.minByOrNull { it.bandwidth }
+                ?: return emptyList()
+            val variantBody = fetchText(best.url, "", HLS_PROBE_MAX_BYTES) ?: return emptyList()
+            return variantBody.lines()
+                .map { it.trim() }
+                .filter { it.startsWith("http") }
+        }
+        return body.lines()
+            .map { it.trim() }
+            .filter { it.startsWith("http") }
+    }
+
+    /** Parse tinggi (height) dari label varian seperti "1280x720 · 2500 kbps". */
+    private fun variantHeight(label: String): Int {
+        return Regex("(\\d+)x(\\d+)")
+            .find(label)
+            ?.groupValues
+            ?.get(2)
+            ?.toIntOrNull()
+            ?: 0
+    }
+
+    private fun fetchText(url: String, headers: String, maxBytes: Int): String? {
+        return runCatching {
+            val conn = openAuthenticatedConnection(
+                url, method = "GET", username = "", password = "", headers = headers
+            )
+            try {
+                val code = conn.responseCode
+                if (code !in 200..299) return null
+                readBounded(conn.inputStream, maxBytes)
+            } finally {
+                conn.disconnect()
+            }
+        }.getOrNull()
     }
 
     private suspend fun runSingle(

@@ -18,7 +18,8 @@ object SocialMediaExtractor {
         val title: String?,
         val quality: String = "",
         val mimeType: String = "",
-        val cookies: String = ""
+        val cookies: String = "",
+        val isHls: Boolean = false
     )
 
     fun isSocialMediaUrl(url: String): Boolean {
@@ -283,6 +284,19 @@ object SocialMediaExtractor {
     private fun extractAllYouTube(url: String): List<Result> {
         val videoId = extractYouTubeId(url) ?: return emptyList()
 
+        // Strategi 1: VISIONOS player API — URL stream tanpa n-signature.
+        // URL adaptif/HLS dari client ini bisa langsung di-download (tidak 403).
+        val vision = extractYouTubeViaVisionos(videoId)
+        if (vision != null) {
+            App.logEvent("YT DEBUG: VISIONOS OK → HLS ${vision.directUrl.take(80)}...")
+            return listOf(vision)
+        }
+
+        // Strategi 2: halaman WEB (ytInitialPlayerResponse) + fallback Piped/Invidious.
+        return extractYouTubeFromPage(url, videoId)
+    }
+
+    private fun extractYouTubeFromPage(url: String, videoId: String): List<Result> {
         val httpResult = httpGetWithCookies(
             "https://www.youtube.com/shorts/$videoId",
             mapOf(
@@ -339,6 +353,61 @@ object SocialMediaExtractor {
             return options
         } catch (_: Exception) { }
         return emptyList()
+    }
+
+    /** Strategi VISIONOS: player API mengembalikan URL HLS/adaptif tanpa
+     *  n-signature, sehingga bisa langsung di-download (tidak HTTP 403). */
+    private fun extractYouTubeViaVisionos(videoId: String): Result? {
+        // Butuh visitorData + cookies dari halaman agar API tidak LOGIN_REQUIRED.
+        val page = httpGetWithCookies(
+            "https://www.youtube.com/shorts/$videoId",
+            mapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
+                "Accept-Language" to "en-US,en;q=0.9"
+            ),
+            timeoutMs = 20000
+        ) ?: return null
+        val visitor = Regex("""VISITOR_DATA"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
+            ?: Regex("""visitorData"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
+            ?: return null
+        App.logEvent("YT DEBUG: VISIONOS visitorData ${visitor.take(24)}..., cookies=${page.cookies.take(24)}")
+
+        val body = buildString {
+            append("{\"context\":{\"client\":{")
+            append("\"clientName\":\"VISIONOS\",")
+            append("\"clientVersion\":\"1.02\",")
+            append("\"deviceMake\":\"Apple\",")
+            append("\"deviceModel\":\"RealityDevice17,1\",")
+            append("\"userAgent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15\",")
+            append("\"osName\":\"visionOS\",")
+            append("\"osVersion\":\"26.5.23O471\",")
+            append("\"hl\":\"en\",")
+            append("\"visitorData\":\"$visitor\"")
+            append("}},\"videoId\":\"$videoId\"}")
+        }
+        val json = httpPostJson(
+            "https://www.youtube.com/youtubei/v1/player",
+            body,
+            mapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
+                "Origin" to "https://www.youtube.com",
+                "Referer" to "https://www.youtube.com/",
+                "X-Goog-Visitor-Id" to visitor,
+                "X-YouTube-Client-Name" to "101",
+                "X-YouTube-Client-Version" to "1.02"
+            ),
+            timeoutMs = 20000
+        ) ?: return null
+
+        return runCatching {
+            val obj = JSONObject(json)
+            if (obj.optJSONObject("playabilityStatus")?.optString("status") != "OK") return null
+            val title = obj.optJSONObject("videoDetails")?.optString("title") ?: "YouTube_$videoId"
+            val hls = obj.optJSONObject("streamingData")?.optString("hlsManifestUrl")
+            if (hls.isNullOrEmpty()) return null
+            val safeName = sanitizeFileName(title)
+            Result(hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL", cookies = "", isHls = true)
+        }.getOrNull()
     }
 
     private fun isUrlForbidden(item: Result): Boolean {
@@ -536,5 +605,27 @@ object SocialMediaExtractor {
 
     private fun httpGet(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): String? {
         return httpGetWithCookies(urlStr, headers, timeoutMs)?.body
+    }
+
+    private fun httpPostJson(
+        urlStr: String,
+        body: String,
+        headers: Map<String, String> = emptyMap(),
+        timeoutMs: Int = 15000
+    ): String? {
+        val conn = URL(urlStr).openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "POST"
+            conn.connectTimeout = timeoutMs
+            conn.readTimeout = timeoutMs
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Accept", "application/json")
+            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+            conn.doOutput = true
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            if (code !in 200..299) return null
+            return BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+        } catch (_: Exception) { return null } finally { conn.disconnect() }
     }
 }
