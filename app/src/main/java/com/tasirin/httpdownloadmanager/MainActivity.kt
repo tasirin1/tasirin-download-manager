@@ -343,6 +343,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
 
+        /* Advanced options toggle */
+        val advancedToggle = view.findViewById<TextView>(R.id.advanced_toggle)
+        val advancedSection = view.findViewById<View>(R.id.advanced_section)
+        advancedToggle.setOnClickListener {
+            if (advancedSection.visibility == View.VISIBLE) {
+                advancedSection.visibility = View.GONE
+                advancedToggle.text = getString(R.string.advanced_options)
+            } else {
+                advancedSection.visibility = View.VISIBLE
+                advancedToggle.text = getString(R.string.advanced_options_expanded)
+            }
+        }
+
         val storageText = view.findViewById<TextView>(R.id.text_storage_remaining)
         storageText.text = getString(R.string.storage_remaining, Formats.bytes(App.engine.freeSpaceBytes()))
 

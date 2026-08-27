@@ -136,6 +136,8 @@
     <string name="sort_by">Sort</string>
     <string name="recent_search_hint">Search history URLs&#8230;</string>
     <string name="clear_history">Clear history</string>
+    <string name="advanced_options">Advanced &#9656;</string>
+    <string name="advanced_options_expanded">Advanced &#9662;</string>
     <string name="settings_port_label">Remote server port</string>
     <string name="settings_port_hint">Port (1024–65535)</string>
     <string name="settings_speed_custom">Custom: %1$d KB/s</string>
