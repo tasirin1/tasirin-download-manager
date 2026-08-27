@@ -320,14 +320,14 @@ object SocialMediaExtractor {
         Regex("[?&]v=([A-Za-z0-9_-]{11})").find(url)
             ?.groupValues?.get(1)?.let { return it }
         // youtu.be/VIDEO_ID
-        Regex("youtu\.be/([A-Za-z0-9_-]{11})").find(url)
+        Regex("youtu\\.be/([A-Za-z0-9_-]{11})").find(url)
             ?.groupValues?.get(1)?.let { return it }
         return null
     }
 
     private fun sanitizeFileName(name: String): String {
-        return name.replace(Regex("[^A-Za-z0-9_\-. ]"), "_")
-            .replace(Regex("\s+"), "_")
+        return name.replace(Regex("[^A-Za-z0-9_\\-. ]"), "_")
+            .replace(Regex("\\s+"), "_")
             .take(80)
     }
 
