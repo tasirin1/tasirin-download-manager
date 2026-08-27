@@ -14,7 +14,9 @@ object SocialMediaExtractor {
     data class Result(
         val directUrl: String,
         val fileName: String?,
-        val title: String?
+        val title: String?,
+        val quality: String = "",
+        val mimeType: String = ""
     )
 
     fun isSocialMediaUrl(url: String): Boolean {
@@ -33,6 +35,7 @@ object SocialMediaExtractor {
                 lower.contains("youtu.be/")
     }
 
+    /** Ekstrak URL terbaik (satu opsi). */
     suspend fun extract(url: String): Result? = withContext(Dispatchers.IO) {
         try {
             val lower = url.lowercase()
@@ -50,24 +53,59 @@ object SocialMediaExtractor {
         } catch (_: Exception) { null }
     }
 
+    /** Ekstrak semua opsi resolusi yang tersedia. */
+    suspend fun extractAll(url: String): List<Result> = withContext(Dispatchers.IO) {
+        try {
+            val lower = url.lowercase()
+            when {
+                lower.contains("tiktok.com/") || lower.contains("vm.tiktok.com/") ->
+                    extractAllTikTok(url)
+                lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
+                    extractAllInstagram(url)
+                lower.contains("twitter.com/") || lower.contains("x.com/") ->
+                    extractAllTwitter(url)
+                lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
+                    extractAllYouTube(url)
+                else -> emptyList()
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
     // ── TikTok ───────────────────────────────────────────────────────────
 
     private fun extractTikTok(url: String): Result? {
+        val options = extractAllTikTok(url)
+        return options.firstOrNull { it.quality.contains("HD", ignoreCase = true) }
+            ?: options.firstOrNull()
+    }
+
+    private fun extractAllTikTok(url: String): List<Result> {
         val encoded = URLEncoder.encode(url, "UTF-8")
-        val json = httpGet("https://www.tikwm.com/api/?url=$encoded&hd=1") ?: return null
+        val json = httpGet("https://www.tikwm.com/api/?url=$encoded&hd=1") ?: return emptyList()
         val obj = JSONObject(json)
-        if (obj.optInt("code", -1) != 0) return null
-        val data = obj.optJSONObject("data") ?: return null
-        val directUrl = data.optString("hdplay").ifEmpty {
-            data.optString("play").ifEmpty { return null }
-        }
-        if (directUrl.isEmpty()) return null
+        if (obj.optInt("code", -1) != 0) return emptyList()
+        val data = obj.optJSONObject("data") ?: return emptyList()
         val title = data.optString("title", "")
         val author = try {
             data.optJSONObject("author")?.optString("unique_id", "")
         } catch (_: Exception) { "" }
         val id = data.optString("id", "")
-        return Result(directUrl, "TikTok_${author}_$id.mp4".trim('_'), title)
+        val namePrefix = "TikTok_${author}_$id".trim('_')
+        val options = mutableListOf<Result>()
+
+        val hdUrl = data.optString("hdplay", "")
+        if (hdUrl.startsWith("http")) {
+            options.add(Result(hdUrl, "$namePrefix.mp4", title, "HD", "video/mp4"))
+        }
+        val sdUrl = data.optString("play", "")
+        if (sdUrl.startsWith("http")) {
+            options.add(Result(sdUrl, "$namePrefix.mp4", title, "SD", "video/mp4"))
+        }
+        val wmUrl = data.optString("wmplay", "")
+        if (wmUrl.startsWith("http") && wmUrl != sdUrl) {
+            options.add(Result(wmUrl, "$namePrefix_wm.mp4", title, "SD (watermark)", "video/mp4"))
+        }
+        return options
     }
 
     // ── Instagram ────────────────────────────────────────────────────────
@@ -77,41 +115,72 @@ object SocialMediaExtractor {
         "Accept" to "text/html"
     )
 
-    private fun extractInstagram(url: String): Result? {
-        val shortcode = Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)").find(url)
-            ?.groupValues?.get(1) ?: return null
+    private val IG_HEADERS = mapOf(
+        "User-Agent" to "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Accept" to "text/html"
+    )
 
-        // Strategi 1: halaman utama via Googlebot — cari video atau gambar
+    private fun extractInstagram(url: String): Result? {
+        val options = extractAllInstagram(url)
+        return options.firstOrNull()
+    }
+
+    private fun extractAllInstagram(url: String): List<Result> {
+        val shortcode = Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)").find(url)
+            ?.groupValues?.get(1) ?: return emptyList()
+        val options = mutableListOf<Result>()
+
+        // Strategi 1: halaman utama via Googlebot
         val pageHtml = httpGet("https://www.instagram.com/p/$shortcode/", GOOGLEBOT_HEADERS)
         if (pageHtml != null && pageHtml.length > 1000) {
+            // Cari semua gambar display_url
+            val displayUrls = extractAllDisplayUrlsFromPage(pageHtml)
+            displayUrls.forEachIndexed { idx, imgUrl ->
+                options.add(Result(imgUrl, "Instagram_${shortcode}_${idx+1}.jpg",
+                    "Instagram $shortcode", "Photo ${idx+1}", "image/jpeg"))
+            }
             // Cari video
             val videoUrl = extractVideoFromPage(pageHtml)
             if (videoUrl != null) {
-                return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
-            }
-            // Cari gambar (prioritas: ig_cache_key full resolusi)
-            val displayUrl = extractDisplayUrlFromPage(pageHtml)
-            if (displayUrl != null) {
-                return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
+                options.add(0, Result(videoUrl, "Instagram_${shortcode}.mp4",
+                    "Instagram $shortcode", "Video", "video/mp4"))
             }
         }
 
-        // Strategi 2: embed page (contextJSON legacy — beberapa post mungkin masih punya)
-        val embedHtml = httpGet(
-            "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
-        )
-        if (embedHtml != null) {
-            val media = extractContextJson(embedHtml)
-            if (media != null) {
-                val result = extractFromMedia(media, shortcode)
-                if (result != null) return result
+        // Strategi 2: embed page
+        if (options.isEmpty()) {
+            val embedHtml = httpGet(
+                "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
+            )
+            if (embedHtml != null) {
+                val media = extractContextJson(embedHtml)
+                if (media != null) {
+                    val result = extractFromMedia(media, shortcode)
+                    if (result != null) options.add(result)
+                }
             }
         }
-
-        return null
+        return options
     }
 
-    /** Extract video URL dari escaped JSON di halaman Instagram. */
+    private fun extractAllDisplayUrlsFromPage(html: String): List<String> {
+        val urls = mutableListOf<String>()
+        // Cari semua scontent URLs
+        val regex = Regex("https?://[^\"]*scontent[^\"]*\\.(?:jpg|png|webp)[^\"]*")
+        regex.findAll(html).forEach { match ->
+            val raw = match.value
+                .replace("\\u002F", "/")
+                .replace("\\u0026", "&")
+            if (raw !in urls && !raw.contains("s640x640")) {
+                urls.add(raw)
+            }
+        }
+        // Prioritas: ig_cache_key URLs (full resolusi)
+        val cacheKeyUrls = urls.filter { it.contains("ig_cache_key") }
+        if (cacheKeyUrls.isNotEmpty()) return cacheKeyUrls.take(10)
+        return urls.take(10)
+    }
+
     private fun extractVideoFromPage(html: String): String? {
         val idx = html.indexOf("video_versions")
         if (idx < 0) return null
@@ -120,82 +189,31 @@ object SocialMediaExtractor {
             .replace("\\u002F", "/")
             .replace("\\u0026", "&")
             .replace("\\/", "/")
-            .replace("\\\"", "\"")
-        val pattern = Regex(""""url":"(https://[^"]+)"""")
-        for (match in pattern.findAll(unescaped)) {
-            val url = match.groupValues[1]
-            if (url.contains(".mp4")) return url
-        }
-        return null
-    }
-
-    /** Extract gambar dari escaped JSON — prioritas ig_cache_key (full resolusi). */
-    private fun extractDisplayUrlFromPage(html: String): String? {
-        val unescaped = html
+        val videoRegex = Regex(""""url"\s*:\s*"(https?://[^"]+\\.mp4[^"]*)"""")
+        val match = videoRegex.find(unescaped) ?: return null
+        return match.groupValues[1]
             .replace("\\u002F", "/")
             .replace("\\u0026", "&")
-            .replace("\\/", "/")
-            .replace("\\\"", "\"")
-            .replace("&amp;", "&")
-        val pattern = Regex("""https?://scontent[^"]+""")
-        val candidates = mutableListOf<String>()
-        for (match in pattern.findAll(unescaped)) {
-            val url = match.groupValues[0]
-            val path = url.substringBefore("?")
-            if (path.endsWith(".jpg") || path.endsWith(".webp") || path.endsWith(".png")) {
-                candidates.add(url)
-            }
-        }
-        if (candidates.isEmpty()) return null
-
-        // Prioritas: ig_cache_key tanpa stp (full resolusi) > p1080x1080 > s640x640
-        val withCacheKey = candidates.filter { it.contains("ig_cache_key") }
-        if (withCacheKey.isNotEmpty()) {
-            val noCrop = withCacheKey.filter { !it.contains("stp=") }
-            if (noCrop.isNotEmpty()) return noCrop.first()
-            val highRes = withCacheKey.filter { it.contains("p1080x1080") || it.contains("s1080x1080") }
-            if (highRes.isNotEmpty()) return highRes.first()
-            return withCacheKey.first()
-        }
-
-        val withStp = candidates.filter { it.contains("s640x640") }
-        if (withStp.isNotEmpty()) return withStp.first()
-
-        return candidates.first()
     }
 
-    // ── Instagram contextJSON (legacy) ───────────────────────────────────
+    private fun extractDisplayUrlFromPage(html: String): String? {
+        val urls = extractAllDisplayUrlsFromPage(html)
+        return urls.firstOrNull()
+    }
 
-    private val IG_HEADERS = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A055F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language" to "en-US,en;q=0.9",
-        "Sec-Fetch-Dest" to "document",
-        "Sec-Fetch-Mode" to "navigate",
-        "Sec-Fetch-Site" to "none",
-        "Sec-Fetch-User" to "?1"
-    )
-
-    @Suppress("EmptyCatchBlock", "kotlin_empty_catch")
     private fun extractContextJson(html: String): JSONObject? {
-        val key = "\"contextJSON\":"
-        var searchFrom = 0
-        while (true) {
-            val idx = html.indexOf(key, searchFrom)
-            if (idx == -1) break
-            val quoteStart = html.indexOf('"', idx + key.length)
-            if (quoteStart == -1) break
-            var i = quoteStart + 1
-            var escaped = false
-            while (i < html.length) {
-                val ch = html[i]
-                if (escaped) escaped = false
-                else if (ch == '\\') escaped = true
-                else if (ch == '"') break
-                i++
-            }
-            searchFrom = i + 1
-            val token = html.substring(quoteStart, i + 1)
+        val regex = Regex("""window\._ sharedData\s*=\s*({.*?});""")
+            ?: Regex(""""shortcode_media"\s*:\s*({.*?})\s*[,}]""")
+        for (pattern in listOf(
+            Regex("contextJSON\\s*=\\s*\"(.+?)\""),
+            Regex("\"token\"\\s*:\\s*\"(.+?)\""),
+        )) {
+            val match = pattern.find(html) ?: continue
+            val token = match.groupValues[1]
+                .replace("\\\\u002F", "/")
+                .replace("\\\\u0026", "&")
+                .replace("\\\"", "\"")
+                .replace("\\/", "/")
             try {
                 val inner = JSONObject(token).toString()
                 val obj = JSONObject(inner)
@@ -215,37 +233,32 @@ object SocialMediaExtractor {
     }
 
     private fun extractFromMedia(media: JSONObject, shortcode: String): Result? {
-        // Single video
         val videoUrl = media.optString("video_url", "")
         if (videoUrl.startsWith("http")) {
-            return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
+            return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4")
         }
-        // Carousel/sidecar
         val sidecar = media.optJSONObject("edge_sidecar_to_children")
         val edges = sidecar?.optJSONArray("edges")
         if (edges != null && edges.length() > 0) {
-            // Cari video pertama
             for (i in 0 until edges.length()) {
                 val node = edges.optJSONObject(i)?.optJSONObject("node") ?: continue
                 if (node.optBoolean("is_video", false)) {
                     val cv = node.optString("video_url", "")
                     if (cv.startsWith("http")) {
-                        return Result(cv, "Instagram_${shortcode}.mp4", "Instagram $shortcode")
+                        return Result(cv, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4")
                     }
                 }
             }
-            // Fallback: gambar pertama
             val firstNode = edges.optJSONObject(0)?.optJSONObject("node")
             val img = firstNode?.optString("display_url", "")
                 ?: media.optString("display_url", "")
             if (img.startsWith("http")) {
-                return Result(img, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
+                return Result(img, "Instagram_${shortcode}.jpg", "Instagram $shortcode", "Photo", "image/jpeg")
             }
         }
-        // Single image
         val displayUrl = media.optString("display_url", "")
         if (displayUrl.startsWith("http")) {
-            return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode")
+            return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode", "Photo", "image/jpeg")
         }
         return null
     }
@@ -253,73 +266,55 @@ object SocialMediaExtractor {
     // ── YouTube ────────────────────────────────────────────────────────
 
     private fun extractYouTube(url: String): Result? {
-        // Extract video ID from URL
-        val videoId = extractYouTubeId(url) ?: return null
+        val options = extractAllYouTube(url)
+        return options.firstOrNull()
+    }
 
-        // Try Piped API instances (free, open-source YouTube proxy)
-        val pipedInstances = listOf(
-            "https://pipedapi.kavin.rocks",
-            "https://pipedapi.in.projectsegfau.lt",
-            "https://watchapi.whatever.social"
-        )
-        for (instance in pipedInstances) {
-            val json = httpGet("$instance/streams/$videoId", timeoutMs = 20000)
-            if (json != null) {
-                try {
-                    val obj = JSONObject(json)
-                    val title = obj.optString("title", "YouTube_$videoId")
-                    val duration = obj.optLong("duration", 0L)
+    private fun extractAllYouTube(url: String): List<Result> {
+        val videoId = extractYouTubeId(url) ?: return emptyList()
 
-                    // Cari video stream terbaik
-                    val videoStreams = obj.optJSONArray("videoStreams")
-                    if (videoStreams != null) {
-                        var bestStream: JSONObject? = null
-                        var bestHeight = 0
-                        for (i in 0 until videoStreams.length()) {
-                            val stream = videoStreams.optJSONObject(i) ?: continue
-                            val height = stream.optInt("height", 0)
-                            val videoOnly = stream.optBoolean("videoOnly", false)
-                            val mime = stream.optString("mimeType", "")
-                            if (!videoOnly && height > bestHeight && mime.contains("video")) {
-                                bestHeight = height
-                                bestStream = stream
-                            }
-                        }
-                        // Fallback: video-only stream (perlu audio terpisah)
-                        if (bestStream == null) {
-                            for (i in 0 until videoStreams.length()) {
-                                val stream = videoStreams.optJSONObject(i) ?: continue
-                                val height = stream.optInt("height", 0)
-                                val mime = stream.optString("mimeType", "")
-                                if (height > bestHeight && mime.contains("video")) {
-                                    bestHeight = height
-                                    bestStream = stream
-                                }
-                            }
-                        }
-                        if (bestStream != null) {
-                            val videoUrl = bestStream.optString("url", "")
-                            if (videoUrl.startsWith("http")) {
-                                val ext = if (bestStream.optString("mimeType", "").contains("webm")) "webm" else "mp4"
-                                val safeName = sanitizeFileName(title)
-                                return Result(videoUrl, "YouTube_${safeName}.$ext", title)
-                            }
-                        }
-                    }
-                } catch (_: Exception) { }
+        val pageHtml = httpGet(
+            "https://www.youtube.com/shorts/$videoId",
+            mapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Accept-Language" to "en-US,en;q=0.9"
+            ),
+            timeoutMs = 20000
+        ) ?: return emptyList()
+
+        val match = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*(?:var\s|</script)""")
+            .find(pageHtml)
+            ?: Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""").find(pageHtml)
+            ?: return emptyList()
+
+        try {
+            val data = JSONObject(match.groupValues[1])
+            val title = data.optString("title", "YouTube_$videoId")
+            val streamingData = data.optJSONObject("streamingData") ?: return emptyList()
+            val formats = streamingData.optJSONArray("formats") ?: return emptyList()
+            val options = mutableListOf<Result>()
+
+            for (i in 0 until formats.length()) {
+                val fmt = formats.optJSONObject(i) ?: continue
+                val videoUrl = fmt.optString("url", "")
+                if (videoUrl.startsWith("http")) {
+                    val quality = fmt.optString("qualityLabel", "Unknown")
+                    val mimeType = fmt.optString("mimeType", "video/mp4")
+                    val ext = if (mimeType.contains("webm")) "webm" else "mp4"
+                    val safeName = sanitizeFileName(title)
+                    options.add(Result(videoUrl, "YouTube_${safeName}.$ext", title, quality, mimeType))
+                }
             }
-        }
-        return null
+            return options
+        } catch (_: Exception) { }
+        return emptyList()
     }
 
     private fun extractYouTubeId(url: String): String? {
-        // youtube.com/shorts/VIDEO_ID
         Regex("/shorts/([A-Za-z0-9_-]{11})").find(url)
             ?.groupValues?.get(1)?.let { return it }
-        // youtube.com/watch?v=VIDEO_ID
         Regex("[?&]v=([A-Za-z0-9_-]{11})").find(url)
             ?.groupValues?.get(1)?.let { return it }
-        // youtu.be/VIDEO_ID
         Regex("youtu\\.be/([A-Za-z0-9_-]{11})").find(url)
             ?.groupValues?.get(1)?.let { return it }
         return null
@@ -334,34 +329,39 @@ object SocialMediaExtractor {
     // ── Twitter/X ────────────────────────────────────────────────────────
 
     private fun extractTwitter(url: String): Result? {
+        val options = extractAllTwitter(url)
+        return options.firstOrNull()
+    }
+
+    private fun extractAllTwitter(url: String): List<Result> {
         val cleanUrl = url.replace("https://x.com/", "https://twitter.com/")
         val path = URL(cleanUrl).path
-        val json = httpGet("https://api.vxtwitter.com/twitter$path") ?: return null
+        val json = httpGet("https://api.vxtwitter.com/twitter$path") ?: return emptyList()
         val obj = JSONObject(json)
-        val tweet = obj.optJSONObject("tweet") ?: return null
-        val media = tweet.optJSONArray("media") ?: return null
+        val tweet = obj.optJSONObject("tweet") ?: return emptyList()
+        val user = tweet.optJSONObject("user")?.optString("name") ?: "Twitter"
+        val text = tweet.optString("text", "")
+        val media = tweet.optJSONArray("media") ?: return emptyList()
+        val options = mutableListOf<Result>()
+
         for (i in 0 until media.length()) {
             val item = media.optJSONObject(i) ?: continue
-            if (item.optString("type") == "video") {
-                val directUrl = item.optString("url")
-                if (directUrl.startsWith("http")) {
-                    val user = tweet.optJSONObject("user")?.optString("name") ?: "Twitter"
-                    return Result(directUrl, "Twitter_${user}.mp4", tweet.optString("text", ""))
+            when (item.optString("type")) {
+                "video" -> {
+                    val directUrl = item.optString("url")
+                    if (directUrl.startsWith("http")) {
+                        options.add(Result(directUrl, "Twitter_${user}.mp4", text, "Video", "video/mp4"))
+                    }
+                }
+                "photo" -> {
+                    val directUrl = item.optString("url")
+                    if (directUrl.startsWith("http")) {
+                        options.add(Result(directUrl, "Twitter_${user}.jpg", text, "Photo", "image/jpeg"))
+                    }
                 }
             }
         }
-        // Fallback: photo
-        for (i in 0 until media.length()) {
-            val item = media.optJSONObject(i) ?: continue
-            if (item.optString("type") == "photo") {
-                val directUrl = item.optString("url")
-                if (directUrl.startsWith("http")) {
-                    val user = tweet.optJSONObject("user")?.optString("name") ?: "Twitter"
-                    return Result(directUrl, "Twitter_${user}.jpg", tweet.optString("text", ""))
-                }
-            }
-        }
-        return null
+        return options
     }
 
     // ── HTTP ─────────────────────────────────────────────────────────────

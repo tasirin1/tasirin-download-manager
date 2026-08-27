@@ -153,6 +153,9 @@
     <string name="open_folder_unavailable">No file-manager app available to open the folder</string>
     <string name="settings_auto_sort">Auto-move to type subfolder (Video/Photos)</string>
     <string name="hls_quality_title">Pick video quality</string>
+    <string name="social_quality_title">Pick video quality</string>
+    <string name="social_extracting">Extracting media options…</string>
+    <string name="social_no_options">No downloadable media found for this URL.</string>
     <string name="hls_direct">Download original playlist (no pick)</string>
     <string name="gallery_empty">No videos found yet.</string>
     <string name="gallery_open_error">No app found to open this file</string>

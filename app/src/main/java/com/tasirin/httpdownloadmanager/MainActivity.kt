@@ -45,6 +45,7 @@ import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Updater
+import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
 import kotlinx.coroutines.Dispatchers
@@ -416,7 +417,44 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val checksum = checksumInput.text?.toString()?.trim().orEmpty()
                 val perSpeed = speedKbps[spinnerSpeedPer.selectedItemPosition]
                 val priority = priorityValues[spinnerPriority.selectedItemPosition]
-                if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
+                val singleUrl = urls.firstOrNull().orEmpty()
+                if (SocialMediaExtractor.isSocialMediaUrl(singleUrl) && urls.size == 1) {
+                    // Social media: ekstrak semua opsi resolusi dulu
+                    lifecycleScope.launch {
+                        val options = withContext(Dispatchers.IO) {
+                            runCatching { SocialMediaExtractor.extractAll(singleUrl) }.getOrNull()
+                        }
+                        if (options.isNullOrEmpty()) {
+                            val mirrors = parseMirrors()
+                            addAll(urls, name, username, password, headers, perSpeed, priority, checksum, mirrors)
+                        } else if (options.size == 1) {
+                            val chosen = options[0]
+                            App.engine.addDownload(
+                                url = chosen.directUrl,
+                                fileName = chosen.fileName ?: name.ifEmpty { null },
+                                username = username,
+                                password = password,
+                                headers = headers,
+                                speedLimitKbps = perSpeed,
+                                priority = priority,
+                                checksum = checksum,
+                                mirrors = parseMirrors()
+                            )
+                        } else {
+                            showSocialQualityPicker(
+                                options = options,
+                                name = name,
+                                username = username,
+                                password = password,
+                                headers = headers,
+                                perSpeed = perSpeed,
+                                priority = priority,
+                                checksum = checksum,
+                                mirrors = parseMirrors()
+                            )
+                        }
+                    }
+                } else if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
                     lifecycleScope.launch {
                         val variants = withContext(Dispatchers.IO) {
                             runCatching { App.engine.probeHlsVariants(urls[0]) }.getOrNull()
@@ -443,6 +481,41 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
                 }
             }
+            .show()
+    }
+
+    private fun showSocialQualityPicker(
+        options: List<SocialMediaExtractor.Result>,
+        name: String,
+        username: String,
+        password: String,
+        headers: String,
+        perSpeed: Int,
+        priority: Int,
+        checksum: String,
+        mirrors: List<String> = emptyList()
+    ) {
+        val labels = options.map { opt ->
+            val size = if (opt.quality.isNotBlank()) " [${opt.quality}]" else ""
+            "${opt.fileName?.substringBeforeLast('.') ?: "media"}$size"
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.social_quality_title)
+            .setItems(labels.toTypedArray()) { _, which ->
+                val chosen = options[which]
+                App.engine.addDownload(
+                    url = chosen.directUrl,
+                    fileName = chosen.fileName ?: name.ifEmpty { null },
+                    username = username,
+                    password = password,
+                    headers = headers,
+                    speedLimitKbps = perSpeed,
+                    priority = priority,
+                    checksum = checksum,
+                    mirrors = mirrors
+                )
+            }
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
