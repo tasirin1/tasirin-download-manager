@@ -858,11 +858,11 @@ class DownloadEngine(appContext: Context) {
                 ) }
                 return runDownload(item.copy(url = result.directUrl, fileName = newName), skipSocial = true)
             }
-            // Ekstraksi gagal — jangan download URL asli (hasilnya HTML)
+            // Ekstraksi gagal — post mungkin private/deleted atau platform memblokir
             throw IOException(
-                "Could not extract media from $host. " +
-                "The post may be private, deleted, or the platform blocked extraction. " +
-                "Try copying the direct video/image URL from your browser."
+                "Cannot download from $host. " +
+                "This post may be private, deleted, or temporarily unavailable. " +
+                "Try opening the post in your browser first."
             )
         }
         val saver = FileSaver(context)
@@ -1431,7 +1431,12 @@ class DownloadEngine(appContext: Context) {
 
     private fun verifySize(id: String, downloaded: Long, total: Long) {
         if (total > 0 && downloaded != total) {
-            throw IOException("Size mismatch: expected $total, received $downloaded")
+            // CDN kadang kirim Content-Length beda sedikit — toleransi 5%
+            val diff = kotlin.math.abs(total - downloaded)
+            val tolerance = total / 20  // 5%
+            if (diff > tolerance) {
+                throw IOException("Size mismatch: expected $total, received $downloaded")
+            }
         }
     }
 
