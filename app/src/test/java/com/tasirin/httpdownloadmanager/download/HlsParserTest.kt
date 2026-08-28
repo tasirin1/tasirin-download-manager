@@ -84,6 +84,8 @@ class HlsParserTest {
             https://cdn.example.com/videos/480.m3u8
             #EXT-X-STREAM-INF:BANDWIDTH=3789534,RESOLUTION=720x1280,FRAME-RATE=60.0,CODECS="avc1.4D4020,mp4a.40.2"
             https://cdn.example.com/videos/720.m3u8
+            #EXT-X-STREAM-INF:BANDWIDTH=291706,RESOLUTION=240x426,CODECS="avc1.4D4015,mp4a.40.2"
+            https://cdn.example.com/videos/240.m3u8
         """.trimIndent()
         val variants = HlsParser.parseMaster(master, "https://cdn.example.com/videos/master.m3u8")!!
         assertEquals(60, variants[0].frameRate)
