@@ -33,7 +33,7 @@ object SocialMediaExtractor {
                 lower.contains("instagr.am/p/") ||
                 lower.contains("instagr.am/reel/") ||
                 lower.contains("twitter.com/") ||
-                Regex("(?:https?://(?:www\.)?|\.?)x\.com/").containsMatchIn(lower) ||
+                Regex("""(?:https?://(?:www\.)?|\.?)x\.com/""").containsMatchIn(lower) ||
                 lower.contains("youtube.com/") ||
                 lower.contains("youtu.be/")
     }
