@@ -1068,7 +1068,7 @@ class DownloadEngine(appContext: Context) {
 
             // 3) Remux video + audio jadi MP4 bila audio tersedia.
             val remuxed = audioStream != null &&
-                HlsMp4Muxer.remux(videoTs, audioStream, mp4)
+                HlsMp4Muxer.remux(videoTs, audioStream, mp4, plan.videoSegmentDurationsUs)
             if (remuxed) {
                 App.logEvent("HLS: remux OK → MP4 with audio")
                 val fileName = "$baseName.mp4"
@@ -1239,6 +1239,7 @@ class DownloadEngine(appContext: Context) {
 
     private data class HlsPlan(
         val videoSegments: List<String>,
+        val videoSegmentDurationsUs: List<Long> = emptyList(),
         val audioSegments: List<String>? = null
     )
 
@@ -1254,16 +1255,22 @@ class DownloadEngine(appContext: Context) {
         val variants = HlsParser.parseMaster(body, baseUrl) ?: return null
         // Hindari varian raksasa (4K/8K): pilih tertinggi yang ≤1080p dan
         // (bila ada) berprofil AVC tanpa B-frame agar remux MP4 mulus.
-        // Pilih varian AVC (avc1.4D, tanpa B-frame) dengan bandwidth
-            // tertinggi yang tidak terlalu besar (≤6 Mbps) untuk menghindari
-            // 4K/8K raksasa. Tanpa filter height agar video portrait (720×1280)
-            // tetap terpilih; fps dan kualitas sangat tergantung bitrate.
+        // Pilih varian AVC (avc1.4D, tanpa B-frame) dengan bandwidth paling
+            // mendekati target ~1,2 Mbps — keseimbangan kualitas tinggi, hasil
+            // cukup kecil, dan durasi segmen stabil (AVC 30-60 fps). AVC 1080p
+            // (avc1.64002A) punya B-frame sehingga dihindari agar remux mulus.
+            val target = 1_200_000L
             val best = variants
-                .filter { it.codecs.contains("avc1.4D") && it.bandwidth in 100_000..6_000_000 }
-                .maxByOrNull { it.bandwidth }
+                .filter { it.codecs.contains("avc1.4D") && it.bandwidth in 200_000..2_500_000 }
+                .minByOrNull { kotlin.math.abs(it.bandwidth - target) }
+                ?: variants
+                    .filter { it.codecs.contains("avc1.4D") }
+                    .minByOrNull { it.bandwidth }
                 ?: variants.minByOrNull { it.bandwidth }
                 ?: return null
-        val videoSegments = mediaSegments(best.url) ?: return null
+        val videoSegs = mediaSegmentsWithDurations(best.url) ?: return null
+        val videoSegments = videoSegs.map { it.first }
+        val videoDurations = videoSegs.map { it.second }
         val audioSegments = best.audioGroupId?.let { group ->
             val renditions = HlsParser.parseAudioRenditions(body, baseUrl)
             val match = renditions.firstOrNull { it.groupId == group && it.isDefault }
@@ -1274,16 +1281,35 @@ class DownloadEngine(appContext: Context) {
             "HLS plan: ${best.codecs} ${best.bandwidth/1000}kbps, " +
                 "${videoSegments.size} video, ${audioSegments?.size ?: 0} audio segments"
         )
-        return HlsPlan(videoSegments, audioSegments)
+        return HlsPlan(videoSegments, videoDurations, audioSegments)
     }
 
-    private fun mediaSegments(playlistUrl: String): List<String>? {
+    /** Parse segmen dari media playlist, mengembalikan (url, durasi_us). */
+    private fun mediaSegmentsWithDurations(playlistUrl: String): List<Pair<String, Long>>? {
         val body = fetchText(playlistUrl, "", HLS_PROBE_MAX_BYTES) ?: return null
-        val segments = body.lines()
-            .map { it.trim() }
-            .filter { it.startsWith("http") }
-        return if (segments.isEmpty()) null else segments
+        val result = mutableListOf<Pair<String, Long>>()
+        val lines = body.lines()
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i].trim()
+            if (line.startsWith("#EXTINF:")) {
+                // Format: #EXTINF:<durasi>, atau #EXTINF:<durasi>, ...
+                val dur = line.substringAfter(":").substringBefore(",").trim()
+                    .toDoubleOrNull() ?: 0.0
+                val url = lines.getOrNull(i + 1)?.trim().orEmpty()
+                if (url.startsWith("http")) {
+                    result.add(url to (dur * 1_000_000).toLong())
+                }
+                i += 2; continue
+            }
+            i++
+        }
+        return if (result.isEmpty()) null else result
     }
+
+    private fun mediaSegments(playlistUrl: String): List<String>? =
+        mediaSegmentsWithDurations(playlistUrl)?.map { it.first }
+
 
     private fun fetchText(url: String, headers: String, maxBytes: Int): String? {
         return runCatching {

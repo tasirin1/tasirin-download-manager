@@ -15,7 +15,12 @@ import java.nio.ByteBuffer
  *  Tanpa ffmpeg/library tambahan (APK tetap kecil). */
 object HlsMp4Muxer {
 
-    fun remux(videoTs: File, audio: AdtsAac.Stream?, outMp4: File): Boolean {
+    fun remux(
+        videoTs: File,
+        audio: AdtsAac.Stream?,
+        outMp4: File,
+        segmentDurationsUs: List<Long> = emptyList()
+    ): Boolean {
         var muxer: MediaMuxer? = null
         var videoExt: MediaExtractor? = null
         try {
@@ -45,7 +50,7 @@ object HlsMp4Muxer {
             val videoBuf = runCatching {
                 vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
             }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
-            writeAll(videoExt, muxer, videoTrack, videoBuf)
+            writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs)
             if (audioTrack >= 0) {
                 audio?.let { stream ->
                     writeAacFrames(muxer, audioTrack, stream.frames, stream.sampleRate)
@@ -71,9 +76,94 @@ object HlsMp4Muxer {
         return null
     }
 
-    private fun writeAll(ext: MediaExtractor, muxer: MediaMuxer, track: Int, bufferSize: Int) {
+    private fun writeAll(
+        ext: MediaExtractor,
+        muxer: MediaMuxer,
+        track: Int,
+        bufferSize: Int,
+        segmentDurationsUs: List<Long> = emptyList()
+    ) {
         val buffer = ByteBuffer.allocate(bufferSize)
         val info = MediaCodec.BufferInfo()
+        if (segmentDurationsUs.isEmpty()) {
+            // Playlist tanpa EXTINF (jarang): fallback ke PTS dengan drift
+            // agar PTS tetap naik saat perangkat tidak memberinya durasi.
+            writeAllPts(ext, muxer, track, buffer, info, bufferSize)
+            return
+        }
+
+        // Timeline dibangun dari durasi segmen (#EXTINF) supaya sinkron dengan
+        // audio yang memakai frame-count × 1024/sampleRate. PTS MPEG-TS
+        // YouTube tidak bisa diandalkan untuk durasi karena restart per segmen
+        // dan span yang tidak proporsional dengan #EXTINF.
+        var segIndex = 0
+        var timelineOffsetUs = 0L
+        var lastPts = -1L
+        var segMinPts = -1L
+        var segMaxPts = -1L
+        var segDurationUs = segmentDurationsUs[0]
+
+        while (true) {
+            buffer.clear()
+            val size = ext.readSampleData(buffer, 0)
+            if (size < 0) break
+            buffer.position(0)
+            buffer.limit(size)
+            val pts = ext.sampleTime
+
+            // Deteksi restart segmen: PTS turun mendadak (mundur > 1 detik)
+            val restarted = lastPts >= 0 && pts < lastPts - 1_000_000L
+            var normalizedUs: Long
+            if (restarted) {
+                // Finalisasi segmen sebelumnya: tambahkan durasinya
+                timelineOffsetUs += segDurationUs
+                normalizedUs = timelineOffsetUs
+                segIndex++
+                if (segIndex < segmentDurationsUs.size) {
+                    segDurationUs = segmentDurationsUs[segIndex]
+                } else {
+                    segDurationUs = if (segMaxPts > segMinPts) {
+                        (segMaxPts - segMinPts) * 1_000_000L / 90_000L
+                    } else 5_000_000L // default 5 detik
+                }
+                segMinPts = pts
+                segMaxPts = pts
+            } else {
+                if (lastPts < 0) {
+                    segMinPts = pts
+                    segMaxPts = pts
+                    normalizedUs = timelineOffsetUs
+                } else {
+                    segMaxPts = maxOf(segMaxPts, pts)
+                    normalizedUs = if (segDurationUs > 0 && segMaxPts > segMinPts) {
+                        val ratio = (pts - segMinPts).toDouble() / (segMaxPts - segMinPts)
+                        timelineOffsetUs + (ratio * segDurationUs).toLong()
+                    } else {
+                        timelineOffsetUs + 1
+                    }
+                }
+            }
+            lastPts = pts
+            val flags = if (ext.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
+                MediaCodec.BUFFER_FLAG_KEY_FRAME
+            } else {
+                0
+            }
+            info.set(0, size, normalizedUs, flags)
+            muxer.writeSampleData(track, buffer, info)
+            if (!ext.advance()) break
+        }
+    }
+
+    /** Fallback: normalisasi PTS dengan drift minimal agar tetap naik. */
+    private fun writeAllPts(
+        ext: MediaExtractor,
+        muxer: MediaMuxer,
+        track: Int,
+        buffer: ByteBuffer,
+        info: MediaCodec.BufferInfo,
+        @Suppress("UNUSED_PARAMETER") bufferSize: Int
+    ) {
         var firstPts = -1L
         var lastPts = -1L
         var drift = 0L
@@ -86,9 +176,6 @@ object HlsMp4Muxer {
             val pts = ext.sampleTime
             if (firstPts < 0) firstPts = pts
             var normalized = pts - firstPts + drift
-            // Segmen MPEG-TS YouTube mereset PTS ke nilai kecil di tiap segmen.
-            // Bila PTS global mundur (restart segmen), dorong drift agar urutan
-            // tetap naik — MediaMuxer menolak PTS yang menurun.
             if (lastPts >= 0 && normalized < lastPts) {
                 drift += lastPts - normalized + 1
                 normalized = lastPts + 1
