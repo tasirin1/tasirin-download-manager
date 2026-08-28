@@ -1372,22 +1372,40 @@ class DownloadEngine(appContext: Context) {
                 avc.minByOrNull { it.bandwidth }
             }
         } ?: variants.minByOrNull { it.bandwidth } ?: return null
-        App.logEvent("HLS DEBUG: fetching variant ${best.url.take(100)}, h=${headers.take(30)}")
-        val videoSegs = mediaSegmentsWithDurations(best.url, headers)
-        if (videoSegs == null) { App.logEvent("HLS DEBUG: mediaSegmentsWithDurations returned null for variant"); return null }
-        val videoSegments = videoSegs.map { it.first }
-        val videoDurations = videoSegs.map { it.second }
-        val audioSegments = best.audioGroupId?.let { group ->
-            val renditions = HlsParser.parseAudioRenditions(body, baseUrl)
-            val match = renditions.firstOrNull { it.groupId == group && it.isDefault }
-                ?: renditions.firstOrNull { it.groupId == group }
-            match?.let { mediaSegments(it.url, headers) }
+        // Urutkan varian dari kualitas tertinggi ke terendah untuk fallback.
+        // YouTube kadang memblokir media playlist varian tertinggi (404) tapi
+        // membiarkan varian rendah lewat. Coba beberapa varian sampai ada yang berhasil.
+        val candidates = if (preferredHeight > 0) {
+            // Saat user pilih resolusi: urutkan dari paling dekat target ke terjauh
+            variants.filter { it.codecs.contains("avc") }
+                .sortedBy { kotlin.math.abs(it.height - preferredHeight) }
+        } else {
+            // Default: urutkan dari bandwidth tertinggi ke terendah
+            variants.sortedByDescending { it.bandwidth }
         }
-        App.logEvent(
-            "HLS plan: ${best.codecs} ${best.bandwidth/1000}kbps ${best.frameRate}fps, " +
-                "${videoSegments.size} video, ${audioSegments?.size ?: 0} audio segments"
-        )
-        return HlsPlan(videoSegments, videoDurations, audioSegments)
+        val audioRenditions = HlsParser.parseAudioRenditions(body, baseUrl)
+        for (candidate in candidates) {
+            App.logEvent("HLS DEBUG: trying variant ${candidate.codecs} ${candidate.bandwidth/1000}kbps ${candidate.height}p ${candidate.frameRate}fps, url=${candidate.url.take(80)}")
+            val videoSegs = mediaSegmentsWithDurations(candidate.url, headers)
+            if (videoSegs == null) {
+                App.logEvent("HLS DEBUG: variant ${candidate.height}p failed, trying next...")
+                continue
+            }
+            val videoSegments = videoSegs.map { it.first }
+            val videoDurations = videoSegs.map { it.second }
+            val audioSegments = candidate.audioGroupId?.let { group ->
+                val match = audioRenditions.firstOrNull { it.groupId == group && it.isDefault }
+                    ?: audioRenditions.firstOrNull { it.groupId == group }
+                match?.let { mediaSegments(it.url, headers) }
+            }
+            App.logEvent(
+                "HLS plan: ${candidate.codecs} ${candidate.bandwidth/1000}kbps ${candidate.frameRate}fps, " +
+                    "${videoSegments.size} video, ${audioSegments?.size ?: 0} audio segments"
+            )
+            return HlsPlan(videoSegments, videoDurations, audioSegments)
+        }
+        App.logEvent("HLS DEBUG: all ${candidates.size} variants failed (media playlist 404/error)")
+        return null
     }
 
     /** Parse segmen dari media playlist, mengembalikan (url, durasi_us). */
