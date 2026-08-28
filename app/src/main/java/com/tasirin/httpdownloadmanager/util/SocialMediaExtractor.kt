@@ -3,6 +3,7 @@ package com.tasirin.httpdownloadmanager.util
 import com.tasirin.httpdownloadmanager.App
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -11,6 +12,9 @@ import java.net.URL
 import java.net.URLEncoder
 
 object SocialMediaExtractor {
+
+    /** Batas total waktu ekstraksi media sosial (ms). */
+    private const val EXTRACT_TOTAL_TIMEOUT_MS = 25_000L
 
     data class Result(
         val directUrl: String,
@@ -58,20 +62,25 @@ object SocialMediaExtractor {
 
     /** Ekstrak semua opsi resolusi yang tersedia. */
     suspend fun extractAll(url: String): List<Result> = withContext(Dispatchers.IO) {
-        try {
-            val lower = url.lowercase()
-            when {
-                lower.contains("tiktok.com/") || lower.contains("vm.tiktok.com/") ->
-                    extractAllTikTok(url)
-                lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
-                    extractAllInstagram(url)
-                lower.contains("twitter.com/") || lower.contains("x.com/") ->
-                    extractAllTwitter(url)
-                lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
-                    extractAllYouTube(url)
-                else -> emptyList()
-            }
-        } catch (_: Exception) { emptyList() }
+        // Batas keras total ekstraksi: rantai fallback (piped/invidious/embed)
+        // punya timeout sendiri, tapi jangan sampai menahan thread server atau
+        // dialog probe terlalu lama bila semua mirror lambat/gagal.
+        withTimeoutOrNull(EXTRACT_TOTAL_TIMEOUT_MS) {
+            try {
+                val lower = url.lowercase()
+                when {
+                    lower.contains("tiktok.com/") || lower.contains("vm.tiktok.com/") ->
+                        extractAllTikTok(url)
+                    lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
+                        extractAllInstagram(url)
+                    lower.contains("twitter.com/") || lower.contains("x.com/") ->
+                        extractAllTwitter(url)
+                    lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
+                        extractAllYouTube(url)
+                    else -> emptyList()
+                }
+            } catch (_: Exception) { emptyList() }
+        } ?: emptyList()
     }
 
     // ── TikTok ───────────────────────────────────────────────────────────

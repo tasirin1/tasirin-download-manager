@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Batas waktu ekstraksi media sosial** — `SocialMediaExtractor.extractAll` kini dibungkus `withTimeoutOrNull(25s)` sehingga rantai fallback (piped/invidious/embed) yang lambat tidak menahan thread server (endpoint `/api/social_options`) atau dialog probe terlalu lama; kembali kosong jika melebihi batas.
 - **Fix koneksi bocor di Updater** — `conn.disconnect()` sekarang dipanggil di blok `finally` sehingga `HttpURLConnection` tetap tertutup walau exception terlempar saat download APK.
 - **Fix cookie Instagram embed** — Hasil carousel dari embed page sekarang membawa cookies dari fetch embed (sebelumnya kosong), sehingga CDN download tidak berisiko HTTP 403.
 
