@@ -133,40 +133,50 @@ object SocialMediaExtractor {
             ?.groupValues?.get(1) ?: return emptyList()
         val options = mutableListOf<Result>()
 
-        // Strategi 1: halaman utama via Googlebot
-        val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", GOOGLEBOT_HEADERS)
-        val igCookies = httpResult?.cookies.orEmpty()
-        val pageHtml = httpResult?.body
-        App.logEvent("IG DEBUG: main page ${pageHtml?.length ?: 0} chars, shortcode=$shortcode")
-        if (pageHtml != null && pageHtml.length > 1000) {
-            // Cari semua gambar display_url
-            val displayUrls = extractAllDisplayUrlsFromPage(pageHtml)
-            App.logEvent("IG DEBUG: found ${displayUrls.size} image URLs, video=${extractVideoFromPage(pageHtml) != null}")
-            displayUrls.forEachIndexed { idx, imgUrl ->
-                options.add(Result(imgUrl, "Instagram_${shortcode}_${idx+1}.jpg",
-                    "Instagram $shortcode", "Photo ${idx+1}", "image/jpeg", cookies = igCookies))
-            }
-            // Cari video
-            val videoUrl = extractVideoFromPage(pageHtml)
-            if (videoUrl != null) {
-                options.add(0, Result(videoUrl, "Instagram_${shortcode}.mp4",
-                    "Instagram $shortcode", "Video", "video/mp4", cookies = igCookies))
+        // Strategi 1: embed page — data carousel presisi (hanya foto/video milik post ini)
+        // Format contextJSON":"{...}" berisi edge_sidecar_to_children lengkap.
+        val igCookies = ""
+        val embedHtml = httpGetWithCookies(
+            "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
+        )?.body
+        App.logEvent("IG DEBUG: embed page ${embedHtml?.length ?: 0} chars, shortcode=$shortcode")
+        if (embedHtml != null && embedHtml.length > 1000) {
+            val media = extractContextJson(embedHtml)
+            if (media != null) {
+                val all = extractAllFromMedia(media, shortcode, igCookies)
+                if (all.isNotEmpty()) {
+                    App.logEvent("IG DEBUG: embed carousel ${all.size} items")
+                    options.addAll(all)
+                }
             }
         }
 
-        // Strategi 2: embed page
+        // Strategi 2: halaman utama via Googlebot — hanya bila embed gagal
         if (options.isEmpty()) {
-            val embedHtml = httpGet(
-                "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
-            )
-            App.logEvent("IG DEBUG: embed page ${embedHtml?.length ?: 0} chars (main page failed/private)")
-            if (embedHtml != null) {
-                val media = extractContextJson(embedHtml)
-                if (media != null) {
-                    val result = extractFromMedia(media, shortcode)
-                    if (result != null) options.add(result)
+            val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", GOOGLEBOT_HEADERS)
+            val pageCookies = httpResult?.cookies.orEmpty()
+            val pageHtml = httpResult?.body
+            App.logEvent("IG DEBUG: main page ${pageHtml?.length ?: 0} chars, shortcode=$shortcode")
+            if (pageHtml != null && pageHtml.length > 1000) {
+                val displayUrls = extractAllDisplayUrlsFromPage(pageHtml)
+                App.logEvent("IG DEBUG: found ${displayUrls.size} image URLs, video=${extractVideoFromPage(pageHtml) != null}")
+                displayUrls.forEachIndexed { idx, imgUrl ->
+                    options.add(Result(imgUrl, "Instagram_${shortcode}_${idx+1}.jpg",
+                        "Instagram $shortcode", "Photo ${idx+1}", "image/jpeg", cookies = pageCookies))
+                }
+                val videoUrl = extractVideoFromPage(pageHtml)
+                if (videoUrl != null) {
+                    options.add(0, Result(videoUrl, "Instagram_${shortcode}.mp4",
+                        "Instagram $shortcode", "Video", "video/mp4", cookies = pageCookies))
                 }
             }
+        }
+
+        // Dukungan img_index dari URL: pilih item tertentu di carousel
+        val imgIndex = Regex("[?&]img_index=(\\d+)").find(url)?.groupValues?.get(1)?.toIntOrNull()
+        if (imgIndex != null && imgIndex > 0 && imgIndex <= options.size) {
+            val selected = options[imgIndex - 1]
+            return listOf(selected)
         }
         return options
     }
@@ -242,21 +252,50 @@ object SocialMediaExtractor {
     }
 
     private fun extractContextJson(html: String): JSONObject? {
-        val regex = Regex("""window\._ sharedData\s*=\s*({.*?});""")
-            ?: Regex(""""shortcode_media"\s*:\s*({.*?})\s*[,}]""")
+        // Format 1 (embed page): contextJSON":"{escaped JSON}"
+        val embedKey = "contextJSON\":\""
+        val embedIdx = html.indexOf(embedKey)
+        if (embedIdx >= 0) {
+            val start = embedIdx + embedKey.length
+            var i = start
+            while (i < html.length) {
+                val c = html[i]
+                if (c == '\\' && i + 1 < html.length) { i += 2; continue }
+                if (c == '"') break
+                i++
+            }
+            if (i > start) {
+                val token = html.substring(start, i)
+                    .replace("\\u002F", "/")
+                    .replace("\\u0026", "&")
+                    .replace("\\\"", "\"")
+                    .replace("\\/", "/")
+                    .replace("\\\\", "\\")
+                try {
+                    val obj = JSONObject(token)
+                    val gql = obj.optJSONObject("gql_data")
+                    val media = gql?.optJSONObject("shortcode_media")
+                    if (media != null) return media
+                    val context = obj.optJSONObject("context")
+                    val ctxMedia = context?.optJSONObject("media")
+                    if (ctxMedia != null) return ctxMedia
+                } catch (_: Exception) { /* lanjut */ }
+            }
+        }
+        // Format 2: contextJSON = "..." (JS assignment)
+        // Format 3: "token": "..."
         for (pattern in listOf(
             Regex("contextJSON\\s*=\\s*\"(.+?)\""),
             Regex("\"token\"\\s*:\\s*\"(.+?)\""),
         )) {
             val match = pattern.find(html) ?: continue
             val token = match.groupValues[1]
-                .replace("\\\\u002F", "/")
-                .replace("\\\\u0026", "&")
+                .replace("\\u002F", "/")
+                .replace("\\u0026", "&")
                 .replace("\\\"", "\"")
                 .replace("\\/", "/")
             try {
-                val inner = JSONObject(token).toString()
-                val obj = JSONObject(inner)
+                val obj = JSONObject(token)
                 val gql = obj.optJSONObject("gql_data")
                 if (gql != null) {
                     val media = gql.optJSONObject("shortcode_media")
@@ -267,18 +306,13 @@ object SocialMediaExtractor {
                     val media = context.optJSONObject("media")
                     if (media != null) return media
                 }
-            } catch (_: Exception) {
-                // Respons tanpa field JSON yang dicari — coba kandidat berikutnya.
-            }
+            } catch (_: Exception) { /* lanjut */ }
         }
         return null
     }
 
     private fun extractFromMedia(media: JSONObject, shortcode: String): Result? {
-        val videoUrl = media.optString("video_url", "")
-        if (videoUrl.startsWith("http")) {
-            return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4")
-        }
+        // Video (single atau carousel pertama yang video)
         val sidecar = media.optJSONObject("edge_sidecar_to_children")
         val edges = sidecar?.optJSONArray("edges")
         if (edges != null && edges.length() > 0) {
@@ -298,12 +332,52 @@ object SocialMediaExtractor {
                 return Result(img, "Instagram_${shortcode}.jpg", "Instagram $shortcode", "Photo", "image/jpeg")
             }
         }
+        val videoUrl = media.optString("video_url", "")
+        if (videoUrl.startsWith("http")) {
+            return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4")
+        }
         val displayUrl = media.optString("display_url", "")
         if (displayUrl.startsWith("http")) {
             return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode", "Photo", "image/jpeg")
         }
         return null
     }
+
+    private fun extractAllFromMedia(media: JSONObject, shortcode: String, cookies: String): List<Result> {
+        val results = mutableListOf<Result>()
+        // Cek carousel dulu
+        val sidecar = media.optJSONObject("edge_sidecar_to_children")
+        val edges = sidecar?.optJSONArray("edges")
+        if (edges != null && edges.length() > 0) {
+            for (i in 0 until edges.length()) {
+                val node = edges.optJSONObject(i)?.optJSONObject("node") ?: continue
+                if (node.optBoolean("is_video", false)) {
+                    val cv = node.optString("video_url", "")
+                    if (cv.startsWith("http")) {
+                        results.add(Result(cv, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4", cookies = cookies))
+                    }
+                } else {
+                    val img = node.optString("display_url", "")
+                    if (img.startsWith("http")) {
+                        results.add(Result(img, "Instagram_${shortcode}_${i+1}.jpg", "Instagram $shortcode", "Photo ${i+1}", "image/jpeg", cookies = cookies))
+                    }
+                }
+            }
+        }
+        if (results.isEmpty()) {
+            // Single video atau foto
+            val videoUrl = media.optString("video_url", "")
+            if (videoUrl.startsWith("http")) {
+                results.add(Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4", cookies = cookies))
+            }
+            val displayUrl = media.optString("display_url", "")
+            if (displayUrl.startsWith("http") && results.isEmpty()) {
+                results.add(Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode", "Photo", "image/jpeg", cookies = cookies))
+            }
+        }
+        return results
+    }
+
 
     // ── YouTube ────────────────────────────────────────────────────────
 
