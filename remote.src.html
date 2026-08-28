@@ -1188,6 +1188,9 @@
       <select id="qualitySelect" class="quality-select hidden" aria-label="Media quality">
         <option value="0">Quality: Auto (best)</option>
       </select>
+      <select id="photoSelect" class="quality-select hidden" aria-label="Select photo">
+        <option value="0">Select photo: All</option>
+      </select>
       <div id="advToggle" class="adv-toggle">Advanced options</div>
       <div id="advSection" class="adv-section hidden">
         <input id="name" type="text" placeholder="File name (optional)">
@@ -1455,7 +1458,7 @@ let pendingAddForm = false;
 function toggleAddForm(show) {
   addSheet.classList.toggle('hidden', !show);
   if (!show) {
-    qualitySelect.classList.add('hidden'); socialPlatform = ''; socialOptions = [];
+    qualitySelect.classList.add('hidden'); photoSelect.classList.add('hidden'); socialPlatform = ''; socialVideoOptions = []; socialPhotoOptions = [];
     document.getElementById('advSection').classList.add('hidden');
     document.getElementById('advToggle').textContent = 'Advanced options';
   }
@@ -4367,8 +4370,10 @@ document.getElementById('clearCompletedBtn').addEventListener('click', function 
 
 // --- Social quality picker ---
 const qualitySelect = document.getElementById('qualitySelect');
+const photoSelect = document.getElementById('photoSelect');
 let socialPlatform = '';  // 'youtube' | 'social' | ''
-let socialOptions = [];   // [{label, preferredHeight, url, ...}]
+let socialVideoOptions = [];  // [{label, url, ...}]
+let socialPhotoOptions = [];  // [{label, url, ...}]
 
 function isSocialUrl(u) {
   var l = u.toLowerCase();
@@ -4388,52 +4393,74 @@ function probeSocialQuality() {
   if (!u || !isSocialUrl(u)) {
     qualitySelect.classList.add('hidden');
     qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>';
+    photoSelect.classList.add('hidden');
+    photoSelect.innerHTML = '<option value="0">Select photo: All</option>';
     socialPlatform = '';
-    socialOptions = [];
+    socialVideoOptions = [];
+    socialPhotoOptions = [];
     return;
   }
   socialDebounce = setTimeout(function () {
     var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
     if (isYT) {
-      // YouTube: static resolution list
+      // YouTube: static resolution list (no photos)
       socialPlatform = 'youtube';
-      socialOptions = [
+      socialVideoOptions = [
         {label: '1080p', preferredHeight: 1080},
         {label: '720p', preferredHeight: 720},
         {label: '480p', preferredHeight: 480},
         {label: '360p', preferredHeight: 360},
         {label: '240p', preferredHeight: 240}
       ];
+      socialPhotoOptions = [];
       qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>' +
-        socialOptions.map(function (o, i) {
+        socialVideoOptions.map(function (o, i) {
           return '<option value="' + (i + 1) + '">' + o.label + '</option>';
         }).join('');
       qualitySelect.classList.remove('hidden');
+      photoSelect.classList.add('hidden');
       return;
     }
-    // Other platforms: fetch from server
+    // Other platforms: fetch from server (photos + videos split)
     socialPlatform = 'social';
-    socialOptions = [];
-    qualitySelect.innerHTML = '<option value="0">Loading qualities…</option>';
+    socialVideoOptions = [];
+    socialPhotoOptions = [];
+    qualitySelect.innerHTML = '<option value="0">Loading…</option>';
     qualitySelect.classList.remove('hidden');
+    photoSelect.classList.add('hidden');
     fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.ok || !d.options || !d.options.length) {
-          qualitySelect.classList.add('hidden');
-          socialPlatform = '';
-          return;
-        }
+        if (!d.ok) { qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
         socialPlatform = d.platform || 'social';
-        socialOptions = d.options;
-        qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>' +
-          d.options.map(function (o, i) {
-            return '<option value="' + (i + 1) + '">' + o.label + '</option>';
-          }).join('');
-        qualitySelect.classList.remove('hidden');
+        var videos = d.videos || [];
+        var photos = d.photos || [];
+        socialVideoOptions = videos;
+        socialPhotoOptions = photos;
+        // Video quality picker
+        if (videos.length) {
+          qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>' +
+            videos.map(function (o, i) {
+              return '<option value="' + (i + 1) + '">' + o.label + '</option>';
+            }).join('');
+          qualitySelect.classList.remove('hidden');
+        } else {
+          qualitySelect.classList.add('hidden');
+        }
+        // Photo carousel picker
+        if (photos.length > 1) {
+          photoSelect.innerHTML = '<option value="0">Select photo: All</option>' +
+            photos.map(function (o, i) {
+              return '<option value="' + (i + 1) + '">' + o.label + '</option>';
+            }).join('');
+          photoSelect.classList.remove('hidden');
+        } else {
+          photoSelect.classList.add('hidden');
+        }
       })
       .catch(function () {
         qualitySelect.classList.add('hidden');
+        photoSelect.classList.add('hidden');
         socialPlatform = '';
       });
   }, 400);
@@ -4463,19 +4490,32 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   body.append('method', document.getElementById('dlMethod').value);
   body.append('headers', document.getElementById('dlHeaders').value.trim());
   body.append('postBody', document.getElementById('dlPostBody').value.trim());
-  // Social quality: include preferredHeight for YouTube, or override URL for other platforms
+  // Social quality: photo picker (carousel) + video quality picker
+  // Prioritas: foto carousel > video quality > YouTube resolusi
+  var photoIdx = parseInt(photoSelect.value, 10) || 0;
   var qualityIdx = parseInt(qualitySelect.value, 10) || 0;
-  if (qualityIdx > 0 && socialPlatform === 'youtube' && socialOptions.length) {
-    var chosen = socialOptions[qualityIdx - 1];
-    if (chosen && chosen.preferredHeight) {
-      body.append('preferredHeight', String(chosen.preferredHeight));
-    }
-  } else if (qualityIdx > 0 && socialPlatform === 'social' && socialOptions.length) {
-    var chosen = socialOptions[qualityIdx - 1];
+  if (photoIdx > 0 && socialPlatform === 'social' && socialPhotoOptions.length) {
+    // User picked a specific photo from carousel
+    var chosen = socialPhotoOptions[photoIdx - 1];
     if (chosen && chosen.url) {
       body.set('url', chosen.url);
       if (chosen.fileName) body.set('name', chosen.fileName);
-      // Merge social cookies with user's custom headers
+      if (chosen.cookies) {
+        var userHdr = document.getElementById('dlHeaders').value.trim();
+        var merged = (userHdr ? userHdr + '\n' : '') + 'Cookie: ' + chosen.cookies;
+        body.set('headers', merged);
+      }
+    }
+  } else if (qualityIdx > 0 && socialPlatform === 'youtube' && socialVideoOptions.length) {
+    var chosen = socialVideoOptions[qualityIdx - 1];
+    if (chosen && chosen.preferredHeight) {
+      body.append('preferredHeight', String(chosen.preferredHeight));
+    }
+  } else if (qualityIdx > 0 && socialPlatform === 'social' && socialVideoOptions.length) {
+    var chosen = socialVideoOptions[qualityIdx - 1];
+    if (chosen && chosen.url) {
+      body.set('url', chosen.url);
+      if (chosen.fileName) body.set('name', chosen.fileName);
       if (chosen.cookies) {
         var userHdr = document.getElementById('dlHeaders').value.trim();
         var merged = (userHdr ? userHdr + '\n' : '') + 'Cookie: ' + chosen.cookies;

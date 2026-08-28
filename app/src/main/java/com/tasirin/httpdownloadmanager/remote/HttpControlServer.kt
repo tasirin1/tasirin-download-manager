@@ -778,24 +778,27 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 SocialMediaExtractor.extractAll(url)
             }
         } catch (_: Exception) { emptyList() }
-        val arr = JSONArray()
+        val photos = JSONArray()
+        val videos = JSONArray()
         for (r in results) {
+            val isVideo = r.mimeType.startsWith("video")
             val label = r.quality.takeIf { it.isNotBlank() }
                 ?: r.mimeType.takeIf { it.isNotBlank() }
-                ?: "Video"
-            arr.put(JSONObject()
+                ?: if (isVideo) "Video" else "Photo"
+            val obj = JSONObject()
                 .put("label", label)
                 .put("url", r.directUrl)
                 .put("fileName", r.fileName ?: "")
                 .put("quality", r.quality)
                 .put("mimeType", r.mimeType)
                 .put("cookies", r.cookies)
-            )
+            if (isVideo) videos.put(obj) else photos.put(obj)
         }
         return jsonResponse(
             JSONObject().put("ok", true)
                 .put("platform", if (results.isNotEmpty()) "social" else "none")
-                .put("options", arr)
+                .put("photos", photos)
+                .put("videos", videos)
         )
     }
 

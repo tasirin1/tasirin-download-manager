@@ -276,6 +276,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val mirrorInput = view.findViewById<EditText>(R.id.input_mirrors)
         val socialQualitySection = view.findViewById<View>(R.id.social_quality_section)
         val socialQualitySpinner = view.findViewById<Spinner>(R.id.spinner_social_quality)
+        val socialCarouselSection = view.findViewById<View>(R.id.social_carousel_section)
+        val socialCarouselSpinner = view.findViewById<Spinner>(R.id.spinner_social_carousel)
         val speedKbps = SPEED_KBPS
         val spinnerSpeedPer = view.findViewById<Spinner>(R.id.spinner_speed_limit_per)
         setupSpinner(
@@ -363,6 +365,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // YouTube memakai daftar resolusi tetap (1080/720/480/360/240);
         // platform lain memakai kualitas hasil ekstraksi (HD/SD/Photo, dst).
         var socialOptions: List<SocialMediaExtractor.Result> = emptyList()
+        var socialVideoOptions: List<SocialMediaExtractor.Result> = emptyList()
+        var socialPhotoOptions: List<SocialMediaExtractor.Result> = emptyList()
         var socialYoutubeHeights: IntArray = intArrayOf()
         var socialJob: Job? = null
         fun probeSocialQuality() {
@@ -376,18 +380,24 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             if (!isSocial) {
                 socialJob = null
                 socialOptions = emptyList()
+                socialVideoOptions = emptyList()
+                socialPhotoOptions = emptyList()
                 socialYoutubeHeights = intArrayOf()
                 socialQualitySection.isVisible = false
+                socialCarouselSection.isVisible = false
                 return
             }
             val isYoutube = target.contains("youtube.com/") || target.contains("youtu.be/")
             if (isYoutube) {
                 socialOptions = emptyList()
+                socialVideoOptions = emptyList()
+                socialPhotoOptions = emptyList()
                 socialYoutubeHeights = intArrayOf(1080, 720, 480, 360, 240)
                 val labels = listOf(getString(R.string.social_quality_default)) +
                     socialYoutubeHeights.map { "${it}p" }
                 setupSpinner(this@MainActivity, socialQualitySpinner, labels)
                 socialQualitySection.isVisible = true
+                socialCarouselSection.isVisible = false
                 return
             }
             socialYoutubeHeights = intArrayOf()
@@ -396,11 +406,18 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     runCatching { SocialMediaExtractor.extractAll(target) }.getOrElse { emptyList() }
                 }
                 socialOptions = options
-                if (options.isEmpty()) {
-                    socialQualitySection.isVisible = false
-                } else {
+                // Pisahkan opsi video dan foto
+                socialVideoOptions = options.filter { it.mimeType.startsWith("video") }
+                socialPhotoOptions = options.filter { it.mimeType.startsWith("image") }
+                val hasVideo = socialVideoOptions.isNotEmpty()
+                val hasPhotos = socialPhotoOptions.isNotEmpty()
+                socialQualitySection.isVisible = false
+                socialCarouselSection.isVisible = false
+                if (!hasVideo && !hasPhotos) return@launch
+                // Section kualitas video
+                if (hasVideo) {
                     val labels = listOf(getString(R.string.social_quality_default)) +
-                        options.map { opt ->
+                        socialVideoOptions.map { opt ->
                             if (opt.quality.isBlank()) {
                                 opt.mimeType.takeIf { it.isNotBlank() } ?: "Video"
                             } else {
@@ -409,6 +426,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         }
                     setupSpinner(this@MainActivity, socialQualitySpinner, labels)
                     socialQualitySection.isVisible = true
+                }
+                // Section pemilihan foto carousel
+                if (hasPhotos) {
+                    val photoLabels = listOf(getString(R.string.social_quality_default)) +
+                        socialPhotoOptions.map { opt ->
+                            opt.quality.takeIf { it.isNotBlank() }
+                                ?: opt.mimeType.takeIf { it.isNotBlank() }
+                                ?: "Photo"
+                        }
+                    setupSpinner(this@MainActivity, socialCarouselSpinner, photoLabels)
+                    socialCarouselSection.isVisible = true
                 }
             }
         }
@@ -498,19 +526,27 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                // Media sosial: pakai resolusi yang dipilih (bukan URL asli)
-                // bila opsi sudah dimuat dan user tidak memilih "Auto (best)".
+                // Media sosial: pakai opsi yang dipilih dari spinner.
+                // Prioritas: foto carousel > video quality > YouTube resolusi.
                 val socialSel = socialQualitySpinner.selectedItemPosition
-                val selectedOption = if (
+                val selectedVideoOption = if (
                     socialQualitySection.isVisible &&
-                    socialOptions.isNotEmpty() &&
-                    socialSel in 1..socialOptions.size
-                ) socialOptions[socialSel - 1] else null
+                    socialVideoOptions.isNotEmpty() &&
+                    socialSel in 1..socialVideoOptions.size
+                ) socialVideoOptions[socialSel - 1] else null
                 val selectedYtHeight = if (
                     socialQualitySection.isVisible &&
                     socialYoutubeHeights.isNotEmpty() &&
                     socialSel in 1..socialYoutubeHeights.size
                 ) socialYoutubeHeights[socialSel - 1] else 0
+                val carouselSel = socialCarouselSpinner.selectedItemPosition
+                val selectedPhotoOption = if (
+                    socialCarouselSection.isVisible &&
+                    socialPhotoOptions.isNotEmpty() &&
+                    carouselSel in 1..socialPhotoOptions.size
+                ) socialPhotoOptions[carouselSel - 1] else null
+                // Gabungkan: foto carousel diprioritaskan, lalu video, lalu YouTube
+                val selectedOption = selectedPhotoOption ?: selectedVideoOption
                 val name = nameInput.text?.toString()?.trim().orEmpty()
                 val username = usernameInput.text?.toString()?.trim().orEmpty()
                 val password = passwordInput.text?.toString()?.trim().orEmpty()

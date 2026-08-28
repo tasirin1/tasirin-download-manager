@@ -153,6 +153,7 @@
     <string name="open_folder_unavailable">No file-manager app available to open the folder</string>
     <string name="settings_auto_sort">Auto-move to type subfolder (Video/Photos)</string>
     <string name="social_quality_label">Quality</string>
+    <string name="social_carousel_label">Select photo</string>
     <string name="social_quality_default">Auto (best)</string>
     <string name="hls_quality_title">Pick video quality</string>
     <string name="hls_direct">Download original playlist (no pick)</string>
