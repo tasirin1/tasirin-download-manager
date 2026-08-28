@@ -1264,17 +1264,16 @@ class DownloadEngine(appContext: Context) {
         val avc = variants.filter { it.codecs.contains("avc1.4D") }
         // Saat user eksplisit memilih resolusi (preferredHeight), pakai semua
         // varian AVC (termasuk itag 312 avc1.64002A untuk 1080p) yang paling
-        // mendekati tinggi target, dengan FRAME-RATE tertinggi agar tetap
-        // mulus tanpa frame drop. Tanpa pilihan, pertahankan perilaku default
-        // (avc1.4D FRAME-RATE tertinggi).
+        // mendekati tinggi target. JANGAN difilter by FRAME-RATE tertinggi
+        // di sini: resolusi rendah (240/360/480) memang 30fps sedangkan
+        // 720/1080 60fps — memaksa 60fps membuat semua pilihan jatuh ke
+        // varian tertinggi. Setiap resolusi memakai fps aslinya (wajar).
+        // Tanpa pilihan, pertahankan perilaku default (avc1.4D FRAME-RATE
+        // tertinggi) untuk kualitas terbaik.
         val best = if (preferredHeight > 0) {
             val targetAvc = variants.filter { it.codecs.contains("avc") }
-            val bestTargetFps = targetAvc.maxOfOrNull { it.frameRate } ?: 0
-            val pool = if (bestTargetFps > 0) {
-                targetAvc.filter { it.frameRate == bestTargetFps }
-            } else targetAvc
-            pool.minByOrNull { kotlin.math.abs(it.height - preferredHeight) }
-                ?: pool.minByOrNull { it.bandwidth }
+            targetAvc.minByOrNull { kotlin.math.abs(it.height - preferredHeight) }
+                ?: targetAvc.minByOrNull { it.bandwidth }
         } else {
             val bestFps = avc.maxOfOrNull { it.frameRate } ?: 0
             if (bestFps > 0) {
