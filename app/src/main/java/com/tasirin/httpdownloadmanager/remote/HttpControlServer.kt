@@ -22,6 +22,7 @@ import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
+import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CancellationException
@@ -206,6 +207,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     session.method == Method.GET && session.uri == "/api/thumb" -> serveThumb(session)
                     session.method == Method.GET && session.uri == "/api/media" -> serveMedia(session)
                     session.method == Method.POST && session.uri == "/api/add" -> addDownload(session)
+                    session.method == Method.GET && session.uri.startsWith("/api/social_options") -> socialOptions(session)
                     session.method == Method.POST && session.uri == "/api/upload" -> handleUpload(session)
                     session.method == Method.GET && session.uri == "/api/upload_verify" -> uploadVerify(session)
                     session.method == Method.POST && session.uri == "/api/action" -> runAction(session)
@@ -720,6 +722,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             .let { if (it == "POST") "POST" else "GET" }
         val postBody = params["postBody"]?.trim().orEmpty()
         val headers = params["headers"]?.trim().orEmpty()
+        val preferredHeight = params["preferredHeight"]?.toIntOrNull()?.coerceIn(0, 4320) ?: 0
         if (!isRemoteDestinationAllowed(folderPath)) {
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
@@ -735,9 +738,59 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             priority = priority,
             checksum = checksum,
             destination = storage,
-            folderPath = folderPath
+            folderPath = folderPath,
+            preferredHeight = preferredHeight
         )
         return jsonResponse(JSONObject().put("ok", true))
+    }
+
+
+    /** Endpoint untuk opsi kualitas media sosial */
+    private fun socialOptions(session: IHTTPSession): Response {
+        val url = session.param("url")?.trim().orEmpty()
+        if (url.isEmpty()) {
+            return jsonResponse(JSONObject().put("ok", false).put("error", "empty url"))
+        }
+        val isYouTube = url.contains("youtube.com/") || url.contains("youtu.be/")
+        if (isYouTube) {
+            // YouTube: daftar resolusi tetap (sesuai native app)
+            val arr = JSONArray()
+            val heights = intArrayOf(1080, 720, 480, 360, 240)
+            for (h in heights) {
+                arr.put(JSONObject()
+                    .put("label", "${h}p")
+                    .put("preferredHeight", h)
+                )
+            }
+            return jsonResponse(
+                JSONObject().put("ok", true).put("platform", "youtube").put("options", arr)
+            )
+        }
+        // Platform lain: ekstrak opsi dari social media extractor
+        val results = try {
+            kotlinx.coroutines.runBlocking {
+                SocialMediaExtractor.extractAll(url)
+            }
+        } catch (_: Exception) { emptyList() }
+        val arr = JSONArray()
+        for (r in results) {
+            val label = r.quality.takeIf { it.isNotBlank() }
+                ?: r.mimeType.takeIf { it.isNotBlank() }
+                ?: "Video"
+            arr.put(JSONObject()
+                .put("label", label)
+                .put("url", r.directUrl)
+                .put("fileName", r.fileName ?: "")
+                .put("quality", r.quality)
+                .put("mimeType", r.mimeType)
+                .put("cookies", r.cookies)
+            )
+        }
+        return jsonResponse(
+            JSONObject().put("ok", true)
+                .put("platform", if (results.isNotEmpty()) "social" else "none")
+                .put("options", arr)
+        )
     }
 
     private fun handleUpload(session: IHTTPSession): Response {

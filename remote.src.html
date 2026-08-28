@@ -880,6 +880,10 @@
   .add-sheet {
  gap: 10px; padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px)); max-height: 84vh; overflow-y: auto; }
 
+  .quality-select {
+ width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font-size: 14px; margin-top: 6px; box-sizing: border-box; }
+  .quality-select.hidden { display: none; }
+
   .sheet-title {
  font-size: 13px; font-weight: 700; color: var(--muted); padding: 6px 8px 10px; word-break: break-word; }
 
@@ -1168,6 +1172,9 @@
     <form id="addForm" class="sheet-box add-sheet">
       <div class="sheet-title" id="addSheetTitle">Add Download</div>
       <input id="url" type="url" placeholder="File URL (https://…)" required>
+      <select id="qualitySelect" class="quality-select hidden" aria-label="Media quality">
+        <option value="0">Quality: Auto (best)</option>
+      </select>
       <input id="name" type="text" placeholder="File name (optional)">
       <input id="checksum" type="text" placeholder="Optional checksum (md5:/sha1:/sha256:)">
       <div class="grid2">
@@ -1436,6 +1443,7 @@ const dlList = document.getElementById('list');
 let pendingAddForm = false;
 function toggleAddForm(show) {
   addSheet.classList.toggle('hidden', !show);
+  if (!show) { qualitySelect.classList.add('hidden'); socialPlatform = ''; socialOptions = []; }
   if (show) setTimeout(function () { document.getElementById('url').focus(); }, 60);
 }
 function onNewDownloadClick() {
@@ -4336,6 +4344,83 @@ document.getElementById('resumeAllBtn').addEventListener('click', function () { 
 document.getElementById('retryFailedBtn').addEventListener('click', function () { globalAction('retry_failed'); });
 document.getElementById('clearCompletedBtn').addEventListener('click', function () { globalAction('clear_completed'); });
 
+// --- Social quality picker ---
+const qualitySelect = document.getElementById('qualitySelect');
+let socialPlatform = '';  // 'youtube' | 'social' | ''
+let socialOptions = [];   // [{label, preferredHeight, url, ...}]
+
+function isSocialUrl(u) {
+  var l = u.toLowerCase();
+  if (l.indexOf('cdninstagram.com') !== -1) return false;
+  if (l.indexOf('tiktokcdn.com') !== -1) return false;
+  return l.indexOf('tiktok.com/') !== -1 ||
+    l.indexOf('instagram.com/p/') !== -1 || l.indexOf('instagram.com/reel/') !== -1 ||
+    l.indexOf('instagram.com/tv/') !== -1 || l.indexOf('instagr.am/') !== -1 ||
+    l.indexOf('twitter.com/') !== -1 || l.indexOf('x.com/') !== -1 ||
+    l.indexOf('youtube.com/') !== -1 || l.indexOf('youtu.be/') !== -1;
+}
+
+let socialDebounce = null;
+function probeSocialQuality() {
+  clearTimeout(socialDebounce);
+  var u = document.getElementById('url').value.trim();
+  if (!u || !isSocialUrl(u)) {
+    qualitySelect.classList.add('hidden');
+    qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>';
+    socialPlatform = '';
+    socialOptions = [];
+    return;
+  }
+  socialDebounce = setTimeout(function () {
+    var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
+    if (isYT) {
+      // YouTube: static resolution list
+      socialPlatform = 'youtube';
+      socialOptions = [
+        {label: '1080p', preferredHeight: 1080},
+        {label: '720p', preferredHeight: 720},
+        {label: '480p', preferredHeight: 480},
+        {label: '360p', preferredHeight: 360},
+        {label: '240p', preferredHeight: 240}
+      ];
+      qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>' +
+        socialOptions.map(function (o, i) {
+          return '<option value="' + (i + 1) + '">' + o.label + '</option>';
+        }).join('');
+      qualitySelect.classList.remove('hidden');
+      return;
+    }
+    // Other platforms: fetch from server
+    socialPlatform = 'social';
+    socialOptions = [];
+    qualitySelect.innerHTML = '<option value="0">Loading qualities…</option>';
+    qualitySelect.classList.remove('hidden');
+    fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok || !d.options || !d.options.length) {
+          qualitySelect.classList.add('hidden');
+          socialPlatform = '';
+          return;
+        }
+        socialPlatform = d.platform || 'social';
+        socialOptions = d.options;
+        qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>' +
+          d.options.map(function (o, i) {
+            return '<option value="' + (i + 1) + '">' + o.label + '</option>';
+          }).join('');
+        qualitySelect.classList.remove('hidden');
+      })
+      .catch(function () {
+        qualitySelect.classList.add('hidden');
+        socialPlatform = '';
+      });
+  }, 400);
+}
+
+document.getElementById('url').addEventListener('input', probeSocialQuality);
+probeSocialQuality();
+
 document.getElementById('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const url = document.getElementById('url').value.trim();
@@ -4351,6 +4436,26 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   body.append('method', document.getElementById('dlMethod').value);
   body.append('headers', document.getElementById('dlHeaders').value.trim());
   body.append('postBody', document.getElementById('dlPostBody').value.trim());
+  // Social quality: include preferredHeight for YouTube, or override URL for other platforms
+  var qualityIdx = parseInt(qualitySelect.value, 10) || 0;
+  if (qualityIdx > 0 && socialPlatform === 'youtube' && socialOptions.length) {
+    var chosen = socialOptions[qualityIdx - 1];
+    if (chosen && chosen.preferredHeight) {
+      body.append('preferredHeight', String(chosen.preferredHeight));
+    }
+  } else if (qualityIdx > 0 && socialPlatform === 'social' && socialOptions.length) {
+    var chosen = socialOptions[qualityIdx - 1];
+    if (chosen && chosen.url) {
+      body.set('url', chosen.url);
+      if (chosen.fileName) body.set('name', chosen.fileName);
+      // Merge social cookies with user's custom headers
+      if (chosen.cookies) {
+        var userHdr = document.getElementById('dlHeaders').value.trim();
+        var merged = (userHdr ? userHdr + '\n' : '') + 'Cookie: ' + chosen.cookies;
+        body.set('headers', merged);
+      }
+    }
+  }
   try {
     const res = await fetch(API + '/api/add', {
       method: 'POST',
