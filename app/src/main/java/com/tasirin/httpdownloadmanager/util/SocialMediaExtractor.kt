@@ -172,47 +172,52 @@ object SocialMediaExtractor {
     }
 
     private fun extractAllDisplayUrlsFromPage(html: String): List<String> {
-        // Strategi 1: Cari foto carousel/post via t39.30808-6 path
-        // (path CDN khusus foto post Instagram, termasuk carousel)
-        val postRegex = Regex("https?://[^"]*scontent[^"]*t39\\.30808-6/[^"]*_n\\.jpg[^"]*")
-        val byFileId = linkedMapOf<String, String>()
-        postRegex.findAll(html).forEach { match ->
+        // Semua URL gambar dari CDN Instagram (scontent*.cdninstagram.com).
+        // Path CDN bervariasi (t39.30808-6, t51.82787-15, t51.82787-19, dst),
+        // jadi jangan dikunci ke satu pola path. Buang profil pic (t51.2885-*),
+        // dedup per ID file, lalu utamakan versi resolusi penuh.
+        val imgRegex = Regex("https?://[^\"]*scontent[^\"]*cdninstagram\\.com[^\"]*\\.(?:jpg|jpeg|png|webp)[^\"]*")
+        val decoded = mutableListOf<String>()
+        imgRegex.findAll(html).forEach { match ->
             val raw = match.value
                 .replace("\\u002F", "/")
                 .replace("\\u0026", "&")
                 .replace("\\/", "/")
                 .replace("&amp;", "&")
-            val fidMatch = Regex("/(\\d+_\\d+_\\d+)_n\\.jpg").find(raw)
-            val fid = fidMatch?.groupValues?.get(1) ?: raw
-            if (fid !in byFileId) {
-                byFileId[fid] = raw
-            } else {
-                val existing = byFileId[fid] ?: ""
-                if (existing.contains("s640x640") && !raw.contains("s640x640")) {
-                    byFileId[fid] = raw
+            if (raw.startsWith("http") && !raw.contains("/t51.2885-")) {
+                decoded.add(raw)
+            }
+        }
+        if (decoded.isEmpty()) {
+            // Strategi cadangan: pola CDN lain yang belum tertangkap di atas
+            val fallbackRegex = Regex("https?://[^\"]*scontent[^\"]*\\.(?:jpg|jpeg|png|webp)[^\"]*")
+            fallbackRegex.findAll(html).forEach { match ->
+                val raw = match.value
+                    .replace("\\u002F", "/")
+                    .replace("\\u0026", "&")
+                    .replace("\\/", "/")
+                    .replace("&amp;", "&")
+                if (raw.startsWith("http") && !raw.contains("/t51.2885-")) {
+                    decoded.add(raw)
                 }
             }
         }
-        if (byFileId.isNotEmpty()) return byFileId.values.take(20).toList()
-
-        // Strategi 2: Fallback — semua scontent URLs (profile pics, dll)
-        val urls = mutableListOf<String>()
-        val fallbackRegex = Regex("https?://[^"]*scontent[^"]*\\.(?:jpg|png|webp)[^"]*")
-        fallbackRegex.findAll(html).forEach { match ->
-            val raw = match.value
-                .replace("\\u002F", "/")
-                .replace("\\u0026", "&")
-                .replace("\\/", "/")
-                .replace("&amp;", "&")
-            if (raw !in urls && !raw.contains("s640x640")) {
-                urls.add(raw)
+        // Dedup per ID file (contoh: 774314790_18387324052161_1234), utamakan
+        // URL tanpa marker thumbnail kecil di query (s150x150 / s640x640).
+        val byFileId = linkedMapOf<String, String>()
+        val idRegex = Regex("/(\\d+_\\d+_\\d+)_[a-z0-9]+\\.(?:jpg|jpeg|png|webp)")
+        decoded.forEach { url ->
+            val fid = idRegex.find(url)?.groupValues?.get(1) ?: url
+            val existing = byFileId[fid]
+            if (existing == null ||
+                (existing.contains("s640x640") && !url.contains("s640x640")) ||
+                (existing.contains("s150x150") && !url.contains("s150x150"))
+            ) {
+                byFileId[fid] = url
             }
         }
-        val cacheKeyUrls = urls.filter { it.contains("ig_cache_key") }
-        if (cacheKeyUrls.isNotEmpty()) return cacheKeyUrls.take(10)
-        return urls.take(10)
+        return byFileId.values.take(20).toList()
     }
-
 
     private fun extractVideoFromPage(html: String): String? {
         val idx = html.indexOf("video_versions")
