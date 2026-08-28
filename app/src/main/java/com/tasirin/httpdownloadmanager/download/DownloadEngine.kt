@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 import kotlin.coroutines.coroutineContext
 import java.io.BufferedOutputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -873,6 +874,14 @@ class DownloadEngine(appContext: Context) {
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
+        // Resume HLS: URL sudah berupa manifest m3u8 dari ekstraksi sebelumnya.
+        // Arahkan ulang ke downloadHls agar tidak diunduh sebagai file polos.
+        if (isHlsManifestUrl(item.url)) {
+            val hlsName = item.fileName
+            updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }
+            downloadHls(item, hlsName)
+            return
+        }
         // Social media: ekstrak direct URL menggunakan API publik
         // (tikwm.com untuk TikTok, embed page JSON untuk Instagram, vxtwitter untuk Twitter)
         if (SocialMediaExtractor.isSocialMediaUrl(item.url)) {
@@ -993,6 +1002,12 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
+    private fun isHlsManifestUrl(url: String): Boolean {
+        return url.contains("manifest.googlevideo.com") ||
+            url.contains("/api/manifest/hls") ||
+            url.lowercase().contains(".m3u8")
+    }
+
     /** Unduh HLS (m3u8): pilih varian terbaik, unduh semua segmen .ts lalu
      *  gabung jadi satu file dapat diputar. Tidak butuh ffmpeg — segmen dari
      *  YouTube HLS sudah berisi video+audio gabungan (MPEG-TS). */
@@ -1026,49 +1041,31 @@ class DownloadEngine(appContext: Context) {
             BufferedOutputStream(FileOutputStream(partial)).use { out ->
                 for (url in segmentUrls) {
                     coroutineContext.ensureActive()
-                    val segConn = trackConnection(
-                        item.id,
-                        openAuthenticatedConnection(
-                            url, method = "GET",
-                            username = item.username,
-                            password = item.password,
-                            headers = item.headers
-                        )
-                    )
-                    try {
-                        val code = segConn.responseCode
-                        if (code !in 200..299) throw IOException("HLS segment HTTP $code")
-                        val input = segConn.inputStream
-                        try {
-                            while (true) {
-                                val read = input.read(buffer)
-                                if (read == -1) break
-                                out.write(buffer, 0, read)
-                                downloaded += read
-                                throttle.sleepIfNeeded { downloaded }
-                                val now = System.currentTimeMillis()
-                                if (now - lastNotify >= 1000) {
-                                    lastNotify = now
-                                    coroutineContext.ensureActive()
-                                    val (speed, eta) = speedTracker.sample(item.id, downloaded, 0)
-                                    updateItem(item.id, persist = false) {
-                                        it.copy(
-                                            state = DownloadState.DOWNLOADING,
-                                            bytesDownloaded = downloaded,
-                                            totalBytes = 0,
-                                            speedBps = speed,
-                                            etaSeconds = eta
-                                        )
-                                    }
-                                    scheduleProgressSave()
-                                }
+                    // Segmen di-buffer di memori dulu dan baru ditulis ke file
+                    // setelah sukses penuh, supaya percobaan ulang segmen tidak
+                    // meninggalkan byte parsial di file gabungan (anti-korup).
+                    val segBytes = fetchHlsSegmentWithRetry(
+                        item, url, buffer, throttle, downloaded
+                    ) { segNow ->
+                        val totalNow = downloaded + segNow
+                        val now = System.currentTimeMillis()
+                        if (now - lastNotify >= 1000) {
+                            lastNotify = now
+                            val (speed, eta) = speedTracker.sample(item.id, totalNow, 0)
+                            updateItem(item.id, persist = false) {
+                                it.copy(
+                                    state = DownloadState.DOWNLOADING,
+                                    bytesDownloaded = totalNow,
+                                    totalBytes = 0,
+                                    speedBps = speed,
+                                    etaSeconds = eta
+                                )
                             }
-                        } finally {
-                            runCatching { input.close() }
+                            scheduleProgressSave()
                         }
-                    } finally {
-                        untrackConnection(item.id, segConn)
                     }
+                    out.write(segBytes)
+                    downloaded += segBytes.size
                 }
             }
             coroutineContext.ensureActive()
@@ -1094,6 +1091,74 @@ class DownloadEngine(appContext: Context) {
         } catch (e: Exception) {
             runCatching { partial.delete() }
             throw e
+        }
+    }
+
+    /** Unduh satu segmen HLS dengan retry sekali untuk error jaringan sementara
+     *  (mis. Socket closed di perangkat dengan koneksi tidak stabil). */
+    private suspend fun fetchHlsSegmentWithRetry(
+        item: DownloadItem,
+        url: String,
+        buffer: ByteArray,
+        throttle: SpeedThrottle,
+        committed: Long,
+        notify: (Long) -> Unit
+    ): ByteArray {
+        var attempts = 0
+        while (true) {
+            coroutineContext.ensureActive()
+            try {
+                return fetchHlsSegment(item, url, buffer, throttle, committed, notify)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                attempts++
+                if (attempts >= 2 || !isNetworkError(e.message)) throw e
+            }
+        }
+    }
+
+    private suspend fun fetchHlsSegment(
+        item: DownloadItem,
+        url: String,
+        buffer: ByteArray,
+        throttle: SpeedThrottle,
+        committed: Long,
+        notify: (Long) -> Unit
+    ): ByteArray {
+        val segConn = trackConnection(
+            item.id,
+            openAuthenticatedConnection(
+                url, method = "GET",
+                username = item.username,
+                password = item.password,
+                headers = item.headers
+            )
+        )
+        try {
+            val code = segConn.responseCode
+            if (code !in 200..299) throw IOException("HLS segment HTTP $code")
+            val segBuf = ByteArrayOutputStream()
+            val input = segConn.inputStream
+            try {
+                var segBytes = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    segBytes += read
+                    if (segBytes > HLS_SEGMENT_MAX_BYTES) {
+                        throw IOException("HLS segment too large")
+                    }
+                    segBuf.write(buffer, 0, read)
+                    throttle.sleepIfNeeded { committed + segBytes }
+                    notify(segBytes)
+                }
+            } finally {
+                runCatching { input.close() }
+            }
+            return segBuf.toByteArray()
+        } finally {
+            untrackConnection(item.id, segConn)
         }
     }
 
@@ -1925,6 +1990,7 @@ class DownloadEngine(appContext: Context) {
         private const val BUFFER_SIZE = 64 * 1024
         private const val MAX_REDIRECTS = 5
         private const val HLS_PROBE_MAX_BYTES = 1_000_000
+        private const val HLS_SEGMENT_MAX_BYTES = 64L * 1024 * 1024
         private const val SEGMENT_MIN_BYTES = 5L * 1024 * 1024
         private const val RETRY_DELAY_1_MS = 5_000L
         private const val RETRY_DELAY_MAX_MS = 300_000L
