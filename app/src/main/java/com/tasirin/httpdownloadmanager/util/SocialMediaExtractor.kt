@@ -416,6 +416,10 @@ object SocialMediaExtractor {
     suspend fun extractNonHlsYouTube(url: String): Result? = withContext(Dispatchers.IO) {
         try {
             val videoId = extractYouTubeId(url) ?: return@withContext null
+            // Strategi 0: coba adaptiveFormats dari VISIONOS (URL langsung tanpa HLS)
+            val visionAdaptive = extractYouTubeViaVisionosAdaptive(videoId)
+            if (visionAdaptive != null) return@withContext visionAdaptive
+            // Strategi 1: halaman WEB + Piped/Invidious/Cobalt
             val results = extractYouTubeFromPage(url, videoId)
             results.firstOrNull { it.directUrl.startsWith("http") }
         } catch (_: Exception) { null }
@@ -546,12 +550,108 @@ object SocialMediaExtractor {
             val obj = JSONObject(json)
             if (obj.optJSONObject("playabilityStatus")?.optString("status") != "OK") return null
             val title = obj.optJSONObject("videoDetails")?.optString("title") ?: "YouTube_$videoId"
-            val hls = obj.optJSONObject("streamingData")?.optString("hlsManifestUrl")
-            if (hls.isNullOrEmpty()) return null
+            val streamingData = obj.optJSONObject("streamingData")
             val safeName = sanitizeFileName(title)
-            // Cookies dari halaman diperlukan untuk fetching master & media
-            // playlist di server googlevideo (tanpa cookies sering 403/404).
-            Result(hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL", cookies = page.cookies, isHls = true)
+            // Strategi 1: HLS manifest — cobalah dulu untuk kualitas terbaik.
+            val hls = streamingData?.optString("hlsManifestUrl")
+            if (!hls.isNullOrEmpty()) {
+                return@runCatching Result(hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL", cookies = page.cookies, isHls = true)
+            }
+            // Strategi 2: adaptiveFormats langsung (tanpa HLS) — TV client
+            // biasanya mengembalikan URL langsung tanpa n-signature.
+            val adaptive = streamingData?.optJSONArray("adaptiveFormats")
+            if (adaptive != null && adaptive.length() > 0) {
+                // Pilih varian video terbaik (prioritas: 720p/1080p AVC)
+                val candidates = mutableListOf<JSONObject>()
+                for (i in 0 until adaptive.length()) {
+                    val fmt = adaptive.optJSONObject(i) ?: continue
+                    val url = fmt.optString("url", "")
+                    if (url.startsWith("http")) candidates.add(fmt)
+                }
+                // Sort: video dulu (bukan audio), bandwidth tertinggi
+                candidates.sortWith(compareByDescending<JSONObject> {
+                    it.optString("mimeType", "").contains("video/")
+                }.thenByDescending { it.optLong("bitrate", 0) })
+                val best = candidates.firstOrNull()
+                if (best != null) {
+                    val url = best.getString("url")
+                    val mime = best.optString("mimeType", "video/mp4")
+                    val quality = best.optString("qualityLabel", "Unknown")
+                    App.logEvent("YT DEBUG: VISIONOS adaptive fallback → $quality ${mime.take(20)}")
+                    val ext = if (mime.contains("webm")) "webm" else "mp4"
+                    return@runCatching Result(url, "YouTube_$safeName.$ext", title, quality, mime, cookies = page.cookies)
+                }
+            }
+            null
+        }.getOrNull()
+    }
+
+    /** Strategi VISIONOS adaptive: ambil URL langsung dari adaptiveFormats
+     *  tanpa lewat HLS (menghindari media playlist 404). */
+    private fun extractYouTubeViaVisionosAdaptive(videoId: String): Result? {
+        val page = httpGetWithCookies(
+            "https://www.youtube.com/shorts/$videoId",
+            mapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
+                "Accept-Language" to "en-US,en;q=0.9"
+            ),
+            timeoutMs = 20000
+        ) ?: return null
+        val visitor = Regex("""VISITOR_DATA"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
+            ?: Regex("""visitorData"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
+            ?: return null
+        val body = buildString {
+            append("{"context":{"client":{")
+            append(""clientName":"VISIONOS",")
+            append(""clientVersion":"1.02",")
+            append(""deviceMake":"Apple",")
+            append(""deviceModel":"RealityDevice17,1",")
+            append(""userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15",")
+            append(""osName":"visionOS",")
+            append(""osVersion":"26.5.23O471",")
+            append(""hl":"en",")
+            append(""visitorData":"$visitor"")
+            append("}},"videoId":"$videoId"}")
+        }
+        val json = httpPostJson(
+            "https://www.youtube.com/youtubei/v1/player",
+            body,
+            mapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
+                "Origin" to "https://www.youtube.com",
+                "Referer" to "https://www.youtube.com/",
+                "X-Goog-Visitor-Id" to visitor,
+                "X-YouTube-Client-Name" to "101",
+                "X-YouTube-Client-Version" to "1.02"
+            ),
+            timeoutMs = 20000
+        ) ?: return null
+        return runCatching {
+            val obj = JSONObject(json)
+            if (obj.optJSONObject("playabilityStatus")?.optString("status") != "OK") return null
+            val title = obj.optJSONObject("videoDetails")?.optString("title") ?: "YouTube_$videoId"
+            val streamingData = obj.optJSONObject("streamingData")
+            val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return null
+            val safeName = sanitizeFileName(title)
+            // Kumpulkan semua format dengan URL langsung
+            val candidates = mutableListOf<JSONObject>()
+            for (i in 0 until adaptive.length()) {
+                val fmt = adaptive.optJSONObject(i) ?: continue
+                val url = fmt.optString("url", "")
+                if (url.startsWith("http")) candidates.add(fmt)
+            }
+            if (candidates.isEmpty()) return null
+            // Sort: video dulu, bandwidth tertinggi
+            candidates.sortWith(compareByDescending<JSONObject> {
+                it.optString("mimeType", "").contains("video/")
+            }.thenByDescending { it.optLong("bitrate", 0) })
+            val best = candidates.first()
+            val url = best.getString("url")
+            val mime = best.optString("mimeType", "video/mp4")
+            val quality = best.optString("qualityLabel", "Unknown")
+            App.logEvent("YT DEBUG: VISIONOS adaptive → $quality ${mime.take(20)}")
+            val ext = if (mime.contains("webm")) "webm" else "mp4"
+            Result(url, "YouTube_$safeName.$ext", title, quality, mime, cookies = page.cookies)
         }.getOrNull()
     }
 
@@ -575,7 +675,9 @@ object SocialMediaExtractor {
         "pipedapi.adminforge.de/streams/",
         "pipedapi.kavin.rocks/streams/",
         "pipedapi.leptons.xyz/streams/",
-        "pipedapi.video.founderweb.com/streams/"
+        "pipedapi.video.founderweb.com/streams/",
+        "pipedapi.in.projectsegfau.lt/streams/",
+        "api.piped.yt/streams/"
     )
 
     private fun extractYouTubeViaPiped(videoId: String): List<Result> {
@@ -615,10 +717,12 @@ object SocialMediaExtractor {
     // Instance Invidious publik — /latest_version menyelesaikan transformasi
     // n-signature di sisi server lalu me-redirect ke stream googlevideo.
     private val INVIDIOUS_INSTANCES = listOf(
-        "invidious.tiekoetter.com",
         "invidious.nerdvpn.de",
         "invidious.f5.si",
-        "inv.nadeko.net"
+        "inv.nadeko.net",
+        "vid.puffyan.us",
+        "yewtu.be",
+        "invidious.privacyredirect.com"
     )
 
     private fun extractYouTubeViaInvidious(videoId: String): Result? {

@@ -1145,7 +1145,7 @@ class DownloadEngine(appContext: Context) {
             }
 
             // 4) Fallback: publish video-only .ts seperti semula.
-            App.logEvent("HLS: remux failed, falling back to video-only .ts")
+            App.logEvent("HLS: remux failed (codec may be VP9/non-AVC), falling back to video-only .ts")
             runCatching { mp4.delete() }
             runCatching { audioAdts.delete() }
             val fileName = "$baseName.ts"
@@ -1394,9 +1394,18 @@ class DownloadEngine(appContext: Context) {
             val videoSegments = videoSegs.map { it.first }
             val videoDurations = videoSegs.map { it.second }
             val audioSegments = candidate.audioGroupId?.let { group ->
-                val match = audioRenditions.firstOrNull { it.groupId == group && it.isDefault }
-                    ?: audioRenditions.firstOrNull { it.groupId == group }
-                match?.let { mediaSegments(it.url, headers) }
+                val groupRenditions = audioRenditions.filter { it.groupId == group }
+                val ordered = groupRenditions.filter { it.isDefault } + groupRenditions.filter { !it.isDefault }
+                var audioResult: List<String>? = null
+                for (rendition in ordered) {
+                    val segs = runCatching { mediaSegments(rendition.url, headers) }.getOrNull()
+                    if (!segs.isNullOrEmpty()) {
+                        audioResult = segs
+                        break
+                    }
+                    App.logEvent("HLS DEBUG: audio rendition ${rendition.groupId}/${rendition.name} failed, trying next...")
+                }
+                audioResult
             }
             App.logEvent(
                 "HLS plan: ${candidate.codecs} ${candidate.bandwidth/1000}kbps ${candidate.frameRate}fps, " +
