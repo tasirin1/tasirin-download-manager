@@ -23,7 +23,7 @@ object HlsParser {
     private val NAME_RE: Regex = Regex("NAME=\"([^\"]+)\"")
     private val AUDIO_RE: Regex = Regex("AUDIO=\"([^\"]+)\"")
     private val CODECS_RE: Regex = Regex("CODECS=\"([^\"]+)\"")
-    private val FRAME_RATE_RE: Regex = Regex("FRAME-RATE=([\d.]+)")
+    private val FRAME_RATE_RE: Regex = Regex("FRAME-RATE=([\\d.]+)")
     private val MEDIA_TYPE_RE: Regex = Regex("TYPE=([A-Z]+)")
     private val MEDIA_GROUP_RE: Regex = Regex("GROUP-ID=\"([^\"]+)\"")
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
