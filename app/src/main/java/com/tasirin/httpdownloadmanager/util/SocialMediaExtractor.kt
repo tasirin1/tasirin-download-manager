@@ -4,6 +4,7 @@ import com.tasirin.httpdownloadmanager.App
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -572,23 +573,14 @@ object SocialMediaExtractor {
             if (adaptive != null && adaptive.length() > 0) {
                 // Pilih varian video terbaik (prioritas: 720p/1080p AVC)
                 val candidates = mutableListOf<JSONObject>()
-                for (i in 0 until adaptive.length()) {
-                    val fmt = adaptive.optJSONObject(i) ?: continue
-                    val url = fmt.optString("url", "")
-                    if (url.startsWith("http")) candidates.add(fmt)
-                }
-                // Sort: video dulu (bukan audio), bandwidth tertinggi
-                candidates.sortWith(compareByDescending<JSONObject> {
-                    it.optString("mimeType", "").contains("video/")
-                }.thenByDescending { it.optLong("bitrate", 0) })
-                val best = candidates.firstOrNull()
+                val (videoAd, audioAd) = bestAdaptivePair(streamingData)
+                val best = adaptiveFormatByUrl(adaptive, videoAd)
                 if (best != null) {
                     val url = best.getString("url")
                     val mime = best.optString("mimeType", "video/mp4")
                     val quality = best.optString("qualityLabel", "Unknown")
                     App.logEvent("YT DEBUG: VISIONOS adaptive fallback → $quality ${mime.take(20)}")
                     val ext = if (mime.contains("webm")) "webm" else "mp4"
-                    val (_, audioAd) = bestAdaptivePair(streamingData)
                     return@runCatching Result(
                         url, "YouTube_$safeName.$ext", title, quality, mime,
                         cookies = page.cookies, videoUrl = url, audioUrl = audioAd
@@ -646,25 +638,15 @@ object SocialMediaExtractor {
             val streamingData = obj.optJSONObject("streamingData")
             val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return null
             val safeName = sanitizeFileName(title)
-            // Kumpulkan semua format dengan URL langsung
-            val candidates = mutableListOf<JSONObject>()
-            for (i in 0 until adaptive.length()) {
-                val fmt = adaptive.optJSONObject(i) ?: continue
-                val url = fmt.optString("url", "")
-                if (url.startsWith("http")) candidates.add(fmt)
-            }
-            if (candidates.isEmpty()) return null
-            // Sort: video dulu, bandwidth tertinggi
-            candidates.sortWith(compareByDescending<JSONObject> {
-                it.optString("mimeType", "").contains("video/")
-            }.thenByDescending { it.optLong("bitrate", 0) })
-            val best = candidates.first()
+            // Pilih video AVC MP4 bila ada (remux MP4 mulus); WebM hanya
+            // cadangan terakhir karena muxer MP4 tidak menerima VP9/opus.
+            val (videoAd, audioAd) = bestAdaptivePair(streamingData)
+            val best = adaptiveFormatByUrl(adaptive, videoAd) ?: return null
             val url = best.getString("url")
             val mime = best.optString("mimeType", "video/mp4")
             val quality = best.optString("qualityLabel", "Unknown")
             App.logEvent("YT DEBUG: VISIONOS adaptive → $quality ${mime.take(20)}")
             val ext = if (mime.contains("webm")) "webm" else "mp4"
-            val (_, audioAd) = bestAdaptivePair(streamingData)
             Result(
                 url, "YouTube_$safeName.$ext", title, quality, mime,
                 cookies = page.cookies, videoUrl = url, audioUrl = audioAd
@@ -677,6 +659,17 @@ object SocialMediaExtractor {
  *  ke MP4 mulus), lalu MP4 lain, lalu WebM. Prioritas audio: MP4/M4A AAC
  *  (itag 140, lalu 139), lalu audio MP4 lain. Audio WebM (opus) dikembalikan
  *  kosong karena muxer MP4 tidak menerima opus. */
+/** Cari objek format adaptive berdasarkan URL (untuk mengambil mime/quality
+ *  dari hasil `bestAdaptivePair`). */
+private fun adaptiveFormatByUrl(adaptive: JSONArray?, url: String): JSONObject? {
+    if (adaptive == null || url.isEmpty()) return null
+    for (i in 0 until adaptive.length()) {
+        val fmt = adaptive.optJSONObject(i) ?: continue
+        if (fmt.optString("url", "") == url) return fmt
+    }
+    return null
+}
+
 private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
     val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return "" to ""
     var videoUrl = ""
