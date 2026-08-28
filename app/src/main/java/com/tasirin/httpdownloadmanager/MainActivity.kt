@@ -359,14 +359,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
         }
-        val fileInfoWatcher = object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
-                probeFileInfo()
-                probeSocialQuality()
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        }
         // Deteksi link media sosial → tampilkan pemilihan resolusi.
         var socialOptions: List<SocialMediaExtractor.Result> = emptyList()
         var socialJob: Job? = null
@@ -404,6 +396,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     socialQualitySection.visibility = View.VISIBLE
                 }
             }
+        }
+        val fileInfoWatcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
+                probeFileInfo()
+                probeSocialQuality()
+            }
+            override fun afterTextChanged(s: Editable?) {}
         }
         urlInput.addTextChangedListener(fileInfoWatcher)
         usernameInput.addTextChangedListener(fileInfoWatcher)
