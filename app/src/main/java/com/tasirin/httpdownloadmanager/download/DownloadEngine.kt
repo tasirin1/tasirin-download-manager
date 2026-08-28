@@ -1403,7 +1403,7 @@ class DownloadEngine(appContext: Context) {
                         audioResult = segs
                         break
                     }
-                    App.logEvent("HLS DEBUG: audio rendition ${rendition.groupId}/${rendition.name} failed, trying next...")
+                    App.logEvent("HLS DEBUG: audio rendition ${rendition.groupId} failed (default=${rendition.isDefault}), trying next...")
                 }
                 audioResult
             }
