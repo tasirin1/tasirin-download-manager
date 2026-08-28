@@ -1254,15 +1254,15 @@ class DownloadEngine(appContext: Context) {
         val variants = HlsParser.parseMaster(body, baseUrl) ?: return null
         // Hindari varian raksasa (4K/8K): pilih tertinggi yang ≤1080p dan
         // (bila ada) berprofil AVC tanpa B-frame agar remux MP4 mulus.
-        val best = variants
-            .filter { variantHeight(it.name) in 1..1080 }
-            .sortedWith(
-                compareByDescending<HlsVariant> { it.codecs.contains("avc1.4D") }
-                    .thenByDescending { it.bandwidth }
-            )
-            .firstOrNull()
-            ?: variants.minByOrNull { it.bandwidth }
-            ?: return null
+        // Pilih varian AVC (avc1.4D, tanpa B-frame) dengan bandwidth
+            // tertinggi yang tidak terlalu besar (≤6 Mbps) untuk menghindari
+            // 4K/8K raksasa. Tanpa filter height agar video portrait (720×1280)
+            // tetap terpilih; fps dan kualitas sangat tergantung bitrate.
+            val best = variants
+                .filter { it.codecs.contains("avc1.4D") && it.bandwidth in 100_000..6_000_000 }
+                .maxByOrNull { it.bandwidth }
+                ?: variants.minByOrNull { it.bandwidth }
+                ?: return null
         val videoSegments = mediaSegments(best.url) ?: return null
         val audioSegments = best.audioGroupId?.let { group ->
             val renditions = HlsParser.parseAudioRenditions(body, baseUrl)
@@ -1270,6 +1270,10 @@ class DownloadEngine(appContext: Context) {
                 ?: renditions.firstOrNull { it.groupId == group }
             match?.let { mediaSegments(it.url) }
         }
+        App.logEvent(
+            "HLS plan: ${best.codecs} ${best.bandwidth/1000}kbps, " +
+                "${videoSegments.size} video, ${audioSegments?.size ?: 0} audio segments"
+        )
         return HlsPlan(videoSegments, audioSegments)
     }
 
@@ -1279,16 +1283,6 @@ class DownloadEngine(appContext: Context) {
             .map { it.trim() }
             .filter { it.startsWith("http") }
         return if (segments.isEmpty()) null else segments
-    }
-
-    /** Parse tinggi (height) dari label varian seperti "1280x720 · 2500 kbps". */
-    private fun variantHeight(label: String): Int {
-        return Regex("(\\d+)x(\\d+)")
-            .find(label)
-            ?.groupValues
-            ?.get(2)
-            ?.toIntOrNull()
-            ?: 0
     }
 
     private fun fetchText(url: String, headers: String, maxBytes: Int): String? {
