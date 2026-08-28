@@ -172,23 +172,47 @@ object SocialMediaExtractor {
     }
 
     private fun extractAllDisplayUrlsFromPage(html: String): List<String> {
-        val urls = mutableListOf<String>()
-        // Cari semua scontent URLs
-        val regex = Regex("https?://[^\"]*scontent[^\"]*\\.(?:jpg|png|webp)[^\"]*")
-        regex.findAll(html).forEach { match ->
+        // Strategi 1: Cari foto carousel/post via t39.30808-6 path
+        // (path CDN khusus foto post Instagram, termasuk carousel)
+        val postRegex = Regex("https?://[^"]*scontent[^"]*t39\\.30808-6/[^"]*_n\\.jpg[^"]*")
+        val byFileId = linkedMapOf<String, String>()
+        postRegex.findAll(html).forEach { match ->
             val raw = match.value
                 .replace("\\u002F", "/")
                 .replace("\\u0026", "&")
+                .replace("\\/", "/")
+                .replace("&amp;", "&")
+            val fidMatch = Regex("/(\\d+_\\d+_\\d+)_n\\.jpg").find(raw)
+            val fid = fidMatch?.groupValues?.get(1) ?: raw
+            if (fid !in byFileId) {
+                byFileId[fid] = raw
+            } else {
+                val existing = byFileId[fid] ?: ""
+                if (existing.contains("s640x640") && !raw.contains("s640x640")) {
+                    byFileId[fid] = raw
+                }
+            }
+        }
+        if (byFileId.isNotEmpty()) return byFileId.values.take(20).toList()
+
+        // Strategi 2: Fallback — semua scontent URLs (profile pics, dll)
+        val urls = mutableListOf<String>()
+        val fallbackRegex = Regex("https?://[^"]*scontent[^"]*\\.(?:jpg|png|webp)[^"]*")
+        fallbackRegex.findAll(html).forEach { match ->
+            val raw = match.value
+                .replace("\\u002F", "/")
+                .replace("\\u0026", "&")
+                .replace("\\/", "/")
                 .replace("&amp;", "&")
             if (raw !in urls && !raw.contains("s640x640")) {
                 urls.add(raw)
             }
         }
-        // Prioritas: ig_cache_key URLs (full resolusi)
         val cacheKeyUrls = urls.filter { it.contains("ig_cache_key") }
         if (cacheKeyUrls.isNotEmpty()) return cacheKeyUrls.take(10)
         return urls.take(10)
     }
+
 
     private fun extractVideoFromPage(html: String): String? {
         val idx = html.indexOf("video_versions")
