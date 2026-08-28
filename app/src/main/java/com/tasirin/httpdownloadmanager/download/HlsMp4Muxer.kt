@@ -7,12 +7,15 @@ import android.media.MediaMuxer
 import java.io.File
 import java.nio.ByteBuffer
 
-/** Remux video MPEG-TS (AVC) + audio AAC (ADTS, sudah di-parse) menjadi satu
- *  file MP4 memakai MediaExtractor (video) + MediaMuxer bawaan Android.
- *  Audio ditulis manual dari frame AAC murni (tanpa header ADTS) supaya
+/** Remux video + audio terpisah menjadi satu file MP4 memakai
+ *  MediaExtractor + MediaMuxer bawaan Android (tanpa ffmpeg, APK tetap
+ *  kecil). Mendukung tiga kombinasi:
+ *  - video MPEG-TS (AVC) + audio ADTS (sudah di-parse) — `remux`
+ *  - video MPEG-TS (AVC) + audio MP4/M4A (AAC) — `remuxWithAudioFile`
+ *  - video MP4 (video-only) + audio MP4/M4A (AAC) — `remuxMp4s`
+ *  Audio ADTS ditulis manual dari frame AAC murni (tanpa header ADTS) supaya
  *  deterministik — MediaExtractor untuk file ADTS menghasilkan format
- *  is-adts/sample ber-header yang tidak bisa langsung ditulis ke MP4.
- *  Tanpa ffmpeg/library tambahan (APK tetap kecil). */
+ *  is-adts/sample ber-header yang tidak bisa langsung ditulis ke MP4. */
 object HlsMp4Muxer {
 
     fun remux(
@@ -71,6 +74,101 @@ object HlsMp4Muxer {
         }
     }
 
+/** Remux video MPEG-TS (AVC) + file audio MP4/M4A (AAC, dari
+ *  adaptiveFormats YouTube) menjadi satu MP4. Video memakai timeline seragam
+ *  (sama seperti `remux`), audio memakai PTS asli file M4A. */
+    fun remuxWithAudioFile(
+    videoTs: File,
+    audioMp4: File,
+    outMp4: File,
+    segmentDurationsUs: List<Long> = emptyList()
+): Boolean {
+    var muxer: MediaMuxer? = null
+    var videoExt: MediaExtractor? = null
+    var audioExt: MediaExtractor? = null
+    try {
+        if (outMp4.exists() && !outMp4.delete()) return false
+        muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+
+        // --- Track video (MPEG-TS AVC) via MediaExtractor ---
+        videoExt = MediaExtractor()
+        videoExt.setDataSource(videoTs.absolutePath)
+        val vIndex = selectVideoTrack(videoExt) ?: return false
+        val vFormat = videoExt.getTrackFormat(vIndex)
+        videoExt.selectTrack(vIndex)
+        val videoTrack = muxer.addTrack(vFormat)
+
+        // --- Track audio (AAC dalam MP4/M4A) via MediaExtractor ---
+        audioExt = MediaExtractor()
+        audioExt.setDataSource(audioMp4.absolutePath)
+        val aIndex = selectAudioTrack(audioExt) ?: return false
+        val aFormat = audioExt.getTrackFormat(aIndex)
+        audioExt.selectTrack(aIndex)
+        val audioTrack = muxer.addTrack(aFormat)
+
+        muxer.start()
+        val videoBuf = runCatching {
+            vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
+        }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
+        val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
+            countVideoFrames(videoTs)
+        } else 0
+        writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount)
+        writeTrackPts(audioExt, muxer, audioTrack)
+        muxer.stop()
+        return true
+    } catch (t: Throwable) {
+        runCatching { outMp4.delete() }
+        return false
+    } finally {
+        runCatching { videoExt?.release() }
+        runCatching { audioExt?.release() }
+        runCatching { muxer?.release() }
+    }
+}
+
+/** Remux video MP4 (video-only) + audio MP4/M4A (AAC, keduanya dari
+ *  adaptiveFormats YouTube) menjadi satu MP4. Kedua track memakai PTS asli
+ *  file masing-masing (dinormalisasi drift agar selalu naik). */
+    fun remuxMp4s(
+    videoMp4: File,
+    audioMp4: File,
+    outMp4: File
+): Boolean {
+    var muxer: MediaMuxer? = null
+    var videoExt: MediaExtractor? = null
+    var audioExt: MediaExtractor? = null
+    try {
+        if (outMp4.exists() && !outMp4.delete()) return false
+        muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+
+        videoExt = MediaExtractor()
+        videoExt.setDataSource(videoMp4.absolutePath)
+        val vIndex = selectVideoTrack(videoExt) ?: return false
+        videoExt.selectTrack(vIndex)
+        val videoTrack = muxer.addTrack(videoExt.getTrackFormat(vIndex))
+
+        audioExt = MediaExtractor()
+        audioExt.setDataSource(audioMp4.absolutePath)
+        val aIndex = selectAudioTrack(audioExt) ?: return false
+        audioExt.selectTrack(aIndex)
+        val audioTrack = muxer.addTrack(audioExt.getTrackFormat(aIndex))
+
+        muxer.start()
+        writeTrackPts(videoExt, muxer, videoTrack)
+        writeTrackPts(audioExt, muxer, audioTrack)
+        muxer.stop()
+        return true
+    } catch (t: Throwable) {
+        runCatching { outMp4.delete() }
+        return false
+    } finally {
+        runCatching { videoExt?.release() }
+        runCatching { audioExt?.release() }
+        runCatching { muxer?.release() }
+    }
+}
+
     private fun selectVideoTrack(ext: MediaExtractor): Int? {
         for (i in 0 until ext.trackCount) {
             val mime = ext.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
@@ -92,7 +190,7 @@ object HlsMp4Muxer {
         if (segmentDurationsUs.isEmpty() || videoFrameCount <= 1) {
             // Playlist tanpa EXTINF atau frame tidak terhitung (jarang):
             // fallback ke PTS dengan drift agar tetap naik.
-            writeAllPts(ext, muxer, track, buffer, info, bufferSize)
+            writeTrackPts(ext, muxer, track)
             return
         }
 
@@ -151,15 +249,15 @@ object HlsMp4Muxer {
         }
     }
 
-    /** Fallback: normalisasi PTS dengan drift minimal agar tetap naik. */
-    private fun writeAllPts(
+    /** Normalisasi PTS track (MP4/M4A) dengan drift minimal agar selalu naik,
+     *  lalu tulis semua sampel ke muxer. */
+    private fun writeTrackPts(
         ext: MediaExtractor,
         muxer: MediaMuxer,
-        track: Int,
-        buffer: ByteBuffer,
-        info: MediaCodec.BufferInfo,
-        @Suppress("UNUSED_PARAMETER") bufferSize: Int
+        track: Int
     ) {
+        val buffer = ByteBuffer.allocate(1 shl 20)
+        val info = MediaCodec.BufferInfo()
         var firstPts = -1L
         var lastPts = -1L
         var drift = 0L

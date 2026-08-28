@@ -23,7 +23,9 @@ object SocialMediaExtractor {
         val quality: String = "",
         val mimeType: String = "",
         val cookies: String = "",
-        val isHls: Boolean = false
+        val isHls: Boolean = false,
+        val audioUrl: String = "",
+        val videoUrl: String = ""
     )
 
     fun isSocialMediaUrl(url: String): Boolean {
@@ -555,7 +557,14 @@ object SocialMediaExtractor {
             // Strategi 1: HLS manifest — cobalah dulu untuk kualitas terbaik.
             val hls = streamingData?.optString("hlsManifestUrl")
             if (!hls.isNullOrEmpty()) {
-                return@runCatching Result(hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL", cookies = page.cookies, isHls = true)
+                // Audio CDN HLS sering di-404 YouTube; siapkan url audio/video dari
+                // adaptiveFormats sebagai cadangan agar hasil akhir tetap bersuara.
+                val (videoAd, audioAd) = bestAdaptivePair(streamingData)
+                return@runCatching Result(
+                    hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL",
+                    cookies = page.cookies, isHls = true,
+                    videoUrl = videoAd, audioUrl = audioAd
+                )
             }
             // Strategi 2: adaptiveFormats langsung (tanpa HLS) — TV client
             // biasanya mengembalikan URL langsung tanpa n-signature.
@@ -579,7 +588,11 @@ object SocialMediaExtractor {
                     val quality = best.optString("qualityLabel", "Unknown")
                     App.logEvent("YT DEBUG: VISIONOS adaptive fallback → $quality ${mime.take(20)}")
                     val ext = if (mime.contains("webm")) "webm" else "mp4"
-                    return@runCatching Result(url, "YouTube_$safeName.$ext", title, quality, mime, cookies = page.cookies)
+                    val (_, audioAd) = bestAdaptivePair(streamingData)
+                    return@runCatching Result(
+                        url, "YouTube_$safeName.$ext", title, quality, mime,
+                        cookies = page.cookies, videoUrl = url, audioUrl = audioAd
+                    )
                 }
             }
             null
@@ -651,9 +664,58 @@ object SocialMediaExtractor {
             val quality = best.optString("qualityLabel", "Unknown")
             App.logEvent("YT DEBUG: VISIONOS adaptive → $quality ${mime.take(20)}")
             val ext = if (mime.contains("webm")) "webm" else "mp4"
-            Result(url, "YouTube_$safeName.$ext", title, quality, mime, cookies = page.cookies)
+            val (_, audioAd) = bestAdaptivePair(streamingData)
+            Result(
+                url, "YouTube_$safeName.$ext", title, quality, mime,
+                cookies = page.cookies, videoUrl = url, audioUrl = audioAd
+            )
         }.getOrNull()
     }
+
+/** Pilih pasangan video+audio adaptive terbaik dari streamingData VISIONOS
+ *  (URL langsung, tanpa n-transform). Prioritas video: MP4/AVC (bisa diremux
+ *  ke MP4 mulus), lalu MP4 lain, lalu WebM. Prioritas audio: MP4/M4A AAC
+ *  (itag 140, lalu 139), lalu audio MP4 lain. Audio WebM (opus) dikembalikan
+ *  kosong karena muxer MP4 tidak menerima opus. */
+private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
+    val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return "" to ""
+    var videoUrl = ""
+    var audioUrl = ""
+    var videoRank = Int.MAX_VALUE
+    var audioRank = Int.MAX_VALUE
+    for (i in 0 until adaptive.length()) {
+        val fmt = adaptive.optJSONObject(i) ?: continue
+        val mime = fmt.optString("mimeType", "")
+        val url = fmt.optString("url", "")
+        if (!url.startsWith("http")) continue
+        when {
+            mime.contains("video/") -> {
+                val rank = when {
+                    mime.contains("mp4") && mime.contains("avc1") -> 0
+                    mime.contains("mp4") -> 1
+                    else -> 2
+                }
+                if (rank < videoRank) {
+                    videoRank = rank
+                    videoUrl = url
+                }
+            }
+            mime.contains("audio/mp4") -> {
+                val itag = fmt.optInt("itag", 0)
+                val rank = when (itag) {
+                    140 -> 0
+                    139 -> 1
+                    else -> 2
+                }
+                if (rank < audioRank) {
+                    audioRank = rank
+                    audioUrl = url
+                }
+            }
+        }
+    }
+    return videoUrl to audioUrl
+}
 
     private fun isUrlForbidden(item: Result): Boolean {
         return runCatching {

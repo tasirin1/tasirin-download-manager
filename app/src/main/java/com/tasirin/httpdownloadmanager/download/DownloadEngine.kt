@@ -935,7 +935,8 @@ class DownloadEngine(appContext: Context) {
                     try {
                         downloadHls(
                             item.copy(url = result.directUrl, fileName = hlsName, headers = hlsHeaders),
-                            hlsName
+                            hlsName,
+                            adaptiveAudioUrl = result.audioUrl
                         )
                         return
                     } catch (e: IOException) {
@@ -954,7 +955,13 @@ class DownloadEngine(appContext: Context) {
                                 if (existing.isNotEmpty()) "${existing}\nCookie: ${fallback.cookies}" else "Cookie: ${fallback.cookies}"
                             } else item.headers
                             updateItem(item.id) { it.copy(url = fallback.directUrl, fileName = if (!item.nameIsCustom) fbName else item.fileName, headers = fbHeaders) }
-                            return runDownload(item.copy(url = fallback.directUrl, fileName = fbName, headers = fbHeaders), skipSocial = true)
+                            val fbItem = item.copy(url = fallback.directUrl, fileName = fbName, headers = fbHeaders)
+                            if (fallback.audioUrl.isNotEmpty()) {
+                                App.logEvent("SOCIAL: non-HLS adaptive pair → merging video+audio into MP4")
+                                downloadAdaptiveMuxed(fbItem, fallback.videoUrl, fallback.audioUrl, fbName)
+                                return
+                            }
+                            return runDownload(fbItem, skipSocial = true)
                         }
                         // Non-HLS juga gagal — kembalikan URL ke original supaya
                         // retry ulang melewati ekstraksi sosial media (bukan langsung HLS).
@@ -974,7 +981,13 @@ class DownloadEngine(appContext: Context) {
                     fileName = if (!item.nameIsCustom) newName else item.fileName,
                     headers = mergedHeaders
                 ) }
-                return runDownload(item.copy(url = result.directUrl, fileName = newName, headers = mergedHeaders), skipSocial = true)
+                val resultItem = item.copy(url = result.directUrl, fileName = newName, headers = mergedHeaders)
+                if (result.audioUrl.isNotEmpty()) {
+                    App.logEvent("SOCIAL: adaptive pair → merging video+audio into MP4")
+                    downloadAdaptiveMuxed(resultItem, result.videoUrl, result.audioUrl, newName)
+                    return
+                }
+                return runDownload(resultItem, skipSocial = true)
             }
             // Ekstraksi gagal — post mungkin private/deleted atau platform memblokir
             throw IOException(
@@ -1071,7 +1084,7 @@ class DownloadEngine(appContext: Context) {
     /** Unduh HLS (m3u8): pilih varian terbaik, unduh semua segmen .ts lalu
      *  gabung jadi satu file dapat diputar. Tidak butuh ffmpeg — segmen dari
      *  YouTube HLS sudah berisi video+audio gabungan (MPEG-TS). */
-    private suspend fun downloadHls(item: DownloadItem, outName: String) {
+    private suspend fun downloadHls(item: DownloadItem, outName: String, adaptiveAudioUrl: String = "") {
         val saver = FileSaver(context)
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
@@ -1127,16 +1140,32 @@ class DownloadEngine(appContext: Context) {
                 if (audioStream == null) App.logEvent("HLS: audio download/parse failed, audio skipped")
             }
 
+            // 2b) Audio playlist HLS di-404 YouTube — coba audio langsung dari
+            //     adaptiveFormats VISIONOS (URL M4A tanpa n-transform).
+            var adaptiveAudioFile: File? = null
+            if (audioStream == null) {
+                adaptiveAudioFile = tryDownloadAdaptiveAudio(
+                    item, adaptiveAudioUrl, baseName, buffer, throttle, progress, saver
+                )
+            }
+
             coroutineContext.ensureActive()
 
             // 3) Remux video + audio jadi MP4 bila audio tersedia.
-            val remuxed = audioStream != null &&
-                HlsMp4Muxer.remux(videoTs, audioStream, mp4, plan.videoSegmentDurationsUs)
+            var remuxed = false
+            if (audioStream != null) {
+                remuxed = HlsMp4Muxer.remux(videoTs, audioStream, mp4, plan.videoSegmentDurationsUs)
+            } else if (adaptiveAudioFile != null) {
+                remuxed = HlsMp4Muxer.remuxWithAudioFile(
+                    videoTs, adaptiveAudioFile, mp4, plan.videoSegmentDurationsUs
+                )
+            }
             if (remuxed) {
                 App.logEvent("HLS: remux OK → MP4 with audio")
                 val fileName = "$baseName.mp4"
                 videoTs.delete()
                 audioAdts.delete()
+                adaptiveAudioFile?.delete()
                 val published0 = publishItem(saver, mp4, fileName, item)
                 val finalName = published0.fileName ?: fileName
                 val published = organizeIfEnabled(saver, published0, finalName)
@@ -1145,7 +1174,7 @@ class DownloadEngine(appContext: Context) {
             }
 
             // 4) Fallback: publish video-only .ts seperti semula.
-            App.logEvent("HLS: remux failed (codec may be VP9/non-AVC), falling back to video-only .ts")
+            App.logEvent("HLS: remux failed (no audio available), falling back to video-only .ts")
             runCatching { mp4.delete() }
             runCatching { audioAdts.delete() }
             val fileName = "$baseName.ts"
@@ -1186,6 +1215,126 @@ class DownloadEngine(appContext: Context) {
                 out.write(transform(segBytes))
                 progress.downloaded += segBytes.size
             }
+        }
+    }
+
+    /** Unduh satu file adaptive (audio M4A / video MP4) dari URL VISIONOS ke
+     *  file temp. Mengembalikan false bila HTTP gagal atau file kosong. */
+    private suspend fun downloadAdaptiveFile(
+        item: DownloadItem,
+        url: String,
+        target: File,
+        buffer: ByteArray,
+        throttle: SpeedThrottle,
+        progress: HlsProgress
+    ): Boolean {
+        if (url.isBlank()) return false
+        val conn = trackConnection(
+            item.id,
+            openAuthenticatedConnection(
+                url, method = "GET",
+                username = item.username,
+                password = item.password,
+                headers = item.headers
+            )
+        )
+        try {
+            val code = conn.responseCode
+            if (code !in 200..299) return false
+            BufferedOutputStream(FileOutputStream(target)).use { out ->
+                val input = conn.inputStream
+                try {
+                    var bytes = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        bytes += read
+                        if (bytes > HLS_SEGMENT_MAX_BYTES * 8L) {
+                            throw IOException("adaptive file too large")
+                        }
+                        out.write(buffer, 0, read)
+                        throttle.sleepIfNeeded { progress.downloaded + bytes }
+                    }
+                } finally {
+                    runCatching { input.close() }
+                }
+            }
+            return target.length() > 0L
+        } finally {
+            untrackConnection(item.id, conn)
+        }
+    }
+
+    /** Unduh audio adaptive (M4A AAC) dari URL VISIONOS ke file temp. Dipakai
+     *  saat audio playlist HLS di-404 YouTube. Mengembalikan null bila URL
+     *  kosong atau download gagal — caller lalu jatuh ke video-only .ts. */
+    private suspend fun tryDownloadAdaptiveAudio(
+        item: DownloadItem,
+        adaptiveAudioUrl: String,
+        baseName: String,
+        buffer: ByteArray,
+        throttle: SpeedThrottle,
+        progress: HlsProgress,
+        saver: FileSaver
+    ): File? {
+        if (adaptiveAudioUrl.isBlank()) return null
+        return try {
+            val audioM4a = saver.partialFile("$baseName.audioM4a", segment = null).apply { delete() }
+            val ok = downloadAdaptiveFile(item, adaptiveAudioUrl, audioM4a, buffer, throttle, progress)
+            if (!ok || audioM4a.length() < 1_000L) {
+                App.logEvent("HLS: adaptive audio download failed, skipped")
+                return null
+            }
+            App.logEvent("HLS: adaptive audio downloaded (${Formats.bytes(audioM4a.length())}), remuxing...")
+            audioM4a
+        } catch (e: Exception) {
+            App.logEvent("HLS: adaptive audio download failed (${e.message?.take(50)}), skipped")
+            null
+        }
+    }
+
+    /** Unduh video MP4 + audio M4A adaptive lalu remux jadi satu MP4 bersuara.
+     *  Dipakai saat HLS gagal total dan URL adaptive tersedia. */
+    private suspend fun downloadAdaptiveMuxed(
+        item: DownloadItem,
+        adaptiveVideoUrl: String,
+        adaptiveAudioUrl: String,
+        outName: String
+    ) {
+        val saver = FileSaver(context)
+        val baseName = outName.removeSuffix(".mp4").removeSuffix(".webm").ifBlank { outName }
+        val videoMp4 = saver.partialFile("$baseName.videoMp4", segment = null).apply { delete() }
+        val audioM4a = saver.partialFile("$baseName.audioM4a", segment = null).apply { delete() }
+        val mp4 = saver.partialFile("$baseName.muxed", segment = null).apply { delete() }
+        val progress = HlsProgress()
+        val buffer = ByteArray(BUFFER_SIZE)
+        val globalLimit = StoragePrefs.speedLimitKbps(context)
+        val limit = if (item.speedLimitKbps > 0) item.speedLimitKbps else globalLimit
+        val throttle = if (item.speedLimitKbps > 0) {
+            SpeedThrottle(limit, null)
+        } else {
+            SpeedThrottle(limit, globalRateLimiter())
+        }
+        try {
+            val videoOk = downloadAdaptiveFile(item, adaptiveVideoUrl, videoMp4, buffer, throttle, progress)
+            if (!videoOk) throw IOException("adaptive video download failed")
+            val audioOk = downloadAdaptiveFile(item, adaptiveAudioUrl, audioM4a, buffer, throttle, progress)
+            if (!audioOk) throw IOException("adaptive audio download failed")
+            coroutineContext.ensureActive()
+            val remuxed = HlsMp4Muxer.remuxMp4s(videoMp4, audioM4a, mp4)
+            if (!remuxed) throw IOException("adaptive remux failed")
+            val fileName = "$baseName.mp4"
+            videoMp4.delete()
+            audioM4a.delete()
+            val published0 = publishItem(saver, mp4, fileName, item)
+            val finalName = published0.fileName ?: fileName
+            val published = organizeIfEnabled(saver, published0, finalName)
+            finishHls(item, progress.downloaded, published, finalName)
+        } catch (e: Exception) {
+            runCatching { videoMp4.delete() }
+            runCatching { audioM4a.delete() }
+            runCatching { mp4.delete() }
+            throw e
         }
     }
 
