@@ -1253,21 +1253,19 @@ class DownloadEngine(appContext: Context) {
             return if (segments.isEmpty()) null else HlsPlan(segments)
         }
         val variants = HlsParser.parseMaster(body, baseUrl) ?: return null
-        // Hindari varian raksasa (4K/8K): pilih tertinggi yang ≤1080p dan
-        // (bila ada) berprofil AVC tanpa B-frame agar remux MP4 mulus.
-        // Pilih varian AVC (avc1.4D, tanpa B-frame) dengan bandwidth paling
-            // mendekati target ~1,2 Mbps — keseimbangan kualitas tinggi, hasil
-            // cukup kecil, dan durasi segmen stabil (AVC 30-60 fps). AVC 1080p
-            // (avc1.64002A) punya B-frame sehingga dihindari agar remux mulus.
-            val target = 1_200_000L
-            val best = variants
-                .filter { it.codecs.contains("avc1.4D") && it.bandwidth in 200_000..2_500_000 }
-                .minByOrNull { kotlin.math.abs(it.bandwidth - target) }
-                ?: variants
-                    .filter { it.codecs.contains("avc1.4D") }
-                    .minByOrNull { it.bandwidth }
-                ?: variants.minByOrNull { it.bandwidth }
-                ?: return null
+        // Hindari varian raksasa (4K/8K) dan varian ber-B-frame (avc1.64002A)
+        // agar remux MP4 mulus. Pilih varian AVC (avc1.4D, tanpa B-frame)
+        // dengan FRAME-RATE tertinggi — varian bitrate rendah (mis. 480p)
+        // adalah VFR yang frame-nya dibuang YouTube sehingga hasil download
+        // terlihat "frame drop". FRAME-RATE tertinggi (60 fps) menjaga semua
+        // frame asli; di antara fps sama, ambil bandwidth terendah.
+        val avc = variants.filter { it.codecs.contains("avc1.4D") }
+        val bestFps = avc.maxOfOrNull { it.frameRate } ?: 0
+        val best = if (bestFps > 0) {
+            avc.filter { it.frameRate == bestFps }.minByOrNull { it.bandwidth }
+        } else {
+            avc.minByOrNull { it.bandwidth }
+        } ?: variants.minByOrNull { it.bandwidth } ?: return null
         val videoSegs = mediaSegmentsWithDurations(best.url) ?: return null
         val videoSegments = videoSegs.map { it.first }
         val videoDurations = videoSegs.map { it.second }
@@ -1278,7 +1276,7 @@ class DownloadEngine(appContext: Context) {
             match?.let { mediaSegments(it.url) }
         }
         App.logEvent(
-            "HLS plan: ${best.codecs} ${best.bandwidth/1000}kbps, " +
+            "HLS plan: ${best.codecs} ${best.bandwidth/1000}kbps ${best.frameRate}fps, " +
                 "${videoSegments.size} video, ${audioSegments?.size ?: 0} audio segments"
         )
         return HlsPlan(videoSegments, videoDurations, audioSegments)

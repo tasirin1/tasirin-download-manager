@@ -5,7 +5,8 @@ data class HlsVariant(
     val url: String,
     val bandwidth: Long,
     val codecs: String = "",
-    val audioGroupId: String? = null
+    val audioGroupId: String? = null,
+    val frameRate: Int = 0
 )
 
 data class HlsRendition(
@@ -22,6 +23,7 @@ object HlsParser {
     private val NAME_RE: Regex = Regex("NAME=\"([^\"]+)\"")
     private val AUDIO_RE: Regex = Regex("AUDIO=\"([^\"]+)\"")
     private val CODECS_RE: Regex = Regex("CODECS=\"([^\"]+)\"")
+    private val FRAME_RATE_RE: Regex = Regex("FRAME-RATE=([\d.]+)")
     private val MEDIA_TYPE_RE: Regex = Regex("TYPE=([A-Z]+)")
     private val MEDIA_GROUP_RE: Regex = Regex("GROUP-ID=\"([^\"]+)\"")
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
@@ -46,6 +48,8 @@ object HlsParser {
                         .find(line)?.groupValues?.get(1)
                     val audioGroup = AUDIO_RE
                         .find(line)?.groupValues?.get(1)
+                    val frameRate = FRAME_RATE_RE
+                        .find(line)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
                     val codecs = CODECS_RE
                         .find(line)?.groupValues?.get(1).orEmpty()
                     val kbps = bandwidth?.div(1000L) ?: 0L
@@ -53,7 +57,10 @@ object HlsParser {
                         ?: (res?.let { "$it · $kbps kbps" })
                         ?: "$kbps kbps"
                     variants.add(
-                        HlsVariant(label, resolveUrl(baseUrl, next), bandwidth ?: 0L, codecs, audioGroup)
+                        HlsVariant(
+                            label, resolveUrl(baseUrl, next),
+                            bandwidth ?: 0L, codecs, audioGroup, frameRate
+                        )
                     )
                 }
                 i += 2

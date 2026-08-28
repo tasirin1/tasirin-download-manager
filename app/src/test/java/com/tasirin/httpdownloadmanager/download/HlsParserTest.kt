@@ -77,6 +77,21 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parse master - frameRate dibaca dari atribut FRAME-RATE`() {
+        val master = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=1072240,RESOLUTION=480x854,FRAME-RATE=30,CODECS="avc1.4D401F,mp4a.40.2"
+            https://cdn.example.com/videos/480.m3u8
+            #EXT-X-STREAM-INF:BANDWIDTH=3789534,RESOLUTION=720x1280,FRAME-RATE=60.0,CODECS="avc1.4D4020,mp4a.40.2"
+            https://cdn.example.com/videos/720.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(master, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(60, variants[0].frameRate)
+        assertEquals(30, variants[1].frameRate)
+        assertEquals(0, variants.minByOrNull { it.bandwidth }!!.frameRate)
+    }
+
+    @Test
     fun `parse master - audioGroupId dari atribut AUDIO`() {
         val master = """
             #EXTM3U
