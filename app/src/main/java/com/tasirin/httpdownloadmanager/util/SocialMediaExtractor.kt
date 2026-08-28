@@ -446,12 +446,17 @@ object SocialMediaExtractor {
             val data = JSONObject(match.groupValues[1])
             val title = data.optString("title", "YouTube_$videoId")
             val streamingData = data.optJSONObject("streamingData") ?: return emptyList()
-            val formats = streamingData.optJSONArray("formats") ?: return emptyList()
+            // Baca both formats (muxed) AND adaptiveFormats (separate video/audio)
+            val muxedFormats = streamingData.optJSONArray("formats")
+            val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats")
+            val allFormats = mutableListOf<JSONObject>()
+            muxedFormats?.let { for (i in 0 until it.length()) it.optJSONObject(i)?.let { f -> allFormats.add(f) } }
+            adaptiveFormats?.let { for (i in 0 until it.length()) it.optJSONObject(i)?.let { f -> allFormats.add(f) } }
+            if (allFormats.isEmpty()) return emptyList()
             val options = mutableListOf<Result>()
-            App.logEvent("YT DEBUG: formats=${formats.length()}")
+            App.logEvent("YT DEBUG: formats=${muxedFormats?.length() ?: 0}, adaptive=${adaptiveFormats?.length() ?: 0}")
 
-            for (i in 0 until formats.length()) {
-                val fmt = formats.optJSONObject(i) ?: continue
+            for (fmt in allFormats) {
                 val videoUrl = fmt.optString("url", "")
                 if (videoUrl.startsWith("http")) {
                     val quality = fmt.optString("qualityLabel", "Unknown")
@@ -473,6 +478,11 @@ object SocialMediaExtractor {
                 if (invidious != null) {
                     App.logEvent("YT DEBUG: using Invidious fallback")
                     return listOf(invidious)
+                }
+                val cobalt = extractYouTubeViaCobalt(videoId)
+                if (cobalt != null) {
+                    App.logEvent("YT DEBUG: using Cobalt fallback")
+                    return listOf(cobalt)
                 }
             }
             return options
@@ -613,6 +623,51 @@ object SocialMediaExtractor {
                 return Result(resolved, null, "YouTube_$videoId", "360p", "video/mp4")
             }
             App.logEvent("YT DEBUG: invidious $instance failed/unavailable")
+        }
+        return null
+    }
+
+    // ── Cobalt.tools ────────────────────────────────────────────────────────
+    // Cobalt adalah service open-source yang resolve n-signature YouTube di
+    // sisi server sehingga URL yang dikembalikan bisa langsung di-download.
+    private val COBALT_INSTANCES = listOf(
+        "https://api.cobalt.tools"
+    )
+
+    private fun extractYouTubeViaCobalt(videoId: String): Result? {
+        val watchUrl = "https://www.youtube.com/watch?v=$videoId"
+        for (instance in COBALT_INSTANCES) {
+            val result = runCatching {
+                val conn = URL("$instance/") as java.net.URL
+                val httpConn = conn.openConnection() as java.net.HttpURLConnection
+                httpConn.requestMethod = "POST"
+                httpConn.connectTimeout = 8000
+                httpConn.readTimeout = 12000
+                httpConn.setRequestProperty("Content-Type", "application/json")
+                httpConn.setRequestProperty("Accept", "application/json")
+                httpConn.setRequestProperty("User-Agent", "Mozilla/5.0")
+                httpConn.doOutput = true
+                val body = """{"url":"$watchUrl","filenameStyle":"pretty","downloadMode":"auto"}"""
+                httpConn.outputStream.use { it.write(body.toByteArray()) }
+                val code = httpConn.responseCode
+                if (code !in 200..299) {
+                    App.logEvent("YT DEBUG: cobalt $instance HTTP $code")
+                    return@runCatching null
+                }
+                val resp = httpConn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+                val obj = JSONObject(resp)
+                val status = obj.optString("status", "")
+                val url = obj.optString("url", "")
+                if (status == "tunnel" || status == "redirect") {
+                    val fileName = obj.optString("filename", "YouTube_$videoId.mp4")
+                    App.logEvent("YT DEBUG: cobalt $instance OK → $status")
+                    return Result(url, fileName, "YouTube_$videoId", "Auto", "video/mp4")
+                }
+                // Cobalt v10+ format: {"status":"error",...}
+                App.logEvent("YT DEBUG: cobalt $instance: status=$status")
+                null
+            }.getOrNull()
+            if (result != null) return result
         }
         return null
     }
