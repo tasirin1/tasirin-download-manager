@@ -360,7 +360,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
         // Deteksi link media sosial → tampilkan pemilihan resolusi.
+        // YouTube memakai daftar resolusi tetap (1080/720/480/360/240);
+        // platform lain memakai kualitas hasil ekstraksi (HD/SD/Photo, dst).
         var socialOptions: List<SocialMediaExtractor.Result> = emptyList()
+        var socialYoutubeHeights: IntArray = intArrayOf()
         var socialJob: Job? = null
         fun probeSocialQuality() {
             socialJob?.cancel()
@@ -373,9 +376,21 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             if (!isSocial) {
                 socialJob = null
                 socialOptions = emptyList()
+                socialYoutubeHeights = intArrayOf()
                 socialQualitySection.isVisible = false
                 return
             }
+            val isYoutube = target.contains("youtube.com/") || target.contains("youtu.be/")
+            if (isYoutube) {
+                socialOptions = emptyList()
+                socialYoutubeHeights = intArrayOf(1080, 720, 480, 360, 240)
+                val labels = listOf(getString(R.string.social_quality_default)) +
+                    socialYoutubeHeights.map { "${it}p" }
+                setupSpinner(this@MainActivity, socialQualitySpinner, labels)
+                socialQualitySection.isVisible = true
+                return
+            }
+            socialYoutubeHeights = intArrayOf()
             socialJob = lifecycleScope.launch {
                 val options = withContext(Dispatchers.IO) {
                     runCatching { SocialMediaExtractor.extractAll(target) }.getOrElse { emptyList() }
@@ -416,6 +431,34 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             mirrorInput.text?.toString()?.trim().orEmpty()
                 .split(URL_SPLIT)
                 .filter { it.startsWith("http://") || it.startsWith("https://") }
+
+        fun addYoutubeWithHeight(
+            urls: List<String>,
+            height: Int,
+            name: String,
+            username: String,
+            password: String,
+            headers: String,
+            perSpeed: Int,
+            priority: Int,
+            checksum: String,
+            mirrors: List<String>
+        ) {
+            urls.forEachIndexed { index, url ->
+                App.engine.addDownload(
+                    url = url,
+                    fileName = if (index == 0) name else null,
+                    username = username,
+                    password = password,
+                    headers = headers,
+                    speedLimitKbps = perSpeed,
+                    priority = priority,
+                    checksum = if (index == 0) checksum else "",
+                    mirrors = if (index == 0) mirrors else emptyList(),
+                    preferredHeight = height
+                )
+            }
+        }
 
         fun addAll(
             urls: List<String>,
@@ -463,6 +506,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     socialOptions.isNotEmpty() &&
                     socialSel in 1..socialOptions.size
                 ) socialOptions[socialSel - 1] else null
+                val selectedYtHeight = if (
+                    socialQualitySection.isVisible &&
+                    socialYoutubeHeights.isNotEmpty() &&
+                    socialSel in 1..socialYoutubeHeights.size
+                ) socialYoutubeHeights[socialSel - 1] else 0
                 val name = nameInput.text?.toString()?.trim().orEmpty()
                 val username = usernameInput.text?.toString()?.trim().orEmpty()
                 val password = passwordInput.text?.toString()?.trim().orEmpty()
@@ -470,7 +518,23 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val checksum = checksumInput.text?.toString()?.trim().orEmpty()
                 val perSpeed = speedKbps[spinnerSpeedPer.selectedItemPosition]
                 val priority = priorityValues[spinnerPriority.selectedItemPosition]
-                if (selectedOption != null) {
+                if (selectedYtHeight > 0) {
+                    // YouTube: simpan resolusi pilihan; engine memilih varian
+                    // HLS yang paling mendekati saat download dimulai (URL CDN
+                    // tetap segar karena di-resolve tiap kali).
+                    addYoutubeWithHeight(
+                        urls = urls,
+                        height = selectedYtHeight,
+                        name = name,
+                        username = username,
+                        password = password,
+                        headers = headers,
+                        perSpeed = perSpeed,
+                        priority = priority,
+                        checksum = checksum,
+                        mirrors = parseMirrors()
+                    )
+                } else if (selectedOption != null) {
                     // URL CDN hasil ekstraksi masih hangat (baru saja dimuat) —
                     // gunakan langsung, ganti nama file, dan gabung cookies.
                     val mergedHeaders = if (selectedOption.cookies.isNotEmpty()) {

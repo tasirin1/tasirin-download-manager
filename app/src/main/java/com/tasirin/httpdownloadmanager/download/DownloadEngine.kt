@@ -176,7 +176,8 @@ class DownloadEngine(appContext: Context) {
         destination: String = "",
         folderPath: String = "",
         mirrors: List<String> = emptyList(),
-        monitor: Boolean = false
+        monitor: Boolean = false,
+        preferredHeight: Int = 0
     ) {
         val cleanUrl = url.trim()
         if (cleanUrl.isEmpty()) return
@@ -202,7 +203,8 @@ class DownloadEngine(appContext: Context) {
             priority = priority,
             checksum = checksum,
             mirrors = mirrors,
-            monitor = monitor
+            monitor = monitor,
+            preferredHeight = preferredHeight
         )
         update(listOf(item) + _items.value)
         flushSave()
@@ -1018,7 +1020,7 @@ class DownloadEngine(appContext: Context) {
 
         val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES)
             ?: throw IOException("Cannot fetch HLS manifest")
-        val plan = parseHlsPlan(master, item.url)
+        val plan = parseHlsPlan(master, item.url, item.preferredHeight)
         if (plan == null || plan.videoSegments.isEmpty()) throw IOException("No HLS segments found")
         App.logEvent(
             "HLS: ${plan.videoSegments.size} video segments, " +
@@ -1244,7 +1246,7 @@ class DownloadEngine(appContext: Context) {
     )
 
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
-    private fun parseHlsPlan(body: String, baseUrl: String): HlsPlan? {
+    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0): HlsPlan? {
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
             val segments = body.lines()
@@ -1260,11 +1262,26 @@ class DownloadEngine(appContext: Context) {
         // terlihat "frame drop". FRAME-RATE tertinggi (60 fps) menjaga semua
         // frame asli; di antara fps sama, ambil bandwidth terendah.
         val avc = variants.filter { it.codecs.contains("avc1.4D") }
-        val bestFps = avc.maxOfOrNull { it.frameRate } ?: 0
-        val best = if (bestFps > 0) {
-            avc.filter { it.frameRate == bestFps }.minByOrNull { it.bandwidth }
+        // Saat user eksplisit memilih resolusi (preferredHeight), pakai semua
+        // varian AVC (termasuk itag 312 avc1.64002A untuk 1080p) yang paling
+        // mendekati tinggi target, dengan FRAME-RATE tertinggi agar tetap
+        // mulus tanpa frame drop. Tanpa pilihan, pertahankan perilaku default
+        // (avc1.4D FRAME-RATE tertinggi).
+        val best = if (preferredHeight > 0) {
+            val targetAvc = variants.filter { it.codecs.contains("avc") }
+            val bestTargetFps = targetAvc.maxOfOrNull { it.frameRate } ?: 0
+            val pool = if (bestTargetFps > 0) {
+                targetAvc.filter { it.frameRate == bestTargetFps }
+            } else targetAvc
+            pool.minByOrNull { kotlin.math.abs(it.height - preferredHeight) }
+                ?: pool.minByOrNull { it.bandwidth }
         } else {
-            avc.minByOrNull { it.bandwidth }
+            val bestFps = avc.maxOfOrNull { it.frameRate } ?: 0
+            if (bestFps > 0) {
+                avc.filter { it.frameRate == bestFps }.minByOrNull { it.bandwidth }
+            } else {
+                avc.minByOrNull { it.bandwidth }
+            }
         } ?: variants.minByOrNull { it.bandwidth } ?: return null
         val videoSegs = mediaSegmentsWithDurations(best.url) ?: return null
         val videoSegments = videoSegs.map { it.first }

@@ -6,7 +6,8 @@ data class HlsVariant(
     val bandwidth: Long,
     val codecs: String = "",
     val audioGroupId: String? = null,
-    val frameRate: Int = 0
+    val frameRate: Int = 0,
+    val height: Int = 0
 )
 
 data class HlsRendition(
@@ -24,6 +25,7 @@ object HlsParser {
     private val AUDIO_RE: Regex = Regex("AUDIO=\"([^\"]+)\"")
     private val CODECS_RE: Regex = Regex("CODECS=\"([^\"]+)\"")
     private val FRAME_RATE_RE: Regex = Regex("FRAME-RATE=([\\d.]+)")
+    private val RESOLUTION_HEIGHT_RE: Regex = Regex("RESOLUTION=([\\d]+)x([\\d]+)")
     private val MEDIA_TYPE_RE: Regex = Regex("TYPE=([A-Z]+)")
     private val MEDIA_GROUP_RE: Regex = Regex("GROUP-ID=\"([^\"]+)\"")
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
@@ -50,6 +52,12 @@ object HlsParser {
                         .find(line)?.groupValues?.get(1)
                     val frameRate = FRAME_RATE_RE
                         .find(line)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
+                    val height = RESOLUTION_HEIGHT_RE
+                        .find(line)?.groupValues?.let { g ->
+                            val w = g[1].toIntOrNull()
+                            val h = g[2].toIntOrNull()
+                            if (w != null && h != null) minOf(w, h) else 0
+                        } ?: 0
                     val codecs = CODECS_RE
                         .find(line)?.groupValues?.get(1).orEmpty()
                     val kbps = bandwidth?.div(1000L) ?: 0L
@@ -59,7 +67,7 @@ object HlsParser {
                     variants.add(
                         HlsVariant(
                             label, resolveUrl(baseUrl, next),
-                            bandwidth ?: 0L, codecs, audioGroup, frameRate
+                            bandwidth ?: 0L, codecs, audioGroup, frameRate, height
                         )
                     )
                 }

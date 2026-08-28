@@ -49,6 +49,7 @@ object DownloadItemCodec {
                 segArr.put(so)
             }
             o.put("segments", segArr)
+            o.put("preferredHeight", item.preferredHeight)
             arr.put(o)
         }
         return arr.toString()
@@ -103,7 +104,8 @@ object DownloadItemCodec {
                 mirrors = parseStringList(o.optJSONArray("mirrors")),
                 monitor = o.optBoolean("monitor", false),
                 etag = o.optString("etag"),
-                segments = parseSegments(o)
+                segments = parseSegments(o),
+                preferredHeight = o.optInt("preferredHeight", 0)
             )
         }.getOrNull()
     }

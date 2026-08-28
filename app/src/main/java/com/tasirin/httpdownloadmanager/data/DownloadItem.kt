@@ -41,7 +41,8 @@ data class DownloadItem(
     val postBody: String = "",
     val segments: List<DownloadSegment> = emptyList(),
     val speedBps: Long = 0,
-    val etaSeconds: Long = 0
+    val etaSeconds: Long = 0,
+    val preferredHeight: Int = 0
 ) {
     val progressPercent: Int
         get() = if (totalBytes > 0) ((bytesDownloaded * 100) / totalBytes).toInt() else 0

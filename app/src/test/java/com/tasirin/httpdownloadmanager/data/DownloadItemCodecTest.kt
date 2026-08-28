@@ -38,7 +38,8 @@ class DownloadItemCodecTest {
             DownloadSegment(index = 1, start = 5_000, end = 9_999, downloaded = 0)
         ),
         speedBps = 12_345,
-        etaSeconds = 7
+        etaSeconds = 7,
+        preferredHeight = 720
     )
 
     @Test
