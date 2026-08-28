@@ -114,6 +114,10 @@ object Updater {
     /** Pastikan APK ditandatangani sertifikat release resmi sebelum dipasang.
      *  API 28+ memakai GET_SIGNING_CERTIFICATES (v2/v3), Android 5-8 memakai
      *  GET_SIGNATURES — dua-duanya mengembalikan byte DER sertifikat. */
+    // GET_SIGNATURES/signatures sengaja dipakai karena dibutuhkan Android 5-8
+    // (minSdk 21) untuk verifikasi tanda tangan sumber APK v1; API 28+ sudah
+    // memakai GET_SIGNING_CERTIFICATES. Deprecation di-suppress bukan bug.
+    @Suppress("DEPRECATION")
     fun isSignatureValid(context: Context, file: File): Boolean = runCatching {
         val flags = if (Build.VERSION.SDK_INT >= 28) {
             PackageManager.GET_SIGNING_CERTIFICATES
@@ -135,6 +139,7 @@ object Updater {
         }
     }.getOrDefault(false)
 
+    @Suppress("DEPRECATION")
     private fun signingCerts(info: PackageInfo?): List<ByteArray> {
         if (info == null) return emptyList()
         if (Build.VERSION.SDK_INT >= 28) {

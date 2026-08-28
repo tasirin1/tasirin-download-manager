@@ -199,7 +199,7 @@ object SocialMediaExtractor {
             .replace("\\u0026", "&")
             .replace("\\/", "/")
             .replace("&amp;", "&")
-        val videoRegex = Regex(""""url"\s*:\s*"(https?://[^"]+\\.mp4[^"]*)"""")
+        val videoRegex = Regex(""""url"\s*:\s*"(https?://[^"]+\.mp4[^"]*)"""")
         val match = videoRegex.find(unescaped) ?: return null
         return match.groupValues[1]
             .replace("\\u002F", "/")
@@ -238,7 +238,9 @@ object SocialMediaExtractor {
                     val media = context.optJSONObject("media")
                     if (media != null) return media
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+                // Respons tanpa field JSON yang dicari — coba kandidat berikutnya.
+            }
         }
         return null
     }
@@ -351,7 +353,9 @@ object SocialMediaExtractor {
                 }
             }
             return options
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+            // Gagal mem-parse halaman/response YouTube — biarkan fallback lain lanjut.
+        }
         return emptyList()
     }
 

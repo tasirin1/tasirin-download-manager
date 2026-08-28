@@ -22,6 +22,7 @@ import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
+import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -155,7 +156,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
     private val appBuild: Int by lazy {
         runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionCode
+            context.packageManager.getPackageInfo(context.packageName, 0).versionCodeCompat().toInt()
         }.getOrDefault(0)
     }
     private val serverLog = ServerLog()
@@ -743,19 +744,19 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (StoragePrefs.isServerReadOnly(context)) {
             return readOnlyDenied().closeConnection()
         }
-        val name = session.parms["name"]?.trim()?.filterNot { it.isISOControl() }?.take(180)
+        val name = session.param("name")?.trim()?.filterNot { it.isISOControl() }?.take(180)
             ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")?.replace("..", "_")
             ?.takeIf { it.isNotEmpty() }
             ?: "upload_${System.currentTimeMillis()}"
-        val storage = session.parms["storage"]?.trim().orEmpty()
-        val folderPath = session.parms["path"]?.trim().orEmpty()
+        val storage = session.param("storage")?.trim().orEmpty()
+        val folderPath = session.param("path")?.trim().orEmpty()
         if (!isRemoteDestinationAllowed(folderPath)) {
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
             )
         }
-        val chunkIdx = session.parms["chunk"]?.toIntOrNull() ?: -1
-        val chunks = (session.parms["chunks"]?.toIntOrNull() ?: 1).coerceAtLeast(1)
+        val chunkIdx = session.param("chunk")?.toIntOrNull() ?: -1
+        val chunks = (session.param("chunks")?.toIntOrNull() ?: 1).coerceAtLeast(1)
         val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
 
         if (chunkIdx >= 0) {
@@ -786,8 +787,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun uploadVerify(session: IHTTPSession): Response {
-        val id = session.parms["id"]?.trim().orEmpty()
-        val token = session.parms["verify"]?.trim()
+        val id = session.param("id")?.trim().orEmpty()
+        val token = session.param("verify")?.trim()
         if (!ServerSecurity.isUploadVerifyTokenValid(
                 token,
                 id,
@@ -850,7 +851,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         chunks: Int,
         length: Long
     ): Response {
-        val id = session.parms["id"]?.trim()?.take(64)
+        val id = session.param("id")?.trim()?.take(64)
             ?.takeIf { ServerSecurity.isUploadIdAllowed(it) }
         ?: run {
                 drainBody(session)
@@ -926,7 +927,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         chunks: Int,
         length: Long
     ): Response {
-        val offset = session.parms["offset"]?.toLongOrNull()
+        val offset = session.param("offset")?.toLongOrNull()
             ?: chunkIdx.toLong() * DEFAULT_CHUNK_BYTES
         if (!ServerSecurity.isChunkOffsetAllowed(offset, MAX_UPLOAD_BYTES)) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid offset")
@@ -1103,7 +1104,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun fsZip(session: IHTTPSession): Response {
-        val raw = session.parms["path"].orEmpty()
+        val raw = session.param("path").orEmpty()
         if (raw.isEmpty()) return notFound()
         if (raw.startsWith(FS_PREFIX) && !isFsPathAllowed(raw.removePrefix(FS_PREFIX))) {
             return notFound()
@@ -1254,9 +1255,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun mediaZip(session: IHTTPSession): Response {
-        val requestedTokens = session.parms["tokens"].orEmpty()
+        val requestedTokens = session.param("tokens").orEmpty()
             .split(",").filter { it.isNotBlank() }.distinct()
-        val paths = session.parms["paths"].orEmpty().split(",").filter { it.isNotBlank() }
+        val paths = session.param("paths").orEmpty().split(",").filter { it.isNotBlank() }
         if (requestedTokens.size + paths.size > MAX_MEDIA_ZIP_TOKENS) return notFound()
         val tokens = requestedTokens.filter(::isMediaTokenAllowed).toMutableList()
         if (tokens.isEmpty() && paths.isEmpty()) return notFound()
@@ -1346,7 +1347,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val item = App.engine.items.value.find {
             it.id == id && it.state == DownloadState.COMPLETED
         } ?: return notFound()
-        val download = session.parms["dl"] == "1"
+        val download = session.param("dl") == "1"
         val mime = MimeTypes.forFile(item.fileName)
         val input: InputStream
         val total: Long
@@ -1399,7 +1400,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val id = session.uri.removePrefix("/stream_part/")
         val now = System.currentTimeMillis()
         val secret = partialStreamSecret()
-        val token = session.parms["token"].orEmpty()
+        val token = session.param("token").orEmpty()
         if (!ServerSecurity.isPartialTokenValid(token, id, now, secret)) return notFound()
         val item = App.engine.items.value.find { it.id == id } ?: return notFound()
         if (item.state == DownloadState.COMPLETED) return notFound()
@@ -1439,7 +1440,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun serveThumb(session: IHTTPSession): Response {
-        val token = session.parms["token"].orEmpty()
+        val token = session.param("token").orEmpty()
         if (token.isEmpty()) return notFound()
         val raw = MediaLibrary.decodeToken(token) ?: return notFound()
         return safeRun("serveThumb") {
@@ -1501,10 +1502,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun serveMedia(session: IHTTPSession): Response {
-        val token = session.parms["token"].orEmpty()
+        val token = session.param("token").orEmpty()
         if (token.isEmpty()) return notFound()
         val raw = MediaLibrary.decodeToken(token) ?: return notFound()
-        val download = session.parms["dl"] == "1"
+        val download = session.param("dl") == "1"
         val rangeHeader = session.headers["range"] ?: session.headers["Range"]
         val input: InputStream
         val total: Long
@@ -1562,15 +1563,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun galleryJson(session: IHTTPSession): Response {
-        val q = session.parms["q"]?.trim()?.lowercase().orEmpty()
-        val type = session.parms["type"]?.trim().orEmpty()
+        val q = session.param("q")?.trim()?.lowercase().orEmpty()
+        val type = session.param("type")?.trim().orEmpty()
         // Penampil foto sudah dihapus; permintaan foto tidak perlu menyentuh disk.
         if (type == "image") {
             return jsonResponse(
                 JSONObject().put("items", JSONArray()).put("hasMore", false).put("total", 0)
             )
         }
-        val page = (session.parms["page"]?.toIntOrNull() ?: 0).coerceAtLeast(0)
+        val page = (session.param("page")?.toIntOrNull() ?: 0).coerceAtLeast(0)
         val start = page * GALLERY_PAGE_SIZE
         val pageEnd = start + GALLERY_PAGE_SIZE
         // Scanner sudah video-only; type=video bukan filter tambahan. Pencarian
@@ -1737,9 +1738,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // ---------- File manager ----------
 
     private fun fsList(session: IHTTPSession): Response {
-        val raw = session.parms["path"].orEmpty()
-        val offset = (session.parms["offset"]?.toIntOrNull() ?: 0).coerceAtLeast(0)
-        val limit = (session.parms["limit"]?.toIntOrNull() ?: FS_PAGE_SIZE)
+        val raw = session.param("path").orEmpty()
+        val offset = (session.param("offset")?.toIntOrNull() ?: 0).coerceAtLeast(0)
+        val limit = (session.param("limit")?.toIntOrNull() ?: FS_PAGE_SIZE)
             .coerceIn(1, FS_PAGE_MAX)
         return when {
             raw.isEmpty() -> fsRoots()
@@ -2511,7 +2512,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // ---------- QR code ----------
 
     private fun qrPngResponse(session: IHTTPSession): Response {
-        val text = session.parms["text"].orEmpty()
+        val text = session.param("text").orEmpty()
         if (text.isEmpty() || text.length > MAX_QR_TEXT_LENGTH) return notFound()
         val now = System.currentTimeMillis()
         val cached = qrCache[text]

@@ -18,7 +18,7 @@ object CrashLog {
     private const val MAX_BYTES = 100_000
     private const val FILE_NAME = "crash.log"
     /** ThreadLocal formatter (SimpleDateFormat tidak thread-safe). */
-    private val stampFormat = ThreadLocal.withInitial {
+    private val stampFormat: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
     }
 
@@ -28,7 +28,8 @@ object CrashLog {
             // (terlihat dari file manager tanpa root; otomatis dihapus saat uninstall).
             val dir = context.getExternalFilesDir(null) ?: context.filesDir
             val file = File(dir, FILE_NAME)
-            val stamp = stampFormat.get().format(Date())
+            val stamp = (stampFormat.get()
+                ?: SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)).format(Date())
             val text = buildString {
                 appendLine("=== $stamp [$tag] ===")
                 appendLine(Log.getStackTraceString(t))

@@ -20,6 +20,7 @@ import android.view.Window
 import android.view.WindowManager
 import android.view.MenuItem
 import android.view.View
+import androidx.core.view.isVisible
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -47,6 +48,7 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
+import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -290,11 +292,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val advancedToggle = view.findViewById<TextView>(R.id.advanced_toggle)
         val advancedSection = view.findViewById<View>(R.id.advanced_section)
         advancedToggle.setOnClickListener {
-            if (advancedSection.visibility == View.VISIBLE) {
-                advancedSection.visibility = View.GONE
+            if (advancedSection.isVisible) {
+                advancedSection.isVisible = false
                 advancedToggle.text = getString(R.string.advanced_options)
             } else {
-                advancedSection.visibility = View.VISIBLE
+                advancedSection.isVisible = true
                 advancedToggle.text = getString(R.string.advanced_options_expanded)
             }
         }
@@ -509,7 +511,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             packageManager.getPackageInfo(packageName, 0)
         }.getOrNull()
         val version = info?.versionName ?: "1.0"
-        val build = info?.versionCode ?: 0
+        val build = info?.versionCodeCompat()?.toInt() ?: 0
         val view = layoutInflater.inflate(R.layout.dialog_about, null)
         view.findViewById<TextView>(R.id.about_version).text =
             getString(R.string.about_version, version)
@@ -582,7 +584,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         lifecycleScope.launch {
             val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@MainActivity) }
             val current = runCatching {
-                packageManager.getPackageInfo(packageName, 0).versionCode
+                packageManager.getPackageInfo(packageName, 0).versionCodeCompat().toInt()
             }.getOrDefault(0)
             val msg = when {
                 info == null -> getString(R.string.update_failed)
