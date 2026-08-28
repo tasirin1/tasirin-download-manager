@@ -37,6 +37,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.tasirin.httpdownloadmanager.data.DownloadItem
+import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.databinding.ActivityMainBinding
@@ -266,12 +267,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private fun showAddDialog(prefillUrl: String? = null) {
         val view = layoutInflater.inflate(R.layout.dialog_add_download, null)
         val urlInput = view.findViewById<EditText>(R.id.input_url)
+        if (!prefillUrl.isNullOrBlank()) urlInput.setText(prefillUrl)
         val nameInput = view.findViewById<EditText>(R.id.input_name)
         val usernameInput = view.findViewById<EditText>(R.id.input_username)
         val passwordInput = view.findViewById<EditText>(R.id.input_password)
         val headersInput = view.findViewById<EditText>(R.id.input_headers)
         val checksumInput = view.findViewById<EditText>(R.id.input_checksum)
         val mirrorInput = view.findViewById<EditText>(R.id.input_mirrors)
+        val socialQualitySection = view.findViewById<View>(R.id.social_quality_section)
+        val socialQualitySpinner = view.findViewById<Spinner>(R.id.spinner_social_quality)
         val speedKbps = SPEED_KBPS
         val spinnerSpeedPer = view.findViewById<Spinner>(R.id.spinner_speed_limit_per)
         setupSpinner(
@@ -355,10 +359,49 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
         }
+        // Deteksi link media sosial → tampilkan pemilihan resolusi.
+        var socialOptions: List<SocialMediaExtractor.Result> = emptyList()
+        var socialJob: Job? = null
+        fun probeSocialQuality() {
+            socialJob?.cancel()
+            val allUrls = urlInput.text?.toString().orEmpty()
+            val target = allUrls
+                .split(URL_SPLIT)
+                .firstOrNull { it.startsWith("http://") || it.startsWith("https://") }
+                ?.trim().orEmpty()
+            val isSocial = target.isNotEmpty() && SocialMediaExtractor.isSocialMediaUrl(target)
+            if (!isSocial) {
+                socialJob = null
+                socialOptions = emptyList()
+                socialQualitySection.isVisible = false
+                return
+            }
+            socialJob = lifecycleScope.launch {
+                val options = withContext(Dispatchers.IO) {
+                    runCatching { SocialMediaExtractor.extractAll(target) }.getOrElse { emptyList() }
+                }
+                socialOptions = options
+                if (options.isEmpty()) {
+                    socialQualitySection.isVisible = false
+                } else {
+                    val labels = listOf(getString(R.string.social_quality_default)) +
+                        options.map { opt ->
+                            if (opt.quality.isBlank()) {
+                                opt.mimeType.takeIf { it.isNotBlank() } ?: "Video"
+                            } else {
+                                opt.quality
+                            }
+                        }
+                    setupSpinner(this@MainActivity, socialQualitySpinner, labels)
+                    socialQualitySection.isVisible = true
+                }
+            }
+        }
         val fileInfoWatcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
                 probeFileInfo()
+                probeSocialQuality()
             }
             override fun afterTextChanged(s: Editable?) {}
         }
@@ -366,6 +409,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         usernameInput.addTextChangedListener(fileInfoWatcher)
         passwordInput.addTextChangedListener(fileInfoWatcher)
         headersInput.addTextChangedListener(fileInfoWatcher)
+        probeSocialQuality()
         probeFileInfo()
 
         fun parseMirrors(): List<String> =
@@ -411,6 +455,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
+                // Media sosial: pakai resolusi yang dipilih (bukan URL asli)
+                // bila opsi sudah dimuat dan user tidak memilih "Auto (best)".
+                val socialSel = socialQualitySpinner.selectedItemPosition
+                val selectedOption = if (
+                    socialQualitySection.isVisible &&
+                    socialOptions.isNotEmpty() &&
+                    socialSel in 1..socialOptions.size
+                ) socialOptions[socialSel - 1] else null
                 val name = nameInput.text?.toString()?.trim().orEmpty()
                 val username = usernameInput.text?.toString()?.trim().orEmpty()
                 val password = passwordInput.text?.toString()?.trim().orEmpty()
@@ -418,7 +470,26 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val checksum = checksumInput.text?.toString()?.trim().orEmpty()
                 val perSpeed = speedKbps[spinnerSpeedPer.selectedItemPosition]
                 val priority = priorityValues[spinnerPriority.selectedItemPosition]
-                if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
+                if (selectedOption != null) {
+                    // URL CDN hasil ekstraksi masih hangat (baru saja dimuat) —
+                    // gunakan langsung, ganti nama file, dan gabung cookies.
+                    val mergedHeaders = if (selectedOption.cookies.isNotEmpty()) {
+                        val existing = headers.trim()
+                        if (existing.isNotEmpty()) "${existing}\nCookie: ${selectedOption.cookies}"
+                        else "Cookie: ${selectedOption.cookies}"
+                    } else headers
+                    App.engine.addDownload(
+                        url = selectedOption.directUrl,
+                        fileName = selectedOption.fileName ?: name,
+                        username = username,
+                        password = password,
+                        headers = mergedHeaders,
+                        speedLimitKbps = perSpeed,
+                        priority = priority,
+                        checksum = checksum,
+                        mirrors = parseMirrors()
+                    )
+                } else if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
                     lifecycleScope.launch {
                         val variants = withContext(Dispatchers.IO) {
                             runCatching { App.engine.probeHlsVariants(urls[0]) }.getOrNull()

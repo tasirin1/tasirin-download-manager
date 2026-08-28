@@ -19,6 +19,27 @@
         android:minLines="2"
         android:maxLines="4" />
 
+    <LinearLayout
+        android:id="@+id/social_quality_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/social_quality_label"
+            android:textAppearance="?android:attr/textAppearanceSmall" />
+
+        <Spinner
+            android:id="@+id/spinner_social_quality"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+
     <TextView
         android:id="@+id/text_storage_remaining"
         android:layout_width="match_parent"
