@@ -879,6 +879,19 @@
 
   .add-sheet {
  gap: 10px; padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px)); max-height: 84vh; overflow-y: auto; }
+  .add-sheet textarea#url {
+ min-height: 48px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font-size: 14px; resize: vertical; box-sizing: border-box; width: 100%; font-family: inherit; }
+  .add-sheet input[type="text"],
+  .add-sheet input[type="url"],
+  .add-sheet select,
+  .add-sheet textarea {
+ width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font-size: 14px; box-sizing: border-box; }
+  .adv-toggle {
+ padding: 10px 0; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
+  .adv-toggle:hover { color: var(--fg); }
+  .adv-section {
+ display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .adv-section.hidden { display: none; }
 
   .quality-select {
  width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font-size: 14px; margin-top: 6px; box-sizing: border-box; }
@@ -1171,13 +1184,15 @@
   <div id="addSheet" class="sheet hidden">
     <form id="addForm" class="sheet-box add-sheet">
       <div class="sheet-title" id="addSheetTitle">Add Download</div>
-      <input id="url" type="url" placeholder="File URL (https://…)" required>
+      <textarea id="url" rows="2" placeholder="URL (https://…) — supports multiple links separated by new lines" required></textarea>
       <select id="qualitySelect" class="quality-select hidden" aria-label="Media quality">
         <option value="0">Quality: Auto (best)</option>
       </select>
-      <input id="name" type="text" placeholder="File name (optional)">
-      <input id="checksum" type="text" placeholder="Optional checksum (md5:/sha1:/sha256:)">
-      <div class="grid2">
+      <div id="advToggle" class="adv-toggle">Advanced options</div>
+      <div id="advSection" class="adv-section hidden">
+        <input id="name" type="text" placeholder="File name (optional)">
+        <input id="checksum" type="text" placeholder="Checksum (md5:/sha1:/sha256:)">
+        <input id="storage" type="text" placeholder="Destination folder (empty = default)">
         <select id="speed">
           <option value="0">Speed: global</option>
           <option value="128">128 KB/s</option>
@@ -1192,17 +1207,13 @@
           <option value="0" selected>Priority: Normal</option>
           <option value="1">Priority: High</option>
         </select>
-      </div>
-      <input id="storage" type="text" placeholder="Destination folder path on device (empty = default)" value="">
-      <details id="advancedAdd">
-        <summary>Advanced options</summary>
         <select id="dlMethod">
           <option value="GET" selected>GET</option>
           <option value="POST">POST</option>
         </select>
-        <textarea id="dlHeaders" rows="2" placeholder="Custom headers (one per line: Key: Value)"></textarea>
-        <textarea id="dlPostBody" rows="2" placeholder="POST body (key=value&amp;key2=value2)" class="hidden"></textarea>
-      </details>
+        <textarea id="dlHeaders" rows="2" placeholder="Custom headers (Key: Value)"></textarea>
+        <textarea id="dlPostBody" rows="2" placeholder="POST body" class="hidden"></textarea>
+      </div>
       <div class="form-row">
         <button type="submit" class="btn-main">Add Download</button>
         <button id="cancelAdd" type="button" class="btn-ghost">Cancel</button>
@@ -1443,7 +1454,11 @@ const dlList = document.getElementById('list');
 let pendingAddForm = false;
 function toggleAddForm(show) {
   addSheet.classList.toggle('hidden', !show);
-  if (!show) { qualitySelect.classList.add('hidden'); socialPlatform = ''; socialOptions = []; }
+  if (!show) {
+    qualitySelect.classList.add('hidden'); socialPlatform = ''; socialOptions = [];
+    document.getElementById('advSection').classList.add('hidden');
+    document.getElementById('advToggle').textContent = 'Advanced options';
+  }
   if (show) setTimeout(function () { document.getElementById('url').focus(); }, 60);
 }
 function onNewDownloadClick() {
@@ -1463,6 +1478,12 @@ document.getElementById('cancelAdd').addEventListener('click', function () {
 document.getElementById('dlMethod').addEventListener('change', function () {
   var isPost = this.value === 'POST';
   document.getElementById('dlPostBody').classList.toggle('hidden', !isPost);
+});
+document.getElementById('advToggle').addEventListener('click', function () {
+  var sec = document.getElementById('advSection');
+  var isHidden = sec.classList.contains('hidden');
+  sec.classList.toggle('hidden', !isHidden);
+  this.textContent = isHidden ? 'Advanced options ▾' : 'Advanced options';
 });
 addSheet.addEventListener('click', function (e) {
   if (e.target === addSheet) toggleAddForm(false);
@@ -4363,7 +4384,7 @@ function isSocialUrl(u) {
 let socialDebounce = null;
 function probeSocialQuality() {
   clearTimeout(socialDebounce);
-  var u = document.getElementById('url').value.trim();
+  var u = document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '';
   if (!u || !isSocialUrl(u)) {
     qualitySelect.classList.add('hidden');
     qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>';
@@ -4423,8 +4444,14 @@ probeSocialQuality();
 
 document.getElementById('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const url = document.getElementById('url').value.trim();
-  if (!url) return;
+  const rawUrl = document.getElementById('url').value.trim();
+  if (!rawUrl) return;
+  const urls = rawUrl.split(/[\s,]+/).filter(function (u) {
+    return u.indexOf('http://') === 0 || u.indexOf('https://') === 0;
+  });
+  if (!urls.length) { alert('No valid URLs found.'); return; }
+  // For social media quality, use first URL only
+  const url = urls[0];
   const body = new URLSearchParams({url: url});
   const name = document.getElementById('name').value.trim();
   if (name) body.append('name', name);
@@ -4466,8 +4493,21 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     if (!res.ok || !data || !data.ok) {
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
     }
+    // Send additional URLs as separate requests
+    for (var i = 1; i < urls.length; i++) {
+      try {
+        var extraBody = new URLSearchParams({url: urls[i]});
+        extraBody.append('speedLimitKbps', document.getElementById('speed').value);
+        extraBody.append('priority', document.getElementById('priority').value);
+        extraBody.append('path', document.getElementById('storage').value.trim());
+        extraBody.append('method', document.getElementById('dlMethod').value);
+        await fetch(API + '/api/add', {
+          method: 'POST', body: extraBody,
+          headers: {'X-Requested-With': 'XMLHttpRequest'}
+        });
+      } catch (x) {}
+    }
     document.getElementById('url').value = '';
-    document.getElementById('name').value = '';
     toggleAddForm(false);
     refresh();
   } catch (err) {
