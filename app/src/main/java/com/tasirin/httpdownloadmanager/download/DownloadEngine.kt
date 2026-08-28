@@ -1018,8 +1018,8 @@ class DownloadEngine(appContext: Context) {
 
         val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES)
             ?: throw IOException("Cannot fetch HLS manifest")
-        val segmentUrls = parseHlsSegments(master, item.url)
-        if (segmentUrls.isEmpty()) throw IOException("No HLS segments found")
+        val plan = parseHlsPlan(master, item.url)
+        if (plan == null || plan.videoSegments.isEmpty()) throw IOException("No HLS segments found")
 
         val globalLimit = StoragePrefs.speedLimitKbps(context)
         val limit = if (item.speedLimitKbps > 0) item.speedLimitKbps else globalLimit
@@ -1029,69 +1029,137 @@ class DownloadEngine(appContext: Context) {
             SpeedThrottle(limit, globalRateLimiter())
         }
 
-        val fileName = if (outName.lowercase().endsWith(".ts")) outName else "$outName.ts"
-        val partial = saver.partialFile(fileName)
-        partial.delete()
-        var downloaded = 0L
-        var lastNotify = 0L
+        val baseName = outName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { outName }
+        val videoTs = saver.partialFile("$baseName.video", segment = null).apply { delete() }
+        val audioAdts = saver.partialFile("$baseName.audio", segment = null).apply { delete() }
+        val mp4 = saver.partialFile("$baseName.muxed", segment = null).apply { delete() }
+        val progress = HlsProgress()
         val buffer = ByteArray(BUFFER_SIZE)
         coroutineContext.ensureActive()
 
         try {
-            BufferedOutputStream(FileOutputStream(partial)).use { out ->
-                for (url in segmentUrls) {
-                    coroutineContext.ensureActive()
-                    // Segmen di-buffer di memori dulu dan baru ditulis ke file
-                    // setelah sukses penuh, supaya percobaan ulang segmen tidak
-                    // meninggalkan byte parsial di file gabungan (anti-korup).
-                    val segBytes = fetchHlsSegmentWithRetry(
-                        item, url, buffer, throttle, downloaded
-                    ) { segNow ->
-                        val totalNow = downloaded + segNow
-                        val now = System.currentTimeMillis()
-                        if (now - lastNotify >= 1000) {
-                            lastNotify = now
-                            val (speed, eta) = speedTracker.sample(item.id, totalNow, 0)
-                            updateItem(item.id, persist = false) {
-                                it.copy(
-                                    state = DownloadState.DOWNLOADING,
-                                    bytesDownloaded = totalNow,
-                                    totalBytes = 0,
-                                    speedBps = speed,
-                                    etaSeconds = eta
-                                )
-                            }
-                            scheduleProgressSave()
-                        }
-                    }
-                    out.write(segBytes)
-                    downloaded += segBytes.size
+            // 1) Unduh segmen video (MPEG-TS) ke file temp.
+            downloadSegmentsToFile(item, plan.videoSegments, videoTs, buffer, throttle, progress)
+
+            // 2) Unduh segmen audio (ADTS AAC) ke file temp bila terpisah.
+            var audioOk = false
+            val audioPlan = plan.audioSegments
+            if (!audioPlan.isNullOrEmpty()) {
+                try {
+                    // Strip tag ID3 per-segmen supaya file diisi ADTS bersih yang
+                    // bisa dibaca MediaExtractor.
+                    downloadSegmentsToFile(
+                        item, audioPlan, audioAdts, buffer, throttle, progress,
+                        transform = { AdtsAac.stripId3(it) }
+                    )
+                    val stream = AdtsAac.parse(audioAdts.readBytes())
+                    audioOk = stream != null && stream.frames.isNotEmpty()
+                } catch (e: Exception) {
+                    audioOk = false
                 }
             }
+
             coroutineContext.ensureActive()
-            val published0 = publishItem(saver, partial, fileName, item)
+
+            // 3) Remux video + audio jadi MP4 bila audio tersedia.
+            val remuxed = audioOk &&
+                HlsMp4Muxer.remux(videoTs, audioAdts, mp4)
+            if (remuxed) {
+                val fileName = "$baseName.mp4"
+                videoTs.delete()
+                audioAdts.delete()
+                val published0 = publishItem(saver, mp4, fileName, item)
+                val finalName = published0.fileName ?: fileName
+                val published = organizeIfEnabled(saver, published0, finalName)
+                finishHls(item, progress.downloaded, published, finalName)
+                return
+            }
+
+            // 4) Fallback: publish video-only .ts seperti semula.
+            runCatching { mp4.delete() }
+            runCatching { audioAdts.delete() }
+            val fileName = "$baseName.ts"
+            val published0 = publishItem(saver, videoTs, fileName, item)
             val finalName = published0.fileName ?: fileName
             val published = organizeIfEnabled(saver, published0, finalName)
-            speedTracker.reset(item.id)
-            updateItem(item.id) {
-                it.copy(
-                    state = DownloadState.COMPLETED,
-                    fileName = finalName,
-                    bytesDownloaded = downloaded,
-                    totalBytes = downloaded,
-                    contentUri = published.contentUri,
-                    filePath = published.filePath,
-                    autoResume = false,
-                    speedBps = 0,
-                    etaSeconds = 0,
-                    finishedAt = System.currentTimeMillis()
-                )
-            }
-            flushSave()
+            finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
-            runCatching { partial.delete() }
+            runCatching { videoTs.delete() }
+            runCatching { audioAdts.delete() }
+            runCatching { mp4.delete() }
             throw e
         }
+    }
+
+    private class HlsProgress {
+        var downloaded = 0L
+        var lastNotify = 0L
+    }
+
+    /** Unduh daftar segmen ke satu file. Tiap segmen ditulis setelah sukses
+     *  penuh (anti-korup) dan boleh di-transform (mis. strip ID3 audio). */
+    private suspend fun downloadSegmentsToFile(
+        item: DownloadItem,
+        urls: List<String>,
+        target: File,
+        buffer: ByteArray,
+        throttle: SpeedThrottle,
+        progress: HlsProgress,
+        transform: (ByteArray) -> ByteArray = { it }
+    ) {
+        BufferedOutputStream(FileOutputStream(target)).use { out ->
+            for (url in urls) {
+                coroutineContext.ensureActive()
+                val segBytes = fetchHlsSegmentWithRetry(
+                    item, url, buffer, throttle, progress.downloaded
+                ) { segNow -> reportHlsProgress(item, progress, segNow) }
+                out.write(transform(segBytes))
+                progress.downloaded += segBytes.size
+            }
+        }
+    }
+
+    private fun reportHlsProgress(item: DownloadItem, progress: HlsProgress, segNow: Long) {
+        val totalNow = progress.downloaded + segNow
+        val now = System.currentTimeMillis()
+        if (now - progress.lastNotify >= 1000) {
+            progress.lastNotify = now
+            val (speed, eta) = speedTracker.sample(item.id, totalNow, 0)
+            updateItem(item.id, persist = false) {
+                it.copy(
+                    state = DownloadState.DOWNLOADING,
+                    bytesDownloaded = totalNow,
+                    totalBytes = 0,
+                    speedBps = speed,
+                    etaSeconds = eta
+                )
+            }
+            scheduleProgressSave()
+        }
+    }
+
+    private fun finishHls(
+        item: DownloadItem,
+        downloaded: Long,
+        published: FileSaver.PublishResult,
+        finalName: String
+    ) {
+        speedTracker.reset(item.id)
+        updateItem(item.id) {
+            it.copy(
+                state = DownloadState.COMPLETED,
+                fileName = finalName,
+                bytesDownloaded = downloaded,
+                totalBytes = downloaded,
+                contentUri = published.contentUri,
+                filePath = published.filePath,
+                autoResume = false,
+                speedBps = 0,
+                etaSeconds = 0,
+                finishedAt = System.currentTimeMillis()
+            )
+        }
+        flushSave()
     }
 
     /** Unduh satu segmen HLS dengan retry sekali untuk error jaringan sementara
@@ -1162,25 +1230,48 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun parseHlsSegments(body: String, baseUrl: String): List<String> {
-        // Master playlist berisi varian; ambil yang bandwidth tertinggi.
-        if (body.contains("#EXT-X-STREAM-INF")) {
-            val variants = HlsParser.parseMaster(body, baseUrl) ?: return emptyList()
-            // Hindari varian raksasa (4K/8K): pilih tertinggi yang ≤1080p,
-            // fallback ke bandwidth terkecil bila semua di atas 1080p.
-            val best = variants
-                .filter { variantHeight(it.name) in 1..1080 }
-                .maxByOrNull { it.bandwidth }
-                ?: variants.minByOrNull { it.bandwidth }
-                ?: return emptyList()
-            val variantBody = fetchText(best.url, "", HLS_PROBE_MAX_BYTES) ?: return emptyList()
-            return variantBody.lines()
+    private data class HlsPlan(
+        val videoSegments: List<String>,
+        val audioSegments: List<String>? = null
+    )
+
+    /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
+    private fun parseHlsPlan(body: String, baseUrl: String): HlsPlan? {
+        if (!body.contains("#EXT-X-STREAM-INF")) {
+            // Media playlist langsung (bukan master) — tanpa audio terpisah.
+            val segments = body.lines()
                 .map { it.trim() }
                 .filter { it.startsWith("http") }
+            return if (segments.isEmpty()) null else HlsPlan(segments)
         }
-        return body.lines()
+        val variants = HlsParser.parseMaster(body, baseUrl) ?: return null
+        // Hindari varian raksasa (4K/8K): pilih tertinggi yang ≤1080p dan
+        // (bila ada) berprofil AVC tanpa B-frame agar remux MP4 mulus.
+        val best = variants
+            .filter { variantHeight(it.name) in 1..1080 }
+            .sortedWith(
+                compareByDescending<HlsVariant> { it.codecs.contains("avc1.4D") }
+                    .thenByDescending { it.bandwidth }
+            )
+            .firstOrNull()
+            ?: variants.minByOrNull { it.bandwidth }
+            ?: return null
+        val videoSegments = mediaSegments(best.url) ?: return null
+        val audioSegments = best.audioGroupId?.let { group ->
+            val renditions = HlsParser.parseAudioRenditions(body, baseUrl)
+            val match = renditions.firstOrNull { it.groupId == group && it.isDefault }
+                ?: renditions.firstOrNull { it.groupId == group }
+            match?.let { mediaSegments(it.url) }
+        }
+        return HlsPlan(videoSegments, audioSegments)
+    }
+
+    private fun mediaSegments(playlistUrl: String): List<String>? {
+        val body = fetchText(playlistUrl, "", HLS_PROBE_MAX_BYTES) ?: return null
+        val segments = body.lines()
             .map { it.trim() }
             .filter { it.startsWith("http") }
+        return if (segments.isEmpty()) null else segments
     }
 
     /** Parse tinggi (height) dari label varian seperti "1280x720 · 2500 kbps". */
@@ -2050,12 +2141,6 @@ private data class ServerHeaders(
     val contentDisposition: String?,
     val contentType: String?,
     val etag: String? = null
-)
-
-data class HlsVariant(
-    val name: String,
-    val url: String,
-    val bandwidth: Long
 )
 
 data class UrlProbe(

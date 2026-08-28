@@ -2,6 +2,7 @@ package com.tasirin.httpdownloadmanager.download
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HlsParserTest {
@@ -73,5 +74,33 @@ class HlsParserTest {
         )
         // base tanpa path -> relative menempel di akar
         assertEquals("https://cdn.example.com/low.m3u8", HlsParser.resolveUrl("https://cdn.example.com/master.m3u8", "low.m3u8"))
+    }
+
+    @Test
+    fun `parse master - audioGroupId dari atribut AUDIO`() {
+        val master = """
+            #EXTM3U
+            #EXT-X-MEDIA:URI="audio.m3u8",TYPE=AUDIO,GROUP-ID="aud",NAME="Default",DEFAULT=YES
+            #EXT-X-STREAM-INF:BANDWIDTH=1280000,RESOLUTION=1280x720,NAME="720p",AUDIO="aud"
+            https://cdn.example.com/videos/720.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(master, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals("aud", variants[0].audioGroupId)
+    }
+
+    @Test
+    fun `parse audio rendition - menghormati DEFAULT dan resolusi URL`() {
+        val master = """
+            #EXTM3U
+            #EXT-X-MEDIA:URI="/audios/low.m3u8",TYPE=AUDIO,GROUP-ID="low",NAME="Low",DEFAULT=YES,AUTOSELECT=YES
+            #EXT-X-MEDIA:URI="high.m3u8",TYPE=AUDIO,GROUP-ID="high",NAME="High"
+            #EXT-X-MEDIA:URI="subs.m3u8",TYPE=SUBTITLES,GROUP-ID="sub",NAME="Subs"
+        """.trimIndent()
+        val renditions = HlsParser.parseAudioRenditions(master, "https://cdn.example.com/videos/master.m3u8")
+        assertEquals(2, renditions.size)
+        assertTrue(renditions[0].isDefault)
+        assertEquals("https://cdn.example.com/audios/low.m3u8", renditions[0].url)
+        assertEquals("https://cdn.example.com/videos/high.m3u8", renditions[1].url)
+        assertTrue(!renditions[1].isDefault)
     }
 }
