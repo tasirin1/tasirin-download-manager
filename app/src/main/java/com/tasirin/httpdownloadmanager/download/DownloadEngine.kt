@@ -91,6 +91,11 @@ class DownloadEngine(appContext: Context) {
     private val jobs = ConcurrentHashMap<String, Job>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
     private val pendingRetries = ConcurrentHashMap.newKeySet<String>()
+    /** URL HLS yang sudah gagal (media playlist 403/404) — jangan retry; re-extract dari YouTube URL. */
+    private val failedHlsUrls = ConcurrentHashMap.newKeySet<String>()
+    /** URL sosial media original per item (YouTube/TikTok/etc) — disimpan saat ekstraksi
+     *  menghasilkan URL HLS yang berbeda; dipakai untuk re-extract saat HLS gagal. */
+    private val originalSocialUrls = ConcurrentHashMap<String, String>()
     private val activeConns = ConcurrentHashMap<String, MutableSet<HttpURLConnection>>()
     private val speedTracker = SpeedTracker()
     private var saveJob: Job? = null
@@ -254,6 +259,7 @@ class DownloadEngine(appContext: Context) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD CANCELLED: ${it.fileName}") }
         retryAttempts.remove(id)
         pendingRetries.remove(id)
+        originalSocialUrls.remove(id)
         speedTracker.reset(id)
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
@@ -274,6 +280,7 @@ class DownloadEngine(appContext: Context) {
         val item = _items.value.find { it.id == id }
         retryAttempts.remove(id)
         pendingRetries.remove(id)
+        originalSocialUrls.remove(id)
         speedTracker.reset(id)
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
@@ -888,11 +895,20 @@ class DownloadEngine(appContext: Context) {
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
         // Resume HLS: URL sudah berupa manifest m3u8 dari ekstraksi sebelumnya.
         // Arahkan ulang ke downloadHls agar tidak diunduh sebagai file polos.
-        if (isHlsManifestUrl(item.url)) {
+        // TAPI: bila URL ini sudah gagal sebelumnya (failedHlsUrls), jangan retry
+        // HLS yang sama — lewati ke ekstraksi sosial media supaya URL baru didapat.
+        if (isHlsManifestUrl(item.url) && !failedHlsUrls.contains(item.url)) {
             val hlsName = item.fileName
             updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }
             downloadHls(item, hlsName)
             return
+        }
+        // HLS URL sudah gagal sebelumnya — re-extract dari URL sosial media original.
+        val originalUrl = originalSocialUrls[item.id]
+        if (originalUrl != null && isHlsManifestUrl(item.url)) {
+            App.logEvent("HLS: re-extracting from original URL (manifest was failed)")
+            updateItem(item.id) { it.copy(url = originalUrl) }
+            return runDownload(item.copy(url = originalUrl), skipSocial)
         }
         // Social media: ekstrak direct URL menggunakan API publik
         // (tikwm.com untuk TikTok, embed page JSON untuk Instagram, vxtwitter untuk Twitter)
@@ -903,6 +919,9 @@ class DownloadEngine(appContext: Context) {
             if (result != null && result.directUrl != item.url) {
                 App.logEvent("SOCIAL: extracted direct URL from $host → ${result.directUrl.take(80)}...")
                 App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.take(50)}...")
+                // Simpan URL sosial media original supaya saat HLS gagal kita
+                // bisa re-extract dari URL asli (bukan dari URL manifest HLS yang stale).
+                if (result.isHls) originalSocialUrls[item.id] = item.url
                 // YouTube via HLS: segmen .ts digabung jadi satu file.
                 if (result.isHls) {
                     val hlsName = result.fileName ?: item.fileName
@@ -921,6 +940,9 @@ class DownloadEngine(appContext: Context) {
                         return
                     } catch (e: IOException) {
                         // HLS gagal (mis. media playlist butuh pot token / 403).
+                        // Tandai URL HLS sebagai gagal supaya resume/retry tidak
+                        // mengulang HLS yang sama — re-extract dari YouTube URL.
+                        failedHlsUrls.add(result.directUrl)
                         // Fallback: coba ekstrak non-HLS (page/Piped/Invidious).
                         App.logEvent("HLS: download failed (${e.message?.take(50)}), trying non-HLS fallback")
                         val fallback = SocialMediaExtractor.extractNonHlsYouTube(item.url)
