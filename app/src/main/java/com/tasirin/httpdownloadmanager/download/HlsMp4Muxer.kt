@@ -50,7 +50,10 @@ object HlsMp4Muxer {
             val videoBuf = runCatching {
                 vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
             }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
-            writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs)
+            val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
+                countVideoFrames(videoTs)
+            } else 0
+            writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount)
             if (audioTrack >= 0) {
                 audio?.let { stream ->
                     writeAacFrames(muxer, audioTrack, stream.frames, stream.sampleRate)
@@ -81,77 +84,70 @@ object HlsMp4Muxer {
         muxer: MediaMuxer,
         track: Int,
         bufferSize: Int,
-        segmentDurationsUs: List<Long> = emptyList()
+        segmentDurationsUs: List<Long>,
+        videoFrameCount: Int
     ) {
         val buffer = ByteBuffer.allocate(bufferSize)
         val info = MediaCodec.BufferInfo()
-        if (segmentDurationsUs.isEmpty()) {
-            // Playlist tanpa EXTINF (jarang): fallback ke PTS dengan drift
-            // agar PTS tetap naik saat perangkat tidak memberinya durasi.
+        if (segmentDurationsUs.isEmpty() || videoFrameCount <= 1) {
+            // Playlist tanpa EXTINF atau frame tidak terhitung (jarang):
+            // fallback ke PTS dengan drift agar tetap naik.
             writeAllPts(ext, muxer, track, buffer, info, bufferSize)
             return
         }
 
-        // Timeline dibangun dari durasi segmen (#EXTINF) supaya sinkron dengan
-        // audio yang memakai frame-count × 1024/sampleRate. PTS MPEG-TS
-        // YouTube tidak bisa diandalkan untuk durasi karena restart per segmen
-        // dan span yang tidak proporsional dengan #EXTINF.
-        var segIndex = 0
-        var timelineOffsetUs = 0L
-        var lastPts = -1L
-        var segMinPts = -1L
-        var segMaxPts = -1L
-        var segDurationUs = segmentDurationsUs[0]
-
+        // PTS MPEG-TS YouTube tidak bisa diandalkan (restart per segmen, span
+        // tidak proporsional dengan #EXTINF) sehingga tidak dipakai. Sebagai
+        // gantinya, durasi total video diambil dari #EXTINF lalu dibagi rata
+        // ke setiap frame — timeline seragam, naik terus, dan sinkron dengan
+        // audio (frame-count × 1024/sampleRate). Hasil: video lancar tanpa
+        // stutter maupun desync.
+        val totalUs = segmentDurationsUs.sum().coerceAtLeast(1L)
+        val stepUs = (totalUs / videoFrameCount).coerceAtLeast(1L)
+        var frameIndex = 0L
         while (true) {
             buffer.clear()
             val size = ext.readSampleData(buffer, 0)
             if (size < 0) break
             buffer.position(0)
             buffer.limit(size)
-            val pts = ext.sampleTime
-
-            // Deteksi restart segmen: PTS turun mendadak (mundur > 1 detik)
-            val restarted = lastPts >= 0 && pts < lastPts - 1_000_000L
-            var normalizedUs: Long
-            if (restarted) {
-                // Finalisasi segmen sebelumnya: tambahkan durasinya
-                timelineOffsetUs += segDurationUs
-                normalizedUs = timelineOffsetUs
-                segIndex++
-                if (segIndex < segmentDurationsUs.size) {
-                    segDurationUs = segmentDurationsUs[segIndex]
-                } else {
-                    segDurationUs = if (segMaxPts > segMinPts) {
-                        (segMaxPts - segMinPts) * 1_000_000L / 90_000L
-                    } else 5_000_000L // default 5 detik
-                }
-                segMinPts = pts
-                segMaxPts = pts
-            } else {
-                if (lastPts < 0) {
-                    segMinPts = pts
-                    segMaxPts = pts
-                    normalizedUs = timelineOffsetUs
-                } else {
-                    segMaxPts = maxOf(segMaxPts, pts)
-                    normalizedUs = if (segDurationUs > 0 && segMaxPts > segMinPts) {
-                        val ratio = (pts - segMinPts).toDouble() / (segMaxPts - segMinPts)
-                        timelineOffsetUs + (ratio * segDurationUs).toLong()
-                    } else {
-                        timelineOffsetUs + 1
-                    }
-                }
-            }
-            lastPts = pts
+            val pts = frameIndex * stepUs
             val flags = if (ext.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
                 MediaCodec.BUFFER_FLAG_KEY_FRAME
             } else {
                 0
             }
-            info.set(0, size, normalizedUs, flags)
+            info.set(0, size, pts, flags)
             muxer.writeSampleData(track, buffer, info)
             if (!ext.advance()) break
+            frameIndex++
+        }
+    }
+
+    /** Hitung jumlah frame video pada file .ts (pass terpisah, extractor baru
+     *  dikembalikan ke posisi awal) untuk timeline seragam. */
+    private fun countVideoFrames(file: File): Int {
+        val ext = MediaExtractor()
+        return try {
+            ext.setDataSource(file.absolutePath)
+            val index = selectVideoTrack(ext) ?: return 0
+            ext.selectTrack(index)
+            val size = runCatching {
+                ext.getTrackFormat(index).getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
+            }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
+            val buffer = ByteBuffer.allocate(size)
+            var count = 0
+            while (true) {
+                buffer.clear()
+                if (ext.readSampleData(buffer, 0) < 0) break
+                count++
+                if (!ext.advance()) break
+            }
+            count
+        } catch (t: Throwable) {
+            0
+        } finally {
+            runCatching { ext.release() }
         }
     }
 
