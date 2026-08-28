@@ -766,6 +766,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 JSONObject().put("ok", true).put("platform", "youtube").put("options", arr)
             )
         }
+        // Hanya proses URL media sosial yang dikenal; tolak URL acak (SSRF guard)
+        if (!SocialMediaExtractor.isSocialMediaUrl(url)) {
+            return jsonResponse(
+                JSONObject().put("ok", true).put("platform", "none").put("options", JSONArray())
+            )
+        }
         // Platform lain: ekstrak opsi dari social media extractor
         val results = try {
             kotlinx.coroutines.runBlocking {
