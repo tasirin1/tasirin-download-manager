@@ -590,7 +590,7 @@ object SocialMediaExtractor {
      *  tanpa lewat HLS (menghindari media playlist 404). */
     private fun extractYouTubeViaVisionosAdaptive(videoId: String): Result? {
         val page = httpGetWithCookies(
-            "https://www.youtube.com/shorts/$videoId",
+            "https://www.youtube.com/watch?v=$videoId",
             mapOf(
                 "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
                 "Accept-Language" to "en-US,en;q=0.9"
@@ -601,17 +601,17 @@ object SocialMediaExtractor {
             ?: Regex("""visitorData"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
             ?: return null
         val body = buildString {
-            append("{"context":{"client":{")
-            append(""clientName":"VISIONOS",")
-            append(""clientVersion":"1.02",")
-            append(""deviceMake":"Apple",")
-            append(""deviceModel":"RealityDevice17,1",")
-            append(""userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15",")
-            append(""osName":"visionOS",")
-            append(""osVersion":"26.5.23O471",")
-            append(""hl":"en",")
-            append(""visitorData":"$visitor"")
-            append("}},"videoId":"$videoId"}")
+            append("{\"context\":{\"client\":{")
+            append("\"clientName\":\"VISIONOS\",")
+            append("\"clientVersion\":\"1.02\",")
+            append("\"deviceMake\":\"Apple\",")
+            append("\"deviceModel\":\"RealityDevice17,1\",")
+            append("\"userAgent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15\",")
+            append("\"osName\":\"visionOS\",")
+            append("\"osVersion\":\"26.5.23O471\",")
+            append("\"hl\":\"en\",")
+            append("\"visitorData\":\"$visitor\"")
+            append("}},\"videoId\":\"$videoId\"}")
         }
         val json = httpPostJson(
             "https://www.youtube.com/youtubei/v1/player",
