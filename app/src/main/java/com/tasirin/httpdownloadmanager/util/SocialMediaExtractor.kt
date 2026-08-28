@@ -636,38 +636,34 @@ object SocialMediaExtractor {
 
     private fun extractYouTubeViaCobalt(videoId: String): Result? {
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
+        val body = """{"url":"$watchUrl","filenameStyle":"pretty","downloadMode":"auto"}"""
         for (instance in COBALT_INSTANCES) {
-            val result = runCatching {
-                val conn = URL("$instance/") as java.net.URL
-                val httpConn = conn.openConnection() as java.net.HttpURLConnection
-                httpConn.requestMethod = "POST"
-                httpConn.connectTimeout = 8000
-                httpConn.readTimeout = 12000
-                httpConn.setRequestProperty("Content-Type", "application/json")
-                httpConn.setRequestProperty("Accept", "application/json")
-                httpConn.setRequestProperty("User-Agent", "Mozilla/5.0")
-                httpConn.doOutput = true
-                val body = """{"url":"$watchUrl","filenameStyle":"pretty","downloadMode":"auto"}"""
-                httpConn.outputStream.use { it.write(body.toByteArray()) }
-                val code = httpConn.responseCode
-                if (code !in 200..299) {
-                    App.logEvent("YT DEBUG: cobalt $instance HTTP $code")
-                    return@runCatching null
-                }
-                val resp = httpConn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+            App.logEvent("YT DEBUG: cobalt trying $instance")
+            val resp = httpPostJson(
+                "$instance/",
+                body,
+                mapOf("User-Agent" to "Mozilla/5.0", "Accept" to "application/json"),
+                timeoutMs = 15000
+            )
+            if (resp == null) {
+                App.logEvent("YT DEBUG: cobalt $instance failed/unavailable")
+                continue
+            }
+            return runCatching {
                 val obj = JSONObject(resp)
                 val status = obj.optString("status", "")
                 val url = obj.optString("url", "")
-                if (status == "tunnel" || status == "redirect") {
+                if (status.isNotEmpty() && url.startsWith("http")) {
                     val fileName = obj.optString("filename", "YouTube_$videoId.mp4")
                     App.logEvent("YT DEBUG: cobalt $instance OK → $status")
-                    return Result(url, fileName, "YouTube_$videoId", "Auto", "video/mp4")
+                    Result(url, fileName, "YouTube_$videoId", "Auto", "video/mp4")
+                } else {
+                    // Cobalt v10+ bisa mengembalikan error dalam "text" field
+                    val err = obj.optString("text", obj.optString("error", status))
+                    App.logEvent("YT DEBUG: cobalt $instance no url: status=$status err=$err")
+                    null
                 }
-                // Cobalt v10+ format: {"status":"error",...}
-                App.logEvent("YT DEBUG: cobalt $instance: status=$status")
-                null
-            }.getOrNull()
-            if (result != null) return result
+            }.getOrNull()?.let { return it }
         }
         return null
     }
