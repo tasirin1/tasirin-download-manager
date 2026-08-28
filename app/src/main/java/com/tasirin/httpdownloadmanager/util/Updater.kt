@@ -86,21 +86,24 @@ object Updater {
                 return null
             }
             val total = conn.contentLength.toLong().coerceAtLeast(0L)
-            conn.inputStream.use { input ->
-                target.outputStream().use { out ->
-                    val buf = ByteArray(64 * 1024)
-                    var done = 0L
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        done += n
-                        if (done > info.apkSize) throw SecurityException("Update size mismatch")
-                        onProgress(done, total)
+            try {
+                conn.inputStream.use { input ->
+                    target.outputStream().use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        var done = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            out.write(buf, 0, n)
+                            done += n
+                            if (done > info.apkSize) throw SecurityException("Update size mismatch")
+                            onProgress(done, total)
+                        }
                     }
                 }
+            } finally {
+                conn.disconnect()
             }
-            conn.disconnect()
             break
         }
         if (info.apkSize > 0 && target.length() != info.apkSize) {

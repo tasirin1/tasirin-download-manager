@@ -135,17 +135,18 @@ object SocialMediaExtractor {
 
         // Strategi 1: embed page — data carousel presisi (hanya foto/video milik post ini)
         // Format contextJSON":"{...}" berisi edge_sidecar_to_children lengkap.
-        val igCookies = ""
-        val embedHtml = httpGetWithCookies(
+        val embedResult = httpGetWithCookies(
             "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
-        )?.body
+        )
+        val embedHtml = embedResult?.body
+        val igCookies = embedResult?.cookies.orEmpty()
         App.logEvent("IG DEBUG: embed page ${embedHtml?.length ?: 0} chars, shortcode=$shortcode")
         if (embedHtml != null && embedHtml.length > 1000) {
             val media = extractContextJson(embedHtml)
             if (media != null) {
                 val all = extractAllFromMedia(media, shortcode, igCookies)
                 if (all.isNotEmpty()) {
-                    App.logEvent("IG DEBUG: embed carousel ${all.size} items")
+                    App.logEvent("IG DEBUG: embed carousel ${all.size} items, cookies=${igCookies.take(30)}")
                     options.addAll(all)
                 }
             }
