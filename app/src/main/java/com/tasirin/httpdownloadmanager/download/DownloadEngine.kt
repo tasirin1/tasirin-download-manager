@@ -896,11 +896,15 @@ class DownloadEngine(appContext: Context) {
                 // YouTube via HLS: segmen .ts digabung jadi satu file.
                 if (result.isHls) {
                     val hlsName = result.fileName ?: item.fileName
+                    val hlsHeaders = if (result.cookies.isNotEmpty()) {
+                        val existing = item.headers.trim()
+                        if (existing.isNotEmpty()) "${existing}\nCookie: ${result.cookies}" else "Cookie: ${result.cookies}"
+                    } else item.headers
                     updateItem(item.id) {
-                        it.copy(url = result.directUrl, fileName = if (!item.nameIsCustom) hlsName else item.fileName)
+                        it.copy(url = result.directUrl, fileName = if (!item.nameIsCustom) hlsName else item.fileName, headers = hlsHeaders)
                     }
                     downloadHls(
-                        item.copy(url = result.directUrl, fileName = hlsName, headers = item.headers),
+                        item.copy(url = result.directUrl, fileName = hlsName, headers = hlsHeaders),
                         hlsName
                     )
                     return
@@ -1020,8 +1024,11 @@ class DownloadEngine(appContext: Context) {
 
         val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES)
             ?: throw IOException("Cannot fetch HLS manifest")
-        val plan = parseHlsPlan(master, item.url, item.preferredHeight)
-        if (plan == null || plan.videoSegments.isEmpty()) throw IOException("No HLS segments found")
+        val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers)
+        if (plan == null || plan.videoSegments.isEmpty()) {
+            App.logEvent("HLS DEBUG: master ${master.length} chars, stream-inf=${master.contains("#EXT-X-STREAM-INF")}, url=${item.url.take(90)}")
+            throw IOException("No HLS segments found")
+        }
         App.logEvent(
             "HLS: ${plan.videoSegments.size} video segments, " +
                 (plan.audioSegments?.size ?: 0) + " audio segments"
@@ -1246,12 +1253,13 @@ class DownloadEngine(appContext: Context) {
     )
 
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
-    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0): HlsPlan? {
+    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = ""): HlsPlan? {
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
             val segments = body.lines()
-                .map { it.trim() }
+                .map { HlsParser.resolveUrl(baseUrl, it.trim()) }
                 .filter { it.startsWith("http") }
+            App.logEvent("HLS: direct media playlist, ${segments.size} segments")
             return if (segments.isEmpty()) null else HlsPlan(segments)
         }
         val variants = HlsParser.parseMaster(body, baseUrl) ?: return null
@@ -1282,14 +1290,14 @@ class DownloadEngine(appContext: Context) {
                 avc.minByOrNull { it.bandwidth }
             }
         } ?: variants.minByOrNull { it.bandwidth } ?: return null
-        val videoSegs = mediaSegmentsWithDurations(best.url) ?: return null
+        val videoSegs = mediaSegmentsWithDurations(best.url, headers) ?: return null
         val videoSegments = videoSegs.map { it.first }
         val videoDurations = videoSegs.map { it.second }
         val audioSegments = best.audioGroupId?.let { group ->
             val renditions = HlsParser.parseAudioRenditions(body, baseUrl)
             val match = renditions.firstOrNull { it.groupId == group && it.isDefault }
                 ?: renditions.firstOrNull { it.groupId == group }
-            match?.let { mediaSegments(it.url) }
+            match?.let { mediaSegments(it.url, headers) }
         }
         App.logEvent(
             "HLS plan: ${best.codecs} ${best.bandwidth/1000}kbps ${best.frameRate}fps, " +
@@ -1299,8 +1307,8 @@ class DownloadEngine(appContext: Context) {
     }
 
     /** Parse segmen dari media playlist, mengembalikan (url, durasi_us). */
-    private fun mediaSegmentsWithDurations(playlistUrl: String): List<Pair<String, Long>>? {
-        val body = fetchText(playlistUrl, "", HLS_PROBE_MAX_BYTES) ?: return null
+    private fun mediaSegmentsWithDurations(playlistUrl: String, headers: String = ""): List<Pair<String, Long>>? {
+        val body = fetchText(playlistUrl, headers, HLS_PROBE_MAX_BYTES) ?: return null
         val result = mutableListOf<Pair<String, Long>>()
         val lines = body.lines()
         var i = 0
@@ -1310,7 +1318,7 @@ class DownloadEngine(appContext: Context) {
                 // Format: #EXTINF:<durasi>, atau #EXTINF:<durasi>, ...
                 val dur = line.substringAfter(":").substringBefore(",").trim()
                     .toDoubleOrNull() ?: 0.0
-                val url = lines.getOrNull(i + 1)?.trim().orEmpty()
+                val url = HlsParser.resolveUrl(playlistUrl, lines.getOrNull(i + 1)?.trim().orEmpty())
                 if (url.startsWith("http")) {
                     result.add(url to (dur * 1_000_000).toLong())
                 }
@@ -1321,8 +1329,8 @@ class DownloadEngine(appContext: Context) {
         return if (result.isEmpty()) null else result
     }
 
-    private fun mediaSegments(playlistUrl: String): List<String>? =
-        mediaSegmentsWithDurations(playlistUrl)?.map { it.first }
+    private fun mediaSegments(playlistUrl: String, headers: String = ""): List<String>? =
+        mediaSegmentsWithDurations(playlistUrl, headers)?.map { it.first }
 
 
     private fun fetchText(url: String, headers: String, maxBytes: Int): String? {

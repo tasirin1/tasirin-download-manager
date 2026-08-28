@@ -523,7 +523,9 @@ object SocialMediaExtractor {
             val hls = obj.optJSONObject("streamingData")?.optString("hlsManifestUrl")
             if (hls.isNullOrEmpty()) return null
             val safeName = sanitizeFileName(title)
-            Result(hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL", cookies = "", isHls = true)
+            // Cookies dari halaman diperlukan untuk fetching master & media
+            // playlist di server googlevideo (tanpa cookies sering 403/404).
+            Result(hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL", cookies = page.cookies, isHls = true)
         }.getOrNull()
     }
 
