@@ -90,6 +90,7 @@ class DownloadEngine(appContext: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
+    private val pendingRetries = ConcurrentHashMap.newKeySet<String>()
     private val activeConns = ConcurrentHashMap<String, MutableSet<HttpURLConnection>>()
     private val speedTracker = SpeedTracker()
     private var saveJob: Job? = null
@@ -216,6 +217,7 @@ class DownloadEngine(appContext: Context) {
     fun pause(id: String) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD PAUSED: ${it.fileName}") }
         retryAttempts.remove(id)
+        pendingRetries.remove(id)
         speedTracker.reset(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
@@ -231,6 +233,7 @@ class DownloadEngine(appContext: Context) {
         if (item.state != DownloadState.PAUSED && item.state != DownloadState.FAILED) return
         App.logEvent("DOWNLOAD RESUMED: ${item.fileName}")
         retryAttempts.remove(id)
+        pendingRetries.remove(id)
         clearSegProgress(id)
         updateItem(id) { it.copy(state = DownloadState.PENDING, autoResume = true) }
         attemptStart(id)
@@ -250,6 +253,7 @@ class DownloadEngine(appContext: Context) {
     fun cancel(id: String) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD CANCELLED: ${it.fileName}") }
         retryAttempts.remove(id)
+        pendingRetries.remove(id)
         speedTracker.reset(id)
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
@@ -269,6 +273,7 @@ class DownloadEngine(appContext: Context) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD DELETED: ${it.fileName}") }
         val item = _items.value.find { it.id == id }
         retryAttempts.remove(id)
+        pendingRetries.remove(id)
         speedTracker.reset(id)
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
@@ -453,6 +458,7 @@ class DownloadEngine(appContext: Context) {
     fun retryFailed() {
         _items.value.filter { it.state == DownloadState.FAILED }.forEach { item ->
             retryAttempts.remove(item.id)
+            pendingRetries.remove(item.id)
             updateItem(item.id) {
                 it.copy(state = DownloadState.PENDING, autoResume = true, error = null)
             }
@@ -468,6 +474,7 @@ class DownloadEngine(appContext: Context) {
         if (ids.isEmpty()) return
         ids.forEach { id ->
             retryAttempts.remove(id)
+            pendingRetries.remove(id)
             updateItem(id) {
                 it.copy(state = DownloadState.PENDING, autoResume = true, error = null)
             }
@@ -634,6 +641,7 @@ class DownloadEngine(appContext: Context) {
         StorageCleanup.runIfLow(context, _items.value)
         for (item in pending) {
             if (active >= max) break
+            if (pendingRetries.contains(item.id)) continue
             if (launchItem(item)) active++
         }
     }
@@ -783,8 +791,10 @@ class DownloadEngine(appContext: Context) {
             val retryInfo = "Failed (attempt $attempts/$maxRetries) — retrying in ${Formats.eta(backoff / 1000)}"
             App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} ($retryInfo)")
             updateItem(id) { it.copy(state = DownloadState.PENDING, error = retryInfo) }
+            pendingRetries.add(id)
             scope.launch {
                 delay(backoff)
+                pendingRetries.remove(id)
                 if (_items.value.find { it.id == id }?.state == DownloadState.PENDING) {
                     updateItem(id) { it.copy(error = null) }
                     attemptStart(id)
@@ -924,7 +934,9 @@ class DownloadEngine(appContext: Context) {
                             updateItem(item.id) { it.copy(url = fallback.directUrl, fileName = if (!item.nameIsCustom) fbName else item.fileName, headers = fbHeaders) }
                             return runDownload(item.copy(url = fallback.directUrl, fileName = fbName, headers = fbHeaders), skipSocial = true)
                         }
-                        // Non-HLS juga gagal — lempar error asli
+                        // Non-HLS juga gagal — kembalikan URL ke original supaya
+                        // retry ulang melewati ekstraksi sosial media (bukan langsung HLS).
+                        updateItem(item.id) { it.copy(url = item.url) }
                         throw e
                     }
                 }

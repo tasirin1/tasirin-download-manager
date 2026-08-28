@@ -423,7 +423,7 @@ object SocialMediaExtractor {
 
     private fun extractYouTubeFromPage(url: String, videoId: String): List<Result> {
         val httpResult = httpGetWithCookies(
-            "https://www.youtube.com/shorts/$videoId",
+            "https://www.youtube.com/watch?v=$videoId",
             mapOf(
                 "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
                 "Accept-Language" to "en-US,en;q=0.9"
@@ -474,12 +474,18 @@ object SocialMediaExtractor {
                     App.logEvent("YT DEBUG: using Piped fallback (${piped.size} stream)")
                     return piped
                 }
-                val invidious = extractYouTubeViaInvidious(videoId)
+                val invidious = runCatching { extractYouTubeViaInvidious(videoId) }.getOrElse { e ->
+                    App.logEvent("YT DEBUG: invidious error: ${e.message?.take(80)}")
+                    null
+                }
                 if (invidious != null) {
                     App.logEvent("YT DEBUG: using Invidious fallback")
                     return listOf(invidious)
                 }
-                val cobalt = extractYouTubeViaCobalt(videoId)
+                val cobalt = runCatching { extractYouTubeViaCobalt(videoId) }.getOrElse { e ->
+                    App.logEvent("YT DEBUG: cobalt error: ${e.message?.take(80)}")
+                    null
+                }
                 if (cobalt != null) {
                     App.logEvent("YT DEBUG: using Cobalt fallback")
                     return listOf(cobalt)
@@ -668,36 +674,37 @@ object SocialMediaExtractor {
         return null
     }
 
-    /** Ikuti redirect /latest_version dan kembalikan URL stream final non-HTML. */
+    /** Ikuti redirect /latest_version dan kembalikan URL stream final non-HTML.
+     *  Seluruh body per-iteration dibungkus runCatching: timeout/koneksi gagal
+     *  (SocketTimeoutException, IOException) TIDAK boleh menghentikan rantai
+     *  fallback YouTube — cukup dianggap gagal dan lanjut ke instance lain. */
     private fun resolveInvidiousLatest(instance: String, videoId: String, itag: String): String? {
         val start = "https://$instance/latest_version?id=$videoId&itag=$itag"
         var current = start
         for (i in 0 until 6) {
-            val conn = runCatching {
-                val c = URL(current).openConnection() as HttpURLConnection
-                c.instanceFollowRedirects = false
-                c.connectTimeout = 4000
-                c.readTimeout = 4000
-                c.setRequestProperty("User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0")
-                c.setRequestProperty("Accept", "video/mp4,*/*")
-                c
-            }.getOrNull() ?: return null
-            try {
-                val code = conn.responseCode
-                if (code in 301..308) {
-                    val loc = conn.getHeaderField("Location")
-                    conn.disconnect()
-                    if (loc.isNullOrBlank()) return null
-                    current = java.net.URI(current).resolve(loc).toString()
-                    continue
-                }
-                val type = conn.contentType ?: ""
-                if (code in 200..299 && type.contains("video", ignoreCase = true)) {
-                    return current
-                }
-                return null
-            } finally { runCatching { conn.disconnect() } }
+            runCatching {
+                val conn = URL(current).openConnection() as HttpURLConnection
+                try {
+                    conn.instanceFollowRedirects = false
+                    conn.connectTimeout = 4000
+                    conn.readTimeout = 4000
+                    conn.setRequestProperty("User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0")
+                    conn.setRequestProperty("Accept", "video/mp4,*/*")
+                    val code = conn.responseCode
+                    if (code in 301..308) {
+                        val loc = conn.getHeaderField("Location")
+                        if (loc.isNullOrBlank()) return null
+                        current = java.net.URI(current).resolve(loc).toString()
+                        return@runCatching null
+                    }
+                    val type = conn.contentType ?: ""
+                    if (code in 200..299 && type.contains("video", ignoreCase = true)) {
+                        return current
+                    }
+                    return null
+                } finally { runCatching { conn.disconnect() } }
+            }.getOrNull()?.let { return it }
         }
         return null
     }
