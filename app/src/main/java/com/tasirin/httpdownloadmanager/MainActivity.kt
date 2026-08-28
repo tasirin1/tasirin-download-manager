@@ -373,7 +373,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             if (!isSocial) {
                 socialJob = null
                 socialOptions = emptyList()
-                socialQualitySection.visibility = View.GONE
+                socialQualitySection.isVisible = false
                 return
             }
             socialJob = lifecycleScope.launch {
@@ -382,7 +382,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
                 socialOptions = options
                 if (options.isEmpty()) {
-                    socialQualitySection.visibility = View.GONE
+                    socialQualitySection.isVisible = false
                 } else {
                     val labels = listOf(getString(R.string.social_quality_default)) +
                         options.map { opt ->
@@ -393,7 +393,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                             }
                         }
                     setupSpinner(this@MainActivity, socialQualitySpinner, labels)
-                    socialQualitySection.visibility = View.VISIBLE
+                    socialQualitySection.isVisible = true
                 }
             }
         }
@@ -459,7 +459,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 // bila opsi sudah dimuat dan user tidak memilih "Auto (best)".
                 val socialSel = socialQualitySpinner.selectedItemPosition
                 val selectedOption = if (
-                    socialQualitySection.visibility == View.VISIBLE &&
+                    socialQualitySection.isVisible &&
                     socialOptions.isNotEmpty() &&
                     socialSel in 1..socialOptions.size
                 ) socialOptions[socialSel - 1] else null
