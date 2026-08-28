@@ -91,6 +91,9 @@ class HlsParserTest {
         assertEquals(60, variants[0].frameRate)
         assertEquals(30, variants[1].frameRate)
         assertEquals(0, variants.minByOrNull { it.bandwidth }!!.frameRate)
+        assertEquals(720, variants[0].height)
+        assertEquals(480, variants[1].height)
+        assertEquals(240, variants.minByOrNull { it.bandwidth }!!.height)
     }
 
     @Test
