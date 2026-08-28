@@ -1020,6 +1020,10 @@ class DownloadEngine(appContext: Context) {
             ?: throw IOException("Cannot fetch HLS manifest")
         val plan = parseHlsPlan(master, item.url)
         if (plan == null || plan.videoSegments.isEmpty()) throw IOException("No HLS segments found")
+        App.logEvent(
+            "HLS: ${plan.videoSegments.size} video segments, " +
+                (plan.audioSegments?.size ?: 0) + " audio segments"
+        )
 
         val globalLimit = StoragePrefs.speedLimitKbps(context)
         val limit = if (item.speedLimitKbps > 0) item.speedLimitKbps else globalLimit
@@ -1042,29 +1046,31 @@ class DownloadEngine(appContext: Context) {
             downloadSegmentsToFile(item, plan.videoSegments, videoTs, buffer, throttle, progress)
 
             // 2) Unduh segmen audio (ADTS AAC) ke file temp bila terpisah.
-            var audioOk = false
+            var audioStream: AdtsAac.Stream? = null
             val audioPlan = plan.audioSegments
             if (!audioPlan.isNullOrEmpty()) {
                 try {
                     // Strip tag ID3 per-segmen supaya file diisi ADTS bersih yang
-                    // bisa dibaca MediaExtractor.
+                    // bisa dibaca parser ADTS.
                     downloadSegmentsToFile(
                         item, audioPlan, audioAdts, buffer, throttle, progress,
                         transform = { AdtsAac.stripId3(it) }
                     )
                     val stream = AdtsAac.parse(audioAdts.readBytes())
-                    audioOk = stream != null && stream.frames.isNotEmpty()
+                    if (stream != null && stream.frames.isNotEmpty()) audioStream = stream
                 } catch (e: Exception) {
-                    audioOk = false
+                    audioStream = null
                 }
+                if (audioStream == null) App.logEvent("HLS: audio download/parse failed, audio skipped")
             }
 
             coroutineContext.ensureActive()
 
             // 3) Remux video + audio jadi MP4 bila audio tersedia.
-            val remuxed = audioOk &&
-                HlsMp4Muxer.remux(videoTs, audioAdts, mp4)
+            val remuxed = audioStream != null &&
+                HlsMp4Muxer.remux(videoTs, audioStream, mp4)
             if (remuxed) {
+                App.logEvent("HLS: remux OK → MP4 with audio")
                 val fileName = "$baseName.mp4"
                 videoTs.delete()
                 audioAdts.delete()
@@ -1076,6 +1082,7 @@ class DownloadEngine(appContext: Context) {
             }
 
             // 4) Fallback: publish video-only .ts seperti semula.
+            App.logEvent("HLS: remux failed, falling back to video-only .ts")
             runCatching { mp4.delete() }
             runCatching { audioAdts.delete() }
             val fileName = "$baseName.ts"

@@ -16,7 +16,9 @@ internal class BodyTooLargeException : IOException("Request body too large")
  *  gabung dengan parameter query. Dibatasi 4 MB. */
 internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
     val map = mutableMapOf<String, String>()
-    session.parms.forEach { (k, v) -> map[k] = v }
+    session.getParameters().forEach { (k, v) ->
+        v.firstOrNull()?.let { map[k] = it }
+    }
     val rawLength = session.headers["content-length"]?.toLongOrNull() ?: 0L
     if (rawLength > MAX_BODY_SIZE) throw BodyTooLargeException()
     val length = rawLength.toInt()
@@ -53,6 +55,11 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
     }
     return map
 }
+
+/** Parameter query/form sesi — pengganti `parms` yang deprecated di
+ *  NanoHTTPD 2.3.1. Mengembalikan nilai pertama per key (null bila kosong). */
+internal fun NanoHTTPD.IHTTPSession.param(key: String): String? =
+    getParameters()[key]?.firstOrNull()
 
 /** Habiskan body sesi tanpa memprosesnya (untuk request yang body-nya
  *  sengaja diabaikan) supaya koneksi bisa dipakai ulang. */

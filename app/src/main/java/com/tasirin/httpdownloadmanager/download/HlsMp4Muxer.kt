@@ -5,43 +5,52 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import java.io.File
-import java.io.IOException
 import java.nio.ByteBuffer
 
-/** Remux video MPEG-TS (AVC) + audio ADTS (AAC) menjadi satu file MP4 memakai
- *  MediaExtractor + MediaMuxer bawaan Android — tanpa ffmpeg/library tambahan
- *  (APK tetap kecil). Mengembalikan true bila MP4 berhasil dibuat dan diputar. */
+/** Remux video MPEG-TS (AVC) + audio AAC (ADTS, sudah di-parse) menjadi satu
+ *  file MP4 memakai MediaExtractor (video) + MediaMuxer bawaan Android.
+ *  Audio ditulis manual dari frame AAC murni (tanpa header ADTS) supaya
+ *  deterministik — MediaExtractor untuk file ADTS menghasilkan format
+ *  is-adts/sample ber-header yang tidak bisa langsung ditulis ke MP4.
+ *  Tanpa ffmpeg/library tambahan (APK tetap kecil). */
 object HlsMp4Muxer {
 
-    fun remux(videoTs: File, audioAdts: File, outMp4: File): Boolean {
+    fun remux(videoTs: File, audio: AdtsAac.Stream?, outMp4: File): Boolean {
         var muxer: MediaMuxer? = null
         var videoExt: MediaExtractor? = null
-        var audioExt: MediaExtractor? = null
         try {
             if (outMp4.exists() && !outMp4.delete()) return false
             muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
-            // Add semua track DULU, baru start() (syarat MediaMuxer).
-            // --- Track video (MPEG-TS AVC) ---
+            // --- Track video (MPEG-TS AVC) via MediaExtractor ---
             videoExt = MediaExtractor()
-            val vIndex = selectTrack(videoExt.setData(videoTs), isVideo = true) ?: return false
+            videoExt.setDataSource(videoTs.absolutePath)
+            val vIndex = selectVideoTrack(videoExt) ?: return false
             val vFormat = videoExt.getTrackFormat(vIndex)
             videoExt.selectTrack(vIndex)
             val videoTrack = muxer.addTrack(vFormat)
 
-            // --- Track audio (ADTS AAC) ---
-            audioExt = MediaExtractor()
-            val aIndex = selectTrack(audioExt.setData(audioAdts), isVideo = false) ?: return false
-            val aFormat = audioExt.getTrackFormat(aIndex)
-            audioExt.selectTrack(aIndex)
-            val audioTrack = muxer.addTrack(aFormat)
+            // --- Track audio (AAC murni) dibangun manual dari ADTS parse ---
+            var audioTrack = -1
+            if (audio != null && audio.frames.isNotEmpty()) {
+                val aFormat = MediaFormat.createAudioFormat(
+                    MediaFormat.MIMETYPE_AUDIO_AAC, audio.sampleRate, audio.channels
+                )
+                aFormat.setByteBuffer("csd-0", ByteBuffer.wrap(audio.csd0))
+                aFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 1 shl 16)
+                audioTrack = muxer.addTrack(aFormat)
+            }
 
             muxer.start()
             val videoBuf = runCatching {
                 vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
             }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
             writeAll(videoExt, muxer, videoTrack, videoBuf)
-            writeAll(audioExt, muxer, audioTrack, 1 shl 20)
+            if (audioTrack >= 0) {
+                audio?.let { stream ->
+                    writeAacFrames(muxer, audioTrack, stream.frames, stream.sampleRate)
+                }
+            }
 
             muxer.stop()
             return true
@@ -50,22 +59,14 @@ object HlsMp4Muxer {
             return false
         } finally {
             runCatching { videoExt?.release() }
-            runCatching { audioExt?.release() }
             runCatching { muxer?.release() }
         }
     }
 
-    /** setDataSource dengan try-catch agar deteksi error konsisten. Mengembalikan
-     *  MediaExtractor siap dibaca. */
-    private fun MediaExtractor.setData(file: File): MediaExtractor {
-        setDataSource(file.absolutePath)
-        return this
-    }
-
-    private fun selectTrack(ext: MediaExtractor, isVideo: Boolean): Int? {
+    private fun selectVideoTrack(ext: MediaExtractor): Int? {
         for (i in 0 until ext.trackCount) {
             val mime = ext.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
-            if (isVideo == mime.startsWith("video/")) return i
+            if (mime.startsWith("video/")) return i
         }
         return null
     }
@@ -73,18 +74,25 @@ object HlsMp4Muxer {
     private fun writeAll(ext: MediaExtractor, muxer: MediaMuxer, track: Int, bufferSize: Int) {
         val buffer = ByteBuffer.allocate(bufferSize)
         val info = MediaCodec.BufferInfo()
-        var base = -1L
+        var firstPts = -1L
         var lastPts = -1L
+        var drift = 0L
         while (true) {
+            buffer.clear()
             val size = ext.readSampleData(buffer, 0)
             if (size < 0) break
+            buffer.position(0)
+            buffer.limit(size)
             val pts = ext.sampleTime
-            // Normalisasi ke 0 supaya track video & audio sejajar; MediaMuxer
-            // juga wajib menerima PTS tidak menurun (AVC High dengan B-frame
-            // urutannya beda — variasi ini di-fallback ke TS video-only).
-            if (base < 0) base = pts
-            val normalized = pts - base
-            if (normalized < lastPts) throw IOException("Non-monotonic PTS")
+            if (firstPts < 0) firstPts = pts
+            var normalized = pts - firstPts + drift
+            // Segmen MPEG-TS YouTube mereset PTS ke nilai kecil di tiap segmen.
+            // Bila PTS global mundur (restart segmen), dorong drift agar urutan
+            // tetap naik — MediaMuxer menolak PTS yang menurun.
+            if (lastPts >= 0 && normalized < lastPts) {
+                drift += lastPts - normalized + 1
+                normalized = lastPts + 1
+            }
             lastPts = normalized
             val flags = if (ext.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
                 MediaCodec.BUFFER_FLAG_KEY_FRAME
@@ -94,6 +102,32 @@ object HlsMp4Muxer {
             info.set(0, size, normalized, flags)
             muxer.writeSampleData(track, buffer, info)
             if (!ext.advance()) break
+        }
+    }
+
+    /** Tulis frame AAC murni (tanpa header ADTS) dengan PTS kontinu — tiap
+     *  frame = 1024 sampel audio pada sampleRate. */
+    private fun writeAacFrames(
+        muxer: MediaMuxer,
+        track: Int,
+        frames: List<ByteArray>,
+        sampleRate: Int
+    ) {
+        val buffer = ByteBuffer.allocate(1 shl 16)
+        val info = MediaCodec.BufferInfo()
+        val stepUs = if (sampleRate > 0) {
+            1_000_000L * AdtsAac.SAMPLES_PER_FRAME / sampleRate
+        } else {
+            0L
+        }
+        var pts = 0L
+        for (frame in frames) {
+            buffer.clear()
+            buffer.put(frame)
+            buffer.flip()
+            info.set(0, frame.size, pts, 0)
+            muxer.writeSampleData(track, buffer, info)
+            pts += stepUs
         }
     }
 }

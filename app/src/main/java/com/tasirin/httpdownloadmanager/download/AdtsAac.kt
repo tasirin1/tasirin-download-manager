@@ -16,7 +16,7 @@ object AdtsAac {
         96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350
     )
 
-    private const val SAMPLES_PER_FRAME = 1024L
+    const val SAMPLES_PER_FRAME = 1024L
 
     /** Ukuran tag ID3v2 di posisi offset (0 bila tidak ada). Video/audio segmen
      *  HLS YouTube sering diawali tag ID3 berisi timestamp transport stream. */
