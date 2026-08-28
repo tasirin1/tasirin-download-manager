@@ -74,105 +74,115 @@ object HlsMp4Muxer {
         }
     }
 
-/** Remux video MPEG-TS (AVC) + file audio MP4/M4A (AAC, dari
- *  adaptiveFormats YouTube) menjadi satu MP4. Video memakai timeline seragam
- *  (sama seperti `remux`), audio memakai PTS asli file M4A. */
+    /** Remux video MPEG-TS (AVC) + file audio MP4/M4A (AAC, dari
+     *  adaptiveFormats YouTube) menjadi satu MP4. Video memakai timeline
+     *  seragam (sama seperti `remux`), audio memakai PTS asli file M4A. */
     fun remuxWithAudioFile(
-    videoTs: File,
-    audioMp4: File,
-    outMp4: File,
-    segmentDurationsUs: List<Long> = emptyList()
-): Boolean {
-    var muxer: MediaMuxer? = null
-    var videoExt: MediaExtractor? = null
-    var audioExt: MediaExtractor? = null
-    try {
-        if (outMp4.exists() && !outMp4.delete()) return false
-        muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        videoTs: File,
+        audioMp4: File,
+        outMp4: File,
+        segmentDurationsUs: List<Long> = emptyList()
+    ): Boolean {
+        var muxer: MediaMuxer? = null
+        var videoExt: MediaExtractor? = null
+        var audioExt: MediaExtractor? = null
+        try {
+            if (outMp4.exists() && !outMp4.delete()) return false
+            muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
-        // --- Track video (MPEG-TS AVC) via MediaExtractor ---
-        videoExt = MediaExtractor()
-        videoExt.setDataSource(videoTs.absolutePath)
-        val vIndex = selectVideoTrack(videoExt) ?: return false
-        val vFormat = videoExt.getTrackFormat(vIndex)
-        videoExt.selectTrack(vIndex)
-        val videoTrack = muxer.addTrack(vFormat)
+            // --- Track video (MPEG-TS AVC) via MediaExtractor ---
+            videoExt = MediaExtractor()
+            videoExt.setDataSource(videoTs.absolutePath)
+            val vIndex = selectVideoTrack(videoExt) ?: return false
+            val vFormat = videoExt.getTrackFormat(vIndex)
+            videoExt.selectTrack(vIndex)
+            val videoTrack = muxer.addTrack(vFormat)
 
-        // --- Track audio (AAC dalam MP4/M4A) via MediaExtractor ---
-        audioExt = MediaExtractor()
-        audioExt.setDataSource(audioMp4.absolutePath)
-        val aIndex = selectAudioTrack(audioExt) ?: return false
-        val aFormat = audioExt.getTrackFormat(aIndex)
-        audioExt.selectTrack(aIndex)
-        val audioTrack = muxer.addTrack(aFormat)
+            // --- Track audio (AAC dalam MP4/M4A) via MediaExtractor ---
+            audioExt = MediaExtractor()
+            audioExt.setDataSource(audioMp4.absolutePath)
+            val aIndex = selectAudioTrack(audioExt) ?: return false
+            val aFormat = audioExt.getTrackFormat(aIndex)
+            audioExt.selectTrack(aIndex)
+            val audioTrack = muxer.addTrack(aFormat)
 
-        muxer.start()
-        val videoBuf = runCatching {
-            vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
-        }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
-        val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
-            countVideoFrames(videoTs)
-        } else 0
-        writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount)
-        writeTrackPts(audioExt, muxer, audioTrack)
-        muxer.stop()
-        return true
-    } catch (t: Throwable) {
-        runCatching { outMp4.delete() }
-        return false
-    } finally {
-        runCatching { videoExt?.release() }
-        runCatching { audioExt?.release() }
-        runCatching { muxer?.release() }
+            muxer.start()
+            val videoBuf = runCatching {
+                vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
+            }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
+            val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
+                countVideoFrames(videoTs)
+            } else 0
+            writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount)
+            writeTrackPts(audioExt, muxer, audioTrack)
+            muxer.stop()
+            return true
+        } catch (t: Throwable) {
+            runCatching { outMp4.delete() }
+            return false
+        } finally {
+            runCatching { videoExt?.release() }
+            runCatching { audioExt?.release() }
+            runCatching { muxer?.release() }
+        }
     }
-}
 
-/** Remux video MP4 (video-only) + audio MP4/M4A (AAC, keduanya dari
- *  adaptiveFormats YouTube) menjadi satu MP4. Kedua track memakai PTS asli
- *  file masing-masing (dinormalisasi drift agar selalu naik). */
+    /** Remux video MP4 (video-only) + audio MP4/M4A (AAC, keduanya dari
+     *  adaptiveFormats YouTube) menjadi satu MP4. Kedua track memakai PTS
+     *  asli file masing-masing (dinormalisasi drift agar selalu naik). */
     fun remuxMp4s(
-    videoMp4: File,
-    audioMp4: File,
-    outMp4: File
-): Boolean {
-    var muxer: MediaMuxer? = null
-    var videoExt: MediaExtractor? = null
-    var audioExt: MediaExtractor? = null
-    try {
-        if (outMp4.exists() && !outMp4.delete()) return false
-        muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        videoMp4: File,
+        audioMp4: File,
+        outMp4: File
+    ): Boolean {
+        var muxer: MediaMuxer? = null
+        var videoExt: MediaExtractor? = null
+        var audioExt: MediaExtractor? = null
+        try {
+            if (outMp4.exists() && !outMp4.delete()) return false
+            muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
-        videoExt = MediaExtractor()
-        videoExt.setDataSource(videoMp4.absolutePath)
-        val vIndex = selectVideoTrack(videoExt) ?: return false
-        videoExt.selectTrack(vIndex)
-        val videoTrack = muxer.addTrack(videoExt.getTrackFormat(vIndex))
+            // --- Track video (MP4 video-only) via MediaExtractor ---
+            videoExt = MediaExtractor()
+            videoExt.setDataSource(videoMp4.absolutePath)
+            val vIndex = selectVideoTrack(videoExt) ?: return false
+            videoExt.selectTrack(vIndex)
+            val videoTrack = muxer.addTrack(videoExt.getTrackFormat(vIndex))
 
-        audioExt = MediaExtractor()
-        audioExt.setDataSource(audioMp4.absolutePath)
-        val aIndex = selectAudioTrack(audioExt) ?: return false
-        audioExt.selectTrack(aIndex)
-        val audioTrack = muxer.addTrack(audioExt.getTrackFormat(aIndex))
+            // --- Track audio (AAC dalam MP4/M4A) via MediaExtractor ---
+            audioExt = MediaExtractor()
+            audioExt.setDataSource(audioMp4.absolutePath)
+            val aIndex = selectAudioTrack(audioExt) ?: return false
+            audioExt.selectTrack(aIndex)
+            val audioTrack = muxer.addTrack(audioExt.getTrackFormat(aIndex))
 
-        muxer.start()
-        writeTrackPts(videoExt, muxer, videoTrack)
-        writeTrackPts(audioExt, muxer, audioTrack)
-        muxer.stop()
-        return true
-    } catch (t: Throwable) {
-        runCatching { outMp4.delete() }
-        return false
-    } finally {
-        runCatching { videoExt?.release() }
-        runCatching { audioExt?.release() }
-        runCatching { muxer?.release() }
+            muxer.start()
+            writeTrackPts(videoExt, muxer, videoTrack)
+            writeTrackPts(audioExt, muxer, audioTrack)
+            muxer.stop()
+            return true
+        } catch (t: Throwable) {
+            runCatching { outMp4.delete() }
+            return false
+        } finally {
+            runCatching { videoExt?.release() }
+            runCatching { audioExt?.release() }
+            runCatching { muxer?.release() }
+        }
     }
-}
 
     private fun selectVideoTrack(ext: MediaExtractor): Int? {
         for (i in 0 until ext.trackCount) {
             val mime = ext.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
             if (mime.startsWith("video/")) return i
+        }
+        return null
+    }
+
+    private fun selectAudioTrack(ext: MediaExtractor): Int? {
+        for (i in 0 until ext.trackCount) {
+            val mime = ext.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
+            if (mime.startsWith("audio/")) return i
         }
         return null
     }
