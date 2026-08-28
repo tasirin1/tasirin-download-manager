@@ -1262,7 +1262,35 @@ class DownloadEngine(appContext: Context) {
             App.logEvent("HLS: direct media playlist, ${segments.size} segments")
             return if (segments.isEmpty()) null else HlsPlan(segments)
         }
-        val variants = HlsParser.parseMaster(body, baseUrl) ?: return null
+        var variants = HlsParser.parseMaster(body, baseUrl)
+        // Fallback: bila parseMaster gagal (mis. format YouTube 2026 yang
+        // memformat #EXT-X-STREAM-INF berbeda), coba ekstrak varian dengan
+        // regex manual dari semua pasangan STREAM-INF + baris berikutnya.
+        if (variants.isNullOrEmpty()) {
+            val fallbackVariants = mutableListOf<HlsVariant>()
+            val lines = body.lines()
+            for (idx in lines.indices) {
+                val ln = lines[idx].trim()
+                if (ln.startsWith("#EXT-X-STREAM-INF:")) {
+                    val next = lines.getOrNull(idx + 1)?.trim().orEmpty()
+                    if (next.isNotEmpty() && !next.startsWith("#") && (next.startsWith("http") || next.startsWith("/"))) {
+                        val bw = Regex("BANDWIDTH=(\\d+)").find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                        val h = Regex("RESOLUTION=\\d+x(\\d+)").find(ln)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        val codecs = Regex("CODECS=\"([^\"]+)\"").find(ln)?.groupValues?.get(1).orEmpty()
+                        val fps = Regex("FRAME-RATE=([\\d.]+)").find(ln)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
+                        fallbackVariants.add(HlsVariant("$h p", HlsParser.resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
+                    }
+                }
+            }
+            if (fallbackVariants.isNotEmpty()) {
+                App.logEvent("HLS: parseMaster failed, fallback found ${fallbackVariants.size} variants")
+                variants = fallbackVariants.sortedByDescending { it.bandwidth }
+            } else {
+                App.logEvent("HLS: parseMaster failed, no fallback variants found, dumping first 500 chars")
+                App.logEvent("HLS: body[0..500]=${body.take(500).replace("\n","|").replace("\r","")}")
+                return null
+            }
+        }
         // Hindari varian raksasa (4K/8K) dan varian ber-B-frame (avc1.64002A)
         // agar remux MP4 mulus. Pilih varian AVC (avc1.4D, tanpa B-frame)
         // dengan FRAME-RATE tertinggi — varian bitrate rendah (mis. 480p)
@@ -1290,7 +1318,9 @@ class DownloadEngine(appContext: Context) {
                 avc.minByOrNull { it.bandwidth }
             }
         } ?: variants.minByOrNull { it.bandwidth } ?: return null
-        val videoSegs = mediaSegmentsWithDurations(best.url, headers) ?: return null
+        App.logEvent("HLS DEBUG: fetching variant ${best.url.take(100)}, h=${headers.take(30)}")
+        val videoSegs = mediaSegmentsWithDurations(best.url, headers)
+        if (videoSegs == null) { App.logEvent("HLS DEBUG: mediaSegmentsWithDurations returned null for variant"); return null }
         val videoSegments = videoSegs.map { it.first }
         val videoDurations = videoSegs.map { it.second }
         val audioSegments = best.audioGroupId?.let { group ->
@@ -1308,7 +1338,10 @@ class DownloadEngine(appContext: Context) {
 
     /** Parse segmen dari media playlist, mengembalikan (url, durasi_us). */
     private fun mediaSegmentsWithDurations(playlistUrl: String, headers: String = ""): List<Pair<String, Long>>? {
-        val body = fetchText(playlistUrl, headers, HLS_PROBE_MAX_BYTES) ?: return null
+        val body = fetchText(playlistUrl, headers, HLS_PROBE_MAX_BYTES)
+        if (body == null) { App.logEvent("HLS DEBUG: fetchText null for ${playlistUrl.take(80)}"); return null }
+        App.logEvent("HLS DEBUG: variant playlist ${body.length} chars from ${playlistUrl.take(70)}")
+        if (body.length < 100) App.logEvent("HLS DEBUG: variant body: ${body.take(200)}")
         val result = mutableListOf<Pair<String, Long>>()
         val lines = body.lines()
         var i = 0
