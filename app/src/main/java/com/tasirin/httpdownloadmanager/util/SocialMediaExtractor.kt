@@ -411,6 +411,16 @@ object SocialMediaExtractor {
         return extractYouTubeFromPage(url, videoId)
     }
 
+    /** Ekstrak URL non-HLS dari YouTube: halaman WEB langsung + fallback Piped/Invidious.
+     *  Dipanggil bila VISIONOS HLS gagal (media playlist butuh pot token). */
+    suspend fun extractNonHlsYouTube(url: String): Result? = withContext(Dispatchers.IO) {
+        try {
+            val videoId = extractYouTubeId(url) ?: return@withContext null
+            val results = extractYouTubeFromPage(url, videoId)
+            results.firstOrNull { it.directUrl.startsWith("http") }
+        } catch (_: Exception) { null }
+    }
+
     private fun extractYouTubeFromPage(url: String, videoId: String): List<Result> {
         val httpResult = httpGetWithCookies(
             "https://www.youtube.com/shorts/$videoId",

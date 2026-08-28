@@ -903,12 +903,32 @@ class DownloadEngine(appContext: Context) {
                     updateItem(item.id) {
                         it.copy(url = result.directUrl, fileName = if (!item.nameIsCustom) hlsName else item.fileName, headers = hlsHeaders)
                     }
-                    downloadHls(
-                        item.copy(url = result.directUrl, fileName = hlsName, headers = hlsHeaders),
-                        hlsName
-                    )
-                    return
+                    try {
+                        downloadHls(
+                            item.copy(url = result.directUrl, fileName = hlsName, headers = hlsHeaders),
+                            hlsName
+                        )
+                        return
+                    } catch (e: IOException) {
+                        // HLS gagal (mis. media playlist butuh pot token / 403).
+                        // Fallback: coba ekstrak non-HLS (page/Piped/Invidious).
+                        App.logEvent("HLS: download failed (${e.message?.take(50)}), trying non-HLS fallback")
+                        val fallback = SocialMediaExtractor.extractNonHlsYouTube(item.url)
+                        if (fallback != null && fallback.directUrl != item.url && !fallback.isHls) {
+                            App.logEvent("SOCIAL: non-HLS fallback: ${fallback.directUrl.take(80)}")
+                            val fbName = fallback.fileName ?: item.fileName
+                            val fbHeaders = if (fallback.cookies.isNotEmpty()) {
+                                val existing = item.headers.trim()
+                                if (existing.isNotEmpty()) "${existing}\nCookie: ${fallback.cookies}" else "Cookie: ${fallback.cookies}"
+                            } else item.headers
+                            updateItem(item.id) { it.copy(url = fallback.directUrl, fileName = if (!item.nameIsCustom) fbName else item.fileName, headers = fbHeaders) }
+                            return runDownload(item.copy(url = fallback.directUrl, fileName = fbName, headers = fbHeaders), skipSocial = true)
+                        }
+                        // Non-HLS juga gagal — lempar error asli
+                        throw e
+                    }
                 }
+                // Non-HLS extraction path (bukan HLS)
                 val newName = result.fileName ?: item.fileName
                 // Gabung cookies dari extraction ke headers untuk CDN download
                 val mergedHeaders = if (result.cookies.isNotEmpty()) {
@@ -1338,10 +1358,24 @@ class DownloadEngine(appContext: Context) {
 
     /** Parse segmen dari media playlist, mengembalikan (url, durasi_us). */
     private fun mediaSegmentsWithDurations(playlistUrl: String, headers: String = ""): List<Pair<String, Long>>? {
-        val body = fetchText(playlistUrl, headers, HLS_PROBE_MAX_BYTES)
-        if (body == null) { App.logEvent("HLS DEBUG: fetchText null for ${playlistUrl.take(80)}"); return null }
-        App.logEvent("HLS DEBUG: variant playlist ${body.length} chars from ${playlistUrl.take(70)}")
-        if (body.length < 100) App.logEvent("HLS DEBUG: variant body: ${body.take(200)}")
+        // Fetch media playlist dengan logging detail untuk diagnosa 403/404/exception
+        val body: String? = try {
+            val conn = openAuthenticatedConnection(
+                playlistUrl, method = "GET", username = "", password = "", headers = headers
+            )
+            try {
+                val code = conn.responseCode
+                if (code !in 200..299) {
+                    val errBody = try { readBounded(conn.errorStream ?: conn.inputStream, 300) } catch (_: Exception) { "" }
+                    App.logEvent("HLS DEBUG: media playlist HTTP $code from ${playlistUrl.take(70)}, err=${errBody.take(150)}")
+                    return null
+                }
+                val b = readBounded(conn.inputStream, HLS_PROBE_MAX_BYTES)
+                App.logEvent("HLS DEBUG: media playlist ${b.length} chars, $code from ${playlistUrl.take(70)}")
+                b
+            } finally { conn.disconnect() }
+        } catch (e: Exception) { App.logEvent("HLS DEBUG: media playlist exception: ${e.javaClass.simpleName}: ${e.message?.take(100)}"); null }
+        if (body == null) return null
         val result = mutableListOf<Pair<String, Long>>()
         val lines = body.lines()
         var i = 0
