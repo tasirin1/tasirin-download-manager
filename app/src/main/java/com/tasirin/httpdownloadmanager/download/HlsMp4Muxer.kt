@@ -86,7 +86,12 @@ object HlsMp4Muxer {
             val normalized = pts - base
             if (normalized < lastPts) throw IOException("Non-monotonic PTS")
             lastPts = normalized
-            info.set(0, size, normalized, ext.sampleFlags)
+            val flags = if (ext.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
+                MediaCodec.BUFFER_FLAG_KEY_FRAME
+            } else {
+                0
+            }
+            info.set(0, size, normalized, flags)
             muxer.writeSampleData(track, buffer, info)
             if (!ext.advance()) break
         }
