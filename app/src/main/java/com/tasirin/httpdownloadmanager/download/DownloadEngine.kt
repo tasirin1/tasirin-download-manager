@@ -408,6 +408,7 @@ class DownloadEngine(appContext: Context) {
             } else if (current.contains("cdninstagram.com") || current.contains("scontent")) {
                 conn.setRequestProperty("Referer", "https://www.instagram.com/")
                 conn.setRequestProperty("Origin", "https://www.instagram.com")
+            }
             if (current == url || isSameOrigin(url, current)) {
                 applyAuthHeaders(conn, username, password, headers)
             }
