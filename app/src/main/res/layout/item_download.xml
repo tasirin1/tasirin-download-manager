@@ -23,7 +23,7 @@
             android:ellipsize="middle"
             android:singleLine="true"
             android:textAppearance="?android:attr/textAppearanceMedium"
-            android:textStyle="medium"
+            android:textStyle="bold"
             android:textColor="@color/text_primary" />
 
         <!-- Baris 2: badge status (titik berwarna) + status + persen di kanan -->
