@@ -34,3 +34,5 @@ docs:
       - CHANGELOG.md
       - AGENTS.md
       - CONTRIBUTING.md
+      - SECURITY.md
+      - docs/**

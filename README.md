@@ -2,10 +2,13 @@
 
 [![Build](https://github.com/tasirin1/tasirin-download-manager/actions/workflows/build.yml/badge.svg)](https://github.com/tasirin1/tasirin-download-manager/actions)
 [![Release](https://img.shields.io/github/v/release/tasirin1/tasirin-download-manager)](https://github.com/tasirin1/tasirin-download-manager/releases)
+[![Website](https://img.shields.io/badge/website-tasirin1.github.io/tasirin--download--manager-blue)](https://tasirin1.github.io/tasirin-download-manager/)
 
 Aplikasi unduhan untuk Android dengan kontrol web realtime, file manager jarak jauh, dan galeri video. Dibuat untuk HP dan TV box, tanpa iklan dan tanpa akun.
 
 **Bahasa:** [Indonesia](README.md) · [English](README.en.md) · [Changelog](CHANGELOG.md)
+
+> **Untuk AI yang mengelola repository ini:** baca [AGENTS.md](AGENTS.md) sebagai panduan utama sebelum mengubah apa pun. [CONTRIBUTING.md](CONTRIBUTING.md) adalah ringkasan aturan untuk kontributor. Bagian "Struktur Repository" di bawah memberi peta file cepat.
 
 ## Fitur
 
@@ -17,7 +20,7 @@ Aplikasi unduhan untuk Android dengan kontrol web realtime, file manager jarak j
 - Streaming media dengan dukungan Range serta tautan berbagi sementara.
 - Berjalan di Android 5.0+ dengan foreground service dan opsi auto-start.
 
-## Unduh
+## Unduh APK
 
 1. Buka [halaman rilis terbaru](https://github.com/tasirin1/tasirin-download-manager/releases/latest).
 2. Unduh APK `tasirin-download-manager-v1.0-<code>.apk`.
@@ -33,6 +36,56 @@ APK dirilis lewat GitHub Actions dan ditandatangani dengan kunci rilis resmi. Pe
 
 Server hanya dimaksudkan untuk jaringan lokal. Gunakan PIN saat perangkat dipakai bersama atau Wi-Fi tidak terlindungi.
 
+## Website
+
+Halaman arahan publik terdeploy dari folder **`docs/`** pada branch `main`
+melalui **GitHub Pages** → <https://tasirin1.github.io/tasirin-download-manager/>.
+
+- **Sumber** website: `docs/index.html` (satu file HTML/CSS/JS).
+- **Screenshot**: `docs/screenshots/`.
+- Setiap perubahan `docs/` otomatis di-deploy ulang oleh *pages-build-deployment*.
+- Website menampilkan versi/APK terbaru lewat GitHub Releases API — tidak perlu
+  meng-edit detail versi secara manual di HTML.
+
+## Struktur Repository
+
+Peta cepat untuk pengelolaan dan debugging:
+
+```
+docs/index.html               Website GitHub Pages (satu file)
+remote.src.html               Sumber readable remote web (jangan edit assets/remote.html)
+assets/remote.html            Remote web minified (digenapi oleh scripts/prepare_remote.py)
+app/src/main/java/...         Kode aplikasi Android (Kotlin)
+scripts/                      Guard & utilitas: check_repo.py, prepare_remote.py, security_audit.py
+CHANGELOG.md                  Riwayat perubahan per rilis (wajib update)
+.github/workflows/            CI: build.yml, codeql.yml, gitleaks.yml, dll.
+LICENSE / SECURITY.md         Lisensi MIT & kebijakan keamanan
+```
+
+Peta file yang lebih detail, arsitektur, keputusan historis, dan pola bug ada di
+[AGENTS.md](AGENTS.md).
+
+## Membangun & Rilis
+
+Rilis resmi hanya dibuat melalui GitHub Actions — push ke `main` menjalankan
+test, lint, build APK signed, dan me-refresh release `v1.0`. Jangan ubah
+`versionName`/`versionCode` manual.
+
+Untuk debug lokal:
+
+```bash
+./gradlew assembleDebug
+```
+
+Guard lokal sebelum commit:
+
+```bash
+python3 scripts/check_repo.py                 # satu pintu guard struktur + remote + README + audit
+python3 scripts/security_audit.py --self-test # audit statis bug/error/keamanan
+python3 scripts/prepare_remote.py --check     # sinkron remote.html + node check + i18n
+node scripts/upload_smoke_test.js             # smoke test alur upload remote
+```
+
 ## Keamanan & Privasi
 
 - Tidak memerlukan akun dan tidak mengirim data ke server pengembang.
@@ -41,28 +94,7 @@ Server hanya dimaksudkan untuk jaringan lokal. Gunakan PIN saat perangkat dipaka
 - CI menjalankan unit test, lint, CodeQL, Gitleaks, pemindaian internal, dan verifikasi tanda tangan APK.
 - Play Protect dapat menampilkan peringatan pada aplikasi sideload dengan akses semua file karena model risikonya konservatif. Periksa build CI sebelum memasang APK.
 
-## Build
-
-Rilis resmi hanya dibuat melalui GitHub Actions:
-
-```bash
-# Push ke main akan menjalankan test, lint, build signed APK, dan release.
-```
-
-Untuk debug lokal:
-
-```bash
-./gradlew assembleDebug
-```
-
-Pemindaian statis dapat dijalankan sebelum commit:
-
-```bash
-python3 scripts/security_audit.py --self-test
-python3 scripts/security_audit.py
-python3 scripts/prepare_remote.py --check
-node scripts/upload_smoke_test.js
-```
+Kerentanan keamanan dilaporkan privat — lihat [SECURITY.md](SECURITY.md).
 
 ## Lisensi
 

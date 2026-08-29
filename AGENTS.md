@@ -27,6 +27,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── gradle/libs.versions.toml          # Version catalog — pusat versi dependensi & plugin
 ├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
+├── docs/index.html                    # WEBSITE GitHub Pages (satu file; deploy otomatis dari /docs)
 ├── docs/screenshots/                 # Screenshot README (remote-web.png, gallery.png, downloads.png)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
@@ -231,23 +232,28 @@ kuat dan tanpa diskusi:
     `jacocoTestCoverageVerification` (ambang LINE 5%, lihat
     `app/build.gradle.kts` — naikkan seiring bertambahnya test); ringkasan
     cakupan dicetak di job summary.
-13. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
+13. **Website (`docs/index.html`)**: situs GitHub Pages dari folder `/docs`
+    (deploy otomatis oleh `pages-build-deployment` saat push ke `main`).
+    Satu file; versi APK/ukur tidak boleh di-hardcode — script di bagian
+    bawah mengambilnya dari GitHub Releases API. Screenshot di
+    `docs/screenshots/`. Perubahan `docs/` masuk label `docs` (labeler).
+14. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
     versi sekaligus; tiap langkah lewat CI dulu. Versi dipusatkan di
     `gradle/libs.versions.toml` (version catalog) — update cukup di satu
     tempat, Dependabot ikut membacanya.
-14. **Changelog wajib per perubahan kode** — commit yang mengubah `app/src/main`,
+15. **Changelog wajib per perubahan kode** — commit yang mengubah `app/src/main`,
     `remote.src.html`, `app/build.gradle.kts`, atau `scripts/` wajib menyertakan
     entri `CHANGELOG.md`. Untuk PR, sebut nomor PR di isi entri setelah dibuat.
     **Dijaga otomatis CI** berdasarkan diff push/PR. Satu commit/PR = satu tujuan;
     jangan campur fitur + refactor besar + docs.
-15. **Jangan berhenti di tengah alur rilis** — setiap push rilis ke `main` wajib
+16. **Jangan berhenti di tengah alur rilis** — setiap push rilis ke `main` wajib
     dipantau sampai workflow Build APK sukses dan asset APK terbaru ada di release
     `v1.0` (lihat "Cara cek rilis terbaru"). Normal flow adalah PR; owner boleh push
     hotfix/docs langsung hanya jika CI tetap dipantau penuh.
-16. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
+17. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
     .githooks` (memanggil `scripts/check_repo.py --pre-commit`; unit test
     otomatis hanya bila Java/Gradle tersedia). Hook tidak wajib; CI tetap penentu.
-17. **Cek kesehatan keystore otomatis di CI** — workflow membandingkan
+18. **Cek kesehatan keystore otomatis di CI** — workflow membandingkan
     fingerprint sertifikat signing dari `KEYSTORE_BASE64` dengan
     `c2785a61...`; mismatch = build gagal (keystore salah/korup terdeteksi
     lebih awal).
