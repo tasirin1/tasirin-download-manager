@@ -42,8 +42,17 @@ data class DownloadItem(
     val segments: List<DownloadSegment> = emptyList(),
     val speedBps: Long = 0,
     val etaSeconds: Long = 0,
-    val preferredHeight: Int = 0
+    val preferredHeight: Int = 0,
+    val progressPercentOverride: Int = -1
 ) {
     val progressPercent: Int
-        get() = if (totalBytes > 0) ((bytesDownloaded * 100) / totalBytes).toInt() else 0
+        // Untuk HLS total asli tidak diketahui, jadi persentase dihitung dari
+        // jumlah segmen (via progressPercentOverride); jangan pakai total palsu.
+        get() = if (progressPercentOverride >= 0) {
+            progressPercentOverride
+        } else if (totalBytes > 0) {
+            ((bytesDownloaded * 100) / totalBytes).toInt()
+        } else {
+            0
+        }
 }

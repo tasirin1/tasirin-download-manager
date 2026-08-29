@@ -1216,7 +1216,7 @@ class DownloadEngine(appContext: Context) {
         var lastNotify = 0L
         var totalSegments = 0
         var segmentsDone = 0
-        var estimateTotal = 0L
+        var avgSegBytes = 0L
     }
 
     /** Unduh daftar segmen ke satu file. Tiap segmen ditulis setelah sukses
@@ -1239,9 +1239,8 @@ class DownloadEngine(appContext: Context) {
                 out.write(transform(segBytes))
                 progress.downloaded += segBytes.size
                 progress.segmentsDone++
-                if (progress.totalSegments > 0 && progress.segmentsDone > 0) {
-                    progress.estimateTotal =
-                        (progress.downloaded / progress.segmentsDone) * progress.totalSegments
+                if (progress.segmentsDone > 0) {
+                    progress.avgSegBytes = progress.downloaded / progress.segmentsDone
                 }
             }
         }
@@ -1271,7 +1270,6 @@ class DownloadEngine(appContext: Context) {
             val code = conn.responseCode
             if (code !in 200..299) return false
             val total = contentLength(conn)
-            if (total > 0) progress.estimateTotal = progress.downloaded + total
             BufferedOutputStream(FileOutputStream(target)).use { out ->
                 val input = conn.inputStream
                 try {
@@ -1285,7 +1283,7 @@ class DownloadEngine(appContext: Context) {
                         }
                         out.write(buffer, 0, read)
                         throttle.sleepIfNeeded { progress.downloaded + bytes }
-                        reportHlsProgress(item, progress, bytes)
+                        reportHlsProgress(item, progress, bytes, total)
                     }
                 } finally {
                     runCatching { input.close() }
@@ -1371,21 +1369,40 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun reportHlsProgress(item: DownloadItem, progress: HlsProgress, segNow: Long) {
+    private fun reportHlsProgress(
+        item: DownloadItem,
+        progress: HlsProgress,
+        segNow: Long,
+        total: Long = 0
+    ) {
         val totalNow = progress.downloaded + segNow
         val now = System.currentTimeMillis()
         if (now - progress.lastNotify >= 1000) {
             progress.lastNotify = now
-            // Untuk HLS total asli tidak diketahui sampai semua segmen selesai.
-            // Pakai estimasi (rata-rata ukuran segmen x jumlah segmen) supaya
-            // bar progres bergerak; tanpa ini bar diam di 0 selama unduhan.
-            val effTotal = progress.estimateTotal
+            // Total HLS asli tidak diketahui (segmen tidak punya Content-Length
+            // konsisten). Persentase dihitung dari jumlah segmen (progressPercentOverride)
+            // supaya bar bergerak tanpa menampilkan total palsu di UI.
+            val percent = if (progress.totalSegments > 0) {
+                // Fraksi segmen aktif pakai rata2 ukuran segmen selesai.
+                val frac = if (progress.avgSegBytes > 0) {
+                    (segNow.toDouble() / progress.avgSegBytes).coerceIn(0.0, 1.0)
+                } else {
+                    0.0
+                }
+                (((progress.segmentsDone + frac) * 100) / progress.totalSegments).toInt()
+            } else {
+                0
+            }
+            // File adaptive (video/audio MP4): Content-Length riil, total
+            // kumulatif = byte yang sudah selesai + ukuran file aktif.
+            val effTotal = if (total > 0) progress.downloaded + total else 0L
             val (speed, eta) = speedTracker.sample(item.id, totalNow, effTotal)
             updateItem(item.id, persist = false) {
                 it.copy(
                     state = DownloadState.DOWNLOADING,
                     bytesDownloaded = totalNow,
                     totalBytes = effTotal,
+                    progressPercentOverride = if (total > 0) -1 else percent,
                     speedBps = speed,
                     etaSeconds = eta
                 )
@@ -1412,6 +1429,7 @@ class DownloadEngine(appContext: Context) {
                 autoResume = false,
                 speedBps = 0,
                 etaSeconds = 0,
+                progressPercentOverride = -1,
                 finishedAt = System.currentTimeMillis()
             )
         }

@@ -28,6 +28,21 @@ class DownloadItemTest {
     }
 
     @Test
+    fun `progressPercentOverride - HLS memakai persen segmen bukan total palsu`() {
+        val hls = item(bytesDownloaded = 1_000_000, totalBytes = 0).copy(progressPercentOverride = 56)
+        // Bar & persen memakai override, totalBytes 0 (tanpa denominator palsu).
+        assertEquals(56, hls.progressPercent)
+        assertEquals(0, hls.totalBytes)
+    }
+
+    @Test
+    fun `progressPercentOverride - default -1 fallback ke perhitungan total`() {
+        assertEquals(50, item(bytesDownloaded = 500, totalBytes = 1000).progressPercent)
+        val hls = item(bytesDownloaded = 500, totalBytes = 0).copy(progressPercentOverride = -1)
+        assertEquals(0, hls.progressPercent)
+    }
+
+    @Test
     fun `nilai default tidak mengubah perilaku`() {
         val item = item(bytesDownloaded = 0, totalBytes = 0)
         assertEquals(DownloadState.DOWNLOADING, item.state)

@@ -60,6 +60,14 @@ class DownloadAdapter(private val listener: Listener) :
                 Formats.bytes(item.bytesDownloaded),
                 Formats.bytes(item.totalBytes)
             )
+        } else if (item.progressPercentOverride >= 0) {
+            // HLS: total asli tidak diketahui — tampilkan persen + byte riil
+            // tanpa denominator palsu (mis. "56% • 4.0 MB").
+            String.format(
+                Locale.US, "%d%% \u2022 %s",
+                item.progressPercent,
+                Formats.bytes(item.bytesDownloaded)
+            )
         } else {
             Formats.bytes(item.bytesDownloaded)
         }

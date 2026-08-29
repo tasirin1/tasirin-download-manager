@@ -4040,7 +4040,7 @@ function render(items) {
 
 function rowSubHtml(it) {
   const done = it.state === 'COMPLETED';
-  const prog = done ? 100 : (it.totalBytes > 0 ? Math.round(it.bytesDownloaded * 100 / it.totalBytes) : 0);
+  const prog = done ? 100 : Math.max(0, Math.min(100, Math.round(it.progress || 0)));
   let meta;
   if (done) {
     meta = fmt(it.totalBytes || it.bytesDownloaded);
@@ -4095,7 +4095,7 @@ function patchRowSub(li, it) {
   const errBox = li._err || (li._err = li.querySelector('.err'));
   if (errBox && errBox.textContent !== it.error) errBox.textContent = it.error || '';
   const done = it.state === 'COMPLETED';
-  const prog = done ? 100 : (it.totalBytes > 0 ? Math.round(it.bytesDownloaded * 100 / it.totalBytes) : 0);
+  const prog = done ? 100 : Math.max(0, Math.min(100, Math.round(it.progress || 0)));
   let meta = rowMetaText(it);
   if (it.state === 'DOWNLOADING' && it.speedBps > 0) {
     meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
