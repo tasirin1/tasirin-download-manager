@@ -6,6 +6,18 @@
         android:title="@string/action_settings"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_pause_all"
+        android:title="@string/pause_all"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_resume_all"
+        android:title="@string/resume_all"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_retry_failed"
+        android:title="@string/retry_failed"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_clear_failed"
         android:title="@string/action_clear_failed"
         app:showAsAction="never" />

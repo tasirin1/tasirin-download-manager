@@ -2,6 +2,7 @@ package com.tasirin.httpdownloadmanager
 
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -35,7 +36,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.data.DownloadState
@@ -60,6 +63,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: DownloadAdapter
     private var pendingMoveId: String? = null
+    private var summaryActive = 0
+    private var summaryPaused = 0
+    private var summaryFailed = 0
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -99,20 +105,36 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
         binding.fabAdd.setOnClickListener { showAddDialog() }
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
+        binding.emptyPasteButton.setOnClickListener { pasteFromClipboard() }
         binding.emptyRemoteButton.setOnClickListener { openRemote() }
 
-        binding.btnPauseAll.setOnClickListener {
-            App.engine.pauseAll()
-            Toast.makeText(this, R.string.pause_all, Toast.LENGTH_SHORT).show()
+        // Geser item: kanan = pause/resume, kiri = hapus (dengan konfirmasi).
+        val swipeCallback = object :
+            ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean = false
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.bindingAdapterPosition
+                if (position == RecyclerView.NO_POSITION) return
+                val item = adapter.currentList.getOrNull(position) ?: return
+                // Pulihkan tampilan item setelah animasi swipe.
+                adapter.notifyItemChanged(position)
+                when (direction) {
+                    ItemTouchHelper.RIGHT -> when (item.state) {
+                        DownloadState.DOWNLOADING, DownloadState.PENDING ->
+                            App.engine.pause(item.id)
+                        DownloadState.PAUSED -> App.engine.resume(item.id)
+                        else -> Unit
+                    }
+                    ItemTouchHelper.LEFT -> confirmSwipeDelete(item)
+                }
+            }
         }
-        binding.btnResumeAll.setOnClickListener {
-            App.engine.resumeAll()
-            Toast.makeText(this, R.string.resume_all, Toast.LENGTH_SHORT).show()
-        }
-        binding.btnRetryFailed.setOnClickListener {
-            App.engine.retryFailed()
-            Toast.makeText(this, R.string.retry_failed, Toast.LENGTH_SHORT).show()
-        }
+        ItemTouchHelper(swipeCallback).attachToRecyclerView(binding.recycler)
 
         lifecycleScope.launch {
             App.engine.items.collect { items ->
@@ -563,10 +585,31 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         return true
     }
 
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.findItem(R.id.action_pause_all)?.isVisible = summaryActive > 0
+        menu.findItem(R.id.action_resume_all)?.isVisible = summaryPaused > 0 || summaryFailed > 0
+        menu.findItem(R.id.action_retry_failed)?.isVisible = summaryFailed > 0
+        return super.onPrepareOptionsMenu(menu)
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_settings -> {
                 startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            R.id.action_pause_all -> {
+                App.engine.pauseAll()
+                Toast.makeText(this, R.string.pause_all, Toast.LENGTH_SHORT).show()
+                true
+            }
+            R.id.action_resume_all -> {
+                App.engine.resumeAll()
+                Toast.makeText(this, R.string.resume_all, Toast.LENGTH_SHORT).show()
+                true
+            }
+            R.id.action_retry_failed -> {
+                App.engine.retryFailed()
                 true
             }
             R.id.action_clear_failed -> {
@@ -874,23 +917,50 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .show()
     }
 
-    /** Statistik + visibilitas tombol batch dihitung dalam SATU iterasi daftar
-     *  (sebelumnya 4× iterasi per emisi: 3× any{} + 1× statistik). */
+    /** Ringkasan ringkas: "3 active · 5 done · 1 failed", dihitung dalam SATU
+     *  iterasi daftar (bukan beberapa pass terpisah). */
     private fun updateToolbar(items: List<DownloadItem>) {
         var active = 0
-        var failed = 0
         var paused = 0
+        var failed = 0
+        var done = 0
         for (item in items) {
             when (item.state) {
                 DownloadState.DOWNLOADING, DownloadState.PENDING -> active++
-                DownloadState.FAILED -> failed++
                 DownloadState.PAUSED -> paused++
+                DownloadState.FAILED -> failed++
+                DownloadState.COMPLETED -> done++
                 else -> {}
             }
         }
-        binding.btnPauseAll.visibility = if (active > 0) View.VISIBLE else View.GONE
-        binding.btnResumeAll.visibility = if (paused > 0 || failed > 0) View.VISIBLE else View.GONE
-        binding.btnRetryFailed.visibility = if (failed > 0) View.VISIBLE else View.GONE
+        summaryActive = active
+        summaryPaused = paused
+        summaryFailed = failed
+        binding.textSummary.text = getString(R.string.summary_line, active, done, failed)
+    }
+
+    /** Tempel URL dari clipboard ke dialog tambah download (untuk empty state). */
+    private fun pasteFromClipboard() {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val text = cm?.primaryClip?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)?.text?.toString()?.trim().orEmpty()
+        if (text.isEmpty()) {
+            Toast.makeText(this, R.string.clipboard_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        showAddDialog(text)
+    }
+
+    /** Konfirmasi hapus item dari hasil swipe ke kiri. */
+    private fun confirmSwipeDelete(item: DownloadItem) {
+        AlertDialog.Builder(this)
+            .setTitle(item.fileName)
+            .setMessage(R.string.confirm_delete)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                lifecycleScope.launch(Dispatchers.IO) { App.engine.remove(item.id) }
+            }
+            .show()
     }
 
     /** Ekspor log error (crash + error server) ke file .txt di folder Download. */

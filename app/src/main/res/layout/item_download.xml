@@ -12,37 +12,42 @@
         android:background="@drawable/item_focus_bg"
         android:focusable="true"
         android:orientation="vertical"
-        android:minHeight="72dp"
+        android:minHeight="80dp"
         android:padding="16dp">
 
-        <LinearLayout
+        <!-- Baris 1: nama file -->
+        <TextView
+            android:id="@+id/text_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:ellipsize="middle"
+            android:singleLine="true"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textStyle="medium"
+            android:textColor="@color/text_primary" />
 
-            <TextView
-                android:id="@+id/text_name"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="middle"
-                android:singleLine="true"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
-
-        </LinearLayout>
-
+        <!-- Baris 2: badge status (titik berwarna) + status + persen di kanan -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
+
+            <View
+                android:id="@+id/status_dot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/bg_status_dot" />
 
             <TextView
                 android:id="@+id/text_status"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
@@ -56,21 +61,25 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
+        <!-- Baris 3: progress bar -->
         <ProgressBar
             android:id="@+id/progress_bar"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="8dp"
+            android:layout_height="9dp"
             android:layout_marginTop="8dp"
             android:max="100"
             android:progressBackgroundTint="@color/line" />
 
+        <!-- Baris 4+: info tambahan (kecepatan / checksum / lokasi) -->
         <TextView
             android:id="@+id/text_speed"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/primary"
+            android:textSize="12sp"
             android:visibility="gone" />
 
         <TextView
@@ -81,6 +90,7 @@
             android:text="@string/checksum_ok"
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/status_on"
+            android:textSize="12sp"
             android:visibility="gone" />
 
         <TextView
@@ -90,6 +100,7 @@
             android:layout_marginTop="2dp"
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/text_secondary"
+            android:textSize="12sp"
             android:visibility="gone" />
 
     </LinearLayout>

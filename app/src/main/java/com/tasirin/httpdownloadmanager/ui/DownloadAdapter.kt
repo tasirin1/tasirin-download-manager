@@ -36,6 +36,13 @@ class DownloadAdapter(private val listener: Listener) :
         DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.text_secondary
     }
 
+    private fun statusDotColor(state: DownloadState): Int = when (state) {
+        DownloadState.DOWNLOADING, DownloadState.PENDING -> R.color.primary
+        DownloadState.COMPLETED -> R.color.status_on
+        DownloadState.FAILED -> R.color.status_off
+        DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.text_hint
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemDownloadBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         binding.progressBar.max = 100
@@ -48,6 +55,9 @@ class DownloadAdapter(private val listener: Listener) :
 
         b.textName.text = item.fileName
         b.textStatus.text = statusText(item, b.root.context)
+        b.statusDot.backgroundTintList = ColorStateList.valueOf(
+            ContextCompat.getColor(b.root.context, statusDotColor(item.state))
+        )
         b.progressBar.progress = item.progressPercent
         b.progressBar.progressTintList = ColorStateList.valueOf(
             ContextCompat.getColor(b.root.context, progressColor(item.state))
