@@ -141,10 +141,10 @@ object SocialMediaExtractor {
 
     private fun extractScribdDocumentTitle(body: String): String {
         // JSON-LD dulu, lalu OG/meta, lalu <title>.
-        val jsonLd = Regex("<script type="application/ld\+json">(.*?)</script>", RegexOption.DOT_MATCHES_ALL)
+        val jsonLd = Regex("<script type=\"application/ld\\+json\">(.*?)</script>", RegexOption.DOT_MATCHES_ALL)
             .find(body)?.groupValues?.get(1)
         if (jsonLd != null) {
-            val t = Regex(""name"\\s*:\\s*\"([^\"]+)\"").find(jsonLd)?.groupValues?.get(1)
+            val t = Regex("\"name\"\\s*:\\s*\"([^\"]+)\"").find(jsonLd)?.groupValues?.get(1)
             if (t != null && t.isNotBlank()) return t.trim()
         }
         Regex("property=\"og:title\"\\s+content=\"([^\"]+)\"").find(body)?.groupValues?.get(1)?.let { return it }
@@ -155,20 +155,10 @@ object SocialMediaExtractor {
 
     private fun extractScribdPageUrls(body: String): List<String> {
         // URL gambar halaman Scribd umumnya disisipkan sebagai string JSON di
-        // dalam script/konfigurasi (mis. window.DOCUMENT_VIEWER_STATE atau
-        // data JSON html5uploader). Cari semua URL ke CDN gambar halaman.
+        // dalam script/konfigurasi (mis. konfigurasi viewer). Cari semua URL
+        // absolut yang mengarah ke CDN gambar halaman.
         val found = LinkedHashSet<String>()
-        val pageRe = Regex(
-            "\\"image_url\\"(?::\\s*)?\\"(?:https?:)?//[^\\\"]*scribdassets[^\\\"]*\\"|" +
-            "(\"request_url\"|\"url\")(?::\\s*)?\\"(?:https?:)?//[^\\\"]*\.(?:jpe?g|png)\""
-        )
-        pageRe.findAll(body).forEach { found.add(it.value) }
-        if (found.isNotEmpty()) return found.take(512).toList()
-
-        // Fallback: URL absolut biasa ke CDN gambar halaman.
-        Regex("https?://[^\\\"'\\s]*\.(?:jpe?g|png)(\\?[^\\\"'\\s]*)?")
-            .findAll(body)
-            .forEach { found.add(it.value) }
+        Regex("https?://[^\"\\s]*\\.(?:jpe?g|png)(\\?[^\"\\s]*)?").findAll(body).forEach { found.add(it.value) }
         return found.take(512).toList()
     }
 
