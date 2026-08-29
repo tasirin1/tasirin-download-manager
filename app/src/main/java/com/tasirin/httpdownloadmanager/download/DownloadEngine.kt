@@ -912,7 +912,9 @@ class DownloadEngine(appContext: Context) {
         }
         // Social media: ekstrak direct URL menggunakan API publik
         // (tikwm.com untuk TikTok, embed page JSON untuk Instagram, vxtwitter untuk Twitter)
-        if (SocialMediaExtractor.isSocialMediaUrl(item.url)) {
+        // skipSocial=true dipakai saat URL sudah hasil ekstraksi (mis. CDN lookaside
+        // hasil extractFacebook) — jangan di-extract ulang karena bisa salah deteksi.
+        if (!skipSocial && SocialMediaExtractor.isSocialMediaUrl(item.url)) {
             val host = runCatching { java.net.URL(item.url).host }.getOrDefault("?")
             App.logEvent("SOCIAL: extracting direct URL from $host ...")
             val result = SocialMediaExtractor.extract(item.url, item.headers)

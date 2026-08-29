@@ -71,6 +71,9 @@ object SocialMediaExtractor {
     fun isSocialMediaUrl(url: String): Boolean {
         val lower = url.lowercase()
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
+        // CDN media Facebook memakai fbsbx.com/fbcdn.net; substring "x.com/"
+        // di dalamnya bisa membuat URL-nya salah deteksi sebagai Twitter/X.
+        if (lower.contains("fbsbx.com") || lower.contains("fbcdn.net")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
         return lower.contains("tiktok.com/") ||
                 lower.contains("instagram.com/p/") ||
