@@ -52,6 +52,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.tasirin.httpdownloadmanager.util.whiteNavigationIcon
 
 /** Halaman pengaturan: server remote, keamanan, log, unduhan, dan penyimpanan. */
 class SettingsActivity : AppCompatActivity() {
@@ -73,6 +74,7 @@ class SettingsActivity : AppCompatActivity() {
         applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        binding.toolbar.whiteNavigationIcon()
 
         renderServer()
         wireServerSwitch()

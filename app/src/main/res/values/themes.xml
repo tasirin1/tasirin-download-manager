@@ -25,7 +25,6 @@
         <item name="android:textColorPrimary">@color/white</item>
         <item name="android:textColorSecondary">@color/white</item>
         <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="navigationIconTint">@color/white</item>
     </style>
 
     <!-- Tombol terisi (primary). -->

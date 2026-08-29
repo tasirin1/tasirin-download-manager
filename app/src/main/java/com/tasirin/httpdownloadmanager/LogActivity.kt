@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import com.tasirin.httpdownloadmanager.util.whiteNavigationIcon
 
 /** Halaman khusus log server realtime: layar penuh, auto-scroll default mati. */
 class LogActivity : AppCompatActivity() {
@@ -49,6 +50,7 @@ class LogActivity : AppCompatActivity() {
         applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        binding.toolbar.whiteNavigationIcon()
 
         binding.logAutoscroll.isChecked = logAutoScroll
         binding.logAutoscroll.setOnCheckedChangeListener { _, checked ->

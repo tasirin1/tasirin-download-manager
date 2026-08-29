@@ -37,6 +37,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.tasirin.httpdownloadmanager.util.whiteNavigationIcon
 
 class GalleryActivity : AppCompatActivity() {
 
@@ -57,6 +58,7 @@ class GalleryActivity : AppCompatActivity() {
         applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        binding.toolbar.whiteNavigationIcon()
 
         binding.recycler.layoutManager = GridLayoutManager(this, SPAN_COUNT)
         binding.recycler.adapter = adapter
