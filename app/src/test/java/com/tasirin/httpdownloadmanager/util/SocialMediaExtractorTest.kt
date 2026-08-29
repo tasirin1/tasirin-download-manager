@@ -14,8 +14,9 @@ class SocialMediaExtractorTest {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://vm.tiktok.com/abc/"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.instagram.com/p/abc/"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.instagram.com/reel/abc/"))
-        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.facebook.com/share/v/abc/"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://x.com/username/status/123"))
+        // Facebook tidak lagi didukung — jangan dikenali sebagai media sosial.
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://www.facebook.com/share/v/abc/"))
     }
 
     @Test
@@ -27,7 +28,7 @@ class SocialMediaExtractorTest {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(
             "https://v16m.tiktokcdn-us.com/video/tos/123.mp4"
         ))
-        // lookaside fbsbx mengandung substring "x.com/" tapi bukan Twitter.
+        // CDN Facebook tidak dikenali (fitur FB dihapus).
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(
             "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1020806507787076"
         ))
