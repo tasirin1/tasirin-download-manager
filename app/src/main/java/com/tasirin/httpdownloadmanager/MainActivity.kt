@@ -350,10 +350,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
             override fun afterTextChanged(s: Editable?) {}
         }
+        // Deteksi kualitas hanya bergantung pada URL; watcher di field lain
+        // (username/password/headers) tidak perlu karena tiap ketikan di sana
+        // akan membatalkan & memulai ulang ekstraksi jaringan tanpa mengubah URL.
         urlInput.addTextChangedListener(socialWatcher)
-        usernameInput.addTextChangedListener(socialWatcher)
-        passwordInput.addTextChangedListener(socialWatcher)
-        headersInput.addTextChangedListener(socialWatcher)
         probeSocialQuality()
 
         fun parseMirrors(): List<String> =

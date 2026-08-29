@@ -481,13 +481,22 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun retryFailed() {
-        _items.value.filter { it.state == DownloadState.FAILED }.forEach { item ->
-            retryAttempts.remove(item.id)
-            pendingRetries.remove(item.id)
-            updateItem(item.id) {
-                it.copy(state = DownloadState.PENDING, autoResume = true, error = null)
-            }
+        // Batch: satu salinan daftar + satu emisi StateFlow, bukan N kali
+        // updateItem saat pengguna menekan Retry Failed (sama seperti pauseAll).
+        val ids = _items.value.filter { it.state == DownloadState.FAILED }.map { it.id }
+        if (ids.isEmpty()) return
+        val idSet = ids.toSet()
+        ids.forEach { id ->
+            retryAttempts.remove(id)
+            pendingRetries.remove(id)
         }
+        update(_items.value.map { item ->
+            if (item.id in idSet) {
+                item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
+            } else {
+                item
+            }
+        })
         startQueued()
     }
 
