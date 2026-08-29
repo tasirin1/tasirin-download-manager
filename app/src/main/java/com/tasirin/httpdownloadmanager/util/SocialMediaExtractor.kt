@@ -17,8 +17,9 @@ object SocialMediaExtractor {
     /** Batas total waktu ekstraksi media sosial (ms). */
     private const val EXTRACT_TOTAL_TIMEOUT_MS = 25_000L
 
-    /** Regex X/Twitter — dihoist agar tidak dikompilasi ulang tiap panggilan. */
-    private val X_URL_RE = Regex("""(?:https?://(?:www\.)?|\.?)x\.com/""")
+    /** Regex X/Twitter — x.com harus host (awal string atau setelah skema),
+     *  bukan substring (mis. fbsbx.com mengandung "x.com/"). */
+    private val X_URL_RE = Regex("""(?:^|https?://)(?:www\.)?x\.com/""")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
      * (Instagram & YouTube) yang dipanggil berulang saat unduh. */
@@ -80,7 +81,7 @@ object SocialMediaExtractor {
                     extractTikTok(url)
                 lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
                     extractInstagram(url)
-                lower.contains("twitter.com/") || lower.contains("x.com/") ->
+                lower.contains("twitter.com/") || X_URL_RE.containsMatchIn(lower) ->
                     extractTwitter(url)
                 lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
                     extractYouTube(url)
@@ -102,7 +103,7 @@ object SocialMediaExtractor {
                         extractAllTikTok(url)
                     lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
                         extractAllInstagram(url)
-                    lower.contains("twitter.com/") || lower.contains("x.com/") ->
+                    lower.contains("twitter.com/") || X_URL_RE.containsMatchIn(lower) ->
                         extractAllTwitter(url)
                     lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
                         extractAllYouTube(url)
