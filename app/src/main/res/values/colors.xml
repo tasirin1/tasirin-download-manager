@@ -1,16 +1,20 @@
 <resources>
-    <color name="primary">#0D47A1</color>
-    <color name="primary_dark">#002171</color>
-    <color name="accent">#FF6F00</color>
+    <!-- Palet utama: biru modern + aksen jingga, latar abu terang. -->
+    <color name="primary">#1565C0</color>
+    <color name="primary_dark">#0D47A1</color>
+    <color name="accent">#F57C00</color>
     <color name="white">#FFFFFF</color>
-    <color name="ic_launcher_background">#0D47A1</color>
+    <color name="window_bg">#F2F4F8</color>
+    <color name="ic_launcher_background">#1565C0</color>
     <color name="status_on">#2E7D32</color>
-    <color name="status_off">#B00020</color>
-    <color name="text_secondary">#757575</color>
+    <color name="status_off">#C62828</color>
+    <color name="text_primary">#1B1F27</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_hint">#9AA0A6</color>
     <color name="card_bg">#FFFFFF</color>
-    <color name="line">#E3E8F2</color>
-    <color name="chip_pressed">#E8EAF6</color>
-    <color name="gallery_thumb_bg">#EEEEEE</color>
-    <color name="gallery_ext_text">#999999</color>
-    <color name="gallery_overlay">#66000000</color>
+    <color name="line">#E5E9F0</color>
+    <color name="chip_pressed">#E3F0FB</color>
+    <color name="gallery_thumb_bg">#EEF1F5</color>
+    <color name="gallery_ext_text">#9AA0A6</color>
+    <color name="gallery_overlay">#6610182A</color>
 </resources>

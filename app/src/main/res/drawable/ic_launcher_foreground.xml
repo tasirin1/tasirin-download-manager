@@ -16,6 +16,6 @@
         android:fillColor="#FFFFFF"
         android:pathData="M40,56 h28 l-14,14 z" />
     <path
-        android:fillColor="#FF6F00"
+        android:fillColor="@color/accent"
         android:pathData="M42,79 h24 v3 h-24 z" />
 </vector>

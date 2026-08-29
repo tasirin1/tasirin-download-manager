@@ -3,69 +3,88 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingHorizontal="24dp"
-    android:paddingTop="24dp">
+    android:paddingHorizontal="20dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="4dp">
 
-    <EditText
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:minHeight="48dp"
-        android:id="@+id/input_url"
+    <!-- Field utama: URL -->
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:text="@string/url_label"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:textColor="@color/text_secondary"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/input_url"
+        style="@style/AppInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
         android:hint="@string/url_hint_multi"
         android:inputType="textUri|textMultiLine"
         android:autofillHints="url"
-        android:minLines="2"
-        android:maxLines="4" />
+        android:minLines="3"
+        android:maxLines="4"
+        android:minHeight="52dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
 
+    <!-- Media sosial: pilihan kualitas -->
     <LinearLayout
         android:id="@+id/social_quality_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
         android:visibility="gone">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/social_quality_label"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/text_secondary"
+            android:textStyle="bold" />
 
         <Spinner
             android:id="@+id/spinner_social_quality"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" />
+            android:layout_marginTop="6dp" />
     </LinearLayout>
 
+    <!-- Media sosial: pilihan foto carousel -->
     <LinearLayout
         android:id="@+id/social_carousel_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
         android:visibility="gone">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/social_carousel_label"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/text_secondary"
+            android:textStyle="bold" />
 
         <Spinner
             android:id="@+id/spinner_social_carousel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" />
+            android:layout_marginTop="6dp" />
     </LinearLayout>
 
+    <!-- Info file & storage -->
     <TextView
         android:id="@+id/text_storage_remaining"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="12dp"
         android:textAppearance="?android:attr/textAppearanceSmall"
         android:textColor="@color/text_secondary" />
 
@@ -73,21 +92,30 @@
         android:id="@+id/text_file_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:textAppearance="?android:attr/textAppearanceSmall"
         android:textColor="@color/primary"
         android:visibility="gone" />
 
+    <!-- Advanced toggle -->
     <TextView
         android:id="@+id/advanced_toggle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:paddingVertical="8dp"
+        android:paddingVertical="10dp"
+        android:paddingHorizontal="4dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:gravity="start|center_vertical"
         android:text="@string/advanced_options"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="@color/text_secondary"
-        android:background="?android:attr/selectableItemBackground" />
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:textColor="@color/primary"
+        android:textStyle="bold" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
 
     <LinearLayout
         android:id="@+id/advanced_section"
@@ -96,73 +124,103 @@
         android:orientation="vertical"
         android:visibility="gone">
 
-        <EditText
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:minHeight="48dp"
-            android:id="@+id/input_name"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:hint="@string/name_hint_optional"
-            android:inputType="text"
-            android:autofillHints="name" />
+            android:layout_marginTop="14dp"
+            android:text="@string/section_authenticate"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/text_secondary"
+            android:textStyle="bold" />
 
         <EditText
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:minHeight="48dp"
             android:id="@+id/input_username"
+            style="@style/AppInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:hint="@string/username_hint_optional"
             android:inputType="text"
-            android:autofillHints="username" />
+            android:autofillHints="username"
+            android:minHeight="48dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
 
         <EditText
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:minHeight="48dp"
             android:id="@+id/input_password"
+            style="@style/AppInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:hint="@string/password_hint_optional"
             android:inputType="textPassword"
-            android:autofillHints="password" />
-
-        <EditText
-            android:focusable="true"
-            android:focusableInTouchMode="true"
+            android:autofillHints="password"
             android:minHeight="48dp"
-            android:id="@+id/input_headers"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="@string/headers_hint_optional"
-            android:inputType="textMultiLine"
-            android:importantForAutofill="no"
-            android:minLines="2"
-            android:maxLines="4" />
+            android:layout_marginTop="14dp"
+            android:text="@string/section_file"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/text_secondary"
+            android:textStyle="bold" />
 
         <EditText
-            android:focusable="true"
-            android:focusableInTouchMode="true"
+            android:id="@+id/input_name"
+            style="@style/AppInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:hint="@string/name_hint_optional"
+            android:inputType="text"
+            android:autofillHints="name"
             android:minHeight="48dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+
+        <EditText
             android:id="@+id/input_checksum"
+            style="@style/AppInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:hint="@string/checksum_hint_optional"
             android:inputType="text"
-            android:importantForAutofill="no" />
+            android:importantForAutofill="no"
+            android:minHeight="48dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/section_network"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/text_secondary"
+            android:textStyle="bold" />
 
         <EditText
+            android:id="@+id/input_headers"
+            style="@style/AppInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:hint="@string/headers_hint_optional"
+            android:inputType="textMultiLine"
+            android:importantForAutofill="no"
+            android:minLines="2"
+            android:maxLines="3"
+            android:minHeight="56dp"
             android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:minHeight="48dp"
+            android:focusableInTouchMode="true" />
+
+        <EditText
             android:id="@+id/input_mirrors"
+            style="@style/AppInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
@@ -170,32 +228,39 @@
             android:importantForAutofill="no"
             android:inputType="textUri|textMultiLine"
             android:minLines="2"
-            android:maxLines="4" />
+            android:maxLines="3"
+            android:minHeight="56dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="14dp"
             android:text="@string/speed_limit_per_label"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/text_secondary"
+            android:textStyle="bold" />
 
         <Spinner
             android:id="@+id/spinner_speed_limit_per"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" />
+            android:layout_marginTop="6dp" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="12dp"
             android:text="@string/priority_label"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/text_secondary"
+            android:textStyle="bold" />
 
         <Spinner
             android:id="@+id/spinner_priority"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" />
+            android:layout_marginTop="6dp" />
     </LinearLayout>
 </LinearLayout>

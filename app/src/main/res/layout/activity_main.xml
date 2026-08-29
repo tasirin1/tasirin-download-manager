@@ -8,18 +8,17 @@
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
+        style="@style/Toolbar.Theme.HttpDownloadManager"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        app:title="@string/app_name">
-
-    </androidx.appcompat.widget.Toolbar>
+        app:title="@string/app_name" />
 
     <LinearLayout
         android:id="@+id/server_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
         android:background="@drawable/bg_status_card"
         android:clickable="true"
         android:focusable="true"
@@ -73,7 +72,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="12dp"
-        android:paddingTop="4dp">
+        android:paddingTop="10dp">
 
         <TextView
             android:id="@+id/filter_all"
@@ -151,11 +150,11 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:paddingHorizontal="12dp"
-        android:paddingTop="6dp"
-        tools:ignore="ButtonStyle">
+        android:paddingTop="8dp">
 
         <Button
             android:id="@+id/btn_pause_all"
+            style="@style/TvOutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -167,6 +166,7 @@
 
         <Button
             android:id="@+id/btn_resume_all"
+            style="@style/TvOutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -178,6 +178,7 @@
 
         <Button
             android:id="@+id/btn_retry_failed"
+            style="@style/TvOutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -192,7 +193,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:baselineAligned="false"
         android:orientation="horizontal">
 
@@ -204,7 +205,7 @@
             android:background="@drawable/bg_stat_box"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="10dp">
+            android:paddingVertical="12dp">
 
             <TextView
                 android:id="@+id/stat_total_value"
@@ -230,7 +231,7 @@
             android:background="@drawable/bg_stat_box"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="10dp">
+            android:paddingVertical="12dp">
 
             <TextView
                 android:id="@+id/stat_active_value"
@@ -258,7 +259,7 @@
             android:background="@drawable/bg_stat_box"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="10dp">
+            android:paddingVertical="12dp">
 
             <TextView
                 android:id="@+id/stat_done_value"
@@ -285,7 +286,7 @@
             android:background="@drawable/bg_stat_box"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="10dp">
+            android:paddingVertical="12dp">
 
             <TextView
                 android:id="@+id/stat_failed_value"
@@ -346,15 +347,13 @@
 
             <Button
                 android:id="@+id/empty_add_button"
+                style="@style/AppButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:background="@drawable/bg_btn_filled"
-                android:backgroundTint="@null"
                 android:minHeight="56dp"
                 android:paddingHorizontal="28dp"
                 android:text="@string/add_download"
-                android:textColor="@color/white"
                 android:textSize="16sp" />
 
             <Button
@@ -371,18 +370,16 @@
 
         <Button
             android:id="@+id/fab_add"
+            style="@style/AppButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
-            android:layout_margin="16dp"
-            android:background="@drawable/bg_btn_filled"
-            android:backgroundTint="@null"
+            android:layout_margin="14dp"
             android:drawableStart="@drawable/ic_add"
             android:drawablePadding="8dp"
             android:minHeight="52dp"
             android:paddingHorizontal="22dp"
             android:text="@string/add_download"
-            android:textColor="@color/white"
             android:textSize="15sp" />
     </FrameLayout>
 </LinearLayout>
