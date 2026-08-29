@@ -105,6 +105,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         statActiveLabel = binding.statActiveLabel
 
         setSupportActionBar(binding.toolbar)
+        val overflowColor = ContextCompat.getColor(this, R.color.white)
+        binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
+            ?.apply { setTint(overflowColor) }
 
         adapter = DownloadAdapter(this)
         binding.recycler.layoutManager = LinearLayoutManager(this)
@@ -113,10 +116,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding.fabAdd.setOnClickListener { showAddDialog() }
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
         binding.emptyRemoteButton.setOnClickListener { openRemote() }
-        binding.btnOpenRemote.setOnClickListener { openRemote() }
-        binding.serverCard.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        }
 
         binding.btnPauseAll.setOnClickListener {
             App.engine.pauseAll()
@@ -184,29 +183,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 .setMessage(stack)
                 .setPositiveButton(R.string.ok, null)
                 .show()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        updateServerStatus()
-    }
-
-    private fun updateServerStatus() {
-        val tv = findViewById<TextView>(R.id.server_status) ?: return
-        val detail = findViewById<TextView>(R.id.server_detail) ?: return
-        val btn = findViewById<View>(R.id.btn_open_remote) ?: return
-        val alive = App.httpServer.isAlive
-        tv.text = getString(
-            if (alive) R.string.server_status_running else R.string.server_status_stopped
-        )
-        tv.setTextColor(ContextCompat.getColor(this, if (alive) R.color.status_on else R.color.status_off))
-        if (alive) {
-            detail.text = remoteUrl() ?: getString(R.string.remote_no_url)
-            btn.isEnabled = true
-        } else {
-            detail.text = getString(R.string.server_status_detail_off)
-            btn.isEnabled = false
         }
     }
 

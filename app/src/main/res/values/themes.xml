@@ -25,6 +25,9 @@
         <item name="android:textColorPrimary">@color/white</item>
         <item name="android:textColorSecondary">@color/white</item>
         <item name="android:fontFamily">sans-serif-medium</item>
+        <!-- Warna ikon tipis (titik tiga overflow) jadi putih di toolbar primary. -->
+        <item name="colorControlNormal">@color/white</item>
+        <item name="android:colorControlNormal">@color/white</item>
     </style>
 
     <!-- Tombol terisi (primary). -->

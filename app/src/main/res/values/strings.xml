@@ -85,10 +85,7 @@
     <string name="settings_section_server">Remote server</string>
     <string name="battery_request_failed">Failed to open battery settings</string>
     <string name="notification_server_active">Remote server active (HTTP) — reachable from other devices</string>
-    <string name="server_status_running">Server: active</string>
-    <string name="server_status_stopped">Server: off</string>
     <string name="open_remote">Open Remote Web</string>
-    <string name="server_status_detail_off">Turn on via Settings</string>
     <string name="server_not_running_hint">Server is off. Turn it on in Settings.</string>
     <string name="open_remote_failed">Failed to open remote web</string>
     <string name="copy_address">Copy Address</string>
@@ -120,7 +117,7 @@
     <string name="filter_completed">Completed</string>
     <string name="filter_failed">Failed</string>
     <string name="storage_remaining">Storage available: %1$s</string>
-    <string name="file_info_checking">Checking file info…</string>
+    <string name="file_info_checking">Checking URL&#8230;</string>
     <string name="file_info_unknown">Could not read file info from server</string>
     <string name="file_info_size_unknown">unknown size</string>
     <string name="file_info_type_unknown">unknown type</string>
