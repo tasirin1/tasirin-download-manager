@@ -55,8 +55,7 @@ object SocialMediaExtractor {
             .replace(Regex("\\s+"), "_")
             .trim('_')
             .take(120)
-            .ifBlank { "Scribd_Document" }
-        return "Scribd_$safe.pdf"
+        return if (safe.isBlank()) "Scribd_Document.pdf" else "Scribd_$safe.pdf"
     }
 
     /** Ekstrak URL terbaik (satu opsi). `headers` (mis. Cookie dari dialog)
