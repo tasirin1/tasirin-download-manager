@@ -19,7 +19,6 @@ import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.Checksums
 import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MimeTypes
-import com.tasirin.httpdownloadmanager.util.ScribdPdf
 import com.tasirin.httpdownloadmanager.util.StorageCleanup
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
@@ -220,44 +219,6 @@ class DownloadEngine(appContext: Context) {
         attemptStart(item.id)
     }
 
-    /** Tambah unduhan PDF Scribd dari URL halaman yang sudah ditangkap WebView
-     *  (imageUrls). Langsung bangun PDF via [downloadScribdPdf] — tidak perlu
-     *  ekstraksi ulang (Scribd memblokir klien HTTP biasa dengan challenge). */
-    private val scribdPdfPending =
-        java.util.concurrent.ConcurrentHashMap<String, List<String>>()
-
-    fun addScribdPdf(
-        url: String,
-        imageUrls: List<String>,
-        title: String,
-        cookies: String,
-        customName: String = ""
-    ) {
-        if (imageUrls.isEmpty()) return
-        val cleanUrl = url.trim()
-        val base = customName.trim().ifEmpty { SocialMediaExtractor.scribdFileName(title) }
-            .removeSuffix(".pdf")
-        val name = FileNames.safe("$base.pdf")
-        val id = UUID.randomUUID().toString()
-        val headers = if (cookies.isNotBlank()) "Cookie: $cookies" else ""
-        val item = DownloadItem(
-            id = id,
-            url = cleanUrl,
-            fileName = name,
-            state = DownloadState.PENDING,
-            bytesDownloaded = 0,
-            totalBytes = 0,
-            nameIsCustom = true,
-            autoResume = true,
-            headers = headers
-        )
-        update(listOf(item) + _items.value)
-        flushSave()
-        App.logEvent("DOWNLOAD ADDED: $name (scribd.com, ${imageUrls.size} pages)")
-        scribdPdfPending[id] = imageUrls
-        attemptStart(id)
-    }
-
     fun pause(id: String) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD PAUSED: ${it.fileName}") }
         retryAttempts.remove(id)
@@ -447,10 +408,6 @@ class DownloadEngine(appContext: Context) {
             } else if (current.contains("cdninstagram.com") || current.contains("scontent")) {
                 conn.setRequestProperty("Referer", "https://www.instagram.com/")
                 conn.setRequestProperty("Origin", "https://www.instagram.com")
-            } else if (current.contains("scribdassets.com") || current.contains("scribd.com")) {
-                conn.setRequestProperty("Referer", "https://www.scribd.com/")
-                conn.setRequestProperty("Origin", "https://www.scribd.com")
-            }
             if (current == url || isSameOrigin(url, current)) {
                 applyAuthHeaders(conn, username, password, headers)
             }
@@ -935,15 +892,6 @@ class DownloadEngine(appContext: Context) {
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
-        // Scribd: halaman sudah ditangkap WebView (challenge browser sudah lolos
-        // di perangkat) — langsung bangun PDF dari URL gambar, tanpa ekstraksi ulang.
-        scribdPdfPending.remove(item.id)?.let { pageUrls ->
-            if (pageUrls.isNotEmpty()) {
-                updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }
-                downloadScribdPdf(item, pageUrls)
-                return
-            }
-        }
         // Resume HLS: URL sudah berupa manifest m3u8 dari ekstraksi sebelumnya.
         // Arahkan ulang ke downloadHls agar tidak diunduh sebagai file polos.
         // TAPI: bila URL ini sudah gagal sebelumnya (failedHlsUrls), jangan retry
@@ -967,11 +915,6 @@ class DownloadEngine(appContext: Context) {
             val host = runCatching { java.net.URL(item.url).host }.getOrDefault("?")
             App.logEvent("SOCIAL: extracting direct URL from $host ...")
             val result = SocialMediaExtractor.extract(item.url, item.headers)
-            if (result != null && result.imageUrls.isNotEmpty()) {
-                App.logEvent("SOCIAL: Scribd document with ${result.imageUrls.size} pages ($host)")
-                downloadScribdPdf(item, result, host)
-                return
-            }
             if (result != null && result.directUrl != item.url) {
                 App.logEvent("SOCIAL: extracted direct URL from $host → ${result.directUrl.take(80)}...")
                 App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.take(50)}...")
@@ -1391,142 +1334,6 @@ class DownloadEngine(appContext: Context) {
             runCatching { audioM4a.delete() }
             runCatching { mp4.delete() }
             throw e
-        }
-    }
-
-    /** Unduh dokumen Scribd dari daftar URL halaman yang sudah ditangkap WebView. */
-    private suspend fun downloadScribdPdf(item: DownloadItem, pageUrls: List<String>) {
-        val result = SocialMediaExtractor.Result(
-            directUrl = item.url,
-            fileName = item.fileName,
-            title = item.fileName,
-            mimeType = "application/pdf",
-            cookies = item.headers,
-            imageUrls = pageUrls
-        )
-        downloadScribdPdf(item, result, "scribd.com")
-    }
-
-    /** Unduh dokumen Scribd: ambil tiap gambar halaman lalu susun jadi PDF. */
-    private suspend fun downloadScribdPdf(
-        item: DownloadItem,
-        result: SocialMediaExtractor.Result,
-        host: String
-    ) {
-        if (result.imageUrls.isEmpty()) {
-            throw IOException("Scribd: no page images found (document requires browser/JS)")
-        }
-        val saver = FileSaver(context)
-        val baseName = (result.fileName ?: item.fileName).removeSuffix(".pdf").ifBlank { "Scribd_Document" }
-        val pdf = saver.partialFile("$baseName.pdf", segment = null).apply { delete() }
-        val throttle = SpeedThrottle(StoragePrefs.speedLimitKbps(context), globalRateLimiter())
-        val buffer = ByteArray(BUFFER_SIZE)
-        val progress = HlsProgress()
-        val pages = ArrayList<ScribdPdf.Page>(result.imageUrls.size)
-        try {
-            var index = 0
-            for (url in result.imageUrls) {
-                coroutineContext.ensureActive()
-                index++
-                val jpeg = fetchScribdPageBytes(item, url, buffer, throttle, progress)
-                if (jpeg == null || !ScribdPdf.isJpeg(jpeg)) {
-                    App.logEvent("SCRIBD DEBUG: page $index failed (${if (jpeg == null) "fetch" else "not JPEG"}), skipped")
-                    continue
-                }
-                val info = ScribdPdf.jpegInfo(jpeg)
-                if (info == null) {
-                    App.logEvent("SCRIBD DEBUG: page $index JPEG header not recognized, skipped")
-                    continue
-                }
-                val cs = if (info.channels == 1) "/DeviceGray" else if (info.channels == 4) "/DeviceCMYK" else "/DeviceRGB"
-                pages.add(ScribdPdf.Page(jpeg, info.width, info.height, cs))
-                updateItem(item.id, persist = false) {
-                    it.copy(
-                        state = DownloadState.DOWNLOADING,
-                        bytesDownloaded = progress.downloaded,
-                        speedBps = 0,
-                        etaSeconds = 0
-                    )
-                }
-            }
-            if (pages.isEmpty()) {
-                throw IOException("Scribd: all pages failed to download (possibly blocked/Cookie required)")
-            }
-            coroutineContext.ensureActive()
-            if (!ScribdPdf.build(pdf, pages)) {
-                throw IOException("Scribd: failed to build PDF")
-            }
-            App.logEvent("BACKGROUND COMPLETED: $baseName.pdf (${pages.size} pages)")
-            val published0 = publishItem(saver, pdf, "$baseName.pdf", item)
-            val finalName = published0.fileName ?: "$baseName.pdf"
-            val published = organizeIfEnabled(saver, published0, finalName)
-            speedTracker.reset(item.id)
-            updateItem(item.id) {
-                it.copy(
-                    state = DownloadState.COMPLETED,
-                    fileName = finalName,
-                    bytesDownloaded = pdf.length(),
-                    totalBytes = pdf.length(),
-                    contentUri = published.contentUri,
-                    filePath = published.filePath,
-                    autoResume = false,
-                    speedBps = 0,
-                    etaSeconds = 0,
-                    finishedAt = System.currentTimeMillis()
-                )
-            }
-            flushSave()
-        } catch (e: Exception) {
-            runCatching { pdf.delete() }
-            throw e
-        }
-    }
-
-    /** Ambil byte satu halaman Scribd (gambar). Mengembalikan null bila gagal. */
-    private suspend fun fetchScribdPageBytes(
-        item: DownloadItem,
-        url: String,
-        buffer: ByteArray,
-        throttle: SpeedThrottle,
-        progress: HlsProgress
-    ): ByteArray? {
-        return try {
-            val conn = trackConnection(
-                item.id,
-                openAuthenticatedConnection(
-                    url, method = "GET",
-                    username = item.username,
-                    password = item.password,
-                    headers = item.headers
-                )
-            )
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) return null
-                val out = ByteArrayOutputStream()
-                val input = conn.inputStream
-                try {
-                    var bytes = 0L
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read == -1) break
-                        bytes += read
-                        if (bytes > HLS_SEGMENT_MAX_BYTES) return null
-                        out.write(buffer, 0, read)
-                        throttle.sleepIfNeeded { progress.downloaded + bytes }
-                    }
-                    progress.downloaded += out.size()
-                } finally {
-                    runCatching { input.close() }
-                }
-                out.toByteArray()
-            } finally {
-                untrackConnection(item.id, conn)
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            null
         }
     }
 
