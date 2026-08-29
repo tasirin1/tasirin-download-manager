@@ -95,7 +95,7 @@ class GalleryActivity : AppCompatActivity() {
                 } else {
                     fullList = mergedProgress(fullList)
                 }
-                applyFilterUi()
+                updateList()
             }
         }
     }
@@ -113,7 +113,7 @@ class GalleryActivity : AppCompatActivity() {
         else entry.copy(progressPercent = partialProgress[entry.name] ?: -1)
     }
 
-    private fun applyFilterUi() {
+    private fun updateList() {
         adapter.submit(fullList)
         binding.emptyView.visibility = if (fullList.isEmpty()) View.VISIBLE else View.GONE
     }
@@ -140,7 +140,7 @@ class GalleryActivity : AppCompatActivity() {
             } finally {
                 loadingMore = false
             }
-            applyFilterUi()
+            updateList()
         }
     }
 

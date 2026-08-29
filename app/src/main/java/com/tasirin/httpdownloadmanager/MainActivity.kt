@@ -132,16 +132,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         lifecycleScope.launch {
             App.engine.items.collect { items ->
                 runCatching {
-                    val filtered = applyFilter(items)
-                    adapter.submitList(filtered)
+                    adapter.submitList(items)
                     binding.emptyView.visibility =
-                        if (filtered.isEmpty()) View.VISIBLE else View.GONE
+                        if (items.isEmpty()) View.VISIBLE else View.GONE
                     updateToolbar(items)
                 }
             }
         }
-
-        setupFilterViews()
 
         requestPermissionsIfNeeded()
         runCatching {
@@ -588,13 +585,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 true
             }
             R.id.action_clear_failed -> {
-                App.engine.clearFailed()
-                refreshList()
+                lifecycleScope.launch(Dispatchers.IO) { App.engine.clearFailed() }
                 true
             }
             R.id.action_clear_completed -> {
-                App.engine.clearCompleted()
-                refreshList()
+                lifecycleScope.launch(Dispatchers.IO) { App.engine.clearCompleted() }
                 true
             }
             R.id.action_about -> {
@@ -894,53 +889,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .show()
     }
 
-    private enum class DownloadFilter { ALL, ACTIVE, COMPLETED, FAILED }
-
-    private var currentFilter = DownloadFilter.ALL
-    private var sortMode = 0
-
-    private fun setupFilterViews() {
-        // Diinisialisasi di sini, bukan di properti, karena getSharedPreferences
-        // belum tersedia saat field Activity dibuat (force close di Android).
-        sortMode = StoragePrefs.sortMode(this)
-
-        val map = listOf(
-            R.id.filter_all to DownloadFilter.ALL,
-            R.id.filter_active to DownloadFilter.ACTIVE,
-            R.id.filter_completed to DownloadFilter.COMPLETED,
-            R.id.filter_failed to DownloadFilter.FAILED
-        )
-        map.forEach { (id, filter) ->
-            findViewById<TextView>(id)?.setOnClickListener {
-                currentFilter = filter
-                updateFilterColors()
-                refreshList()
-            }
-        }
-        updateFilterColors()
-    }
-
-    private fun updateFilterColors() {
-        val map = listOf(
-            R.id.filter_all to DownloadFilter.ALL,
-            R.id.filter_active to DownloadFilter.ACTIVE,
-            R.id.filter_completed to DownloadFilter.COMPLETED,
-            R.id.filter_failed to DownloadFilter.FAILED
-        )
-        map.forEach { (id, filter) ->
-            val tv = findViewById<TextView>(id) ?: return@forEach
-            val selected = filter == currentFilter
-            tv.isSelected = selected
-            tv.setTextColor(
-                ContextCompat.getColor(
-                    this,
-                    if (selected) R.color.white else R.color.text_secondary
-                )
-            )
-            tv.typeface = if (selected) android.graphics.Typeface.DEFAULT_BOLD else null
-        }
-    }
-
     /** Statistik + visibilitas tombol batch dihitung dalam SATU iterasi daftar
      *  (sebelumnya 4× iterasi per emisi: 3× any{} + 1× statistik). */
     private fun updateToolbar(items: List<DownloadItem>) {
@@ -973,43 +921,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding.btnPauseAll.visibility = if (active > 0) View.VISIBLE else View.GONE
         binding.btnResumeAll.visibility = if (paused > 0 || failed > 0) View.VISIBLE else View.GONE
         binding.btnRetryFailed.visibility = if (failed > 0) View.VISIBLE else View.GONE
-    }
-
-    private fun refreshList() {
-        runCatching {
-            val items = App.engine.items.value
-            val filtered = applyFilter(items)
-            adapter.submitList(filtered)
-            binding.emptyView.visibility =
-                if (filtered.isEmpty()) View.VISIBLE else View.GONE
-            updateToolbar(items)
-        }
-    }
-
-    private fun applyFilter(items: List<DownloadItem>): List<DownloadItem> {
-        val filtered = when (currentFilter) {
-            DownloadFilter.ALL -> items
-            DownloadFilter.ACTIVE -> items.filter {
-                it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-            }
-            DownloadFilter.COMPLETED -> items.filter { it.state == DownloadState.COMPLETED }
-            DownloadFilter.FAILED -> items.filter {
-                it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED
-            }
-        }
-        return when (sortMode) {
-            // Daftar engine sudah terurut addedAt desc, jadi tanpa sort ulang.
-            0 -> filtered
-            1 -> filtered.asReversed()
-            2 -> filtered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileName })
-            3 -> filtered.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.fileName })
-            4 -> filtered.sortedByDescending { it.totalBytes }
-            5 -> filtered.sortedBy { it.totalBytes }
-            else -> filtered.sortedWith(
-                compareBy<DownloadItem> { STATE_RANK[it.state] ?: 0 }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.fileName }
-            )
-        }
     }
 
     /** Ekspor log error (crash + error server) ke file .txt di folder Download. */
@@ -1106,14 +1017,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     companion object {
-        private val STATE_RANK = mapOf(
-            DownloadState.PENDING to 0,
-            DownloadState.DOWNLOADING to 1,
-            DownloadState.PAUSED to 2,
-            DownloadState.COMPLETED to 3,
-            DownloadState.FAILED to 4,
-            DownloadState.CANCELLED to 5
-        )
         private val URL_SPLIT = Regex("[\\s,]+")
         private const val EXTRA_ADD_DOWNLOAD = "com.tasirin.httpdownloadmanager.ADD_DOWNLOAD"
         private val SPEED_KBPS = intArrayOf(0, 128, 256, 512, 1024, 2048, 5120)

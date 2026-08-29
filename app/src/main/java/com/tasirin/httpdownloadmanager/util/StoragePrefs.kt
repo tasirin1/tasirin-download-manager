@@ -36,7 +36,6 @@ object StoragePrefs {
     private const val KEY_MAX_RETRIES = "max_retries"
     private const val KEY_SERVER_PORT = "server_port"
     private const val KEY_SEGMENTS = "segments"
-    private const val KEY_SORT_MODE = "sort_mode"
     private const val KEY_AUTO_SORT = "auto_sort"
     private const val KEY_SMALL_FIRST = "small_first"
     private const val KEY_DELETE_PARTIAL_ON_CANCEL = "delete_partial_on_cancel"
@@ -336,10 +335,6 @@ object StoragePrefs {
             putInt(KEY_SEGMENTS, value.coerceIn(1, 8))
         }
     }
-
-    fun sortMode(context: Context): Int =
-        prefs(context)
-            .getInt(KEY_SORT_MODE, 0).coerceIn(0, 6)
 
     fun getConnectTimeoutSec(context: Context): Int =
         prefs(context)

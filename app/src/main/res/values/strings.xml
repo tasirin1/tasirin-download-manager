@@ -114,10 +114,6 @@
     <string name="ok">OK</string>
     <string name="checksum_hint_optional">Optional checksum (md5:/sha1:/sha256:) — e.g. md5:abcdef&#8230;</string>
     <string name="shortcut_add_download">Add Download</string>
-    <string name="filter_all">All</string>
-    <string name="filter_active">Active</string>
-    <string name="filter_completed">Completed</string>
-    <string name="filter_failed">Failed</string>
     <string name="checksum_ok">✓ Checksum OK</string>
     <string name="location_label">Location: %1$s</string>
     <string name="location_media_store">MediaStore / Custom folder</string>
