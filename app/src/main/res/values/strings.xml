@@ -100,12 +100,6 @@
     <string name="about_github">Open GitHub</string>
     <string name="about_check_update">Check Update</string>
     <string name="about_tech">minSdk %1$d · targetSdk %2$d · build %3$d</string>
-    <string name="stat_total">Total</string>
-    <string name="stat_number">%d</string>
-    <string name="stat_active">Active</string>
-    <string name="stat_done">Done</string>
-    <string name="stat_failed">Failed</string>
-    <string name="stat_active_speed">Active · %1$s</string>
     <string name="action_about">About</string>
     <string name="log_exported">Server log exported to Download folder (httpdm-serverlog-*.txt)</string>
     <string name="log_export_failed">Failed to export log</string>
@@ -154,7 +148,6 @@
     <string name="speed_limit_per_label">Speed limit (per download)</string>
     <string name="priority_label">Priority</string>
     <string name="action_limit_priority">Limit &amp; priority</string>
-
 
     <string-array name="concurrent_options">
         <item>1</item>

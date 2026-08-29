@@ -44,7 +44,6 @@ import com.tasirin.httpdownloadmanager.databinding.ActivityMainBinding
 import com.tasirin.httpdownloadmanager.ui.DownloadAdapter
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.Permissions
-import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
@@ -61,12 +60,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: DownloadAdapter
     private var pendingMoveId: String? = null
-    private lateinit var statTotal: TextView
-    private lateinit var statActive: TextView
-    private lateinit var statDone: TextView
-    private lateinit var statFailed: TextView
-    private lateinit var statActiveLabel: TextView
-
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -95,14 +88,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         applyEdgeToEdge(binding.root)
-        // Cache TextView statistik: updateToolbar dipanggil ~2x/detik saat
-        // download aktif, findViewById tiap tick tidak perlu.
-        statTotal = binding.statTotalValue
-        statActive = binding.statActiveValue
-        statDone = binding.statDoneValue
-        statFailed = binding.statFailedValue
-        statActiveLabel = binding.statActiveLabel
-
         setSupportActionBar(binding.toolbar)
         val overflowColor = ContextCompat.getColor(this, R.color.white)
         binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
@@ -893,31 +878,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
      *  (sebelumnya 4× iterasi per emisi: 3× any{} + 1× statistik). */
     private fun updateToolbar(items: List<DownloadItem>) {
         var active = 0
-        var done = 0
         var failed = 0
         var paused = 0
-        var speed = 0L
         for (item in items) {
             when (item.state) {
-                DownloadState.DOWNLOADING -> {
-                    active++
-                    speed += item.speedBps
-                }
-                DownloadState.PENDING -> active++
-                DownloadState.COMPLETED -> done++
+                DownloadState.DOWNLOADING, DownloadState.PENDING -> active++
                 DownloadState.FAILED -> failed++
                 DownloadState.PAUSED -> paused++
                 else -> {}
             }
         }
-        statTotal.text = getString(R.string.stat_number, items.size)
-        statActive.text = getString(R.string.stat_number, active)
-        statDone.text = getString(R.string.stat_number, done)
-        statFailed.text = getString(R.string.stat_number, failed)
-        statActiveLabel.text = getString(
-            if (speed > 0) R.string.stat_active_speed else R.string.stat_active,
-            Formats.speed(speed)
-        )
         binding.btnPauseAll.visibility = if (active > 0) View.VISIBLE else View.GONE
         binding.btnResumeAll.visibility = if (paused > 0 || failed > 0) View.VISIBLE else View.GONE
         binding.btnRetryFailed.visibility = if (failed > 0) View.VISIBLE else View.GONE
