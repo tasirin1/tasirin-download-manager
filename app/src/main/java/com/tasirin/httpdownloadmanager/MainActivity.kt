@@ -57,6 +57,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private data class PendingScribd(
+    val url: String,
+    val name: String
+)
+
 class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     private lateinit var binding: ActivityMainBinding
@@ -72,6 +77,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
 
+    private var pendingScribd: PendingScribd? = null
+
+    private val scribdLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result -> handleScribdResult(result) }
+
     private val movePicker = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
@@ -84,6 +95,37 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }.onFailure {
                 Toast.makeText(this, R.string.storage_picker_error, Toast.LENGTH_LONG).show()
             }
+        }
+    }
+
+    private fun handleScribdResult(result: androidx.activity.result.ActivityResult) {
+        val pending = pendingScribd ?: return
+        pendingScribd = null
+        if (result.resultCode == RESULT_OK) {
+            val data = result.data
+            val pageUrls = data
+                ?.getStringArrayListExtra(ScribdExtractorActivity.EXTRA_PAGE_URLS)
+                .orEmpty()
+                .filter { it.startsWith("http") }
+            if (pageUrls.isEmpty()) {
+                Toast.makeText(this, R.string.scribd_no_pages, Toast.LENGTH_LONG).show()
+                return
+            }
+            val title = data?.getStringExtra(ScribdExtractorActivity.EXTRA_TITLE).orEmpty()
+            val cookies = data?.getStringExtra(ScribdExtractorActivity.EXTRA_COOKIES).orEmpty()
+            val fileName = if (pending.name.isBlank()) {
+                SocialMediaExtractor.scribdFileName(title)
+            } else pending.name
+            App.logEvent("SOCIAL: Scribd ${pageUrls.size} pages via WebView → building PDF")
+            App.engine.addScribdPdf(
+                url = pending.url,
+                imageUrls = pageUrls,
+                title = title,
+                cookies = cookies,
+                customName = fileName
+            )
+        } else {
+            Toast.makeText(this, R.string.scribd_extract_failed, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -554,6 +596,21 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val checksum = checksumInput.text?.toString()?.trim().orEmpty()
                 val perSpeed = speedKbps[spinnerSpeedPer.selectedItemPosition]
                 val priority = priorityValues[spinnerPriority.selectedItemPosition]
+                // Scribd: halaman tidak bisa dibaca klien HTTP (Fastly Client
+                // Challenge), jadi render dulu via WebView lalu serahkan URL
+                // gambar halaman ke engine untuk disusun jadi PDF.
+                val scribdTarget = urls.firstOrNull {
+                    it.contains("scribd.com") && !it.contains("scribdassets.com")
+                }
+                if (scribdTarget != null) {
+                    pendingScribd = PendingScribd(url = scribdTarget, name = name)
+                    scribdLauncher.launch(
+                        Intent(this, ScribdExtractorActivity::class.java).apply {
+                            putExtra(ScribdExtractorActivity.EXTRA_URL, scribdTarget)
+                        }
+                    )
+                    return@setPositiveButton
+                }
                 if (selectedYtHeight > 0) {
                     // YouTube: simpan resolusi pilihan; engine memilih varian
                     // HLS yang paling mendekati saat download dimulai (URL CDN

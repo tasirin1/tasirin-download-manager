@@ -289,4 +289,9 @@
     <string name="gallery_thumb_desc">Media preview</string>
     <string name="label_user_agent">User-Agent</string>
     <string name="hint_custom_user_agent">Or type custom User-Agent</string>
+    <string name="scribd_extractor_title">Scribd — Extract Pages</string>
+    <string name="scribd_rendering">Loading document… this may take a few moments.</string>
+    <string name="scribd_extracting">Extracting page images…</string>
+    <string name="scribd_no_pages">No book pages could be extracted. The document may be private, require login, or blocked by Scribd. Try opening it in your browser first.</string>
+    <string name="scribd_extract_failed">Scribd extraction failed.</string>
 </resources>

@@ -220,6 +220,44 @@ class DownloadEngine(appContext: Context) {
         attemptStart(item.id)
     }
 
+    /** Tambah unduhan PDF Scribd dari URL halaman yang sudah ditangkap WebView
+     *  (imageUrls). Langsung bangun PDF via [downloadScribdPdf] — tidak perlu
+     *  ekstraksi ulang (Scribd memblokir klien HTTP biasa dengan challenge). */
+    private val scribdPdfPending =
+        java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+
+    fun addScribdPdf(
+        url: String,
+        imageUrls: List<String>,
+        title: String,
+        cookies: String,
+        customName: String = ""
+    ) {
+        if (imageUrls.isEmpty()) return
+        val cleanUrl = url.trim()
+        val base = customName.trim().ifEmpty { SocialMediaExtractor.scribdFileName(title) }
+            .removeSuffix(".pdf")
+        val name = FileNames.safe("$base.pdf")
+        val id = UUID.randomUUID().toString()
+        val headers = if (cookies.isNotBlank()) "Cookie: $cookies" else ""
+        val item = DownloadItem(
+            id = id,
+            url = cleanUrl,
+            fileName = name,
+            state = DownloadState.PENDING,
+            bytesDownloaded = 0,
+            totalBytes = 0,
+            nameIsCustom = true,
+            autoResume = true,
+            headers = headers
+        )
+        update(listOf(item) + _items.value)
+        flushSave()
+        App.logEvent("DOWNLOAD ADDED: $name (scribd.com, ${imageUrls.size} pages)")
+        scribdPdfPending[id] = imageUrls
+        attemptStart(id)
+    }
+
     fun pause(id: String) {
         _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD PAUSED: ${it.fileName}") }
         retryAttempts.remove(id)
@@ -897,6 +935,15 @@ class DownloadEngine(appContext: Context) {
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
+        // Scribd: halaman sudah ditangkap WebView (challenge browser sudah lolos
+        // di perangkat) — langsung bangun PDF dari URL gambar, tanpa ekstraksi ulang.
+        scribdPdfPending.remove(item.id)?.let { pageUrls ->
+            if (pageUrls.isNotEmpty()) {
+                updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }
+                downloadScribdPdf(item, pageUrls)
+                return
+            }
+        }
         // Resume HLS: URL sudah berupa manifest m3u8 dari ekstraksi sebelumnya.
         // Arahkan ulang ke downloadHls agar tidak diunduh sebagai file polos.
         // TAPI: bila URL ini sudah gagal sebelumnya (failedHlsUrls), jangan retry
@@ -1345,6 +1392,19 @@ class DownloadEngine(appContext: Context) {
             runCatching { mp4.delete() }
             throw e
         }
+    }
+
+    /** Unduh dokumen Scribd dari daftar URL halaman yang sudah ditangkap WebView. */
+    private suspend fun downloadScribdPdf(item: DownloadItem, pageUrls: List<String>) {
+        val result = SocialMediaExtractor.Result(
+            directUrl = item.url,
+            fileName = item.fileName,
+            title = item.fileName,
+            mimeType = "application/pdf",
+            cookies = item.headers,
+            imageUrls = pageUrls
+        )
+        downloadScribdPdf(item, result, "scribd.com")
     }
 
     /** Unduh dokumen Scribd: ambil tiap gambar halaman lalu susun jadi PDF. */

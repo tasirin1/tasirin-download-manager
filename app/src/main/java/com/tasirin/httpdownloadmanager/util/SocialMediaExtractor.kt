@@ -48,6 +48,17 @@ object SocialMediaExtractor {
                 lower.contains("youtu.be/")
     }
 
+    /** Nama file PDF aman dari judul dokumen Scribd. */
+    fun scribdFileName(title: String): String {
+        val safe = title
+            .replace(Regex("[\\/:*?\"<>|]"), "_")
+            .replace(Regex("\\s+"), "_")
+            .trim('_')
+            .take(120)
+            .ifBlank { "Scribd_Document" }
+        return "Scribd_$safe.pdf"
+    }
+
     /** Ekstrak URL terbaik (satu opsi). `headers` (mis. Cookie dari dialog)
      *  diteruskan untuk platform yang butuh sesi (mis. Scribd). */
     suspend fun extract(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
@@ -115,15 +126,9 @@ object SocialMediaExtractor {
             return null
         }
         val title = extractScribdDocumentTitle(page.body)
-        val safe = title
-            .replace(Regex("[\\/:*?\"<>|]"), "_")
-            .replace(Regex("\\s+"), "_")
-            .trim('_')
-            .take(120)
-            .ifBlank { "Scribd_${System.currentTimeMillis()}" }
         App.logEvent("SCRIBD DEBUG: ${pageUrls.size} pages, title=$title")
         return Result(
-            "", "Scribd_$safe.pdf", title,
+            "", scribdFileName(title), title,
             "Document", "application/pdf",
             cookies = parseHeaderValue(headers, "Cookie"),
             isHls = false,
