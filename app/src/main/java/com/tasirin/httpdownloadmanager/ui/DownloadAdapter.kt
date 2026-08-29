@@ -53,26 +53,6 @@ class DownloadAdapter(private val listener: Listener) :
             ContextCompat.getColor(b.root.context, progressColor(item.state))
         )
 
-        val quick = b.buttonQuick
-        val quickResume = item.state == DownloadState.PAUSED || item.state == DownloadState.FAILED
-        val quickPause = item.state == DownloadState.DOWNLOADING || item.state == DownloadState.PENDING
-        if (quickResume || quickPause) {
-            quick.visibility = View.VISIBLE
-            val quickIcon = ContextCompat.getDrawable(
-                b.root.context,
-                if (quickResume) R.drawable.ic_play else R.drawable.ic_pause
-            )?.mutate()
-            quickIcon?.setTint(ContextCompat.getColor(b.root.context, R.color.primary))
-            quick.setCompoundDrawablesRelative(null, null, quickIcon, null)
-            quick.contentDescription = b.root.context.getString(
-                if (quickResume) R.string.resume else R.string.pause
-            )
-            quick.setOnClickListener {
-                listener.onAction(item, if (quickResume) Action.RESUME else Action.PAUSE)
-            }
-        } else {
-            quick.visibility = View.GONE
-        }
         b.textProgress.text = if (item.totalBytes > 0) {
             String.format(
                 Locale.US, "%d%% \u2022 %s / %s",

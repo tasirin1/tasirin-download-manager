@@ -30,19 +30,6 @@
                 android:singleLine="true"
                 android:textAppearance="?android:attr/textAppearanceMedium" />
 
-            <Button
-                android:id="@+id/button_quick"
-                style="@style/TvOutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:contentDescription="@string/pause"
-                android:minWidth="44dp"
-                android:minHeight="44dp"
-                android:paddingHorizontal="10dp"
-                android:visibility="gone"
-                android:drawableStart="@drawable/ic_pause"
-                android:drawablePadding="0dp" />
-
         </LinearLayout>
 
         <LinearLayout
