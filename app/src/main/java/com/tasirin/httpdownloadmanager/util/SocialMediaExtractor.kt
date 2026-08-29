@@ -993,7 +993,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             while (true) {
                 val m = regex.find(html, start) ?: break
                 val url = m.groupValues[1].let { unescapeFb(it) }
-                if (url.startsWith("http") && url.contains(".mp4")) found.putIfAbsent(url, label)
+                if (url.startsWith("http") && url.length in 20..2000) found.putIfAbsent(url, label)
                 start = m.range.last + 1
             }
         }
@@ -1002,6 +1002,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             val q = if (url.contains("quality=hd") || url.contains("_hd")) "HD" else "SD"
             found.putIfAbsent(url, q)
         }
+        App.logEvent("FB DEBUG: $source found=${found.size} first=${found.keys.firstOrNull()?.take(120) ?: "-"}")
         val options = mutableListOf<Result>()
         found.forEach { (url, quality) ->
             options.add(Result(url, "Facebook_${videoId}.mp4", "Facebook $videoId", quality, "video/mp4", cookies))
@@ -1047,6 +1048,8 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             .replace("\\u0025", "%")
             .replace("\\u0026", "&")
             .replace("\\u003d", "=")
+            .replace("\\x26", "&")
+            .replace("\\x3d", "=")
             .replace("\\u002F", "/")
             .replace("&amp;", "&")
     }
