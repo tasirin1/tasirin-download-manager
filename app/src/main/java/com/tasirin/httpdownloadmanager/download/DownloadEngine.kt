@@ -1139,6 +1139,7 @@ class DownloadEngine(appContext: Context) {
 
         try {
             // 1) Unduh segmen video (MPEG-TS) ke file temp.
+            progress.totalSegments = plan.videoSegments.size + (plan.audioSegments?.size ?: 0)
             downloadSegmentsToFile(item, plan.videoSegments, videoTs, buffer, throttle, progress)
 
             // 2) Unduh segmen audio (ADTS AAC) ke file temp bila terpisah.
@@ -1213,6 +1214,9 @@ class DownloadEngine(appContext: Context) {
     private class HlsProgress {
         var downloaded = 0L
         var lastNotify = 0L
+        var totalSegments = 0
+        var segmentsDone = 0
+        var estimateTotal = 0L
     }
 
     /** Unduh daftar segmen ke satu file. Tiap segmen ditulis setelah sukses
@@ -1234,6 +1238,11 @@ class DownloadEngine(appContext: Context) {
                 ) { segNow -> reportHlsProgress(item, progress, segNow) }
                 out.write(transform(segBytes))
                 progress.downloaded += segBytes.size
+                progress.segmentsDone++
+                if (progress.totalSegments > 0 && progress.segmentsDone > 0) {
+                    progress.estimateTotal =
+                        (progress.downloaded / progress.segmentsDone) * progress.totalSegments
+                }
             }
         }
     }
@@ -1261,6 +1270,8 @@ class DownloadEngine(appContext: Context) {
         try {
             val code = conn.responseCode
             if (code !in 200..299) return false
+            val total = contentLength(conn)
+            if (total > 0) progress.estimateTotal = progress.downloaded + total
             BufferedOutputStream(FileOutputStream(target)).use { out ->
                 val input = conn.inputStream
                 try {
@@ -1274,11 +1285,13 @@ class DownloadEngine(appContext: Context) {
                         }
                         out.write(buffer, 0, read)
                         throttle.sleepIfNeeded { progress.downloaded + bytes }
+                        reportHlsProgress(item, progress, bytes)
                     }
                 } finally {
                     runCatching { input.close() }
                 }
             }
+            progress.downloaded += target.length()
             return target.length() > 0L
         } finally {
             untrackConnection(item.id, conn)
@@ -1363,12 +1376,16 @@ class DownloadEngine(appContext: Context) {
         val now = System.currentTimeMillis()
         if (now - progress.lastNotify >= 1000) {
             progress.lastNotify = now
-            val (speed, eta) = speedTracker.sample(item.id, totalNow, 0)
+            // Untuk HLS total asli tidak diketahui sampai semua segmen selesai.
+            // Pakai estimasi (rata-rata ukuran segmen x jumlah segmen) supaya
+            // bar progres bergerak; tanpa ini bar diam di 0 selama unduhan.
+            val effTotal = progress.estimateTotal
+            val (speed, eta) = speedTracker.sample(item.id, totalNow, effTotal)
             updateItem(item.id, persist = false) {
                 it.copy(
                     state = DownloadState.DOWNLOADING,
                     bytesDownloaded = totalNow,
-                    totalBytes = 0,
+                    totalBytes = effTotal,
                     speedBps = speed,
                     etaSeconds = eta
                 )
