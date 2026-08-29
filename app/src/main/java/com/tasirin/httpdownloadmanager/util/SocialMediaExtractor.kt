@@ -26,13 +26,16 @@ object SocialMediaExtractor {
         val cookies: String = "",
         val isHls: Boolean = false,
         val audioUrl: String = "",
-        val videoUrl: String = ""
+        val videoUrl: String = "",
+        val imageUrls: List<String> = emptyList()
     )
 
     fun isSocialMediaUrl(url: String): Boolean {
         val lower = url.lowercase()
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
+        if (lower.contains("scribdassets.com")) return false
+        if (lower.contains("scribd.com")) return true
         return lower.contains("tiktok.com/") ||
                 lower.contains("instagram.com/p/") ||
                 lower.contains("instagram.com/reel/") ||
@@ -45,11 +48,14 @@ object SocialMediaExtractor {
                 lower.contains("youtu.be/")
     }
 
-    /** Ekstrak URL terbaik (satu opsi). */
-    suspend fun extract(url: String): Result? = withContext(Dispatchers.IO) {
+    /** Ekstrak URL terbaik (satu opsi). `headers` (mis. Cookie dari dialog)
+     *  diteruskan untuk platform yang butuh sesi (mis. Scribd). */
+    suspend fun extract(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
         try {
             val lower = url.lowercase()
             when {
+                lower.contains("scribd.com") ->
+                    extractScribd(url, headers)
                 lower.contains("tiktok.com/") || lower.contains("vm.tiktok.com/") ->
                     extractTikTok(url)
                 lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
@@ -64,7 +70,7 @@ object SocialMediaExtractor {
     }
 
     /** Ekstrak semua opsi resolusi yang tersedia. */
-    suspend fun extractAll(url: String): List<Result> = withContext(Dispatchers.IO) {
+    suspend fun extractAll(url: String, headers: String = ""): List<Result> = withContext(Dispatchers.IO) {
         // Batas keras total ekstraksi: rantai fallback (piped/invidious/embed)
         // punya timeout sendiri, tapi jangan sampai menahan thread server atau
         // dialog probe terlalu lama bila semua mirror lambat/gagal.
@@ -72,6 +78,8 @@ object SocialMediaExtractor {
             try {
                 val lower = url.lowercase()
                 when {
+                    lower.contains("scribd.com") ->
+                        listOfNotNull(extractScribd(url, headers))
                     lower.contains("tiktok.com/") || lower.contains("vm.tiktok.com/") ->
                         extractAllTikTok(url)
                     lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
@@ -84,6 +92,110 @@ object SocialMediaExtractor {
                 }
             } catch (_: Exception) { emptyList() }
         } ?: emptyList()
+    }
+
+    // ── Scribd ────────────────────────────────────────────────────────────
+
+    /** Ekstrak dokumen publik Scribd. Terbatas pada gambar halaman (mode
+     *  "Extract from Server") — tidak butuh akun, hanya dokumen publik.
+     *  Bila Scribd memblokir dengan Client Challenge (butuh JS), gagal dengan
+     *  pesan jelas. Mengembalikan Result bertipe `scribd` dengan daftar URL
+     *  gambar halaman yang nanti disusun jadi PDF oleh DownloadEngine. */
+    private fun extractScribd(url: String, headers: String = ""): Result? {
+        val docUrl = url.trim()
+        val page = httpGetWithCookies(docUrl, httpHeadersWith(headers), timeoutMs = 25000)
+            ?: return null
+        if (isScribdChallenge(page.body)) {
+            App.logEvent("SCRIBD DEBUG: blocked by Client Challenge (needs JS/browser)")
+            return null
+        }
+        val pageUrls = extractScribdPageUrls(page.body)
+        if (pageUrls.isEmpty()) {
+            App.logEvent("SCRIBD DEBUG: page rendered via JS / no page image URLs in HTML")
+            return null
+        }
+        val title = extractScribdDocumentTitle(page.body)
+        val safe = title
+            .replace(Regex("[\\/:*?\"<>|]"), "_")
+            .replace(Regex("\\s+"), "_")
+            .trim('_')
+            .take(120)
+            .ifBlank { "Scribd_${System.currentTimeMillis()}" }
+        App.logEvent("SCRIBD DEBUG: ${pageUrls.size} pages, title=$title")
+        return Result(
+            "", "Scribd_$safe.pdf", title,
+            "Document", "application/pdf",
+            cookies = parseHeaderValue(headers, "Cookie"),
+            isHls = false,
+            imageUrls = pageUrls
+        )
+    }
+
+    private fun isScribdChallenge(body: String): Boolean {
+        val lower = body.lowercase()
+        return lower.contains("client challenge") ||
+            lower.contains("_fs-ch") ||
+            lower.contains("enable javascript to proceed") ||
+            lower.contains("you need to enable javascript")
+    }
+
+    private fun extractScribdDocumentTitle(body: String): String {
+        // JSON-LD dulu, lalu OG/meta, lalu <title>.
+        val jsonLd = Regex("<script type="application/ld\+json">(.*?)</script>", RegexOption.DOT_MATCHES_ALL)
+            .find(body)?.groupValues?.get(1)
+        if (jsonLd != null) {
+            val t = Regex(""name"\\s*:\\s*\"([^\"]+)\"").find(jsonLd)?.groupValues?.get(1)
+            if (t != null && t.isNotBlank()) return t.trim()
+        }
+        Regex("property=\"og:title\"\\s+content=\"([^\"]+)\"").find(body)?.groupValues?.get(1)?.let { return it }
+        Regex("name=\"twitter:title\"\\s+content=\"([^\"]+)\"").find(body)?.groupValues?.get(1)?.let { return it }
+        Regex("<title>\\s*([^<]*?)\\s*</title>").find(body)?.groupValues?.get(1)?.let { return it }
+        return ""
+    }
+
+    private fun extractScribdPageUrls(body: String): List<String> {
+        // URL gambar halaman Scribd umumnya disisipkan sebagai string JSON di
+        // dalam script/konfigurasi (mis. window.DOCUMENT_VIEWER_STATE atau
+        // data JSON html5uploader). Cari semua URL ke CDN gambar halaman.
+        val found = LinkedHashSet<String>()
+        val pageRe = Regex(
+            "\\"image_url\\"(?::\\s*)?\\"(?:https?:)?//[^\\\"]*scribdassets[^\\\"]*\\"|" +
+            "(\"request_url\"|\"url\")(?::\\s*)?\\"(?:https?:)?//[^\\\"]*\.(?:jpe?g|png)\""
+        )
+        pageRe.findAll(body).forEach { found.add(it.value) }
+        if (found.isNotEmpty()) return found.take(512).toList()
+
+        // Fallback: URL absolut biasa ke CDN gambar halaman.
+        Regex("https?://[^\\\"'\\s]*\.(?:jpe?g|png)(\\?[^\\\"'\\s]*)?")
+            .findAll(body)
+            .forEach { found.add(it.value) }
+        return found.take(512).toList()
+    }
+
+    private fun httpHeadersWith(headers: String): Map<String, String> {
+        val map = LinkedHashMap<String, String>()
+        if (headers.isBlank()) return map
+        headers.lines().forEach { line ->
+            val s = line.substringBefore('#').trim()
+            if (s.isEmpty()) return@forEach
+            val idx = s.indexOf(':')
+            if (idx > 0) {
+                map[s.substring(0, idx).trim()] = s.substring(idx + 1).trim()
+            }
+        }
+        return map
+    }
+
+    private fun parseHeaderValue(headers: String, wanted: String): String {
+        if (headers.isBlank()) return ""
+        for (line in headers.lines()) {
+            val idx = line.indexOf(':')
+            if (idx <= 0) continue
+            if (line.substring(0, idx).trim().equals(wanted, ignoreCase = true)) {
+                return line.substring(idx + 1).trim()
+            }
+        }
+        return ""
     }
 
     // ── TikTok ───────────────────────────────────────────────────────────
