@@ -45,9 +45,13 @@ object SocialMediaExtractor {
     private val FB_VIDEO_ID_ATTR_RE = Regex("data-video-id=\"([0-9]+)\"")
     private val FB_OG_V_RE = Regex("[?&]v=([0-9]+)")
     private val FB_HD_SRC_RE = Regex("\"hd_src\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_BROWSER_HD_RE = Regex("\"browser_native_hd_url\"\\s*:\\s*\"([^\"]+)\"")
     private val FB_PLAYABLE_HD_RE = Regex("\"playable_url_quality_hd\"\\s*:\\s*\"([^\"]+)\"")
     private val FB_SD_SRC_RE = Regex("\"sd_src\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_BROWSER_SD_RE = Regex("\"browser_native_sd_url\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_BROWSER_URL_RE = Regex("\"browser_native_url\"\\s*:\\s*\"([^\"]+)\"")
     private val FB_PLAYABLE_RE = Regex("\"playable_url\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_MP4_TOKEN_RE = Regex("\\.mp4")
     private val FB_OG_VIDEO_RE = Regex("<meta[^>]+property=\"og:video[^\"]*\"[^>]+content=\"([^\"]+)\"")
     private val FB_SHARE_ID_RE = Regex("/v/([A-Za-z0-9_-]+)")
     private val SANITIZE_WS_RE = Regex("\\s+")
@@ -944,7 +948,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
         App.logEvent("FB DEBUG: page ${html.length} chars, url=${url.take(80)}")
         val videoId = extractFacebookVideoId(url, html) ?: return emptyList()
         App.logEvent("FB DEBUG: videoId=$videoId")
-        val options = extractFacebookFromHtml(html, videoId, cookies)
+        val options = extractFacebookFromHtml(html, videoId, cookies, "page")
         if (options.isNotEmpty()) return options
 
         // Strategi 2: halaman plugin embed — sering memuat hd_src/sd_src walau
@@ -954,7 +958,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             GOOGLEBOT_HEADERS, 20000
         )?.body.orEmpty()
         App.logEvent("FB DEBUG: plugin ${plugin.length} chars")
-        val fromPlugin = extractFacebookFromHtml(plugin, videoId, cookies)
+        val fromPlugin = extractFacebookFromHtml(plugin, videoId, cookies, "plugin")
         if (fromPlugin.isNotEmpty()) return fromPlugin
 
         // Strategi 3: halaman embed lama /video/embed/<id> — cadangan terakhir.
@@ -962,28 +966,68 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             "https://www.facebook.com/video/embed?video_id=$videoId", GOOGLEBOT_HEADERS, 20000
         )?.body.orEmpty()
         App.logEvent("FB DEBUG: embed ${embed.length} chars")
-        return extractFacebookFromHtml(embed, videoId, cookies)
+        return extractFacebookFromHtml(embed, videoId, cookies, "embed")
     }
 
-    private fun extractFacebookFromHtml(html: String, videoId: String, cookies: String): List<Result> {
+    private fun extractFacebookFromHtml(html: String, videoId: String, cookies: String, source: String): List<Result> {
         if (html.length < 200) return emptyList()
         val found = linkedMapOf<String, String>() // url -> quality label
         // og:video biasanya mengarah ke halaman video, bukan file media — dilewati.
         val candidates = listOf(
             FB_HD_SRC_RE to "HD",
+            FB_BROWSER_HD_RE to "HD",
             FB_PLAYABLE_HD_RE to "HD",
             FB_SD_SRC_RE to "SD",
-            FB_PLAYABLE_RE to "SD"
+            FB_BROWSER_SD_RE to "SD",
+            FB_PLAYABLE_RE to "SD",
+            FB_BROWSER_URL_RE to ""
         )
+        // Diagnostik: berapa banyak tiap pola muncul — untuk menelusuri bila gagal.
+        App.logEvent("FB DEBUG: $source" +
+            " hd_src=${FB_HD_SRC_RE.findAll(html).count()} playableHD=${FB_PLAYABLE_HD_RE.findAll(html).count()}" +
+            " sd_src=${FB_SD_SRC_RE.findAll(html).count()} playable=${FB_PLAYABLE_RE.findAll(html).count()}" +
+            " browserNative=${FB_BROWSER_HD_RE.findAll(html).count() + FB_BROWSER_SD_RE.findAll(html).count() + FB_BROWSER_URL_RE.findAll(html).count()}" +
+            " mp4Hits=${FB_MP4_TOKEN_RE.findAll(html).count()}")
         candidates.forEach { (regex, label) ->
-            val url = regex.find(html)?.groupValues?.get(1)?.let { unescapeFb(it) }
-            if (!url.isNullOrEmpty() && url.contains(".mp4")) found[url] = label
+            var start = 0
+            while (true) {
+                val m = regex.find(html, start) ?: break
+                val url = m.groupValues[1].let { unescapeFb(it) }
+                if (url.startsWith("http") && url.contains(".mp4")) found.putIfAbsent(url, label)
+                start = m.range.last + 1
+            }
+        }
+        // Fallback: URL mp4 langsung yang diapit tanda kutip di halaman (semua kualitas).
+        extractFacebookMp4Urls(html).forEach { url ->
+            val q = if (url.contains("quality=hd") || url.contains("_hd")) "HD" else "SD"
+            found.putIfAbsent(url, q)
         }
         val options = mutableListOf<Result>()
         found.forEach { (url, quality) ->
             options.add(Result(url, "Facebook_${videoId}.mp4", "Facebook $videoId", quality, "video/mp4", cookies))
         }
         return options
+    }
+
+    /** Pindai semua URL mp4 yang diapit tanda kutip di halaman (menangani JSON
+     *  escape \/ untuk slash); dedup dilakukan oleh caller. */
+    private fun extractFacebookMp4Urls(html: String): List<String> {
+        val out = mutableListOf<String>()
+        var idx = html.indexOf(".mp4")
+        var guard = 0
+        while (idx >= 0 && guard++ < 100) {
+            var start = idx
+            while (start > 0 && html[start - 1] != '"') start--
+            var end = idx + 4
+            while (end < html.length && html[end] != '"') end++
+            if (start >= 0 && end > idx + 4) {
+                val url = unescapeFb(html.substring(start, end))
+                if (url.startsWith("http") && url.contains(".mp4") && url.length in 20..2000) out.add(url)
+            }
+            idx = html.indexOf(".mp4", idx + 4)
+            if (out.size >= 8) break
+        }
+        return out
     }
 
     private fun extractFacebookVideoId(url: String, html: String): String? {
