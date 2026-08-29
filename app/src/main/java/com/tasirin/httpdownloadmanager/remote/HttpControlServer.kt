@@ -2604,7 +2604,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         getOrCreateThumb(context, raw, ::isFsPathAllowed, ::isMediaUriAllowed)
     }
 
-    fun appendLog(message: String) = serverLog.append(message.replace(Regex("[\r\n\t]+"), " "))
+    fun appendLog(message: String) = serverLog.append(message.replace(LOG_SANITIZE_RE, " "))
 
     fun logVersion(): Long = serverLog.version()
 
@@ -2660,6 +2660,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     companion object {
         private val REQUEST_SECRET_RE = Regex("([?&]?(?:token|pin|id|verify)=)[^&]+")
+        /** Regex sanitasi log — dihoist agar tidak dikompilasi ulang per panggilan log. */
+        private val LOG_SANITIZE_RE = Regex("[\r\n\t]+")
         private const val SERVER_SOCKET_TIMEOUT_MS = 60_000
         private const val FS_PREFIX = "f:"
         private const val MS_PREFIX = "m:"

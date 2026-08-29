@@ -13,12 +13,15 @@ import java.util.zip.ZipOutputStream
 /** Pembuat arsip ZIP (folder filesystem + folder media Android 10+). */
 object ZipCreator {
 
+    /** Kontrol karakter C0 (U+0000-U+001F) yang bisa dipakai exploit nama entri. */
+    private val CONTROL_CHARS_RE = Regex("[\\u0000-\\u001f]")
+
     /** Nama dari filesystem/MediaStore tidak boleh dipakai mentah sebagai
      *  path ZIP; normalisasi mencegah Zip Slip di extractor pihak ketiga. */
     internal fun safeEntryPath(path: String): String =
         path.replace('\\', '/')
             .split('/')
-            .map { part -> part.replace(Regex("[\\u0000-\\u001f]"), "_") }
+            .map { part -> part.replace(CONTROL_CHARS_RE, "_") }
             .filter { it.isNotEmpty() && it != "." && it != ".." }
             .joinToString("/")
 

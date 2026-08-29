@@ -1476,10 +1476,10 @@ class DownloadEngine(appContext: Context) {
                 if (ln.startsWith("#EXT-X-STREAM-INF:")) {
                     val next = lines.getOrNull(idx + 1)?.trim().orEmpty()
                     if (next.isNotEmpty() && !next.startsWith("#") && (next.startsWith("http") || next.startsWith("/"))) {
-                        val bw = Regex("BANDWIDTH=(\\d+)").find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-                        val h = Regex("RESOLUTION=\\d+x(\\d+)").find(ln)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                        val codecs = Regex("CODECS=\"([^\"]+)\"").find(ln)?.groupValues?.get(1).orEmpty()
-                        val fps = Regex("FRAME-RATE=([\\d.]+)").find(ln)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
+                        val bw = HLS_BW_RE.find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                        val h = HLS_HEIGHT_RE.find(ln)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        val codecs = HLS_CODECS_RE.find(ln)?.groupValues?.get(1).orEmpty()
+                        val fps = HLS_FPS_RE.find(ln)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
                         fallbackVariants.add(HlsVariant("$h p", HlsParser.resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
                     }
                 }
@@ -2400,6 +2400,11 @@ class DownloadEngine(appContext: Context) {
     }
 
     companion object {
+        // Regex fallback varian HLS (per-baris saat parseMaster gagal).
+        private val HLS_BW_RE = Regex("BANDWIDTH=(\\d+)")
+        private val HLS_HEIGHT_RE = Regex("RESOLUTION=\\d+x(\\d+)")
+        private val HLS_CODECS_RE = Regex("CODECS=\"([^\"]+)\"")
+        private val HLS_FPS_RE = Regex("FRAME-RATE=([\\d.]+)")
         private val CONTENT_DISPOSITION_STAR = Regex("filename\\*=([^;]+)")
         private val DEFAULT_NAME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
         private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")

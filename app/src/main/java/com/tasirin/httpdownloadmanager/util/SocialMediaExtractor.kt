@@ -17,6 +17,9 @@ object SocialMediaExtractor {
     /** Batas total waktu ekstraksi media sosial (ms). */
     private const val EXTRACT_TOTAL_TIMEOUT_MS = 25_000L
 
+    /** Regex X/Twitter — dihoist agar tidak dikompilasi ulang tiap panggilan. */
+    private val X_URL_RE = Regex("""(?:https?://(?:www\.)?|\.?)x\.com/""")
+
     data class Result(
         val directUrl: String,
         val fileName: String?,
@@ -40,7 +43,7 @@ object SocialMediaExtractor {
                 lower.contains("instagr.am/p/") ||
                 lower.contains("instagr.am/reel/") ||
                 lower.contains("twitter.com/") ||
-                Regex("""(?:https?://(?:www\.)?|\.?)x\.com/""").containsMatchIn(lower) ||
+                X_URL_RE.containsMatchIn(lower) ||
                 lower.contains("youtube.com/") ||
                 lower.contains("youtu.be/")
     }
@@ -259,11 +262,6 @@ object SocialMediaExtractor {
             .replace("&amp;", "&")
     }
 
-    private fun extractDisplayUrlFromPage(html: String): String? {
-        val urls = extractAllDisplayUrlsFromPage(html)
-        return urls.firstOrNull()
-    }
-
     private fun extractContextJson(html: String): JSONObject? {
         // Format 1 (embed page): contextJSON":"{escaped JSON}"
         val embedKey = "contextJSON\":\""
@@ -320,38 +318,6 @@ object SocialMediaExtractor {
                     if (media != null) return media
                 }
             } catch (_: Exception) { /* lanjut */ }
-        }
-        return null
-    }
-
-    private fun extractFromMedia(media: JSONObject, shortcode: String): Result? {
-        // Video (single atau carousel pertama yang video)
-        val sidecar = media.optJSONObject("edge_sidecar_to_children")
-        val edges = sidecar?.optJSONArray("edges")
-        if (edges != null && edges.length() > 0) {
-            for (i in 0 until edges.length()) {
-                val node = edges.optJSONObject(i)?.optJSONObject("node") ?: continue
-                if (node.optBoolean("is_video", false)) {
-                    val cv = node.optString("video_url", "")
-                    if (cv.startsWith("http")) {
-                        return Result(cv, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4")
-                    }
-                }
-            }
-            val firstNode = edges.optJSONObject(0)?.optJSONObject("node")
-            val img = firstNode?.optString("display_url", "")
-                ?: media.optString("display_url", "")
-            if (img.startsWith("http")) {
-                return Result(img, "Instagram_${shortcode}.jpg", "Instagram $shortcode", "Photo", "image/jpeg")
-            }
-        }
-        val videoUrl = media.optString("video_url", "")
-        if (videoUrl.startsWith("http")) {
-            return Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4")
-        }
-        val displayUrl = media.optString("display_url", "")
-        if (displayUrl.startsWith("http")) {
-            return Result(displayUrl, "Instagram_${shortcode}.jpg", "Instagram $shortcode", "Photo", "image/jpeg")
         }
         return null
     }
