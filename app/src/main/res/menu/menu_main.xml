@@ -6,6 +6,14 @@
         android:title="@string/action_settings"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_clear_failed"
+        android:title="@string/action_clear_failed"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_clear_completed"
+        android:title="@string/action_clear_completed"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_about"
         android:title="@string/action_about"
         app:showAsAction="never" />

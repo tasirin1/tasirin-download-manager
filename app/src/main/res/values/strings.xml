@@ -70,6 +70,8 @@
     <string name="remote_start_failed">Failed to start server: %1$s</string>
 
     <string name="action_settings">Settings</string>
+    <string name="action_clear_failed">Clear All Failed</string>
+    <string name="action_clear_completed">Clear Completed</string>
     <string name="settings_background">Automatically resume interrupted downloads (background)</string>
     <string name="settings_autostart">Start automatically on device boot</string>
     <string name="settings_concurrent">Concurrent downloads (queue)</string>
@@ -116,13 +118,6 @@
     <string name="filter_active">Active</string>
     <string name="filter_completed">Completed</string>
     <string name="filter_failed">Failed</string>
-    <string name="storage_remaining">Storage available: %1$s</string>
-    <string name="file_info_checking">Checking URL&#8230;</string>
-    <string name="file_info_unknown">Could not read file info from server</string>
-    <string name="file_info_size_unknown">unknown size</string>
-    <string name="file_info_type_unknown">unknown type</string>
-    <string name="file_info_format">%1$s · %2$s · %3$s</string>
-    <string name="file_info_large_warning">⚠ File size %1$s is larger than available storage</string>
     <string name="checksum_ok">✓ Checksum OK</string>
     <string name="location_label">Location: %1$s</string>
     <string name="location_media_store">MediaStore / Custom folder</string>
@@ -133,7 +128,6 @@
     <string name="resume_all">Resume all</string>
     <string name="retry_failed">Retry failed</string>
 
-    <string name="sort_by">Sort</string>
     <string name="advanced_options">Advanced &#9656;</string>
     <string name="advanced_options_expanded">Advanced &#9662;</string>
     <string name="settings_port_label">Remote server port</string>
@@ -217,16 +211,6 @@
         <item quantity="other">%d downloads completed</item>
     </plurals>
 
-    <string-array name="sort_options">
-        <item>Date (newest)</item>
-        <item>Date (oldest)</item>
-        <item>Name (A–Z)</item>
-        <item>Name (Z–A)</item>
-        <item>Size (largest)</item>
-        <item>Size (smallest)</item>
-        <item>Status</item>
-    </string-array>
-
     <string-array name="segment_options">
         <item>1 (no parallel)</item>
         <item>2</item>
@@ -286,7 +270,6 @@
     </plurals>
     <string name="cleanup_empty">No junk files found</string>
     <string name="cleanup_running">Cleaning…</string>
-    <string name="label_value">%1$s: %2$s</string>
     <string name="gallery_thumb_desc">Media preview</string>
     <string name="label_user_agent">User-Agent</string>
     <string name="hint_custom_user_agent">Or type custom User-Agent</string>

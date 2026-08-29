@@ -79,24 +79,6 @@
             android:layout_marginTop="6dp" />
     </LinearLayout>
 
-    <!-- Info file & storage -->
-    <TextView
-        android:id="@+id/text_storage_remaining"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="@color/text_secondary" />
-
-    <TextView
-        android:id="@+id/text_file_info"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="@color/primary"
-        android:visibility="gone" />
-
     <!-- Advanced toggle -->
     <TextView
         android:id="@+id/advanced_toggle"

@@ -298,6 +298,24 @@ class DownloadEngine(appContext: Context) {
         scheduleSave()
     }
 
+    fun clearFailed() {
+        // Hanya membersihkan daftar item gagal; file parsial ikut dibersihkan.
+        val failed = _items.value.filter { it.state == DownloadState.FAILED }
+        failed.forEach { item ->
+            retryAttempts.remove(item.id)
+            pendingRetries.remove(item.id)
+            originalSocialUrls.remove(item.id)
+            speedTracker.reset(item.id)
+            clearSegProgress(item.id)
+            jobs.remove(item.id)?.cancel()
+            disconnectActive(item.id)
+            FileSaver(context).deleteFiles(item)
+            App.logEvent("DOWNLOAD DELETED: ${item.fileName}")
+        }
+        update(_items.value.filterNot { it.state == DownloadState.FAILED })
+        scheduleSave()
+    }
+
     fun importStream(
         fileName: String,
         destination: String = "",

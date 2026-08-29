@@ -341,12 +341,6 @@ object StoragePrefs {
         prefs(context)
             .getInt(KEY_SORT_MODE, 0).coerceIn(0, 6)
 
-    fun setSortMode(context: Context, value: Int) {
-        prefs(context).edit {
-            putInt(KEY_SORT_MODE, value.coerceIn(0, 6))
-        }
-    }
-
     fun getConnectTimeoutSec(context: Context): Int =
         prefs(context)
             .getInt(KEY_CONNECT_TIMEOUT_SEC, 15)

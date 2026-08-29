@@ -76,20 +76,6 @@
             android:paddingVertical="10dp"
             android:text="@string/filter_failed"
             android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/sort_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:focusable="true"
-            android:gravity="end"
-            android:minHeight="44dp"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="10dp"
-            android:text="@string/sort_by"
-            android:textColor="@color/primary"
-            android:textSize="14sp" />
     </LinearLayout>
 
     <LinearLayout

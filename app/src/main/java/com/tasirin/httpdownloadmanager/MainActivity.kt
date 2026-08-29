@@ -52,7 +52,6 @@ import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -283,60 +282,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
 
-        val storageText = view.findViewById<TextView>(R.id.text_storage_remaining)
-        storageText.text = getString(R.string.storage_remaining, Formats.bytes(App.engine.freeSpaceBytes()))
-
-        val fileInfoText = view.findViewById<TextView>(R.id.text_file_info)
-        var probeJob: Job? = null
-        fun probeFileInfo() {
-            probeJob?.cancel()
-            val allUrls = urlInput.text?.toString().orEmpty()
-            val probeTarget = allUrls
-                .split(URL_SPLIT)
-                .firstOrNull { it.startsWith("http://") || it.startsWith("https://") }
-                ?.trim().orEmpty()
-            if (probeTarget.isEmpty()) {
-                fileInfoText.visibility = View.GONE
-                return
-            }
-            probeJob = lifecycleScope.launch {
-                delay(600)
-                fileInfoText.text = getString(R.string.file_info_checking)
-                fileInfoText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.primary))
-                fileInfoText.visibility = View.VISIBLE
-                val probe = withContext(Dispatchers.IO) {
-                    runCatching {
-                        App.engine.probeUrl(
-                            probeTarget,
-                            usernameInput.text?.toString()?.trim().orEmpty(),
-                            passwordInput.text?.toString().orEmpty(),
-                            headersInput.text?.toString()?.trim().orEmpty()
-                        )
-                    }.getOrNull()
-                }
-                if (probe == null) {
-                    fileInfoText.text = getString(R.string.file_info_unknown)
-                    return@launch
-                }
-                val guessedName = probeTarget.substringAfterLast('/').substringBefore('?')
-                val name = probe.fileName?.takeIf { it.isNotBlank() } ?: guessedName
-                val size = if (probe.sizeBytes > 0) {
-                    Formats.bytes(probe.sizeBytes)
-                } else {
-                    getString(R.string.file_info_size_unknown)
-                }
-                val type = probe.contentType?.takeIf { it.isNotBlank() }
-                    ?: getString(R.string.file_info_type_unknown)
-                fileInfoText.text = getString(R.string.file_info_format, name, size, type)
-                if (probe.sizeBytes > 0 && probe.sizeBytes > App.engine.freeSpaceBytes()) {
-                    fileInfoText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_off))
-                    fileInfoText.append("\n" + getString(
-                        R.string.file_info_large_warning,
-                        Formats.bytes(probe.sizeBytes)
-                    ))
-                }
-            }
-        }
         // Deteksi link media sosial → tampilkan pemilihan resolusi.
         // YouTube memakai daftar resolusi tetap (1080/720/480/360/240);
         // platform lain memakai kualitas hasil ekstraksi (HD/SD/Photo, dst).
@@ -416,20 +361,18 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
         }
-        val fileInfoWatcher = object : TextWatcher {
+        val socialWatcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
-                probeFileInfo()
                 probeSocialQuality()
             }
             override fun afterTextChanged(s: Editable?) {}
         }
-        urlInput.addTextChangedListener(fileInfoWatcher)
-        usernameInput.addTextChangedListener(fileInfoWatcher)
-        passwordInput.addTextChangedListener(fileInfoWatcher)
-        headersInput.addTextChangedListener(fileInfoWatcher)
+        urlInput.addTextChangedListener(socialWatcher)
+        usernameInput.addTextChangedListener(socialWatcher)
+        passwordInput.addTextChangedListener(socialWatcher)
+        headersInput.addTextChangedListener(socialWatcher)
         probeSocialQuality()
-        probeFileInfo()
 
         fun parseMirrors(): List<String> =
             mirrorInput.text?.toString()?.trim().orEmpty()
@@ -642,6 +585,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         return when (item.itemId) {
             R.id.action_settings -> {
                 startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            R.id.action_clear_failed -> {
+                App.engine.clearFailed()
+                refreshList()
+                true
+            }
+            R.id.action_clear_completed -> {
+                App.engine.clearCompleted()
+                refreshList()
                 true
             }
             R.id.action_about -> {
@@ -950,8 +903,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // Diinisialisasi di sini, bukan di properti, karena getSharedPreferences
         // belum tersedia saat field Activity dibuat (force close di Android).
         sortMode = StoragePrefs.sortMode(this)
-        findViewById<TextView>(R.id.sort_button)?.setOnClickListener { showSortDialog() }
-        updateSortButton()
 
         val map = listOf(
             R.id.filter_all to DownloadFilter.ALL,
@@ -1059,27 +1010,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { it.fileName }
             )
         }
-    }
-
-    private fun showSortDialog() {
-        val options = resources.getStringArray(R.array.sort_options)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.sort_by)
-            .setSingleChoiceItems(options, sortMode) { _, which ->
-                sortMode = which
-                StoragePrefs.setSortMode(this, which)
-                updateSortButton()
-                refreshList()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun updateSortButton() {
-        val tv = findViewById<TextView>(R.id.sort_button) ?: return
-        val options = resources.getStringArray(R.array.sort_options)
-        val label = options.getOrElse(sortMode) { options[0] }
-                tv.text = getString(R.string.label_value, getString(R.string.sort_by), label)
     }
 
     /** Ekspor log error (crash + error server) ke file .txt di folder Download. */
