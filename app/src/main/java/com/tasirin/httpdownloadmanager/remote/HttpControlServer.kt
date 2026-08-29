@@ -1692,11 +1692,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         fsMediaCache.clear()
     }
 
-    /** Invalidate itemsJson cache saat daftar download berubah. */
-    fun invalidateItemsCache() {
-        cachedItems = null
-    }
-
     /** Invalidate fsRoots cache saat settings berubah. */
     fun invalidateFsRootsCache() {
         cachedFsRoots = null

@@ -20,6 +20,38 @@ object SocialMediaExtractor {
     /** Regex X/Twitter — dihoist agar tidak dikompilasi ulang tiap panggilan. */
     private val X_URL_RE = Regex("""(?:https?://(?:www\.)?|\.?)x\.com/""")
 
+    /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
+     * (Instagram & YouTube) yang dipanggil berulang saat unduh. */
+    private val IG_SHORTCODE_RE = Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)")
+    private val IG_IMG_INDEX_RE = Regex("[?&]img_index=(\\d+)")
+    private val IG_IMG_URL_RE =
+        Regex("https?://[^\"]*scontent[^\"]*cdninstagram\\.com[^\"]*\\.(?:jpg|jpeg|png|webp)[^\"]*")
+    private val IG_IMG_URL_FALLBACK_RE =
+        Regex("https?://[^\"]*scontent[^\"]*\\.(?:jpg|jpeg|png|webp)[^\"]*")
+    private val IG_FILE_ID_RE = Regex("/(\\d+_\\d+_\\d+)_[a-z0-9]+\\.(?:jpg|jpeg|png|webp)")
+    private val IG_VIDEO_URL_RE = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+\\.mp4[^\"]*)\"")
+    private val IG_CONTEXT_JSON_RE = Regex("contextJSON\\s*=\\s*\"(.+?)\"")
+    private val IG_TOKEN_RE = Regex("\"token\"\\s*:\\s*\"(.+?)\"")
+    private val YT_PLAYER_RESP_RE =
+        Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*(?:var\s|</script)""")
+    private val YT_PLAYER_RESP_LAX_RE = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""")
+    private val YT_VISITOR_DATA_RE = Regex("""VISITOR_DATA"\s*:\s*"([^"]+)""")
+    private val YT_VISITOR_DATA_LOW_RE = Regex("""visitorData"\s*:\s*"([^"]+)""")
+    private val YT_ID_SHORTS_RE = Regex("/shorts/([A-Za-z0-9_-]{11})")
+    private val YT_ID_V_RE = Regex("[?&]v=([A-Za-z0-9_-]{11})")
+    private val YT_ID_YOUTU_RE = Regex("youtu\\.be/([A-Za-z0-9_-]{11})")
+    private val SANITIZE_BAD_CHARS_RE = Regex("[^A-Za-z0-9_\\-. ]")
+    private val FB_VIDEO_ID_JSON_RE = Regex("\"(?:video_id|videoID|videoId)\"\\s*:\\s*\"([0-9]+)\"")
+    private val FB_VIDEO_ID_ATTR_RE = Regex("data-video-id=\"([0-9]+)\"")
+    private val FB_OG_V_RE = Regex("[?&]v=([0-9]+)")
+    private val FB_HD_SRC_RE = Regex("\"hd_src\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_PLAYABLE_HD_RE = Regex("\"playable_url_quality_hd\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_SD_SRC_RE = Regex("\"sd_src\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_PLAYABLE_RE = Regex("\"playable_url\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_OG_VIDEO_RE = Regex("<meta[^>]+property=\"og:video[^\"]*\"[^>]+content=\"([^\"]+)\"")
+    private val FB_SHARE_ID_RE = Regex("/v/([A-Za-z0-9_-]+)")
+    private val SANITIZE_WS_RE = Regex("\\s+")
+
     data class Result(
         val directUrl: String,
         val fileName: String?,
@@ -43,6 +75,8 @@ object SocialMediaExtractor {
                 lower.contains("instagr.am/p/") ||
                 lower.contains("instagr.am/reel/") ||
                 lower.contains("twitter.com/") ||
+                lower.contains("facebook.com/") ||
+                lower.contains("fb.watch/") ||
                 X_URL_RE.containsMatchIn(lower) ||
                 lower.contains("youtube.com/") ||
                 lower.contains("youtu.be/")
@@ -59,6 +93,8 @@ object SocialMediaExtractor {
                     extractInstagram(url)
                 lower.contains("twitter.com/") || lower.contains("x.com/") ->
                     extractTwitter(url)
+                lower.contains("facebook.com/") || lower.contains("fb.watch/") ->
+                    extractFacebook(url)
                 lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
                     extractYouTube(url)
                 else -> null
@@ -81,6 +117,8 @@ object SocialMediaExtractor {
                         extractAllInstagram(url)
                     lower.contains("twitter.com/") || lower.contains("x.com/") ->
                         extractAllTwitter(url)
+                    lower.contains("facebook.com/") || lower.contains("fb.watch/") ->
+                        extractAllFacebook(url)
                     lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
                         extractAllYouTube(url)
                     else -> emptyList()
@@ -144,7 +182,7 @@ object SocialMediaExtractor {
     }
 
     private fun extractAllInstagram(url: String): List<Result> {
-        val shortcode = Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)").find(url)
+        val shortcode = IG_SHORTCODE_RE.find(url)
             ?.groupValues?.get(1) ?: return emptyList()
         val options = mutableListOf<Result>()
 
@@ -189,7 +227,7 @@ object SocialMediaExtractor {
         }
 
         // Dukungan img_index dari URL: pilih item tertentu di carousel
-        val imgIndex = Regex("[?&]img_index=(\\d+)").find(url)?.groupValues?.get(1)?.toIntOrNull()
+        val imgIndex = IG_IMG_INDEX_RE.find(url)?.groupValues?.get(1)?.toIntOrNull()
         if (imgIndex != null && imgIndex > 0 && imgIndex <= options.size) {
             val selected = options[imgIndex - 1]
             return listOf(selected)
@@ -202,7 +240,7 @@ object SocialMediaExtractor {
         // Path CDN bervariasi (t39.30808-6, t51.82787-15, t51.82787-19, dst),
         // jadi jangan dikunci ke satu pola path. Buang profil pic (t51.2885-*),
         // dedup per ID file, lalu utamakan versi resolusi penuh.
-        val imgRegex = Regex("https?://[^\"]*scontent[^\"]*cdninstagram\\.com[^\"]*\\.(?:jpg|jpeg|png|webp)[^\"]*")
+        val imgRegex = IG_IMG_URL_RE
         val decoded = mutableListOf<String>()
         imgRegex.findAll(html).forEach { match ->
             val raw = match.value
@@ -216,7 +254,7 @@ object SocialMediaExtractor {
         }
         if (decoded.isEmpty()) {
             // Strategi cadangan: pola CDN lain yang belum tertangkap di atas
-            val fallbackRegex = Regex("https?://[^\"]*scontent[^\"]*\\.(?:jpg|jpeg|png|webp)[^\"]*")
+            val fallbackRegex = IG_IMG_URL_FALLBACK_RE
             fallbackRegex.findAll(html).forEach { match ->
                 val raw = match.value
                     .replace("\\u002F", "/")
@@ -231,7 +269,7 @@ object SocialMediaExtractor {
         // Dedup per ID file (contoh: 774314790_18387324052161_1234), utamakan
         // URL tanpa marker thumbnail kecil di query (s150x150 / s640x640).
         val byFileId = linkedMapOf<String, String>()
-        val idRegex = Regex("/(\\d+_\\d+_\\d+)_[a-z0-9]+\\.(?:jpg|jpeg|png|webp)")
+        val idRegex = IG_FILE_ID_RE
         decoded.forEach { url ->
             val fid = idRegex.find(url)?.groupValues?.get(1) ?: url
             val existing = byFileId[fid]
@@ -254,7 +292,7 @@ object SocialMediaExtractor {
             .replace("\\u0026", "&")
             .replace("\\/", "/")
             .replace("&amp;", "&")
-        val videoRegex = Regex(""""url"\s*:\s*"(https?://[^"]+\.mp4[^"]*)"""")
+        val videoRegex = IG_VIDEO_URL_RE
         val match = videoRegex.find(unescaped) ?: return null
         return match.groupValues[1]
             .replace("\\u002F", "/")
@@ -296,8 +334,8 @@ object SocialMediaExtractor {
         // Format 2: contextJSON = "..." (JS assignment)
         // Format 3: "token": "..."
         for (pattern in listOf(
-            Regex("contextJSON\\s*=\\s*\"(.+?)\""),
-            Regex("\"token\"\\s*:\\s*\"(.+?)\""),
+            IG_CONTEXT_JSON_RE,
+            IG_TOKEN_RE,
         )) {
             val match = pattern.find(html) ?: continue
             val token = match.groupValues[1]
@@ -407,9 +445,9 @@ object SocialMediaExtractor {
         val ytCookies = httpResult.cookies
         App.logEvent("YT DEBUG: page ${pageHtml.length} chars, id=$videoId, cookies=${ytCookies.take(40)}")
 
-        val match = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*(?:var\s|</script)""")
+        val match = YT_PLAYER_RESP_RE
             .find(pageHtml)
-            ?: Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""").find(pageHtml)
+            ?: YT_PLAYER_RESP_LAX_RE.find(pageHtml)
             ?: run {
                 App.logEvent("YT DEBUG: ytInitialPlayerResponse not found")
                 return emptyList()
@@ -483,8 +521,8 @@ object SocialMediaExtractor {
             ),
             timeoutMs = 20000
         ) ?: return null
-        val visitor = Regex("""VISITOR_DATA"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
-            ?: Regex("""visitorData"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
+        val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
+            ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
             ?: return null
         App.logEvent("YT DEBUG: VISIONOS visitorData ${visitor.take(24)}..., cookies=${page.cookies.take(24)}")
 
@@ -568,8 +606,8 @@ object SocialMediaExtractor {
             ),
             timeoutMs = 20000
         ) ?: return null
-        val visitor = Regex("""VISITOR_DATA"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
-            ?: Regex("""visitorData"\s*:\s*"([^"]+)""").find(page.body)?.groupValues?.get(1)
+        val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
+            ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
             ?: return null
         val body = buildString {
             append("{\"context\":{\"client\":{")
@@ -835,18 +873,18 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
     }
 
     private fun extractYouTubeId(url: String): String? {
-        Regex("/shorts/([A-Za-z0-9_-]{11})").find(url)
+        YT_ID_SHORTS_RE.find(url)
             ?.groupValues?.get(1)?.let { return it }
-        Regex("[?&]v=([A-Za-z0-9_-]{11})").find(url)
+        YT_ID_V_RE.find(url)
             ?.groupValues?.get(1)?.let { return it }
-        Regex("youtu\\.be/([A-Za-z0-9_-]{11})").find(url)
+        YT_ID_YOUTU_RE.find(url)
             ?.groupValues?.get(1)?.let { return it }
         return null
     }
 
     private fun sanitizeFileName(name: String): String {
-        return name.replace(Regex("[^A-Za-z0-9_\\-. ]"), "_")
-            .replace(Regex("\\s+"), "_")
+        return name.replace(SANITIZE_BAD_CHARS_RE, "_")
+            .replace(SANITIZE_WS_RE, "_")
             .take(80)
     }
 
@@ -886,6 +924,87 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             }
         }
         return options
+    }
+
+    // ── Facebook ─────────────────────────────────────────────────────────
+
+    private fun extractFacebook(url: String): Result? {
+        val options = extractAllFacebook(url)
+        return options.firstOrNull { it.quality.contains("HD", ignoreCase = true) }
+            ?: options.firstOrNull()
+    }
+
+    private fun extractAllFacebook(url: String): List<Result> {
+        // Share link diarahkan otomatis ke halaman video kanonik (instanceFollowRedirects).
+        // Halaman publik video Facebook memuat hd_src/sd_src/playable_url di JSON-nya
+        // untuk bot/browser; CDN fbsbx bisa langsung diunduh dengan cookie halaman.
+        val page = httpGetWithCookies(url, GOOGLEBOT_HEADERS, 20000) ?: return emptyList()
+        val html = page.body
+        val cookies = page.cookies
+        App.logEvent("FB DEBUG: page ${html.length} chars, url=${url.take(80)}")
+        val videoId = extractFacebookVideoId(url, html) ?: return emptyList()
+        App.logEvent("FB DEBUG: videoId=$videoId")
+        val options = extractFacebookFromHtml(html, videoId, cookies)
+        if (options.isNotEmpty()) return options
+
+        // Strategi 2: halaman plugin embed — sering memuat hd_src/sd_src walau
+        // halaman utama tidak (mis. konten yang butuh login untuk halaman biasa).
+        val plugin = httpGetWithCookies(
+            "https://www.facebook.com/plugins/video.php?href=${URLEncoder.encode(url, "UTF-8")}&show_text=false",
+            GOOGLEBOT_HEADERS, 20000
+        )?.body.orEmpty()
+        App.logEvent("FB DEBUG: plugin ${plugin.length} chars")
+        val fromPlugin = extractFacebookFromHtml(plugin, videoId, cookies)
+        if (fromPlugin.isNotEmpty()) return fromPlugin
+
+        // Strategi 3: halaman embed lama /video/embed/<id> — cadangan terakhir.
+        val embed = httpGetWithCookies(
+            "https://www.facebook.com/video/embed?video_id=$videoId", GOOGLEBOT_HEADERS, 20000
+        )?.body.orEmpty()
+        App.logEvent("FB DEBUG: embed ${embed.length} chars")
+        return extractFacebookFromHtml(embed, videoId, cookies)
+    }
+
+    private fun extractFacebookFromHtml(html: String, videoId: String, cookies: String): List<Result> {
+        if (html.length < 200) return emptyList()
+        val found = linkedMapOf<String, String>() // url -> quality label
+        // og:video biasanya mengarah ke halaman video, bukan file media — dilewati.
+        val candidates = listOf(
+            FB_HD_SRC_RE to "HD",
+            FB_PLAYABLE_HD_RE to "HD",
+            FB_SD_SRC_RE to "SD",
+            FB_PLAYABLE_RE to "SD"
+        )
+        candidates.forEach { (regex, label) ->
+            val url = regex.find(html)?.groupValues?.get(1)?.let { unescapeFb(it) }
+            if (!url.isNullOrEmpty() && url.contains(".mp4")) found[url] = label
+        }
+        val options = mutableListOf<Result>()
+        found.forEach { (url, quality) ->
+            options.add(Result(url, "Facebook_${videoId}.mp4", "Facebook $videoId", quality, "video/mp4", cookies))
+        }
+        return options
+    }
+
+    private fun extractFacebookVideoId(url: String, html: String): String? {
+        FB_VIDEO_ID_JSON_RE.find(html)?.groupValues?.get(1)?.let { return it }
+        FB_VIDEO_ID_ATTR_RE.find(html)?.groupValues?.get(1)?.let { return it }
+        FB_OG_VIDEO_RE.find(html)?.groupValues?.get(1)?.let { og ->
+            val v = FB_OG_V_RE.find(og)?.groupValues?.get(1)
+            if (v != null) return v
+        }
+        FB_SHARE_ID_RE.find(url)?.groupValues?.get(1)?.let { return it }
+        return null
+    }
+
+    /** URL media di JSON Facebook memakai escape JSON (\/, \u0025, dst) — unescape. */
+    private fun unescapeFb(s: String): String {
+        return s.replace("\\/", "/")
+            .replace("\\u0025", "%")
+            .replace("\\u0026", "&")
+            .replace("\\u003d", "=")
+            .replace("\\u002F", "/")
+            .replace("&amp;", "&")
     }
 
     // ── HTTP ─────────────────────────────────────────────────────────────
