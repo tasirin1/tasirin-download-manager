@@ -163,11 +163,6 @@ object SocialMediaExtractor {
 
     // ── Instagram ────────────────────────────────────────────────────────
 
-    private val GOOGLEBOT_HEADERS = mapOf(
-        "User-Agent" to "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        "Accept" to "text/html"
-    )
-
     private val IG_HEADERS = mapOf(
         "User-Agent" to "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
         "Accept" to "text/html"
@@ -204,7 +199,7 @@ object SocialMediaExtractor {
 
         // Strategi 2: halaman utama via Googlebot — hanya bila embed gagal
         if (options.isEmpty()) {
-            val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", GOOGLEBOT_HEADERS)
+            val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", IG_HEADERS)
             val pageCookies = httpResult?.cookies.orEmpty()
             val pageHtml = httpResult?.body
             App.logEvent("IG DEBUG: main page ${pageHtml?.length ?: 0} chars, shortcode=$shortcode")
