@@ -183,6 +183,15 @@ object SocialMediaExtractor {
         "Accept" to "text/html"
     )
 
+    /** Header browser asli untuk halaman Facebook. Googlebot mendapat halaman
+     *  ringkas yang hanya berisi redirect JS lookaside (bukan URL media asli),
+     *  sedangkan browser asli menerima JSON dengan browser_native_hd/sd_url. */
+    private val FB_HEADERS = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language" to "en-US,en;q=0.9,id;q=0.8"
+    )
+
     private fun extractInstagram(url: String): Result? {
         val options = extractAllInstagram(url)
         return options.firstOrNull()
@@ -943,11 +952,11 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
 
     private fun extractAllFacebook(url: String): List<Result> {
         // Share link diarahkan otomatis ke halaman video kanonik (instanceFollowRedirects).
-        // Halaman publik video Facebook memuat hd_src/sd_src/playable_url di JSON-nya
-        // untuk bot/browser; CDN fbsbx bisa langsung diunduh dengan cookie halaman.
-        val page = httpGetWithCookies(url, GOOGLEBOT_HEADERS, 20000) ?: return emptyList()
-        val html = page.body
-        val cookies = page.cookies
+        // Halaman publik video Facebook memuat browser_native_hd/sd_url berisi CDN
+        // video-*.xx.fbcdn.net asli bila diminta dengan UA browser asli. Googlebot
+        // justru mendapat halaman ringkas yang hanya berisi redirect JS lookaside —
+        // jadi browser asli dicoba lebih dulu, Googlebot jadi cadangan.
+        val (html, cookies) = facebookPage(url)
         App.logEvent("FB DEBUG: page ${html.length} chars, url=${url.take(80)}")
         val videoId = extractFacebookVideoId(url, html) ?: return emptyList()
         App.logEvent("FB DEBUG: videoId=$videoId")
@@ -958,7 +967,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
         // halaman utama tidak (mis. konten yang butuh login untuk halaman biasa).
         val plugin = httpGetWithCookies(
             "https://www.facebook.com/plugins/video.php?href=${URLEncoder.encode(url, "UTF-8")}&show_text=false",
-            GOOGLEBOT_HEADERS, 20000
+            FB_HEADERS, 20000
         )?.body.orEmpty()
         App.logEvent("FB DEBUG: plugin ${plugin.length} chars")
         val fromPlugin = extractFacebookFromHtml(plugin, videoId, cookies, "plugin")
@@ -966,10 +975,22 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
 
         // Strategi 3: halaman embed lama /video/embed/<id> — cadangan terakhir.
         val embed = httpGetWithCookies(
-            "https://www.facebook.com/video/embed?video_id=$videoId", GOOGLEBOT_HEADERS, 20000
+            "https://www.facebook.com/video/embed?video_id=$videoId", FB_HEADERS, 20000
         )?.body.orEmpty()
         App.logEvent("FB DEBUG: embed ${embed.length} chars")
         return extractFacebookFromHtml(embed, videoId, cookies, "embed")
+    }
+
+    /** Ambil halaman video Facebook. Browser asli dicoba dulu; bila kosong/gagal,
+     *  fallback ke Googlebot (yang kadang tetap memberi URL media langsung). */
+    private fun facebookPage(url: String): Pair<String, String> {
+        val page = httpGetWithCookies(url, FB_HEADERS, 20000)
+        if (page != null && page.body.isNotEmpty()) {
+            return page.body to page.cookies
+        }
+        val bot = httpGetWithCookies(url, GOOGLEBOT_HEADERS, 20000)
+        if (bot != null) return bot.body to bot.cookies
+        return "" to ""
     }
 
     private fun extractFacebookFromHtml(html: String, videoId: String, cookies: String, source: String): List<Result> {
@@ -996,7 +1017,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             while (true) {
                 val m = regex.find(html, start) ?: break
                 val url = m.groupValues[1].let { unescapeFb(it) }
-                if (url.startsWith("http") && url.length in 20..2000) found.putIfAbsent(url, label)
+                if (isValidFacebookMediaUrl(url) && url.length in 20..2000) found.putIfAbsent(url, label)
                 start = m.range.last + 1
             }
         }
@@ -1026,12 +1047,22 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             while (end < html.length && html[end] != '"') end++
             if (start >= 0 && end > idx + 4) {
                 val url = unescapeFb(html.substring(start, end))
-                if (url.startsWith("http") && url.contains(".mp4") && url.length in 20..2000) out.add(url)
+                if (isValidFacebookMediaUrl(url) && url.contains(".mp4") && url.length in 20..2000) out.add(url)
             }
             idx = html.indexOf(".mp4", idx + 4)
             if (out.size >= 8) break
         }
         return out
+    }
+
+    /** URL media Facebook yang masih bisa diunduh. Redirect JS lookaside crawler
+     *  dan fragmen DASH (BaseURL/SegmentBase) bukan file media — buang. */
+    private fun isValidFacebookMediaUrl(url: String): Boolean {
+        if (!url.startsWith("http") || url.length > 2000) return false
+        if (url.contains("/lookaside/crawler/")) return false
+        if (url.contains("\\u") || url.contains("<") ||
+            url.contains("BaseURL") || url.contains("SegmentBase")) return false
+        return true
     }
 
     private fun extractFacebookVideoId(url: String, html: String): String? {
