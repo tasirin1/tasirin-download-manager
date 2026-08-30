@@ -13,6 +13,7 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.databinding.ItemDownloadBinding
+import com.tasirin.httpdownloadmanager.databinding.ItemSectionHeaderBinding
 import java.io.File
 import java.util.Locale
 
