@@ -174,9 +174,9 @@ object AdtsAac {
     /** Baca satu frame ADTS utuh (payload tanpa header) dari stream; lewati
      *  tag ID3 yang mungkin menyela aliran. null saat EOF / data rusak. */
     private fun readFrame(input: InputStream): Frame? {
-        val hdr = ByteArray(9)
+        val hdr = ByteArray(10)
         val h = nextHeader(input, hdr) ?: return null
-        val pre = 9 - h.headerLen
+        val pre = 10 - h.headerLen
         val payloadLen = h.frameLen - h.headerLen
         if (payloadLen < pre || payloadLen > MAX_FRAME_BYTES) return null
         val payload = ByteArray(payloadLen)
@@ -185,19 +185,20 @@ object AdtsAac {
         return Frame(h, payload)
     }
 
-    /** Baca 9 byte kandidat header frame ADTS berikutnya, lewati tag ID3.
-     *  null saat EOF / syncword tidak valid. */
+    /** Baca 10 byte kandidat header berikutnya (header ID3 penuh atau header
+     *  ADTS 7/9 byte + awal payload), lewati tag ID3. null saat EOF /
+     *  syncword tidak valid. */
     private fun nextHeader(input: InputStream, hdr: ByteArray): Header? {
         while (true) {
-            if (!readExact(input, hdr, 0, 9)) return null
+            if (!readExact(input, hdr, 0, 10)) return null
             // Tag ID3 (10 byte) bisa menyela aliran ADTS gabungan segmen.
             if (hdr[0] == 0x49.toByte() && hdr[1] == 0x44.toByte() && hdr[2] == 0x33.toByte()) {
                 var size = 0
                 for (i in 0 until 4) size = (size shl 7) or (hdr[6 + i].toInt() and 0x7F)
                 var total = 10 + size
                 if (hdr[5].toInt() and 0x10 != 0) total += 10 // footer
-                if (total < 9) return null
-                if (!skipExact(input, total - 9)) return null
+                if (total < 10) return null
+                if (!skipExact(input, total - 10)) return null
                 continue
             }
             val b0 = hdr[0].toInt() and 0xFF
