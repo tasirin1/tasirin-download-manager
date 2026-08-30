@@ -22,6 +22,8 @@ import android.view.WindowManager
 import android.view.MenuItem
 import android.view.View
 import androidx.core.view.isVisible
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -45,6 +47,7 @@ import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.databinding.ActivityMainBinding
 import com.tasirin.httpdownloadmanager.ui.DownloadAdapter
+import com.tasirin.httpdownloadmanager.ui.DownloadRow
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
@@ -107,6 +110,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
         binding.emptyPasteButton.setOnClickListener { pasteFromClipboard() }
         binding.emptyRemoteButton.setOnClickListener { openRemote() }
+        binding.chipYoutube.setOnClickListener { showAddDialog(SAMPLE_YOUTUBE) }
+        binding.chipTiktok.setOnClickListener { showAddDialog(SAMPLE_TIKTOK) }
+        binding.chipInstagram.setOnClickListener { showAddDialog(SAMPLE_INSTAGRAM) }
+        binding.chipX.setOnClickListener { showAddDialog(SAMPLE_X) }
 
         // Geser item: kanan = pause/resume, kiri = hapus (dengan konfirmasi).
         val swipeCallback = object :
@@ -117,12 +124,23 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 target: RecyclerView.ViewHolder
             ): Boolean = false
 
+            override fun getSwipeDirs(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder
+            ): Int {
+                // Header section tidak boleh digeser.
+                if (viewHolder is DownloadAdapter.HeaderHolder) return 0
+                return super.getSwipeDirs(recyclerView, viewHolder)
+            }
+
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.bindingAdapterPosition
                 if (position == RecyclerView.NO_POSITION) return
-                val item = adapter.currentList.getOrNull(position) ?: return
+                val row = adapter.currentList.getOrNull(position) ?: return
                 // Pulihkan tampilan item setelah animasi swipe.
                 adapter.notifyItemChanged(position)
+                if (row !is DownloadRow.Item) return
+                val item = row.item
                 when (direction) {
                     ItemTouchHelper.RIGHT -> when (item.state) {
                         DownloadState.DOWNLOADING, DownloadState.PENDING ->
@@ -139,7 +157,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         lifecycleScope.launch {
             App.engine.items.collect { items ->
                 runCatching {
-                    adapter.submitList(items)
+                    adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
                     binding.emptyView.visibility =
                         if (items.isEmpty()) View.VISIBLE else View.GONE
                     updateToolbar(items)
@@ -936,7 +954,26 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         summaryActive = active
         summaryPaused = paused
         summaryFailed = failed
-        binding.textSummary.text = getString(R.string.summary_line, active, done, failed)
+        binding.textSummary.text = summaryText(active, done, failed)
+    }
+
+    /** Ringkasan dengan titik berwarna: "● 3 active · ● 5 done · ● 1 failed". */
+    private fun summaryText(active: Int, done: Int, failed: Int): SpannableString {
+        val a = getString(R.string.summary_active, active)
+        val d = getString(R.string.summary_done, done)
+        val f = getString(R.string.summary_failed, failed)
+        val text = "● $a   ● $d   ● $f"
+        val sp = SpannableString(text)
+        val activeColor = ContextCompat.getColor(this, R.color.primary)
+        val doneColor = ContextCompat.getColor(this, R.color.status_on)
+        val failedColor = ContextCompat.getColor(this, R.color.status_off)
+        val firstDot = text.indexOf('●')
+        val secondDot = text.indexOf('●', firstDot + 1)
+        val thirdDot = text.indexOf('●', secondDot + 1)
+        sp.setSpan(ForegroundColorSpan(activeColor), firstDot, firstDot + 1, 0)
+        sp.setSpan(ForegroundColorSpan(doneColor), secondDot, secondDot + 1, 0)
+        sp.setSpan(ForegroundColorSpan(failedColor), thirdDot, thirdDot + 1, 0)
+        return sp
     }
 
     /** Tempel URL dari clipboard ke dialog tambah download (untuk empty state). */
@@ -1061,5 +1098,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         private const val EXTRA_ADD_DOWNLOAD = "com.tasirin.httpdownloadmanager.ADD_DOWNLOAD"
         private val SPEED_KBPS = intArrayOf(0, 128, 256, 512, 1024, 2048, 5120)
         private val PRIORITY_VALUES = intArrayOf(-1, 0, 1)
+        private const val SAMPLE_YOUTUBE = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        private const val SAMPLE_TIKTOK = "https://www.tiktok.com/@username/video/0000000000000000000"
+        private const val SAMPLE_INSTAGRAM = "https://www.instagram.com/reel/example/"
+        private const val SAMPLE_X = "https://x.com/username/status/0000000000000000000"
     }
 }

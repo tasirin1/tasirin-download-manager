@@ -40,7 +40,17 @@
     <string name="paste_clipboard">Paste from Clipboard</string>
     <string name="clipboard_empty">Clipboard is empty</string>
     <string name="confirm_delete">Delete this download? The file will be removed.</string>
-    <string name="summary_line">%1$d active · %2$d done · %3$d failed</string>
+    <string name="summary_active">%1$d active</string>
+    <string name="summary_done">%1$d done</string>
+    <string name="summary_failed">%1$d failed</string>
+    <string name="chip_youtube">YouTube</string>
+    <string name="chip_tiktok">TikTok</string>
+    <string name="chip_instagram">Instagram</string>
+    <string name="chip_x">X</string>
+    <string name="section_active">Active</string>
+    <string name="section_paused">Paused</string>
+    <string name="section_failed">Failed</string>
+    <string name="section_completed">Completed</string>
     <string name="no_app_to_open">No app found to open this file</string>
     <string name="speed_and_eta">%1$s · ETA %2$s</string>
 

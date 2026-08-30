@@ -1,64 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="12dp"
     android:layout_marginVertical="6dp"
-    android:background="@drawable/bg_card_rounded">
+    android:background="@drawable/bg_card_shadow">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/item_focus_bg"
         android:focusable="true"
+        android:minHeight="72dp"
         android:orientation="vertical"
-        android:minHeight="80dp"
-        android:padding="16dp">
+        android:padding="14dp">
 
-        <!-- Baris 1: nama file -->
-        <TextView
-            android:id="@+id/text_name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="middle"
-            android:singleLine="true"
-            android:textAppearance="?android:attr/textAppearanceMedium"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
-
-        <!-- Baris 2: badge status (titik berwarna) + status + persen di kanan -->
+        <!-- Baris 1: nama file + persen besar di kanan -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <View
-                android:id="@+id/status_dot"
-                android:layout_width="8dp"
-                android:layout_height="8dp"
-                android:background="@drawable/bg_status_dot" />
-
             <TextView
-                android:id="@+id/text_status"
+                android:id="@+id/text_name"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:ellipsize="end"
+                android:ellipsize="middle"
                 android:maxLines="1"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:textColor="@color/text_primary" />
 
             <TextView
                 android:id="@+id/text_progress"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:gravity="end"
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp" />
+        </LinearLayout>
+
+        <!-- Baris 2: badge status (pill berwarna) + info sekunder -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/status_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge_pill"
+                android:paddingLeft="8dp"
+                android:paddingTop="3dp"
+                android:paddingRight="8dp"
+                android:paddingBottom="3dp"
+                android:textColor="@color/white"
+                android:textSize="11sp"
+                tools:text="Downloading" />
+
+            <TextView
+                android:id="@+id/text_speed"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                android:textColor="@color/primary"
+                android:textSize="12sp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <!-- Baris 3: progress bar -->
@@ -71,22 +89,25 @@
             android:max="100"
             android:progressBackgroundTint="@color/line" />
 
-        <!-- Baris 4+: info tambahan (kecepatan / checksum / lokasi) -->
+        <!-- Baris error (gagal / pending dengan pesan) -->
         <TextView
-            android:id="@+id/text_speed"
+            android:id="@+id/text_error"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:maxLines="2"
             android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/primary"
+            android:textColor="@color/status_off"
             android:textSize="12sp"
             android:visibility="gone" />
 
+        <!-- Baris 4+: info tambahan (checksum / lokasi) -->
         <TextView
             android:id="@+id/text_checksum_ok"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="6dp"
             android:text="@string/checksum_ok"
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/status_on"
@@ -104,4 +125,15 @@
             android:visibility="gone" />
 
     </LinearLayout>
+
+    <!-- Stripe status kiri (overlay), di-tint sesuai state di adapter. -->
+    <View
+        android:id="@+id/status_stripe"
+        android:layout_width="6dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start|top"
+        android:layout_marginStart="5dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_status_stripe" />
 </FrameLayout>

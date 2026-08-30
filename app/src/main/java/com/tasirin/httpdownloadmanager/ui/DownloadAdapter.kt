@@ -16,8 +16,14 @@ import com.tasirin.httpdownloadmanager.databinding.ItemDownloadBinding
 import java.io.File
 import java.util.Locale
 
+/** Baris daftar: header grup status atau item download. */
+sealed class DownloadRow {
+    data class Header(val title: String) : DownloadRow()
+    data class Item(val item: DownloadItem) : DownloadRow()
+}
+
 class DownloadAdapter(private val listener: Listener) :
-    ListAdapter<DownloadItem, DownloadAdapter.ViewHolder>(DIFF) {
+    ListAdapter<DownloadRow, RecyclerView.ViewHolder>(DIFF) {
 
     enum class Action { PAUSE, RESUME, CANCEL, DELETE, OPEN, OPEN_FOLDER, MONITOR }
 
@@ -27,7 +33,15 @@ class DownloadAdapter(private val listener: Listener) :
         fun onLongPress(item: DownloadItem)
     }
 
-    class ViewHolder(val binding: ItemDownloadBinding) : RecyclerView.ViewHolder(binding.root)
+    class ItemHolder(val binding: ItemDownloadBinding) : RecyclerView.ViewHolder(binding.root)
+    class HeaderHolder(val binding: ItemSectionHeaderBinding) : RecyclerView.ViewHolder(binding.root)
+
+    private fun stateColor(state: DownloadState): Int = when (state) {
+        DownloadState.PENDING, DownloadState.DOWNLOADING -> R.color.primary
+        DownloadState.COMPLETED -> R.color.status_on
+        DownloadState.FAILED -> R.color.status_off
+        DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.text_hint
+    }
 
     private fun progressColor(state: DownloadState): Int = when (state) {
         DownloadState.PENDING, DownloadState.DOWNLOADING -> R.color.primary
@@ -36,45 +50,56 @@ class DownloadAdapter(private val listener: Listener) :
         DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.text_secondary
     }
 
-    private fun statusDotColor(state: DownloadState): Int = when (state) {
-        DownloadState.DOWNLOADING, DownloadState.PENDING -> R.color.primary
-        DownloadState.COMPLETED -> R.color.status_on
-        DownloadState.FAILED -> R.color.status_off
-        DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.text_hint
+    override fun getItemViewType(position: Int): Int =
+        if (getItem(position) is DownloadRow.Header) TYPE_HEADER else TYPE_ITEM
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return if (viewType == TYPE_HEADER) {
+            HeaderHolder(ItemSectionHeaderBinding.inflate(inflater, parent, false))
+        } else {
+            val binding = ItemDownloadBinding.inflate(inflater, parent, false)
+            binding.progressBar.max = 100
+            ItemHolder(binding)
+        }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemDownloadBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        binding.progressBar.max = 100
-        return ViewHolder(binding)
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (val row = getItem(position)) {
+            is DownloadRow.Header -> {
+                (holder as HeaderHolder).binding.textSectionTitle.text = row.title
+            }
+            is DownloadRow.Item -> bindItem(holder as ItemHolder, row.item)
+        }
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val item = getItem(position)
+    private fun bindItem(holder: ItemHolder, item: DownloadItem) {
         val b = holder.binding
+        val ctx = b.root.context
+        val color = ContextCompat.getColor(ctx, stateColor(item.state))
 
         b.textName.text = item.fileName
-        b.textStatus.text = statusText(item, b.root.context)
-        b.statusDot.backgroundTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(b.root.context, statusDotColor(item.state))
-        )
+        b.statusBadge.text = badgeText(item, ctx)
+        b.statusBadge.backgroundTintList = ColorStateList.valueOf(color)
+        b.statusBadge.setTextColor(ContextCompat.getColor(ctx, R.color.white))
+        b.statusStripe.backgroundTintList = ColorStateList.valueOf(color)
+
         b.progressBar.progress = item.progressPercent
         b.progressBar.progressTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(b.root.context, progressColor(item.state))
+            ContextCompat.getColor(ctx, progressColor(item.state))
         )
 
         b.textProgress.text = if (item.totalBytes > 0) {
             String.format(
-                Locale.US, "%d%% \u2022 %s / %s",
+                Locale.US, "%d%%  %s / %s",
                 item.progressPercent,
                 Formats.bytes(item.bytesDownloaded),
                 Formats.bytes(item.totalBytes)
             )
         } else if (item.progressPercentOverride >= 0) {
-            // HLS: total asli tidak diketahui — tampilkan persen + byte riil
-            // tanpa denominator palsu (mis. "56% • 4.0 MB").
+            // HLS: total asli tidak diketahui — persen + byte riil tanpa denominator palsu.
             String.format(
-                Locale.US, "%d%% \u2022 %s",
+                Locale.US, "%d%%  %s",
                 item.progressPercent,
                 Formats.bytes(item.bytesDownloaded)
             )
@@ -85,12 +110,16 @@ class DownloadAdapter(private val listener: Listener) :
         val showSpeed = item.state == DownloadState.DOWNLOADING && item.speedBps > 0
         b.textSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
         if (showSpeed) {
-            b.textSpeed.text = b.root.context.getString(
+            b.textSpeed.text = ctx.getString(
                 R.string.speed_and_eta,
                 Formats.speed(item.speedBps),
                 Formats.eta(item.etaSeconds)
             )
         }
+
+        val error = item.error?.takeIf { it.isNotBlank() }
+        b.textError.visibility = if (error != null) View.VISIBLE else View.GONE
+        if (error != null) b.textError.text = error
 
         b.textChecksumOk.visibility =
             if (item.state == DownloadState.COMPLETED && item.checksumVerified) {
@@ -99,16 +128,15 @@ class DownloadAdapter(private val listener: Listener) :
                 View.GONE
             }
         if (item.state == DownloadState.COMPLETED) {
-            val context = b.root.context
             val location = when {
                 !item.filePath.isNullOrEmpty() -> {
                     File(item.filePath).parent ?: item.filePath
                 }
                 !item.contentUri.isNullOrEmpty() ->
-                    context.getString(R.string.location_media_store)
-                else -> context.getString(R.string.location_internal)
+                    ctx.getString(R.string.location_media_store)
+                else -> ctx.getString(R.string.location_internal)
             }
-            b.textLocation.text = context.getString(R.string.location_label, location)
+            b.textLocation.text = ctx.getString(R.string.location_label, location)
             b.textLocation.visibility = View.VISIBLE
         } else {
             b.textLocation.visibility = View.GONE
@@ -121,15 +149,14 @@ class DownloadAdapter(private val listener: Listener) :
         }
     }
 
-    private fun statusText(item: DownloadItem, context: android.content.Context): String {
+    private fun badgeText(item: DownloadItem, context: android.content.Context): String {
         return when (item.state) {
-            DownloadState.PENDING ->
-                item.error ?: context.getString(R.string.status_pending)
+            DownloadState.PENDING -> context.getString(R.string.status_pending)
             DownloadState.DOWNLOADING -> context.getString(R.string.status_downloading)
             DownloadState.PAUSED -> context.getString(R.string.status_paused)
             DownloadState.COMPLETED -> context.getString(R.string.status_completed)
             DownloadState.CANCELLED -> context.getString(R.string.status_cancelled)
-            DownloadState.FAILED -> item.error ?: context.getString(R.string.status_failed)
+            DownloadState.FAILED -> context.getString(R.string.status_failed)
         }.let { base ->
             if (item.state == DownloadState.COMPLETED && item.monitor) {
                 "$base · ${context.getString(R.string.status_monitor)}"
@@ -140,11 +167,44 @@ class DownloadAdapter(private val listener: Listener) :
     }
 
     companion object {
-        private val DIFF = object : DiffUtil.ItemCallback<DownloadItem>() {
-            override fun areItemsTheSame(oldItem: DownloadItem, newItem: DownloadItem) =
-                oldItem.id == newItem.id
+        private const val TYPE_HEADER = 0
+        private const val TYPE_ITEM = 1
 
-            override fun areContentsTheSame(oldItem: DownloadItem, newItem: DownloadItem) =
+        /** Bangun daftar ber-section: Active → Paused → Completed → Failed. */
+        fun buildSections(context: android.content.Context, items: List<DownloadItem>): List<DownloadRow> {
+            val rows = mutableListOf<DownloadRow>()
+            fun addGroup(labelRes: Int, group: List<DownloadItem>) {
+                if (group.isEmpty()) return
+                rows.add(DownloadRow.Header(context.getString(labelRes)))
+                group.forEach { rows.add(DownloadRow.Item(it)) }
+            }
+            val active = items.filter {
+                it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
+            }
+            val paused = items.filter { it.state == DownloadState.PAUSED }
+            val completed = items.filter { it.state == DownloadState.COMPLETED }
+            val failed = items.filter {
+                it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED
+            }
+            addGroup(R.string.section_active, active)
+            addGroup(R.string.section_paused, paused)
+            addGroup(R.string.section_completed, completed)
+            addGroup(R.string.section_failed, failed)
+            return rows
+        }
+
+        private val DIFF = object : DiffUtil.ItemCallback<DownloadRow>() {
+            override fun areItemsTheSame(oldItem: DownloadRow, newItem: DownloadRow): Boolean {
+                return when {
+                    oldItem is DownloadRow.Header && newItem is DownloadRow.Header ->
+                        oldItem.title == newItem.title
+                    oldItem is DownloadRow.Item && newItem is DownloadRow.Item ->
+                        oldItem.item.id == newItem.item.id
+                    else -> false
+                }
+            }
+
+            override fun areContentsTheSame(oldItem: DownloadRow, newItem: DownloadRow): Boolean =
                 oldItem == newItem
         }
     }
