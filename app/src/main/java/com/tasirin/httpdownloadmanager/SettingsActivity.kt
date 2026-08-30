@@ -260,28 +260,18 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun renderServer() {
         val server = App.httpServer
-        val needsStorage = when {
-            Build.VERSION.SDK_INT >= 30 -> !Environment.isExternalStorageManager()
+        binding.storageBtn.visibility = when {
+            Build.VERSION.SDK_INT >= 30 -> if (Permissions.needsAllFilesAccess(this))
+                View.VISIBLE else View.GONE
             Build.VERSION.SDK_INT >= 23 ->
-                checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
-                    PackageManager.PERMISSION_GRANTED
-            else -> false
+                if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                        PackageManager.PERMISSION_GRANTED
+                ) View.VISIBLE else View.GONE
+            else -> View.GONE
         }
-        binding.storageBtn.visibility = if (needsStorage) View.VISIBLE else View.GONE
         binding.storageBtn.setOnClickListener {
             if (Build.VERSION.SDK_INT >= 30) {
-                runCatching {
-                    startActivity(
-                        Intent(
-                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            "package:$packageName".toUri()
-                        )
-                    )
-                }.onFailure {
-                    runCatching {
-                        startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-                    }
-                }
+                Permissions.requestAllFilesAccess(this)
             } else {
                 requestPermissionsIfNeeded()
             }

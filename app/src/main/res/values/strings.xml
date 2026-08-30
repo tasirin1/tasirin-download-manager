@@ -251,6 +251,9 @@
     <string name="settings_server_read_only">Read-only server</string>
     <string name="settings_hint_read_only">Blocks upload, rename, move, delete &amp; create from the remote web. Download &amp; browsing still work.</string>
     <string name="remote_storage_btn">Enable file access (storage permission)</string>
+    <string name="file_access_title">Enable file access?</string>
+    <string name="file_access_message">Allow full access to files so the remote File Manager and direct folder paths work correctly. Downloads and gallery keep working even without it — you can enable it later from Settings.</string>
+    <string name="file_access_enable">Enable</string>
     <string name="remote_pin_required">Set a PIN in Settings first before starting the server (for network security)</string>
     <string name="settings_server_autostart">Start server automatically after device restart</string>
     <string name="settings_section_storage">Storage</string>

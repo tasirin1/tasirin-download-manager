@@ -171,6 +171,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
 
         requestPermissionsIfNeeded()
+        offerFileAccessIfFirstRun()
         runCatching {
             if (StoragePrefs.isBackgroundEnabled(this)) {
                 App.engine.resumeInterrupted()
@@ -246,6 +247,24 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private fun requestPermissionsIfNeeded() {
         val needed = Permissions.missingRuntime(this)
         if (needed.isNotEmpty()) permissionLauncher.launch(needed)
+    }
+
+    /** Tawarkan aktivasi "All files access" sekali saja saat pertama kali dibuka. */
+    private fun offerFileAccessIfFirstRun() {
+        if (StoragePrefs.isFileAccessOffered(this)) return
+        // Tandai sudah ditawarkan SELALU (sekali saja): kalau ditolak jangan ganggu
+        // lagi; user bisa mengaktifkannya manual lewat Settings kapan pun.
+        StoragePrefs.setFileAccessOffered(this, true)
+        val needs = Permissions.needsAllFilesAccess(this)
+        if (!needs) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.file_access_title)
+            .setMessage(R.string.file_access_message)
+            .setPositiveButton(R.string.file_access_enable) { _, _ ->
+                Permissions.requestAllFilesAccess(this)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
