@@ -40,7 +40,7 @@ object HlsMp4Muxer {
 
             // --- Track audio (AAC murni) dibangun manual dari ADTS parse ---
             var audioTrack = -1
-            if (audio != null && audio.frames.isNotEmpty()) {
+            if (audio != null) {
                 val aFormat = MediaFormat.createAudioFormat(
                     MediaFormat.MIMETYPE_AUDIO_AAC, audio.sampleRate, audio.channels
                 )
@@ -57,10 +57,8 @@ object HlsMp4Muxer {
                 countVideoFrames(videoTs)
             } else 0
             writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount)
-            if (audioTrack >= 0) {
-                audio?.let { stream ->
-                    writeAacFrames(muxer, audioTrack, stream.frames, stream.sampleRate)
-                }
+            audio?.let { stream ->
+                writeAacFrames(muxer, audioTrack, stream)
             }
 
             muxer.stop()
@@ -297,22 +295,21 @@ object HlsMp4Muxer {
     }
 
     /** Tulis frame AAC murni (tanpa header ADTS) dengan PTS kontinu — tiap
-     *  frame = 1024 sampel audio pada sampleRate. */
-    private fun writeAacFrames(
-        muxer: MediaMuxer,
-        track: Int,
-        frames: List<ByteArray>,
-        sampleRate: Int
-    ) {
-        val buffer = ByteBuffer.allocate(1 shl 16)
+     *  frame = 1024 sampel audio pada sampleRate. Frame dibaca satu per satu
+     *  dari `AdtsAac.Stream` (lazy, tidak menahan semua audio di RAM). */
+    private fun writeAacFrames(muxer: MediaMuxer, track: Int, stream: AdtsAac.Stream) {
+        var buffer = ByteBuffer.allocate(1 shl 16)
         val info = MediaCodec.BufferInfo()
-        val stepUs = if (sampleRate > 0) {
-            1_000_000L * AdtsAac.SAMPLES_PER_FRAME / sampleRate
+        val stepUs = if (stream.sampleRate > 0) {
+            1_000_000L * AdtsAac.SAMPLES_PER_FRAME / stream.sampleRate
         } else {
             0L
         }
         var pts = 0L
-        for (frame in frames) {
+        stream.forEachFrame { frame ->
+            if (frame.size > buffer.capacity()) {
+                buffer = ByteBuffer.allocate(frame.size.coerceAtLeast(buffer.capacity() * 2))
+            }
             buffer.clear()
             buffer.put(frame)
             buffer.flip()

@@ -1,7 +1,10 @@
 package com.tasirin.httpdownloadmanager.download
 
+import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdtsAacTest {
@@ -21,12 +24,16 @@ class AdtsAacTest {
         return b
     }
 
+    private val id3 = byteArrayOf(
+        0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    )
+
     @Test
     fun `parse satu frame ADTS - sample rate dan channel benar`() {
         val stream = AdtsAac.parse(adtsFrame(1, 7, 2, 100))!!
         assertEquals(22050, stream.sampleRate)
         assertEquals(2, stream.channels)
-        assertEquals(1, stream.frames.size)
+        assertEquals(1, stream.frameCount)
         // AAC-LC (profile 1) + sfIndex 7 + 2ch
         assertEquals(0x13.toByte(), stream.csd0[0])
         assertEquals(0x90.toByte(), stream.csd0[1])
@@ -34,26 +41,20 @@ class AdtsAacTest {
 
     @Test
     fun `id3 tag di awal dilewati`() {
-        val id3 = byteArrayOf(
-            0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-        )
         val data = id3 + adtsFrame(1, 7, 2, 100)
         assertEquals(10, AdtsAac.id3TagSize(data, 0))
         val stream = AdtsAac.parse(data)!!
         assertEquals(22050, stream.sampleRate)
-        assertEquals(1, stream.frames.size)
+        assertEquals(1, stream.frameCount)
     }
 
     @Test
     fun `stripId3 menghilangkan tag ID3 tapi menyisakan ADTS utuh`() {
-        val id3 = byteArrayOf(
-            0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-        )
         val data = id3 + adtsFrame(1, 7, 2, 100) + id3 + adtsFrame(1, 7, 2, 100)
         val clean = AdtsAac.stripId3(data)
         assertEquals(0, AdtsAac.id3TagSize(clean, 0))
         val stream = AdtsAac.parse(clean)!!
-        assertEquals(2, stream.frames.size)
+        assertEquals(2, stream.frameCount)
     }
 
     @Test
@@ -66,5 +67,43 @@ class AdtsAacTest {
     fun `durasi - frame 22050 Hz`() {
         assertEquals(1024L * 1_000_000L / 22050L, AdtsAac.durationUs(1, 22050))
         assertEquals(0L, AdtsAac.durationUs(0, 22050))
+    }
+
+    @Test
+    fun `forEachFrame menerjemahkan payload tanpa header ADTS`() {
+        val stream = AdtsAac.parse(id3 + adtsFrame(1, 7, 2, 100) + adtsFrame(1, 7, 2, 100))!!
+        assertFalse(stream.isEmpty)
+        val sizes = ArrayList<Int>()
+        stream.forEachFrame { sizes.add(it.size) }
+        assertEquals(listOf(100, 100), sizes)
+    }
+
+    @Test
+    fun `open membaca frame dari file dengan id3 dan id3 menyela`() {
+        val data = id3 + adtsFrame(1, 7, 2, 100) + id3 + adtsFrame(1, 7, 2, 100) + adtsFrame(1, 7, 2, 100)
+        val tmp = File.createTempFile("adts", ".aac")
+        try {
+            tmp.writeBytes(data)
+            val stream = AdtsAac.open(tmp)!!
+            assertEquals(22050, stream.sampleRate)
+            assertEquals(2, stream.channels)
+            assertEquals(3, stream.frameCount)
+            val sizes = ArrayList<Int>()
+            stream.forEachFrame { sizes.add(it.size) }
+            assertEquals(listOf(100, 100, 100), sizes)
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    @Test
+    fun `open file non ADTS - null`() {
+        val tmp = File.createTempFile("adts", ".aac")
+        try {
+            tmp.writeBytes(byteArrayOf(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07))
+            assertNull(AdtsAac.open(tmp))
+        } finally {
+            tmp.delete()
+        }
     }
 }

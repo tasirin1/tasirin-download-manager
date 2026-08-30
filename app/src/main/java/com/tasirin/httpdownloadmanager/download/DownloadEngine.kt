@@ -1162,8 +1162,8 @@ class DownloadEngine(appContext: Context) {
                         item, audioPlan, audioAdts, buffer, throttle, progress,
                         transform = { AdtsAac.stripId3(it) }
                     )
-                    val stream = AdtsAac.parse(audioAdts.readBytes())
-                    if (stream != null && stream.frames.isNotEmpty()) audioStream = stream
+                    val stream = AdtsAac.open(audioAdts)
+                    if (stream != null && !stream.isEmpty) audioStream = stream
                 } catch (e: Exception) {
                     audioStream = null
                 }
