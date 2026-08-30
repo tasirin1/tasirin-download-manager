@@ -4,7 +4,6 @@
 
     <string name="add_download">Add Download</string>
     <string name="url_hint_multi">URL (multiple allowed, one per line)</string>
-    <string name="url_label">URL</string>
     <string name="section_authenticate">Authentication (optional)</string>
     <string name="section_file">File (optional)</string>
     <string name="section_network">Network (optional)</string>

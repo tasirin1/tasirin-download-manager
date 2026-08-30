@@ -3,25 +3,16 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingHorizontal="20dp"
-    android:paddingTop="16dp"
+    android:paddingHorizontal="16dp"
+    android:paddingTop="12dp"
     android:paddingBottom="4dp">
-
-    <!-- Field utama: URL -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/url_label"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="@color/text_secondary"
-        android:textStyle="bold" />
 
     <!-- Pemberitahuan platform terdeteksi (feedback deteksi link). -->
     <TextView
         android:id="@+id/text_social_platform"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:background="@drawable/bg_badge_pill"
         android:backgroundTint="@color/chip_pressed_blue"
         android:paddingLeft="10dp"
@@ -36,7 +27,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -51,9 +42,9 @@
             android:hint="@string/url_hint_multi"
             android:inputType="textUri|textMultiLine"
             android:autofillHints="url"
-            android:minLines="3"
-            android:maxLines="4"
-            android:minHeight="64dp"
+            android:minLines="2"
+            android:maxLines="3"
+            android:minHeight="52dp"
             android:focusable="true"
             android:focusableInTouchMode="true" />
 
@@ -63,10 +54,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:minHeight="48dp"
-            android:paddingHorizontal="14dp"
+            android:minHeight="44dp"
+            android:paddingHorizontal="12dp"
             android:text="@string/paste"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
     <!-- Media sosial: pilihan kualitas dalam kartu -->
@@ -75,9 +66,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:background="@drawable/bg_card_section"
-        android:padding="12dp"
+        android:padding="10dp"
         android:visibility="gone">
 
         <TextView
@@ -101,9 +92,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:background="@drawable/bg_card_section"
-        android:padding="12dp"
+        android:padding="10dp"
         android:visibility="gone">
 
         <TextView
@@ -126,8 +117,8 @@
         android:id="@+id/advanced_toggle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:paddingVertical="10dp"
+        android:layout_marginTop="8dp"
+        android:paddingVertical="8dp"
         android:paddingHorizontal="4dp"
         android:background="?android:attr/selectableItemBackground"
         android:gravity="start|center_vertical"
