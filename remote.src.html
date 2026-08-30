@@ -897,6 +897,12 @@
  width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font-size: 14px; margin-top: 6px; box-sizing: border-box; }
   .quality-select.hidden { display: none; }
 
+  .platform-badge {
+ display: inline-block; padding: 5px 12px; margin-top: 8px; border-radius: 999px;
+ background: var(--primary-soft); border: 1px solid var(--primary); color: var(--primary);
+ font-size: 12px; font-weight: 700; }
+  .platform-badge.hidden { display: none; }
+
   .sheet-title {
  font-size: 13px; font-weight: 700; color: var(--muted); padding: 6px 8px 10px; word-break: break-word; }
 
@@ -1185,6 +1191,7 @@
     <form id="addForm" class="sheet-box add-sheet">
       <div class="sheet-title" id="addSheetTitle">Add Download</div>
       <textarea id="url" rows="2" placeholder="URL (https://…) — supports multiple links separated by new lines" required></textarea>
+      <div id="platformBadge" class="platform-badge hidden"></div>
       <select id="qualitySelect" class="quality-select hidden" aria-label="Media quality">
         <option value="0">Quality: Auto (best)</option>
       </select>
@@ -1459,6 +1466,7 @@ function toggleAddForm(show) {
   addSheet.classList.toggle('hidden', !show);
   if (!show) {
     qualitySelect.classList.add('hidden'); photoSelect.classList.add('hidden'); socialPlatform = ''; socialVideoOptions = []; socialPhotoOptions = [];
+    document.getElementById('platformBadge').classList.add('hidden');
     document.getElementById('advSection').classList.add('hidden');
     document.getElementById('advToggle').textContent = 'Advanced options';
   }
@@ -4386,11 +4394,25 @@ function isSocialUrl(u) {
     l.indexOf('youtube.com/') !== -1 || l.indexOf('youtu.be/') !== -1;
 }
 
+function socialPlatformLabel(u) {
+  if (u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1) return 'YouTube';
+  if (u.indexOf('tiktok.com/') !== -1 || u.indexOf('douyin.com') !== -1) return 'TikTok';
+  if (u.indexOf('instagram.com') !== -1 || u.indexOf('instagr.am') !== -1) return 'Instagram';
+  if (u.indexOf('twitter.com') !== -1 || u.indexOf('x.com') !== -1) return 'X';
+  return 'Social media';
+}
+function setPlatformBadge(u) {
+  if (!u || !isSocialUrl(u)) { document.getElementById('platformBadge').classList.add('hidden'); return; }
+  var el = document.getElementById('platformBadge');
+  el.textContent = 'Detected: ' + socialPlatformLabel(u);
+  el.classList.remove('hidden');
+}
 let socialDebounce = null;
 function probeSocialQuality() {
   clearTimeout(socialDebounce);
   var u = document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '';
   if (!u || !isSocialUrl(u)) {
+    document.getElementById('platformBadge').classList.add('hidden');
     qualitySelect.classList.add('hidden');
     qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>';
     photoSelect.classList.add('hidden');
@@ -4400,6 +4422,7 @@ function probeSocialQuality() {
     socialPhotoOptions = [];
     return;
   }
+  setPlatformBadge(u);
   socialDebounce = setTimeout(function () {
     var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
     if (isYT) {
@@ -4431,7 +4454,7 @@ function probeSocialQuality() {
     fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.ok) { qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
+        if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
         socialPlatform = d.platform || 'social';
         var videos = d.videos || [];
         var photos = d.photos || [];
@@ -4459,6 +4482,7 @@ function probeSocialQuality() {
         }
       })
       .catch(function () {
+        document.getElementById('platformBadge').classList.add('hidden');
         qualitySelect.classList.add('hidden');
         photoSelect.classList.add('hidden');
         socialPlatform = '';
