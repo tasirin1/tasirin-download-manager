@@ -1404,8 +1404,21 @@ class DownloadEngine(appContext: Context) {
             }
             // File adaptive (video/audio MP4): Content-Length riil, total
             // kumulatif = byte yang sudah selesai + ukuran file aktif.
-            val effTotal = if (total > 0) progress.downloaded + total else 0L
+            val effTotal = if (total > 0) {
+                progress.downloaded + total
+            } else {
+                // HLS segmen: total asli tidak diketahui, jadi estimasi total
+                // = rata-rata ukuran segmen selesai x jumlah segmen. Denominator
+                // ini dipakai UI agar progress menampilkan "/≈MB" (bukan kosong)
+                // dan ETA bisa dihitung dari kecepatan EMA.
+                progress.avgSegBytes * progress.totalSegments
+            }
             val (speed, eta) = speedTracker.sample(item.id, totalNow, effTotal)
+            val etaFromSegments = if (total == 0L && speed > 0 && effTotal > 0) {
+                ((effTotal - totalNow) / speed).coerceAtLeast(0L)
+            } else {
+                eta
+            }
             updateItem(item.id, persist = false) {
                 it.copy(
                     state = DownloadState.DOWNLOADING,
@@ -1413,7 +1426,7 @@ class DownloadEngine(appContext: Context) {
                     totalBytes = effTotal,
                     progressPercentOverride = if (total > 0) -1 else percent,
                     speedBps = speed,
-                    etaSeconds = eta
+                    etaSeconds = etaFromSegments
                 )
             }
             scheduleProgressSave()
