@@ -1226,6 +1226,12 @@ class DownloadEngine(appContext: Context) {
         var totalSegments = 0
         var segmentsDone = 0
         var avgSegBytes = 0L
+        /** Jumlah Content-Length pasti segmen yang sudah di-fetch (mutlak). */
+        var exactBytes = 0L
+        /** Ukuran segmen referensi stabil (dari segmen pertama yang berukuran wajar). */
+        var refSegBytes = 0L
+        /** Total mutlak akhir bila semua segmen sudah punya ukuran pasti; else estimasi. */
+        var exactTotal = 0L
     }
 
     /** Unduh daftar segmen ke satu file. Tiap segmen ditulis setelah sukses
@@ -1243,14 +1249,40 @@ class DownloadEngine(appContext: Context) {
             for (url in urls) {
                 coroutineContext.ensureActive()
                 val segBytes = fetchHlsSegmentWithRetry(
-                    item, url, buffer, throttle, progress.downloaded
-                ) { segNow -> reportHlsProgress(item, progress, segNow) }
-                out.write(transform(segBytes))
-                progress.downloaded += segBytes.size
+                    item, url, buffer, throttle, progress.downloaded,
+                    notify = { segNow -> reportHlsProgress(item, progress, segNow) },
+                    onLength = { declared ->
+                        // Segmen referensi dari header Content-Length (ukuran
+                        // mentah) hanya untuk estimasi sisa; ukuran PASTI segmen
+                        // yang sudah selesai memakai hasil tulis riil di bawah
+                        // supaya konsisten dengan bytesDownloaded (audio di-strip
+                        // ID3 sehingga ukuran tulis bisa lebih kecil).
+                        if (progress.refSegBytes == 0L && declared >= HLS_REF_SEGMENT_MIN) {
+                            progress.refSegBytes = declared
+                        }
+                    }
+                )
+                val written = transform(segBytes)
+                out.write(written)
+                progress.downloaded += written.size
                 progress.segmentsDone++
+                // Song referensi cadangan: bila header tidak memberi ukuran wajar,
+                // pakai ukuran tulis riil segmen data pertama.
+                if (progress.refSegBytes == 0L && written.size >= HLS_REF_SEGMENT_MIN) {
+                    progress.refSegBytes = written.size.toLong()
+                }
                 if (progress.segmentsDone > 0) {
                     progress.avgSegBytes = progress.downloaded / progress.segmentsDone
                 }
+                // Total mendekati mutlak: jumlah ukuran riil segmen selesai +
+                // estimasi stabil (refSegBytes x sisa), supaya angka tidak bergoyang.
+                val known = progress.exactBytes + written.size
+                progress.exactBytes = known
+                val remaining = progress.totalSegments - progress.segmentsDone
+                progress.exactTotal = known +
+                    (if (remaining > 0 && progress.refSegBytes > 0) {
+                        progress.refSegBytes * remaining
+                    } else 0L)
             }
         }
     }
@@ -1407,11 +1439,10 @@ class DownloadEngine(appContext: Context) {
             val effTotal = if (total > 0) {
                 progress.downloaded + total
             } else {
-                // HLS segmen: total asli tidak diketahui, jadi estimasi total
-                // = rata-rata ukuran segmen selesai x jumlah segmen. Denominator
-                // ini dipakai UI agar progress menampilkan "/≈MB" (bukan kosong)
-                // dan ETA bisa dihitung dari kecepatan EMA.
-                progress.avgSegBytes * progress.totalSegments
+                // HLS segmen: gabungan ukuran pasti (Content-Length) segmen yang
+                // sudah selesai + estimasi stabil (refSegBytes x sisa). Stabil
+                // sejak awal dan mendekati mutlak di akhir — tidak "bergoyang".
+                progress.exactTotal
             }
             val (speed, eta) = speedTracker.sample(item.id, totalNow, effTotal)
             val etaFromSegments = if (total == 0L && speed > 0 && effTotal > 0) {
@@ -1466,13 +1497,16 @@ class DownloadEngine(appContext: Context) {
         buffer: ByteArray,
         throttle: SpeedThrottle,
         committed: Long,
-        notify: (Long) -> Unit
+        notify: (Long) -> Unit,
+        onLength: (Long) -> Unit = {}
     ): ByteArray {
         var attempts = 0
         while (true) {
             coroutineContext.ensureActive()
             try {
-                return fetchHlsSegment(item, url, buffer, throttle, committed, notify)
+                return fetchHlsSegment(
+                    item, url, buffer, throttle, committed, notify, onLength
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1488,7 +1522,8 @@ class DownloadEngine(appContext: Context) {
         buffer: ByteArray,
         throttle: SpeedThrottle,
         committed: Long,
-        notify: (Long) -> Unit
+        notify: (Long) -> Unit,
+        onLength: (Long) -> Unit = {}
     ): ByteArray {
         val segConn = trackConnection(
             item.id,
@@ -1502,6 +1537,9 @@ class DownloadEngine(appContext: Context) {
         try {
             val code = segConn.responseCode
             if (code !in 200..299) throw IOException("HLS segment HTTP $code")
+            // Content-Length header segmen (bila ada) = ukuran pasti segmen ini.
+            val declared = segConn.contentLength.toLong().takeIf { it > 0 }
+            if (declared != null) onLength(declared)
             val segBuf = ByteArrayOutputStream()
             val input = segConn.inputStream
             try {
@@ -2490,6 +2528,8 @@ class DownloadEngine(appContext: Context) {
         private const val MAX_REDIRECTS = 5
         private const val HLS_PROBE_MAX_BYTES = 1_000_000
         private const val HLS_SEGMENT_MAX_BYTES = 64L * 1024 * 1024
+        /** Segmen HLS ukuran ini dianggap segmen data (bukan init/small). */
+        private const val HLS_REF_SEGMENT_MIN = 256L * 1024
         private const val SEGMENT_MIN_BYTES = 5L * 1024 * 1024
         private const val RETRY_DELAY_1_MS = 5_000L
         private const val RETRY_DELAY_MAX_MS = 300_000L
