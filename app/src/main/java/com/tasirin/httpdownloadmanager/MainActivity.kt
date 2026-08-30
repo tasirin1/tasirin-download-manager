@@ -1030,9 +1030,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     /** Ringkasan dengan titik berwarna: "● 3 active · ● 5 done · ● 1 failed". */
     private fun summaryText(active: Int, done: Int, failed: Int): SpannableString {
-        val a = getQuantityString(R.plurals.summary_active, active, active)
-        val d = getQuantityString(R.plurals.summary_done, done, done)
-        val f = getQuantityString(R.plurals.summary_failed, failed, failed)
+        val a = resources.getQuantityString(R.plurals.summary_active, active, active)
+        val d = resources.getQuantityString(R.plurals.summary_done, done, done)
+        val f = resources.getQuantityString(R.plurals.summary_failed, failed, failed)
         val text = "● $a   ● $d   ● $f"
         val sp = SpannableString(text)
         val activeColor = ContextCompat.getColor(this, R.color.primary)
