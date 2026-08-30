@@ -36,9 +36,23 @@ object Permissions {
     fun needsAllFilesAccess(context: Context): Boolean =
         Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()
 
+    /** Sinkronkan "Full access to main storage" dengan izin sistem: bila user baru
+     *  saja menekan Enable lalu benar-benar memberi izin "All files access", aktifkan
+     *  `fs_full_access` otomatis. Dipanggil di onResume MainActivity & SettingsActivity. */
+    fun syncFullAccessAfterGrant(context: Context) {
+        if (!StoragePrefs.isFullAccessPending(context)) return
+        StoragePrefs.setFullAccessPending(context, false)
+        if (!needsAllFilesAccess(context)) {
+            StoragePrefs.setFsFullAccessEnabled(context, true)
+        }
+    }
+
     /** Buka halaman "All files access" khusus aplikasi (fallback ke daftar umum). */
     fun requestAllFilesAccess(context: Context) {
         if (Build.VERSION.SDK_INT < 30) return
+        // Tandai niat: auto-aktifkan "Full access to main storage" begitu izin
+        // sistem "All files access" benar-benar diberikan (lihat onResume sinkron).
+        StoragePrefs.setFullAccessPending(context, true)
         runCatching {
             context.startActivity(
                 Intent(

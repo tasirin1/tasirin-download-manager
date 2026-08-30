@@ -41,6 +41,7 @@ object StoragePrefs {
     private const val KEY_DELETE_PARTIAL_ON_CANCEL = "delete_partial_on_cancel"
     private const val KEY_PIN_ENFORCED = "pin_enforced"
     private const val KEY_FS_FULL_ACCESS = "fs_full_access"
+    private const val KEY_FS_FULL_ACCESS_PENDING = "fs_full_access_pending"
     private const val KEY_EXTRA_FOLDERS = "extra_folders"
     private const val KEY_CONNECT_TIMEOUT_SEC = "connect_timeout_sec"
     private const val KEY_READ_TIMEOUT_SEC = "read_timeout_sec"
@@ -228,6 +229,17 @@ object StoragePrefs {
     fun setFsFullAccessEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
             putBoolean(KEY_FS_FULL_ACCESS, enabled)
+        }
+    }
+
+    /** true = user baru saja menekan Enable (halaman izin sistem dibuka); dipakai
+     *  untuk auto-aktifkan "Full access to main storage" setelah izin diberikan. */
+    fun isFullAccessPending(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_FS_FULL_ACCESS_PENDING, false)
+
+    fun setFullAccessPending(context: Context, pending: Boolean) {
+        prefs(context).edit {
+            putBoolean(KEY_FS_FULL_ACCESS_PENDING, pending)
         }
     }
 

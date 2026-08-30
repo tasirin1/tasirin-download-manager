@@ -109,7 +109,9 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Permissions.syncFullAccessAfterGrant(this)
         renderServer()
+        renderChecks()
     }
 
     /** Seksi kartu yang bisa dilipat (state disimpan di StoragePrefs). */

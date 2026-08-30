@@ -238,6 +238,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             ?.let { "http://$it:${App.httpServer.listeningPort}/" }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Setelah kembali dari halaman izin sistem: auto-aktifkan "Full access to
+        // main storage" bila izin "All files access" baru saja diberikan.
+        Permissions.syncFullAccessAfterGrant(this)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
