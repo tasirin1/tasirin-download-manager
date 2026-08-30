@@ -26,6 +26,7 @@ import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
@@ -65,6 +66,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: DownloadAdapter
+    private lateinit var listLayoutManager: LinearLayoutManager
     private var pendingMoveId: String? = null
     private var summaryActive = 0
     private var summaryPaused = 0
@@ -103,8 +105,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             ?.apply { setTint(overflowColor) }
 
         adapter = DownloadAdapter(this)
-        binding.recycler.layoutManager = LinearLayoutManager(this)
+        listLayoutManager = LinearLayoutManager(this)
+        binding.recycler.layoutManager = listLayoutManager
         binding.recycler.adapter = adapter
+        binding.recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                updateStickyHeader()
+            }
+        })
 
         binding.fabAdd.setOnClickListener { showAddDialog() }
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
@@ -154,6 +162,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             App.engine.items.collect { items ->
                 runCatching {
                     adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
+                    updateStickyHeader()
                     binding.emptyView.visibility =
                         if (items.isEmpty()) View.VISIBLE else View.GONE
                     updateToolbar(items)
@@ -267,6 +276,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val headersInput = view.findViewById<EditText>(R.id.input_headers)
         val checksumInput = view.findViewById<EditText>(R.id.input_checksum)
         val mirrorInput = view.findViewById<EditText>(R.id.input_mirrors)
+        val btnPasteUrl = view.findViewById<Button>(R.id.btn_paste_url)
+        val platformBadge = view.findViewById<TextView>(R.id.text_social_platform)
         val socialQualitySection = view.findViewById<View>(R.id.social_quality_section)
         val socialQualitySpinner = view.findViewById<Spinner>(R.id.spinner_social_quality)
         val socialCarouselSection = view.findViewById<View>(R.id.social_carousel_section)
@@ -287,17 +298,28 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         )
         spinnerPriority.setSelection(1)
 
-        /* Advanced options toggle */
-        val advancedToggle = view.findViewById<TextView>(R.id.advanced_toggle)
+        // Tombol Paste: isi URL dari clipboard tanpa perlu keluar dialog.
+        btnPasteUrl.setOnClickListener {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val text = cm?.primaryClip?.takeIf { it.itemCount > 0 }
+                ?.getItemAt(0)?.text?.toString()?.trim().orEmpty()
+            if (text.isEmpty()) {
+                Toast.makeText(this, R.string.clipboard_empty, Toast.LENGTH_SHORT).show()
+            } else {
+                urlInput.setText(text)
+                urlInput.setSelection(urlInput.text.length)
+            }
+        }
+
+        /* Advanced options toggle (accordion dengan chevron berputar) */
+        val advancedToggle = view.findViewById<View>(R.id.advanced_toggle)
+        val advancedChevron = view.findViewById<ImageView>(R.id.advanced_chevron)
         val advancedSection = view.findViewById<View>(R.id.advanced_section)
         advancedToggle.setOnClickListener {
-            if (advancedSection.isVisible) {
-                advancedSection.isVisible = false
-                advancedToggle.text = getString(R.string.advanced_options)
-            } else {
-                advancedSection.isVisible = true
-                advancedToggle.text = getString(R.string.advanced_options_expanded)
-            }
+            val expanded = !advancedSection.isVisible
+            advancedSection.isVisible = expanded
+            // Chevron berputar mengikuti status buka/tutup.
+            advancedChevron.animate().rotation(if (expanded) 180f else 0f).setDuration(200).start()
         }
 
         // Deteksi link media sosial → tampilkan pemilihan resolusi.
@@ -308,6 +330,28 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialPhotoOptions: List<SocialMediaExtractor.Result> = emptyList()
         var socialYoutubeHeights: IntArray = intArrayOf()
         var socialJob: Job? = null
+        fun platformLabelFrom(url: String): String {
+            val host = runCatching { Uri.parse(url).host.orEmpty() }.getOrDefault("").lowercase()
+            return when {
+                host.contains("youtube.com") || host.contains("youtu.be") ->
+                    getString(R.string.platform_youtube)
+                host.contains("tiktok.com") || host.contains("douyin.com") ->
+                    getString(R.string.platform_tiktok)
+                host.contains("instagram.com") || host.contains("instagr.am") ->
+                    getString(R.string.platform_instagram)
+                host.contains("twitter.com") || host.contains("x.com") ->
+                    getString(R.string.platform_x)
+                else -> getString(R.string.platform_social)
+            }
+        }
+        fun setPlatformBadge(url: String?) {
+            if (url.isNullOrBlank()) {
+                platformBadge.isVisible = false
+                return
+            }
+            platformBadge.isVisible = true
+            platformBadge.text = getString(R.string.platform_detected, platformLabelFrom(url))
+        }
         fun probeSocialQuality() {
             socialJob?.cancel()
             val allUrls = urlInput.text?.toString().orEmpty()
@@ -324,8 +368,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialYoutubeHeights = intArrayOf()
                 socialQualitySection.isVisible = false
                 socialCarouselSection.isVisible = false
+                platformBadge.isVisible = false
                 return
             }
+            setPlatformBadge(target)
             val isYoutube = target.contains("youtube.com/") || target.contains("youtu.be/")
             if (isYoutube) {
                 socialOptions = emptyList()
@@ -352,7 +398,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val hasPhotos = socialPhotoOptions.isNotEmpty()
                 socialQualitySection.isVisible = false
                 socialCarouselSection.isVisible = false
-                if (!hasVideo && !hasPhotos) return@launch
+                if (!hasVideo && !hasPhotos) {
+                    platformBadge.isVisible = false
+                    return@launch
+                }
                 // Section kualitas video
                 if (hasVideo) {
                     val labels = listOf(getString(R.string.social_quality_default)) +
@@ -970,6 +1019,21 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         sp.setSpan(ForegroundColorSpan(doneColor), secondDot, secondDot + 1, 0)
         sp.setSpan(ForegroundColorSpan(failedColor), thirdDot, thirdDot + 1, 0)
         return sp
+    }
+
+    /** Header section sticky: tampilkan judul section yang sedang di-scroll. */
+    private fun updateStickyHeader() {
+        val first = listLayoutManager.findFirstVisibleItemPosition()
+        val scrolled = binding.recycler.canScrollVertically(-1)
+        var title: String? = null
+        if (first != RecyclerView.NO_POSITION) {
+            for (i in 0..first) {
+                val row = adapter.currentList.getOrNull(i) ?: break
+                if (row is DownloadRow.Header) title = row.title
+            }
+        }
+        binding.textSectionSticky.isVisible = scrolled && title != null
+        if (title != null) binding.textSectionSticky.text = title
     }
 
     /** Tempel URL dari clipboard ke dialog tambah download (untuk empty state). */

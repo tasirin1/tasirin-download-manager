@@ -40,9 +40,26 @@
             android:focusableInTouchMode="true"
             android:paddingBottom="88dp" />
 
+        <!-- Header section sticky: menampilkan judul section saat scroll. -->
+        <TextView
+            android:id="@+id/text_section_sticky"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:background="@color/window_bg"
+            android:paddingLeft="18dp"
+            android:paddingTop="6dp"
+            android:paddingRight="18dp"
+            android:paddingBottom="6dp"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:text="Active" />
+
         <LinearLayout
             android:id="@+id/empty_view"
-            android:layout_width="wrap_content"
+            android:layout_width="320dp"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center"
@@ -68,50 +85,55 @@
             <Button
                 android:id="@+id/empty_add_button"
                 style="@style/AppButton"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:minHeight="56dp"
-                android:paddingHorizontal="28dp"
+                android:layout_marginTop="26dp"
+                android:minHeight="58dp"
+                android:paddingHorizontal="32dp"
                 android:text="@string/add_download"
                 android:textSize="16sp" />
 
-            <Button
-                android:id="@+id/empty_paste_button"
-                style="@style/TvOutlinedButton"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:minHeight="48dp"
-                android:paddingHorizontal="24dp"
-                android:text="@string/paste_clipboard"
-                android:textSize="14sp" />
+                android:gravity="center"
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/empty_remote_button"
-                style="@style/TvOutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:minHeight="48dp"
-                android:paddingHorizontal="24dp"
-                android:text="@string/open_remote"
-                android:textSize="14sp" />
+                <Button
+                    android:id="@+id/empty_paste_button"
+                    style="@style/TvOutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="46dp"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/paste_clipboard"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/empty_remote_button"
+                    style="@style/TvOutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:minHeight="46dp"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/open_remote"
+                    android:textSize="13sp" />
+            </LinearLayout>
         </LinearLayout>
 
 
-        <Button
+        <ImageButton
             android:id="@+id/fab_add"
-            style="@style/AppButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
             android:layout_gravity="bottom|end"
-            android:layout_margin="14dp"
-            android:drawableStart="@drawable/ic_add"
-            android:drawablePadding="8dp"
-            android:minHeight="52dp"
-            android:paddingHorizontal="22dp"
-            android:text="@string/add_download"
-            android:textSize="15sp" />
+            android:layout_margin="16dp"
+            android:background="@drawable/bg_fab"
+            android:contentDescription="@string/add_download"
+            android:src="@drawable/ic_add" />
     </FrameLayout>
 </LinearLayout>

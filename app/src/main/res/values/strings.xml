@@ -39,6 +39,13 @@
     <string name="empty_hint">No downloads yet.\nAdd a URL to start downloading.</string>
     <string name="paste_clipboard">Paste from Clipboard</string>
     <string name="clipboard_empty">Clipboard is empty</string>
+    <string name="paste">Paste</string>
+    <string name="platform_youtube">YouTube</string>
+    <string name="platform_tiktok">TikTok</string>
+    <string name="platform_instagram">Instagram</string>
+    <string name="platform_x">X</string>
+    <string name="platform_social">Social media</string>
+    <string name="platform_detected">Detected: %1$s</string>
     <string name="confirm_delete">Delete this download? The file will be removed.</string>
     <string name="summary_active">%1$d active</string>
     <string name="summary_done">%1$d done</string>
@@ -128,8 +135,7 @@
     <string name="resume_all">Resume all</string>
     <string name="retry_failed">Retry failed</string>
 
-    <string name="advanced_options">Advanced &#9656;</string>
-    <string name="advanced_options_expanded">Advanced &#9662;</string>
+    <string name="advanced_options">Advanced</string>
     <string name="settings_port_label">Remote server port</string>
     <string name="settings_port_hint">Port (1024–65535)</string>
     <string name="settings_speed_custom">Custom: %1$d KB/s</string>

@@ -17,4 +17,5 @@
     <color name="gallery_thumb_bg">#EEF1F5</color>
     <color name="gallery_ext_text">#9AA0A6</color>
     <color name="gallery_overlay">#6610182A</color>
+    <color name="chip_pressed_blue">#1A1565C0</color>
 </resources>

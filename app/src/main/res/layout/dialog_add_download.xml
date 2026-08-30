@@ -16,28 +16,68 @@
         android:textColor="@color/text_secondary"
         android:textStyle="bold" />
 
-    <EditText
-        android:id="@+id/input_url"
-        style="@style/AppInput"
+    <!-- Pemberitahuan platform terdeteksi (feedback deteksi link). -->
+    <TextView
+        android:id="@+id/text_social_platform"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_badge_pill"
+        android:backgroundTint="@color/chip_pressed_blue"
+        android:paddingLeft="10dp"
+        android:paddingTop="4dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="4dp"
+        android:textColor="@color/primary"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:hint="@string/url_hint_multi"
-        android:inputType="textUri|textMultiLine"
-        android:autofillHints="url"
-        android:minLines="3"
-        android:maxLines="4"
-        android:minHeight="52dp"
-        android:focusable="true"
-        android:focusableInTouchMode="true" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-    <!-- Media sosial: pilihan kualitas -->
+        <EditText
+            android:id="@+id/input_url"
+            style="@style/AppInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:drawableStart="@drawable/ic_link"
+            android:drawablePadding="8dp"
+            android:hint="@string/url_hint_multi"
+            android:inputType="textUri|textMultiLine"
+            android:autofillHints="url"
+            android:minLines="3"
+            android:maxLines="4"
+            android:minHeight="64dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+
+        <Button
+            android:id="@+id/btn_paste_url"
+            style="@style/TvOutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:minHeight="48dp"
+            android:paddingHorizontal="14dp"
+            android:text="@string/paste"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <!-- Media sosial: pilihan kualitas dalam kartu -->
     <LinearLayout
         android:id="@+id/social_quality_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_card_section"
+        android:padding="12dp"
         android:visibility="gone">
 
         <TextView
@@ -61,7 +101,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_card_section"
+        android:padding="12dp"
         android:visibility="gone">
 
         <TextView
@@ -79,8 +121,8 @@
             android:layout_marginTop="6dp" />
     </LinearLayout>
 
-    <!-- Advanced toggle -->
-    <TextView
+    <!-- Advanced toggle (accordion dengan chevron berputar) -->
+    <LinearLayout
         android:id="@+id/advanced_toggle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -89,10 +131,24 @@
         android:paddingHorizontal="4dp"
         android:background="?android:attr/selectableItemBackground"
         android:gravity="start|center_vertical"
-        android:text="@string/advanced_options"
-        android:textAppearance="?android:attr/textAppearanceMedium"
-        android:textColor="@color/primary"
-        android:textStyle="bold" />
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/advanced_chevron"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_chevron" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/advanced_options"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textColor="@color/primary"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <View
         android:layout_width="match_parent"

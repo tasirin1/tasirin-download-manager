@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.ui
 
 import android.content.res.ColorStateList
+import android.animation.ObjectAnimator
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +13,7 @@ import com.tasirin.httpdownloadmanager.R
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.Formats
+import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.databinding.ItemDownloadBinding
 import com.tasirin.httpdownloadmanager.databinding.ItemSectionHeaderBinding
 import java.io.File
@@ -80,12 +82,17 @@ class DownloadAdapter(private val listener: Listener) :
         val color = ContextCompat.getColor(ctx, stateColor(item.state))
 
         b.textName.text = item.fileName
+        b.fileIcon.setImageResource(fileIconRes(item.fileName))
+        b.fileIcon.imageTintList = ColorStateList.valueOf(
+            ContextCompat.getColor(ctx, R.color.text_hint)
+        )
         b.statusBadge.text = badgeText(item, ctx)
         b.statusBadge.backgroundTintList = ColorStateList.valueOf(color)
         b.statusBadge.setTextColor(ContextCompat.getColor(ctx, R.color.white))
         b.statusStripe.backgroundTintList = ColorStateList.valueOf(color)
 
-        b.progressBar.progress = item.progressPercent
+        val prevProgress = b.progressBar.progress
+        smoothProgress(b.progressBar, prevProgress, item.progressPercent)
         b.progressBar.progressTintList = ColorStateList.valueOf(
             ContextCompat.getColor(ctx, progressColor(item.state))
         )
@@ -164,6 +171,35 @@ class DownloadAdapter(private val listener: Listener) :
             } else {
                 base
             }
+        }
+    }
+
+    /** Animasi halus saat progres naik; set langsung saat turun/reset. */
+    private fun smoothProgress(bar: android.widget.ProgressBar, from: Int, to: Int) {
+        (bar.getTag(R.id.progress_animator) as? ObjectAnimator)?.cancel()
+        if (from >= 0 && to > from) {
+            val anim = ObjectAnimator.ofInt(bar, "progress", from, to)
+                .setDuration(350)
+            bar.setTag(R.id.progress_animator, anim)
+            anim.start()
+        } else {
+            bar.progress = to
+            bar.setTag(R.id.progress_animator, null)
+        }
+    }
+
+    /** Pilih ikon tipe file berdasarkan ekstensi/nama file. */
+    private fun fileIconRes(fileName: String): Int {
+        val mime = MimeTypes.forFile(fileName)
+        return when {
+            mime.startsWith("video") -> R.drawable.ic_file_video
+            mime.startsWith("audio") -> R.drawable.ic_file_audio
+            mime.startsWith("image") -> R.drawable.ic_file_image
+            mime == "application/pdf" -> R.drawable.ic_file_pdf
+            mime == "application/zip" ||
+                mime == "application/x-rar-compressed" ||
+                mime == "application/x-7z-compressed" -> R.drawable.ic_file_archive
+            else -> R.drawable.ic_file_generic
         }
     }
 
