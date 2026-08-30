@@ -110,10 +110,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
         binding.emptyPasteButton.setOnClickListener { pasteFromClipboard() }
         binding.emptyRemoteButton.setOnClickListener { openRemote() }
-        binding.chipYoutube.setOnClickListener { showAddDialog(SAMPLE_YOUTUBE) }
-        binding.chipTiktok.setOnClickListener { showAddDialog(SAMPLE_TIKTOK) }
-        binding.chipInstagram.setOnClickListener { showAddDialog(SAMPLE_INSTAGRAM) }
-        binding.chipX.setOnClickListener { showAddDialog(SAMPLE_X) }
 
         // Geser item: kanan = pause/resume, kiri = hapus (dengan konfirmasi).
         val swipeCallback = object :
@@ -1098,9 +1094,5 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         private const val EXTRA_ADD_DOWNLOAD = "com.tasirin.httpdownloadmanager.ADD_DOWNLOAD"
         private val SPEED_KBPS = intArrayOf(0, 128, 256, 512, 1024, 2048, 5120)
         private val PRIORITY_VALUES = intArrayOf(-1, 0, 1)
-        private const val SAMPLE_YOUTUBE = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-        private const val SAMPLE_TIKTOK = "https://www.tiktok.com/@username/video/0000000000000000000"
-        private const val SAMPLE_INSTAGRAM = "https://www.instagram.com/reel/example/"
-        private const val SAMPLE_X = "https://x.com/username/status/0000000000000000000"
     }
 }

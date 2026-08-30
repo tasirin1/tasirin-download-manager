@@ -42,7 +42,7 @@
 
         <LinearLayout
             android:id="@+id/empty_view"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center"
@@ -50,105 +50,53 @@
             android:padding="24dp"
             android:visibility="gone">
 
-            <FrameLayout
-                android:layout_width="140dp"
-                android:layout_height="140dp"
-                android:gravity="center">
-
-                <View
-                    android:layout_width="140dp"
-                    android:layout_height="140dp"
-                    android:background="@drawable/bg_circle_light" />
-
-                <ImageView
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/empty_hint"
-                    android:src="@drawable/ic_download_big"
-                    app:tint="@color/primary" />
-            </FrameLayout>
+            <ImageView
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:contentDescription="@string/empty_hint"
+                android:src="@drawable/ic_download_big" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="16dp"
                 android:gravity="center"
                 android:text="@string/empty_hint"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp" />
+                android:textColor="@color/text_secondary"
+                android:textSize="20sp" />
 
             <Button
                 android:id="@+id/empty_add_button"
                 style="@style/AppButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
+                android:layout_marginTop="24dp"
                 android:minHeight="56dp"
                 android:paddingHorizontal="28dp"
                 android:text="@string/add_download"
                 android:textSize="16sp" />
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/chip_youtube"
-                    style="@style/SuggestionChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/chip_youtube" />
-
-                <Button
-                    android:id="@+id/chip_tiktok"
-                    style="@style/SuggestionChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/chip_tiktok" />
-
-                <Button
-                    android:id="@+id/chip_instagram"
-                    style="@style/SuggestionChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/chip_instagram" />
-
-                <Button
-                    android:id="@+id/chip_x"
-                    style="@style/SuggestionChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/chip_x" />
-            </LinearLayout>
 
             <Button
                 android:id="@+id/empty_paste_button"
                 style="@style/TvOutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:minHeight="44dp"
-                android:paddingHorizontal="22dp"
+                android:layout_marginTop="10dp"
+                android:minHeight="48dp"
+                android:paddingHorizontal="24dp"
                 android:text="@string/paste_clipboard"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/empty_remote_button"
                 style="@style/TvOutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:minHeight="44dp"
-                android:paddingHorizontal="22dp"
+                android:layout_marginTop="10dp"
+                android:minHeight="48dp"
+                android:paddingHorizontal="24dp"
                 android:text="@string/open_remote"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
         </LinearLayout>
 
 

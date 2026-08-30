@@ -43,10 +43,6 @@
     <string name="summary_active">%1$d active</string>
     <string name="summary_done">%1$d done</string>
     <string name="summary_failed">%1$d failed</string>
-    <string name="chip_youtube">YouTube</string>
-    <string name="chip_tiktok">TikTok</string>
-    <string name="chip_instagram">Instagram</string>
-    <string name="chip_x">X</string>
     <string name="section_active">Active</string>
     <string name="section_paused">Paused</string>
     <string name="section_failed">Failed</string>
