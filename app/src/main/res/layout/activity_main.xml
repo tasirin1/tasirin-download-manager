@@ -66,7 +66,7 @@
                     android:layout_gravity="center"
                     android:contentDescription="@string/empty_hint"
                     android:src="@drawable/ic_download_big"
-                    android:tint="@color/primary" />
+                    app:tint="@color/primary" />
             </FrameLayout>
 
             <TextView
