@@ -16,6 +16,9 @@ rapi, APK kecil, dan rilis selalu hijau. **Untuk AI yang mengelola repo: baca
    dijamin otomatis oleh CI (guard CHANGELOG).
 4. **Jangan build lokal untuk rilis.** Rilis resmi hanya lewat GitHub
    Actions (workflow `Build APK`). Build lokal hanya untuk debugging cepat.
+5. **Jangan install Android SDK lokal** (sdkmanager/platform/build-tools) di
+   mesin pengembangan — boros RAM/disk. Verifikasi cepat pakai
+   `python3 scripts/check_repo.py`; compile/lint/test resmi tetap di CI.
 
 ## Aturan bahasa & gaya
 

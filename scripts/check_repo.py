@@ -64,8 +64,50 @@ def static_checks() -> tuple[Result, ...]:
     return (Result("struktur repo", not missing, 0.0, detail),)
 
 
+def _local_sdk_markers() -> list[str]:
+    """Penanda Android SDK terpasang/terkonfigurasi lokal."""
+    markers: list[str] = []
+    env = {**os.environ}
+    for var in ("ANDROID_HOME", "ANDROID_SDK_ROOT", "ANDROID_SDK_HOME"):
+        val = env.get(var, "").strip()
+        if val:
+            markers.append(f"{var}={val}")
+    if shutil.which("sdkmanager"):
+        markers.append(f"sdkmanager={shutil.which('sdkmanager')}")
+    if (ROOT / "local.properties").is_file():
+        markers.append(str(ROOT / "local.properties"))
+    for probe in (
+        Path.home() / ".android",
+        Path.home() / "Android",
+        Path("/opt/android-sdk"),
+        Path("/usr/lib/android-sdk"),
+    ):
+        if probe.exists() and (probe / "sdkmanager").exists():
+            markers.append(str(probe))
+    return markers
+
+
+def no_local_sdk() -> Result:
+    """Saran larangan: SDK lokal tidak boleh diinstal (boros RAM/disk)."""
+    in_ci = os.environ.get("CI") in ("true", "1")
+    markers = _local_sdk_markers()
+    if not in_ci and markers:
+        return Result(
+            name="no local SDK",
+            ok=False,
+            seconds=0.0,
+            output=(
+                "Android SDK lokal terdeteksi (larangan repo): "
+                + "; ".join(markers)
+                + ". Hapus SDK lokal dan gunakan CI saja untuk build/lint/test."
+            ),
+        )
+    return Result("no local SDK", True, 0.0, "")
+
+
 def fast_checks() -> list[Result]:
-    results = list(static_checks())
+    results = [no_local_sdk()]
+    results += list(static_checks())
     results.extend(
         [
             python_tool("remote web", "scripts/prepare_remote.py", ["--check"]),

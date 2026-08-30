@@ -107,7 +107,7 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
   `speed_limit_kbps`, `max_retries`, `connect_timeout_sec`, `read_timeout_sec`,
   `small_first`, `delete_partial_on_cancel`, `recent_urls`, `sort_mode`,
   `auto_sort`, `battery_exempt`, `collapsed_sections`, `thumb_cleanup_last`, `partial_stream_secret`,
-  `server_session_secret`.
+  `server_session_secret`, `file_access_offered`.
   Kunci galeri foto/video terpisah sudah tidak dipakai; scanner galeri sekarang video-only.
 
 ## Keputusan & larangan historis
@@ -115,6 +115,9 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
 Hal berikut sengaja dihapus/dilarang — JANGAN dihidupkan kembali tanpa alasan
 kuat dan tanpa diskusi:
 
+- **Android SDK lokal** — DILARANG meng-install SDK (sdkmanager/platform/
+  build-tools) di mesin kerja: boros RAM/disk; build/lint/test resmi via CI.
+  `scripts/check_repo.py` memblokir bila penanda SDK lokal terdeteksi (non-CI).
 - **Auto-install APK** (`REQUEST_INSTALL_PACKAGES`) — dihapus; `Updater.kt`
   download-only + verifikasi tanda tangan (kurangi sinyal berbahaya Play Protect).
 - **Tema gelap native** (`values-night`) — dihapus; app selalu tema terang.
@@ -184,6 +187,11 @@ kuat dan tanpa diskusi:
 1. **Build resmi HANYA via GitHub Actions** — jangan build lokal untuk rilis.
    Build lokal (`./gradlew assembleDebug`) hanya untuk debugging cepat dan tidak
    pernah menggantikan CI.
+   **DILARANG meng-install Android SDK lokal** (sdkmanager, platform, build-tools)
+   di mesin ini: ini memboroskan RAM/disk dan bukan alur resmi. Semua build,
+   lint, dan unit test berjalan di CI. Bila butuh verifikasi cepat, gunakan
+   guard lintas-platform (`scripts/check_repo.py`) yang tidak butuh SDK, dan
+   serahkan verifikasi compile penuh ke PR/CI.
 2. **Bahasa**:
    - **UI aplikasi memakai Bahasa Inggris** (default `values/strings.xml`, tanpa
      `values-en` lagi — terjemahan default = Inggris; `remote.html` juga Inggris).
