@@ -12,6 +12,8 @@ class MimeTypesTest {
         assertEquals("application/pdf", MimeTypes.forFile("dokumen.pdf"))
         assertEquals("video/mp4", MimeTypes.forFile("video.mp4"))
         assertEquals("video/x-matroska", MimeTypes.forFile("film.mkv"))
+        assertEquals("video/mp2t", MimeTypes.forFile("stream.ts"))
+        assertEquals("video/mp2t", MimeTypes.forFile("bluray.m2ts"))
         assertEquals("image/jpeg", MimeTypes.forFile("foto.JPG"))
         assertEquals("text/plain", MimeTypes.forFile("catatan.txt"))
     }
@@ -26,6 +28,7 @@ class MimeTypesTest {
     fun `extensionFor - mime dengan parameter`() {
         assertEquals(".pdf", MimeTypes.extensionFor("application/pdf; charset=utf-8"))
         assertEquals(".mp4", MimeTypes.extensionFor("video/mp4"))
+        assertEquals(".ts", MimeTypes.extensionFor("video/mp2t"))
         assertEquals(".jpg", MimeTypes.extensionFor("image/jpeg"))
     }
 

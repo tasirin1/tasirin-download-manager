@@ -75,7 +75,7 @@ object MediaLibrary {
     )
 
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
-    private val VIDEO_EXTS = setOf("mp4", "mkv", "webm", "avi", "mov", "3gp", "m4v", "mpg", "mpeg")
+    private val VIDEO_EXTS = setOf("mp4", "mkv", "webm", "avi", "mov", "3gp", "m4v", "mpg", "mpeg", "ts", "m2ts")
 
     private fun isGalleryVideo(name: String): Boolean =
         VIDEO_EXTS.contains(name.substringAfterLast('.', "").lowercase())
