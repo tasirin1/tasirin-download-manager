@@ -357,7 +357,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialYoutubeHeights: IntArray = intArrayOf()
         var socialJob: Job? = null
         fun platformLabelFrom(url: String): String {
-            val host = runCatching { Uri.parse(url).host.orEmpty() }.getOrDefault("").lowercase()
+            val host = runCatching { url.toUri().host.orEmpty() }.getOrDefault("").lowercase()
             return when {
                 host.contains("youtube.com") || host.contains("youtu.be") ->
                     getString(R.string.platform_youtube)
@@ -1030,9 +1030,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     /** Ringkasan dengan titik berwarna: "● 3 active · ● 5 done · ● 1 failed". */
     private fun summaryText(active: Int, done: Int, failed: Int): SpannableString {
-        val a = getString(R.string.summary_active, active)
-        val d = getString(R.string.summary_done, done)
-        val f = getString(R.string.summary_failed, failed)
+        val a = getQuantityString(R.plurals.summary_active, active, active)
+        val d = getQuantityString(R.plurals.summary_done, done, done)
+        val f = getQuantityString(R.plurals.summary_failed, failed, failed)
         val text = "● $a   ● $d   ● $f"
         val sp = SpannableString(text)
         val activeColor = ContextCompat.getColor(this, R.color.primary)
