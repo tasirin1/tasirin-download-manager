@@ -51,6 +51,7 @@ object DownloadItemCodec {
             o.put("segments", segArr)
             o.put("preferredHeight", item.preferredHeight)
             o.put("progressPercentOverride", item.progressPercentOverride)
+            o.put("audioOnly", item.audioOnly)
             arr.put(o)
         }
         return arr.toString()
@@ -107,7 +108,8 @@ object DownloadItemCodec {
                 etag = o.optString("etag"),
                 segments = parseSegments(o),
                 preferredHeight = o.optInt("preferredHeight", 0),
-                progressPercentOverride = o.optInt("progressPercentOverride", -1)
+                progressPercentOverride = o.optInt("progressPercentOverride", -1),
+                audioOnly = o.optBoolean("audioOnly", false)
             )
         }.getOrNull()
     }

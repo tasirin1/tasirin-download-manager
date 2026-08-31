@@ -311,6 +311,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val platformBadge = view.findViewById<TextView>(R.id.text_social_platform)
         val socialQualitySection = view.findViewById<View>(R.id.social_quality_section)
         val socialQualitySpinner = view.findViewById<Spinner>(R.id.spinner_social_quality)
+        val audioOnlyCheck = view.findViewById<android.widget.CheckBox>(R.id.check_audio_only)
         val socialCarouselSection = view.findViewById<View>(R.id.social_carousel_section)
         val socialCarouselSpinner = view.findViewById<Spinner>(R.id.spinner_social_carousel)
         val speedKbps = SPEED_KBPS
@@ -398,6 +399,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialPhotoOptions = emptyList()
                 socialYoutubeHeights = intArrayOf()
                 socialQualitySection.isVisible = false
+                audioOnlyCheck.isVisible = false
                 socialCarouselSection.isVisible = false
                 platformBadge.isVisible = false
                 return
@@ -413,6 +415,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     socialYoutubeHeights.map { "${it}p" }
                 setupSpinner(this@MainActivity, socialQualitySpinner, labels)
                 socialQualitySection.isVisible = true
+                audioOnlyCheck.isVisible = true
                 socialCarouselSection.isVisible = false
                 return
             }
@@ -428,6 +431,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val hasVideo = socialVideoOptions.isNotEmpty()
                 val hasPhotos = socialPhotoOptions.isNotEmpty()
                 socialQualitySection.isVisible = false
+                audioOnlyCheck.isVisible = false
                 socialCarouselSection.isVisible = false
                 if (!hasVideo && !hasPhotos) {
                     platformBadge.isVisible = false
@@ -445,6 +449,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         }
                     setupSpinner(this@MainActivity, socialQualitySpinner, labels)
                     socialQualitySection.isVisible = true
+                    audioOnlyCheck.isVisible = true
                 }
                 // Section pemilihan foto carousel
                 if (hasPhotos) {
@@ -487,7 +492,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             perSpeed: Int,
             priority: Int,
             checksum: String,
-            mirrors: List<String>
+            mirrors: List<String>,
+            audioOnly: Boolean = false
         ) {
             urls.forEachIndexed { index, url ->
                 App.engine.addDownload(
@@ -500,7 +506,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     priority = priority,
                     checksum = if (index == 0) checksum else "",
                     mirrors = if (index == 0) mirrors else emptyList(),
-                    preferredHeight = height
+                    preferredHeight = height,
+                    audioOnly = audioOnly
                 )
             }
         }
@@ -514,7 +521,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             perSpeed: Int,
             priority: Int,
             checksum: String,
-            mirrors: List<String>
+            mirrors: List<String>,
+            audioOnly: Boolean = false
         ) {
             urls.forEachIndexed { index, url ->
                 App.engine.addDownload(
@@ -526,7 +534,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     speedLimitKbps = perSpeed,
                     priority = priority,
                     checksum = if (index == 0) checksum else "",
-                    mirrors = if (index == 0) mirrors else emptyList()
+                    mirrors = if (index == 0) mirrors else emptyList(),
+                    audioOnly = audioOnly
                 )
             }
         }
@@ -571,6 +580,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val checksum = checksumInput.text?.toString()?.trim().orEmpty()
                 val perSpeed = speedKbps[spinnerSpeedPer.selectedItemPosition]
                 val priority = priorityValues[spinnerPriority.selectedItemPosition]
+                val audioOnly = audioOnlyCheck.isChecked
                 if (selectedYtHeight > 0) {
                     // YouTube: simpan resolusi pilihan; engine memilih varian
                     // HLS yang paling mendekati saat download dimulai (URL CDN
@@ -585,7 +595,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         perSpeed = perSpeed,
                         priority = priority,
                         checksum = checksum,
-                        mirrors = parseMirrors()
+                        mirrors = parseMirrors(),
+                        audioOnly = audioOnly
                     )
                 } else if (selectedOption != null) {
                     // URL CDN hasil ekstraksi masih hangat (baru saja dimuat) —
@@ -604,7 +615,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         speedLimitKbps = perSpeed,
                         priority = priority,
                         checksum = checksum,
-                        mirrors = parseMirrors()
+                        mirrors = parseMirrors(),
+                        audioOnly = audioOnly
                     )
                 } else if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
                     lifecycleScope.launch {
@@ -613,7 +625,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         }
                         if (variants.isNullOrEmpty()) {
                             val mirrors = parseMirrors()
-                            addAll(urls, name, username, password, headers, perSpeed, priority, checksum, mirrors)
+                            addAll(urls, name, username, password, headers, perSpeed, priority, checksum, mirrors, audioOnly)
                         } else {
                             showHlsPicker(
                                 variants = variants,
@@ -630,7 +642,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         }
                     }
                 } else {
-                    addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
+                    addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors(), audioOnly)
                 }
             }
             .show()

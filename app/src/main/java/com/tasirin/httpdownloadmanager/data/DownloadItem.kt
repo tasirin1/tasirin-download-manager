@@ -43,7 +43,10 @@ data class DownloadItem(
     val speedBps: Long = 0,
     val etaSeconds: Long = 0,
     val preferredHeight: Int = 0,
-    val progressPercentOverride: Int = -1
+    val progressPercentOverride: Int = -1,
+    /** Audio-only: unduh hanya jalur audio (M4A AAC) untuk YouTube/TikTok.
+     *  Mengabaikan video/pemilihan resolusi. */
+    val audioOnly: Boolean = false
 ) {
     val progressPercent: Int
         // Untuk HLS total asli tidak diketahui, jadi persentase dihitung dari
