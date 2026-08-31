@@ -35,20 +35,7 @@
             android:textSize="14sp"
             tools:text="● 2 active   ● 5 done   ● 1 failed" />
 
-        <TextView
-            android:id="@+id/btn_clear_failed"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:background="@drawable/bg_btn_tv"
-            android:paddingLeft="12dp"
-            android:paddingTop="6dp"
-            android:paddingRight="12dp"
-            android:paddingBottom="6dp"
-            android:text="@string/action_clear_failed"
-            android:textColor="@color/status_off"
-            android:textSize="12sp"
-            tools:text="Clear failed" />
+
     </LinearLayout>
 
     <FrameLayout

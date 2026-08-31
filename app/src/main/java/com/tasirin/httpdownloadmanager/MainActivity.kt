@@ -116,9 +116,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         })
 
-        binding.btnClearFailed.setOnClickListener {
-            lifecycleScope.launch(Dispatchers.IO) { App.engine.clearFailed() }
-        }
         binding.fabAdd.setOnClickListener { showAddDialog() }
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
         binding.emptyPasteButton.setOnClickListener { pasteFromClipboard() }
@@ -718,10 +715,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 App.engine.retryFailed()
                 true
             }
-            R.id.action_clear_failed -> {
-                lifecycleScope.launch(Dispatchers.IO) { App.engine.clearFailed() }
-                true
-            }
+
             R.id.action_clear_completed -> {
                 lifecycleScope.launch(Dispatchers.IO) { App.engine.clearCompleted() }
                 true

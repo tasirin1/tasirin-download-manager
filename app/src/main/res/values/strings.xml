@@ -99,7 +99,6 @@
     <string name="remote_start_failed">Failed to start server: %1$s</string>
 
     <string name="action_settings">Settings</string>
-    <string name="action_clear_failed">Clear All Failed</string>
     <string name="action_clear_completed">Clear Completed</string>
     <string name="settings_background">Automatically resume interrupted downloads (background)</string>
     <string name="settings_autostart">Start automatically on device boot</string>

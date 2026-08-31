@@ -9,7 +9,7 @@
     android:background="@drawable/bg_section_header"
     android:focusable="true"
     android:gravity="center_vertical"
-    android:minHeight="44dp"
+    android:minHeight="36dp"
     android:orientation="horizontal"
     android:paddingLeft="10dp"
     android:paddingRight="10dp">
@@ -27,9 +27,9 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_weight="1"
-        android:textColor="@color/text_primary"
-        android:textSize="15sp"
-        android:textStyle="bold"
+        android:textColor="@color/text_hint"
+        android:textSize="12sp"
+        android:textStyle="normal"
         tools:text="Active" />
 
     <TextView
@@ -45,6 +45,6 @@
         android:paddingBottom="2dp"
         android:textColor="@color/primary"
         android:textSize="12sp"
-        android:textStyle="bold"
+        android:textStyle="normal"
         tools:text="3" />
 </LinearLayout>

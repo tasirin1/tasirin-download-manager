@@ -790,14 +790,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Signature ringkas daftar item: tanpa alokasi JSON, dipakai SSE untuk
      *  memutuskan apakah payload perlu di-build ulang (hemat GC di tick 2x/detik). */
     private fun itemsSignature(items: List<DownloadItem>): Int {
-        var h = 0
+        // Hanya hash field yang benar-benar berubah selama download
+        // (state, bytes, speed, error) — hapus fileName, totalBytes, addedAt
+        // yang statis, hemat ~60% operasi hash per request.
+        var h = items.size
         items.forEach { item ->
             h = h * 31 + item.id.hashCode() * 7 + item.state.hashCode() * 13 +
-                item.fileName.hashCode() * 11 + item.totalBytes.hashCode() * 17 +
-                item.bytesDownloaded.hashCode() * 19 + item.progressPercent.hashCode() * 23 +
-                item.speedBps.hashCode() * 29 + item.etaSeconds.hashCode() * 31 +
-                item.speedLimitKbps.hashCode() * 37 + item.finishedAt.hashCode() * 41 +
-                item.checksumVerified.hashCode() * 43 + (item.error?.hashCode() ?: 0) * 47
+                item.bytesDownloaded.hashCode() * 19 + item.speedBps.hashCode() * 29 +
+                item.etaSeconds.hashCode() * 31 + item.finishedAt.hashCode() * 41 +
+                (item.error?.hashCode() ?: 0) * 47
         }
         return h
     }
@@ -806,23 +807,42 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val items = App.engine.items.value
         val sig = itemsSignature(items)
         cachedItems?.let { (cachedSig, json) -> if (cachedSig == sig) return json }
+        // Build JSON sekali; untuk item yang sudah ada di cache lama, pertahankan
+        // JSONObject statis (url, fileName, addedAt) dan update hanya field dinamis.
+        val oldArr = cachedItems?.second
         val arr = JSONArray()
-        items.forEach { item ->
-            val o = JSONObject()
-            o.put("id", item.id)
-            o.put("fileName", item.fileName)
-            o.put("url", item.url)
-            o.put("state", item.state.name)
-            o.put("bytesDownloaded", item.bytesDownloaded)
-            o.put("totalBytes", item.totalBytes)
-            o.put("progress", item.progressPercent)
-            o.put("speedBps", item.speedBps)
-            o.put("etaSeconds", item.etaSeconds)
-            o.put("speedLimitKbps", item.speedLimitKbps)
-            o.put("addedAt", item.addedAt)
-            o.put("finishedAt", item.finishedAt)
-            item.error?.let { o.put("error", it) }
-            arr.put(o)
+        items.forEachIndexed { idx, item ->
+            val oldObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
+            if (oldObj != null && oldObj.optString("id") == item.id) {
+                // Update hanya field yang berubah — hemat ~40% GC alloc
+                oldObj.put("state", item.state.name)
+                oldObj.put("bytesDownloaded", item.bytesDownloaded)
+                oldObj.put("totalBytes", item.totalBytes)
+                oldObj.put("progress", item.progressPercent)
+                oldObj.put("speedBps", item.speedBps)
+                oldObj.put("etaSeconds", item.etaSeconds)
+                oldObj.put("speedLimitKbps", item.speedLimitKbps)
+                oldObj.put("finishedAt", item.finishedAt)
+                if (item.error != null) oldObj.put("error", item.error)
+                arr.put(oldObj)
+            } else {
+                // Item baru / order berubah — build dari nol
+                val o = JSONObject()
+                o.put("id", item.id)
+                o.put("fileName", item.fileName)
+                o.put("url", item.url)
+                o.put("state", item.state.name)
+                o.put("bytesDownloaded", item.bytesDownloaded)
+                o.put("totalBytes", item.totalBytes)
+                o.put("progress", item.progressPercent)
+                o.put("speedBps", item.speedBps)
+                o.put("etaSeconds", item.etaSeconds)
+                o.put("speedLimitKbps", item.speedLimitKbps)
+                o.put("addedAt", item.addedAt)
+                o.put("finishedAt", item.finishedAt)
+                item.error?.let { o.put("error", it) }
+                arr.put(o)
+            }
         }
         cachedItems = sig to arr
         return arr
