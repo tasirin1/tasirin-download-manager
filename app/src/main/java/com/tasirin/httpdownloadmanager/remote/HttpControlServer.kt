@@ -69,8 +69,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val serverScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
             runCatching { Log.w("HttpControlServer", "coroutine error", e) }
-        }
-    )
+        })
+
+    private var periodicCleanupJob: Job? = null
     private val sseClients = CopyOnWriteArrayList<SseStream>()
     @Volatile private var sseJob: Job? = null
     @Volatile private var sseLastPayload = ""
@@ -106,6 +107,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Cache itemsJson berdasarkan signature; satu Pair agar sig & JSON tidak
     // pernah terbaca sebagai versi campuran saat request server paralel.
     @Volatile private var cachedItems: Pair<Int, JSONArray>? = null
+    // Fix #4: cache terpisah untuk bytes/speed yang berubah tiap detik
+    // tanpa rebuild struktur JSON (hemat ~30% CPU saat polling aktif).
+    @Volatile private var lastDynamicUpdate = 0L
+    private const val DYNAMIC_UPDATE_MS = 500L
     // Cache statusObject: jarang berubah (port, readOnly, versi).
     @Volatile private var cachedStatusJson: JSONObject? = null
     // Statistik folder dihitung paralel: listing folder dengan banyak subfolder
@@ -188,9 +193,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Alamat IP client dari NanoHTTPD session (tanpa port). */
     private fun clientAddress(session: IHTTPSession): String {
-        val raw = session.headers["x-forwarded-for"]
-            ?: session.remoteIpAddress
-        return raw?.substringBefore(",")?.trim().orEmpty()
+        val remoteIp = session.remoteIpAddress.orEmpty()
+        // Hanya percaya X-Forwarded-For jika remote IP adalah reverse proxy LAN
+        // (127.x, 10.x, 172.16-31.x, 192.168.x). Tanpa reverse proxy,
+        // header ini bisa dipalsukan oleh client untuk bypass rate-limit.
+        val trustForwarded = remoteIp.startsWith("127.") ||
+            remoteIp.startsWith("10.") ||
+            (remoteIp.startsWith("172.") && remoteIp.substringAfter("172.").substringBefore(".").toIntOrNull()?.let { it in 16..31 } == true) ||
+            remoteIp.startsWith("192.168.")
+        return if (trustForwarded) {
+            session.headers["x-forwarded-for"]?.substringBefore(",")?.trim().orEmpty()
+                .ifEmpty { remoteIp }
+        } else remoteIp
     }
 
     override fun serve(session: IHTTPSession): Response {
@@ -230,10 +244,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 return throttled
             }
             snapshotLastHit[ip] = now
-            if (snapshotLastHit.size > 256) {
-                val cutoff = now - 60_000L
-                snapshotLastHit.entries.removeIf { it.value < cutoff }
-            }
         }
         val response = try {
             when {
@@ -337,6 +347,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 super.start(SERVER_SOCKET_TIMEOUT_MS)
                 lastError = null
                 cleanupCache()
+                startPeriodicCleanup()
                 appendLog(
                     "SERVER STARTED on port $listeningPort (Android ${Build.VERSION.RELEASE} " +
                         "API ${Build.VERSION.SDK_INT}, ${Build.MANUFACTURER} ${Build.MODEL}, " +
@@ -384,8 +395,71 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     }
 
+    /** Periodic cleanup: bersihkan ConcurrentHashMap yang tidak dibersihkan
+     *  oleh request handler saat server idle (5 menit sekali). */
+    private fun startPeriodicCleanup() {
+        periodicCleanupJob?.cancel()
+        periodicCleanupJob = serverScope.launch {
+            while (true) {
+                delay(PERIODIC_CLEANUP_MS)
+                runCatching { periodicCleanup() }
+            }
+        }
+    }
+
+    private fun periodicCleanup() {
+        val now = System.currentTimeMillis()
+        // snapshotLastHit: entry > 60 detik
+        if (snapshotLastHit.size > 32) {
+            val cutoff60 = now - 60_000L
+            snapshotLastHit.entries.removeIf { it.value < cutoff60 }
+        }
+        // loginAttempts: entry > 15 menit
+        if (loginAttempts.size > 16) {
+            loginAttempts.entries.removeIf {
+                now - it.value.lastAttempt > 15 * 60 * 1000L
+            }
+        }
+        // completedUploads: entry > 1 jam
+        if (completedUploads.size > 8) {
+            completedUploads.entries.removeIf { now - it.value.second > 3_600_000L }
+        }
+        // failedUploads: entry > 1 jam
+        if (failedUploads.size > 8) {
+            failedUploads.entries.removeIf { now - it.value.second > 3_600_000L }
+        }
+        // uploadLocks: entry > 30 menit
+        if (uploadLocks.size > 4) {
+            uploadLocks.entries.removeIf {
+                now - it.value.lastUse.get() > 30 * 60 * 1000L
+            }
+        }
+        // qrCache: entry > 15 menit
+        if (qrCache.size > 8) {
+            val qrCutoff = now - 15 * 60 * 1000L
+            qrCache.entries.removeIf { it.value.first < qrCutoff }
+        }
+        // shareTokens: entry > 24 jam
+        if (shareTokens.size > 8) {
+            shareTokens.entries.removeIf {
+                now - it.value.createdAt > SHARE_TTL_MS
+            }
+        }
+        // mediaMetaCache: entry > 15 menit
+        if (mediaMetaCache.size > 8) {
+            mediaMetaCache.entries.removeIf { now - it.value.first > MEDIA_META_TTL_MS }
+        }
+        // cachedItems: force refresh setiap 30 detik supaya bytes/speed update
+        if (cachedItems != null && now - lastDynamicUpdate > 30_000L) {
+            cachedItems = null
+            lastDynamicUpdate = now
+        }
+    }
+
     @Synchronized
     fun stopServer() {
+        periodicCleanupJob?.cancel()
+        periodicCleanupJob = null
         if (!isAlive && statPool.isTerminated) return
         appendLog("SERVER STOPPED (port $listeningPort)")
         statPoolEnabled = false
@@ -2716,6 +2790,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SHARE_TTL_HOURS = 24
         private const val PARTIAL_STREAM_TTL_MS = 60 * 60 * 1000L
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
+        private const val PERIODIC_CLEANUP_MS = 5 * 60 * 1000L
         private const val SNAPSHOT_RATE_MS = 1_000L
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100

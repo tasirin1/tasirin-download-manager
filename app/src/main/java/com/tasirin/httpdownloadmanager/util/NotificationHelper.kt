@@ -17,8 +17,10 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.download.DownloadService
+import java.util.concurrent.atomic.AtomicInteger
 
 object NotificationHelper {
+    private val nextNotifId = AtomicInteger(0)
 
     const val CHANNEL_ID = "downloads"
     const val NOTIFICATION_ID = 1001
@@ -143,7 +145,7 @@ object NotificationHelper {
             PackageManager.PERMISSION_GRANTED
         ) return
         val success = item.state == DownloadState.COMPLETED
-        val id = item.id.hashCode()
+        val id = nextNotifId.getAndIncrement()
         val title = if (success) item.fileName else "Failed: ${item.fileName}"
         val text = if (success) Formats.bytes(item.bytesDownloaded) else (item.error ?: "Unknown error")
         val intent = Intent(context, MainActivity::class.java).setPackage(context.packageName)

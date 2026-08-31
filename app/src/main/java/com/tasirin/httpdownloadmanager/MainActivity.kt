@@ -21,6 +21,7 @@ import android.view.Window
 import android.view.WindowManager
 import android.view.MenuItem
 import android.view.View
+import android.view.animation.AnimationUtils
 import androidx.core.view.isVisible
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
@@ -168,8 +169,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 runCatching {
                     adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
                     updateStickyHeader()
+                    val showEmpty = items.isEmpty()
                     binding.emptyView.visibility =
-                        if (items.isEmpty()) View.VISIBLE else View.GONE
+                        if (showEmpty) View.VISIBLE else View.GONE
+                    if (showEmpty && binding.emptyView.animation == null) {
+                        runCatching {
+                            val pulse = AnimationUtils.loadAnimation(
+                                this@MainActivity, R.anim.pulse
+                            )
+                            binding.emptyView.getChildAt(0).startAnimation(pulse)
+                        }
+                    } else if (!showEmpty) {
+                        binding.emptyView.getChildAt(0).clearAnimation()
+                    }
                     updateToolbar(items)
                 }
             }
@@ -883,8 +895,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             })
         }
         if (item.state != DownloadState.DOWNLOADING) {
-            options.add(getString(R.string.action_move_up) to { App.engine.moveUp(item.id) })
-            options.add(getString(R.string.action_move_down) to { App.engine.moveDown(item.id) })
+            options.add(getString(R.string.action_move_up) to {
+                App.engine.moveUp(item.id)
+                Toast.makeText(this, R.string.moved_up, Toast.LENGTH_SHORT).show()
+            })
+            options.add(getString(R.string.action_move_down) to {
+                App.engine.moveDown(item.id)
+                Toast.makeText(this, R.string.moved_down, Toast.LENGTH_SHORT).show()
+            })
         }
         if (item.state == DownloadState.COMPLETED ||
             item.state == DownloadState.FAILED ||
