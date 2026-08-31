@@ -25,8 +25,9 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.tasirin.httpdownloadmanager.util.whiteNavigationIcon
 
 /** Halaman khusus log server realtime: layar penuh, auto-scroll default mati. */
@@ -35,8 +36,8 @@ class LogActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLogBinding
 
     private companion object {
-        val EXPORT_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        val EXPORT_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+        val EXPORT_TIME = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        val EXPORT_STAMP = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
     }
     private var logAutoScroll = false
     private var logSearch = ""
@@ -106,7 +107,7 @@ class LogActivity : AppCompatActivity() {
                 val log = App.httpServer.snapshotLog()
                 val header = buildString {
                     appendLine("=== Tasirin Download Manager - Log Server (realtime) ===")
-                    appendLine("Time: ${EXPORT_TIME.format(LocalDateTime.now())}")
+                    appendLine("Time: ${EXPORT_TIME.format(Date())}")
                     appendLine(
                         "App version: " + runCatching {
                             val info = packageManager.getPackageInfo(packageName, 0)
@@ -130,7 +131,7 @@ class LogActivity : AppCompatActivity() {
                     }
                     appendLine()
                 }
-                val stamp = EXPORT_STAMP.format(LocalDateTime.now())
+                val stamp = EXPORT_STAMP.format(Date())
                 runCatching {
                     if (Build.VERSION.SDK_INT >= 29) {
                         val resolver = contentResolver
