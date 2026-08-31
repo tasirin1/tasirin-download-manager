@@ -164,7 +164,6 @@
     <string name="social_quality_label">Quality</string>
     <string name="social_carousel_label">Select photo</string>
     <string name="social_quality_default">Auto (best)</string>
-    <string name="audio_only_label">Audio only (M4A)</string>
     <string name="hls_quality_title">Pick video quality</string>
     <string name="hls_direct">Download original playlist (no pick)</string>
     <string name="gallery_empty">No videos found yet.</string>

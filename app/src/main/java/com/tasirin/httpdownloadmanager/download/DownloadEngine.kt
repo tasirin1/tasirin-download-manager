@@ -183,8 +183,7 @@ class DownloadEngine(appContext: Context) {
         folderPath: String = "",
         mirrors: List<String> = emptyList(),
         monitor: Boolean = false,
-        preferredHeight: Int = 0,
-        audioOnly: Boolean = false
+        preferredHeight: Int = 0
     ) {
         val cleanUrl = url.trim()
         if (cleanUrl.isEmpty()) return
@@ -211,8 +210,7 @@ class DownloadEngine(appContext: Context) {
             checksum = checksum,
             mirrors = mirrors,
             monitor = monitor,
-            preferredHeight = preferredHeight,
-            audioOnly = audioOnly
+            preferredHeight = preferredHeight
         )
         update(listOf(item) + _items.value)
         flushSave()
@@ -953,30 +951,6 @@ class DownloadEngine(appContext: Context) {
                 // Simpan URL sosial media original supaya saat HLS gagal kita
                 // bisa re-extract dari URL asli (bukan dari URL manifest HLS yang stale).
                 if (result.isHls) originalSocialUrls[item.id] = item.url
-                // Audio-only: ekspor langsung jalur audio M4A untuk YouTube (dan
-                // platform lain yang menyediakan URL audio terpisah) — tanpa
-                // video. Gunakan header cookies hasil ekstraksi.
-                if (item.audioOnly) {
-                    if (result.audioUrl.isNotEmpty()) {
-                        val audioName = (result.fileName ?: item.fileName)
-                            .removeSuffix(".ts").removeSuffix(".mp4").removeSuffix(".webm")
-                            .let { FileNames.safe("$it.m4a") }
-                        App.logEvent("SOCIAL: audio-only → ${result.audioUrl.take(80)}")
-                        try {
-                            downloadAudioOnly(
-                                item.copy(url = result.audioUrl, fileName = audioName),
-                                result.audioUrl, audioName
-                            )
-                            return
-                        } catch (e: Exception) {
-                            // Audio gagal — teruskan ke path normal (video)
-                            // supaya user tetap dapat sesuatu.
-                            App.logEvent("SOCIAL: audio-only failed (${e.message?.take(50)}), falling back to video")
-                        }
-                    } else {
-                        App.logEvent("SOCIAL: audio-only diminta tapi tidak ada URL audio — lanjut video")
-                    }
-                }
                 // YouTube via HLS: segmen .ts digabung jadi satu file.
                 if (result.isHls) {
                     val hlsName = result.fileName ?: item.fileName
@@ -1398,43 +1372,6 @@ class DownloadEngine(appContext: Context) {
         } catch (e: Exception) {
             App.logEvent("HLS: adaptive audio download failed (${e.message?.take(50)}), skipped")
             null
-        }
-    }
-
-    /** Unduh audio M4A (AAC) langsung dari URL adaptive dan publish sebagai
-     *  file `.m4a`. Mode audio-only: tidak ada video, tidak ada remux. */
-    private suspend fun downloadAudioOnly(
-        item: DownloadItem,
-        audioUrl: String,
-        outName: String
-    ) {
-        if (audioUrl.isBlank()) throw IOException("audio URL empty")
-        val saver = FileSaver(context)
-        val baseName = outName.removeSuffix(".m4a").ifBlank { "audio" }
-        val audioFile = saver.partialFile("$baseName.audioOnly", segment = null).apply { delete() }
-        val progress = HlsProgress()
-        val buffer = ByteArray(BUFFER_SIZE)
-        val globalLimit = StoragePrefs.speedLimitKbps(context)
-        val limit = if (item.speedLimitKbps > 0) item.speedLimitKbps else globalLimit
-        val throttle = if (item.speedLimitKbps > 0) {
-            SpeedThrottle(limit, null)
-        } else {
-            SpeedThrottle(limit, globalRateLimiter())
-        }
-        try {
-            val ok = downloadAdaptiveFile(item, audioUrl, audioFile, buffer, throttle, progress)
-            if (!ok || audioFile.length() < 1_000L) {
-                throw IOException("audio download failed or empty")
-            }
-            App.logEvent("HLS: audio-only downloaded (${Formats.bytes(audioFile.length())})")
-            val fileName = "$baseName.m4a"
-            val published0 = publishItem(saver, audioFile, fileName, item)
-            val finalName = published0.fileName ?: fileName
-            val published = organizeIfEnabled(saver, published0, finalName)
-            finishHls(item, progress.downloaded, published, finalName)
-        } catch (e: Exception) {
-            runCatching { audioFile.delete() }
-            throw e
         }
     }
 

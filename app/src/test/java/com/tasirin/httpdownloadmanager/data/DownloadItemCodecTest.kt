@@ -39,8 +39,7 @@ class DownloadItemCodecTest {
         ),
         speedBps = 12_345,
         etaSeconds = 7,
-        preferredHeight = 720,
-        audioOnly = true
+        preferredHeight = 720
     )
 
     @Test
@@ -128,7 +127,6 @@ class DownloadItemCodecTest {
         assertTrue(it.mirrors.isEmpty())
         assertTrue(it.segments.isEmpty())
         assertEquals(false, it.monitor)
-        assertEquals(false, it.audioOnly)
         assertEquals(0, it.addedAt)
     }
 
