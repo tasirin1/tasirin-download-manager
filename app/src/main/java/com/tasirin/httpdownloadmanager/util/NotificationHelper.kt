@@ -15,6 +15,7 @@ import com.tasirin.httpdownloadmanager.MainActivity
 import com.tasirin.httpdownloadmanager.R
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
+import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.download.DownloadService
 
 object NotificationHelper {
@@ -133,5 +134,33 @@ object NotificationHelper {
                 .setProgress(0, 0, false)
         }
         return builder.build()
+    }
+
+    /** Notifikasi per-item: selesai/gagal — muncul di bawah notifikasi service. */
+    fun notifyItemFinished(context: Context, item: DownloadItem) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) return
+        val success = item.state == DownloadState.COMPLETED
+        val id = item.id.hashCode()
+        val title = if (success) item.fileName else "Failed: ${item.fileName}"
+        val text = if (success) Formats.bytes(item.bytesDownloaded) else (item.error ?: "Unknown error")
+        val intent = Intent(context, MainActivity::class.java).setPackage(context.packageName)
+        val pending = PendingIntent.getActivity(
+            context, id, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notif = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .build()
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(id, notif)
     }
 }

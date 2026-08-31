@@ -115,6 +115,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // otomatis supaya listing subfolder tidak gagal setelah restart server.
     @Volatile private var statPool: ThreadPoolExecutor = newStatPool()
     @Volatile private var statPoolEnabled = true
+    // Rate limiter per-IP untuk /api/snapshot: cegah client hammered dengan
+    // polling cepat (1 req/detik/IP sudah cukup untuk UI responsif).
+    private val snapshotLastHit = ConcurrentHashMap<String, Long>()
+    private const val SNAPSHOT_RATE_MS = 1_000L
     // Cache allowedFsRoots: dibangun ulang hanya saat settings berubah,
     // bukan setiap request (16x per request file manager).
     @Volatile private var cachedFsRoots: List<File>? = null
@@ -166,6 +170,30 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // render bitmap 520x520 tiap panggilan itu boros CPU/RAM.
     private val qrCache = ConcurrentHashMap<String, Pair<Long, ByteArray>>()
 
+
+    // Cache snapshot terakhir untuk throttle: throttled request mengembalikan
+    // JSON yang sama tanpa rebuild, sehingga UI tetap responsif.
+    @Volatile private var lastSnapshotJson = "{}"
+
+    /** Bangun snapshot baru DAN update cache. */
+    private fun buildSnapshot(): JSONObject {
+        val payload = JSONObject()
+            .put("items", itemsJson())
+            .put("status", statusObject())
+        lastSnapshotJson = payload.toString()
+        return payload
+    }
+
+    /** Kembalikan JSON snapshot cache untuk throttle request. */
+    private fun snapshotPayloadCached(): String = lastSnapshotJson
+
+    /** Alamat IP client dari NanoHTTPD session (tanpa port). */
+    private fun clientAddress(session: IHTTPSession): String {
+        val raw = session.headers["x-forwarded-for"]
+            ?: session.remoteIpAddress
+        return raw?.substringBefore(",")?.trim().orEmpty()
+    }
+
     override fun serve(session: IHTTPSession): Response {
         // NanoHTTPD internal pool bisa terminated saat stop/start server;
         // tangkap RejectedExecutionException supaya tidak crash.
@@ -185,6 +213,28 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             )
             appendRequestLog(session, denied, System.currentTimeMillis() - startedAt)
             return denied
+        }
+        // Rate-limit per-IP untuk endpoint polling/cache yang sering: mencegah
+        // klien/script hammering menguras CPU server saat banyak device meloop.
+        if (session.method == Method.GET && session.uri == "/api/snapshot") {
+            val ip = clientAddress(session).ifEmpty { "unknown" }
+            val now = System.currentTimeMillis()
+            val last = snapshotLastHit.getOrDefault(ip, 0L)
+            if (now - last < SNAPSHOT_RATE_MS) {
+                // Throttle: kembalikan snapshot cache terakhir tanpa rebuild.
+                val throttled = newFixedLengthResponse(
+                    Response.Status.OK,
+                    "application/json; charset=utf-8",
+                    snapshotPayloadCached()
+                )
+                appendRequestLog(session, throttled, System.currentTimeMillis() - startedAt)
+                return throttled
+            }
+            snapshotLastHit[ip] = now
+            if (snapshotLastHit.size > 256) {
+                val cutoff = now - 60_000L
+                snapshotLastHit.entries.removeIf { it.value < cutoff }
+            }
         }
         val response = try {
             when {
@@ -656,9 +706,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Gabungan daftar download + status: satu request untuk polling pengaman. */
     private fun snapshotJson(): Response {
-        val payload = JSONObject()
-            .put("items", itemsJson())
-            .put("status", statusObject())
+        val payload = buildSnapshot()
         return jsonResponse(payload)
     }
 

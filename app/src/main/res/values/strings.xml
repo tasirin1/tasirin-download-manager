@@ -67,6 +67,8 @@
 
     <string name="action_rename">Rename</string>
     <string name="action_move">Move</string>
+    <string name="action_move_up">Move Up</string>
+    <string name="action_move_down">Move Down</string>
 
     <string name="status_pending">Pending&#8230;</string>
     <string name="status_downloading">Downloading&#8230;</string>

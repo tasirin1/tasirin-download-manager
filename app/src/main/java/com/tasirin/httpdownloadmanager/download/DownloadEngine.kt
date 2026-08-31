@@ -20,6 +20,7 @@ import com.tasirin.httpdownloadmanager.util.Checksums
 import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StorageCleanup
+import com.tasirin.httpdownloadmanager.util.NotificationHelper
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
@@ -481,6 +482,36 @@ class DownloadEngine(appContext: Context) {
         }.forEach { resume(it.id) }
     }
 
+    /** Pindahkan item ke atas/atas-antrean (daftar tampil terbaru di atas).
+     *  Pertukaran posisi hanya pada item yang tidak aktif download, supaya
+     *  tidak mengganggu segmen yang sedang berjalan. */
+    fun moveUp(id: String) {
+        val list = _items.value
+        val idx = list.indexOfFirst { it.id == id }
+        if (idx <= 0) return
+        val item = list[idx]
+        val items = list.toMutableList()
+        items[idx] = items[idx - 1]
+        items[idx - 1] = item
+        update(items)
+        scheduleSave()
+        App.logEvent("DOWNLOAD MOVED UP: ${item.fileName}")
+    }
+
+    /** Pindahkan item ke bawah antrean. */
+    fun moveDown(id: String) {
+        val list = _items.value
+        val idx = list.indexOfFirst { it.id == id }
+        if (idx < 0 || idx >= list.size - 1) return
+        val item = list[idx]
+        val items = list.toMutableList()
+        items[idx] = items[idx + 1]
+        items[idx + 1] = item
+        update(items)
+        scheduleSave()
+        App.logEvent("DOWNLOAD MOVED DOWN: ${item.fileName}")
+    }
+
     fun retryFailed() {
         // Batch: satu salinan daftar + satu emisi StateFlow, bukan N kali
         // updateItem saat pengguna menekan Retry Failed (sama seperti pauseAll).
@@ -764,6 +795,7 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == id } ?: item)
             return
         }
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
@@ -815,6 +847,7 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == id } ?: item)
             return
         }
         if (maxRetries > 0 && attempts <= maxRetries && item.autoResume) {
@@ -863,6 +896,7 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == id } ?: item)
         }
     }
 
@@ -1499,6 +1533,7 @@ class DownloadEngine(appContext: Context) {
             )
         }
         flushSave()
+        NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == item.id } ?: item)
     }
 
     /** Unduh satu segmen HLS dengan retry sekali untuk error jaringan sementara
@@ -1948,6 +1983,7 @@ class DownloadEngine(appContext: Context) {
         flushSave()
         persistCookies()
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
+        NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == item.id } ?: item)
         } catch (e: IOException) {
             if (!coroutineContext.isActive) throw CancellationException()
             throw e
@@ -2091,6 +2127,7 @@ class DownloadEngine(appContext: Context) {
         flushSave()
         clearSegProgress(item.id)
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
+        NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == item.id } ?: item)
     }
 
     private suspend fun downloadSegment(

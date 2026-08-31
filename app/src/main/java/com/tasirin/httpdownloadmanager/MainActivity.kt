@@ -882,6 +882,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 lifecycleScope.launch(Dispatchers.IO) { App.engine.cancel(item.id) }
             })
         }
+        if (item.state != DownloadState.DOWNLOADING) {
+            options.add(getString(R.string.action_move_up) to { App.engine.moveUp(item.id) })
+            options.add(getString(R.string.action_move_down) to { App.engine.moveDown(item.id) })
+        }
         if (item.state == DownloadState.COMPLETED ||
             item.state == DownloadState.FAILED ||
             item.state == DownloadState.CANCELLED
