@@ -118,7 +118,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Rate limiter per-IP untuk /api/snapshot: cegah client hammered dengan
     // polling cepat (1 req/detik/IP sudah cukup untuk UI responsif).
     private val snapshotLastHit = ConcurrentHashMap<String, Long>()
-    private const val SNAPSHOT_RATE_MS = 1_000L
     // Cache allowedFsRoots: dibangun ulang hanya saat settings berubah,
     // bukan setiap request (16x per request file manager).
     @Volatile private var cachedFsRoots: List<File>? = null
@@ -2717,6 +2716,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SHARE_TTL_HOURS = 24
         private const val PARTIAL_STREAM_TTL_MS = 60 * 60 * 1000L
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
+        private const val SNAPSHOT_RATE_MS = 1_000L
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
         private const val FS_LISTING_TTL_MS = 3_000L
