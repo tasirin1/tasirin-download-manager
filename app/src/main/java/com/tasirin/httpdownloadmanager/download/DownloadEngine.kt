@@ -105,27 +105,23 @@ class DownloadEngine(appContext: Context) {
     private var lastProgressSaveAt = 0L
     // URL yang pernah gagal di sesi ini: cadangan yang sama tidak dicoba
     // berulang-ulang (hemat waktu saat ISP/proxy menolak beberapa host).
-    // newKeySet() baru ada API 24; pakai setFromMap agar aman di Android 5 (API 21).
-    private val failedUrls = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
-
-    private fun rememberFailedUrl(url: String) {
-        failedUrls.add(url)
-        // Hapus cukup entri supaya ukuran kembali di bawah batas;
-        // sebelumnya hanya menghapus 1 entri -> set bisa tumbuh tak terbatas.
-        while (failedUrls.size > 256) {
-            val iterator = failedUrls.iterator()
-            if (iterator.hasNext()) {
-                iterator.next()
-                iterator.remove()
-            } else break
-        }
+    // LinkedHashMap(accessOrder=true) auto-evict LRU saat > 256 — O(1) cleanup.
+    private val failedUrls = object : LinkedHashMap<String, Boolean>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?) = size > 256
     }
 
-    private val connectTimeoutMs: Int
-        get() = StoragePrefs.getConnectTimeoutSec(context) * 1000
+    private fun rememberFailedUrl(url: String) {
+        failedUrls[url] = true
+    }
 
-    private val readTimeoutMs: Int
-        get() = StoragePrefs.getReadTimeoutSec(context) * 1000
+    // Cached timeout values — hindari recompute dari SharedPreferences tiap koneksi
+    private var connectTimeoutMs: Int = StoragePrefs.getConnectTimeoutSec(context) * 1000
+    private var readTimeoutMs: Int = StoragePrefs.getReadTimeoutSec(context) * 1000
+
+    fun refreshTimeouts() {
+        connectTimeoutMs = StoragePrefs.getConnectTimeoutSec(context) * 1000
+        readTimeoutMs = StoragePrefs.getReadTimeoutSec(context) * 1000
+    }
 
     @Volatile
     private var interruptedResumed = false
@@ -2602,9 +2598,19 @@ class DownloadEngine(appContext: Context) {
     private val cookiePrefs by lazy {
         context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
     }
+    // Debounce cookie write: hindari I/O berlebih saat banyak download selesai simultan
+    private var cookieWriteJob: Job? = null
 
     /** Simpan cookie ke SharedPreferences agar persist antar restart. */
     private fun persistCookies() {
+        cookieWriteJob?.cancel()
+        cookieWriteJob = scope.launch {
+            delay(COOKIE_WRITE_DEBOUNCE_MS)
+            persistCookiesImmediate()
+        }
+    }
+
+    private fun persistCookiesImmediate() {
         try {
             val arr = JSONArray()
             cookieManager.cookieStore.cookies.forEach { c ->
@@ -2656,6 +2662,7 @@ class DownloadEngine(appContext: Context) {
         private const val SAVE_DEBOUNCE_MS = 400L
         private const val PROGRESS_SAVE_INTERVAL_MS = 2_000L
         private const val SEG_FLUSH_INTERVAL_MS = 500L
+        private const val COOKIE_WRITE_DEBOUNCE_MS = 2_000L
         private const val MONITOR_INTERVAL_MS = 30 * 60 * 1000L
         // User-Agent realistis agar situs download tidak memblokir koneksi.
         private const val DEFAULT_USER_AGENT =

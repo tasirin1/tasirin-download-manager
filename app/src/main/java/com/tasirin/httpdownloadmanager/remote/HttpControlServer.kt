@@ -74,7 +74,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private var periodicCleanupJob: Job? = null
     private val sseClients = CopyOnWriteArrayList<SseStream>()
     @Volatile private var sseJob: Job? = null
-    @Volatile private var sseLastPayload = ""
+    @Volatile private var sseLastFrameHash = 0
     @Volatile private var sseLastPushAt = 0L
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
     private val shareLock = Any()
@@ -789,10 +789,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Signature ringkas daftar item: tanpa alokasi JSON, dipakai SSE untuk
      *  memutuskan apakah payload perlu di-build ulang (hemat GC di tick 2x/detik). */
+    private var lastSigItems: List<DownloadItem>? = null
+    private var lastSigResult = 0
+
     private fun itemsSignature(items: List<DownloadItem>): Int {
-        // Hanya hash field yang benar-benar berubah selama download
-        // (state, bytes, speed, error) — hapus fileName, totalBytes, addedAt
-        // yang statis, hemat ~60% operasi hash per request.
+        // Cache: kalau list masih referensi yang sama (update in-place),
+        // kembalikan signature terakhir tanpa recompute.
+        if (items === lastSigItems) return lastSigResult
         var h = items.size
         items.forEach { item ->
             h = h * 31 + item.id.hashCode() * 7 + item.state.hashCode() * 13 +
@@ -800,6 +803,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 item.etaSeconds.hashCode() * 31 + item.finishedAt.hashCode() * 41 +
                 (item.error?.hashCode() ?: 0) * 47
         }
+        lastSigItems = items
+        lastSigResult = h
         return h
     }
 
@@ -2595,8 +2600,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val pushFrame = { payloadText: String ->
                     runCatching {
                         val now = System.currentTimeMillis()
-                        if (payloadText != sseLastPayload || now - sseLastPushAt > SSE_HEARTBEAT_MS) {
-                            sseLastPayload = payloadText
+                        val frameHash = payloadText.hashCode()
+                        if (frameHash != sseLastFrameHash || now - sseLastPushAt > SSE_HEARTBEAT_MS) {
+                            sseLastFrameHash = frameHash
                             sseLastPushAt = now
                             val frame = "data: $payloadText\n\n"
                             val closed = sseClients.filter { it.isClosed }
