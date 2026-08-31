@@ -16,7 +16,7 @@
         android:orientation="vertical"
         android:padding="14dp">
 
-        <!-- Baris 1: nama file + persen besar di kanan -->
+        <!-- Baris 1: ikon + nama + badge status (full-bleed kanan) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -25,9 +25,9 @@
 
             <ImageView
                 android:id="@+id/file_icon"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:layout_marginEnd="8dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginEnd="10dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_file_generic" />
 
@@ -42,48 +42,52 @@
                 android:textColor="@color/text_primary" />
 
             <TextView
-                android:id="@+id/text_progress"
+                android:id="@+id/status_badge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:gravity="end"
-                android:textAppearance="?android:attr/textAppearanceMedium"
-                android:textColor="@color/text_primary"
-                android:textSize="17sp" />
+                android:layout_marginStart="10dp"
+                android:background="@drawable/bg_badge_pill"
+                android:paddingLeft="10dp"
+                android:paddingTop="4dp"
+                android:paddingRight="10dp"
+                android:paddingBottom="4dp"
+                android:textColor="@color/white"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                tools:text="Downloading" />
         </LinearLayout>
 
-        <!-- Baris 2: badge status (pill berwarna) + info sekunder -->
+        <!-- Baris 2: progres byte + persen (di bawah nama) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <TextView
-                android:id="@+id/status_badge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_badge_pill"
-                android:paddingLeft="8dp"
-                android:paddingTop="3dp"
-                android:paddingRight="8dp"
-                android:paddingBottom="3dp"
-                android:textColor="@color/white"
-                android:textSize="11sp"
-                tools:text="Downloading" />
-
-            <TextView
-                android:id="@+id/text_speed"
+                android:id="@+id/text_progress"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textAppearance="?android:attr/textAppearanceSmall"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                tools:text="4 MB / ≈6 MB" />
+
+            <TextView
+                android:id="@+id/text_speed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:gravity="end"
+                android:maxLines="1"
+                android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textColor="@color/primary"
                 android:textSize="12sp"
+                tools:text="2.1 MB/s · ETA 00:12"
                 android:visibility="gone" />
         </LinearLayout>
 
@@ -92,7 +96,7 @@
             android:id="@+id/progress_bar"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="9dp"
+            android:layout_height="10dp"
             android:layout_marginTop="8dp"
             android:max="100"
             android:progressBackgroundTint="@color/line" />
@@ -133,15 +137,4 @@
             android:visibility="gone" />
 
     </LinearLayout>
-
-    <!-- Stripe status kiri (overlay), di-tint sesuai state di adapter. -->
-    <View
-        android:id="@+id/status_stripe"
-        android:layout_width="6dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="start|top"
-        android:layout_marginStart="5dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="12dp"
-        android:background="@drawable/bg_status_stripe" />
 </FrameLayout>

@@ -71,6 +71,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private var summaryActive = 0
     private var summaryPaused = 0
     private var summaryFailed = 0
+    private var lastItems: List<DownloadItem> = emptyList()
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -114,6 +115,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         })
 
+        binding.btnClearFailed.setOnClickListener {
+            lifecycleScope.launch(Dispatchers.IO) { App.engine.clearFailed() }
+        }
         binding.fabAdd.setOnClickListener { showAddDialog() }
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
         binding.emptyPasteButton.setOnClickListener { pasteFromClipboard() }
@@ -160,6 +164,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
         lifecycleScope.launch {
             App.engine.items.collect { items ->
+                lastItems = items
                 runCatching {
                     adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
                     updateStickyHeader()
@@ -890,6 +895,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .setTitle(item.fileName)
             .setItems(labels) { _, which -> options[which].second.invoke() }
             .show()
+    }
+
+    override fun onToggleSection(key: String) {
+        val collapsed = StoragePrefs.isSectionCollapsed(this, key)
+        StoragePrefs.setSectionCollapsed(this, key, !collapsed)
+        adapter.submitList(DownloadAdapter.buildSections(this, lastItems))
+        updateStickyHeader()
     }
 
     private fun showRenameDialog(item: DownloadItem) {

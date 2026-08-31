@@ -14,6 +14,7 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
+import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.databinding.ItemDownloadBinding
 import com.tasirin.httpdownloadmanager.databinding.ItemSectionHeaderBinding
 import java.io.File
@@ -21,7 +22,12 @@ import java.util.Locale
 
 /** Baris daftar: header grup status atau item download. */
 sealed class DownloadRow {
-    data class Header(val title: String) : DownloadRow()
+    data class Header(
+        val title: String,
+        val count: Int,
+        val collapsed: Boolean,
+        val key: String
+    ) : DownloadRow()
     data class Item(val item: DownloadItem) : DownloadRow()
 }
 
@@ -34,10 +40,13 @@ class DownloadAdapter(private val listener: Listener) :
         fun onAction(item: DownloadItem, action: Action)
         fun onTap(item: DownloadItem)
         fun onLongPress(item: DownloadItem)
+        fun onToggleSection(key: String)
     }
 
     class ItemHolder(val binding: ItemDownloadBinding) : RecyclerView.ViewHolder(binding.root)
-    class HeaderHolder(val binding: ItemSectionHeaderBinding) : RecyclerView.ViewHolder(binding.root)
+    class HeaderHolder(val binding: ItemSectionHeaderBinding) : RecyclerView.ViewHolder(binding.root) {
+        var bindToggle: (() -> Unit)? = null
+    }
 
     private fun stateColor(state: DownloadState): Int = when (state) {
         DownloadState.PENDING, DownloadState.DOWNLOADING -> R.color.primary
@@ -69,10 +78,21 @@ class DownloadAdapter(private val listener: Listener) :
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val row = getItem(position)) {
-            is DownloadRow.Header -> {
-                (holder as HeaderHolder).binding.textSectionTitle.text = row.title
-            }
+            is DownloadRow.Header -> bindHeader(holder as HeaderHolder, row)
             is DownloadRow.Item -> bindItem(holder as ItemHolder, row.item)
+        }
+    }
+
+    private fun bindHeader(holder: HeaderHolder, row: DownloadRow.Header) {
+        val b = holder.binding
+        b.textSectionTitle.text = row.title
+        b.textSectionCount.text = row.count.toString()
+        val chevron = if (row.collapsed) R.drawable.ic_chevron else R.drawable.ic_chevron_up
+        b.sectionChevron.setImageResource(chevron)
+        b.sectionChevron.visibility = if (row.count > 0) View.VISIBLE else View.INVISIBLE
+        b.sectionHeaderRoot.setOnClickListener { holder.bindToggle?.invoke() }
+        holder.bindToggle = {
+            listener.onToggleSection(row.key)
         }
     }
 
@@ -89,8 +109,6 @@ class DownloadAdapter(private val listener: Listener) :
         b.statusBadge.text = badgeText(item, ctx)
         b.statusBadge.backgroundTintList = ColorStateList.valueOf(color)
         b.statusBadge.setTextColor(ContextCompat.getColor(ctx, R.color.white))
-        b.statusStripe.backgroundTintList = ColorStateList.valueOf(color)
-
         val prevProgress = b.progressBar.progress
         smoothProgress(b.progressBar, prevProgress, item.progressPercent)
         b.progressBar.progressTintList = ColorStateList.valueOf(
@@ -207,13 +225,17 @@ class DownloadAdapter(private val listener: Listener) :
         private const val TYPE_HEADER = 0
         private const val TYPE_ITEM = 1
 
-        /** Bangun daftar ber-section: Active → Paused → Completed → Failed. */
+        /** Bangun daftar ber-section: Active → Paused → Completed → Failed.
+         *  Section yang collapse (StoragePrefs.collapsed_sections) memakai
+         *  header dan menyembunyikan item-nya. */
         fun buildSections(context: android.content.Context, items: List<DownloadItem>): List<DownloadRow> {
             val rows = mutableListOf<DownloadRow>()
             fun addGroup(labelRes: Int, group: List<DownloadItem>) {
                 if (group.isEmpty()) return
-                rows.add(DownloadRow.Header(context.getString(labelRes)))
-                group.forEach { rows.add(DownloadRow.Item(it)) }
+                val key = context.resources.getResourceEntryName(labelRes)
+                val collapsed = StoragePrefs.isSectionCollapsed(context, key)
+                rows.add(DownloadRow.Header(context.getString(labelRes), group.size, collapsed, key))
+                if (!collapsed) group.forEach { rows.add(DownloadRow.Item(it)) }
             }
             val active = items.filter {
                 it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
@@ -234,7 +256,7 @@ class DownloadAdapter(private val listener: Listener) :
             override fun areItemsTheSame(oldItem: DownloadRow, newItem: DownloadRow): Boolean {
                 return when {
                     oldItem is DownloadRow.Header && newItem is DownloadRow.Header ->
-                        oldItem.title == newItem.title
+                        oldItem.key == newItem.key
                     oldItem is DownloadRow.Item && newItem is DownloadRow.Item ->
                         oldItem.item.id == newItem.item.id
                     else -> false

@@ -13,18 +13,43 @@
         android:layout_height="?attr/actionBarSize"
         app:title="@string/app_name" />
 
-    <!-- Ringkasan ringkas: aktif / selesai / gagal. Tombol batch pindah ke
-         menu overflow (lihat updateToolbar). -->
-    <TextView
-        android:id="@+id/text_summary"
+    <!-- Kartu ringkasan: statistik aktif/selesai/gagal + aksi cepat. -->
+    <LinearLayout
+        android:id="@+id/summary_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="4dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp"
-        tools:text="2 active · 5 done · 1 failed" />
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/bg_card_shadow"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/text_summary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            tools:text="● 2 active   ● 5 done   ● 1 failed" />
+
+        <TextView
+            android:id="@+id/btn_clear_failed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_btn_tv"
+            android:paddingLeft="12dp"
+            android:paddingTop="6dp"
+            android:paddingRight="12dp"
+            android:paddingBottom="6dp"
+            android:text="@string/action_clear_failed"
+            android:textColor="@color/status_off"
+            android:textSize="12sp"
+            tools:text="Clear failed" />
+    </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -126,14 +151,19 @@
         </LinearLayout>
 
 
-        <ImageButton
+        <Button
             android:id="@+id/fab_add"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
             android:layout_margin="16dp"
-            android:background="@drawable/bg_fab"
-            android:contentDescription="@string/add_download"
-            android:src="@drawable/ic_add" />
+            android:background="@drawable/bg_btn_filled"
+            android:drawableStart="@drawable/ic_add"
+            android:gravity="center"
+            android:minHeight="52dp"
+            android:paddingHorizontal="22dp"
+            android:text="@string/add_download"
+            android:textColor="@color/white"
+            android:textSize="15sp" />
     </FrameLayout>
 </LinearLayout>
