@@ -110,7 +110,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Fix #4: cache terpisah untuk bytes/speed yang berubah tiap detik
     // tanpa rebuild struktur JSON (hemat ~30% CPU saat polling aktif).
     @Volatile private var lastDynamicUpdate = 0L
-    private const val DYNAMIC_UPDATE_MS = 500L
+
     // Cache statusObject: jarang berubah (port, readOnly, versi).
     @Volatile private var cachedStatusJson: JSONObject? = null
     // Statistik folder dihitung paralel: listing folder dengan banyak subfolder
@@ -417,7 +417,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // loginAttempts: entry > 15 menit
         if (loginAttempts.size > 16) {
             loginAttempts.entries.removeIf {
-                now - it.value.lastAttempt > 15 * 60 * 1000L
+                now - it.value.updatedAt > 15 * 60 * 1000L
             }
         }
         // completedUploads: entry > 1 jam
@@ -442,7 +442,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // shareTokens: entry > 24 jam
         if (shareTokens.size > 8) {
             shareTokens.entries.removeIf {
-                now - it.value.createdAt > SHARE_TTL_MS
+                now > it.value.expiresAt
             }
         }
         // mediaMetaCache: entry > 15 menit
@@ -2791,6 +2791,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val PARTIAL_STREAM_TTL_MS = 60 * 60 * 1000L
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
         private const val PERIODIC_CLEANUP_MS = 5 * 60 * 1000L
+        private const val DYNAMIC_UPDATE_MS = 500L
         private const val SNAPSHOT_RATE_MS = 1_000L
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
