@@ -2079,7 +2079,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Path berada di atas (induk dari) salah satu root yang sah? Hanya untuk
      *  listing browse-only — aksi tulis tetap butuh isFsPathAllowed. */
     /** Tambah header Connection: close (dipakai saat response error). */
-    private fun Response.closeConnection(): Response = this.closeConnection()
+    private fun Response.closeConnection(): Response {
+        addHeader("Connection", "close")
+        return this
+    }
 
     /** Validasi nama file: tidak kosong, tidak ada separator path, tidak traversal. */
     private fun isNameValid(name: String): Boolean =
