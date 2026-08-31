@@ -1143,6 +1143,13 @@ class DownloadEngine(appContext: Context) {
         val audioAdts = saver.partialFile("$baseName.audio", segment = null).apply { delete() }
         val mp4 = saver.partialFile("$baseName.muxed", segment = null).apply { delete() }
         val progress = HlsProgress()
+        progress.estimateTotalBytes = plan.estimateTotalBytes
+        if (plan.estimateTotalBytes > 0) {
+            App.logEvent(
+                "HLS: estimasi total ${Formats.bytes(plan.estimateTotalBytes)} " +
+                    "(BANDWIDTH x durasi #EXTINF) — denominator stabil sejak awal"
+            )
+        }
         val buffer = ByteArray(BUFFER_SIZE)
         coroutineContext.ensureActive()
 
@@ -1232,6 +1239,9 @@ class DownloadEngine(appContext: Context) {
         var refSegBytes = 0L
         /** Total mutlak akhir bila semua segmen sudah punya ukuran pasti; else estimasi. */
         var exactTotal = 0L
+        /** Estimasi awal total dari BANDWIDTH x durasi (dipakai sebelum segmen
+         *  selesai — exactTotal masih 0). */
+        var estimateTotalBytes = 0L
     }
 
     /** Unduh daftar segmen ke satu file. Tiap segmen ditulis setelah sukses
@@ -1439,10 +1449,11 @@ class DownloadEngine(appContext: Context) {
             val effTotal = if (total > 0) {
                 progress.downloaded + total
             } else {
-                // HLS segmen: gabungan ukuran pasti (Content-Length) segmen yang
-                // sudah selesai + estimasi stabil (refSegBytes x sisa). Stabil
-                // sejak awal dan mendekati mutlak di akhir — tidak "bergoyang".
-                progress.exactTotal
+                // HLS segmen: pakai total pasti (Content-Length segmen selesai +
+                // refSegBytes x sisa) bila sudah ada; sebelum segmen pertama
+                // selesai, fallback ke estimasi BANDWIDTH x durasi supaya
+                // denominator tidak nol/bergoyang sejak detik awal.
+                if (progress.exactTotal > 0) progress.exactTotal else progress.estimateTotalBytes
             }
             val (speed, eta) = speedTracker.sample(item.id, totalNow, effTotal)
             val etaFromSegments = if (total == 0L && speed > 0 && effTotal > 0) {
@@ -1567,7 +1578,11 @@ class DownloadEngine(appContext: Context) {
     private data class HlsPlan(
         val videoSegments: List<String>,
         val videoSegmentDurationsUs: List<Long> = emptyList(),
-        val audioSegments: List<String>? = null
+        val audioSegments: List<String>? = null,
+        /** Estimasi total byte dari BANDWIDTH master x total durasi #EXTINF.
+         *  Dihitung sekali di awal supaya denominator "/≈MB" stabil sejak
+         *  detik pertama (tidak menunggu segmen pertama selesai). */
+        val estimateTotalBytes: Long = 0L
     )
 
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
@@ -1578,7 +1593,9 @@ class DownloadEngine(appContext: Context) {
                 .map { HlsParser.resolveUrl(baseUrl, it.trim()) }
                 .filter { it.startsWith("http") }
             App.logEvent("HLS: direct media playlist, ${segments.size} segments")
-            return if (segments.isEmpty()) null else HlsPlan(segments)
+            if (segments.isEmpty()) return null
+            val durations = mediaDurations(body)
+            return HlsPlan(segments, videoSegmentDurationsUs = durations, estimateTotalBytes = estimateBytes(durations, 0L))
         }
         var variants = HlsParser.parseMaster(body, baseUrl)
         // Fallback: bila parseMaster gagal (mis. format YouTube 2026 yang
@@ -1675,7 +1692,13 @@ class DownloadEngine(appContext: Context) {
                 "HLS plan: ${candidate.codecs} ${candidate.bandwidth/1000}kbps ${candidate.frameRate}fps, " +
                     "${videoSegments.size} video, ${audioSegments?.size ?: 0} audio segments"
             )
-            return HlsPlan(videoSegments, videoDurations, audioSegments)
+            val audioBytes = if (audioSegments != null) {
+                estimateAudioBytes(audioSegments.size, videoDurations)
+            } else 0L
+            return HlsPlan(
+                videoSegments, videoDurations, audioSegments,
+                estimateTotalBytes = estimateBytes(videoDurations, candidate.bandwidth) + audioBytes
+            )
         }
         App.logEvent("HLS DEBUG: all ${candidates.size} variants failed (media playlist 404/error)")
         return null
@@ -1724,6 +1747,38 @@ class DownloadEngine(appContext: Context) {
     private fun mediaSegments(playlistUrl: String, headers: String = ""): List<String>? =
         mediaSegmentsWithDurations(playlistUrl, headers)?.map { it.first }
 
+    /** Durasi #EXTINF (mikrodetik) dari body media playlist; kosong bila tidak
+     *  ada tag (fallback untuk direct media playlist). */
+    private fun mediaDurations(body: String): List<Long> {
+        val out = mutableListOf<Long>()
+        for (line in body.lines()) {
+            val t = line.trim()
+            if (t.startsWith("#EXTINF:")) {
+                val dur = t.substringAfter(":").substringBefore(",").trim().toDoubleOrNull() ?: 0.0
+                out.add((dur * 1_000_000).toLong())
+            }
+        }
+        return out
+    }
+
+    /** Estimasi byte video dari BANDWIDTH (bit/detik) x total durasi #EXTINF.
+     *  Sumber: master playlist — tersedia sebelum segmen diunduh. */
+    private fun estimateBytes(durationsUs: List<Long>, bandwidth: Long): Long {
+        val totalUs = durationsUs.sum()
+        if (totalUs <= 0 || bandwidth <= 0) return 0L
+        return (bandwidth * totalUs) / 8_000_000L
+    }
+
+    /** Estimasi audio rendition terpisah (YouTube HLS): ukuran pastinya baru
+     *  diketahui setelah playlist audio di-fetch. Pendekatan awal memakai
+     *  bitrate AAC umum 128 kbps x durasi video (durasi audio ~= video).
+     *  0 bila data tidak cukup. */
+    private fun estimateAudioBytes(audioSegmentCount: Int, videoDurationsUs: List<Long>): Long {
+        val totalUs = videoDurationsUs.sum()
+        if (totalUs <= 0 || audioSegmentCount <= 0) return 0L
+        // 128 kbps AAC, bit -> byte (÷8)
+        return (128_000L * totalUs) / 8_000_000L
+    }
 
     private fun fetchText(url: String, headers: String, maxBytes: Int): String? {
         return runCatching {
