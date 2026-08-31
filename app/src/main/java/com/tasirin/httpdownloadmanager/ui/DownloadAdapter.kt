@@ -86,7 +86,7 @@ class DownloadAdapter(private val listener: Listener) :
     private fun bindHeader(holder: HeaderHolder, row: DownloadRow.Header) {
         val b = holder.binding
         b.textSectionTitle.text = row.title
-        b.textSectionCount.text = row.count.toString()
+        b.textSectionCount.text = String.format(Locale.US, "%d", row.count)
         val chevron = if (row.collapsed) R.drawable.ic_chevron else R.drawable.ic_chevron_up
         b.sectionChevron.setImageResource(chevron)
         b.sectionChevron.visibility = if (row.count > 0) View.VISIBLE else View.INVISIBLE
