@@ -56,26 +56,20 @@ class DownloadItemTest {
     // ── Tambahan: edge-case progress ────────────────────────────────
 
     @Test
-    fun `progressPercent - overflow kecil tidak crash`() {
-        // totalBytes > bytesDownloaded → 100%
-        assertEquals(100, item(bytesDownloaded = 999, totalBytes = 1000).progressPercent)
-    }
-
-    @Test
-    fun `progressPercent - bytesDownloaded > totalBytes`() {
-        // Kasus koreksi file → 100% (clamped by toInt division)
+    fun `progressPercent - overshoot tetap hitung`() {
+        // bytesDownloaded > totalBytes → persentase > 100
         assertEquals(150, item(bytesDownloaded = 1500, totalBytes = 1000).progressPercent)
     }
 
     @Test
     fun `progressPercentOverride - menang atas totalBytes`() {
-        val item = item(bytesDownloaded = 500, totalBytes = 1000).copy(progressPercentOverride = 75)
-        assertEquals(75, item.progressPercent)
+        val overridden = item(bytesDownloaded = 500, totalBytes = 1000).copy(progressPercentOverride = 75)
+        assertEquals(75, overridden.progressPercent)
     }
 
     @Test
-    fun `progressPercentOverride - zero artinya pakai totalBytes`() {
-        // override 0 tidak dianggap aktif (harus >= 0 untuk aktif)
-        val item = item(bytesDownloaded = 500, totalBytes = 1000).copy(progressPercentOverride = 0)
-        assertEquals(50, item.progressPercent)
+    fun `progressPercentOverride - zero pakai totalBytes`() {
+        val overridden = item(bytesDownloaded = 500, totalBytes = 1000).copy(progressPercentOverride = 0)
+        assertEquals(50, overridden.progressPercent)
     }
+}
