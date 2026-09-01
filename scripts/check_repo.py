@@ -105,9 +105,30 @@ def no_local_sdk() -> Result:
     return Result("no local SDK", True, 0.0, "")
 
 
+
+def agents_md_completeness() -> Result:
+    """AGENTS.md wajib punya bagian 'Best practices untuk AI'."""
+    agents = ROOT / "AGENTS.md"
+    if not agents.is_file():
+        return Result("AGENTS.md exists", False, 0.0, "AGENTS.md tidak ditemukan")
+    content = agents.read_text(encoding="utf-8")
+    required_sections = [
+        "Pola bug yang pernah terjadi",
+        "Best practices untuk AI",
+        "Aturan pengembangan",
+    ]
+    missing = [s for s in required_sections if s not in content]
+    if missing:
+        return Result(
+            "AGENTS.md completeness", False, 0.0,
+            f"AGENTS.md kurang bagian: {', '.join(missing)}"
+        )
+    return Result("AGENTS.md completeness", True, 0.0, "OK")
+
 def fast_checks() -> list[Result]:
     results = [no_local_sdk()]
     results += list(static_checks())
+    results.append(agents_md_completeness())
     results.extend(
         [
             python_tool("remote web", "scripts/prepare_remote.py", ["--check"]),

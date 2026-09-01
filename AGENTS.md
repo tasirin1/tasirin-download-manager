@@ -180,6 +180,8 @@ kuat dan tanpa diskusi:
 | ZIP folder dibuat berulang oleh Range paralel | `putIfAbsent` hanya mencegah duplikasi cache, bukan proses create | serialisasi `zipCached()` per key dengan strip lock; recheck cache di dalam lock |
 | Upload progress mundur/macet saat retry | baseline progres global tidak direset ketika file dimulai ulang dari chunk 0 | reset kontribusi file via `resetFileProgress()` sebelum attempt |
 | Batch fs action tetap lanjut setelah gagal | `postFsAction()` menelan error sehingga promise selalu resolved | helper melaporkan error lalu rethrow; caller berhenti dan refresh state |
+| `Accept-Ranges` header case-sensitive | `getHeaderField("Accept-Ranges") == "bytes"` tidak menangani server yang mengembalikan `Bytes`/`BYTES` → multi-segmen dilewati walau server mendukung Range | gunakan `.equals("bytes", ignoreCase = true)` di `DownloadEngine` |
+| Gallery select mode rebuild DOM | `galSetSelectMode()` memanggil `reRenderGalleryLoaded()` yang menghapus semua cell lalu rebuild dari awal (flash & alokasi DOM berulang pada galeri besar) | in-place toggle: tambah/hapus `.gal-check` per cell tanpa membongkar grid; `reRenderGalleryLoaded()` sudah dihapus |
 | SSE reconnect diam bisa gagal masuk state "give up" | flag diberi nilai `true` sebelum reconnect manual | pakai counter percobaan sekali + grace window sebelum menutup EventSource |
 
 ## Aturan pengembangan
@@ -420,3 +422,91 @@ jangan digabung dengan PR fitur lain.
   di-suppress).
 - **Pantangan**: jangan naikkan `minSdk` (tetap 21), dan jangan gabung perubahan
   targetSdk dengan PR fitur lain.
+
+## Best practices untuk AI yang mengelola repo ini
+
+### Sebelum mengubah kode
+
+1. **Baca file yang relevan dulu** — jangan langsung edit. Untuk download engine:
+   baca `DownloadEngine.kt` bagian terkait. Untuk remote web: baca
+   `remote.src.html` (bukan `remote.html`). Untuk keamanan: baca
+   `ServerSecurity.kt` + unit test-nya.
+2. **Jangan sentuh yang sudah stabil** — kalau kode sudah benar dan teruji
+   (mis. `ServerSecurity.isPathAllowed`, `PinHash`), jangan refactor tanpa
+   alasan kuat. Refactor yang tidak perlu meningkatkan risiko regresi.
+3. **Pertahankan minSdk 21** — semua fitur harus punya fallback untuk
+   Android 5. Jangan gunakan API yang hanya tersedia di API 23+ tanpa guard.
+4. **Jangan menambah dependensi** — APK harus tetap kecil (< 3.5 MB).
+  zxing hanya di `testImplementation`. QR encoder sendiri sudah ada di
+   `util/QrEncoder.kt`.
+
+### Saat memperbaiki bug
+
+5. **Perbaiki di sumber masalah, bukan di symptom** — contoh: kalau progress
+   bar stuck, jangan tambahkan `invalidate()` di UI; cari root cause-nya
+   (StateFlow tidak emit karena copy tidak berubah).
+6. **Tambah unit test bila memungkinkan** — terutama untuk logika murni
+   (`ServerSecurity`, `Checksums`, `AdtsAac`, `HlsParser`, `DownloadItemCodec`).
+   Jalankan `python3 scripts/check_repo.py --android` untuk verifikasi.
+7. **Jangan hapus unit test yang ada** — kalau test gagal karena kode berubah,
+   fix test-nya, bukan hapus test-nya.
+
+### Saat mengubah remote web
+
+8. **Edit SELALU di `remote.src.html`** — jangan edit `assets/remote.html`
+   langsung. Jalankan `python3 scripts/prepare_remote.py` setelah edit.
+9. **`innerHTML` wajib pakai `escapeHtml()`** — kecuali untuk string hardcoded
+   (ikon SVG, class CSS). Audit statis menangkap ini.
+10. **Jangan menambahdependensi JavaScript** — remote web harus tetap
+    zero-dependency (satu file, tanpa bundler).
+11. **CSP header sudah ada di `secureHeaders()`** — jangan bypass CSP untuk
+    fitur baru; gunakan pola yang sudah ada (`self`, `unsafe-inline` untuk
+    script/style).
+
+### Saat mengubah download engine
+
+12. **Jangan mengubah `updateItem()`** — ini adalah satu-satunya cara yang
+    benar untuk update StateFlow. `updateItem(id) { it.copy(...) }` membuat
+    copy baru sehingga StateFlow emit ke UI & SSE.
+13. **Hindari `var` di `DownloadItem`** — semua field immutable (`val`). Update
+    lewat `copy()`. Ini menjamin thread-safety via StateFlow.
+14. **Connection tracking wajib** — setiap `HttpURLConnection` harus di-track
+    via `trackConnection()`/`untrackConnection()`. Ini memastikan pause/cancel
+    bisa menutup semua koneksi aktif.
+
+### Saat menambah endpoint server
+
+15. **Keamanan di `ServerSecurity.kt`** — logika validasi (path, token, upload
+    ID) HARUS di `ServerSecurity`, bukan inline di `HttpControlServer`.
+    Unit test-nya sudah komprehensif.
+16. **POST wajib `X-Requested-With: XMLHttpRequest`** — guard CORS sudah ada
+    di `isStateChangeAllowed()`. Endpoint baru yang menerima POST wajib lewat
+    guard ini.
+17. **Redact token/pin di log** — gunakan regex `REQUEST_SECRET_RE` atau
+    `LOG_SANITIZE_RE` saat mencetak request URI di log.
+
+### Verifikasi perubahan
+
+18. **`python3 scripts/check_repo.py`** — jalankan sebelum commit. Cek 8
+    guard: SDK lokal, struktur repo, remote web sync, upload smoke, README
+    sync, audit self-test, security audit, whitespace.
+19. **`python3 scripts/prepare_remote.py --check`** — wajib setelah mengubah
+    `remote.src.html`. Cek sinkron, node --check, larangan kata Indonesia.
+20. **`python3 scripts/security_audit.py`** — audit statis otomatis di CI.
+    Error wajib diperbaiki; warning ditinjau.
+21. **Unit test** — `python3 scripts/check_repo.py --android` (butuh Gradle).
+    atau lewat CI: push ke branch → PR → Build APK workflow.
+
+### Common mistakes yang harus dihindari
+
+| Kesalahan | Mengapa | Yang benar |
+|---|---|---|
+| Edit `assets/remote.html` langsung | CI memverifikasi sinkron | Edit `remote.src.html` lalu `prepare_remote.py` |
+| `var` di `DownloadItem` | StateFlow tidak emit perubahan in-place | `val` + `copy()` via `updateItem()` |
+| `innerHTML` tanpa `escapeHtml()` | XSS di remote web | selalu `escapeHtml(userContent)` |
+| Tambah dependensi baru | APK membesar, CI gagal | cari solusi tanpa dependensi |
+| Hapus unit test | Coverage menurun, CI gagal | fix test, bukan hapus |
+| `runBlocking` di main thread | ANR / crash | pakai coroutine / `Dispatchers.IO` |
+| Commit tanpa CHANGELOG | CI gagal guard CHANGELOG | tambah entri ke `CHANGELOG.md` |
+| Force push ke `main` | History rusak, branch protection | buat PR, jangan force push |
+| Commit keystore/password | Secret bocor | hanya di GitHub Secrets |

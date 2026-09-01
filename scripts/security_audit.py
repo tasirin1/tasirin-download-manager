@@ -189,7 +189,22 @@ RULES = [
         "Unresolved maintenance marker",
         r"\b(?:TODO|FIXME|HACK|XXX)\b",  # audit-ignore: maintenance_marker
         frozenset({"text"}),
+    ),    Rule(
+        "header_comparison_case_sensitive",
+        "warning",
+        "HTTP header compared without ignoreCase (Accept-Ranges, Content-Type, etc.)",
+        r"""getHeaderField\s*\([^)]+\)\s*==\s*"[^"]+""" ,
+        frozenset({"kotlin", "java"}),
     ),
+
+    Rule(
+        "file_scoped_catch_all",
+        "warning",
+        "Broad catch-all that swallows exceptions silently (no logging/throw)",
+        r"""catch\s*\(_:\s*Exception\)\s*\{\s*\}""" ,
+        frozenset({"kotlin"}),
+    ),
+
 ]
 
 
