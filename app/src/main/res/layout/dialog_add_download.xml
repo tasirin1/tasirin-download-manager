@@ -2,72 +2,102 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet"
     android:orientation="vertical"
-    android:paddingHorizontal="16dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="4dp">
+    >
 
-    <!-- Pemberitahuan platform terdeteksi (feedback deteksi link). -->
+    <!-- Handle bar -->
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_sheet_handle" />
+
+    <!-- Title -->
     <TextView
-        android:id="@+id/text_social_platform"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_badge_pill"
-        android:backgroundTint="@color/chip_pressed_blue"
-        android:paddingLeft="10dp"
-        android:paddingTop="4dp"
-        android:paddingRight="10dp"
-        android:paddingBottom="4dp"
-        android:textColor="@color/primary"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:visibility="gone" />
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="6dp"
+        android:text="@string/add_download"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:textStyle="bold" />
 
+    <!-- URL textarea (hero input) — mirip remote: full width, multi-line, rounded -->
+    <EditText
+        android:id="@+id/input_url"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:autofillHints="url"
+        android:background="@drawable/bg_input_tv"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:hint="@string/url_hint_multi"
+        android:inputType="textUri|textMultiLine"
+        android:maxLines="4"
+        android:minHeight="56dp"
+        android:minLines="2"
+        android:paddingStart="14dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="14dp"
+        
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_hint"
+        android:textSize="14sp" />
+
+    <!-- Row: Paste + Platform badge -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginTop="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
-
-        <EditText
-            android:id="@+id/input_url"
-            style="@style/AppInput"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:drawableStart="@drawable/ic_link"
-            android:drawablePadding="8dp"
-            android:hint="@string/url_hint_multi"
-            android:inputType="textUri|textMultiLine"
-            android:autofillHints="url"
-            android:minLines="2"
-            android:maxLines="3"
-            android:minHeight="52dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true" />
 
         <Button
             android:id="@+id/btn_paste_url"
             style="@style/TvOutlinedButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:minHeight="44dp"
-            android:paddingHorizontal="12dp"
+            android:layout_height="36dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
             android:text="@string/paste"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/text_social_platform"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_badge_pill"
+            android:backgroundTint="@color/chip_pressed_blue"
+            android:paddingStart="10dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="3dp"
+            android:textColor="@color/primary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Media sosial: pilihan kualitas dalam kartu -->
+    <!-- Quality card (social media) -->
     <LinearLayout
         android:id="@+id/social_quality_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="6dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginTop="8dp"
         android:background="@drawable/bg_card_section"
+        android:orientation="vertical"
         android:padding="10dp"
         android:visibility="gone">
 
@@ -75,25 +105,27 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/social_quality_label"
-            android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/text_secondary"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <Spinner
             android:id="@+id/spinner_social_quality"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" />
+            android:layout_marginTop="4dp" />
     </LinearLayout>
 
-    <!-- Media sosial: pilihan foto carousel -->
+    <!-- Photo carousel card -->
     <LinearLayout
         android:id="@+id/social_carousel_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
         android:layout_marginTop="6dp"
         android:background="@drawable/bg_card_section"
+        android:orientation="vertical"
         android:padding="10dp"
         android:visibility="gone">
 
@@ -101,33 +133,43 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/social_carousel_label"
-            android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/text_secondary"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <Spinner
             android:id="@+id/spinner_social_carousel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" />
+            android:layout_marginTop="4dp" />
     </LinearLayout>
 
-    <!-- Advanced toggle (accordion dengan chevron berputar) -->
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/line" />
+
+    <!-- Advanced toggle -->
     <LinearLayout
         android:id="@+id/advanced_toggle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:paddingVertical="8dp"
-        android:paddingHorizontal="4dp"
         android:background="?android:attr/selectableItemBackground"
-        android:gravity="start|center_vertical"
-        android:orientation="horizontal">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="18dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="10dp">
 
         <ImageView
             android:id="@+id/advanced_chevron"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
             android:contentDescription="@null"
             android:src="@drawable/ic_chevron" />
 
@@ -136,100 +178,100 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/advanced_options"
-            android:textAppearance="?android:attr/textAppearanceMedium"
-            android:textColor="@color/primary"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/line" />
-
+    <!-- Advanced section -->
     <LinearLayout
         android:id="@+id/advanced_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
         android:visibility="gone">
 
+        <!-- Auth -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
             android:text="@string/section_authenticate"
-            android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/text_secondary"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <EditText
             android:id="@+id/input_username"
             style="@style/AppInput"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="44dp"
             android:layout_marginTop="6dp"
+            android:autofillHints="username"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:hint="@string/username_hint_optional"
             android:inputType="text"
-            android:autofillHints="username"
-            android:minHeight="48dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true" />
+            android:textSize="14sp" />
 
         <EditText
             android:id="@+id/input_password"
             style="@style/AppInput"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:autofillHints="password"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:hint="@string/password_hint_optional"
             android:inputType="textPassword"
-            android:autofillHints="password"
-            android:minHeight="48dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true" />
+            android:textSize="14sp" />
 
+        <!-- File -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:text="@string/section_file"
-            android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/text_secondary"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <EditText
             android:id="@+id/input_name"
             style="@style/AppInput"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="44dp"
             android:layout_marginTop="6dp"
+            android:autofillHints="name"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:hint="@string/name_hint_optional"
             android:inputType="text"
-            android:autofillHints="name"
-            android:minHeight="48dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true" />
+            android:textSize="14sp" />
 
         <EditText
             android:id="@+id/input_checksum"
             style="@style/AppInput"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="@string/checksum_hint_optional"
-            android:inputType="text"
-            android:importantForAutofill="no"
-            android:minHeight="48dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
             android:focusable="true"
-            android:focusableInTouchMode="true" />
+            android:focusableInTouchMode="true"
+            android:hint="@string/checksum_hint_optional"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:textSize="14sp" />
 
+        <!-- Network -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:text="@string/section_network"
-            android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/text_secondary"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <EditText
@@ -238,58 +280,84 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:hint="@string/headers_hint_optional"
-            android:inputType="textMultiLine"
-            android:importantForAutofill="no"
-            android:minLines="2"
-            android:maxLines="3"
-            android:minHeight="56dp"
             android:focusable="true"
-            android:focusableInTouchMode="true" />
+            android:focusableInTouchMode="true"
+            android:hint="@string/headers_hint_optional"
+            android:importantForAutofill="no"
+            android:inputType="textMultiLine"
+            android:maxLines="3"
+            android:minLines="2"
+            android:textSize="14sp" />
 
         <EditText
             android:id="@+id/input_mirrors"
             style="@style/AppInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:hint="@string/mirrors_hint_optional"
             android:importantForAutofill="no"
             android:inputType="textUri|textMultiLine"
-            android:minLines="2"
             android:maxLines="3"
-            android:minHeight="56dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true" />
+            android:minLines="2"
+            android:textSize="14sp" />
 
-        <TextView
+        <!-- Speed + Priority side by side -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="@string/speed_limit_per_label"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/text_secondary"
-            android:textStyle="bold" />
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
 
-        <Spinner
-            android:id="@+id/spinner_speed_limit_per"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/priority_label"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/text_secondary"
-            android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/speed_limit_per_label"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
-        <Spinner
-            android:id="@+id/spinner_priority"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" />
+                <Spinner
+                    android:id="@+id/spinner_speed_limit_per"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="12dp"
+                android:layout_height="0dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/priority_label"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <Spinner
+                    android:id="@+id/spinner_priority"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+        </LinearLayout>
+
     </LinearLayout>
+
 </LinearLayout>

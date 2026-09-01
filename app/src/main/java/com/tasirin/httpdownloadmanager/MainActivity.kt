@@ -60,6 +60,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.Gravity
 
 class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
@@ -640,7 +643,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
                 }
             }
-            .show()
+            .show().also { dlg ->
+                dlg?.window?.apply {
+                    setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                    setLayout(
+                        WindowManager.LayoutParams.MATCH_PARENT,
+                        WindowManager.LayoutParams.WRAP_CONTENT
+                    )
+                    setGravity(Gravity.BOTTOM)
+                }
+            }
     }
 
     private fun showHlsPicker(
