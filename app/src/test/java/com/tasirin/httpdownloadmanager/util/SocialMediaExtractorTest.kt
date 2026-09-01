@@ -36,4 +36,35 @@ class SocialMediaExtractorTest {
             "https://video.fbcdn.net/v/t43.1/123.mp4"
         ))
     }
+
+    @Test
+    fun `isSocialMediaUrl - false positive mencegah domain mirip`() {
+        // notyoutube.com seharusnya TIDAK terdeteksi sebagai YouTube
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://notyoutube.com/video/123"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://evil-tiktok.com/steal"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://fakeinstagram.com/p/abc"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://x-twitter.com/malicious"))
+    }
+
+    @Test
+    fun `isSocialMediaUrl - path tanpa slashaman bukan URL sosial`() {
+        // youtube.com tanpa pathslash (bare domain) tidak terdeteksi
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://youtube.com"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://youtu.be"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://tiktok.com"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://instagram.com"))
+    }
+
+    @Test
+    fun `isSocialMediaUrl - HTTP juga terdeteksi`() {
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://youtube.com/watch?v=abc"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://tiktok.com/@user/video/123"))
+    }
+
+    @Test
+    fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("file:///etc/passwd"))
+    }
 }

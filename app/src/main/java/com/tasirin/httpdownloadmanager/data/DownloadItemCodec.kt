@@ -38,6 +38,8 @@ object DownloadItemCodec {
             item.mirrors.forEach { mirrorArr.put(it) }
             o.put("mirrors", mirrorArr)
             o.put("monitor", item.monitor)
+            o.put("method", item.method)
+            o.put("postBody", item.postBody)
             o.put("etag", item.etag)
             val segArr = JSONArray()
             item.segments.forEach { seg ->
@@ -103,6 +105,8 @@ object DownloadItemCodec {
                 checksum = o.optString("checksum"),
                 checksumVerified = o.optBoolean("checksumVerified", false),
                 mirrors = parseStringList(o.optJSONArray("mirrors")),
+                method = o.optString("method", "GET"),
+                postBody = o.optString("postBody"),
                 monitor = o.optBoolean("monitor", false),
                 etag = o.optString("etag"),
                 segments = parseSegments(o),

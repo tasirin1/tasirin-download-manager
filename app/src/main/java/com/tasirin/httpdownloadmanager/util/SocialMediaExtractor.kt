@@ -20,6 +20,11 @@ object SocialMediaExtractor {
     /** Regex X/Twitter — x.com harus host (awal string atau setelah skema),
      *  bukan substring (mis. fbsbx.com mengandung "x.com/"). */
     private val X_URL_RE = Regex("""(?:^|https?://)(?:www\.)?x\.com/""")
+    /** Regex presisi untuk deteksi domain — mencegah false-positive (mis. notyoutube.com) */
+    private val YT_HOST_RE = Regex("(?:^|https?://)(?:www\.)?(?:youtube\.com/|youtu\.be/)")
+    private val TT_HOST_RE = Regex("(?:^|https?://)(?:www\.)?(?:tiktok\.com/|vm\.tiktok\.com/)")
+    private val IG_HOST_RE = Regex("(?:^|https?://)(?:www\.)?(?:instagram\.com/(?:p|reel|tv)/|instagr\.am/(?:p|reel)/)")
+    private val IG_BROAD_HOST_RE = Regex("(?:^|https?://)(?:www\.)?(?:instagram\.com/|instagr\.am/)")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
      * (Instagram & YouTube) yang dipanggil berulang saat unduh. */
@@ -60,16 +65,11 @@ object SocialMediaExtractor {
         val lower = url.lowercase()
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
-        return lower.contains("tiktok.com/") ||
-                lower.contains("instagram.com/p/") ||
-                lower.contains("instagram.com/reel/") ||
-                lower.contains("instagram.com/tv/") ||
-                lower.contains("instagr.am/p/") ||
-                lower.contains("instagr.am/reel/") ||
+        return TT_HOST_RE.containsMatchIn(lower) ||
+                IG_HOST_RE.containsMatchIn(lower) ||
                 lower.contains("twitter.com/") ||
                 X_URL_RE.containsMatchIn(lower) ||
-                lower.contains("youtube.com/") ||
-                lower.contains("youtu.be/")
+                YT_HOST_RE.containsMatchIn(lower)
     }
 
     /** Ekstrak URL terbaik (satu opsi). */
@@ -77,14 +77,11 @@ object SocialMediaExtractor {
         try {
             val lower = url.lowercase()
             when {
-                lower.contains("tiktok.com/") || lower.contains("vm.tiktok.com/") ->
-                    extractTikTok(url)
-                lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
-                    extractInstagram(url)
+                TT_HOST_RE.containsMatchIn(lower) -> extractTikTok(url)
+                IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractInstagram(url)
                 lower.contains("twitter.com/") || X_URL_RE.containsMatchIn(lower) ->
                     extractTwitter(url)
-                lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
-                    extractYouTube(url)
+                YT_HOST_RE.containsMatchIn(lower) -> extractYouTube(url)
                 else -> null
             }
         } catch (_: Exception) { null }
@@ -99,14 +96,11 @@ object SocialMediaExtractor {
             try {
                 val lower = url.lowercase()
                 when {
-                    lower.contains("tiktok.com/") || lower.contains("vm.tiktok.com/") ->
-                        extractAllTikTok(url)
-                    lower.contains("instagram.com/") || lower.contains("instagr.am/") ->
-                        extractAllInstagram(url)
+                    TT_HOST_RE.containsMatchIn(lower) -> extractAllTikTok(url)
+                    IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractAllInstagram(url)
                     lower.contains("twitter.com/") || X_URL_RE.containsMatchIn(lower) ->
                         extractAllTwitter(url)
-                    lower.contains("youtube.com/") || lower.contains("youtu.be/") ->
-                        extractAllYouTube(url)
+                    YT_HOST_RE.containsMatchIn(lower) -> extractAllYouTube(url)
                     else -> emptyList()
                 }
             } catch (_: Exception) { emptyList() }
