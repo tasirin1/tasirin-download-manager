@@ -51,7 +51,6 @@ class DownloadItemTest {
         assertEquals(0, item.priority)
         assertEquals(0, item.speedLimitKbps)
     }
-}
 
     // ── Tambahan: edge-case progress ────────────────────────────────
 
