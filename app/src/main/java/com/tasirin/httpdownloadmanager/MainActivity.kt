@@ -655,8 +655,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         dialog.show()
     }
 
-    }
-
     private fun showHlsPicker(
         variants: List<com.tasirin.httpdownloadmanager.download.HlsVariant>,
         originalUrl: String,
