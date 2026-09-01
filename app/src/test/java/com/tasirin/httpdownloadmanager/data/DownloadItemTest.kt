@@ -68,7 +68,8 @@ class DownloadItemTest {
 
     @Test
     fun `progressPercentOverride - zero pakai totalBytes`() {
+        // override=0 aktif (>=0), returns 0 (bukan 50 dari totalBytes)
         val overridden = item(bytesDownloaded = 500, totalBytes = 1000).copy(progressPercentOverride = 0)
-        assertEquals(50, overridden.progressPercent)
+        assertEquals(0, overridden.progressPercent)
     }
 }
