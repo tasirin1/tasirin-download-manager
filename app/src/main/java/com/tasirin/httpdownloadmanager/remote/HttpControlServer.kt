@@ -770,12 +770,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             Response.Status.OK,
             "text/html; charset=utf-8",
             html
-        ).also {
-            it.addHeader("Cache-Control", "no-store, must-revalidate")
-            it.addHeader("Content-Security-Policy",
-                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
-                "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
-        }
+        ).also { it.addHeader("Cache-Control", "no-store, must-revalidate") }
     }
 
     private fun downloadsJson(): Response {

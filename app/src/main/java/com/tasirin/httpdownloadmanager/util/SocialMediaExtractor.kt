@@ -21,10 +21,10 @@ object SocialMediaExtractor {
      *  bukan substring (mis. fbsbx.com mengandung "x.com/"). */
     private val X_URL_RE = Regex("""(?:^|https?://)(?:www\.)?x\.com/""")
     /** Regex presisi untuk deteksi domain — mencegah false-positive (mis. notyoutube.com) */
-    private val YT_HOST_RE = Regex("(?:^|https?://)(?:www\.)?(?:youtube\.com/|youtu\.be/)")
-    private val TT_HOST_RE = Regex("(?:^|https?://)(?:www\.)?(?:tiktok\.com/|vm\.tiktok\.com/)")
-    private val IG_HOST_RE = Regex("(?:^|https?://)(?:www\.)?(?:instagram\.com/(?:p|reel|tv)/|instagr\.am/(?:p|reel)/)")
-    private val IG_BROAD_HOST_RE = Regex("(?:^|https?://)(?:www\.)?(?:instagram\.com/|instagr\.am/)")
+    private val YT_HOST_RE = Regex("""(?:^|https?://)(?:www\.)?(?:youtube\.com/|youtu\.be/)""")
+    private val TT_HOST_RE = Regex("""(?:^|https?://)(?:www\.)?(?:tiktok\.com/|vm\.tiktok\.com/)""")
+    private val IG_HOST_RE = Regex("""(?:^|https?://)(?:www\.)?(?:instagram\.com/(?:p|reel|tv)/|instagr\.am/(?:p|reel)/)""")
+    private val IG_BROAD_HOST_RE = Regex("""(?:^|https?://)(?:www\.)?(?:instagram\.com/|instagr\.am/)""")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
      * (Instagram & YouTube) yang dipanggil berulang saat unduh. */
