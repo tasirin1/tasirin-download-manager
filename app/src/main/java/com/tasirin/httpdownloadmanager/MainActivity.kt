@@ -1067,6 +1067,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             "${done} ${getString(R.string.summary_done_label)}"
         binding.chipFailed.visibility =
             if (failed > 0 || paused > 0) View.VISIBLE else View.GONE
+        // Sembunyikan seluruh summary card bila tidak ada chip aktif
+        val anyVisible = active > 0 || done > 0 || failed > 0 || paused > 0
+        binding.summaryCard.visibility = if (anyVisible) View.VISIBLE else View.GONE
         // Gabung failed + paused jadi satu chip status tersendiri biar ringkas;
         // jumlahnya menunjukkan item yang butuh perhatian.
         if (failed > 0 || paused > 0) {
