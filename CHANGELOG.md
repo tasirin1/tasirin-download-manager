@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix bug tampilan dialog add download** -- Dialog kini pakai `Dialog` murni (bukan `AlertDialog`) sehingga title bar ganda (AlertDialog judul + judul di layout) hilang dan tombol Cancel/Download dipindah ke dalam layout bottom-sheet dengan styling konsisten (outlined + filled). Konten `submitDownload()` di-extract jadi fungsi lokal yang dipanggil tombol Download. 
 - **Desain add download jadi bottom sheet** -- Dialog "Add Download" kini tampil sebagai bottom sheet (rounded top corners, anchored to bottom) mirip remote web. Layout didesain ulang: title header, URL textarea hero full-width, tombol Paste inline dengan platform badge, kualitas & carousel photo dalam kartu, advanced toggle accordion, speed & priority side-by-side. Handle bar di atas sebagai visual cue. Background sheet putih dengan corners 20dp.
 
 - **Sembunyikan summary card bila tidak ada item** -- Summary card (3 chip aktif/selesai/gagal) kini disembunyikan sepenuhnya saat daftar download kosong, menghilangkan area putih kosong yang tidak perlu di bawah empty state.

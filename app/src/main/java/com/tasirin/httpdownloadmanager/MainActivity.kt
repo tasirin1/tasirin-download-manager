@@ -541,118 +541,120 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
 
-        AlertDialog.Builder(this)
-            .setTitle(R.string.add_download)
-            .setView(view)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.download) { _, _ ->
-                val urls = urlInput.text?.toString()?.trim().orEmpty()
-                    .split(URL_SPLIT)
-                    .filter { it.startsWith("http://") || it.startsWith("https://") }
-                if (urls.isEmpty()) {
-                    Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                // Media sosial: pakai opsi yang dipilih dari spinner.
-                // Prioritas: foto carousel > video quality > YouTube resolusi.
-                val socialSel = socialQualitySpinner.selectedItemPosition
-                val selectedVideoOption = if (
-                    socialQualitySection.isVisible &&
-                    socialVideoOptions.isNotEmpty() &&
-                    socialSel in 1..socialVideoOptions.size
-                ) socialVideoOptions[socialSel - 1] else null
-                val selectedYtHeight = if (
-                    socialQualitySection.isVisible &&
-                    socialYoutubeHeights.isNotEmpty() &&
-                    socialSel in 1..socialYoutubeHeights.size
-                ) socialYoutubeHeights[socialSel - 1] else 0
-                val carouselSel = socialCarouselSpinner.selectedItemPosition
-                val selectedPhotoOption = if (
-                    socialCarouselSection.isVisible &&
-                    socialPhotoOptions.isNotEmpty() &&
-                    carouselSel in 1..socialPhotoOptions.size
-                ) socialPhotoOptions[carouselSel - 1] else null
-                // Gabungkan: foto carousel diprioritaskan, lalu video, lalu YouTube
-                val selectedOption = selectedPhotoOption ?: selectedVideoOption
-                val name = nameInput.text?.toString()?.trim().orEmpty()
-                val username = usernameInput.text?.toString()?.trim().orEmpty()
-                val password = passwordInput.text?.toString()?.trim().orEmpty()
-                val headers = headersInput.text?.toString()?.trim().orEmpty()
-                val checksum = checksumInput.text?.toString()?.trim().orEmpty()
-                val perSpeed = speedKbps[spinnerSpeedPer.selectedItemPosition]
-                val priority = priorityValues[spinnerPriority.selectedItemPosition]
-                if (selectedYtHeight > 0) {
-                    // YouTube: simpan resolusi pilihan; engine memilih varian
-                    // HLS yang paling mendekati saat download dimulai (URL CDN
-                    // tetap segar karena di-resolve tiap kali).
-                    addYoutubeWithHeight(
-                        urls = urls,
-                        height = selectedYtHeight,
-                        name = name,
-                        username = username,
-                        password = password,
-                        headers = headers,
-                        perSpeed = perSpeed,
-                        priority = priority,
-                        checksum = checksum,
-                        mirrors = parseMirrors()
-                    )
-                } else if (selectedOption != null) {
-                    // URL CDN hasil ekstraksi masih hangat (baru saja dimuat) —
-                    // gunakan langsung, ganti nama file, dan gabung cookies.
-                    val mergedHeaders = if (selectedOption.cookies.isNotEmpty()) {
-                        val existing = headers.trim()
-                        if (existing.isNotEmpty()) "${existing}\nCookie: ${selectedOption.cookies}"
-                        else "Cookie: ${selectedOption.cookies}"
-                    } else headers
-                    App.engine.addDownload(
-                        url = selectedOption.directUrl,
-                        fileName = selectedOption.fileName ?: name,
-                        username = username,
-                        password = password,
-                        headers = mergedHeaders,
-                        speedLimitKbps = perSpeed,
-                        priority = priority,
-                        checksum = checksum,
-                        mirrors = parseMirrors()
-                    )
-                } else if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
-                    lifecycleScope.launch {
-                        val variants = withContext(Dispatchers.IO) {
-                            runCatching { App.engine.probeHlsVariants(urls[0]) }.getOrNull()
-                        }
-                        if (variants.isNullOrEmpty()) {
-                            val mirrors = parseMirrors()
-                            addAll(urls, name, username, password, headers, perSpeed, priority, checksum, mirrors)
-                        } else {
-                            showHlsPicker(
-                                variants = variants,
-                                originalUrl = urls[0],
-                                name = name,
-                                username = username,
-                                password = password,
-                                headers = headers,
-                                perSpeed = perSpeed,
-                                priority = priority,
-                                checksum = checksum,
-                                mirrors = parseMirrors()
-                            )
-                        }
+        // Dialog bottom-sheet: tanpa title bar AlertDialog, tombol ada di layout.
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT
+            )
+            setGravity(Gravity.BOTTOM)
+        }
+        fun submitDownload() {
+            val urls = urlInput.text?.toString()?.trim().orEmpty()
+                .split(URL_SPLIT)
+                .filter { it.startsWith("http://") || it.startsWith("https://") }
+            if (urls.isEmpty()) {
+                Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_SHORT).show()
+                return
+            }
+            // Media sosial: pakai opsi yang dipilih dari spinner.
+            val socialSel = socialQualitySpinner.selectedItemPosition
+            val selectedVideoOption = if (
+                socialQualitySection.isVisible &&
+                socialVideoOptions.isNotEmpty() &&
+                socialSel in 1..socialVideoOptions.size
+            ) socialVideoOptions[socialSel - 1] else null
+            val selectedYtHeight = if (
+                socialQualitySection.isVisible &&
+                socialYoutubeHeights.isNotEmpty() &&
+                socialSel in 1..socialYoutubeHeights.size
+            ) socialYoutubeHeights[socialSel - 1] else 0
+            val carouselSel = socialCarouselSpinner.selectedItemPosition
+            val selectedPhotoOption = if (
+                socialCarouselSection.isVisible &&
+                socialPhotoOptions.isNotEmpty() &&
+                carouselSel in 1..socialPhotoOptions.size
+            ) socialPhotoOptions[carouselSel - 1] else null
+            val selectedOption = selectedPhotoOption ?: selectedVideoOption
+            val name = nameInput.text?.toString()?.trim().orEmpty()
+            val username = usernameInput.text?.toString()?.trim().orEmpty()
+            val password = passwordInput.text?.toString()?.trim().orEmpty()
+            val headers = headersInput.text?.toString()?.trim().orEmpty()
+            val checksum = checksumInput.text?.toString()?.trim().orEmpty()
+            val perSpeed = speedKbps[spinnerSpeedPer.selectedItemPosition]
+            val priority = priorityValues[spinnerPriority.selectedItemPosition]
+            if (selectedYtHeight > 0) {
+                addYoutubeWithHeight(
+                    urls = urls,
+                    height = selectedYtHeight,
+                    name = name,
+                    username = username,
+                    password = password,
+                    headers = headers,
+                    perSpeed = perSpeed,
+                    priority = priority,
+                    checksum = checksum,
+                    mirrors = parseMirrors()
+                )
+            } else if (selectedOption != null) {
+                val mergedHeaders = if (selectedOption.cookies.isNotEmpty()) {
+                    val existing = headers.trim()
+                    if (existing.isNotEmpty()) "${existing}\nCookie: ${selectedOption.cookies}"
+                    else "Cookie: ${selectedOption.cookies}"
+                } else headers
+                App.engine.addDownload(
+                    url = selectedOption.directUrl,
+                    fileName = selectedOption.fileName ?: name,
+                    username = username,
+                    password = password,
+                    headers = mergedHeaders,
+                    speedLimitKbps = perSpeed,
+                    priority = priority,
+                    checksum = checksum,
+                    mirrors = parseMirrors()
+                )
+            } else if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
+                lifecycleScope.launch {
+                    val variants = withContext(Dispatchers.IO) {
+                        runCatching { App.engine.probeHlsVariants(urls[0]) }.getOrNull()
                     }
-                } else {
-                    addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
+                    if (variants.isNullOrEmpty()) {
+                        addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
+                    } else {
+                        showHlsPicker(
+                            variants = variants,
+                            originalUrl = urls[0],
+                            name = name,
+                            username = username,
+                            password = password,
+                            headers = headers,
+                            perSpeed = perSpeed,
+                            priority = priority,
+                            checksum = checksum,
+                            mirrors = parseMirrors()
+                        )
+                    }
                 }
+            } else {
+                addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
             }
-            .show().also { dlg ->
-                dlg?.window?.apply {
-                    setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-                    setLayout(
-                        WindowManager.LayoutParams.MATCH_PARENT,
-                        WindowManager.LayoutParams.WRAP_CONTENT
-                    )
-                    setGravity(Gravity.BOTTOM)
-                }
-            }
+            dialog.dismiss()
+        }
+        // Tombol Cancel
+        view.findViewById<Button>(R.id.btn_cancel).setOnClickListener {
+            dialog.dismiss()
+        }
+        // Tombol Download
+        view.findViewById<Button>(R.id.btn_download).setOnClickListener {
+            submitDownload()
+        }
+        dialog.show()
+    }
+
     }
 
     private fun showHlsPicker(
