@@ -36,8 +36,8 @@ class FormatsTest {
         assertEquals("0s", Formats.eta(0))
         assertEquals("0s", Formats.eta(-5))
         assertEquals("45s", Formats.eta(45))
-        assertEquals("3m 05s", Formats.eta(185))
-        assertEquals("2h 03m", Formats.eta(7380))
-        assertEquals("1h 00m", Formats.eta(3600))
+        assertEquals("3m 5s", Formats.eta(185))
+        assertEquals("2h 3m", Formats.eta(7380))
+        assertEquals("1h 0m", Formats.eta(3600))
     }
 }
