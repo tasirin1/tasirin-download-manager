@@ -35,7 +35,8 @@
     <string name="resume">Resume</string>
     <string name="open">Open</string>
     <string name="delete">Delete</string>
-    <string name="empty_hint">No downloads yet.\nAdd a URL to start downloading.</string>
+    <string name="empty_hint">No downloads yet</string>
+    <string name="empty_subtitle">Paste a link to get started</string>
     <string name="paste_clipboard">Paste from Clipboard</string>
     <string name="clipboard_empty">Clipboard is empty</string>
     <string name="paste">Paste</string>
@@ -58,6 +59,10 @@
         <item quantity="one">%1$d failed</item>
         <item quantity="other">%1$d failed</item>
     </plurals>
+    <string name="summary_active_label">active</string>
+    <string name="summary_done_label">done</string>
+    <string name="summary_failed_label">failed</string>
+    <string name="summary_paused_label">paused</string>
     <string name="section_active">Active</string>
     <string name="section_paused">Paused</string>
     <string name="section_failed">Failed</string>
@@ -72,8 +77,8 @@
     <string name="moved_up">Moved up</string>
     <string name="moved_down">Moved down</string>
 
-    <string name="status_pending">Pending&#8230;</string>
-    <string name="status_downloading">Downloading&#8230;</string>
+    <string name="status_pending">Pending</string>
+    <string name="status_downloading">Downloading</string>
     <string name="status_paused">Paused</string>
     <string name="status_completed">Completed</string>
     <string name="status_cancelled">Cancelled</string>

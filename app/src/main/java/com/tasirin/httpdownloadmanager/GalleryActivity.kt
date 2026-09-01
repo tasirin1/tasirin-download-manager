@@ -337,6 +337,7 @@ private class GalleryAdapter(
         b.textName.text = e.name
         b.textExt.text = e.name.substringAfterLast('.', "").uppercase()
         val ctx = holder.itemView.context
+        // 3. Tampilkan play overlay saat tidak ada thumbnail supaya cell tidak kosong
         b.playOverlay.visibility = if (e.isVideo) View.VISIBLE else View.GONE
         b.textInfo.text = if (e.isPartial) {
             val pct = if (e.progressPercent in 0..100) " · ${e.progressPercent}%" else ""
@@ -354,6 +355,11 @@ private class GalleryAdapter(
             val bmp = loader(e)
             if (bmp != null && holder.bindingAdapterPosition == pos) {
                 b.imageThumb.setImageBitmap(bmp)
+                // Thumbnail ada: sembunyikan play overlay (gambar sudah cukup)
+                if (e.isVideo) b.playOverlay.visibility = View.GONE
+            } else if (e.isVideo) {
+                // 3. Tidak ada thumbnail: play overlay tetap tampil sebagai fallback
+                b.playOverlay.visibility = View.VISIBLE
             }
         }
     }

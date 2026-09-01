@@ -6,6 +6,7 @@
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="12dp"
     android:layout_marginTop="6dp"
+    android:layout_marginBottom="2dp"
     android:background="@drawable/bg_section_header"
     android:focusable="true"
     android:gravity="center_vertical"

@@ -48,13 +48,6 @@ class DownloadAdapter(private val listener: Listener) :
         var bindToggle: (() -> Unit)? = null
     }
 
-    private fun stateColor(state: DownloadState): Int = when (state) {
-        DownloadState.PENDING, DownloadState.DOWNLOADING -> R.color.primary
-        DownloadState.COMPLETED -> R.color.status_on
-        DownloadState.FAILED -> R.color.status_off
-        DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.text_hint
-    }
-
     private fun progressColor(state: DownloadState): Int = when (state) {
         DownloadState.PENDING, DownloadState.DOWNLOADING -> R.color.primary
         DownloadState.COMPLETED -> R.color.status_on
@@ -99,7 +92,6 @@ class DownloadAdapter(private val listener: Listener) :
     private fun bindItem(holder: ItemHolder, item: DownloadItem) {
         val b = holder.binding
         val ctx = b.root.context
-        val color = ContextCompat.getColor(ctx, stateColor(item.state))
 
         b.textName.text = item.fileName
         b.fileIcon.setImageResource(fileIconRes(item.fileName))
@@ -107,8 +99,10 @@ class DownloadAdapter(private val listener: Listener) :
             ContextCompat.getColor(ctx, R.color.text_hint)
         )
         b.statusBadge.text = badgeText(item, ctx)
-        b.statusBadge.backgroundTintList = ColorStateList.valueOf(color)
-        b.statusBadge.setTextColor(ContextCompat.getColor(ctx, R.color.white))
+        b.statusBadge.backgroundTintList = ColorStateList.valueOf(
+            ContextCompat.getColor(ctx, badgeBgColor(item.state))
+        )
+        b.statusBadge.setTextColor(ContextCompat.getColor(ctx, badgeTextColor(item.state)))
         val prevProgress = b.progressBar.progress
         smoothProgress(b.progressBar, prevProgress, item.progressPercent)
         b.progressBar.progressTintList = ColorStateList.valueOf(
@@ -190,6 +184,17 @@ class DownloadAdapter(private val listener: Listener) :
                 base
             }
         }
+    }
+
+    /** 7. Softer badge background for failed/cancelled: use red-bg tint. */
+    private fun badgeBgColor(state: DownloadState): Int = when (state) {
+        DownloadState.FAILED, DownloadState.CANCELLED -> R.color.status_off_soft
+        else -> progressColor(state)
+    }
+
+    private fun badgeTextColor(state: DownloadState): Int = when (state) {
+        DownloadState.FAILED, DownloadState.CANCELLED -> R.color.status_off
+        else -> R.color.white
     }
 
     /** Animasi halus saat progres naik; set langsung saat turun/reset. */

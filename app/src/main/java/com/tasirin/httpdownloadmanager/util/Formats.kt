@@ -40,8 +40,8 @@ object Formats {
         val m = (seconds % 3600) / 60
         val s = seconds % 60
         return when {
-            h > 0 -> String.format(Locale.US, "%dh %02dm", h, m)
-            m > 0 -> String.format(Locale.US, "%dm %02ds", m, s)
+            h > 0 -> String.format(Locale.US, "%dh %dm", h, m)
+            m > 0 -> String.format(Locale.US, "%dm %ds", m, s)
             else -> "${s}s"
         }
     }

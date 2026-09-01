@@ -27,13 +27,54 @@
         android:padding="12dp">
 
         <TextView
-            android:id="@+id/text_summary"
-            android:layout_width="0dp"
+            android:id="@+id/chip_active"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp"
-            tools:text="● 2 active   ● 5 done   ● 1 failed" />
+            android:background="@drawable/bg_chip_pill"
+            android:backgroundTint="@color/chip_active_bg"
+            android:paddingLeft="10dp"
+            android:paddingTop="3dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="3dp"
+            android:textColor="@color/primary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            tools:text="2 active"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/chip_done"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip_pill"
+            android:backgroundTint="@color/chip_done_bg"
+            android:paddingLeft="10dp"
+            android:paddingTop="3dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="3dp"
+            android:textColor="@color/status_on"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            tools:text="5 done"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/chip_failed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip_pill"
+            android:backgroundTint="@color/chip_failed_bg"
+            android:paddingLeft="10dp"
+            android:paddingTop="3dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="3dp"
+            android:textColor="@color/status_off"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            tools:text="1 failed"
+            android:visibility="gone" />
 
 
     </LinearLayout>
@@ -80,8 +121,9 @@
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="96dp"
-                android:layout_height="96dp"
+                android:id="@+id/empty_icon"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
                 android:contentDescription="@string/empty_hint"
                 android:src="@drawable/ic_download_big" />
 
@@ -91,8 +133,18 @@
                 android:layout_marginTop="16dp"
                 android:gravity="center"
                 android:text="@string/empty_hint"
+                android:textColor="@color/text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:text="@string/empty_subtitle"
                 android:textColor="@color/text_secondary"
-                android:textSize="20sp" />
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/empty_add_button"
@@ -138,19 +190,24 @@
         </LinearLayout>
 
 
-        <Button
+        <FrameLayout
             android:id="@+id/fab_add"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
             android:layout_gravity="bottom|end"
             android:layout_margin="16dp"
-            android:background="@drawable/bg_btn_filled"
-            android:drawableStart="@drawable/ic_add"
-            android:gravity="center"
-            android:minHeight="52dp"
-            android:paddingHorizontal="22dp"
-            android:text="@string/add_download"
-            android:textColor="@color/white"
-            android:textSize="15sp" />
+            android:background="@drawable/bg_fab_circle"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="6dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/add_download"
+                android:src="@drawable/ic_add"
+                app:tint="@color/white" />
+        </FrameLayout>
     </FrameLayout>
 </LinearLayout>

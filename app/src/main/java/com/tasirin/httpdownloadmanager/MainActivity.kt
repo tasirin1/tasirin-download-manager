@@ -23,8 +23,6 @@ import android.view.MenuItem
 import android.view.View
 import android.view.animation.AnimationUtils
 import androidx.core.view.isVisible
-import android.text.SpannableString
-import android.text.style.ForegroundColorSpan
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -1053,26 +1051,33 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         summaryActive = active
         summaryPaused = paused
         summaryFailed = failed
-        binding.textSummary.text = summaryText(active, done, failed)
+        updateSummaryChips(active, paused, done, failed)
     }
 
-    /** Ringkasan dengan titik berwarna: "● 3 active · ● 5 done · ● 1 failed". */
-    private fun summaryText(active: Int, done: Int, failed: Int): SpannableString {
-        val a = resources.getQuantityString(R.plurals.summary_active, active, active)
-        val d = resources.getQuantityString(R.plurals.summary_done, done, done)
-        val f = resources.getQuantityString(R.plurals.summary_failed, failed, failed)
-        val text = "● $a   ● $d   ● $f"
-        val sp = SpannableString(text)
-        val activeColor = ContextCompat.getColor(this, R.color.primary)
-        val doneColor = ContextCompat.getColor(this, R.color.status_on)
-        val failedColor = ContextCompat.getColor(this, R.color.status_off)
-        val firstDot = text.indexOf('●')
-        val secondDot = text.indexOf('●', firstDot + 1)
-        val thirdDot = text.indexOf('●', secondDot + 1)
-        sp.setSpan(ForegroundColorSpan(activeColor), firstDot, firstDot + 1, 0)
-        sp.setSpan(ForegroundColorSpan(doneColor), secondDot, secondDot + 1, 0)
-        sp.setSpan(ForegroundColorSpan(failedColor), thirdDot, thirdDot + 1, 0)
-        return sp
+    /** 2. Summary jadi 3 chip kecil berwarna (Active/Paused/Done/Failed).
+     *  Chip hanya tampil bila jumlah > 0 supaya ringkas. */
+    private fun updateSummaryChips(active: Int, paused: Int, done: Int, failed: Int) {
+        binding.chipActive.visibility =
+            if (active > 0) View.VISIBLE else View.GONE
+        if (active > 0) binding.chipActive.text =
+            "${active} ${getString(R.string.summary_active_label)}"
+        binding.chipDone.visibility =
+            if (done > 0) View.VISIBLE else View.GONE
+        if (done > 0) binding.chipDone.text =
+            "${done} ${getString(R.string.summary_done_label)}"
+        binding.chipFailed.visibility =
+            if (failed > 0 || paused > 0) View.VISIBLE else View.GONE
+        // Gabung failed + paused jadi satu chip status tersendiri biar ringkas;
+        // jumlahnya menunjukkan item yang butuh perhatian.
+        if (failed > 0 || paused > 0) {
+            val total = failed + paused
+            val label = if (failed > 0) {
+                getString(R.string.summary_failed_label)
+            } else {
+                getString(R.string.summary_paused_label)
+            }
+            binding.chipFailed.text = "$total $label"
+        }
     }
 
     /** Header section sticky: tampilkan judul section yang sedang di-scroll. */
