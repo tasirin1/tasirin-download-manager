@@ -24,6 +24,7 @@ object SocialMediaExtractor {
     private val YT_HOST_RE = Regex("""(?:https?://)(?:www\.)?youtube\.com/|(?:https?://)youtu\.be/""")
     private val TT_HOST_RE = Regex("""(?:https?://)(?:www\.)?tiktok\.com/|(?:https?://)vm\.tiktok\.com/""")
     private val IG_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/(?:p|reel|tv)/|(?:https?://)instagr\.am/(?:p|reel)/""")
+    private val TW_HOST_RE = Regex("""(?:https?://)(?:www\.)?twitter\.com/""")
     private val IG_BROAD_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/|(?:https?://)instagr\.am/""")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
@@ -67,7 +68,7 @@ object SocialMediaExtractor {
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
         return TT_HOST_RE.containsMatchIn(lower) ||
                 IG_HOST_RE.containsMatchIn(lower) ||
-                lower.contains("twitter.com/") ||
+                TW_HOST_RE.containsMatchIn(lower) ||
                 X_URL_RE.containsMatchIn(lower) ||
                 YT_HOST_RE.containsMatchIn(lower)
     }
@@ -79,7 +80,7 @@ object SocialMediaExtractor {
             when {
                 TT_HOST_RE.containsMatchIn(lower) -> extractTikTok(url)
                 IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractInstagram(url)
-                lower.contains("twitter.com/") || X_URL_RE.containsMatchIn(lower) ->
+                TW_HOST_RE.containsMatchIn(lower) || X_URL_RE.containsMatchIn(lower) ->
                     extractTwitter(url)
                 YT_HOST_RE.containsMatchIn(lower) -> extractYouTube(url)
                 else -> null
@@ -98,7 +99,7 @@ object SocialMediaExtractor {
                 when {
                     TT_HOST_RE.containsMatchIn(lower) -> extractAllTikTok(url)
                     IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractAllInstagram(url)
-                    lower.contains("twitter.com/") || X_URL_RE.containsMatchIn(lower) ->
+                    TW_HOST_RE.containsMatchIn(lower) || X_URL_RE.containsMatchIn(lower) ->
                         extractAllTwitter(url)
                     YT_HOST_RE.containsMatchIn(lower) -> extractAllYouTube(url)
                     else -> emptyList()
