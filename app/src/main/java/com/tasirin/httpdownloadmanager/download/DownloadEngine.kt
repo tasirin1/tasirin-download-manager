@@ -1095,7 +1095,7 @@ class DownloadEngine(appContext: Context) {
                 probeHeaders = headersOf(probe)
                 invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, probeHeaders.etag)
                 val total = contentLength(probe)
-                val ranges = probe.getHeaderField("Accept-Ranges") == "bytes"
+                val ranges = probe.getHeaderField("Accept-Ranges").equals("bytes", ignoreCase = true)
                 // Mirror (proxy GitHub) umumnya tidak mendukung Range, jadi
                 // lewati multi-segmen untuk URL cadangan.
                 if (ranges && total >= SEGMENT_MIN_BYTES &&

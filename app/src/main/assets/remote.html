@@ -504,16 +504,21 @@ galleryGrid.insertBefore(cell, gallerySentinel);
 function galSetSelectMode(on) {
 galSelectMode = on;
 galSelected.clear();
-document.getElementById('galSelectBtn').textContent = on ? 'Cancel selection' : 'Select';
-galleryGrid.classList.toggle('gal-selecting', on);
-galBatch.classList.add('hidden');
-reRenderGalleryLoaded();
+document.getElementById("galSelectBtn").textContent = on ? "Cancel selection" : "Select";
+galleryGrid.classList.toggle("gal-selecting", on);
+galBatch.classList.add("hidden");
+galleryGrid.querySelectorAll(".gal-cell").forEach(function (cell) {
+var check = cell.querySelector(".gal-check");
+if (on && !check) {
+check = document.createElement("span");
+check.className = "gal-check";
+cell.querySelector(".gal-thumb").prepend(check);
 }
-function reRenderGalleryLoaded() {
-const cells = galleryGrid.querySelectorAll('.gal-cell');
-cells.forEach(function (c) { c.remove(); });
-galleryLoaded = 0;
-loadMoreGallery();
+if (check) {
+check.classList.remove("on");
+check.textContent = "";
+}
+});
 }
 function toggleGalSelect(it, cell) {
 const selected = galSelected.has(it);
