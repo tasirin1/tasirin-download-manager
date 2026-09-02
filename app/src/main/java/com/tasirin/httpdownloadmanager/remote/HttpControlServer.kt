@@ -110,7 +110,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Fix #4: cache terpisah untuk bytes/speed yang berubah tiap detik
     // tanpa rebuild struktur JSON (hemat ~30% CPU saat polling aktif).
     @Volatile private var lastDynamicUpdate = 0L
-
     // Cache statusObject: jarang berubah (port, readOnly, versi).
     @Volatile private var cachedStatusJson: JSONObject? = null
     // Statistik folder dihitung paralel: listing folder dengan banyak subfolder
@@ -789,9 +788,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Signature ringkas daftar item: tanpa alokasi JSON, dipakai SSE untuk
      *  memutuskan apakah payload perlu di-build ulang (hemat GC di tick 2x/detik). */
-    private var lastSigItems: List<DownloadItem>? = null
-    private var lastSigResult = 0
+    @Volatile private var lastSigItems: List<DownloadItem>? = null
+    @Volatile private var lastSigResult = 0
 
+    @Synchronized
     private fun itemsSignature(items: List<DownloadItem>): Int {
         // Cache: kalau list masih referensi yang sama (update in-place),
         // kembalikan signature terakhir tanpa recompute.
@@ -808,6 +808,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return h
     }
 
+    @Synchronized
     private fun itemsJson(): JSONArray {
         val items = App.engine.items.value
         val sig = itemsSignature(items)
