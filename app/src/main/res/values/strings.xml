@@ -176,6 +176,10 @@
     <string name="hls_quality_title">Pick video quality</string>
     <string name="hls_direct">Download original playlist (no pick)</string>
     <string name="gallery_empty">No videos found yet.</string>
+    <string name="gallery_folders">Folders</string>
+    <string name="gallery_folder_title">Select folders to scan</string>
+    <string name="gallery_folder_all">All folders</string>
+    <string name="gallery_folder_empty">No video folders found on this device</string>
     <string name="gallery_open_error">No app found to open this file</string>
 
     <string name="speed_limit_per_label">Speed limit (per download)</string>

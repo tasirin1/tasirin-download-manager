@@ -29,6 +29,7 @@ import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.scaleDown
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
+import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -75,7 +76,7 @@ class GalleryActivity : AppCompatActivity() {
             binding.progress.visibility = View.VISIBLE
             partialProgress = activeDownloadProgress()
             fullList = withContext(Dispatchers.IO) {
-                MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount).items
+                MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
             }
             binding.progress.visibility = View.GONE
             loadMore() // halaman awal kurang dari satu layar -> isi otomatis
@@ -90,7 +91,7 @@ class GalleryActivity : AppCompatActivity() {
                 partialProgress = newPartial
                 if (filesChanged) {
                     fullList = withContext(Dispatchers.IO) {
-                        MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount).items
+                        MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
                     }
                 } else {
                     fullList = mergedProgress(fullList)
@@ -202,6 +203,7 @@ class GalleryActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
             finish()
@@ -209,6 +211,7 @@ class GalleryActivity : AppCompatActivity() {
         }
         return super.onOptionsItemSelected(item)
     }
+
 
     companion object {
         private const val SPAN_COUNT = 3

@@ -23,6 +23,7 @@ object MediaLibrary {
 
     @Volatile
     private var scanCache: Triple<Long, List<MediaEntry>, Int>? = null
+    private var scanCacheFolderKey: Set<String> = emptySet()
     private val scanLock = Any()
     @Volatile private var observerRegistered = false
 
@@ -108,9 +109,10 @@ object MediaLibrary {
     fun scan(
         context: Context,
         partialProgress: Map<String, Int> = emptyMap(),
-        maxEntries: Int = GALLERY_MAX_ENTRIES
+        maxEntries: Int = GALLERY_MAX_ENTRIES,
+        selectedFolders: Set<String> = emptySet()
     ): MediaScanResult {
-        val base = scanCached(context, maxEntries)
+        val base = scanCached(context, maxEntries, selectedFolders)
         if (partialProgress.isEmpty()) return base
         val items = base.items.map { entry ->
             if (entry.isPartial) {
@@ -155,18 +157,21 @@ object MediaLibrary {
         else -> fileExists(filePath)
     }
 
-    private fun scanCached(context: Context, maxEntries: Int): MediaScanResult {
+    private fun scanCached(context: Context, maxEntries: Int, selectedFolders: Set<String> = emptySet()): MediaScanResult {
         ensureObserver(context)
         synchronized(scanLock) {
             val now = System.currentTimeMillis()
             val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
+            // Cache hanya valid bila folder selection sama (kosong = semua)
             scanCache?.let { (ts, items, total) ->
-                if (scanCacheUsable(now - ts, SCAN_TTL_MS, items.size, total, limit)) {
+                if (scanCacheFolderKey == selectedFolders &&
+                    scanCacheUsable(now - ts, SCAN_TTL_MS, items.size, total, limit)) {
                     return MediaScanResult(items.take(limit), total)
                 }
             }
-            val result = scanUncached(context, limit)
+            val result = scanUncached(context, limit, selectedFolders)
             scanCache = Triple(now, result.items, result.total)
+            scanCacheFolderKey = selectedFolders
             return result
         }
     }
@@ -204,7 +209,7 @@ object MediaLibrary {
         }
     }
 
-    private fun scanUncached(context: Context, maxEntries: Int): MediaScanResult {
+    private fun scanUncached(context: Context, maxEntries: Int, selectedFolders: Set<String> = emptySet()): MediaScanResult {
         val list = mutableListOf<MediaEntry>()
 
         fun addFile(f: File, isPartial: Boolean = false) {
@@ -255,6 +260,7 @@ object MediaLibrary {
         }
 
         // 3) Folder internal aplikasi (termasuk file .part yang masih berjalan)
+        //    Selalu disertakan (bukan MediaStore) — partial download harus terlihat.
         runCatching {
             val dir = File(context.filesDir, "downloads")
             dir.listFiles()?.forEach { f ->
@@ -268,6 +274,7 @@ object MediaLibrary {
 
         // 4) Hanya video dari MediaStore. Penampil foto sengaja dihapus, jadi
         //    query Images tidak perlu dan hanya memboroskan RAM/CPU.
+        //    Filter berdasarkan selectedFolders (relative path) bila ada.
         runCatching {
             val resolver = context.contentResolver
             val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
@@ -280,8 +287,23 @@ object MediaLibrary {
                 if (Build.VERSION.SDK_INT >= 29) add(MediaStore.MediaColumns.RELATIVE_PATH)
                 add(MediaStore.Video.Media.DURATION)
             }.toTypedArray()
+            // Bangun selection SQL untuk filter folder (API 29+ pakai RELATIVE_PATH)
+            val selection: String?
+            val selectionArgs: Array<String>?
+            if (selectedFolders.isNotEmpty() && Build.VERSION.SDK_INT >= 29) {
+                val placeholders = selectedFolders.joinToString(",") { "?" }
+                selection = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR " +
+                    selectedFolders.joinToString(" OR ") {
+                        "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
+                    }
+                // LIKE perlu '%' di akhir untuk match subfolder
+                selectionArgs = selectedFolders.flatMap { listOf("$it%") + listOf(it) }.toTypedArray()
+            } else {
+                selection = null
+                selectionArgs = null
+            }
             resolver.query(
-                collection, projection, null, null,
+                collection, projection, selection, selectionArgs,
                 "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
             )?.use { c ->
                 val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
@@ -330,6 +352,28 @@ object MediaLibrary {
             .distinctBy { it.filePath ?: it.contentUri ?: it.token }
             .sortedByDescending { it.modified }
         return MediaScanResult(deduped.take(maxEntries), deduped.size)
+    }
+
+    /** Temukan semua folder yang punya video di MediaStore (untuk folder picker).
+     *  Mengembalikan daftar relative path unik (e.g. "DCIM/Camera", "Download"). */
+    fun discoverFolders(context: Context): List<String> {
+        if (Build.VERSION.SDK_INT < 29) return emptyList()
+        return runCatching {
+            val resolver = context.contentResolver
+            val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            val projection = arrayOf(MediaStore.MediaColumns.RELATIVE_PATH)
+            val folders = mutableSetOf<String>()
+            resolver.query(collection, projection, null, null, null)?.use { c ->
+                val idx = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
+                while (c.moveToNext()) {
+                    val path = c.getString(idx) ?: continue
+                    // Ambil folder induk (e.g. "DCIM/Camera/" -> "DCIM/Camera")
+                    val trimmed = path.trimEnd('/')
+                    if (trimmed.isNotEmpty()) folders.add(trimmed)
+                }
+            }
+            folders.sorted()
+        }.getOrDefault(emptyList())
     }
 
     /** Hapus thumbnail disk yang sudah lama tak terpakai (> 7 hari). Dipanggil

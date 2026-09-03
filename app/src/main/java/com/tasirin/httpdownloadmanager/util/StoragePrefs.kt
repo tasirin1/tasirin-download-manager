@@ -57,6 +57,7 @@ object StoragePrefs {
     private const val KEY_SERVER_SESSION_SECRET = "server_session_secret"
     private const val KEY_USER_AGENT = "user_agent"
     private const val KEY_FILE_ACCESS_OFFERED = "file_access_offered"
+    private const val KEY_GALLERY_FOLDERS = "gallery_folders"
 
     /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
     fun isSectionCollapsed(context: Context, key: String): Boolean =
@@ -406,6 +407,15 @@ object StoragePrefs {
 
     fun setFileAccessOffered(context: Context, offered: Boolean) {
         prefs(context).edit { putBoolean(KEY_FILE_ACCESS_OFFERED, offered) }
+    }
+
+    /** Folder yang disertakan di galeri (relative path, e.g. "DCIM/Camera").
+     *  Set kosong = semua folder (default). */
+    fun getGalleryFolders(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_GALLERY_FOLDERS, emptySet()) ?: emptySet()
+
+    fun setGalleryFolders(context: Context, folders: Set<String>) {
+        prefs(context).edit { putStringSet(KEY_GALLERY_FOLDERS, folders) }
     }
 
     /** Bandingkan dua string tanpa short-circuit (constant-time). */

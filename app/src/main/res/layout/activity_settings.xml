@@ -651,6 +651,22 @@
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
 
+                    <Button
+                        android:id="@+id/btn_gallery_folders"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/gallery_folder_title" />
+
+                    <TextView
+                        android:id="@+id/gallery_folders_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+
                     <TextView
                         android:id="@+id/update_status"
                         android:layout_width="match_parent"

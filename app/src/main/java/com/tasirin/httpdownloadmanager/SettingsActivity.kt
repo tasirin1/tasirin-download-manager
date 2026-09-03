@@ -39,6 +39,7 @@ import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.Formats
+import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
@@ -97,6 +98,10 @@ class SettingsActivity : AppCompatActivity() {
                 binding.btnCleanup.isEnabled = true
             }
         }
+        // Gallery folder picker
+        updateGalleryFoldersStatus()
+        binding.btnGalleryFolders.setOnClickListener { showGalleryFolderPicker() }
+
         wireDownloadSettings()
         wireStorageSection()
         wireSave()
@@ -237,6 +242,58 @@ class SettingsActivity : AppCompatActivity() {
 
     /** Hapus file .part menggantung + cache thumbnail. Tidak menyentuh file
      *  milik download yang masih berjalan/antre/jeda. */
+    private fun updateGalleryFoldersStatus() {
+        val folders = StoragePrefs.getGalleryFolders(this)
+        binding.galleryFoldersStatus.text = if (folders.isEmpty()) {
+            getString(R.string.gallery_folder_all)
+        } else {
+            folders.joinToString(", ")
+        }
+    }
+
+    private fun showGalleryFolderPicker() {
+        lifecycleScope.launch {
+            val folders = withContext(Dispatchers.IO) {
+                MediaLibrary.discoverFolders(this@SettingsActivity)
+            }
+            if (folders.isEmpty()) {
+                Toast.makeText(this@SettingsActivity, R.string.gallery_folder_empty, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val allLabel = getString(R.string.gallery_folder_all)
+            val labels = mutableListOf(allLabel)
+            labels.addAll(folders)
+            val currentSelection = StoragePrefs.getGalleryFolders(this@SettingsActivity).toMutableSet()
+            val checked = BooleanArray(labels.size) { i ->
+                i == 0 || currentSelection.contains(labels[i])
+            }
+            checked[0] = currentSelection.isEmpty()
+
+            android.app.AlertDialog.Builder(this@SettingsActivity)
+                .setTitle(R.string.gallery_folder_title)
+                .setMultiChoiceItems(labels.toTypedArray(), checked) { _, which, isChecked ->
+                    if (which == 0) {
+                        if (isChecked) {
+                            for (i in 1 until checked.size) checked[i] = false
+                            currentSelection.clear()
+                        }
+                    } else {
+                        checked[which] = isChecked
+                        if (isChecked) currentSelection.add(labels[which])
+                        else currentSelection.remove(labels[which])
+                    }
+                    checked[0] = currentSelection.isEmpty()
+                }
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    val selected = if (checked[0]) emptySet<String>() else currentSelection.toSet()
+                    StoragePrefs.setGalleryFolders(this@SettingsActivity, selected)
+                    updateGalleryFoldersStatus()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
     private fun cleanupJunkFiles(): Pair<Int, Long> {
         var files = 0
         var bytes = 0L
