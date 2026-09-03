@@ -263,7 +263,7 @@ object StoragePrefs {
 
     fun isServerAutoStartEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_SERVER_AUTOSTART, true)
+            .getBoolean(KEY_SERVER_AUTOSTART, false)
 
     /** Server hanya boleh start otomatis bila PIN wajib sudah disetel. */
     fun isServerStartAllowed(context: Context): Boolean =

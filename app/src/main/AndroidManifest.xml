@@ -16,10 +16,7 @@
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
-    <!-- Izin baterai sengaja: aplikasi download manager, penjelasan ada di UI. -->
-    <uses-permission
-        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
-        tools:ignore="BatteryLife" />
+
 
     <!-- Package visibility untuk targetSdk 30+ (buka file / share / pick);
          diabaikan oleh Android 5–10. -->
