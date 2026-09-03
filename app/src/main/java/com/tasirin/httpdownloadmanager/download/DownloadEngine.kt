@@ -832,7 +832,7 @@ class DownloadEngine(appContext: Context) {
             emptyList()
         }
         val allMirrors = (if (item.mirrors.isNotEmpty()) item.mirrors else autoMirrors)
-            .filterNot { it in failedUrls }
+            .filterNot { failedUrls.containsKey(it) }
         // Error Range pasti gagal lagi di URL yang sama, dan mirror yang pernah
         // gagal tidak perlu dicoba ulang: langsung coba cadangan berikutnya.
         if (allMirrors.isNotEmpty() && (rangeRejected || slowRejected || isConnectError(message))) {
