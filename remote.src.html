@@ -4626,7 +4626,7 @@ function probeSocialQuality() {
       socialPhotoOptions = [];
       qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>' +
         socialVideoOptions.map(function (o, i) {
-          return '<option value="' + (i + 1) + '">' + o.label + '</option>';
+          return '<option value="' + (i + 1) + '">' + escapeHtml(o.label) + '</option>';
         }).join('');
       qualitySelect.classList.remove('hidden');
       photoSelect.classList.add('hidden');
@@ -4652,7 +4652,7 @@ function probeSocialQuality() {
         if (videos.length) {
           qualitySelect.innerHTML = '<option value="0">Quality: Auto (best)</option>' +
             videos.map(function (o, i) {
-              return '<option value="' + (i + 1) + '">' + o.label + '</option>';
+              return '<option value="' + (i + 1) + '">' + escapeHtml(o.label) + '</option>';
             }).join('');
           qualitySelect.classList.remove('hidden');
         } else {
@@ -4662,7 +4662,7 @@ function probeSocialQuality() {
         if (photos.length > 1) {
           photoSelect.innerHTML = '<option value="0">Select photo: All</option>' +
             photos.map(function (o, i) {
-              return '<option value="' + (i + 1) + '">' + o.label + '</option>';
+              return '<option value="' + (i + 1) + '">' + escapeHtml(o.label) + '</option>';
             }).join('');
           photoSelect.classList.remove('hidden');
         } else {

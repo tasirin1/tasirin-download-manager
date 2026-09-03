@@ -106,20 +106,27 @@ class DownloadEngine(appContext: Context) {
     private var lastProgressSaveAt = 0L
     // URL yang pernah gagal di sesi ini: cadangan yang sama tidak dicoba
     // berulang-ulang (hemat waktu saat ISP/proxy menolak beberapa host).
-    // LinkedHashMap(accessOrder=true) auto-evict LRU saat > 256 — O(1) cleanup.
-    // Thread-safe LRU cache: dipakai dari multiple coroutines (handleFailure + runDownload).
-    // ConcurrentHashMap tidak punya eviction otomatis, jadi pakai pairs + batas ukuran.
-    private val failedUrls = ConcurrentHashMap<String, Boolean>()
-    private val FAILED_URLS_MAX = 256
+    // LinkedHashMap(accessOrder=true) = LRU otomatis — akses terakhir dipindah
+    // ke akhir, sehingga eviction selalu membuang entry paling tua.
+    // Dipakai dari multiple coroutines (handleFailure + runDownload).
+    private val failedUrlLock = Any()
+    private val failedUrls = LinkedHashMap<String, Boolean>(0, 0.75f, true)
+    private const val FAILED_URLS_MAX = 256
 
     private fun rememberFailedUrl(url: String) {
-        failedUrls[url] = true
-        // Evict LRU sederhana: bila melebihi batas, buang setengah yang lama
-        if (failedUrls.size > FAILED_URLS_MAX) {
-            val iter = failedUrls.keys.iterator()
-            var drop = failedUrls.size / 2
-            while (iter.hasNext() && drop > 0) { iter.next(); iter.remove(); drop-- }
+        synchronized(failedUrlLock) {
+            failedUrls[url] = true
+            // Evict LRU: bila melebihi batas, buang setengah yang paling tua
+            if (failedUrls.size > FAILED_URLS_MAX) {
+                val iter = failedUrls.keys.iterator()
+                var drop = failedUrls.size / 2
+                while (iter.hasNext() && drop > 0) { iter.next(); iter.remove(); drop-- }
+            }
         }
+    }
+
+    private fun isFailedUrl(url: String): Boolean = synchronized(failedUrlLock) {
+        failedUrls.containsKey(url)
     }
 
     // Cached maxConcurrent — hindari recompute dari SharedPreferences tiap cek
@@ -832,7 +839,7 @@ class DownloadEngine(appContext: Context) {
             emptyList()
         }
         val allMirrors = (if (item.mirrors.isNotEmpty()) item.mirrors else autoMirrors)
-            .filterNot { failedUrls.containsKey(it) }
+            .filterNot { isFailedUrl(it) }
         // Error Range pasti gagal lagi di URL yang sama, dan mirror yang pernah
         // gagal tidak perlu dicoba ulang: langsung coba cadangan berikutnya.
         if (allMirrors.isNotEmpty() && (rangeRejected || slowRejected || isConnectError(message))) {

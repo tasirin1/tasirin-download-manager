@@ -13,12 +13,18 @@ object StoragePrefs {
     const val DEFAULT_PORT = 8080
 
     private const val PREFS = "storage_settings"
+    private val prefsLock = Any()
     @Volatile private var cachedPrefs: android.content.SharedPreferences? = null
 
-    /** Cache SharedPreferences instance untuk menghindari 58x getSharedPreferences call. */
+    /** Cache SharedPreferences instance untuk menghindari 58x getSharedPreferences call.
+     *  Init dijaga lock agar tidak membuat duplikat dari thread paralel. */
     private fun prefs(context: Context): android.content.SharedPreferences {
-        return cachedPrefs ?: context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
-            .also { cachedPrefs = it }
+        cachedPrefs?.let { return it }
+        synchronized(prefsLock) {
+            cachedPrefs?.let { return it }
+            return context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+                .also { cachedPrefs = it }
+        }
     }
     private const val HEX_CHARS = "0123456789abcdef"
     private const val KEY_FOLDER_URI = "folder_uri"
