@@ -1,6 +1,5 @@
 ## [Unreleased]
 
-## [Unreleased]
 - **Fix minor: `failedUrls` eviction bukan LRU** -- Eviction menggunakan `ConcurrentHashMap.keys.iterator()` yang tidak menjamin urutan insert → eviction menghapus entry secara acak. Diganti ke `LinkedHashMap(accessOrder=true)` + `synchronized` lock → eviction benar-benar membuang entry paling tua (LRU). `containsKey()` untuk filter mirror juga dijaga thread-safe.
 - **Fix minor: label XSS di social_options remote web** -- Label kualitas foto/video dari social media extractor di-inject ke `innerHTML` tanpa `escapeHtml()`. Meski risiko rendah (server hanya local network + PIN-protected), konsistensi encoding dicegah agar tidak menjadi celah bila konten berubah. Semua 3 titik `o.label` di option rendering kini pakai `escapeHtml()`.
 - **Fix minor: `StoragePrefs.cachedPrefs` race condition** -- `@Volatile` memastikan visibility tapi bukan atomic init — dua thread bisa membuat 2 instance `SharedPreferences` pada cold start. Ditambahkan double-checked locking (`synchronized(prefsLock)`) agar hanya satu instance yang dibuat.
