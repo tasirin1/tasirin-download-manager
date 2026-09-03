@@ -193,7 +193,7 @@
  display: flex; align-items: center; gap: 8px; margin-top: 7px; }
 
   .bar {
- height: 3px; flex: 1; background: #e9edf5; border-radius: 999px; overflow: hidden; }
+ height: 4px; flex: 1; background: #e9edf5; position: relative; border-radius: 999px; overflow: hidden; }
 
   .bar-pct {
  flex: 0 0 auto; min-width: 38px; text-align: right; font-size: 11.5px; font-weight: 700; color: var(--primary); }
@@ -202,7 +202,19 @@
  background: var(--green); }
 
   .fill {
- height: 100%; background: linear-gradient(90deg, #ffa94d, var(--accent)); width: 0; border-radius: 999px; transition: width .5s ease; }
+ height: 100%; background: linear-gradient(90deg, #ffa94d, var(--accent)); width: 0; border-radius: 999px; transition: width .6s cubic-bezier(.4,0,.2,1); position: relative; overflow: hidden; }
+
+  .fill::after {
+ content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); animation: shimmer 1.8s ease-in-out infinite; }
+
+  @keyframes shimmer {
+ 0% { transform: translateX(-100%); }
+ 100% { transform: translateX(200%); }
+ }
+
+  .bar.downloading .fill { background: linear-gradient(90deg, #4353e6, #6c7cff, var(--primary)); }
+  .bar.paused .fill { background: var(--amber); opacity: .7; }
+  .bar.paused .fill::after { animation: none; }
 
   .item-sub {
  padding-left: 54px; }
@@ -1029,6 +1041,40 @@
  animation: none !important; }
  }
 
+  li.item { position: relative; overflow: hidden; }
+  li.item .swipe-bg { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 20px; font-size: 13px; font-weight: 700; color: #fff; opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 0; }
+  li.item .swipe-bg.left { background: var(--amber); justify-content: flex-start; }
+  li.item .swipe-bg.right { background: var(--red); justify-content: flex-end; }
+  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); transition: transform .2s ease; will-change: transform; }
+  .list.compact li.item { padding: 10px 14px; }
+  .list.compact .item-top { gap: 8px; }
+  .list.compact .icon { width: 32px; height: 32px; border-radius: 8px; }
+  .list.compact .icon svg { width: 18px; height: 18px; }
+  .list.compact .name { font-size: 13px; }
+  .list.compact .meta { font-size: 11.5px; margin-top: 1px; }
+  .list.compact .bar { height: 2px; }
+  .list.compact .bar-pct { font-size: 10.5px; min-width: 32px; }
+  .list.compact .item-sub { padding-left: 40px; }
+  .list.compact .err { font-size: 11.5px; margin-top: 3px; }
+  .list.compact .item-retry { padding: 3px 10px; font-size: 11px; }
+  .compact-toggle { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); cursor: pointer; font-size: 14px; color: var(--muted); transition: all .15s; }
+  .compact-toggle:hover { border-color: var(--primary); color: var(--primary); }
+  .compact-toggle.on { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+  .batch-check { display: none; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line); background: var(--card); flex-shrink: 0; cursor: pointer; appearance: none; -webkit-appearance: none; margin-top: 10px; transition: all .15s; }
+  .batch-check:checked { background: var(--primary); border-color: var(--primary); }
+  .batch-check:checked::after { content: ''; display: block; width: 6px; height: 10px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin: 2px auto; }
+  .batch-mode li.item { display: flex; align-items: flex-start; gap: 10px; }
+  .batch-mode .batch-check { display: block; }
+  .batch-mode .item-top { flex: 1; min-width: 0; }
+  .batch-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: rgba(255,255,255,.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding: 10px 16px; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .batch-toolbar.show { display: flex; }
+  .batch-toolbar button { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .batch-toolbar button:hover { border-color: var(--primary); color: var(--primary); }
+  .batch-toolbar button.danger { color: var(--red); border-color: var(--red); }
+  .batch-toolbar button.danger:hover { background: var(--red-bg); }
+  .batch-toolbar .sel-count { font-size: 12px; color: var(--muted); align-self: center; margin-right: auto; }
+  .sparkline { flex: 0 0 80px; height: 16px; opacity: .85; }
+
   @media (min-width: 601px) {
 
     .sheet {
@@ -1176,6 +1222,15 @@
     <button id="resumeAllBtn" type="button">&#9654; Resume all</button>
     <button id="retryFailedBtn" type="button">&#8635; Retry failed</button>
     <button id="clearCompletedBtn" type="button">&#128465; Clear completed</button>
+    <button id="compactToggleBtn" class="compact-toggle" type="button" title="Compact view">&#9776;</button>
+    <button id="batchModeBtn" type="button">&#9745; Select</button>
+  </div>
+  <div class="batch-toolbar" id="batchToolbar">
+    <span class="sel-count" id="batchSelCount">0 selected</span>
+    <button id="batchPauseBtn" type="button">&#9208; Pause</button>
+    <button id="batchResumeBtn" type="button">&#9654; Resume</button>
+    <button id="batchDeleteBtn" class="danger" type="button">&#128465; Delete</button>
+    <button id="batchCancelBtn" type="button">Cancel</button>
   </div>
 
   <div id="filtersSticky">
@@ -3975,11 +4030,11 @@ function stateBadge(s) {
 
 function fileIcon(name) {
   const e = extOf(name).toLowerCase();
-  if (FILE_ICON_VIDEO.indexOf(e) >= 0) return '\u{1F3AC}';
-  if (FILE_ICON_IMG.indexOf(e) >= 0) return '\u{1F5BC}';
-  if (FILE_ICON_AUD.indexOf(e) >= 0) return '\u{1F3B5}';
+  if (FILE_ICON_VIDEO.indexOf(e) >= 0) return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="3" fill="#4353e6"/><polygon points="10,8.5 16,12 10,15.5" fill="#fff"/></svg>';
+  if (FILE_ICON_IMG.indexOf(e) >= 0) return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" fill="#0f9d58"/><circle cx="9" cy="10" r="2" fill="#fff"/><path d="M3 17l5-5 3 3 4-4 6 6v1a3 3 0 01-3 3H6a3 3 0 01-3-3z" fill="#fff" opacity=".7"/></svg>';
+  if (FILE_ICON_AUD.indexOf(e) >= 0) return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#f76707"/><circle cx="12" cy="12" r="3" fill="#fff"/></svg>';
   if (e === 'apk') return '\u{1F4E6}';
-  if (e === 'pdf') return '\u{1F4C4}';
+  if (e === 'pdf') return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z" fill="#d93025"/><path d="M14 2v6h6" fill="#fdeceb"/><text x="8" y="17" font-size="7" font-weight="700" fill="#fff">PDF</text></svg>';
   if (FILE_ICON_ARC.indexOf(e) >= 0) return '\u{1F4E6}';
   if (FILE_ICON_DOC.indexOf(e) >= 0) return '\u{1F4C4}';
   return '\u{1F4CE}';
@@ -4039,6 +4094,115 @@ function emptyHtml(kind, title, sub, cta) {
     '</div>';
 }
 
+var compactMode = localStorage.getItem('dl_compact') === '1';
+function applyCompact() {
+  var l = document.getElementById('list');
+  if (l) l.classList.toggle('compact', compactMode);
+  var b = document.getElementById('compactToggleBtn');
+  if (b) b.classList.toggle('on', compactMode);
+}
+document.getElementById('compactToggleBtn').addEventListener('click', function () {
+  compactMode = !compactMode;
+  localStorage.setItem('dl_compact', compactMode ? '1' : '0');
+  applyCompact();
+});
+
+var speedHistory = {};
+function recordSpeed(id, speed) {
+  if (!id || speed <= 0) return;
+  if (!speedHistory[id]) speedHistory[id] = [];
+  speedHistory[id].push(speed);
+  if (speedHistory[id].length > 30) speedHistory[id].shift();
+}
+function drawSparkline(canvas) {
+  var id = canvas.dataset.id;
+  var data = speedHistory[id];
+  if (!data || data.length < 2) return;
+  var ctx = canvas.getContext('2d');
+  var w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  var mx = Math.max.apply(null, data);
+  if (mx <= 0) return;
+  var step = w / (data.length - 1);
+  ctx.beginPath();
+  ctx.moveTo(0, h - (data[0] / mx) * h);
+  for (var i = 1; i < data.length; i++) ctx.lineTo(i * step, h - (data[i] / mx) * h);
+  ctx.strokeStyle = '#4353e6';
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.lineTo((data.length - 1) * step, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(67,83,230,.12)';
+  ctx.fill();
+}
+
+function attachSwipe(li) {
+  var sx = 0, swiping = false;
+  var wrap = document.createElement('div');
+  wrap.className = 'swipe-content';
+  while (li.firstChild) wrap.appendChild(li.firstChild);
+  var bgL = document.createElement('div');
+  bgL.className = 'swipe-bg left';
+  bgL.textContent = '\u23F8 Pause';
+  var bgR = document.createElement('div');
+  bgR.className = 'swipe-bg right';
+  bgR.textContent = '\u2715 Delete';
+  li.appendChild(bgL);
+  li.appendChild(bgR);
+  li.appendChild(wrap);
+  li.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; swiping = false; }, {passive: true});
+  li.addEventListener('touchmove', function (e) {
+    var dx = e.touches[0].clientX - sx;
+    if (!swiping && Math.abs(dx) > 8) swiping = true;
+    if (!swiping) return;
+    var c = Math.max(-120, Math.min(120, dx));
+    wrap.style.transform = 'translateX(' + c + 'px)';
+    bgL.style.opacity = c < -30 ? Math.min(1, (-c - 30) / 60) : 0;
+    bgR.style.opacity = c > 30 ? Math.min(1, (c - 30) / 60) : 0;
+  }, {passive: true});
+  li.addEventListener('touchend', function () {
+    var t = wrap.style.transform;
+    var dx = t ? parseFloat(t.replace(/[^\d\-]/g, '')) || 0 : 0;
+    wrap.style.transform = '';
+    bgL.style.opacity = 0;
+    bgR.style.opacity = 0;
+    var itemId = li.dataset.id;
+    if (dx < -80) {
+      var it = currentItems.find(function (x) { return x.id === itemId; });
+      if (it) doAction(itemId, it.state === 'DOWNLOADING' ? 'pause' : 'resume');
+    } else if (dx > 80) {
+      showConfirm('Delete', 'Delete this download?', 'Delete', function () { doAction(itemId, 'delete'); });
+    }
+  }, {passive: true});
+}
+
+var batchMode = false;
+var batchSelected = new Set();
+function toggleBatchMode() {
+  batchMode = !batchMode;
+  batchSelected.clear();
+  document.getElementById('batchModeBtn').classList.toggle('on', batchMode);
+  document.getElementById('batchModeBtn').textContent = batchMode ? '\u2715 Cancel' : '\u2745 Select';
+  document.getElementById('list').classList.toggle('batch-mode', batchMode);
+  document.getElementById('batchToolbar').classList.toggle('show', batchMode);
+  updateBatchCount();
+}
+function updateBatchCount() {
+  document.getElementById('batchSelCount').textContent = batchSelected.size + ' selected';
+}
+document.getElementById('batchModeBtn').addEventListener('click', toggleBatchMode);
+document.getElementById('batchCancelBtn').addEventListener('click', toggleBatchMode);
+document.getElementById('batchPauseBtn').addEventListener('click', function () { batchSelected.forEach(function (id) { doAction(id, 'pause'); }); });
+document.getElementById('batchResumeBtn').addEventListener('click', function () { batchSelected.forEach(function (id) { doAction(id, 'resume'); }); });
+document.getElementById('batchDeleteBtn').addEventListener('click', function () {
+  showConfirm('Delete selected', 'Delete ' + batchSelected.size + ' item(s)?', 'Delete', function () {
+    batchSelected.forEach(function (id) { doAction(id, 'delete'); });
+    toggleBatchMode();
+  });
+});
+
 function render(items) {
   currentItems = items;
   const struct = (webFilter || '') + '::' + structSig(items);
@@ -4066,10 +4230,13 @@ function rowSubHtml(it) {
     meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
     if (it.etaSeconds > 0) meta += ' \u00b7 ETA ' + fmtEta(it.etaSeconds);
   }
+  const barCls = it.state === 'DOWNLOADING' ? ' downloading' : (it.state === 'PAUSED' ? ' paused' : '');
   return '<div class="item-sub">' +
     '<div class="meta">' + stateBadge(it.state) + '<span>' + meta + '</span></div>' +
-    '<div class="bar-wrap"><div class="bar"><div class="fill' + (done ? ' done' : '') + '" style="width:' + prog + '%"></div></div>' +
-    '<span class="bar-pct">' + prog + '%</span></div>' +
+    '<div class="bar-wrap"><div class="bar' + barCls + '"><div class="fill' + (done ? ' done' : '') + '" style="width:' + prog + '%"></div></div>' +
+    '<span class="bar-pct">' + prog + '%</span>' +
+    (it.state === 'DOWNLOADING' ? '<canvas class="sparkline" width="80" height="16" data-id="' + it.id + '"></canvas>' : '') +
+    '</div>' +
     '</div>';
 }
 
@@ -4108,6 +4275,7 @@ function patchRowSub(li, it) {
   if (errBox && errBox.textContent !== it.error) errBox.textContent = it.error || '';
   const done = it.state === 'COMPLETED';
   const prog = done ? 100 : Math.max(0, Math.min(100, Math.round(it.progress || 0)));
+  if (it.state === 'DOWNLOADING' && it.speedBps > 0) recordSpeed(it.id, it.speedBps);
   let meta = rowMetaText(it);
   if (it.state === 'DOWNLOADING' && it.speedBps > 0) {
     meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
@@ -4115,6 +4283,8 @@ function patchRowSub(li, it) {
   }
   const text = sub._text || (sub._text = sub.querySelector('.meta span:not(.badge)'));
   if (text) text.textContent = meta;
+  var spark = sub.querySelector('.sparkline');
+  if (spark) drawSparkline(spark);
   const badge = sub._badge || (sub._badge = sub.querySelector('.badge'));
   if (badge) {
     const label = stateLabel(it.state);
@@ -4224,9 +4394,23 @@ function rebuildList(items) {
         doAction(it.id, 'resume');
       });
     }
+    if (compactMode) li.classList.add('compact');
+    if (batchMode) li.classList.add('batch-mode');
     rowNodes.set(it.id, li);
     list.appendChild(li);
+    attachSwipe(li);
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'batch-check';
+    cb.dataset.id = it.id;
+    cb.addEventListener('change', function () {
+      if (this.checked) batchSelected.add(it.id); else batchSelected.delete(it.id);
+      updateBatchCount();
+    });
+    li.appendChild(cb);
   }
+  applyCompact();
+  document.querySelectorAll('.sparkline').forEach(drawSparkline);
 }
 
 var HTML_ENT = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
