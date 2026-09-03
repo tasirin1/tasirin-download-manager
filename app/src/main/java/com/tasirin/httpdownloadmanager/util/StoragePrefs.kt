@@ -413,15 +413,13 @@ object StoragePrefs {
      *  String kosong = semua folder (default). Disimpan sebagai baris per folder. */
     fun getGalleryFolders(context: Context): List<String> =
         prefs(context).getString(KEY_GALLERY_FOLDERS, null)
-            ?.split("
-")
+            ?.split("\n")
             ?.map { it.trim() }
             ?.filter { it.isNotEmpty() }
             ?: emptyList()
 
     fun setGalleryFolders(context: Context, folders: List<String>) {
-        prefs(context).edit { putString(KEY_GALLERY_FOLDERS, folders.joinToString("
-")) }
+        prefs(context).edit { putString(KEY_GALLERY_FOLDERS, folders.joinToString("\n")) }
     }
 
     /** Bandingkan dua string tanpa short-circuit (constant-time). */
