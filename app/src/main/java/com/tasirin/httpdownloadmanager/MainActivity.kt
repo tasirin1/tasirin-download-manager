@@ -617,8 +617,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialPhotoOptions.forEachIndexed { idx, opt ->
                     val mergedHeaders = if (opt.cookies.isNotEmpty()) {
                         val existing = headers.trim()
-                        if (existing.isNotEmpty()) "${existing}
-Cookie: ${opt.cookies}"
+                        if (existing.isNotEmpty()) "${existing}\nCookie: ${opt.cookies}"
                         else "Cookie: ${opt.cookies}"
                     } else headers
                     App.engine.addDownload(
