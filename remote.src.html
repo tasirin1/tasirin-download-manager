@@ -4522,6 +4522,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   // Prioritas: foto carousel > video quality > YouTube resolusi
   var photoIdx = parseInt(photoSelect.value, 10) || 0;
   var qualityIdx = parseInt(qualitySelect.value, 10) || 0;
+  var sendAll = (photoIdx === 0 && socialPlatform === 'social' && socialPhotoOptions.length > 1);
   if (photoIdx > 0 && socialPlatform === 'social' && socialPhotoOptions.length) {
     // User picked a specific photo from carousel
     var chosen = socialPhotoOptions[photoIdx - 1];
@@ -4552,6 +4553,30 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     }
   }
   try {
+    if (sendAll && socialPhotoOptions.length > 1) {
+      // Download all carousel photos at once
+      for (var ci = 0; ci < socialPhotoOptions.length; ci++) {
+        var cOpt = socialPhotoOptions[ci];
+        if (!cOpt || !cOpt.url) continue;
+        var allBody = new URLSearchParams({url: cOpt.url});
+        if (cOpt.fileName) allBody.append('name', cOpt.fileName);
+        allBody.append('speedLimitKbps', document.getElementById('speed').value);
+        allBody.append('priority', document.getElementById('priority').value);
+        allBody.append('path', document.getElementById('storage').value.trim());
+        allBody.append('method', document.getElementById('dlMethod').value);
+        if (cOpt.cookies) {
+          var uh = document.getElementById('dlHeaders').value.trim();
+          allBody.append('headers', (uh ? uh + '\n' : '') + 'Cookie: ' + cOpt.cookies);
+        } else {
+          allBody.append('headers', document.getElementById('dlHeaders').value.trim());
+        }
+        await fetch(API + '/api/add', {
+          method: 'POST',
+          body: allBody,
+          headers: {'X-Requested-With': 'XMLHttpRequest'}
+        });
+      }
+    } else {
     const res = await fetch(API + '/api/add', {
       method: 'POST',
       body,
@@ -4560,6 +4585,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     const data = await res.json().catch(function () { return null; });
     if (!res.ok || !data || !data.ok) {
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
+    }
     }
     // Send additional URLs as separate requests
     for (var i = 1; i < urls.length; i++) {

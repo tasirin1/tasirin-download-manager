@@ -458,12 +458,22 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
                 // Section pemilihan foto carousel
                 if (hasPhotos) {
-                    val photoLabels = listOf(getString(R.string.social_quality_default)) +
-                        socialPhotoOptions.map { opt ->
-                            opt.quality.takeIf { it.isNotBlank() }
-                                ?: opt.mimeType.takeIf { it.isNotBlank() }
-                                ?: "Photo"
-                        }
+                    val photoLabels = if (socialPhotoOptions.size > 1) {
+                        listOf(String.format(getString(R.string.social_carousel_all), socialPhotoOptions.size)) +
+                            socialPhotoOptions.mapIndexed { i, opt ->
+                                val label = opt.quality.takeIf { it.isNotBlank() }
+                                    ?: opt.mimeType.takeIf { it.isNotBlank() }
+                                    ?: "Photo"
+                                "${i + 1}. $label"
+                            }
+                    } else {
+                        listOf(getString(R.string.social_quality_default)) +
+                            socialPhotoOptions.map { opt ->
+                                opt.quality.takeIf { it.isNotBlank() }
+                                    ?: opt.mimeType.takeIf { it.isNotBlank() }
+                                    ?: "Photo"
+                            }
+                    }
                     setupSpinner(this@MainActivity, socialCarouselSpinner, photoLabels)
                     socialCarouselSection.isVisible = true
                 }
@@ -574,12 +584,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialSel in 1..socialYoutubeHeights.size
             ) socialYoutubeHeights[socialSel - 1] else 0
             val carouselSel = socialCarouselSpinner.selectedItemPosition
+            val carouselAll = socialCarouselSection.isVisible &&
+                socialPhotoOptions.size > 1 && carouselSel == 0
             val selectedPhotoOption = if (
                 socialCarouselSection.isVisible &&
                 socialPhotoOptions.isNotEmpty() &&
                 carouselSel in 1..socialPhotoOptions.size
             ) socialPhotoOptions[carouselSel - 1] else null
-            val selectedOption = selectedPhotoOption ?: selectedVideoOption
+            val selectedOption = if (carouselAll) null else (selectedPhotoOption ?: selectedVideoOption)
             val name = nameInput.text?.toString()?.trim().orEmpty()
             val username = usernameInput.text?.toString()?.trim().orEmpty()
             val password = passwordInput.text?.toString()?.trim().orEmpty()
@@ -600,6 +612,27 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     checksum = checksum,
                     mirrors = parseMirrors()
                 )
+            } else if (carouselAll && socialPhotoOptions.isNotEmpty()) {
+                // Download semua foto carousel sekaligus
+                socialPhotoOptions.forEachIndexed { idx, opt ->
+                    val mergedHeaders = if (opt.cookies.isNotEmpty()) {
+                        val existing = headers.trim()
+                        if (existing.isNotEmpty()) "${existing}
+Cookie: ${opt.cookies}"
+                        else "Cookie: ${opt.cookies}"
+                    } else headers
+                    App.engine.addDownload(
+                        url = opt.directUrl,
+                        fileName = opt.fileName,
+                        username = username,
+                        password = password,
+                        headers = mergedHeaders,
+                        speedLimitKbps = perSpeed,
+                        priority = priority,
+                        checksum = if (idx == 0) checksum else "",
+                        mirrors = if (idx == 0) parseMirrors() else emptyList()
+                    )
+                }
             } else if (selectedOption != null) {
                 val mergedHeaders = if (selectedOption.cookies.isNotEmpty()) {
                     val existing = headers.trim()
