@@ -1,4 +1,5 @@
 ## [Unreleased]
+
 - **Folder picker untuk galeri native** -- Settings kini punya seksi "Gallery folders" dengan pola input yang sama seperti "Extra folders" (kolom path + tombol +). Masukkan path absolut folder yang berisi video (e.g. /storage/emulated/0/DCIM/Camera). Kosongkan untuk scan semua folder (default). Disimpan di SharedPreferences; galeri native filter berdasarkan DATA column; remote web tidak terpengaruh.
 
 - **Fix minor: `failedUrls` eviction bukan LRU** -- Eviction menggunakan `ConcurrentHashMap.keys.iterator()` yang tidak menjamin urutan insert → eviction menghapus entry secara acak. Diganti ke `LinkedHashMap(accessOrder=true)` + `synchronized` lock → eviction benar-benar membuang entry paling tua (LRU). `containsKey()` untuk filter mirror juga dijaga thread-safe.
