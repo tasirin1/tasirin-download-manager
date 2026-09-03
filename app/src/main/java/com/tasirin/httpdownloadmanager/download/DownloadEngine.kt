@@ -111,7 +111,7 @@ class DownloadEngine(appContext: Context) {
     // Dipakai dari multiple coroutines (handleFailure + runDownload).
     private val failedUrlLock = Any()
     private val failedUrls = LinkedHashMap<String, Boolean>(0, 0.75f, true)
-    private const val FAILED_URLS_MAX = 256
+    private val FAILED_URLS_MAX = 256
 
     private fun rememberFailedUrl(url: String) {
         synchronized(failedUrlLock) {
