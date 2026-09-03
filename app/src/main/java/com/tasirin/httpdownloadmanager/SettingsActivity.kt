@@ -39,7 +39,6 @@ import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.Formats
-import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
@@ -98,9 +97,12 @@ class SettingsActivity : AppCompatActivity() {
                 binding.btnCleanup.isEnabled = true
             }
         }
-        // Gallery folder picker
-        updateGalleryFoldersStatus()
-        binding.btnGalleryFolders.setOnClickListener { showGalleryFolderPicker() }
+        // Gallery folder rows (same pattern as extra folders)
+        val galleryBox = findViewById<LinearLayout>(R.id.gallery_folders_container)
+        StoragePrefs.getGalleryFolders(this).forEach { addGalleryFolderRow(galleryBox, it) }
+        findViewById<Button>(R.id.btn_add_gallery_folder).setOnClickListener {
+            addGalleryFolderRow(galleryBox, "")
+        }
 
         wireDownloadSettings()
         wireStorageSection()
@@ -242,56 +244,35 @@ class SettingsActivity : AppCompatActivity() {
 
     /** Hapus file .part menggantung + cache thumbnail. Tidak menyentuh file
      *  milik download yang masih berjalan/antre/jeda. */
-    private fun updateGalleryFoldersStatus() {
-        val folders = StoragePrefs.getGalleryFolders(this)
-        binding.galleryFoldersStatus.text = if (folders.isEmpty()) {
-            getString(R.string.gallery_folder_all)
-        } else {
-            folders.joinToString(", ")
+
+
+    private fun addGalleryFolderRow(box: LinearLayout, path: String) {
+        val row = layoutInflater.inflate(R.layout.row_extra_folder, box, false)
+        val input = row.findViewById<EditText>(R.id.extra_folder_path)
+        input.hint = getString(R.string.gallery_folder_hint)
+        input.setText(path)
+        input.setSelection(input.text.length)
+        row.findViewById<Button>(R.id.btn_remove_folder).setOnClickListener {
+            box.removeView(row)
         }
+        box.addView(row)
     }
 
-    private fun showGalleryFolderPicker() {
-        lifecycleScope.launch {
-            val folders = withContext(Dispatchers.IO) {
-                MediaLibrary.discoverFolders(this@SettingsActivity)
+    private fun applyGalleryFolders(view: View) {
+        val box = view.findViewById<LinearLayout>(R.id.gallery_folders_container)
+        val paths = mutableListOf<String>()
+        for (i in 0 until box.childCount) {
+            val input = box.getChildAt(i).findViewById<EditText>(R.id.extra_folder_path)
+            val path = input.text?.toString()?.trim().orEmpty()
+            if (path.isEmpty()) continue
+            val dir = java.io.File(path)
+            if (!dir.isDirectory) {
+                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
+                return
             }
-            if (folders.isEmpty()) {
-                Toast.makeText(this@SettingsActivity, R.string.gallery_folder_empty, Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-            val allLabel = getString(R.string.gallery_folder_all)
-            val labels = mutableListOf(allLabel)
-            labels.addAll(folders)
-            val currentSelection = StoragePrefs.getGalleryFolders(this@SettingsActivity).toMutableSet()
-            val checked = BooleanArray(labels.size) { i ->
-                i == 0 || currentSelection.contains(labels[i])
-            }
-            checked[0] = currentSelection.isEmpty()
-
-            android.app.AlertDialog.Builder(this@SettingsActivity)
-                .setTitle(R.string.gallery_folder_title)
-                .setMultiChoiceItems(labels.toTypedArray(), checked) { _, which, isChecked ->
-                    if (which == 0) {
-                        if (isChecked) {
-                            for (i in 1 until checked.size) checked[i] = false
-                            currentSelection.clear()
-                        }
-                    } else {
-                        checked[which] = isChecked
-                        if (isChecked) currentSelection.add(labels[which])
-                        else currentSelection.remove(labels[which])
-                    }
-                    checked[0] = currentSelection.isEmpty()
-                }
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    val selected = if (checked[0]) emptySet<String>() else currentSelection.toSet()
-                    StoragePrefs.setGalleryFolders(this@SettingsActivity, selected)
-                    updateGalleryFoldersStatus()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            paths.add(path)
         }
+        StoragePrefs.setGalleryFolders(this, paths)
     }
 
     private fun cleanupJunkFiles(): Pair<Int, Long> {
@@ -742,6 +723,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             applyStoragePath(findViewById<EditText>(R.id.input_storage_path))
             applyExtraFolders(binding.root)
+            applyGalleryFolders(binding.root)
             App.httpServer.invalidateFsRootsCache()
             App.httpServer.invalidateStatusCache()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()

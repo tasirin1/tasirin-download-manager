@@ -651,21 +651,35 @@
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
 
-                    <Button
-                        android:id="@+id/btn_gallery_folders"
-                        style="@style/TvOutlinedButton"
+                    <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="@string/gallery_folder_title" />
+                        android:text="@string/gallery_folder_title"
+                        android:textAppearance="?android:attr/textAppearanceMedium" />
 
                     <TextView
-                        android:id="@+id/gallery_folders_status"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
+                        android:text="@string/gallery_folder_hint"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
+
+                    <LinearLayout
+                        android:id="@+id/gallery_folders_container"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <Button
+                        android:id="@+id/btn_add_gallery_folder"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/bg_btn_tv"
+                        android:backgroundTint="@null"
+                        android:text="@string/storage_add_folder" />
 
                     <TextView
                         android:id="@+id/update_status"

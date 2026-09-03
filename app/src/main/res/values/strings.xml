@@ -179,6 +179,7 @@
     <string name="gallery_folders">Folders</string>
     <string name="gallery_folder_title">Select folders to scan</string>
     <string name="gallery_folder_all">All folders</string>
+    <string name="gallery_folder_hint">Video folders to scan in gallery. Leave empty for all.</string>
     <string name="gallery_folder_empty">No video folders found on this device</string>
     <string name="gallery_open_error">No app found to open this file</string>
 

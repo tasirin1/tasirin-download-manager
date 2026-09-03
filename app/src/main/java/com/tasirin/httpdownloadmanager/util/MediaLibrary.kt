@@ -23,7 +23,7 @@ object MediaLibrary {
 
     @Volatile
     private var scanCache: Triple<Long, List<MediaEntry>, Int>? = null
-    private var scanCacheFolderKey: Set<String> = emptySet()
+    private var scanCacheFolderKey: List<String> = emptyList()
     private val scanLock = Any()
     @Volatile private var observerRegistered = false
 
@@ -110,7 +110,7 @@ object MediaLibrary {
         context: Context,
         partialProgress: Map<String, Int> = emptyMap(),
         maxEntries: Int = GALLERY_MAX_ENTRIES,
-        selectedFolders: Set<String> = emptySet()
+        selectedFolders: List<String> = emptyList()
     ): MediaScanResult {
         val base = scanCached(context, maxEntries, selectedFolders)
         if (partialProgress.isEmpty()) return base
@@ -157,7 +157,7 @@ object MediaLibrary {
         else -> fileExists(filePath)
     }
 
-    private fun scanCached(context: Context, maxEntries: Int, selectedFolders: Set<String> = emptySet()): MediaScanResult {
+    private fun scanCached(context: Context, maxEntries: Int, selectedFolders: List<String> = emptyList()): MediaScanResult {
         ensureObserver(context)
         synchronized(scanLock) {
             val now = System.currentTimeMillis()
@@ -209,7 +209,7 @@ object MediaLibrary {
         }
     }
 
-    private fun scanUncached(context: Context, maxEntries: Int, selectedFolders: Set<String> = emptySet()): MediaScanResult {
+    private fun scanUncached(context: Context, maxEntries: Int, selectedFolders: List<String> = emptyList()): MediaScanResult {
         val list = mutableListOf<MediaEntry>()
 
         fun addFile(f: File, isPartial: Boolean = false) {
@@ -287,17 +287,14 @@ object MediaLibrary {
                 if (Build.VERSION.SDK_INT >= 29) add(MediaStore.MediaColumns.RELATIVE_PATH)
                 add(MediaStore.Video.Media.DURATION)
             }.toTypedArray()
-            // Bangun selection SQL untuk filter folder (API 29+ pakai RELATIVE_PATH)
+            // Bangun selection SQL untuk filter folder (pakai DATA column = path absolut)
             val selection: String?
             val selectionArgs: Array<String>?
-            if (selectedFolders.isNotEmpty() && Build.VERSION.SDK_INT >= 29) {
-                val placeholders = selectedFolders.joinToString(",") { "?" }
-                selection = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR " +
-                    selectedFolders.joinToString(" OR ") {
-                        "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
-                    }
-                // LIKE perlu '%' di akhir untuk match subfolder
-                selectionArgs = selectedFolders.flatMap { listOf("$it%") + listOf(it) }.toTypedArray()
+            if (selectedFolders.isNotEmpty()) {
+                // Filter: file harus berada di salah satu folder yang dipilih
+                // DATA column berisi path absolut (e.g. /storage/emulated/0/DCIM/Camera/VID.mp4)
+                selection = selectedFolders.joinToString(" OR ") { "${MediaStore.MediaColumns.DATA} LIKE ?" }
+                selectionArgs = selectedFolders.map { "$it/%" }.toTypedArray()
             } else {
                 selection = null
                 selectionArgs = null
@@ -354,27 +351,6 @@ object MediaLibrary {
         return MediaScanResult(deduped.take(maxEntries), deduped.size)
     }
 
-    /** Temukan semua folder yang punya video di MediaStore (untuk folder picker).
-     *  Mengembalikan daftar relative path unik (e.g. "DCIM/Camera", "Download"). */
-    fun discoverFolders(context: Context): List<String> {
-        if (Build.VERSION.SDK_INT < 29) return emptyList()
-        return runCatching {
-            val resolver = context.contentResolver
-            val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            val projection = arrayOf(MediaStore.MediaColumns.RELATIVE_PATH)
-            val folders = mutableSetOf<String>()
-            resolver.query(collection, projection, null, null, null)?.use { c ->
-                val idx = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
-                while (c.moveToNext()) {
-                    val path = c.getString(idx) ?: continue
-                    // Ambil folder induk (e.g. "DCIM/Camera/" -> "DCIM/Camera")
-                    val trimmed = path.trimEnd('/')
-                    if (trimmed.isNotEmpty()) folders.add(trimmed)
-                }
-            }
-            folders.sorted()
-        }.getOrDefault(emptyList())
-    }
 
     /** Hapus thumbnail disk yang sudah lama tak terpakai (> 7 hari). Dipanggil
      *  saat aplikasi mulai; server remote punya pembersih serupa saat start. */

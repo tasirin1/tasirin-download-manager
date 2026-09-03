@@ -409,13 +409,19 @@ object StoragePrefs {
         prefs(context).edit { putBoolean(KEY_FILE_ACCESS_OFFERED, offered) }
     }
 
-    /** Folder yang disertakan di galeri (relative path, e.g. "DCIM/Camera").
-     *  Set kosong = semua folder (default). */
-    fun getGalleryFolders(context: Context): Set<String> =
-        prefs(context).getStringSet(KEY_GALLERY_FOLDERS, emptySet()) ?: emptySet()
+    /** Folder yang disertakan di galeri (path absolut, e.g. "/storage/emulated/0/DCIM/Camera").
+     *  String kosong = semua folder (default). Disimpan sebagai baris per folder. */
+    fun getGalleryFolders(context: Context): List<String> =
+        prefs(context).getString(KEY_GALLERY_FOLDERS, null)
+            ?.split("
+")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?: emptyList()
 
-    fun setGalleryFolders(context: Context, folders: Set<String>) {
-        prefs(context).edit { putStringSet(KEY_GALLERY_FOLDERS, folders) }
+    fun setGalleryFolders(context: Context, folders: List<String>) {
+        prefs(context).edit { putString(KEY_GALLERY_FOLDERS, folders.joinToString("
+")) }
     }
 
     /** Bandingkan dua string tanpa short-circuit (constant-time). */
