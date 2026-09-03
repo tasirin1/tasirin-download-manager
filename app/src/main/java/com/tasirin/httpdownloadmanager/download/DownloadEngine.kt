@@ -70,6 +70,7 @@ class DownloadEngine(appContext: Context) {
     // Application context saja, jangan pernah Activity (anti-leak).
     @SuppressLint("StaticFieldLeak")
     private val context: Context = appContext.applicationContext
+    private val fileSaver by lazy { FileSaver(context) }
 
     // Cookie manager in-memory: store per-host cookies so subsequent requests
     // can carry server-set session cookies (helps sites that require cookies,
@@ -106,12 +107,26 @@ class DownloadEngine(appContext: Context) {
     // URL yang pernah gagal di sesi ini: cadangan yang sama tidak dicoba
     // berulang-ulang (hemat waktu saat ISP/proxy menolak beberapa host).
     // LinkedHashMap(accessOrder=true) auto-evict LRU saat > 256 — O(1) cleanup.
-    private val failedUrls = object : LinkedHashMap<String, Boolean>(256, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?) = size > 256
-    }
+    // Thread-safe LRU cache: dipakai dari multiple coroutines (handleFailure + runDownload).
+    // ConcurrentHashMap tidak punya eviction otomatis, jadi pakai pairs + batas ukuran.
+    private val failedUrls = ConcurrentHashMap<String, Boolean>()
+    private val FAILED_URLS_MAX = 256
 
     private fun rememberFailedUrl(url: String) {
         failedUrls[url] = true
+        // Evict LRU sederhana: bila melebihi batas, buang setengah yang lama
+        if (failedUrls.size > FAILED_URLS_MAX) {
+            val iter = failedUrls.keys.iterator()
+            var drop = failedUrls.size / 2
+            while (iter.hasNext() && drop > 0) { iter.next(); iter.remove(); drop-- }
+        }
+    }
+
+    // Cached maxConcurrent — hindari recompute dari SharedPreferences tiap cek
+    private var cachedMaxConcurrent: Int = StoragePrefs.maxConcurrent(context)
+
+    fun refreshMaxConcurrent() {
+        cachedMaxConcurrent = StoragePrefs.maxConcurrent(context)
     }
 
     // Cached timeout values — hindari recompute dari SharedPreferences tiap koneksi
@@ -264,7 +279,7 @@ class DownloadEngine(appContext: Context) {
         disconnectActive(id)
         if (StoragePrefs.isDeletePartialOnCancel(context)) {
             _items.value.find { it.id == id }?.let { item ->
-                FileSaver(context).partialFiles(item).forEach { runCatching { it.delete() } }
+                fileSaver.partialFiles(item).forEach { runCatching { it.delete() } }
             }
         }
         updateItem(id) {
@@ -284,7 +299,7 @@ class DownloadEngine(appContext: Context) {
         jobs.remove(id)?.cancel()
         disconnectActive(id)
         update(_items.value.filterNot { it.id == id })
-        item?.let { FileSaver(context).deleteFiles(it) }
+        item?.let { fileSaver.deleteFiles(it) }
         scheduleSave()
     }
 
@@ -307,9 +322,10 @@ class DownloadEngine(appContext: Context) {
             clearSegProgress(item.id)
             jobs.remove(item.id)?.cancel()
             disconnectActive(item.id)
-            FileSaver(context).deleteFiles(item)
             App.logEvent("DOWNLOAD DELETED: ${item.fileName}")
         }
+        // Batch delete: satu loop, bukan N kali filter list
+        failed.forEach { fileSaver.deleteFiles(it) }
         update(_items.value.filterNot { it.state == DownloadState.FAILED })
         scheduleSave()
     }
@@ -323,7 +339,7 @@ class DownloadEngine(appContext: Context) {
     ): FileSaver.PublishResult {
         val name = sanitizeFileName(fileName)
         val size = length
-        val saver = FileSaver(context)
+        val saver = fileSaver
         val published = saver.saveStream(name, destination, folderPath, writer)
         val finalName = published.fileName ?: name
         val item = DownloadItem(
@@ -473,9 +489,21 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun resumeAll() {
-        _items.value.filter {
+        // Batch: satu filter + satu update, bukan N kali find() di resume()
+        val targets = _items.value.filter {
             it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED
-        }.forEach { resume(it.id) }
+        }
+        if (targets.isEmpty()) return
+        val ids = targets.map { it.id }.toSet()
+        targets.forEach { item ->
+            retryAttempts.remove(item.id)
+            pendingRetries.remove(item.id)
+            clearSegProgress(item.id)
+        }
+        update(_items.value.map { item ->
+            if (item.id in ids) item.copy(state = DownloadState.PENDING, autoResume = true) else item
+        })
+        startQueued()
     }
 
     /** Pindahkan item ke atas/atas-antrean (daftar tampil terbaru di atas).
@@ -545,15 +573,15 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun cleanupOrphans() {
-        FileSaver(context).cleanupOrphanPartials(_items.value)
+        fileSaver.cleanupOrphanPartials(_items.value)
     }
 
-    fun freeSpaceBytes(): Long = FileSaver(context).destinationFreeBytes()
+    fun freeSpaceBytes(): Long = fileSaver.destinationFreeBytes()
 
     fun rename(id: String, newName: String) {
         val item = _items.value.find { it.id == id } ?: return
         if (item.state != DownloadState.COMPLETED) return
-        val newPath = FileSaver(context).rename(item, newName)
+        val newPath = fileSaver.rename(item, newName)
         if (newPath != null) {
             updateItem(id) { it.copy(fileName = newName, filePath = newPath) }
         }
@@ -576,7 +604,7 @@ class DownloadEngine(appContext: Context) {
 
     private suspend fun invalidateChangedResume(item: DownloadItem, etag: String?) {
         if (!shouldInvalidateResume(item, etag)) return
-        val saver = FileSaver(context)
+        val saver = fileSaver
         saver.partialFiles(item).forEach { runCatching { it.delete() } }
         updateItem(item.id) {
             it.copy(
@@ -662,7 +690,7 @@ class DownloadEngine(appContext: Context) {
     fun move(id: String, destTreeUri: Uri) {
         val item = _items.value.find { it.id == id } ?: return
         if (item.state != DownloadState.COMPLETED) return
-        val result = FileSaver(context).move(item, destTreeUri)
+        val result = fileSaver.move(item, destTreeUri)
         if (result != null) {
             updateItem(id) {
                 it.copy(
@@ -687,11 +715,11 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun canStartNow(): Boolean {
-        return jobs.values.count { it.isActive } < StoragePrefs.maxConcurrent(context)
+        return jobs.values.count { it.isActive } < cachedMaxConcurrent
     }
 
     private fun startQueued() {
-        val max = StoragePrefs.maxConcurrent(context)
+        val max = cachedMaxConcurrent
         val smallFirst = StoragePrefs.isSmallFirstEnabled(context)
         val pending = _items.value
             .filter { it.state == DownloadState.PENDING }
@@ -711,7 +739,7 @@ class DownloadEngine(appContext: Context) {
     private fun launchItem(item: DownloadItem): Boolean {
         synchronized(jobs) {
             if (jobs[item.id]?.isActive == true) return false
-            if (jobs.values.count { it.isActive } >= StoragePrefs.maxConcurrent(context)) {
+            if (jobs.values.count { it.isActive } >= cachedMaxConcurrent) {
                 return false
             }
             val job = scope.launch {
@@ -1056,7 +1084,7 @@ class DownloadEngine(appContext: Context) {
                 "Try opening the post in your browser first."
             )
         }
-        val saver = FileSaver(context)
+        val saver = fileSaver
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) {
             throw IOException(
@@ -1145,7 +1173,7 @@ class DownloadEngine(appContext: Context) {
      *  gabung jadi satu file dapat diputar. Tidak butuh ffmpeg — segmen dari
      *  YouTube HLS sudah berisi video+audio gabungan (MPEG-TS). */
     private suspend fun downloadHls(item: DownloadItem, outName: String, adaptiveAudioUrl: String = "") {
-        val saver = FileSaver(context)
+        val saver = fileSaver
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
 
@@ -1414,7 +1442,7 @@ class DownloadEngine(appContext: Context) {
         adaptiveAudioUrl: String,
         outName: String
     ) {
-        val saver = FileSaver(context)
+        val saver = fileSaver
         val baseName = outName.removeSuffix(".mp4").removeSuffix(".webm").ifBlank { outName }
         val videoMp4 = saver.partialFile("$baseName.videoMp4", segment = null).apply { delete() }
         val audioM4a = saver.partialFile("$baseName.audioM4a", segment = null).apply { delete() }
