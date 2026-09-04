@@ -2,7 +2,7 @@
 
 - **Perbaikan Play Protect (4 item)** -- (1) Hapus `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dari manifest; izin baterai hanya diminta lewat intent runtime saat user klik tombol di Settings. (2) Hapus dialog auto-offer "All files access" dari MainActivity; user aktifkan manual dari Settings → Storage → File Manager. (3) Server auto-start saat boot default ke `false`; user harus aktifkan manual. (4) Cleartext tetap diizinkan (download manager butuh HTTP untuk URL user) tapi tidak ada perubahan manifest yang mencurigakan.
 
-- **Hapus resource tidak terpakai** -- 2 drawable (`ic_link`, `ic_folder`), 3 plurals (`summary_active/done/failed`), 4 string (`settings_hint_*`, `settings_timeout_hint`). Hemat ~3 KB APK.
+- **Hapus resource tidak terpakai** -- 2 drawable (`ic_link`, `ic_folder`), 3 plurals (`summary_active/done/failed`), 11 string (`settings_hint_*`, `settings_timeout_hint`, `file_access_*`, `gallery_folder_all/empty`, `settings_hint_read_only`, `settings_pin_label`). Hemat ~4 KB APK.
 - **Path traversal guard untuk folder** -- Gallery folders dan extra folders kini dinormalisasi (`canonicalPath`) dan dibatasi ke `/storage/emulated/0`. Path di luar storage publik ditolak.
 - **HLS progress lebih jujur** -- Remote web tidak lagi menampilkan total bytes yang diestimasi sebagai "X/Y MB" untuk download HLS. Hanya bytes yang sudah diunduh ditampilkan sampai total riil diketahui.
 - **Desain ulang Settings** -- Header kompak (44dp, 14sp), chip navigasi miniatur (36dp), QR collapsible dengan tombol toggle, spinner duplikat label di atas, input port tipe number, divider antar grup, gallery folders di seksi Storage.

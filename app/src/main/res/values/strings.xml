@@ -129,7 +129,6 @@
     <string name="location_label">Location: %1$s</string>
     <string name="location_media_store">MediaStore / Custom folder</string>
     <string name="location_internal">App internal storage</string>
-    <string name="settings_pin_label">Remote server PIN (optional)</string>
     <string name="settings_pin_hint">PIN — leave empty to disable</string>
     <string name="pause_all">Pause all</string>
     <string name="resume_all">Resume all</string>
@@ -162,9 +161,7 @@
     <string name="gallery_empty">No videos found yet.</string>
     <string name="gallery_folders">Folders</string>
     <string name="gallery_folder_title">Select folders to scan</string>
-    <string name="gallery_folder_all">All folders</string>
     <string name="gallery_folder_hint">Video folders to scan in gallery. Leave empty for all.</string>
-    <string name="gallery_folder_empty">No video folders found on this device</string>
     <string name="gallery_open_error">No app found to open this file</string>
 
     <string name="speed_limit_per_label">Speed limit (per download)</string>
@@ -256,11 +253,7 @@
     <string name="settings_pin_enforced">Require PIN when server runs</string>
     <string name="settings_fs_full_access">Full access to main storage (file manager)</string>
     <string name="settings_server_read_only">Read-only server</string>
-    <string name="settings_hint_read_only">Blocks upload, rename, move, delete &amp; create from the remote web. Download &amp; browsing still work.</string>
     <string name="remote_storage_btn">Enable file access (storage permission)</string>
-    <string name="file_access_title">Enable file access?</string>
-    <string name="file_access_message">Allow full access to files so the remote File Manager and direct folder paths work correctly. Downloads and gallery keep working even without it — you can enable it later from Settings.</string>
-    <string name="file_access_enable">Enable</string>
     <string name="remote_pin_required">Set a PIN in Settings first before starting the server (for network security)</string>
     <string name="settings_server_autostart">Start server automatically after device restart</string>
     <string name="settings_section_storage">Storage</string>
