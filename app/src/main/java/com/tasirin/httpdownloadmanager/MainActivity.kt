@@ -1,6 +1,6 @@
-package com.tasirin.httpdownloadmanager
-
 @file:SuppressLint("UseKtx")
+
+package com.tasirin.httpdownloadmanager
 
 import android.annotation.SuppressLint
 import android.app.Dialog
