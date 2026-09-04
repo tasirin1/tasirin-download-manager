@@ -268,16 +268,28 @@ class SettingsActivity : AppCompatActivity() {
     private fun applyGalleryFolders(view: View) {
         val box = view.findViewById<LinearLayout>(R.id.gallery_folders_container)
         val paths = mutableListOf<String>()
+        val externalRoot = if (Build.VERSION.SDK_INT >= 29) {
+            "/storage/emulated/0"
+        } else {
+            runCatching { Environment.getExternalStorageDirectory().absolutePath }
+                .getOrDefault("/storage/emulated/0")
+        }
         for (i in 0 until box.childCount) {
             val input = box.getChildAt(i).findViewById<EditText>(R.id.extra_folder_path)
             val path = input.text?.toString()?.trim().orEmpty()
             if (path.isEmpty()) continue
-            val dir = java.io.File(path)
+            // Normalisasi path: hapus trailing slash, resolve relatif
+            val normalized = java.io.File(path).canonicalPath
+            if (!normalized.startsWith(externalRoot)) {
+                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
+                return
+            }
+            val dir = java.io.File(normalized)
             if (!dir.isDirectory) {
                 Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
                 return
             }
-            paths.add(path)
+            paths.add(normalized)
         }
         StoragePrefs.setGalleryFolders(this, paths)
     }
@@ -711,12 +723,13 @@ class SettingsActivity : AppCompatActivity() {
             val input = box.getChildAt(i).findViewById<EditText>(R.id.extra_folder_path)
             val path = input.text?.toString()?.trim().orEmpty()
             if (path.isEmpty()) continue
-            val dir = java.io.File(path)
+            val normalized = java.io.File(path).canonicalPath
+            val dir = java.io.File(normalized)
             if (!dir.isDirectory && !dir.mkdirs()) {
                 Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
                 return
             }
-            paths.add(path)
+            paths.add(normalized)
         }
         StoragePrefs.setExtraFolders(this, paths)
     }

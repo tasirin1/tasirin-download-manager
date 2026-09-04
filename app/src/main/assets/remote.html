@@ -2576,7 +2576,7 @@ let meta;
 if (done) {
 meta = fmt(it.totalBytes || it.bytesDownloaded);
 if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
-} else if (it.totalBytes > 0) {
+} else if (it.totalBytes > 0 && (it.progressPercentOverride || -1) < 0) {
 meta = fmt(it.bytesDownloaded) + ' / ' + fmt(it.totalBytes);
 } else {
 meta = fmt(it.bytesDownloaded);
@@ -2613,6 +2613,9 @@ if (done) {
 let meta = fmt(it.totalBytes || it.bytesDownloaded);
 if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
 return meta;
+}
+if ((it.progressPercentOverride || -1) >= 0) {
+return fmt(it.bytesDownloaded);
 }
 return it.totalBytes > 0
 ? fmt(it.bytesDownloaded) + ' / ' + fmt(it.totalBytes)
