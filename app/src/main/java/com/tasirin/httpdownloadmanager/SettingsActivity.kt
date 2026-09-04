@@ -423,7 +423,7 @@ class SettingsActivity : AppCompatActivity() {
             this, if (on) R.color.status_on else R.color.text_secondary
         )
         btn.setTextColor(color)
-        val icon = (if (on) R.drawable.ic_check else R.drawable.ic_close).toDrawable()
+        val icon = toDrawable(if (on) R.drawable.ic_check else R.drawable.ic_close)
         if (icon != null) {
             icon.mutate().setTint(color)
             btn.setCompoundDrawablesRelative(null, null, icon, null)
