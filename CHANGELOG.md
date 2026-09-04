@@ -2,6 +2,9 @@
 
 - **Perbaikan Play Protect (4 item)** -- (1) Hapus `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dari manifest; izin baterai hanya diminta lewat intent runtime saat user klik tombol di Settings. (2) Hapus dialog auto-offer "All files access" dari MainActivity; user aktifkan manual dari Settings → Storage → File Manager. (3) Server auto-start saat boot default ke `false`; user harus aktifkan manual. (4) Cleartext tetap diizinkan (download manager butuh HTTP untuk URL user) tapi tidak ada perubahan manifest yang mencurigakan.
 
+- **Tombol prioritas di remote web** -- Item sheet sekarang punya tombol High/Normal/Low priority yang bisa diklik langsung tanpa input manual. Berguna untuk mengatur urutan download saat antrian panjang.
+- **Badge retry count** -- Item yang pernah retry menampilkan badge kecil (e.g. "BB2") di samping nama file. Info retry juga tersedia di JSON API (`retryCount`).
+- **Clipboard auto-detect** -- Saat app kembali ke foreground, clipboard dicek secara otomatis untuk URL. Jika ditemukan URL valid, toast muncul sebagai pengingat. Hanya tampil sekali per URL (tidak spam).
 - **Hapus resource tidak terpakai** -- 2 drawable, 3 plurals, 13 string (`gallery_folders`, `server_switch`, `file_access_*`, `gallery_folder_all/empty`, `settings_hint_*`, `settings_timeout_hint`, `settings_hint_read_only`, `settings_pin_label`). Hemat ~4 KB APK.
 - **Path traversal guard untuk folder** -- Gallery folders dan extra folders kini dinormalisasi (`canonicalPath`) dan dibatasi ke `/storage/emulated/0`. Path di luar storage publik ditolak.
 - **Fix gallery folder filter** -- (1) Filter folder diterapkan ke SEMUA sumber data (text folder, SAF, internal downloads), bukan hanya MediaStore query. (2) Remote web gallery (`/api/gallery`) sekarang mengirim `selectedFolders` dari Settings ke `MediaLibrary.scan()`. (3) Server gallery cache juga menyimpan folder key — cache invalidasi otomatis saat user mengubah pilihan folder.

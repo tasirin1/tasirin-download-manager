@@ -2881,8 +2881,15 @@ function openItemSheet(it) {
   }
   if (it.state === 'DOWNLOADING') acts.push({label: '\u23F8 Pause', op: 'pause'});
   if (it.state === 'PAUSED' || it.state === 'FAILED') acts.push({label: '\u25B6 Resume', op: 'resume'});
-  if (it.state === 'PENDING' || it.state === 'PAUSED' || it.state === 'FAILED') {
-    acts.push({label: '\u23F1 Speed limit', op: 'limit'});
+  if (it.state === 'PENDING' || it.state === 'PAUSED' || it.state === 'FAILED' || it.state === 'DOWNLOADING') {
+    acts.push({label: '\u23F1 Speed & Priority', op: 'limit'});
+  }
+  // Priority quick buttons (only when active/pending/paused)
+  if (it.state === 'DOWNLOADING' || it.state === 'PENDING' || it.state === 'PAUSED') {
+    const curP = it.priority || 0;
+    if (curP < 1) acts.push({label: '\u2B06 High priority', op: 'priority_high'});
+    if (curP !== 0) acts.push({label: '\u2395 Normal priority', op: 'priority_normal'});
+    if (curP > -1) acts.push({label: '\u2B07 Low priority', op: 'priority_low'});
   }
   if (it.state === 'DOWNLOADING' || it.state === 'PENDING' || it.state === 'PAUSED') {
     acts.push({label: '\u2715 Cancel', op: 'cancel'});
@@ -2923,6 +2930,18 @@ function openItemSheet(it) {
             });
           }
         );
+        return;
+      }
+      if (a.op === 'priority_high') {
+        doActionNow(it.id, 'limit_priority', {speedLimitKbps: it.speedLimitKbps || 0, priority: 1});
+        return;
+      }
+      if (a.op === 'priority_normal') {
+        doActionNow(it.id, 'limit_priority', {speedLimitKbps: it.speedLimitKbps || 0, priority: 0});
+        return;
+      }
+      if (a.op === 'priority_low') {
+        doActionNow(it.id, 'limit_priority', {speedLimitKbps: it.speedLimitKbps || 0, priority: -1});
         return;
       }
       doAction(it.id, a.op);
@@ -4375,10 +4394,12 @@ function rebuildList(items) {
     const err = it.error ? '<div class="err">' + escapeHtml(it.error) + '</div>' : '';
     const retry = it.state === 'FAILED'
       ? '<div class="err-actions"><button class="item-retry" type="button">\u21BB Retry</button></div>' : '';
+    const retryBadge = (it.retryCount && it.retryCount > 0)
+      ? '<span class="retry-badge" title="Retried \u00d7' + it.retryCount + '">&#x21BB;' + it.retryCount + '</span>' : '';
     const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
     li.innerHTML =
       '<div class="item-top"><div class="icon ' + iconStateCls(it.state) + '">' + fileIcon(it.fileName) + '</div><div class="item-body">' +
-      '<div class="name">' + escapeHtml(it.fileName) + '</div>' + okBadge + err + retry +
+      '<div class="name">' + escapeHtml(it.fileName) + '</div>' + okBadge + retryBadge + err + retry +
       '</div>' +
       '<button class="item-menu-btn" type="button" title="Actions">\u22EF</button>' +
       '</div>' +

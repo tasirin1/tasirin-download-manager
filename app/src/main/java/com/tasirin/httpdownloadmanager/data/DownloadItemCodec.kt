@@ -53,6 +53,7 @@ object DownloadItemCodec {
             o.put("segments", segArr)
             o.put("preferredHeight", item.preferredHeight)
             o.put("progressPercentOverride", item.progressPercentOverride)
+            if (item.retryCount > 0) o.put("retryCount", item.retryCount)
             arr.put(o)
         }
         return arr.toString()
@@ -111,7 +112,8 @@ object DownloadItemCodec {
                 etag = o.optString("etag"),
                 segments = parseSegments(o),
                 preferredHeight = o.optInt("preferredHeight", 0),
-                progressPercentOverride = o.optInt("progressPercentOverride", -1)
+                progressPercentOverride = o.optInt("progressPercentOverride", -1),
+                retryCount = o.optInt("retryCount", 0)
             )
         }.getOrNull()
     }

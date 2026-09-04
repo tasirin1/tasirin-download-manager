@@ -883,6 +883,7 @@ class DownloadEngine(appContext: Context) {
         }
         if (maxRetries > 0 && attempts <= maxRetries && item.autoResume) {
             retryAttempts[id] = attempts
+            updateItem(id) { it.copy(retryCount = attempts) }
             val baseBackoff = (RETRY_DELAY_1_MS shl (attempts - 1))
                 .coerceAtMost(RETRY_DELAY_MAX_MS)
             // Jitter 0-25% agar beberapa item tidak retry serentak (thundering herd).
