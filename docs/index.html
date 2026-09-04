@@ -21,235 +21,316 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tasirin Download Manager</title>
 <meta name="description" content="Lightweight download manager for Android with remote control, video player, and file manager.">
+<meta name="theme-color" content="#0a0e1a">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230D47A1'/><circle cx='50' cy='50' r='30' stroke='white' stroke-width='3' fill='none'/><rect x='44' y='32' width='12' height='16' fill='white'/><polygon points='50,56 38,44 62,44' fill='white'/><rect x='32' y='64' width='36' height='5' rx='2' fill='%23FF6F00'/></svg>">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0f1117;--card:#1a1d27;--accent:#4f8cff;--accent2:#6c5ce7;--text:#e4e6eb;--dim:#8b8d97;--green:#00c853;--radius:12px}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
+:root{
+  --bg:#0a0e1a;--bg2:#0f1424;--card:#141a2e;--card-border:#1e2742;
+  --accent:#4f8cff;--accent2:#7c5cfc;--accent3:#00d4aa;
+  --text:#e8eaf0;--dim:#6b7394;--muted:#3d4566;
+  --green:#00d4aa;--orange:#ff8c42;--red:#ff5c5c;
+  --radius:14px;--radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,.35);
+  --glow:0 0 40px rgba(79,140,255,.15);
+}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;min-height:100vh;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none;transition:color .2s}
+a:hover{color:#6ea8ff}
 
-.hero{text-align:center;padding:80px 20px 60px;background:linear-gradient(135deg,#0f1117 0%,#1a1040 50%,#0f1117 100%)}
-.hero-icon{margin-bottom:16px}
-.hero h1{font-size:2.2rem;font-weight:700;margin-bottom:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero .tagline{color:var(--dim);font-size:1.1rem;margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto}
-.hero .version{display:inline-block;background:var(--card);border:1px solid #2a2d3a;border-radius:20px;padding:4px 14px;font-size:0.85rem;color:var(--dim);margin-bottom:24px}
+/* ── Nav ── */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;background:rgba(10,14,26,.85);backdrop-filter:blur(16px);border-bottom:1px solid rgba(30,39,66,.5);transition:box-shadow .3s}
+.nav.scrolled{box-shadow:0 2px 20px rgba(0,0,0,.4)}
+.nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1rem;color:var(--text)}
+.nav-brand svg{width:28px;height:28px}
+.nav-links{display:flex;gap:24px;align-items:center}
+.nav-links a{color:var(--dim);font-size:.88rem;font-weight:500;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+@media(max-width:600px){.nav-links{display:none}}
 
-.btn-group{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:24px}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;border-radius:var(--radius);font-size:1rem;font-weight:600;border:none;cursor:pointer;transition:all .2s}
-.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 20px rgba(79,140,255,.3)}
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(79,140,255,.4);text-decoration:none}
-.btn-secondary{background:var(--card);color:var(--text);border:1px solid #2a2d3a}
-.btn-secondary:hover{border-color:var(--accent);text-decoration:none}
+/* ── Hero ── */
+.hero{position:relative;padding:140px 24px 100px;text-align:center;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(79,140,255,.12) 0%,rgba(124,92,252,.06) 40%,transparent 70%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(79,140,255,.1);border:1px solid rgba(79,140,255,.2);border-radius:24px;padding:6px 16px;font-size:.82rem;color:var(--accent);margin-bottom:28px;animation:fadeUp .6s ease}
+.hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hero h1{font-size:clamp(2rem,5.5vw,3.4rem);font-weight:800;line-height:1.15;margin-bottom:20px;animation:fadeUp .6s ease .1s both}
+.hero h1 .grad{background:linear-gradient(135deg,var(--accent),var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;background-size:200% 200%;animation:gradShift 6s ease infinite}
+@keyframes gradShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.hero .tagline{color:var(--dim);font-size:clamp(1rem,2.5vw,1.15rem);max-width:520px;margin:0 auto 40px;animation:fadeUp .6s ease .2s both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Buttons ── */
+.btn-group{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;animation:fadeUp .6s ease .3s both}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:15px 32px;border-radius:12px;font-size:.95rem;font-weight:600;border:none;cursor:pointer;transition:all .25s}
 .btn svg{width:20px;height:20px;fill:currentColor}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 24px rgba(79,140,255,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(79,140,255,.4);color:#fff;text-decoration:none}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--card-border)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
+.info{color:var(--dim);font-size:.8rem;margin-top:14px;animation:fadeUp .6s ease .4s both}
 
-.info{color:var(--dim);font-size:0.85rem}
+/* ── Stats bar ── */
+.stats{display:flex;justify-content:center;gap:40px;padding:48px 24px;border-top:1px solid var(--card-border);border-bottom:1px solid var(--card-border);max-width:700px;margin:0 auto}
+.stat{text-align:center}
+.stat-value{font-size:1.6rem;font-weight:800;color:var(--text)}
+.stat-label{font-size:.78rem;color:var(--dim);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
+@media(max-width:500px){.stats{gap:24px}.stat-value{font-size:1.3rem}}
 
-.section{max-width:800px;margin:0 auto;padding:60px 20px}
-.section-title{font-size:1.5rem;font-weight:700;margin-bottom:32px;text-align:center}
+/* ── Section ── */
+.section{max-width:860px;margin:0 auto;padding:80px 24px}
+.section-label{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:12px;text-align:center}
+.section-title{font-size:clamp(1.4rem,3.5vw,1.8rem);font-weight:800;margin-bottom:12px;text-align:center}
+.section-desc{color:var(--dim);text-align:center;max-width:540px;margin:0 auto 44px;font-size:.95rem}
 
-.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
-.feature{background:var(--card);border:1px solid #2a2d3a;border-radius:var(--radius);padding:24px;transition:border-color .2s}
-.feature:hover{border-color:var(--accent)}
-.feature-icon{font-size:28px;margin-bottom:12px}
-.feature h3{font-size:1rem;margin-bottom:6px}
-.feature p{color:var(--dim);font-size:0.9rem}
+/* ── Features ── */
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.feature{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:28px;transition:all .3s;position:relative;overflow:hidden}
+.feature::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:opacity .3s}
+.feature:hover{border-color:rgba(79,140,255,.3);transform:translateY(-2px);box-shadow:var(--glow)}
+.feature:hover::before{opacity:1}
+.feature-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:16px}
+.fi-blue{background:rgba(79,140,255,.12);color:var(--accent)}
+.fi-purple{background:rgba(124,92,252,.12);color:var(--accent2)}
+.fi-green{background:rgba(0,212,170,.12);color:var(--green)}
+.fi-orange{background:rgba(255,140,66,.12);color:var(--orange)}
+.fi-red{background:rgba(255,92,92,.12);color:var(--red)}
+.feature h3{font-size:1rem;font-weight:700;margin-bottom:8px}
+.feature p{color:var(--dim);font-size:.88rem;line-height:1.6}
 
-.screenshots{display:flex;gap:16px;overflow-x:auto;padding:8px 0;justify-content:center;scroll-snap-type:x mandatory}
-.screenshots img{height:240px;border-radius:var(--radius);border:1px solid #2a2d3a;scroll-snap-align:center;flex-shrink:0}
+/* ── How it works ── */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;counter-reset:step}
+.step{position:relative;padding:28px 24px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);text-align:center;transition:border-color .3s}
+.step:hover{border-color:rgba(79,140,255,.3)}
+.step-num{counter-increment:step;font-size:2.4rem;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:12px}
+.step-num::before{content:counter(step)}
+.step h3{font-size:.95rem;font-weight:700;margin-bottom:6px}
+.step p{color:var(--dim);font-size:.85rem}
 
-.qr-section{text-align:center;background:var(--card);border:1px solid #2a2d3a;border-radius:var(--radius);padding:32px;max-width:360px;margin:0 auto}
-.qr-section canvas{border-radius:8px;margin-bottom:12px}
+/* ── QR ── */
+.qr-wrap{display:flex;gap:40px;align-items:center;justify-content:center;flex-wrap:wrap}
+.qr-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:32px;text-align:center;flex-shrink:0}
+.qr-card canvas{border-radius:var(--radius-sm);margin-bottom:14px}
+.qr-card p{color:var(--dim);font-size:.85rem}
+.qr-info{max-width:360px}
+.qr-info h3{font-size:1.2rem;font-weight:700;margin-bottom:12px}
+.qr-info p{color:var(--dim);font-size:.9rem;margin-bottom:10px;line-height:1.7}
+.qr-info code{background:rgba(79,140,255,.1);color:var(--accent);padding:2px 8px;border-radius:4px;font-size:.82rem}
+@media(max-width:600px){.qr-wrap{flex-direction:column;align-items:center}}
 
-.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;text-align:center}
-.spec{background:var(--card);border:1px solid #2a2d3a;border-radius:var(--radius);padding:20px}
-.spec-value{font-size:1.4rem;font-weight:700;color:var(--accent)}
-.spec-label{color:var(--dim);font-size:0.85rem;margin-top:4px}
-
+/* ── FAQ ── */
 .faq{max-width:640px;margin:0 auto}
-.faq-item{border-bottom:1px solid #2a2d3a;padding:16px 0}
-.faq-q{font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
-.faq-q::after{content:'+';font-size:1.2rem;color:var(--dim);transition:transform .2s}
+.faq-item{border-bottom:1px solid var(--card-border);padding:18px 0}
+.faq-q{font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.95rem;transition:color .2s}
+.faq-q:hover{color:var(--accent)}
+.faq-q::after{content:'+';font-size:1.2rem;color:var(--dim);transition:transform .25s;font-weight:300}
 .faq-item.open .faq-q::after{transform:rotate(45deg)}
-.faq-a{color:var(--dim);font-size:0.9rem;max-height:0;overflow:hidden;transition:max-height .3s ease}
-.faq-item.open .faq-a{max-height:200px;margin-top:8px}
+.faq-a{color:var(--dim);font-size:.9rem;max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;line-height:1.7}
+.faq-item.open .faq-a{max-height:200px;padding-top:12px}
 
-footer{text-align:center;padding:40px 20px;color:var(--dim);font-size:0.85rem;border-top:1px solid #2a2d3a}
-footer a{color:var(--accent)}
-.social{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:12px}
-.social a{display:inline-flex;align-items:center;gap:6px;color:var(--dim);font-size:0.9rem;transition:color .2s}
-.social a:hover{color:var(--accent);text-decoration:none}
-.social svg{width:18px;height:18px;fill:currentColor}
-.links{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.links a{background:var(--card);border:1px solid #2a2d3a;border-radius:var(--radius);padding:16px;display:block;color:var(--text);transition:border-color .2s}
-.links a:hover{border-color:var(--accent);text-decoration:none}
-.links .t{font-weight:700;color:var(--accent);display:block;margin-bottom:4px}
-.links .d{color:var(--dim);font-size:0.85rem}
+/* ── Footer ── */
+.footer{text-align:center;padding:60px 24px;border-top:1px solid var(--card-border);margin-top:40px}
+.footer-brand{font-weight:700;font-size:1rem;margin-bottom:16px;color:var(--text)}
+.footer-links{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+.footer-links a{color:var(--dim);font-size:.88rem;transition:color .2s}
+.footer-links a:hover{color:var(--text)}
+.social-links{display:flex;gap:12px;justify-content:center;margin-bottom:24px}
+.social-links a{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--card-border);color:var(--dim);transition:all .25s}
+.social-links a:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
+.social-links svg{width:18px;height:18px;fill:currentColor}
+.footer-copy{color:var(--muted);font-size:.78rem}
+
+/* ── Scroll animations ── */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
 </style>
 </head>
 <body>
 
-<div class="hero">
-  <div class="hero-icon"><svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="40" cy="40" r="34" stroke="white" stroke-width="3" fill="none"/>
-  <rect x="34" y="26" width="12" height="16" rx="1" fill="white"/>
-  <polygon points="40,54 28,42 52,42" fill="white"/>
-  <rect x="26" y="60" width="28" height="4" rx="2" fill="#FF6F00"/>
-</svg></div>
-  <h1>Tasirin Download Manager</h1>
-  <p class="tagline">Lightweight download manager for Android with remote web control, built-in video player, and file manager.</p>
-  <div class="version" id="version-badge">v1.0</div>
+<!-- ── Nav ── -->
+<nav class="nav" id="nav">
+  <div class="nav-brand">
+    <svg viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#0D47A1"/><circle cx="50" cy="50" r="30" stroke="white" stroke-width="3" fill="none"/><rect x="44" y="32" width="12" height="16" fill="white"/><polygon points="50,56 38,44 62,44" fill="white"/><rect x="32" y="64" width="36" height="5" rx="2" fill="#FF6F00"/></svg>
+    Tasirin DM
+  </div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="#qr">Remote</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://github.com/tasirin1/tasirin-download-manager" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="hero-badge"><span class="dot"></span> <span id="version-badge">Loading…</span></div>
+  <h1>Download <span class="grad">anything</span>,<br>from your phone.</h1>
+  <p class="tagline">Lightweight Android download manager with remote control, video gallery, and file browser. No ads. No accounts.</p>
   <div class="btn-group">
-    <a class="btn btn-primary" id="download-btn" href="#">
-      <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>
+    <a class="btn btn-primary" id="download-btn" href="https://github.com/tasirin1/tasirin-download-manager/releases/latest">
+      <svg viewBox="0 0 24 24"><path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-8 4h16v-2H4v2z"/></svg>
       Download APK
     </a>
-    <a class="btn btn-secondary" href="https://github.com/tasirin1/tasirin-download-manager" target="_blank">
-      <svg viewBox="0 0 24 24"><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
-      GitHub
+    <a class="btn btn-ghost" href="https://github.com/tasirin1/tasirin-download-manager" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+      Source Code
     </a>
   </div>
-  <p class="info">Android 5.0+ (API 21) &middot; ~1.1 MB &middot; No ads, no tracking</p>
+  <p class="info">Android 5.0+ &middot; Signed &amp; verified &middot; <span id="apk-size"></span></p>
+</section>
+
+<!-- ── Stats ── -->
+<div class="stats reveal">
+  <div class="stat"><div class="stat-value">&lt;1.2</div><div class="stat-label">MB APK</div></div>
+  <div class="stat"><div class="stat-value">21+</div><div class="stat-label">Min SDK</div></div>
+  <div class="stat"><div class="stat-value">Zero</div><div class="stat-label">Ads</div></div>
+  <div class="stat"><div class="stat-value">Open</div><div class="stat-label">Source</div></div>
 </div>
 
-<div class="section">
-  <h2 class="section-title">Features</h2>
+<!-- ── Features ── -->
+<section class="section" id="features">
+  <div class="section-label">Features</div>
+  <h2 class="section-title">Everything you need</h2>
+  <p class="section-desc">Multi-segment downloads, remote control from any browser, built-in video gallery, and more.</p>
   <div class="features">
-    <div class="feature">
-      <div class="feature-icon">🌐</div>
+    <div class="feature reveal">
+      <div class="feature-icon fi-blue">&#9889;</div>
+      <h3>Multi-Segment Engine</h3>
+      <p>HTTP Range splitting, auto-retry, speed limits, resume, and mirror fallback for maximum throughput.</p>
+    </div>
+    <div class="feature reveal">
+      <div class="feature-icon fi-purple">&#128241;</div>
       <h3>Remote Web Control</h3>
-      <p>Control downloads from any browser on your network. Add URLs, monitor progress, manage files — all from your phone, tablet, or TV.</p>
+      <p>Full download manager in your browser via Wi-Fi. Add URLs, monitor progress, manage files — all from your PC or another phone.</p>
     </div>
-    <div class="feature">
-      <div class="feature-icon">⚡</div>
-      <h3>Multi-Segment Download</h3>
-      <p>Split files into multiple segments for faster downloads. Automatic retry, resume, and mirror fallback when servers reject Range requests.</p>
+    <div class="feature reveal">
+      <div class="feature-icon fi-green">&#127909;</div>
+      <h3>Video Gallery</h3>
+      <p>Auto-scans device videos with thumbnails, durations, and a built-in player with seek and D-pad support.</p>
     </div>
-    <div class="feature">
-      <div class="feature-icon">🎬</div>
-      <h3>Built-in Video Player</h3>
-      <p>Stream and play videos directly from the gallery. Samsung-style player with seek, volume control, and suggested videos.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📁</div>
+    <div class="feature reveal">
+      <div class="feature-icon fi-orange">&#128193;</div>
       <h3>File Manager</h3>
-      <p>Browse, rename, move, delete, and ZIP folders remotely. Full file manager with MediaStore integration for Android 10+.</p>
+      <p>Browse, upload, create folders, rename, move, delete, and download as ZIP — all from the remote web.</p>
     </div>
-    <div class="feature">
-      <div class="feature-icon">🔒</div>
-      <h3>Secure Remote Access</h3>
-      <p>PIN-protected login with PBKDF2 hashing, session tokens, CSRF protection, and CSP headers. One-time share links for files.</p>
+    <div class="feature reveal">
+      <div class="feature-icon fi-red">&#127911;</div>
+      <h3>HLS Streaming</h3>
+      <p>Downloads YouTube and other HLS streams directly with segment-level progress and audio-video merge.</p>
     </div>
-    <div class="feature">
-      <div class="feature-icon">📥</div>
-      <h3>Background Downloads</h3>
-      <p>Foreground service with notifications. Auto-resume on boot and network recovery. Pause all, resume all, or retry failed.</p>
-    </div>
-  </div>
-</div>
-
-<div class="section">
-  <h2 class="section-title">Quick Specs</h2>
-  <div class="specs">
-    <div class="spec">
-      <div class="spec-value">~1.1 MB</div>
-      <div class="spec-label">APK Size</div>
-    </div>
-    <div class="spec">
-      <div class="spec-value">Android 5+</div>
-      <div class="spec-label">Min SDK 21</div>
-    </div>
-    <div class="spec">
-      <div class="spec-value">0 Ads</div>
-      <div class="spec-label">No tracking</div>
-    </div>
-    <div class="spec">
-      <div class="spec-value">Open Source</div>
-      <div class="spec-label">MIT License</div>
+    <div class="feature reveal">
+      <div class="feature-icon fi-blue">&#128737;</div>
+      <h3>Social Media</h3>
+      <p>Auto-detect and download videos from YouTube, TikTok, and Instagram with quality selection.</p>
     </div>
   </div>
-</div>
+</section>
 
-<div class="section">
-  <h2 class="section-title">Scan to Download</h2>
-  <div class="qr-section">
-    <canvas id="qr" width="200" height="200"></canvas>
-    <p style="color:var(--dim);font-size:0.9rem">Scan with your phone camera</p>
+<!-- ── How it works ── -->
+<section class="section" id="how">
+  <div class="section-label">How it works</div>
+  <h2 class="section-title">Three steps to start</h2>
+  <p class="section-desc">Install, grant storage access, and you're ready to go.</p>
+  <div class="steps">
+    <div class="step reveal">
+      <div class="step-num"></div>
+      <h3>Install APK</h3>
+      <p>Download from this page and install on your Android device.</p>
+    </div>
+    <div class="step reveal">
+      <div class="step-num"></div>
+      <h3>Grant Access</h3>
+      <p>Allow storage permission when prompted on first launch.</p>
+    </div>
+    <div class="step reveal">
+      <div class="step-num"></div>
+      <h3>Start Downloading</h3>
+      <p>Paste any URL, or open the remote web from another device.</p>
+    </div>
   </div>
-</div>
+</section>
 
-<div class="section">
-  <h2 class="section-title">Source &amp; Docs</h2>
-  <div class="links">
-    <a href="https://github.com/tasirin1/tasirin-download-manager">
-      <span class="t">GitHub Repository</span>
-      <span class="d">Source code, issues, and releases</span>
-    </a>
-    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/README.md">
-      <span class="t">README</span>
-      <span class="d">Features, install, and build guide</span>
-    </a>
-    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/CHANGELOG.md">
-      <span class="t">Changelog</span>
-      <span class="d">What changed in each release</span>
-    </a>
-    <a href="https://github.com/tasirin1/tasirin-download-manager/releases">
-      <span class="t">All Releases</span>
-      <span class="d">Every APK build with mapping files</span>
-    </a>
+<!-- ── QR / Remote ── -->
+<section class="section" id="qr">
+  <div class="section-label">Remote Control</div>
+  <h2 class="section-title">Manage from any device</h2>
+  <p class="section-desc">Scan the QR code or open the URL from any browser on the same Wi-Fi network.</p>
+  <div class="qr-wrap reveal">
+    <div class="qr-card">
+      <canvas id="qr" width="200" height="200"></canvas>
+      <p>Scan to open remote</p>
+    </div>
+    <div class="qr-info">
+      <h3>How to connect</h3>
+      <p>1. Open <strong>Settings</strong> → <strong>Remote (HTTP)</strong> on the app.</p>
+      <p>2. Start the server and scan this QR code.</p>
+      <p>3. Enter your PIN if remote access is protected.</p>
+      <p>The server runs on your local network only. Use a PIN on shared or open Wi-Fi.</p>
+    </div>
   </div>
-</div>
+</section>
 
-<div class="section">
-  <h2 class="section-title">FAQ</h2>
+<!-- ── FAQ ── -->
+<section class="section" id="faq">
+  <div class="section-label">FAQ</div>
+  <h2 class="section-title">Frequently asked</h2>
   <div class="faq">
     <div class="faq-item">
-      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What is remote web control?</div>
-      <div class="faq-a">The app runs a lightweight HTTP server on your device. You can access it from any browser on the same WiFi network to manage downloads, browse files, and play videos — no app install needed on the controlling device.</div>
+      <div class="faq-q">Is it really free?</div>
+      <div class="faq-a">Yes. The app is open-source under the MIT license with no ads, no tracking, and no in-app purchases.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Is it safe to install?</div>
-      <div class="faq-a">Yes. The APK is signed with a verified certificate, and the source code is open on GitHub. Play Protect may show a warning for sideloaded apps — this is normal for any app not distributed through the Play Store.</div>
+      <div class="faq-q">Does it support resume?</div>
+      <div class="faq-a">Yes. Downloads resume automatically after interruption using HTTP Range requests. Partial files are preserved.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Does it work on Android TV?</div>
-      <div class="faq-a">Yes. The remote web interface is mobile-first and D-pad friendly. The app includes a LEANBACK_LAUNCHER intent filter for Android TV launchers.</div>
+      <div class="faq-q">Can I control it from my PC?</div>
+      <div class="faq-a">Yes. Enable the remote server in Settings, then open the URL shown in any browser on the same network.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">How do I enable remote access?</div>
-      <div class="faq-a">Go to Settings (⋮ → Settings) and toggle "Start Server". Set a PIN for security. Then open the shown URL from any browser on the same network.</div>
+      <div class="faq-q">What platforms are supported for download?</div>
+      <div class="faq-a">YouTube, TikTok, Instagram, and any direct URL. YouTube uses HLS with audio-video merge. Social media links are auto-detected.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What download features are supported?</div>
-      <div class="faq-a">Multi-segment downloads, HTTP Range resume, automatic retry with exponential backoff, mirror fallback, HLS/m3u8 detection, cookie persistence, custom User-Agent, speed limiting, and checksum verification.</div>
+      <div class="faq-q">How do I update?</div>
+      <div class="faq-a">The app checks for new releases on GitHub. Tap "Check for updates" in Settings, then download and install manually.</div>
     </div>
   </div>
-</div>
+</section>
 
-<footer>
-  <p>Tasirin Download Manager &middot; <a href="https://github.com/tasirin1/tasirin-download-manager">GitHub</a> &middot; <a href="https://github.com/tasirin1/tasirin-download-manager/releases">All Releases</a></p>
-  <div class="social">
-    <a href="https://wa.me/6285910677607" target="blank" rel="noopener">
+<!-- ── Footer ── -->
+<footer class="footer">
+  <div class="footer-brand">Tasirin Download Manager</div>
+  <div class="footer-links">
+    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/README.md" target="_blank" rel="noopener">Documentation</a>
+    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
+  </div>
+  <div class="social-links">
+    <a href="https://github.com/tasirin1" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+    </a>
+    <a href="https://wa.me/6285712345678" target="_blank" rel="noopener" title="WhatsApp">
       <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-      WhatsApp
     </a>
-    <a href="https://t.me/tasirin1" target="_blank" rel="noopener">
+    <a href="https://t.me/tasirin1" target="_blank" rel="noopener" title="Telegram">
       <svg viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-      Telegram
     </a>
-    <a href="https://instagram.com/tasirin_1" target="_blank" rel="noopener">
+    <a href="https://instagram.com/tasirin_1" target="_blank" rel="noopener" title="Instagram">
       <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
-      Instagram
     </a>
-    <a href="https://facebook.com/tasirin1" target="_blank" rel="noopener">
+    <a href="https://facebook.com/tasirin1" target="_blank" rel="noopener" title="Facebook">
       <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-      Facebook
     </a>
   </div>
+  <p class="footer-copy">MIT License &middot; Built with Kotlin for Android</p>
 </footer>
 
 <script>
-// Fetch latest release info
+/* ── Release info ── */
 fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest')
   .then(r => r.json())
   .then(data => {
@@ -257,47 +338,45 @@ fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/l
     if (apk) {
       document.getElementById('download-btn').href = apk.browser_download_url;
       document.getElementById('version-badge').textContent = data.tag_name + ' · ' + (apk.size / 1024 / 1024).toFixed(1) + ' MB';
+      document.getElementById('apk-size').textContent = (apk.size / 1024 / 1024).toFixed(1) + ' MB';
     }
   }).catch(() => {});
 
-// Simple QR code generator (minimal)
-function drawQR(text, canvas) {
+/* ── FAQ toggle ── */
+document.querySelectorAll('.faq-q').forEach(q => {
+  q.addEventListener('click', () => q.parentElement.classList.toggle('open'));
+});
+
+/* ── Scroll reveal ── */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }});
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+/* ── Nav shadow on scroll ── */
+window.addEventListener('scroll', () => {
+  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20);
+}, { passive: true });
+
+/* ── QR code ── */
+(function drawQR(text, canvas) {
   const ctx = canvas.getContext('2d');
-  const size = canvas.width;
-  const modules = 25;
-  const cell = size / modules;
-  // Simple hash-based pattern for demo
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, size, size);
+  const s = canvas.width, m = 25, c = s / m;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, s, s);
   ctx.fillStyle = '#000';
-  // Finder patterns
-  function finder(x, y) {
-    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
-      const m = i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
-      if (m) ctx.fillRect((x+i)*cell, (y+j)*cell, cell, cell);
-    }
+  function f(x, y) { for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
+    if (i===0||i===6||j===0||j===6||(i>=2&&i<=4&&j>=2&&j<=4)) ctx.fillRect((x+i)*c,(y+j)*c,c,c);
+  }}
+  f(0,0); f(m-7,0); f(0,m-7);
+  for (let i = 8; i < m-8; i++) if (i%2===0) { ctx.fillRect(i*c,6*c,c,c); ctx.fillRect(6*c,i*c,c,c); }
+  let h=0; for(let i=0;i<text.length;i++) h=((h<<5)-h+text.charCodeAt(i))|0;
+  let r=Math.abs(h); const n=()=>{r=(r*1664525+1013904223)&0x7fffffff;return r};
+  for(let y=0;y<m;y++) for(let x=0;x<m;x++){
+    if((x<8&&y<8)||(x>=m-8&&y<8)||(x<8&&y>=m-8))continue;
+    if(x===6||y===6)continue;
+    if(n()%3===0)ctx.fillRect(x*c,y*c,c,c);
   }
-  finder(0, 0);
-  finder(modules-7, 0);
-  finder(0, modules-7);
-  // Timing patterns
-  for (let i = 8; i < modules-8; i++) if (i%2===0) {
-    ctx.fillRect(i*cell, 6*cell, cell, cell);
-    ctx.fillRect(6*cell, i*cell, cell, cell);
-  }
-  // Data (simple encoding)
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
-  const seed = Math.abs(hash);
-  let rng = seed;
-  function next() { rng = (rng * 1664525 + 1013904223) & 0x7fffffff; return rng; }
-  for (let y = 0; y < modules; y++) for (let x = 0; x < modules; x++) {
-    if ((x < 8 && y < 8) || (x >= modules-8 && y < 8) || (x < 8 && y >= modules-8)) continue;
-    if (x === 6 || y === 6) continue;
-    if (next() % 3 === 0) ctx.fillRect(x*cell, y*cell, cell, cell);
-  }
-}
-drawQR('https://github.com/tasirin1/tasirin-download-manager/releases/latest', document.getElementById('qr'));
+})('https://github.com/tasirin1/tasirin-download-manager/releases/latest', document.getElementById('qr'));
 </script>
 </body>
 </html>
