@@ -47,7 +47,7 @@ jobs:
             echo "Base commit tidak tersedia (push pertama / manual) — lewati guard CHANGELOG."
             exit 0
           fi
-          git fetch origin main --quiet || true
+# git fetch tidak diperlukan — checkout sudah fetch-depth: 0
           CHANGED=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || git diff --name-only "$BASE" HEAD || true)
           NEEDS_CHANGELOG=$(echo "$CHANGED" | grep -E '^(app/src/main/|remote\.src\.html$|app/build\.gradle\.kts$|scripts/)' || true)
           HAS_CHANGELOG=$(echo "$CHANGED" | grep -x 'CHANGELOG.md' || true)

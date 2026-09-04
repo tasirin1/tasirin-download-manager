@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix CHANGELOG guard CI** -- Hapus `git fetch origin main` yang tidak perlu dari guard CHANGELOG (checkout sudah `fetch-depth: 0`). Guard sekarang membandingkan diff yang benar.
 - **Redesign website GitHub Pages** -- (updated) Bahasa otomatis mengikuti bahasa browser via `navigator.language` (default Indonesia, fallback English). Tombol toggle dihapus. Landing page diperbarui total: fixed navigation bar, gradient hero dengan animasi, stats bar, feature grid dengan hover glow, 3-step "How it works", QR section dengan instruksi, FAQ toggle, scroll reveal animations, dan social links yang lebih rapi.
 - **Hapus auto-detect clipboard** -- Fitur otomatis deteksi URL di clipboard saat app dibuka dihapus (boros notifikasi). Tombol Paste manual tetap ada.
 - **Fix audio HLS: prioritaskan audio original vs dubbing** -- `HlsRendition` sekarang parse `LANGUAGE` dan `NAME` dari `#EXT-X-MEDIA`. Urutan prioritas: (1) default + bukan dubbing, (2) default + dubbing, (3) non-default + bukan dubbing, (4) sisanya. Filter deteksi nama "dub"/"dubbed"/"dubbing". Log detail: `lang=` dan `name=` di tiap pemilihan audio.
