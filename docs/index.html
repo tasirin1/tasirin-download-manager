@@ -13,8 +13,8 @@
     GitHub Releases API (see script at the bottom). Do NOT hardcode APK
     version/size here.
   - Screenshots live in /docs/screenshots/.
-  - Default language is Indonesian (id), secondary is English (en).
-    All translatable text uses data-en attributes; JS switches via lang toggle.
+  - Language auto-detected from browser (navigator.language). Default id (Indonesian),
+    fallback en (English). All translatable text uses data-en attributes.
   Full maintainer guide: https://github.com/tasirin1/tasirin-download-manager/blob/main/AGENTS.md
 -->
 <html lang="id">
@@ -50,10 +50,7 @@ a:hover{color:#6ea8ff}
 .nav-links{display:flex;gap:24px;align-items:center}
 .nav-links a{color:var(--dim);font-size:.88rem;font-weight:500;transition:color .2s}
 .nav-links a:hover{color:var(--text)}
-.lang-toggle{background:var(--card);border:1px solid var(--card-border);border-radius:8px;padding:5px 12px;color:var(--dim);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s}
-.lang-toggle:hover{border-color:var(--accent);color:var(--accent)}
-.lang-toggle.active{background:rgba(79,140,255,.12);border-color:rgba(79,140,255,.3);color:var(--accent)}
-@media(max-width:600px){.nav-links{display:none}.lang-toggle{font-size:.75rem;padding:4px 10px}}
+@media(max-width:600px){.nav-links{display:none}}
 
 /* ── Hero ── */
 .hero{position:relative;padding:140px 24px 100px;text-align:center;overflow:hidden}
@@ -168,14 +165,13 @@ a:hover{color:#6ea8ff}
       <a href="#faq" data-i18n="nav_faq">FAQ</a>
       <a href="https://github.com/tasirin1/tasirin-download-manager" target="_blank" rel="noopener">GitHub</a>
     </div>
-    <button class="lang-toggle" id="langToggle" onclick="toggleLang()">EN</button>
   </div>
 </nav>
 
 <!-- ── Hero ── -->
 <section class="hero">
   <div class="hero-badge"><span class="dot"></span> <span id="version-badge" data-i18n="hero_loading">Memuat...</span></div>
-  <h1><span data-i18n="hero_h1a">Unduh</span> <span class="grad" data-i18n="hero_h1b">apa saja</span><br data-i18n="hero_h1br"><span data-i18n="hero_h1c">dari ponselmu.</span></h1>
+  <h1><span data-i18n="hero_h1a">Unduh</span> <span class="grad" data-i18n="hero_h1b">apa saja</span><br><span data-i18n="hero_h1c">dari ponselmu.</span></h1>
   <p class="tagline" data-i18n="hero_tagline">Manajer unduhan ringan untuk Android dengan kontrol jarak jauh, galeri video, dan file browser. Tanpa iklan. Tanpa akun.</p>
   <div class="btn-group">
     <a class="btn btn-primary" id="download-btn" href="https://github.com/tasirin1/tasirin-download-manager/releases/latest">
@@ -194,7 +190,7 @@ a:hover{color:#6ea8ff}
 <div class="stats reveal">
   <div class="stat"><div class="stat-value">&lt;1.2</div><div class="stat-label" data-i18n="stat_apk">MB APK</div></div>
   <div class="stat"><div class="stat-value">21+</div><div class="stat-label" data-i18n="stat_sdk">Min SDK</div></div>
-  <div class="stat"><div class="stat-value">Nol</div><div class="stat-label" data-i18n="stat_iklan">Iklan</div></div>
+  <div class="stat"><div class="stat-value" data-i18n="stat_val_nol">Nol</div><div class="stat-label" data-i18n="stat_iklan">Iklan</div></div>
   <div class="stat"><div class="stat-value">Open</div><div class="stat-label" data-i18n="stat_source">Source</div></div>
 </div>
 
@@ -343,11 +339,10 @@ a:hover{color:#6ea8ff}
 var EN = {
   nav_fitur:'Features',nav_cara:'How It Works',nav_remote:'Remote',nav_faq:'FAQ',
   hero_loading:'Loading…',hero_h1a:'Download',hero_h1b:'anything',hero_h1c:'from your phone.',
-  hero_h1br:'',
   hero_tagline:'Lightweight Android download manager with remote control, video gallery, and file browser. No ads. No accounts.',
   hero_download:'Download APK',hero_source:'Source Code',
   hero_info:'Android 5.0+ · Signed & verified ·',
-  stat_apk:'MB APK',stat_sdk:'Min SDK',stat_iklan:'Ads',stat_source:'Source',
+  stat_apk:'MB APK',stat_sdk:'Min SDK',stat_iklan:'Ads',stat_source:'Source',stat_val_nol:'Zero',
   feat_label:'Features',feat_title:'Everything you need',
   feat_desc:'Multi-segment downloads, remote control from any browser, built-in video gallery, and more.',
   feat1_title:'Multi-Segment Engine',feat1_desc:'HTTP Range splitting, auto-retry, speed limits, resume, and mirror fallback for maximum throughput.',
@@ -374,41 +369,32 @@ var EN = {
   faq3_q:'Can I control it from my PC?',faq3_a:'Yes. Enable the remote server in Settings, then open the URL shown in any browser on the same network.',
   faq4_q:'What platforms are supported?',faq4_a:'YouTube, TikTok, Instagram, and any direct URL. YouTube uses HLS with audio-video merge. Social media links are auto-detected.',
   faq5_q:'How do I update?',faq5_a:'The app checks for new releases on GitHub. Tap "Check for updates" in Settings, then download and install manually.',
-  footer_docs:'Documentation',footer_changelog:'Changelog',footer_license:'License',
-  stat_val_nol:'Zero'
+  footer_docs:'Documentation',footer_changelog:'Changelog',footer_license:'License'
 };
 
-var lang = localStorage.getItem('site-lang') || 'id';
+/* ── Auto-detect browser language ── */
+function detectLang() {
+  var nav = (navigator.language || navigator.userLanguage || 'id').toLowerCase();
+  return nav.indexOf('id') === 0 ? 'id' : 'en';
+}
 
 function applyLang(l) {
-  lang = l;
-  localStorage.setItem('site-lang', l);
-  var btn = document.getElementById('langToggle');
-  btn.textContent = l === 'id' ? 'EN' : 'ID';
-  btn.classList.toggle('active', l === 'en');
-  document.documentElement.lang = l === 'id' ? 'id' : 'en';
+  document.documentElement.lang = l;
   document.querySelectorAll('[data-i18n]').forEach(function(el) {
-    var key = el.getAttribute('data-i18n');
-    if (l === 'en' && EN[key]) {
-      el.innerHTML = EN[key];
-    } else if (l === 'id') {
-      el.innerHTML = el.getAttribute('data-original') || el.innerHTML;
+    if (l === 'en' && EN[el.getAttribute('data-i18n')]) {
+      el.innerHTML = EN[el.getAttribute('data-i18n')];
+    } else {
+      var orig = el.getAttribute('data-original');
+      if (orig) el.innerHTML = orig;
     }
-  });
-  /* stat "Nol"/"Zero" */
-  document.querySelectorAll('.stat-value').forEach(function(v,i){
-    if(i===2) v.textContent = l==='id'?'Nol':'Zero';
   });
 }
 
-function toggleLang() { applyLang(lang==='id'?'en':'id'); }
-
-/* save originals before first switch */
+/* save Indonesian originals, then apply detected language */
 document.querySelectorAll('[data-i18n]').forEach(function(el) {
   el.setAttribute('data-original', el.innerHTML);
 });
-
-applyLang(lang);
+applyLang(detectLang());
 
 /* ── Release info ── */
 fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest')
