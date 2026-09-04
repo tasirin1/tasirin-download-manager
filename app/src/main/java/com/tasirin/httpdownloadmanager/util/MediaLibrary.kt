@@ -342,6 +342,16 @@ object MediaLibrary {
         }
 
         // Hapus duplikat: file yang sama bisa muncul sebagai path (f:) dan
+        // Filter folder: hapus item yang BUKAN dari folder terpilih.
+        // Sections 1-3 (text folder, SAF, internal downloads) tidak difilter
+        // di tempat asalnya, jadi filter di sini sebelum dedupe.
+        if (selectedFolders.isNotEmpty()) {
+            val allowed = selectedFolders.map { it.trimEnd('/') }.toSet()
+            list.retainAll { entry ->
+                val fp = entry.filePath ?: return@retainAll true
+                allowed.any { fp.startsWith("$it/") || fp == it }
+            }
+        }
         // sebagai MediaStore (u:) — dedupe berdasar path file bila ada.
         // Batasi jumlah entry yang di-hold di memori: cukup untuk 30 halaman
         // galeri (100/halaman) dan membatasi beban RAM di device Android 5+.

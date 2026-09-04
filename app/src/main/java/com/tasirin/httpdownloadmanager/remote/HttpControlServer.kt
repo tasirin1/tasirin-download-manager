@@ -2821,7 +2821,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val PARTIAL_STREAM_TTL_MS = 60 * 60 * 1000L
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
         private const val PERIODIC_CLEANUP_MS = 5 * 60 * 1000L
-        private const val DYNAMIC_UPDATE_MS = 500L
         private const val SNAPSHOT_RATE_MS = 1_000L
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
