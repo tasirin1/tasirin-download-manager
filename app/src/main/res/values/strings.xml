@@ -47,13 +47,20 @@
     <string name="platform_social">Social media</string>
     <string name="platform_detected">Detected: %1$s</string>
     <string name="confirm_delete">Delete this download? The file will be removed.</string>
-    <string name="summary_active_label">active</string>
-    <string name="summary_done_label">done</string>
     <string name="summary_failed_label">failed</string>
     <string name="summary_paused_label">paused</string>
-    <string name="summary_count_active">%1$d active</string>
-    <string name="summary_count_done">%1$d done</string>
-    <string name="summary_count_failed">%1$d %2$s</string>
+    <plurals name="summary_count_active">
+        <item quantity="one">%1$d active</item>
+        <item quantity="other">%1$d active</item>
+    </plurals>
+    <plurals name="summary_count_done">
+        <item quantity="one">%1$d done</item>
+        <item quantity="other">%1$d done</item>
+    </plurals>
+    <plurals name="summary_count_failed">
+        <item quantity="one">%1$d %2$s</item>
+        <item quantity="other">%1$d %2$s</item>
+    </plurals>
     <string name="section_active">Active</string>
     <string name="section_paused">Paused</string>
     <string name="section_failed">Failed</string>

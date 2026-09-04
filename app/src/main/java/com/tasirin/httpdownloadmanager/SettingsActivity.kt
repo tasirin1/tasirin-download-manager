@@ -1,5 +1,7 @@
 package com.tasirin.httpdownloadmanager
 
+@file:SuppressLint("UseKtx")
+
 import android.annotation.SuppressLint
 import android.Manifest
 import android.content.ClipData
@@ -422,7 +424,7 @@ class SettingsActivity : AppCompatActivity() {
             this, if (on) R.color.status_on else R.color.text_secondary
         )
         btn.setTextColor(color)
-        @SuppressLint("UseKtx") val icon = ContextCompat.getDrawable(
+        val icon = ContextCompat.getDrawable(
             this, if (on) R.drawable.ic_check else R.drawable.ic_close
         )
         if (icon != null) {

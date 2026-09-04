@@ -1,5 +1,7 @@
 package com.tasirin.httpdownloadmanager
 
+@file:SuppressLint("UseKtx")
+
 import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.ClipboardManager
@@ -104,7 +106,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         val overflowColor = ContextCompat.getColor(this, R.color.white)
-        @SuppressLint("UseKtx") binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
+        binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
             ?.apply { setTint(overflowColor) }
 
         adapter = DownloadAdapter(this)
@@ -1088,11 +1090,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding.chipActive.visibility =
             if (active > 0) View.VISIBLE else View.GONE
         if (active > 0) binding.chipActive.text =
-            getString(R.string.summary_count_active, active)
+            resources.getQuantityString(R.plurals.summary_count_active, active, active)
         binding.chipDone.visibility =
             if (done > 0) View.VISIBLE else View.GONE
         if (done > 0) binding.chipDone.text =
-            getString(R.string.summary_count_done, done)
+            resources.getQuantityString(R.plurals.summary_count_done, done, done)
         binding.chipFailed.visibility =
             if (failed > 0 || paused > 0) View.VISIBLE else View.GONE
         // Sembunyikan seluruh summary card bila tidak ada chip aktif
@@ -1107,7 +1109,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             } else {
                 getString(R.string.summary_paused_label)
             }
-            binding.chipFailed.text = getString(R.string.summary_count_failed, total, label)
+            binding.chipFailed.text = resources.getQuantityString(R.plurals.summary_count_failed, total, total, label)
         }
     }
 
