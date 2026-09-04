@@ -1,7 +1,7 @@
 # Version catalog — pusat versi dependensi (aturan maintenance).
 # Dependabot membaca grup dari sini; update versi cukup di satu tempat.
 [versions]
-agp = "9.3.2"
+agp = "9.4.0"
 coreKtx = "1.13.1"
 documentfile = "1.1.0"
 nanohttpd = "2.3.1"
