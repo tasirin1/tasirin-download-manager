@@ -139,7 +139,6 @@
     <string name="settings_port_hint">Port (1024–65535)</string>
     <string name="settings_speed_custom">Custom: %1$d KB/s</string>
     <string name="settings_port_invalid">Invalid port (1024–65535)</string>
-    <string name="server_switch">Server</string>
     <string name="server_start">Start server</string>
     <string name="server_stop">Stop server</string>
     <string name="settings_segments">Parallel segments per download</string>
@@ -159,7 +158,6 @@
     <string name="hls_quality_title">Pick video quality</string>
     <string name="hls_direct">Download original playlist (no pick)</string>
     <string name="gallery_empty">No videos found yet.</string>
-    <string name="gallery_folders">Folders</string>
     <string name="gallery_folder_title">Select folders to scan</string>
     <string name="gallery_folder_hint">Video folders to scan in gallery. Leave empty for all.</string>
     <string name="gallery_open_error">No app found to open this file</string>
