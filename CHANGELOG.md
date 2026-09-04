@@ -1316,3 +1316,4 @@ Detail teknis untuk AI/maintainer ada di `AGENTS.md`.
 
 - **Desain add download jadi bottom sheet** -- Dialog "Add Download" kini tampil sebagai bottom sheet (rounded top corners, anchored to bottom) mirip remote web. Layout didesain ulang: title header, URL textarea hero full-width, tombol Paste inline dengan platform badge, kualitas & carousel photo dalam kartu, advanced toggle accordion, speed & priority side-by-side. Handle bar di atas sebagai visual cue. Background sheet putih dengan corners 20dp.
 
+
