@@ -290,7 +290,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="@string/settings_port"
+                        android:text="@string/settings_port_label"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
 
@@ -315,7 +315,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:minHeight="40dp"
-                        android:text="@string/server_log"
+                        android:text="@string/remote_log_label"
                         android:textSize="13sp" />
             </LinearLayout>
 
@@ -511,7 +511,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="@string/settings_retries"
+                        android:text="@string/settings_retry"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
 
@@ -562,7 +562,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="@string/settings_user_agent"
+                        android:text="@string/label_user_agent"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
 
@@ -581,7 +581,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:background="@drawable/bg_input_tv"
-                        android:hint="Custom User-Agent"
+                        android:hint="@string/hint_custom_user_agent"
                         android:importantForAutofill="no"
                         android:inputType="text"
                         android:maxLines="2"
