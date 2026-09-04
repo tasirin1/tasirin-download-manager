@@ -48,7 +48,7 @@ jobs:
             exit 0
           fi
           # git fetch tidak diperlukan — checkout sudah fetch-depth: 0
-          CHANGED=$(git diff --name-only "$BASE" HEAD 2>/dev/null || true)
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
           NEEDS_CHANGELOG=$(echo "$CHANGED" | grep -E '^(app/src/main/|remote\.src\.html$|app/build\.gradle\.kts$|scripts/)' || true)
           HAS_CHANGELOG=$(echo "$CHANGED" | grep -x 'CHANGELOG.md' || true)
           if [ -n "$NEEDS_CHANGELOG" ] && [ -z "$HAS_CHANGELOG" ]; then
