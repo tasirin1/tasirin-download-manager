@@ -1744,15 +1744,25 @@ class DownloadEngine(appContext: Context) {
             val videoDurations = videoSegs.map { it.second }
             val audioSegments = candidate.audioGroupId?.let { group ->
                 val groupRenditions = audioRenditions.filter { it.groupId == group }
-                val ordered = groupRenditions.filter { it.isDefault } + groupRenditions.filter { !it.isDefault }
+                // Prioritas: (1) default + bukan dubbing, (2) default saja, (3) non-default + bukan dubbing, (4) sisanya
+                val isDubbed = { r: HlsRendition ->
+                    r.name.contains("dub", ignoreCase = true) ||
+                    r.name.contains("dubbed", ignoreCase = true) ||
+                    r.name.contains("dubbing", ignoreCase = true)
+                }
+                val ordered = groupRenditions.filter { it.isDefault && !isDubbed(it) } +
+                    groupRenditions.filter { it.isDefault && isDubbed(it) } +
+                    groupRenditions.filter { !it.isDefault && !isDubbed(it) } +
+                    groupRenditions.filter { !it.isDefault && isDubbed(it) }
                 var audioResult: List<String>? = null
                 for (rendition in ordered) {
                     val segs = runCatching { mediaSegments(rendition.url, headers) }.getOrNull()
                     if (!segs.isNullOrEmpty()) {
                         audioResult = segs
+                        App.logEvent("HLS DEBUG: audio selected: group=${rendition.groupId} lang=${rendition.language} name=${rendition.name} default=${rendition.isDefault}")
                         break
                     }
-                    App.logEvent("HLS DEBUG: audio rendition ${rendition.groupId} failed (default=${rendition.isDefault}), trying next...")
+                    App.logEvent("HLS DEBUG: audio rendition ${rendition.groupId} lang=${rendition.language} name=${rendition.name} failed (default=${rendition.isDefault}), trying next...")
                 }
                 audioResult
             }

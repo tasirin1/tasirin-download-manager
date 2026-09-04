@@ -13,7 +13,9 @@ data class HlsVariant(
 data class HlsRendition(
     val groupId: String,
     val url: String,
-    val isDefault: Boolean
+    val isDefault: Boolean,
+    val language: String = "",
+    val name: String = ""
 )
 
 /** Parser playlist master HLS (m3u8) — murni JVM, bisa diuji unit.
@@ -89,7 +91,9 @@ object HlsParser {
             if (MEDIA_TYPE_RE.find(attrs)?.groupValues?.get(1) != "AUDIO") continue
             val groupId = MEDIA_GROUP_RE.find(attrs)?.groupValues?.get(1) ?: continue
             val uri = MEDIA_URI_RE.find(attrs)?.groupValues?.get(1) ?: continue
-            renditions.add(HlsRendition(groupId, resolveUrl(baseUrl, uri), attrs.contains("DEFAULT=YES")))
+            val language = LANGUAGE_RE.find(attrs)?.groupValues?.get(1).orEmpty()
+            val name = NAME_RE.find(attrs)?.groupValues?.get(1).orEmpty()
+            renditions.add(HlsRendition(groupId, resolveUrl(baseUrl, uri), attrs.contains("DEFAULT=YES"), language, name))
         }
         return renditions
     }
