@@ -31,6 +31,7 @@ object HlsParser {
     private val MEDIA_TYPE_RE: Regex = Regex("TYPE=([A-Z]+)")
     private val MEDIA_GROUP_RE: Regex = Regex("GROUP-ID=\"([^\"]+)\"")
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
+    private val LANGUAGE_RE: Regex = Regex("LANGUAGE="([^"]+)")
 
     /** Parse isi master playlist. baseUrl dipakai untuk melengkapi URL varian
      *  yang relatif. Hasil diurutkan menurun menurut bandwidth. */
