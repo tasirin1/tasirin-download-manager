@@ -33,7 +33,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import androidx.core.widget.TextViewCompat
-import androidx.core.content.res.toDrawable
 import androidx.lifecycle.lifecycleScope
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
@@ -423,7 +422,9 @@ class SettingsActivity : AppCompatActivity() {
             this, if (on) R.color.status_on else R.color.text_secondary
         )
         btn.setTextColor(color)
-        val icon = toDrawable(if (on) R.drawable.ic_check else R.drawable.ic_close)
+        @SuppressLint("UseKtx") val icon = ContextCompat.getDrawable(
+            this, if (on) R.drawable.ic_check else R.drawable.ic_close
+        )
         if (icon != null) {
             icon.mutate().setTint(color)
             btn.setCompoundDrawablesRelative(null, null, icon, null)

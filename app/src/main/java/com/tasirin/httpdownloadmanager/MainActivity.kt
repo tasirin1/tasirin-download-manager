@@ -36,7 +36,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.core.content.FileProvider
-import androidx.core.content.res.toDrawable
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -105,7 +104,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         val overflowColor = ContextCompat.getColor(this, R.color.white)
-        binding.toolbar.overflowIcon = toDrawable(R.drawable.ic_more).mutate()
+        @SuppressLint("UseKtx") binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
             ?.apply { setTint(overflowColor) }
 
         adapter = DownloadAdapter(this)
