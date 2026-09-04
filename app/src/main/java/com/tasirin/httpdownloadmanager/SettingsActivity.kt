@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import androidx.core.widget.TextViewCompat
+import androidx.core.content.res.toDrawable
 import androidx.lifecycle.lifecycleScope
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
@@ -113,11 +114,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.btnOpenRemote.setOnClickListener { openRemoteNow() }
         binding.btnCopyUrl.setOnClickListener { copyRemoteUrl() }
         binding.btnShowQr.setOnClickListener {
-            if (binding.qr.visibility == View.VISIBLE) {
-                binding.qr.visibility = View.GONE
-            } else {
-                binding.qr.visibility = View.VISIBLE
-            }
+            binding.qr.isVisible = !binding.qr.isVisible
         }
     }
 
@@ -426,9 +423,7 @@ class SettingsActivity : AppCompatActivity() {
             this, if (on) R.color.status_on else R.color.text_secondary
         )
         btn.setTextColor(color)
-        val icon = ContextCompat.getDrawable(
-            this, if (on) R.drawable.ic_check else R.drawable.ic_close
-        )
+        val icon = (if (on) R.drawable.ic_check else R.drawable.ic_close).toDrawable()
         if (icon != null) {
             icon.mutate().setTint(color)
             btn.setCompoundDrawablesRelative(null, null, icon, null)

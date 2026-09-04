@@ -34,9 +34,9 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.content.FileProvider
+import androidx.core.content.res.toDrawable
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -104,7 +104,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         val overflowColor = ContextCompat.getColor(this, R.color.white)
-        binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
+        binding.toolbar.overflowIcon = R.drawable.ic_more.toDrawable().mutate()
             ?.apply { setTint(overflowColor) }
 
         adapter = DownloadAdapter(this)
@@ -1088,11 +1088,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding.chipActive.visibility =
             if (active > 0) View.VISIBLE else View.GONE
         if (active > 0) binding.chipActive.text =
-            "${active} ${getString(R.string.summary_active_label)}"
+            getString(R.string.summary_count_active, active)
         binding.chipDone.visibility =
             if (done > 0) View.VISIBLE else View.GONE
         if (done > 0) binding.chipDone.text =
-            "${done} ${getString(R.string.summary_done_label)}"
+            getString(R.string.summary_count_done, done)
         binding.chipFailed.visibility =
             if (failed > 0 || paused > 0) View.VISIBLE else View.GONE
         // Sembunyikan seluruh summary card bila tidak ada chip aktif
@@ -1107,7 +1107,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             } else {
                 getString(R.string.summary_paused_label)
             }
-            binding.chipFailed.text = "$total $label"
+            binding.chipFailed.text = getString(R.string.summary_count_failed, total, label)
         }
     }
 

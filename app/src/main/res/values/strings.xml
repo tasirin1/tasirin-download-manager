@@ -51,6 +51,9 @@
     <string name="summary_done_label">done</string>
     <string name="summary_failed_label">failed</string>
     <string name="summary_paused_label">paused</string>
+    <string name="summary_count_active">%1$d active</string>
+    <string name="summary_count_done">%1$d done</string>
+    <string name="summary_count_failed">%1$d %2$s</string>
     <string name="section_active">Active</string>
     <string name="section_paused">Paused</string>
     <string name="section_failed">Failed</string>

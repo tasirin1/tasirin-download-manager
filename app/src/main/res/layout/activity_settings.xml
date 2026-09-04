@@ -247,7 +247,8 @@
                         android:importantForAutofill="no"
                         android:inputType="textPassword"
                         android:minHeight="40dp"
-                        android:textSize="14sp" />
+                        android:textSize="14sp"
+                        tools:ignore="TextFields" />
 
                     <Button
                         android:id="@+id/check_pin_enforced"
