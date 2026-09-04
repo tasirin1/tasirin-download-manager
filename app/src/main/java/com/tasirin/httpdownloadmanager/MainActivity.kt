@@ -259,23 +259,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // Setelah kembali dari halaman izin sistem: auto-aktifkan "Full access to
         // main storage" bila izin "All files access" baru saja diberikan.
         Permissions.syncFullAccessAfterGrant(this)
-        // Auto-detect URL dari clipboard: tawarkan download jika clipboard berisi URL.
-        autoDetectClipboard()
-    }
-
-    private var lastClipboardUrl: String = ""
-
-    private fun autoDetectClipboard() {
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }
-            ?.getItemAt(0)?.text?.toString()?.trim().orEmpty()
-        if (text.isEmpty() || text == lastClipboardUrl) return
-        // Hanya deteksi URL yang valid
-        if (!text.startsWith("http://") && !text.startsWith("https://")) return
-        lastClipboardUrl = text
-        // Jangan tawarkan jika dialog sudah terbuka atau ada download aktif
-        if (App.engine.items.value.any { it.state == DownloadState.DOWNLOADING }) return
-        Toast.makeText(this, getString(R.string.clipboard_detected, text.take(50)), Toast.LENGTH_SHORT).show()
     }
 
     override fun onNewIntent(intent: Intent) {
