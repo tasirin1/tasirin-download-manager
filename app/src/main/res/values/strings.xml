@@ -38,6 +38,7 @@
     <string name="empty_hint">No downloads yet</string>
     <string name="empty_subtitle">Paste a link to get started</string>
     <string name="paste_clipboard">Paste from Clipboard</string>
+    <string name="shortcut_add_download">Add Download</string>
     <string name="clipboard_empty">Clipboard is empty</string>
     <string name="paste">Paste</string>
     <string name="platform_youtube">YouTube</string>
