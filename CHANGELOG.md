@@ -1,5 +1,5 @@
 ## [Unreleased]
-- **Redesign website GitHub Pages** -- Landing page diperbarui total: fixed navigation bar, gradient hero dengan animasi, stats bar, feature grid dengan hover glow, 3-step "How it works", QR section dengan instruksi, FAQ toggle, scroll reveal animations, dan social links yang lebih rapi.
+- **Redesign website GitHub Pages** -- (updated) Default bahasa Indonesia, toggle bahasa Inggris di navbar, semua konten diterjemahkan via data-i18n + JS. Landing page diperbarui total: fixed navigation bar, gradient hero dengan animasi, stats bar, feature grid dengan hover glow, 3-step "How it works", QR section dengan instruksi, FAQ toggle, scroll reveal animations, dan social links yang lebih rapi.
 
 - **Perbaikan Play Protect (4 item)** -- (1) Hapus `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dari manifest; izin baterai hanya diminta lewat intent runtime saat user klik tombol di Settings. (2) Hapus dialog auto-offer "All files access" dari MainActivity; user aktifkan manual dari Settings → Storage → File Manager. (3) Server auto-start saat boot default ke `false`; user harus aktifkan manual. (4) Cleartext tetap diizinkan (download manager butuh HTTP untuk URL user) tapi tidak ada perubahan manifest yang mencurigakan.
 

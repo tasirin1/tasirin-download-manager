@@ -13,14 +13,16 @@
     GitHub Releases API (see script at the bottom). Do NOT hardcode APK
     version/size here.
   - Screenshots live in /docs/screenshots/.
+  - Default language is Indonesian (id), secondary is English (en).
+    All translatable text uses data-en attributes; JS switches via lang toggle.
   Full maintainer guide: https://github.com/tasirin1/tasirin-download-manager/blob/main/AGENTS.md
 -->
-<html lang="en">
+<html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tasirin Download Manager</title>
-<meta name="description" content="Lightweight download manager for Android with remote control, video player, and file manager.">
+<meta name="description" content="Manajer unduhan ringan untuk Android dengan kontrol jarak jauh, pemutar video, dan file manager.">
 <meta name="theme-color" content="#0a0e1a">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230D47A1'/><circle cx='50' cy='50' r='30' stroke='white' stroke-width='3' fill='none'/><rect x='44' y='32' width='12' height='16' fill='white'/><polygon points='50,56 38,44 62,44' fill='white'/><rect x='32' y='64' width='36' height='5' rx='2' fill='%23FF6F00'/></svg>">
 <style>
@@ -44,10 +46,14 @@ a:hover{color:#6ea8ff}
 .nav.scrolled{box-shadow:0 2px 20px rgba(0,0,0,.4)}
 .nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1rem;color:var(--text)}
 .nav-brand svg{width:28px;height:28px}
+.nav-right{display:flex;gap:16px;align-items:center}
 .nav-links{display:flex;gap:24px;align-items:center}
 .nav-links a{color:var(--dim);font-size:.88rem;font-weight:500;transition:color .2s}
 .nav-links a:hover{color:var(--text)}
-@media(max-width:600px){.nav-links{display:none}}
+.lang-toggle{background:var(--card);border:1px solid var(--card-border);border-radius:8px;padding:5px 12px;color:var(--dim);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s}
+.lang-toggle:hover{border-color:var(--accent);color:var(--accent)}
+.lang-toggle.active{background:rgba(79,140,255,.12);border-color:rgba(79,140,255,.3);color:var(--accent)}
+@media(max-width:600px){.nav-links{display:none}.lang-toggle{font-size:.75rem;padding:4px 10px}}
 
 /* ── Hero ── */
 .hero{position:relative;padding:140px 24px 100px;text-align:center;overflow:hidden}
@@ -154,120 +160,123 @@ a:hover{color:#6ea8ff}
     <svg viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#0D47A1"/><circle cx="50" cy="50" r="30" stroke="white" stroke-width="3" fill="none"/><rect x="44" y="32" width="12" height="16" fill="white"/><polygon points="50,56 38,44 62,44" fill="white"/><rect x="32" y="64" width="36" height="5" rx="2" fill="#FF6F00"/></svg>
     Tasirin DM
   </div>
-  <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#how">How it works</a>
-    <a href="#qr">Remote</a>
-    <a href="#faq">FAQ</a>
-    <a href="https://github.com/tasirin1/tasirin-download-manager" target="_blank" rel="noopener">GitHub</a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="#features" data-i18n="nav_fitur">Fitur</a>
+      <a href="#how" data-i18n="nav_cara">Cara Pakai</a>
+      <a href="#qr" data-i18n="nav_remote">Remote</a>
+      <a href="#faq" data-i18n="nav_faq">FAQ</a>
+      <a href="https://github.com/tasirin1/tasirin-download-manager" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <button class="lang-toggle" id="langToggle" onclick="toggleLang()">EN</button>
   </div>
 </nav>
 
 <!-- ── Hero ── -->
 <section class="hero">
-  <div class="hero-badge"><span class="dot"></span> <span id="version-badge">Loading…</span></div>
-  <h1>Download <span class="grad">anything</span>,<br>from your phone.</h1>
-  <p class="tagline">Lightweight Android download manager with remote control, video gallery, and file browser. No ads. No accounts.</p>
+  <div class="hero-badge"><span class="dot"></span> <span id="version-badge" data-i18n="hero_loading">Memuat...</span></div>
+  <h1><span data-i18n="hero_h1a">Unduh</span> <span class="grad" data-i18n="hero_h1b">apa saja</span><br data-i18n="hero_h1br"><span data-i18n="hero_h1c">dari ponselmu.</span></h1>
+  <p class="tagline" data-i18n="hero_tagline">Manajer unduhan ringan untuk Android dengan kontrol jarak jauh, galeri video, dan file browser. Tanpa iklan. Tanpa akun.</p>
   <div class="btn-group">
     <a class="btn btn-primary" id="download-btn" href="https://github.com/tasirin1/tasirin-download-manager/releases/latest">
       <svg viewBox="0 0 24 24"><path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-8 4h16v-2H4v2z"/></svg>
-      Download APK
+      <span data-i18n="hero_download">Unduh APK</span>
     </a>
     <a class="btn btn-ghost" href="https://github.com/tasirin1/tasirin-download-manager" target="_blank" rel="noopener">
       <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-      Source Code
+      <span data-i18n="hero_source">Kode Sumber</span>
     </a>
   </div>
-  <p class="info">Android 5.0+ &middot; Signed &amp; verified &middot; <span id="apk-size"></span></p>
+  <p class="info"><span data-i18n="hero_info">Android 5.0+ &middot; Tanda tangan terverifikasi &middot;</span> <span id="apk-size"></span></p>
 </section>
 
 <!-- ── Stats ── -->
 <div class="stats reveal">
-  <div class="stat"><div class="stat-value">&lt;1.2</div><div class="stat-label">MB APK</div></div>
-  <div class="stat"><div class="stat-value">21+</div><div class="stat-label">Min SDK</div></div>
-  <div class="stat"><div class="stat-value">Zero</div><div class="stat-label">Ads</div></div>
-  <div class="stat"><div class="stat-value">Open</div><div class="stat-label">Source</div></div>
+  <div class="stat"><div class="stat-value">&lt;1.2</div><div class="stat-label" data-i18n="stat_apk">MB APK</div></div>
+  <div class="stat"><div class="stat-value">21+</div><div class="stat-label" data-i18n="stat_sdk">Min SDK</div></div>
+  <div class="stat"><div class="stat-value">Nol</div><div class="stat-label" data-i18n="stat_iklan">Iklan</div></div>
+  <div class="stat"><div class="stat-value">Open</div><div class="stat-label" data-i18n="stat_source">Source</div></div>
 </div>
 
 <!-- ── Features ── -->
 <section class="section" id="features">
-  <div class="section-label">Features</div>
-  <h2 class="section-title">Everything you need</h2>
-  <p class="section-desc">Multi-segment downloads, remote control from any browser, built-in video gallery, and more.</p>
+  <div class="section-label" data-i18n="feat_label">Fitur</div>
+  <h2 class="section-title" data-i18n="feat_title">Semua yang kamu butuhkan</h2>
+  <p class="section-desc" data-i18n="feat_desc">Multi-segmen, kontrol remote dari browser, galeri video bawaan, dan masih banyak lagi.</p>
   <div class="features">
     <div class="feature reveal">
       <div class="feature-icon fi-blue">&#9889;</div>
-      <h3>Multi-Segment Engine</h3>
-      <p>HTTP Range splitting, auto-retry, speed limits, resume, and mirror fallback for maximum throughput.</p>
+      <h3 data-i18n="feat1_title">Mesin Multi-Segmen</h3>
+      <p data-i18n="feat1_desc">HTTP Range splitting, auto-retry, batas kecepatan, resume, dan mirror fallback untuk throughput maksimal.</p>
     </div>
     <div class="feature reveal">
       <div class="feature-icon fi-purple">&#128241;</div>
-      <h3>Remote Web Control</h3>
-      <p>Full download manager in your browser via Wi-Fi. Add URLs, monitor progress, manage files — all from your PC or another phone.</p>
+      <h3 data-i18n="feat2_title">Kontrol Remote Web</h3>
+      <p data-i18n="feat2_desc">Manajer unduhan lengkap di browser via Wi-Fi. Tambah URL, pantau progres, kelola file — semua dari PC atau HP lain.</p>
     </div>
     <div class="feature reveal">
       <div class="feature-icon fi-green">&#127909;</div>
-      <h3>Video Gallery</h3>
-      <p>Auto-scans device videos with thumbnails, durations, and a built-in player with seek and D-pad support.</p>
+      <h3 data-i18n="feat3_title">Galeri Video</h3>
+      <p data-i18n="feat3_desc">Pindai video perangkat otomatis dengan thumbnail, durasi, dan pemutar bawaan dengan dukungan D-pad.</p>
     </div>
     <div class="feature reveal">
       <div class="feature-icon fi-orange">&#128193;</div>
-      <h3>File Manager</h3>
-      <p>Browse, upload, create folders, rename, move, delete, and download as ZIP — all from the remote web.</p>
+      <h3 data-i18n="feat4_title">File Manager</h3>
+      <p data-i18n="feat4_desc">Jelajahi, unggah, buat folder, ubah nama, pindah, hapus, dan unduh sebagai ZIP — semua dari remote web.</p>
     </div>
     <div class="feature reveal">
       <div class="feature-icon fi-red">&#127911;</div>
-      <h3>HLS Streaming</h3>
-      <p>Downloads YouTube and other HLS streams directly with segment-level progress and audio-video merge.</p>
+      <h3 data-i18n="feat5_title">Streaming HLS</h3>
+      <p data-i18n="feat5_desc">Unduh YouTube dan stream HLS lainnya langsung dengan progres per segmen dan merge audio-video.</p>
     </div>
     <div class="feature reveal">
       <div class="feature-icon fi-blue">&#128737;</div>
-      <h3>Social Media</h3>
-      <p>Auto-detect and download videos from YouTube, TikTok, and Instagram with quality selection.</p>
+      <h3 data-i18n="feat6_title">Media Sosial</h3>
+      <p data-i18n="feat6_desc">Deteksi dan unduh video dari YouTube, TikTok, dan Instagram otomatis dengan pemilihan kualitas.</p>
     </div>
   </div>
 </section>
 
 <!-- ── How it works ── -->
 <section class="section" id="how">
-  <div class="section-label">How it works</div>
-  <h2 class="section-title">Three steps to start</h2>
-  <p class="section-desc">Install, grant storage access, and you're ready to go.</p>
+  <div class="section-label" data-i18n="how_label">Cara Pakai</div>
+  <h2 class="section-title" data-i18n="how_title">Tiga langkah untuk memulai</h2>
+  <p class="section-desc" data-i18n="how_desc">Instal, berikan akses penyimpanan, dan kamu siap digunakan.</p>
   <div class="steps">
     <div class="step reveal">
       <div class="step-num"></div>
-      <h3>Install APK</h3>
-      <p>Download from this page and install on your Android device.</p>
+      <h3 data-i18n="how1_title">Instal APK</h3>
+      <p data-i18n="how1_desc">Unduh dari halaman ini dan instal di perangkat Android-mu.</p>
     </div>
     <div class="step reveal">
       <div class="step-num"></div>
-      <h3>Grant Access</h3>
-      <p>Allow storage permission when prompted on first launch.</p>
+      <h3 data-i18n="how2_title">Berikan Akses</h3>
+      <p data-i18n="how2_desc">Izinkan akses penyimpanan saat diminta saat pertama kali dibuka.</p>
     </div>
     <div class="step reveal">
       <div class="step-num"></div>
-      <h3>Start Downloading</h3>
-      <p>Paste any URL, or open the remote web from another device.</p>
+      <h3 data-i18n="how3_title">Mulai Mengunduh</h3>
+      <p data-i18n="how3_desc">Tempel URL apa saja, atau buka remote web dari perangkat lain.</p>
     </div>
   </div>
 </section>
 
 <!-- ── QR / Remote ── -->
 <section class="section" id="qr">
-  <div class="section-label">Remote Control</div>
-  <h2 class="section-title">Manage from any device</h2>
-  <p class="section-desc">Scan the QR code or open the URL from any browser on the same Wi-Fi network.</p>
+  <div class="section-label" data-i18n="qr_label">Kontrol Remote</div>
+  <h2 class="section-title" data-i18n="qr_title">Kelola dari perangkat manapun</h2>
+  <p class="section-desc" data-i18n="qr_desc">Pindai kode QR atau buka URL dari browser manapun di jaringan Wi-Fi yang sama.</p>
   <div class="qr-wrap reveal">
     <div class="qr-card">
       <canvas id="qr" width="200" height="200"></canvas>
-      <p>Scan to open remote</p>
+      <p data-i18n="qr_scan">Pindai untuk membuka remote</p>
     </div>
     <div class="qr-info">
-      <h3>How to connect</h3>
-      <p>1. Open <strong>Settings</strong> → <strong>Remote (HTTP)</strong> on the app.</p>
-      <p>2. Start the server and scan this QR code.</p>
-      <p>3. Enter your PIN if remote access is protected.</p>
-      <p>The server runs on your local network only. Use a PIN on shared or open Wi-Fi.</p>
+      <h3 data-i18n="qr_how_title">Cara menghubungkan</h3>
+      <p data-i18n="qr_step1">1. Buka <strong>Pengaturan</strong> &rarr; <strong>Remote (HTTP)</strong> di aplikasi.</p>
+      <p data-i18n="qr_step2">2. Jalankan server, lalu pindai kode QR ini.</p>
+      <p data-i18n="qr_step3">3. Masukkan PIN jika remote access dilindungi.</p>
+      <p data-i18n="qr_note">Server hanya berjalan di jaringan lokal. Gunakan PIN saat Wi-Fi tidak terlindungi atau digunakan bersama.</p>
     </div>
   </div>
 </section>
@@ -275,27 +284,27 @@ a:hover{color:#6ea8ff}
 <!-- ── FAQ ── -->
 <section class="section" id="faq">
   <div class="section-label">FAQ</div>
-  <h2 class="section-title">Frequently asked</h2>
+  <h2 class="section-title" data-i18n="faq_title">Pertanyaan Umum</h2>
   <div class="faq">
     <div class="faq-item">
-      <div class="faq-q">Is it really free?</div>
-      <div class="faq-a">Yes. The app is open-source under the MIT license with no ads, no tracking, and no in-app purchases.</div>
+      <div class="faq-q" data-i18n="faq1_q">Apakah ini benar-benar gratis?</div>
+      <div class="faq-a" data-i18n="faq1_a">Ya. Aplikasi ini open-source di bawah lisensi MIT tanpa iklan, tanpa pelacakan, dan tanpa pembelian dalam aplikasi.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">Does it support resume?</div>
-      <div class="faq-a">Yes. Downloads resume automatically after interruption using HTTP Range requests. Partial files are preserved.</div>
+      <div class="faq-q" data-i18n="faq2_q">Apakah mendukung resume?</div>
+      <div class="faq-a" data-i18n="faq2_a">Ya. Unduhan otomatis dilanjutkan setelah gangguan menggunakan HTTP Range. File parsial tetap disimpan.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">Can I control it from my PC?</div>
-      <div class="faq-a">Yes. Enable the remote server in Settings, then open the URL shown in any browser on the same network.</div>
+      <div class="faq-q" data-i18n="faq3_q">Bisakah saya kendalikan dari PC?</div>
+      <div class="faq-a" data-i18n="faq3_a">Ya. Aktifkan server remote di Pengaturan, lalu buka URL yang ditampilkan di browser manapun di jaringan yang sama.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">What platforms are supported for download?</div>
-      <div class="faq-a">YouTube, TikTok, Instagram, and any direct URL. YouTube uses HLS with audio-video merge. Social media links are auto-detected.</div>
+      <div class="faq-q" data-i18n="faq4_q">Platform apa saja yang didukung?</div>
+      <div class="faq-a" data-i18n="faq4_a">YouTube, TikTok, Instagram, dan URL langsung apapun. YouTube menggunakan HLS dengan merge audio-video. Tautan media sosial terdeteksi otomatis.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">How do I update?</div>
-      <div class="faq-a">The app checks for new releases on GitHub. Tap "Check for updates" in Settings, then download and install manually.</div>
+      <div class="faq-q" data-i18n="faq5_q">Bagaimana cara update?</div>
+      <div class="faq-a" data-i18n="faq5_a">Aplikasi mengecek rilis baru di GitHub. Ketuk "Periksa pembaruan" di Pengaturan, lalu unduh dan instal secara manual.</div>
     </div>
   </div>
 </section>
@@ -304,9 +313,9 @@ a:hover{color:#6ea8ff}
 <footer class="footer">
   <div class="footer-brand">Tasirin Download Manager</div>
   <div class="footer-links">
-    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/README.md" target="_blank" rel="noopener">Documentation</a>
-    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
-    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/README.md" target="_blank" rel="noopener" data-i18n="footer_docs">Dokumentasi</a>
+    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-i18n="footer_changelog">Changelog</a>
+    <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/LICENSE" target="_blank" rel="noopener" data-i18n="footer_license">Lisensi</a>
     <a href="https://github.com/tasirin1/tasirin-download-manager/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
   </div>
   <div class="social-links">
@@ -330,53 +339,124 @@ a:hover{color:#6ea8ff}
 </footer>
 
 <script>
+/* ── English translations (data-en) ── */
+var EN = {
+  nav_fitur:'Features',nav_cara:'How It Works',nav_remote:'Remote',nav_faq:'FAQ',
+  hero_loading:'Loading…',hero_h1a:'Download',hero_h1b:'anything',hero_h1c:'from your phone.',
+  hero_h1br:'',
+  hero_tagline:'Lightweight Android download manager with remote control, video gallery, and file browser. No ads. No accounts.',
+  hero_download:'Download APK',hero_source:'Source Code',
+  hero_info:'Android 5.0+ · Signed & verified ·',
+  stat_apk:'MB APK',stat_sdk:'Min SDK',stat_iklan:'Ads',stat_source:'Source',
+  feat_label:'Features',feat_title:'Everything you need',
+  feat_desc:'Multi-segment downloads, remote control from any browser, built-in video gallery, and more.',
+  feat1_title:'Multi-Segment Engine',feat1_desc:'HTTP Range splitting, auto-retry, speed limits, resume, and mirror fallback for maximum throughput.',
+  feat2_title:'Remote Web Control',feat2_desc:'Full download manager in your browser via Wi-Fi. Add URLs, monitor progress, manage files — all from your PC or another phone.',
+  feat3_title:'Video Gallery',feat3_desc:'Auto-scans device videos with thumbnails, durations, and a built-in player with D-pad support.',
+  feat4_title:'File Manager',feat4_desc:'Browse, upload, create folders, rename, move, delete, and download as ZIP — all from the remote web.',
+  feat5_title:'HLS Streaming',feat5_desc:'Downloads YouTube and other HLS streams directly with segment-level progress and audio-video merge.',
+  feat6_title:'Social Media',feat6_desc:'Auto-detect and download videos from YouTube, TikTok, and Instagram with quality selection.',
+  how_label:'How It Works',how_title:'Three steps to start',how_desc:'Install, grant storage access, and you\'re ready to go.',
+  how1_title:'Install APK',how1_desc:'Download from this page and install on your Android device.',
+  how2_title:'Grant Access',how2_desc:'Allow storage permission when prompted on first launch.',
+  how3_title:'Start Downloading',how3_desc:'Paste any URL, or open the remote web from another device.',
+  qr_label:'Remote Control',qr_title:'Manage from any device',
+  qr_desc:'Scan the QR code or open the URL from any browser on the same Wi-Fi network.',
+  qr_scan:'Scan to open remote',
+  qr_how_title:'How to connect',
+  qr_step1:'1. Open <strong>Settings</strong> → <strong>Remote (HTTP)</strong> on the app.',
+  qr_step2:'2. Start the server and scan this QR code.',
+  qr_step3:'3. Enter your PIN if remote access is protected.',
+  qr_note:'The server runs on your local network only. Use a PIN on shared or open Wi-Fi.',
+  faq_title:'Frequently Asked',
+  faq1_q:'Is it really free?',faq1_a:'Yes. The app is open-source under the MIT license with no ads, no tracking, and no in-app purchases.',
+  faq2_q:'Does it support resume?',faq2_a:'Yes. Downloads resume automatically after interruption using HTTP Range requests. Partial files are preserved.',
+  faq3_q:'Can I control it from my PC?',faq3_a:'Yes. Enable the remote server in Settings, then open the URL shown in any browser on the same network.',
+  faq4_q:'What platforms are supported?',faq4_a:'YouTube, TikTok, Instagram, and any direct URL. YouTube uses HLS with audio-video merge. Social media links are auto-detected.',
+  faq5_q:'How do I update?',faq5_a:'The app checks for new releases on GitHub. Tap "Check for updates" in Settings, then download and install manually.',
+  footer_docs:'Documentation',footer_changelog:'Changelog',footer_license:'License',
+  stat_val_nol:'Zero'
+};
+
+var lang = localStorage.getItem('site-lang') || 'id';
+
+function applyLang(l) {
+  lang = l;
+  localStorage.setItem('site-lang', l);
+  var btn = document.getElementById('langToggle');
+  btn.textContent = l === 'id' ? 'EN' : 'ID';
+  btn.classList.toggle('active', l === 'en');
+  document.documentElement.lang = l === 'id' ? 'id' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    var key = el.getAttribute('data-i18n');
+    if (l === 'en' && EN[key]) {
+      el.innerHTML = EN[key];
+    } else if (l === 'id') {
+      el.innerHTML = el.getAttribute('data-original') || el.innerHTML;
+    }
+  });
+  /* stat "Nol"/"Zero" */
+  document.querySelectorAll('.stat-value').forEach(function(v,i){
+    if(i===2) v.textContent = l==='id'?'Nol':'Zero';
+  });
+}
+
+function toggleLang() { applyLang(lang==='id'?'en':'id'); }
+
+/* save originals before first switch */
+document.querySelectorAll('[data-i18n]').forEach(function(el) {
+  el.setAttribute('data-original', el.innerHTML);
+});
+
+applyLang(lang);
+
 /* ── Release info ── */
 fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest')
-  .then(r => r.json())
-  .then(data => {
-    const apk = data.assets?.find(a => a.name.endsWith('.apk'));
-    if (apk) {
-      document.getElementById('download-btn').href = apk.browser_download_url;
-      document.getElementById('version-badge').textContent = data.tag_name + ' · ' + (apk.size / 1024 / 1024).toFixed(1) + ' MB';
-      document.getElementById('apk-size').textContent = (apk.size / 1024 / 1024).toFixed(1) + ' MB';
+  .then(function(r){return r.json()})
+  .then(function(data){
+    var apk=data.assets&&data.assets.find(function(a){return a.name.endsWith('.apk')});
+    if(apk){
+      document.getElementById('download-btn').href=apk.browser_download_url;
+      var txt=data.tag_name+' · '+(apk.size/1024/1024).toFixed(1)+' MB';
+      document.getElementById('version-badge').textContent=txt;
+      document.getElementById('apk-size').textContent=(apk.size/1024/1024).toFixed(1)+' MB';
     }
-  }).catch(() => {});
+  }).catch(function(){});
 
 /* ── FAQ toggle ── */
-document.querySelectorAll('.faq-q').forEach(q => {
-  q.addEventListener('click', () => q.parentElement.classList.toggle('open'));
+document.querySelectorAll('.faq-q').forEach(function(q){
+  q.addEventListener('click',function(){q.parentElement.classList.toggle('open')});
 });
 
 /* ── Scroll reveal ── */
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }});
-}, { threshold: 0.12 });
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+var observer=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}});
+},{threshold:0.12});
+document.querySelectorAll('.reveal').forEach(function(el){observer.observe(el)});
 
 /* ── Nav shadow on scroll ── */
-window.addEventListener('scroll', () => {
-  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20);
-}, { passive: true });
+window.addEventListener('scroll',function(){
+  document.getElementById('nav').classList.toggle('scrolled',window.scrollY>20);
+},{passive:true});
 
 /* ── QR code ── */
-(function drawQR(text, canvas) {
-  const ctx = canvas.getContext('2d');
-  const s = canvas.width, m = 25, c = s / m;
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, s, s);
-  ctx.fillStyle = '#000';
-  function f(x, y) { for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
-    if (i===0||i===6||j===0||j===6||(i>=2&&i<=4&&j>=2&&j<=4)) ctx.fillRect((x+i)*c,(y+j)*c,c,c);
+(function drawQR(text,canvas){
+  var ctx=canvas.getContext('2d'),s=canvas.width,m=25,c=s/m;
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,s,s);
+  ctx.fillStyle='#000';
+  function f(x,y){for(var i=0;i<7;i++)for(var j=0;j<7;j++){
+    if(i===0||i===6||j===0||j===6||(i>=2&&i<=4&&j>=2&&j<=4))ctx.fillRect((x+i)*c,(y+j)*c,c,c);
   }}
-  f(0,0); f(m-7,0); f(0,m-7);
-  for (let i = 8; i < m-8; i++) if (i%2===0) { ctx.fillRect(i*c,6*c,c,c); ctx.fillRect(6*c,i*c,c,c); }
-  let h=0; for(let i=0;i<text.length;i++) h=((h<<5)-h+text.charCodeAt(i))|0;
-  let r=Math.abs(h); const n=()=>{r=(r*1664525+1013904223)&0x7fffffff;return r};
-  for(let y=0;y<m;y++) for(let x=0;x<m;x++){
+  f(0,0);f(m-7,0);f(0,m-7);
+  for(var i=8;i<m-8;i++)if(i%2===0){ctx.fillRect(i*c,6*c,c,c);ctx.fillRect(6*c,i*c,c,c)}
+  var h=0;for(i=0;i<text.length;i++)h=((h<<5)-h+text.charCodeAt(i))|0;
+  var r=Math.abs(h);function n(){r=(r*1664525+1013904223)&0x7fffffff;return r}
+  for(var y=0;y<m;y++)for(var x=0;x<m;x++){
     if((x<8&&y<8)||(x>=m-8&&y<8)||(x<8&&y>=m-8))continue;
     if(x===6||y===6)continue;
     if(n()%3===0)ctx.fillRect(x*c,y*c,c,c);
   }
-})('https://github.com/tasirin1/tasirin-download-manager/releases/latest', document.getElementById('qr'));
+})('https://github.com/tasirin1/tasirin-download-manager/releases/latest',document.getElementById('qr'));
 </script>
 </body>
 </html>
