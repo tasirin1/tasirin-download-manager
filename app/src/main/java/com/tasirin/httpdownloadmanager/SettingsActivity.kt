@@ -112,6 +112,13 @@ class SettingsActivity : AppCompatActivity() {
         setupQuickNav()
         binding.btnOpenRemote.setOnClickListener { openRemoteNow() }
         binding.btnCopyUrl.setOnClickListener { copyRemoteUrl() }
+        binding.btnShowQr.setOnClickListener {
+            if (binding.qr.visibility == View.VISIBLE) {
+                binding.qr.visibility = View.GONE
+            } else {
+                binding.qr.visibility = View.VISIBLE
+            }
+        }
     }
 
     override fun onResume() {
@@ -331,11 +338,12 @@ class SettingsActivity : AppCompatActivity() {
             urls.firstOrNull()?.let { address ->
                 generateQrCode(address, 640)?.let { binding.qr.setImageBitmap(it) }
             }
-            binding.qr.visibility = View.VISIBLE
+            binding.btnShowQr.isEnabled = true
         } else {
             binding.serverStatus.setText(R.string.remote_stopped)
             binding.urls.text = getString(R.string.remote_no_url)
             binding.qr.visibility = View.GONE
+            binding.btnShowQr.isEnabled = false
         }
     }
 

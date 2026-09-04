@@ -2,6 +2,7 @@
 
 - **Perbaikan Play Protect (4 item)** -- (1) Hapus `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dari manifest; izin baterai hanya diminta lewat intent runtime saat user klik tombol di Settings. (2) Hapus dialog auto-offer "All files access" dari MainActivity; user aktifkan manual dari Settings → Storage → File Manager. (3) Server auto-start saat boot default ke `false`; user harus aktifkan manual. (4) Cleartext tetap diizinkan (download manager butuh HTTP untuk URL user) tapi tidak ada perubahan manifest yang mencurigakan.
 
+- **Desain ulang Settings** -- Header kompak (44dp, 14sp), chip navigasi miniatur (36dp), QR collapsible dengan tombol toggle, spinner duplikat label di atas, input port tipe number, divider antar grup, gallery folders di seksi Storage.
 - **Folder picker untuk galeri native** -- Settings kini punya seksi "Gallery folders" dengan pola input yang sama seperti "Extra folders" (kolom path + tombol +). Masukkan path absolut folder yang berisi video (e.g. /storage/emulated/0/DCIM/Camera). Kosongkan untuk scan semua folder (default). Disimpan di SharedPreferences; galeri native filter berdasarkan DATA column; remote web tidak terpengaruh.
 
 - **Fix minor: `failedUrls` eviction bukan LRU** -- Eviction menggunakan `ConcurrentHashMap.keys.iterator()` yang tidak menjamin urutan insert → eviction menghapus entry secara acak. Diganti ke `LinkedHashMap(accessOrder=true)` + `synchronized` lock → eviction benar-benar membuang entry paling tua (LRU). `containsKey()` untuk filter mirror juga dijaga thread-safe.

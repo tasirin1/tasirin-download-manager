@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:paddingHorizontal="12dp"
-            android:paddingVertical="8dp">
+            android:paddingVertical="6dp">
 
             <TextView
                 android:id="@+id/nav_server"
@@ -36,11 +36,11 @@
                 android:focusable="true"
                 android:gravity="center"
                 android:layout_marginEnd="6dp"
-                android:minHeight="40dp"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="8dp"
+                android:minHeight="36dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
                 android:text="@string/settings_section_server"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/nav_download"
@@ -51,11 +51,11 @@
                 android:focusable="true"
                 android:gravity="center"
                 android:layout_marginEnd="6dp"
-                android:minHeight="40dp"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="8dp"
+                android:minHeight="36dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
                 android:text="@string/settings_section_download"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/nav_storage"
@@ -66,11 +66,11 @@
                 android:focusable="true"
                 android:gravity="center"
                 android:layout_marginEnd="6dp"
-                android:minHeight="40dp"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="8dp"
+                android:minHeight="36dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
                 android:text="@string/settings_section_storage"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/nav_other"
@@ -81,11 +81,11 @@
                 android:focusable="true"
                 android:gravity="center"
                 android:layout_marginEnd="6dp"
-                android:minHeight="40dp"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="8dp"
+                android:minHeight="36dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
                 android:text="@string/settings_nav_other"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
         </LinearLayout>
     </HorizontalScrollView>
 
@@ -109,11 +109,11 @@
                 android:id="@+id/section_server"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_status_card"
                 android:orientation="vertical"
                 android:paddingHorizontal="14dp"
-                android:paddingBottom="14dp">
+                android:paddingBottom="12dp">
 
                 <TextView
                     android:id="@+id/header_server"
@@ -123,22 +123,22 @@
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     app:drawableEndCompat="@drawable/ic_chevron"
-                    android:drawablePadding="8dp"
+                    android:drawablePadding="6dp"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="52dp"
+                    android:minHeight="44dp"
                     android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp"
+                    android:paddingVertical="10dp"
                     android:text="@string/settings_section_server"
                     android:textColor="@color/primary"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/server_status"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:textAppearance="?android:attr/textAppearanceSmall" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -153,9 +153,9 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:layout_marginEnd="4dp"
-                            android:minHeight="48dp"
+                            android:minHeight="40dp"
                             android:text="@string/open_remote"
-                            android:textSize="13sp" />
+                            android:textSize="12sp" />
 
                         <Button
                             android:id="@+id/btn_copy_url"
@@ -164,9 +164,9 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:layout_marginStart="4dp"
-                            android:minHeight="48dp"
+                            android:minHeight="40dp"
                             android:text="@string/copy_address"
-                            android:textSize="13sp" />
+                            android:textSize="12sp" />
                     </LinearLayout>
 
                     <Button
@@ -174,7 +174,7 @@
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="8dp"
                         android:text="@string/remote_storage_btn"
                         android:visibility="gone" />
 
@@ -182,16 +182,28 @@
                         android:id="@+id/urls"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="6dp"
                         android:textIsSelectable="true"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+                    <!-- QR collapsible -->
+                    <Button
+                        android:id="@+id/btn_show_qr"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="8dp"
+                        android:minHeight="36dp"
+                        android:text="@string/remote_qr_desc"
+                        android:textSize="12sp" />
 
                     <ImageView
                         android:id="@+id/qr"
-                        android:layout_width="200dp"
-                        android:layout_height="200dp"
+                        android:layout_width="180dp"
+                        android:layout_height="180dp"
                         android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="6dp"
                         android:contentDescription="@string/remote_qr_desc"
                         android:visibility="gone" />
 
@@ -200,134 +212,111 @@
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:minHeight="48dp"
-                        android:text="@string/server_switch" />
+                        android:layout_marginTop="8dp"
+                        android:text="@string/server_start" />
 
+                    <!-- Divider -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="8dp"
+                        android:background="@color/line" />
+
+                    <!-- Server toggle group: 2 columns -->
                     <Button
                         android:id="@+id/check_server_autostart"
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="40dp"
                         android:gravity="start|center_vertical"
-                        android:nextFocusDown="@id/input_pin"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_server_autostart" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/settings_pin_label"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:paddingHorizontal="10dp"
+                        android:text="@string/settings_server_autostart"
+                        android:textSize="13sp" />
 
                     <EditText
                         android:focusable="true"
                         android:focusableInTouchMode="true"
-                        android:minHeight="48dp"
                         android:id="@+id/input_pin"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:background="@drawable/bg_input_tv"
                         android:hint="@string/settings_pin_hint"
-                        android:maxLength="10"
+                        android:importantForAutofill="no"
                         android:inputType="textPassword"
-                        tools:ignore="TextFields"
-                        android:nextFocusDown="@id/check_pin_enforced"
-                        android:nextFocusUp="@id/check_server_autostart" />
+                        android:minHeight="40dp"
+                        android:textSize="14sp" />
 
                     <Button
                         android:id="@+id/check_pin_enforced"
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
-                        android:gravity="start|center_vertical"
-                        android:nextFocusUp="@id/input_pin"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_pin_enforced" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="@string/settings_hint_pin"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:minHeight="40dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="10dp"
+                        android:text="@string/settings_pin_enforced"
+                        android:textSize="13sp" />
 
                     <Button
                         android:id="@+id/check_fs_full_access"
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
-                        android:gravity="start|center_vertical"
-                        android:nextFocusDown="@id/input_port"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_fs_full_access" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="@string/settings_hint_fs"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:minHeight="40dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="10dp"
+                        android:text="@string/settings_fs_full_access"
+                        android:textSize="13sp" />
 
                     <Button
                         android:id="@+id/check_server_read_only"
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="40dp"
                         android:gravity="start|center_vertical"
-                        android:nextFocusDown="@id/input_port"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_server_read_only" />
+                        android:paddingHorizontal="10dp"
+                        android:text="@string/settings_server_read_only"
+                        android:textSize="13sp" />
 
+                    <!-- Port input -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/settings_hint_read_only"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/settings_port"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/settings_port_label"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
 
                     <EditText
                         android:focusable="true"
                         android:focusableInTouchMode="true"
-                        android:minHeight="48dp"
                         android:id="@+id/input_port"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
                         android:background="@drawable/bg_input_tv"
-                        android:digits="0123456789"
                         android:hint="@string/settings_port_hint"
                         android:importantForAutofill="no"
-                        android:inputType="text"
-                        android:nextFocusDown="@id/btn_log"
-                        android:nextFocusUp="@id/check_fs_full_access" />
+                        android:inputType="number"
+                        android:minHeight="40dp"
+                        android:textSize="14sp" />
 
                     <Button
                         android:id="@+id/btn_log"
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:nextFocusUp="@id/input_port"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/remote_log_label" />
+                        android:layout_marginTop="6dp"
+                        android:minHeight="40dp"
+                        android:text="@string/server_log"
+                        android:textSize="13sp" />
             </LinearLayout>
 
             <!-- ===== SEKSI: UNDUHAN ===== -->
@@ -335,11 +324,11 @@
                 android:id="@+id/section_download"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_status_card"
                 android:orientation="vertical"
                 android:paddingHorizontal="14dp"
-                android:paddingBottom="14dp">
+                android:paddingBottom="12dp">
 
                 <TextView
                     android:id="@+id/header_download"
@@ -349,84 +338,101 @@
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     app:drawableEndCompat="@drawable/ic_chevron"
-                    android:drawablePadding="8dp"
+                    android:drawablePadding="6dp"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="52dp"
+                    android:minHeight="44dp"
                     android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp"
+                    android:paddingVertical="10dp"
                     android:text="@string/settings_section_download"
                     android:textColor="@color/primary"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
-                    <Button
-                        android:id="@+id/check_background"
-                        style="@style/TvOutlinedButton"
+                    <!-- Download toggles: 2 column grid -->
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:minHeight="48dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_background" />
+                        android:orientation="horizontal">
 
-                    <Button
-                        android:id="@+id/check_autostart"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_autostart" />
+                        <Button
+                            android:id="@+id/check_background"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="3dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="8dp"
+                            android:text="@string/settings_background"
+                            android:textSize="12sp" />
 
-                    <Button
-                        android:id="@+id/check_auto_sort"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_auto_sort" />
+                        <Button
+                            android:id="@+id/check_autostart"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="3dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="8dp"
+                            android:text="@string/settings_autostart"
+                            android:textSize="12sp" />
+                    </LinearLayout>
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="@string/settings_hint_auto_sort"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:orientation="horizontal">
 
-                    <Button
-                        android:id="@+id/check_small_first"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_small_first" />
+                        <Button
+                            android:id="@+id/check_auto_sort"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="3dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="8dp"
+                            android:text="@string/settings_auto_sort"
+                            android:textSize="12sp" />
+
+                        <Button
+                            android:id="@+id/check_small_first"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="3dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="8dp"
+                            android:text="@string/settings_small_first"
+                            android:textSize="12sp" />
+                    </LinearLayout>
 
                     <Button
                         android:id="@+id/check_battery"
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="40dp"
                         android:gravity="start|center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_battery" />
+                        android:paddingHorizontal="10dp"
+                        android:text="@string/settings_battery"
+                        android:textSize="13sp" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
+                        android:layout_marginTop="2dp"
+                        android:layout_marginBottom="2dp"
                         android:text="@string/settings_hint_battery"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
@@ -436,151 +442,163 @@
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="48dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="40dp"
                         android:gravity="start|center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:text="@string/settings_delete_partial_on_cancel" />
+                        android:paddingHorizontal="10dp"
+                        android:text="@string/settings_delete_partial_on_cancel"
+                        android:textSize="13sp" />
 
+                    <!-- Divider before spinners -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="8dp"
+                        android:background="@color/line" />
+
+                    <!-- Spinner group with labels -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
                         android:text="@string/settings_concurrent"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
 
                     <Spinner
                         android:id="@+id/spinner_concurrent"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
                         android:background="@drawable/bg_input_tv"
-                        android:minHeight="48dp"
-                        android:paddingHorizontal="12dp" />
+                        android:minHeight="40dp"
+                        android:paddingHorizontal="10dp" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="10dp"
                         android:text="@string/settings_speed_limit"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
 
                     <Spinner
                         android:id="@+id/spinner_speed"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
                         android:background="@drawable/bg_input_tv"
-                        android:minHeight="48dp"
-                        android:paddingHorizontal="12dp" />
+                        android:minHeight="40dp"
+                        android:paddingHorizontal="10dp" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/settings_retry"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
-
-                    <Spinner
-                        android:id="@+id/spinner_retry"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_input_tv"
-                        android:minHeight="48dp"
-                        android:paddingHorizontal="12dp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="10dp"
                         android:text="@string/settings_segments"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
 
                     <Spinner
                         android:id="@+id/spinner_segments"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
                         android:background="@drawable/bg_input_tv"
-                        android:minHeight="48dp"
-                        android:paddingHorizontal="12dp" />
+                        android:minHeight="40dp"
+                        android:paddingHorizontal="10dp" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/label_user_agent"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:layout_marginTop="10dp"
+                        android:text="@string/settings_retries"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
 
                     <Spinner
-                        android:id="@+id/spinner_user_agent"
+                        android:id="@+id/spinner_retry"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
                         android:background="@drawable/bg_input_tv"
-                        android:minHeight="48dp"
-                        android:paddingHorizontal="12dp" />
-
-                    <EditText
-                        android:id="@+id/edit_user_agent"
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:hint="@string/hint_custom_user_agent"
-                        android:inputType="textUri"
-                        android:minHeight="48dp"
-                        android:paddingHorizontal="12dp"
-                        android:singleLine="true"
-                        android:visibility="gone" />
+                        android:minHeight="40dp"
+                        android:paddingHorizontal="10dp" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="10dp"
                         android:text="@string/settings_connect_timeout"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
 
                     <Spinner
                         android:id="@+id/spinner_connect_timeout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
                         android:background="@drawable/bg_input_tv"
-                        android:minHeight="48dp"
-                        android:paddingHorizontal="12dp" />
+                        android:minHeight="40dp"
+                        android:paddingHorizontal="10dp" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="10dp"
                         android:text="@string/settings_read_timeout"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
 
                     <Spinner
                         android:id="@+id/spinner_read_timeout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
                         android:background="@drawable/bg_input_tv"
-                        android:minHeight="48dp"
-                        android:paddingHorizontal="12dp" />
+                        android:minHeight="40dp"
+                        android:paddingHorizontal="10dp" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/settings_timeout_hint"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/settings_user_agent"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
+
+                    <Spinner
+                        android:id="@+id/spinner_user_agent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_input_tv"
+                        android:minHeight="40dp"
+                        android:paddingHorizontal="10dp" />
+
+                    <EditText
+                        android:id="@+id/edit_user_agent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_input_tv"
+                        android:hint="Custom User-Agent"
+                        android:importantForAutofill="no"
+                        android:inputType="text"
+                        android:maxLines="2"
+                        android:visibility="gone"
+                        android:textSize="13sp" />
             </LinearLayout>
 
-            <!-- ===== SEKSI: PENYIMPANAN ===== -->
+            <!-- ===== SEKSI: STORAGE ===== -->
             <LinearLayout
                 android:id="@+id/section_storage"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_status_card"
                 android:orientation="vertical"
                 android:paddingHorizontal="14dp"
-                android:paddingBottom="14dp">
+                android:paddingBottom="12dp">
 
                 <TextView
                     android:id="@+id/header_storage"
@@ -590,71 +608,29 @@
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     app:drawableEndCompat="@drawable/ic_chevron"
-                    android:drawablePadding="8dp"
+                    android:drawablePadding="6dp"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="52dp"
+                    android:minHeight="44dp"
                     android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp"
+                    android:paddingVertical="10dp"
                     android:text="@string/settings_section_storage"
                     android:textColor="@color/primary"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                     <include layout="@layout/view_storage_section" />
-            </LinearLayout>
 
-
-            <!-- ===== SEKSI: LAINNYA ===== -->
-            <LinearLayout
-                android:id="@+id/section_other"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_status_card"
-                android:orientation="vertical"
-                android:paddingHorizontal="14dp"
-                android:paddingBottom="14dp">
-
-                <TextView
-                    android:id="@+id/header_other"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="-14dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    app:drawableEndCompat="@drawable/ic_chevron"
-                    android:drawablePadding="8dp"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="52dp"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="14dp"
-                    android:text="@string/settings_nav_other"
-                    android:textColor="@color/primary"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/btn_cleanup"
-                        style="@style/TvOutlinedButton"
+                    <!-- Divider before gallery folders -->
+                    <View
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/cleanup_button" />
-
-                    <TextView
-                        android:id="@+id/cleanup_result"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="10dp"
+                        android:background="@color/line" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
                         android:text="@string/gallery_folder_title"
                         android:textAppearance="?android:attr/textAppearanceMedium" />
 
@@ -680,12 +656,60 @@
                         android:background="@drawable/bg_btn_tv"
                         android:backgroundTint="@null"
                         android:text="@string/storage_add_folder" />
+            </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/update_status"
+            <!-- ===== SEKSI: LAINNYA ===== -->
+            <LinearLayout
+                android:id="@+id/section_other"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_status_card"
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp"
+                android:paddingBottom="12dp">
+
+                <TextView
+                    android:id="@+id/header_other"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="-14dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    app:drawableEndCompat="@drawable/ic_chevron"
+                    android:drawablePadding="6dp"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="44dp"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="10dp"
+                    android:text="@string/settings_nav_other"
+                    android:textColor="@color/primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_cleanup"
+                        style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="40dp"
+                        android:text="@string/cleanup_button"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/cleanup_result"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorSecondary" />
 
@@ -693,10 +717,20 @@
                         android:id="@+id/btn_check_update"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="4dp"
                         android:background="@drawable/bg_btn_tv"
                         android:backgroundTint="@null"
-                        android:text="@string/update_check" />
+                        android:minHeight="40dp"
+                        android:text="@string/update_check"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/update_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorSecondary" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
