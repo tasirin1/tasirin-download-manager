@@ -78,7 +78,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var sseLastPushAt = 0L
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
     private val shareLock = Any()
-    @Volatile private var galleryCache: Pair<Long, MediaLibrary.MediaScanResult>? = null
+    @Volatile private var galleryCache: Triple<Long, List<String>, MediaLibrary.MediaScanResult>? = null
     private val loginAttempts = ConcurrentHashMap<String, LoginAttempt>()
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Pair<Int, Long>>>()
     private val fsStatsCacheTtlMs = 60_000L
@@ -1858,14 +1858,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun scannedGallery(maxEntries: Int): MediaLibrary.MediaScanResult {
         val now = System.currentTimeMillis()
+        val folders = StoragePrefs.getGalleryFolders(context)
         val cached = galleryCache
-        if (cached != null && MediaLibrary.scanCacheUsable(
+        if (cached != null && cached.second == folders &&
+            MediaLibrary.scanCacheUsable(
                 now - cached.first, GALLERY_SCAN_TTL_MS,
-                cached.second.items.size, cached.second.total, maxEntries
+                cached.third.items.size, cached.third.total, maxEntries
             )
-        ) return cached.second
-        val result = MediaLibrary.scan(context, maxEntries = maxEntries)
-        galleryCache = now to result
+        ) return cached.third
+        val result = MediaLibrary.scan(context, maxEntries = maxEntries, selectedFolders = folders)
+        galleryCache = Triple(now, folders, result)
         return result
     }
 
