@@ -416,6 +416,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialAudioLanguages = emptyList()
                 socialAudioSection.isVisible = false
                 socialJob = lifecycleScope.launch {
+                    val probeTarget = target
                     val master = withContext(Dispatchers.IO) {
                         runCatching { SocialMediaExtractor.extract(target) }
                             .getOrNull()
@@ -425,6 +426,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     val langs = if (master != null) {
                         withContext(Dispatchers.IO) { App.engine.probeHlsAudioLanguages(master) }
                     } else emptyList()
+                    // Hasil basi dari probe URL lama dibuang bila URL sudah berubah
+                    // (socialJob menunjuk job terbaru; job lama di-cancel).
+                    if (socialJob !== coroutineContext[Job] ||
+                        extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull() != probeTarget
+                    ) return@launch
                     socialAudioLanguages = langs
                     if (langs.isNotEmpty()) {
                         val audioLabels = listOf(getString(R.string.social_audio_auto)) +
@@ -444,9 +450,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
             socialYoutubeHeights = intArrayOf()
             socialJob = lifecycleScope.launch {
+                val probeTarget = target
                 val options = withContext(Dispatchers.IO) {
                     runCatching { SocialMediaExtractor.extractAll(target) }.getOrElse { emptyList() }
                 }
+                if (socialJob !== coroutineContext[Job] ||
+                    extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull() != probeTarget
+                ) return@launch
                 socialOptions = options
                 // Pisahkan opsi video dan foto
                 socialVideoOptions = options.filter { it.mimeType.startsWith("video") }
@@ -1157,9 +1167,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val scrolled = binding.recycler.canScrollVertically(-1)
         var title: String? = null
         if (first != RecyclerView.NO_POSITION) {
-            for (i in 0..first) {
+            // Cari dari posisi terlihat ke atas: biasanya hanya perlu 1-2 item
+            // untuk menemukan Header section terakhir — lebih cepat daripada
+            // memindai 0..first (O(n) per scroll pada daftar panjang).
+            for (i in first downTo 0) {
                 val row = adapter.currentList.getOrNull(i) ?: break
-                if (row is DownloadRow.Header) title = row.title
+                if (row is DownloadRow.Header) {
+                    title = row.title
+                    break
+                }
             }
         }
         binding.textSectionSticky.isVisible = scrolled && title != null

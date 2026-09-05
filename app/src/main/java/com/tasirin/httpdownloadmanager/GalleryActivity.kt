@@ -133,7 +133,12 @@ class GalleryActivity : AppCompatActivity() {
                     val next = minOf(loadedCount + GALLERY_PAGE, MediaLibrary.GALLERY_MAX_ENTRIES)
                     val had = fullList.size
                     fullList = withContext(Dispatchers.IO) {
-                        MediaLibrary.scan(this@GalleryActivity, partialProgress, next).items
+                        MediaLibrary.scan(
+                            this@GalleryActivity,
+                            partialProgress,
+                            next,
+                            StoragePrefs.getGalleryFolders(this@GalleryActivity)
+                        ).items
                     }
                     loadedCount = next
                     if (fullList.size <= had) break
