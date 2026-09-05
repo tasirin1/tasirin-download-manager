@@ -56,7 +56,7 @@ class DownloadItemTest {
 
 
     @Test
-    fun `progressPercent - COMPLETED selalu 100 walau bytesDownloaded < totalBytes`() {
+    fun `progressPercent - COMPLETED selalu 100 walau ukuran server berlebih`() {
         // CDN (mis. Instagram) kadang melaporkan Content-Length lebih besar
         // dari byte yang diterima; item selesai harus tampil 100%, bukan 90-95%:
         val done = item(bytesDownloaded = 4_838_427, totalBytes = 5_332_192)
