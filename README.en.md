@@ -41,7 +41,8 @@ The server is intended for local networks. Use a PIN on shared devices or unsecu
 The public landing page is deployed from the **`docs/`** folder on the `main`
 branch via **GitHub Pages** → <https://tasirin1.github.io/tasirin-download-manager/>.
 
-- **Source**: the website is a single file, `docs/index.html` (HTML/CSS/JS).
+- **Source**: the website is a single file, `docs/index.html` (HTML/CSS/JS) plus PWA
+  assets (`site.webmanifest`, `sw.js`, `icons/`) so it can be installed as an app.
 - **Screenshots**: `docs/screenshots/`.
 - Any change to `docs/` is automatically re-deployed by *pages-build-deployment*.
 - The website reads the latest release/APK info from the GitHub Releases API —

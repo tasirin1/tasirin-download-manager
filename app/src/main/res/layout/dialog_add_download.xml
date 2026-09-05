@@ -144,6 +144,34 @@
             android:layout_marginTop="4dp" />
     </LinearLayout>
 
+    <!-- Audio language card (YouTube HLS) -->
+    <LinearLayout
+        android:id="@+id/social_audio_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_card_section"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/social_audio_label"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/spinner_social_audio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+
     <!-- Divider -->
     <View
         android:layout_width="match_parent"

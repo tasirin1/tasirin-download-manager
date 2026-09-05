@@ -52,6 +52,7 @@ object DownloadItemCodec {
             }
             o.put("segments", segArr)
             o.put("preferredHeight", item.preferredHeight)
+            if (item.preferredAudioLang.isNotEmpty()) o.put("preferredAudioLang", item.preferredAudioLang)
             o.put("progressPercentOverride", item.progressPercentOverride)
             if (item.retryCount > 0) o.put("retryCount", item.retryCount)
             arr.put(o)
@@ -112,6 +113,7 @@ object DownloadItemCodec {
                 etag = o.optString("etag"),
                 segments = parseSegments(o),
                 preferredHeight = o.optInt("preferredHeight", 0),
+                preferredAudioLang = o.optString("preferredAudioLang"),
                 progressPercentOverride = o.optInt("progressPercentOverride", -1),
                 retryCount = o.optInt("retryCount", 0)
             )

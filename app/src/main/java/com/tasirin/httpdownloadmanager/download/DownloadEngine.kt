@@ -203,7 +203,8 @@ class DownloadEngine(appContext: Context) {
         folderPath: String = "",
         mirrors: List<String> = emptyList(),
         monitor: Boolean = false,
-        preferredHeight: Int = 0
+        preferredHeight: Int = 0,
+        preferredAudioLang: String = ""
     ) {
         val cleanUrl = url.trim()
         if (cleanUrl.isEmpty()) return
@@ -230,7 +231,8 @@ class DownloadEngine(appContext: Context) {
             checksum = checksum,
             mirrors = mirrors,
             monitor = monitor,
-            preferredHeight = preferredHeight
+            preferredHeight = preferredHeight,
+            preferredAudioLang = preferredAudioLang
         )
         update(listOf(item) + _items.value)
         flushSave()
@@ -383,6 +385,26 @@ class DownloadEngine(appContext: Context) {
                 conn.disconnect()
             }
         }.getOrNull()
+    }
+
+    /** Probe manifest HLS untuk daftar bahasa audio yang tersedia.
+     *  Mengembalikan list rendisi unik (language + name), dipakai dialog
+     *  Add Download untuk spinner "Audio language". */
+    fun probeHlsAudioLanguages(url: String): List<HlsRendition> {
+        return runCatching {
+            val conn = openAuthenticatedConnection(
+                url, method = "GET", username = "", password = "", headers = ""
+            )
+            try {
+                val code = conn.responseCode
+                if (code !in 200..299) return emptyList()
+                val body = conn.inputStream.use { readBounded(it, HLS_PROBE_MAX_BYTES) }
+                val renditions = HlsParser.parseAudioRenditions(body, conn.url.toString())
+                renditions.distinctBy { it.language.lowercase() + "|" + it.name.lowercase() }
+            } finally {
+                conn.disconnect()
+            }
+        }.getOrElse { emptyList() }
     }
 
     fun probeUrl(
@@ -1187,7 +1209,7 @@ class DownloadEngine(appContext: Context) {
 
         val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES)
             ?: throw IOException("Cannot fetch HLS manifest")
-        val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers)
+        val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang)
         if (plan == null || plan.videoSegments.isEmpty()) {
             App.logEvent("HLS DEBUG: master ${master.length} chars, stream-inf=${master.contains("#EXT-X-STREAM-INF")}, url=${item.url.take(90)}")
             throw IOException("No HLS segments found")
@@ -1654,7 +1676,7 @@ class DownloadEngine(appContext: Context) {
     )
 
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
-    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = ""): HlsPlan? {
+    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = ""): HlsPlan? {
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
             val segments = body.lines()
@@ -1744,16 +1766,24 @@ class DownloadEngine(appContext: Context) {
             val videoDurations = videoSegs.map { it.second }
             val audioSegments = candidate.audioGroupId?.let { group ->
                 val groupRenditions = audioRenditions.filter { it.groupId == group }
-                // Prioritas: (1) default + bukan dubbing, (2) default saja, (3) non-default + bukan dubbing, (4) sisanya
+                // Jika user memilih bahasa audio spesifik, prioritaskan rendition
+                // yang LANGUAGE-nya cocok; sisanya fallback setelahnya.
                 val isDubbed = { r: HlsRendition ->
                     r.name.contains("dub", ignoreCase = true) ||
                     r.name.contains("dubbed", ignoreCase = true) ||
                     r.name.contains("dubbing", ignoreCase = true)
                 }
-                val ordered = groupRenditions.filter { it.isDefault && !isDubbed(it) } +
-                    groupRenditions.filter { it.isDefault && isDubbed(it) } +
-                    groupRenditions.filter { !it.isDefault && !isDubbed(it) } +
-                    groupRenditions.filter { !it.isDefault && isDubbed(it) }
+                val ordered = if (preferredAudioLang.isNotBlank()) {
+                    groupRenditions.filter { it.language.equals(preferredAudioLang, ignoreCase = true) } +
+                        groupRenditions.filter { !it.language.equals(preferredAudioLang, ignoreCase = true) }
+                } else {
+                    // Prioritas default: (1) default + bukan dubbing, (2) default saja,
+                    // (3) non-default + bukan dubbing, (4) sisanya.
+                    groupRenditions.filter { it.isDefault && !isDubbed(it) } +
+                        groupRenditions.filter { it.isDefault && isDubbed(it) } +
+                        groupRenditions.filter { !it.isDefault && !isDubbed(it) } +
+                        groupRenditions.filter { !it.isDefault && isDubbed(it) }
+                }
                 var audioResult: List<String>? = null
                 for (rendition in ordered) {
                     val segs = runCatching { mediaSegments(rendition.url, headers) }.getOrNull()

@@ -41,7 +41,8 @@ Server hanya dimaksudkan untuk jaringan lokal. Gunakan PIN saat perangkat dipaka
 Halaman arahan publik terdeploy dari folder **`docs/`** pada branch `main`
 melalui **GitHub Pages** → <https://tasirin1.github.io/tasirin-download-manager/>.
 
-- **Sumber** website: `docs/index.html` (satu file HTML/CSS/JS).
+- **Sumber** website: `docs/index.html` (satu file HTML/CSS/JS) + aset PWA
+  (`site.webmanifest`, `sw.js`, `icons/`) supaya bisa di-install sebagai aplikasi.
 - **Screenshot**: `docs/screenshots/`.
 - Setiap perubahan `docs/` otomatis di-deploy ulang oleh *pages-build-deployment*.
 - Website menampilkan versi/APK terbaru lewat GitHub Releases API — tidak perlu

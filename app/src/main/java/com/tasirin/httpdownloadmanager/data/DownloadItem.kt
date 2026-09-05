@@ -43,6 +43,7 @@ data class DownloadItem(
     val speedBps: Long = 0,
     val etaSeconds: Long = 0,
     val preferredHeight: Int = 0,
+    val preferredAudioLang: String = "",
     val progressPercentOverride: Int = -1,
     val retryCount: Int = 0
 ) {

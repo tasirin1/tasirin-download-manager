@@ -28,6 +28,9 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
 ├── docs/index.html                    # WEBSITE GitHub Pages (satu file; deploy otomatis dari /docs)
+├── docs/site.webmanifest             # PWA manifest (installable)
+├── docs/sw.js                        # Service worker PWA (network-first)
+├── docs/icons/                       # Ikon PWA (192/512 PNG)
 ├── docs/screenshots/                 # Screenshot README (remote-web.png, gallery.png, downloads.png)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
@@ -244,8 +247,9 @@ kuat dan tanpa diskusi:
     cakupan dicetak di job summary.
 13. **Website (`docs/index.html`)**: situs GitHub Pages dari folder `/docs`
     (deploy otomatis oleh `pages-build-deployment` saat push ke `main`).
-    Satu file; versi APK/ukur tidak boleh di-hardcode — script di bagian
-    bawah mengambilnya dari GitHub Releases API. Screenshot di
+    Satu file HTML; versi APK/ukur tidak boleh di-hardcode — script di bagian
+    bawah mengambilnya dari GitHub Releases API. Tambahan PWA (`site.webmanifest`,
+    `sw.js`, `icons/`) diizinkan supaya halaman installable. Screenshot di
     `docs/screenshots/`. Perubahan `docs/` masuk label `docs` (labeler).
 14. **Update dependensi (AGP/Kotlin/Gradle) bertahap** — jangan lompat beberapa
     versi sekaligus; tiap langkah lewat CI dulu. Versi dipusatkan di

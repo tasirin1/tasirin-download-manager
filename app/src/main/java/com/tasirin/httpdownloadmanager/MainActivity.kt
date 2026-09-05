@@ -25,6 +25,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.animation.AnimationUtils
 import androidx.core.view.isVisible
+import com.tasirin.httpdownloadmanager.download.HlsRendition
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -286,9 +287,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             Intent.ACTION_VIEW -> intent.data?.toString()
             else -> null
         } ?: return
-        val url = raw.trim().split(URL_SPLIT).firstOrNull {
-            it.startsWith("http://") || it.startsWith("https://")
-        } ?: return
+        val url = extractUrls(raw).firstOrNull() ?: return
         showAddDialog(url)
     }
 
@@ -309,6 +308,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val socialQualitySpinner = view.findViewById<Spinner>(R.id.spinner_social_quality)
         val socialCarouselSection = view.findViewById<View>(R.id.social_carousel_section)
         val socialCarouselSpinner = view.findViewById<Spinner>(R.id.spinner_social_carousel)
+        val socialAudioSection = view.findViewById<View>(R.id.social_audio_section)
+        val socialAudioSpinner = view.findViewById<Spinner>(R.id.spinner_social_audio)
         val speedKbps = SPEED_KBPS
         val spinnerSpeedPer = view.findViewById<Spinner>(R.id.spinner_speed_limit_per)
         setupSpinner(
@@ -356,6 +357,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialVideoOptions: List<SocialMediaExtractor.Result> = emptyList()
         var socialPhotoOptions: List<SocialMediaExtractor.Result> = emptyList()
         var socialYoutubeHeights: IntArray = intArrayOf()
+        var socialAudioLanguages: List<HlsRendition> = emptyList()
         var socialJob: Job? = null
         fun platformLabelFrom(url: String): String {
             val host = runCatching { url.toUri().host.orEmpty() }.getOrDefault("").lowercase()
@@ -382,10 +384,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         fun probeSocialQuality() {
             socialJob?.cancel()
             val allUrls = urlInput.text?.toString().orEmpty()
-            val target = allUrls
-                .split(URL_SPLIT)
-                .firstOrNull { it.startsWith("http://") || it.startsWith("https://") }
-                ?.trim().orEmpty()
+            val target = extractUrls(allUrls).firstOrNull().orEmpty()
             val isSocial = target.isNotEmpty() && SocialMediaExtractor.isSocialMediaUrl(target)
             if (!isSocial) {
                 socialJob = null
@@ -393,6 +392,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialVideoOptions = emptyList()
                 socialPhotoOptions = emptyList()
                 socialYoutubeHeights = intArrayOf()
+                socialAudioLanguages = emptyList()
+                socialAudioSection.isVisible = false
                 socialQualitySection.isVisible = false
                 socialCarouselSection.isVisible = false
                 platformBadge.isVisible = false
@@ -410,6 +411,35 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 setupSpinner(this@MainActivity, socialQualitySpinner, labels)
                 socialQualitySection.isVisible = true
                 socialCarouselSection.isVisible = false
+                // Probe bahasa audio dari manifest HLS (background, tidak memblokir):
+                // spinner kualitas langsung tampil, audio terisi saat siap.
+                socialAudioLanguages = emptyList()
+                socialAudioSection.isVisible = false
+                socialJob = lifecycleScope.launch {
+                    val master = withContext(Dispatchers.IO) {
+                        runCatching { SocialMediaExtractor.extract(target) }
+                            .getOrNull()
+                            ?.takeIf { it.isHls && it.directUrl.isNotBlank() }
+                            ?.directUrl
+                    }
+                    val langs = if (master != null) {
+                        withContext(Dispatchers.IO) { App.engine.probeHlsAudioLanguages(master) }
+                    } else emptyList()
+                    socialAudioLanguages = langs
+                    if (langs.isNotEmpty()) {
+                        val audioLabels = listOf(getString(R.string.social_audio_auto)) +
+                            langs.map { r ->
+                                buildString {
+                                    append(r.language.ifEmpty { "?" })
+                                    if (r.name.isNotBlank()) append(" — ").append(r.name)
+                                }
+                            }
+                        setupSpinner(this@MainActivity, socialAudioSpinner, audioLabels)
+                        socialAudioSection.isVisible = true
+                    } else {
+                        socialAudioSection.isVisible = false
+                    }
+                }
                 return
             }
             socialYoutubeHeights = intArrayOf()
@@ -479,13 +509,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         probeSocialQuality()
 
         fun parseMirrors(): List<String> =
-            mirrorInput.text?.toString()?.trim().orEmpty()
-                .split(URL_SPLIT)
-                .filter { it.startsWith("http://") || it.startsWith("https://") }
+            extractUrls(mirrorInput.text?.toString()?.trim().orEmpty())
 
         fun addYoutubeWithHeight(
             urls: List<String>,
             height: Int,
+            audioLang: String,
             name: String,
             username: String,
             password: String,
@@ -506,7 +535,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     priority = priority,
                     checksum = if (index == 0) checksum else "",
                     mirrors = if (index == 0) mirrors else emptyList(),
-                    preferredHeight = height
+                    preferredHeight = height,
+                    preferredAudioLang = audioLang
                 )
             }
         }
@@ -550,9 +580,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             setGravity(Gravity.BOTTOM)
         }
         fun submitDownload() {
-            val urls = urlInput.text?.toString()?.trim().orEmpty()
-                .split(URL_SPLIT)
-                .filter { it.startsWith("http://") || it.startsWith("https://") }
+            val urls = extractUrls(urlInput.text?.toString()?.trim().orEmpty())
             if (urls.isEmpty()) {
                 Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_SHORT).show()
                 return
@@ -569,6 +597,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialYoutubeHeights.isNotEmpty() &&
                 socialSel in 1..socialYoutubeHeights.size
             ) socialYoutubeHeights[socialSel - 1] else 0
+            val audioSel = socialAudioSpinner.selectedItemPosition
+            val selectedAudioLang = if (
+                socialAudioSection.isVisible &&
+                socialAudioLanguages.isNotEmpty() &&
+                audioSel in 1..socialAudioLanguages.size
+            ) socialAudioLanguages[audioSel - 1].language else ""
             val carouselSel = socialCarouselSpinner.selectedItemPosition
             val carouselAll = socialCarouselSection.isVisible &&
                 socialPhotoOptions.size > 1 && carouselSel == 0
@@ -589,6 +623,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 addYoutubeWithHeight(
                     urls = urls,
                     height = selectedYtHeight,
+                    audioLang = selectedAudioLang,
                     name = name,
                     username = username,
                     password = password,
@@ -653,7 +688,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                             perSpeed = perSpeed,
                             priority = priority,
                             checksum = checksum,
-                            mirrors = parseMirrors()
+                            mirrors = parseMirrors(),
+                            audioLang = selectedAudioLang
                         )
                     }
                 }
@@ -683,7 +719,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         perSpeed: Int,
         priority: Int,
         checksum: String,
-        mirrors: List<String> = emptyList()
+        mirrors: List<String> = emptyList(),
+        audioLang: String = ""
     ) {
         val labels = variants.map { it.name } + getString(R.string.hls_direct)
         AlertDialog.Builder(this)
@@ -704,7 +741,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     speedLimitKbps = perSpeed,
                     priority = priority,
                     checksum = checksum,
-                    mirrors = mirrors
+                    mirrors = mirrors,
+                    preferredAudioLang = audioLang
                 )
             }
             .setNegativeButton(R.string.cancel, null)
@@ -1246,7 +1284,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     companion object {
-        private val URL_SPLIT = Regex("[\\s,]+")
+        private val URL_PATTERN = Regex("https?://[^\\s\"'<>]+")
+        private fun extractUrls(text: String): List<String> =
+            URL_PATTERN.findAll(text)
+                .map { it.value.trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}', '"', '\'', '>', '\u2019', '\u201d', '\u2026') }
+                .filter { it.startsWith("http://") || it.startsWith("https://") }
+                .distinct()
+                .toList()
         private const val EXTRA_ADD_DOWNLOAD = "com.tasirin.httpdownloadmanager.ADD_DOWNLOAD"
         private val SPEED_KBPS = intArrayOf(0, 128, 256, 512, 1024, 2048, 5120)
         private val PRIORITY_VALUES = intArrayOf(-1, 0, 1)
