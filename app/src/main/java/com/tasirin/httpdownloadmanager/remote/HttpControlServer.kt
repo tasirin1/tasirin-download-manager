@@ -803,6 +803,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 item.etaSeconds.hashCode() * 31 + item.finishedAt.hashCode() * 41 +
                 item.priority.hashCode() * 43 + item.retryCount.hashCode() * 53 +
                 (if (item.checksumVerified) 1 else 0) * 59 +
+                item.progressPercentOverride.hashCode() * 61 +
                 (item.error?.hashCode() ?: 0) * 47
         }
         lastSigItems = items
@@ -834,6 +835,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 oldObj.put("priority", item.priority)
                 oldObj.put("retryCount", item.retryCount)
                 oldObj.put("checksumVerified", item.checksumVerified)
+                oldObj.put("progressPercentOverride", item.progressPercentOverride)
                 if (item.error != null) {
                     oldObj.put("error", item.error)
                 } else if (oldObj.has("error")) {
@@ -858,6 +860,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 o.put("priority", item.priority)
                 o.put("retryCount", item.retryCount)
                 o.put("checksumVerified", item.checksumVerified)
+                o.put("progressPercentOverride", item.progressPercentOverride)
                 o.put("addedAt", item.addedAt)
                 o.put("finishedAt", item.finishedAt)
                 item.error?.let { o.put("error", it) }

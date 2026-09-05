@@ -84,11 +84,18 @@ class GalleryActivity : AppCompatActivity() {
 
         // Update progres tanpa scan ulang MediaStore. Scan hanya saat daftar file
         // aktif berubah (mulai/selesai), bukan tiap tick persentase.
+        // Tick persentase di-throttle (maks ~1/s): DiffUtil atas ribuan entry
+        // tidak perlu dijalankan pada tiap emisi StateFlow (bisa beberapa per
+        // detik saat banyak download aktif paralel).
+        var lastUiAt = 0L
         lifecycleScope.launch {
             App.engine.items.collect { items ->
                 val newPartial = activeDownloadProgress(items)
                 val filesChanged = newPartial.keys != partialProgress.keys
                 partialProgress = newPartial
+                val now = System.currentTimeMillis()
+                if (!filesChanged && now - lastUiAt < 800L) return@collect
+                lastUiAt = now
                 if (filesChanged) {
                     fullList = withContext(Dispatchers.IO) {
                         MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items

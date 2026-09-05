@@ -242,13 +242,19 @@ class DownloadAdapter(private val listener: Listener) :
                 rows.add(DownloadRow.Header(context.getString(labelRes), group.size, collapsed, key))
                 if (!collapsed) group.forEach { rows.add(DownloadRow.Item(it)) }
             }
-            val active = items.filter {
-                it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-            }
-            val paused = items.filter { it.state == DownloadState.PAUSED }
-            val completed = items.filter { it.state == DownloadState.COMPLETED }
-            val failed = items.filter {
-                it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED
+            // Satu pass pengelompokan (bukan 4x filter): dipanggil pada tiap
+            // emisi StateFlow (progress/download aktif), hemat alokasi.
+            val active = ArrayList<DownloadItem>(items.size)
+            val paused = ArrayList<DownloadItem>()
+            val completed = ArrayList<DownloadItem>()
+            val failed = ArrayList<DownloadItem>()
+            for (item in items) {
+                when (item.state) {
+                    DownloadState.DOWNLOADING, DownloadState.PENDING -> active.add(item)
+                    DownloadState.PAUSED -> paused.add(item)
+                    DownloadState.COMPLETED -> completed.add(item)
+                    DownloadState.FAILED, DownloadState.CANCELLED -> failed.add(item)
+                }
             }
             addGroup(R.string.section_active, active)
             addGroup(R.string.section_paused, paused)

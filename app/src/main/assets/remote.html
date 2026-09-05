@@ -2682,7 +2682,7 @@ items.forEach(function (it) {
 const li = rowNodes.get(it.id);
 if (!li || !li.isConnected) return;
 const sig = it.state + '|' + it.bytesDownloaded + '|' + it.totalBytes + '|' + it.progress + '|' + it.speedBps + '|' +
-it.etaSeconds + '|' + (it.error || '');
+it.etaSeconds + '|' + (it.error || '') + '|' + (it.retryCount || 0) + '|' + (it.checksumVerified ? 1 : 0);
 if (lastRowSig[it.id] === sig) return;
 lastRowSig[it.id] = sig;
 patchRowSub(li, it);
