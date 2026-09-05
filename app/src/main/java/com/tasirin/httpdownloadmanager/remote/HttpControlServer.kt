@@ -1823,9 +1823,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (!e.isPartial) {
                     var d = videoDurationOf(cache, e.token)
                     if (d <= 0 && e.durationMs > 0) d = e.durationMs
-                    if (d <= 0 && extracted < 20) {
+                    if (d <= 0 && extracted < 20 && !isVideoDurationProbeThrottled(e.token)) {
                         d = videoDurationMs(e.token)
-                        if (d > 0) cacheVideoDuration(cache, e.token, d)
+                        if (d > 0) {
+                            cacheVideoDuration(cache, e.token, d)
+                            markVideoDurationProbe(e.token, ok = true)
+                        } else {
+                            markVideoDurationProbe(e.token, ok = false)
+                        }
                         extracted++
                     }
                     o.put("durationMs", d)
@@ -1890,29 +1895,55 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun videoDurationMs(token: String): Long {
         val raw = MediaLibrary.decodeToken(token) ?: return 0L
-        return safeRun("videoDurationMs") {
+        // Senyap (tanpa logError/di-append ke log server): kegagalan probe
+        // adalah hal wajar untuk video korup/tidak dikenal — mencetak
+        // "ERROR setDataSource failed" setiap request galeri hanya derau.
+        return runCatching {
             val mmr = MediaMetadataRetriever()
             try {
                 when {
                     raw.startsWith("f:") -> {
                         val file = File(raw.substring(2))
                         if (!file.isFile || !isFsPathAllowed(file.absolutePath)) {
-                            return@safeRun 0L
+                            return 0L
                         }
                         mmr.setDataSource(file.absolutePath)
                     }
                     raw.startsWith("u:") -> {
                         val uri = raw.substring(2).toUri()
-                        if (!isMediaUriAllowed(uri)) return@safeRun 0L
+                        if (!isMediaUriAllowed(uri)) return 0L
                         mmr.setDataSource(context, uri)
                     }
-                    else -> return@safeRun 0L
+                    else -> return 0L
                 }
                 mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
             } finally {
                 runCatching { mmr.release() }
             }
-        } ?: 0L
+        }.getOrDefault(0L)
+    }
+
+    /** Jeda probe durasi per file setelah gagal: video yang tidak bisa dibaca
+     *  (mis. status 0xFFFFFFEA) tidak perlu diprobes ulang pada tiap request
+     *  galeri — sumber derau ERROR sekaligus kerja MediaMetadataRetriever
+     *  yang sia-sia. Cache hanya di memori dan dibersihkan otomatis. */
+    private val videoDurationProbeAt = HashMap<String, Long>()
+
+    private fun isVideoDurationProbeThrottled(token: String): Boolean {
+        val at = videoDurationProbeAt[token] ?: return false
+        return System.currentTimeMillis() - at < VIDEO_DURATION_PROBE_TTL_MS
+    }
+
+    private fun markVideoDurationProbe(token: String, ok: Boolean) {
+        if (ok) {
+            videoDurationProbeAt.remove(token)
+        } else {
+            if (videoDurationProbeAt.size > 2000) {
+                val cutoff = System.currentTimeMillis() - VIDEO_DURATION_PROBE_TTL_MS
+                videoDurationProbeAt.entries.removeAll { it.value < cutoff }
+            }
+            videoDurationProbeAt[token] = System.currentTimeMillis()
+        }
     }
 
     private val videoDurationLock = Any()
@@ -2843,6 +2874,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SNAPSHOT_RATE_MS = 1_000L
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
+        private const val VIDEO_DURATION_PROBE_TTL_MS = 10L * 60 * 1000
         private const val FS_LISTING_TTL_MS = 3_000L
         private const val FS_LISTING_CACHE_MAX = 5_000
         // Listing file manager di-paginate: maks 1000 entri per request, klien

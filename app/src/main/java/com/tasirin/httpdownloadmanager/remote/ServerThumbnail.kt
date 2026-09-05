@@ -22,6 +22,21 @@ private class ThumbLock {
     val lastUse = AtomicLong(System.currentTimeMillis())
 }
 
+private const val THUMB_FAILURE_TTL_MS = 30L * 60 * 1000
+
+/** Cache kegagalan generate thumbnail per file: video korup / format yang
+ *  tidak bisa di-decode tidak perlu dicoba ulang pada tiap request galeri
+ *  (sebelumnya tiap scroll memicu MediaMetadataRetriever + tidak ada hasil).
+ *  TTL mencegah file rusak "mengunci" thumbnail selamanya bila sudah diperbaiki. */
+private val thumbFailures = ConcurrentHashMap<String, Long>()
+
+/** true bila kegagalan thumbnail masih dalam masa TTL (belum perlu dicoba lagi). */
+internal fun isThumbFailureFresh(
+    storedAt: Long,
+    now: Long,
+    ttlMs: Long = THUMB_FAILURE_TTL_MS
+): Boolean = now - storedAt < ttlMs
+
 /** Satu lock per media mencegah banyak permintaan thumbnail awal men-decode
  *  video yang sama secara paralel (hemat CPU/RAM di device Android 5+).
  *  Lock tidak aktif dibuang agar browsing ribuan media tidak menumpuk RAM. */
@@ -46,6 +61,9 @@ internal fun getOrCreateThumb(
 ): File? {
     if (!isThumbSourceAllowed(ctx, raw, isFsPathAllowed, isMediaUriAllowed)) return null
     val key = sha256Hex(raw).take(16)
+    thumbFailures[key]?.let { at ->
+        if (isThumbFailureFresh(at, System.currentTimeMillis())) return null
+    }
     val dir = File(ctx.cacheDir, "thumbs").apply { runCatching { mkdirs() } }
     if (!dir.isDirectory) return null
     val cached = File(dir, "$key.jpg")
@@ -55,7 +73,15 @@ internal fun getOrCreateThumb(
             cached
         } else {
             val bmp = generateThumb(ctx, raw, isFsPathAllowed, isMediaUriAllowed)
-                ?: return@synchronized null
+                ?: run {
+                    thumbFailures[key] = System.currentTimeMillis()
+                    if (thumbFailures.size > 512) {
+                        val cutoff = System.currentTimeMillis() - THUMB_FAILURE_TTL_MS
+                        thumbFailures.entries.removeAll { it.value < cutoff }
+                    }
+                    return@synchronized null
+                }
+            thumbFailures.remove(key)
             runCatching {
                 val out = FileOutputStream(cached)
                 try {
