@@ -801,6 +801,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             h = h * 31 + item.id.hashCode() * 7 + item.state.hashCode() * 13 +
                 item.bytesDownloaded.hashCode() * 19 + item.speedBps.hashCode() * 29 +
                 item.etaSeconds.hashCode() * 31 + item.finishedAt.hashCode() * 41 +
+                item.priority.hashCode() * 43 + item.retryCount.hashCode() * 53 +
+                (if (item.checksumVerified) 1 else 0) * 59 +
                 (item.error?.hashCode() ?: 0) * 47
         }
         lastSigItems = items
@@ -829,7 +831,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 oldObj.put("etaSeconds", item.etaSeconds)
                 oldObj.put("speedLimitKbps", item.speedLimitKbps)
                 oldObj.put("finishedAt", item.finishedAt)
-                if (item.error != null) oldObj.put("error", item.error)
+                oldObj.put("priority", item.priority)
+                oldObj.put("retryCount", item.retryCount)
+                oldObj.put("checksumVerified", item.checksumVerified)
+                if (item.error != null) {
+                    oldObj.put("error", item.error)
+                } else if (oldObj.has("error")) {
+                    // Error pulih (retry sukses): hapus agar UI remote tidak
+                    // menampilkan error lama setelah item selesai.
+                    oldObj.remove("error")
+                }
                 arr.put(oldObj)
             } else {
                 // Item baru / order berubah — build dari nol
@@ -844,6 +855,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 o.put("speedBps", item.speedBps)
                 o.put("etaSeconds", item.etaSeconds)
                 o.put("speedLimitKbps", item.speedLimitKbps)
+                o.put("priority", item.priority)
+                o.put("retryCount", item.retryCount)
+                o.put("checksumVerified", item.checksumVerified)
                 o.put("addedAt", item.addedAt)
                 o.put("finishedAt", item.finishedAt)
                 item.error?.let { o.put("error", it) }
