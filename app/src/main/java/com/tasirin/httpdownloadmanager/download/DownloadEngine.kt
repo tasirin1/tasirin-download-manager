@@ -1556,6 +1556,10 @@ class DownloadEngine(appContext: Context) {
                     bytesDownloaded = totalNow,
                     totalBytes = effTotal,
                     progressPercentOverride = if (total > 0) -1 else percent,
+                    // Denominasi masih estimasi (BANDWIDTH x durasi) selama
+                    // ukuran segmen riil (exactTotal) belum tersedia; UI memakai
+                    // flag ini untuk menampilkan "~" di depan total.
+                    totalBytesEstimated = total == 0L && progress.exactTotal <= 0,
                     speedBps = speed,
                     etaSeconds = etaFromSegments
                 )
@@ -1583,6 +1587,7 @@ class DownloadEngine(appContext: Context) {
                 speedBps = 0,
                 etaSeconds = 0,
                 progressPercentOverride = -1,
+                totalBytesEstimated = false,
                 finishedAt = System.currentTimeMillis()
             )
         }

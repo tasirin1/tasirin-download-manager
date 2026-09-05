@@ -39,7 +39,8 @@ class DownloadItemCodecTest {
         ),
         speedBps = 12_345,
         etaSeconds = 7,
-        preferredHeight = 720
+        preferredHeight = 720,
+        totalBytesEstimated = true
     )
 
     @Test
@@ -52,6 +53,31 @@ class DownloadItemCodecTest {
         // speedBps/etaSeconds sengaja transient (tidak dipersist, dihitung ulang
         // saat download berjalan) — konsisten dengan perilaku lama.
         assertEquals(item.copy(speedBps = 0, etaSeconds = 0), decoded[0])
+    }
+
+
+    @Test
+    fun `roundtrip - flag totalBytesEstimated utuh`() {
+        val item = DownloadItem(
+            id = "hls-1",
+            url = "https://x/playlist.m3u8",
+            fileName = "a.ts",
+            state = DownloadState.DOWNLOADING,
+            bytesDownloaded = 100,
+            totalBytes = 5_000_000,
+            totalBytesEstimated = true
+        )
+        val decoded = DownloadItemCodec.decode(
+            DownloadItemCodec.encode(listOf(item)), coerceActiveToPaused = false
+        )
+        assertEquals(item.copy(speedBps = 0, etaSeconds = 0), decoded[0])
+    }
+
+    @Test
+    fun `decode - tanpa flag totalBytesEstimated = false`() {
+        val raw = "[{\"id\":\"1\",\"url\":\"https://a/x\",\"fileName\":\"x\",\"state\":\"PAUSED\",\"bytesDownloaded\":0,\"totalBytes\":0}]"
+        val item = DownloadItemCodec.decode(raw, coerceActiveToPaused = false)[0]
+        assertTrue(!item.totalBytesEstimated)
     }
 
     @Test

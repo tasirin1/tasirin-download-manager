@@ -110,11 +110,18 @@ class DownloadAdapter(private val listener: Listener) :
         )
 
         b.textProgress.text = if (item.totalBytes > 0) {
+            // HLS: totalBytes bisa berupa estimasi (BANDWIDTH x durasi) —
+            // tandai dengan "~" supaya jelas bukan angka pasti.
+            val totalTxt = if (item.totalBytesEstimated) {
+                "~" + Formats.bytes(item.totalBytes)
+            } else {
+                Formats.bytes(item.totalBytes)
+            }
             String.format(
                 Locale.US, "%d%%  %s / %s",
                 item.progressPercent,
                 Formats.bytes(item.bytesDownloaded),
-                Formats.bytes(item.totalBytes)
+                totalTxt
             )
         } else if (item.progressPercentOverride >= 0) {
             // HLS: total asli tidak diketahui — persen + byte riil tanpa denominator palsu.

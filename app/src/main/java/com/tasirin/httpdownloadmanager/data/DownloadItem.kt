@@ -45,7 +45,8 @@ data class DownloadItem(
     val preferredHeight: Int = 0,
     val preferredAudioLang: String = "",
     val progressPercentOverride: Int = -1,
-    val retryCount: Int = 0
+    val retryCount: Int = 0,
+    val totalBytesEstimated: Boolean = false
 ) {
     val progressPercent: Int
         // Untuk HLS total asli tidak diketahui, jadi persentase dihitung dari

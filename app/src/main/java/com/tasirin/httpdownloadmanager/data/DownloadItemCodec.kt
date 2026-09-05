@@ -55,6 +55,7 @@ object DownloadItemCodec {
             if (item.preferredAudioLang.isNotEmpty()) o.put("preferredAudioLang", item.preferredAudioLang)
             o.put("progressPercentOverride", item.progressPercentOverride)
             if (item.retryCount > 0) o.put("retryCount", item.retryCount)
+            if (item.totalBytesEstimated) o.put("totalBytesEstimated", true)
             arr.put(o)
         }
         return arr.toString()
@@ -115,7 +116,8 @@ object DownloadItemCodec {
                 preferredHeight = o.optInt("preferredHeight", 0),
                 preferredAudioLang = o.optString("preferredAudioLang"),
                 progressPercentOverride = o.optInt("progressPercentOverride", -1),
-                retryCount = o.optInt("retryCount", 0)
+                retryCount = o.optInt("retryCount", 0),
+                totalBytesEstimated = o.optBoolean("totalBytesEstimated", false)
             )
         }.getOrNull()
     }
