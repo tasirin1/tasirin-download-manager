@@ -3,7 +3,6 @@ package com.tasirin.httpdownloadmanager.remote
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.annotation.SuppressLint
 import androidx.core.net.toUri
@@ -101,9 +100,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val uploadBufferReservation = Any()
     @Volatile private var cachedUploadBufferBytes = 0L
     @Volatile private var cachedUploadBufferAt = 0L
-    // Cache durasi video galeri: metadata tidak berubah, jadi cukup di-hold
-    // di memori agar tiap halaman tidak membuka file video berulang-ulang.
-    @Volatile private var videoDurationsCache: JSONObject? = null
+    // Probe & cache durasi video galeri (di-extract ke helper terpisah,
+    // pola ServerThumbnail: context + lambda izin akses). Metadata tidak
+    // berubah, jadi cukup di-hold di memori; dibuat malas agar konstruktor
+    // server tidak menyentuh disk.
+    private val videoDurations by lazy {
+        ServerVideoDurations(context, ::isFsPathAllowed, ::isMediaUriAllowed)
+    }
     // Cache itemsJson berdasarkan signature; satu Pair agar sig & JSON tidak
     // pernah terbaca sebagai versi campuran saat request server paralel.
     @Volatile private var cachedItems: Pair<Int, JSONArray>? = null
@@ -1285,7 +1288,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             fsMediaCache.clear()
                             invalidateFsListingCache()
                             invalidateGalleryCache()
-                            videoDurationsCache = null
+                            videoDurations.invalidate()
                             MediaLibrary.notifyMediaChanged(context, it)
                         }
                         completedUploads[id] = finalName to System.currentTimeMillis()
@@ -1806,7 +1809,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             (pageEnd + GALLERY_PAGE_SIZE).coerceAtMost(MediaLibrary.GALLERY_MAX_ENTRIES)
         }
         val arr = JSONArray()
-        val cache = loadVideoDurations()
         var extracted = 0
         var matched = 0
         var pageCount = 0
@@ -1821,15 +1823,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     .put("isVideo", true)
                     .put("token", e.token)
                 if (!e.isPartial) {
-                    var d = videoDurationOf(cache, e.token)
+                    var d = videoDurations.of(e.token)
                     if (d <= 0 && e.durationMs > 0) d = e.durationMs
-                    if (d <= 0 && extracted < 20 && !isVideoDurationProbeThrottled(e.token)) {
-                        d = videoDurationMs(e.token)
+                    if (d <= 0 && extracted < 20 && videoDurations.shouldProbe(e.token)) {
+                        d = videoDurations.probeDurationMs(e.token)
                         if (d > 0) {
-                            cacheVideoDuration(cache, e.token, d)
-                            markVideoDurationProbe(e.token, ok = true)
+                            videoDurations.cacheDuration(e.token, d)
                         } else {
-                            markVideoDurationProbe(e.token, ok = false)
+                            videoDurations.recordProbeFailure(e.token)
                         }
                         extracted++
                     }
@@ -1840,7 +1841,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
             matched++
         }
-        if (extracted > 0) saveVideoDurations(cache)
+        if (extracted > 0) videoDurations.save()
         return jsonResponse(
             JSONObject()
                 .put("items", arr)
@@ -1891,102 +1892,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val result = MediaLibrary.scan(context, maxEntries = maxEntries, selectedFolders = folders)
         galleryCache = Triple(now, folders, result)
         return result
-    }
-
-    private fun videoDurationMs(token: String): Long {
-        val raw = MediaLibrary.decodeToken(token) ?: return 0L
-        // Senyap (tanpa logError/di-append ke log server): kegagalan probe
-        // adalah hal wajar untuk video korup/tidak dikenal — mencetak
-        // "ERROR setDataSource failed" setiap request galeri hanya derau.
-        return runCatching {
-            val mmr = MediaMetadataRetriever()
-            try {
-                when {
-                    raw.startsWith("f:") -> {
-                        val file = File(raw.substring(2))
-                        if (!file.isFile || !isFsPathAllowed(file.absolutePath)) {
-                            return 0L
-                        }
-                        mmr.setDataSource(file.absolutePath)
-                    }
-                    raw.startsWith("u:") -> {
-                        val uri = raw.substring(2).toUri()
-                        if (!isMediaUriAllowed(uri)) return 0L
-                        mmr.setDataSource(context, uri)
-                    }
-                    else -> return 0L
-                }
-                mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-            } finally {
-                runCatching { mmr.release() }
-            }
-        }.getOrDefault(0L)
-    }
-
-    /** Jeda probe durasi per file setelah gagal: video yang tidak bisa dibaca
-     *  (mis. status 0xFFFFFFEA) tidak perlu diprobes ulang pada tiap request
-     *  galeri — sumber derau ERROR sekaligus kerja MediaMetadataRetriever
-     *  yang sia-sia. Cache hanya di memori dan dibersihkan otomatis. */
-    private val videoDurationProbeAt = HashMap<String, Long>()
-
-    private fun isVideoDurationProbeThrottled(token: String): Boolean {
-        val at = videoDurationProbeAt[token] ?: return false
-        return System.currentTimeMillis() - at < VIDEO_DURATION_PROBE_TTL_MS
-    }
-
-    private fun markVideoDurationProbe(token: String, ok: Boolean) {
-        if (ok) {
-            videoDurationProbeAt.remove(token)
-        } else {
-            if (videoDurationProbeAt.size > 2000) {
-                val cutoff = System.currentTimeMillis() - VIDEO_DURATION_PROBE_TTL_MS
-                videoDurationProbeAt.entries.removeAll { it.value < cutoff }
-            }
-            videoDurationProbeAt[token] = System.currentTimeMillis()
-        }
-    }
-
-    private val videoDurationLock = Any()
-
-    private fun loadVideoDurations(): JSONObject {
-        videoDurationsCache?.let { return it }
-        synchronized(videoDurationLock) {
-            videoDurationsCache?.let { return it }
-            val loaded = runCatching {
-                JSONObject(File(context.filesDir, "video_durations.json").readText())
-            }.getOrDefault(JSONObject())
-            videoDurationsCache = loaded
-            return loaded
-        }
-    }
-
-    /** Baca durasi dari cache bersama — harus sinkron: banyak thread server
-     *  (nanohttpd) bisa membuka galeri bersamaan, dan org.json JSONObject
-     *  tidak thread-safe (put/optLong paralel bisa korup atau 500). */
-    private fun videoDurationOf(cache: JSONObject, token: String): Long =
-        synchronized(videoDurationLock) {
-            // Prune cache bila terlalu besar (>2000 entries) saat dibaca.
-            if (cache.length() > 2000) {
-                val iter = cache.keys()
-                var removed = 0
-                val toRemove = cache.length() - 1500
-                while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
-            }
-            cache.optLong(token, 0L)
-        }
-
-    private fun cacheVideoDuration(cache: JSONObject, token: String, ms: Long) {
-        synchronized(videoDurationLock) { cache.put(token, ms) }
-    }
-
-    private fun saveVideoDurations(cache: JSONObject) {
-        synchronized(videoDurationLock) {
-            videoDurationsCache = cache
-            if (cache.length() == 0) return
-            runCatching {
-                File(context.filesDir, "video_durations.json").writeText(cache.toString())
-            }
-        }
     }
 
     // ---------- File manager ----------
@@ -2874,7 +2779,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SNAPSHOT_RATE_MS = 1_000L
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
-        private const val VIDEO_DURATION_PROBE_TTL_MS = 10L * 60 * 1000
         private const val FS_LISTING_TTL_MS = 3_000L
         private const val FS_LISTING_CACHE_MAX = 5_000
         // Listing file manager di-paginate: maks 1000 entri per request, klien
