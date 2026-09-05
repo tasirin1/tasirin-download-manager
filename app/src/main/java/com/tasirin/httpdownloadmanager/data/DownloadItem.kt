@@ -51,7 +51,12 @@ data class DownloadItem(
     val progressPercent: Int
         // Untuk HLS total asli tidak diketahui, jadi persentase dihitung dari
         // jumlah segmen (via progressPercentOverride); jangan pakai total palsu.
-        get() = if (progressPercentOverride >= 0) {
+        get() = if (state == DownloadState.COMPLETED) {
+            // Server kadang melaporkan Content-Length lebih besar dari byte
+            // yang benar-benar diterima (mis. CDN Instagram) — download sudah
+            // selesai, jadi tampilan harus 100%, bukan 90-95% yang "mentok".
+            100
+        } else if (progressPercentOverride >= 0) {
             progressPercentOverride
         } else if (totalBytes > 0) {
             ((bytesDownloaded * 100) / totalBytes).toInt()

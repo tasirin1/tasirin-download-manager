@@ -109,7 +109,13 @@ class DownloadAdapter(private val listener: Listener) :
             ContextCompat.getColor(ctx, progressColor(item.state))
         )
 
-        b.textProgress.text = if (item.totalBytes > 0) {
+        b.textProgress.text = if (item.state == DownloadState.COMPLETED) {
+            // Selesai: 100% + ukuran riil. Jangan tampilkan "100% x / y" saat
+            // totalBytes server lebih besar dari byte yang diterima (CDN
+            // Instagram kerap melaporkan Content-Length berlebih).
+            val size = if (item.totalBytes > 0) item.totalBytes else item.bytesDownloaded
+            String.format(Locale.US, "100%%  %s", Formats.bytes(size))
+        } else if (item.totalBytes > 0) {
             // HLS: totalBytes bisa berupa estimasi (BANDWIDTH x durasi) —
             // tandai dengan "~" supaya jelas bukan angka pasti.
             val totalTxt = if (item.totalBytesEstimated) {

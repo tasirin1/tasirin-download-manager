@@ -54,6 +54,20 @@ class DownloadItemTest {
 
     // ── Tambahan: edge-case progress ────────────────────────────────
 
+
+    @Test
+    fun `progressPercent - COMPLETED selalu 100 walau bytesDownloaded < totalBytes`() {
+        // CDN (mis. Instagram) kadang melaporkan Content-Length lebih besar
+        // dari byte yang diterima; item selesai harus tampil 100%, bukan 90-95%:
+        val done = item(bytesDownloaded = 4_838_427, totalBytes = 5_332_192)
+            .copy(state = DownloadState.COMPLETED)
+        assertEquals(100, done.progressPercent)
+        assertEquals(100, item(bytesDownloaded = 0, totalBytes = 0)
+            .copy(state = DownloadState.COMPLETED).progressPercent)
+        assertEquals(100, item(bytesDownloaded = 1500, totalBytes = 1000)
+            .copy(state = DownloadState.COMPLETED).progressPercent)
+    }
+
     @Test
     fun `progressPercent - overshoot tetap hitung`() {
         // bytesDownloaded > totalBytes → persentase > 100
