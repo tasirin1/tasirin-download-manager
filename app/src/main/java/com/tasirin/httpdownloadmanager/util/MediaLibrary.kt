@@ -72,7 +72,8 @@ object MediaLibrary {
         val contentUri: String? = null,
         val isPartial: Boolean = false,
         val progressPercent: Int = -1,
-        val durationMs: Long = 0L
+        val durationMs: Long = 0L,
+        val relativePath: String? = null
     )
 
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
@@ -155,6 +156,48 @@ object MediaLibrary {
     ): Boolean = when {
         filePath.isNullOrBlank() -> !contentUri.isNullOrBlank()
         else -> fileExists(filePath)
+    }
+
+    /** Root storage eksternal utama (sama dengan yang dipakai SettingsActivity
+     *  saat normalisasi folder galeri). RELATIVE_PATH MediaStore dihitung
+     *  relatif terhadap root ini. */
+    fun externalRootPath(): String =
+        if (Build.VERSION.SDK_INT >= 29) "/storage/emulated/0"
+        else runCatching { Environment.getExternalStorageDirectory().absolutePath }
+            .getOrDefault("/storage/emulated/0")
+
+    /** Filter murni: apakah entry media berada di salah satu folder galeri
+     *  terpilih. [dataPath] = path absolut (kolom DATA / hasil File),
+     *  [relativePath] = RELATIVE_PATH MediaStore (API 29+), keduanya boleh
+     *  null. Saat [selectedFolders] kosong = tampilkan semua.
+     *
+     *  Entry tanpa path sama sekali tidak bisa diverifikasi lokasinya, jadi
+     *  saat filter aktif TIDAK ditampilkan — ini menutup bug lama di mana
+     *  baris MediaStore yang kolom DATA-nya null (Android 11+) ikut tampil
+     *  walau berada di luar folder terpilih (keluhan "masih menscan semua").
+     */
+    fun isInGalleryFolders(
+        dataPath: String?,
+        relativePath: String?,
+        externalRoot: String,
+        selectedFolders: List<String>
+    ): Boolean {
+        if (selectedFolders.isEmpty()) return true
+        val allowed = selectedFolders.map { it.trimEnd('/') }.filter { it.isNotEmpty() }
+        val fp = dataPath?.trim().orEmpty()
+        if (fp.isNotEmpty()) {
+            return allowed.any { fp == it || fp.startsWith("$it/") }
+        }
+        val rel = relativePath?.trim('/')?.trimEnd('/').orEmpty()
+        if (rel.isNotEmpty()) {
+            val root = externalRoot.trimEnd('/')
+            return allowed.any { folder ->
+                if (folder == root) return@any true
+                val relFolder = folder.removePrefix(root).trim('/')
+                relFolder.isEmpty() || rel == relFolder || rel.startsWith("$relFolder/")
+            }
+        }
+        return false
     }
 
     private fun scanCached(context: Context, maxEntries: Int, selectedFolders: List<String> = emptyList()): MediaScanResult {
@@ -287,14 +330,38 @@ object MediaLibrary {
                 if (Build.VERSION.SDK_INT >= 29) add(MediaStore.MediaColumns.RELATIVE_PATH)
                 add(MediaStore.Video.Media.DURATION)
             }.toTypedArray()
-            // Bangun selection SQL untuk filter folder (pakai DATA column = path absolut)
+            // Bangun selection SQL untuk filter folder. API 29+ memakai
+            // RELATIVE_PATH (kolom diindeks; DATA deprecated & sering null di
+            // Android 11+ — LIKE di kolom null tidak menjaring apa pun dan
+            // membuat video di luar folder terpilih ikut tampil). API < 29
+            // tetap pakai DATA = path absolut.
             val selection: String?
             val selectionArgs: Array<String>?
             if (selectedFolders.isNotEmpty()) {
-                // Filter: file harus berada di salah satu folder yang dipilih
-                // DATA column berisi path absolut (e.g. /storage/emulated/0/DCIM/Camera/VID.mp4)
-                selection = selectedFolders.joinToString(" OR ") { "${MediaStore.MediaColumns.DATA} LIKE ?" }
-                selectionArgs = selectedFolders.map { "$it/%" }.toTypedArray()
+                val relCol: String? =
+                    if (Build.VERSION.SDK_INT >= 29) MediaStore.MediaColumns.RELATIVE_PATH else null
+                if (relCol != null) {
+                    val clauses = mutableListOf<String>()
+                    val args = mutableListOf<String>()
+                    val root = externalRootPath()
+                    for (folder in selectedFolders) {
+                        val rel = folder.trimEnd('/').removePrefix(root).trim('/')
+                        if (rel.isEmpty()) continue // seluruh root dipilih → tanpa batasan
+                        clauses += "($relCol LIKE ? OR $relCol = ?)"
+                        args += "$rel/%"
+                        args += "$rel/"
+                    }
+                    if (clauses.isEmpty()) {
+                        selection = null
+                        selectionArgs = null
+                    } else {
+                        selection = clauses.joinToString(" OR ")
+                        selectionArgs = args.toTypedArray()
+                    }
+                } else {
+                    selection = selectedFolders.joinToString(" OR ") { "${MediaStore.MediaColumns.DATA} LIKE ?" }
+                    selectionArgs = selectedFolders.map { "$it/%" }.toTypedArray()
+                }
             } else {
                 selection = null
                 selectionArgs = null
@@ -309,11 +376,22 @@ object MediaLibrary {
                 val iMod = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
                 val iData = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
                 val iDur = c.getColumnIndex(MediaStore.Video.Media.DURATION)
+                val iRel = if (Build.VERSION.SDK_INT >= 29) {
+                    c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
+                } else {
+                    -1
+                }
                 while (c.moveToNext()) {
                     val name = c.getString(iName) ?: continue
                     val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
+                    val relativePath = if (iRel >= 0) {
+                        c.getString(iRel)?.takeIf { it.isNotBlank() }
+                    } else {
+                        null
+                    }
                     val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
                     if (!isMediaEntryReadable(filePath, uri)) continue
+                    if (!isInGalleryFolders(filePath, relativePath, externalRootPath(), selectedFolders)) continue
                     list.add(
                         MediaEntry(
                             name = name,
@@ -323,7 +401,8 @@ object MediaLibrary {
                             token = tokenForUri(uri),
                             filePath = filePath,
                             contentUri = uri,
-                            durationMs = if (iDur >= 0) c.getLong(iDur) else 0L
+                            durationMs = if (iDur >= 0) c.getLong(iDur) else 0L,
+                            relativePath = relativePath
                         )
                     )
                 }
@@ -342,17 +421,18 @@ object MediaLibrary {
         }
 
         // Hapus duplikat: file yang sama bisa muncul sebagai path (f:) dan
-        // Filter folder: hapus item yang BUKAN dari folder terpilih.
-        // Sections 1-3 (text folder, SAF, internal downloads) tidak difilter
-        // di tempat asalnya, jadi filter di sini sebelum dedupe.
+        // sebagai MediaStore (u:) — dedupe berdasar path file bila ada.
+        // Filter folder (sebelum dedupe): item dengan path absolut dicocokkan
+        // langsung; item SAF/MediaStore TANPA path (kolom DATA null pada
+        // Android 11+) hanya lolos bila folder asalnya cocok via RELATIVE_PATH.
+        // Item tanpa keduanya tidak ditampilkan saat filter aktif (bukan
+        // dilewatkan seperti bug lama).
         if (selectedFolders.isNotEmpty()) {
-            val allowed = selectedFolders.map { it.trimEnd('/') }.toSet()
+            val root = externalRootPath()
             list.retainAll { entry ->
-                val fp = entry.filePath ?: return@retainAll true
-                allowed.any { fp.startsWith("$it/") || fp == it }
+                isInGalleryFolders(entry.filePath, entry.relativePath, root, selectedFolders)
             }
         }
-        // sebagai MediaStore (u:) — dedupe berdasar path file bila ada.
         // Batasi jumlah entry yang di-hold di memori: cukup untuk 30 halaman
         // galeri (100/halaman) dan membatasi beban RAM di device Android 5+.
         val deduped = list
