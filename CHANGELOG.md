@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix probe bahasa audio HLS tanpa cookie** -- Spinner "Audio Language" memanggil `probeHlsAudioLanguages()` tanpa meneruskan cookie hasil ekstraksi, padahal manifest VISIONOS YouTube sering butuh cookie; akibatnya daftar bahasa bisa kosong/403. Probe kini menerima `headers` dan MainActivity meneruskan `Cookie:` dari hasil ekstraksi.
 - **Fix galeri native: filter folder hilang saat load-more** -- `GalleryActivity.loadMore()` memanggil `MediaLibrary.scan()` tanpa `selectedFolders`, sehingga saat scroll galeri di-scan ulang tanpa filter folder dan video dari folder lain muncul (cache invalid key -> scan penuh). Sekarang load-more meneruskan `StoragePrefs.getGalleryFolders()` seperti panggilan lain.
 - **Fix race probe media sosial (hasil basi)** -- Korut probe kualitas/audio HLS bisa menimpa spinner dengan data URL lama bila user mengganti URL saat probe berjalan. Ditambah guard identitas job + URL target: hasil yang tidak lagi relevan dibuang.
 - **Perf: sticky header scan mundur** -- `updateStickyHeader()` memindai `0..first` (O(n) per scroll). Kini mencari Header mundur dari posisi terlihat (biasanya 1-2 item) dan berhenti di Header pertama.

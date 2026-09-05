@@ -417,14 +417,21 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialAudioSection.isVisible = false
                 socialJob = lifecycleScope.launch {
                     val probeTarget = target
+                    // Ambil Result utuh: cookie dari ekstraksi wajib diteruskan ke
+                    // probe manifest (URL VISIONOS sering butuh cookie).
                     val master = withContext(Dispatchers.IO) {
                         runCatching { SocialMediaExtractor.extract(target) }
                             .getOrNull()
                             ?.takeIf { it.isHls && it.directUrl.isNotBlank() }
-                            ?.directUrl
                     }
+                    val probeHeaders = master?.cookies
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { "Cookie: $it" }
+                        .orEmpty()
                     val langs = if (master != null) {
-                        withContext(Dispatchers.IO) { App.engine.probeHlsAudioLanguages(master) }
+                        withContext(Dispatchers.IO) {
+                            App.engine.probeHlsAudioLanguages(master.directUrl, probeHeaders)
+                        }
                     } else emptyList()
                     // Hasil basi dari probe URL lama dibuang bila URL sudah berubah
                     // (socialJob menunjuk job terbaru; job lama di-cancel).

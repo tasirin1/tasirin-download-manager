@@ -390,10 +390,10 @@ class DownloadEngine(appContext: Context) {
     /** Probe manifest HLS untuk daftar bahasa audio yang tersedia.
      *  Mengembalikan list rendisi unik (language + name), dipakai dialog
      *  Add Download untuk spinner "Audio language". */
-    fun probeHlsAudioLanguages(url: String): List<HlsRendition> {
+    fun probeHlsAudioLanguages(url: String, headers: String = ""): List<HlsRendition> {
         return runCatching {
             val conn = openAuthenticatedConnection(
-                url, method = "GET", username = "", password = "", headers = ""
+                url, method = "GET", username = "", password = "", headers = headers
             )
             try {
                 val code = conn.responseCode
