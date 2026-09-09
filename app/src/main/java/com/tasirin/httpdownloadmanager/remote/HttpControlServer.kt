@@ -2787,7 +2787,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // sekaligus di memori.
         private const val FS_PAGE_SIZE = 300
         private const val FS_PAGE_MAX = 5000
-        private const val FS_MEDIA_CACHE_TTL_MS = 5_000L
+        private const val FS_MEDIA_CACHE_TTL_MS = 15_000L
         private const val FS_MEDIA_CACHE_MAX_FILES = 2_000
         private const val FS_MEDIA_CACHE_MAX_ENTRIES = 50
         private const val DEFAULT_CHUNK_BYTES = 2L * 1024 * 1024

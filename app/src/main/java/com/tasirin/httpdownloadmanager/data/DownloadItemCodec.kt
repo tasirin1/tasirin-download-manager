@@ -85,9 +85,9 @@ object DownloadItemCodec {
                 rawState
             }
             DownloadItem(
-                id = o.getString("id"),
-                url = o.getString("url"),
-                fileName = o.getString("fileName"),
+                id = o.optString("id"),
+                url = o.optString("url"),
+                fileName = o.optString("fileName", "unknown"),
                 state = state,
                 bytesDownloaded = o.optLong("bytesDownloaded", 0),
                 totalBytes = o.optLong("totalBytes", 0),

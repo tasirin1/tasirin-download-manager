@@ -917,6 +917,9 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
 
     data class HttpResult(val body: String, val cookies: String = "")
 
+    /** Batas max body response (16 MB) supaya redirect ke HTML raksasa tidak OOM. */
+    private companion object { const val MAX_RESPONSE_BYTES = 16L * 1024 * 1024 }
+
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
         val conn = URL(urlStr).openConnection() as HttpURLConnection
         try {
@@ -935,7 +938,23 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
                 .flatMap { it.value }
                 .map { it.substringBefore(';') }
                 .joinToString("; ")
-            val body = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+            // Baca terbatas: hindari OOM dari body redirect/HTML raksasa.
+            val input = conn.inputStream
+            val body = try {
+                val buf = java.io.ByteArrayOutputStream()
+                val chunk = ByteArray(8192)
+                var total = 0L
+                while (true) {
+                    val n = input.read(chunk)
+                    if (n < 0) break
+                    total += n
+                    if (total > MAX_RESPONSE_BYTES) break
+                    buf.write(chunk, 0, n)
+                }
+                buf.toString("UTF-8")
+            } finally {
+                runCatching { input.close() }
+            }
             return HttpResult(body, cookies)
         } catch (_: Exception) { return null } finally { conn.disconnect() }
     }

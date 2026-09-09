@@ -183,14 +183,17 @@ object MediaLibrary {
         selectedFolders: List<String>
     ): Boolean {
         if (selectedFolders.isEmpty()) return true
-        val allowed = selectedFolders.map { it.trimEnd('/') }.filter { it.isNotEmpty() }
-        val fp = dataPath?.trim().orEmpty()
+        // Normalisasi semua path: trim whitespace + trailing slash, komparasi
+        // case-sensitive (path Linux case-sensitive; Android file system umumnya
+        // case-insensitive tapi relatif konsisten di MediaStore).
+        val allowed = selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
+        val fp = dataPath?.trim().trimEnd('/').orEmpty()
         if (fp.isNotEmpty()) {
             return allowed.any { fp == it || fp.startsWith("$it/") }
         }
         val rel = relativePath?.trim('/')?.trimEnd('/').orEmpty()
         if (rel.isNotEmpty()) {
-            val root = externalRoot.trimEnd('/')
+            val root = externalRoot.trim().trimEnd('/')
             return allowed.any { folder ->
                 if (folder == root) return@any true
                 val relFolder = folder.removePrefix(root).trim('/')
