@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="UnusedAttribute">
     <!-- Latar belakang gradient biru -->
     <item>
         <shape android:shape="rectangle">
@@ -11,10 +13,7 @@
         </shape>
     </item>
     <!-- Ikon download (putih, di tengah) -->
-    <item
-        android:gravity="center"
-        android:width="96dp"
-        android:height="96dp">
+    <item android:gravity="center">
         <vector
             android:width="96dp"
             android:height="96dp"
@@ -37,9 +36,7 @@
         </vector>
     </item>
     <!-- Garis aksen oranye di bawah -->
-    <item
-        android:gravity="bottom"
-        android:height="4dp">
+    <item android:gravity="bottom" android:height="4dp">
         <shape android:shape="rectangle">
             <solid android:color="#F57C00" />
         </shape>
