@@ -1,4 +1,9 @@
 ## [Unreleased]
+- **Fix: tawaran akses storage hilang saat install pertama kali** -- Fungsi
+  `offerAllFilesAccess()` kosong (hanya comment). Implementasikan dialog
+  satu kali yang menawarkan "All files access" (Android 11+) saat pertama
+  kali dibuka; `isFileAccessOffered` di StoragePrefs sudah ada tapi tidak
+  pernah dipanggil.
 - **Fix: volume thumb tertimpa track saat tidak fokus** -- Pada pemutar video
   remote, dot/thumb volume tertimpa bar karena `filter: drop-shadow` di track
   membuat stacking context baru. Tambah `z-index: 1` di `::-webkit-slider-thumb`

@@ -189,6 +189,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
 
         requestPermissionsIfNeeded()
+        offerAllFilesAccess()
         runCatching {
             if (StoragePrefs.isBackgroundEnabled(this)) {
                 App.engine.resumeInterrupted()
@@ -274,7 +275,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     /** Tawarkan aktivasi "All files access" sekali saja saat pertama kali dibuka. */
-
+    private fun offerAllFilesAccess() {
+        if (StoragePrefs.isFileAccessOffered(this)) return
+        if (!Permissions.needsAllFilesAccess(this)) return
+        StoragePrefs.setFileAccessOffered(this, true)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_fs_full_access)
+            .setMessage(R.string.storage_hint_all_files)
+            .setPositiveButton(R.string.ok) { _, _ ->
+                Permissions.requestAllFilesAccess(this)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
 
     private fun handleIncomingIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_ADD_DOWNLOAD, false) == true) {
