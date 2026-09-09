@@ -19,15 +19,7 @@
     karakter selain `isISOControl()`, mencegah nama file aneh di storage.
   - `SocialMediaExtractor.httpGetWithCookies`: batasi body response 16 MB
     supaya redirect ke HTML raksasa tidak OOM.
-- **Fix: tawaran akses storage hilang saat install pertama kali** -- Fungsi
-  `offerAllFilesAccess()` kosong (hanya comment). Implementasikan dialog
-  satu kali yang menawarkan "All files access" (Android 11+) saat pertama
-  kali dibuka; `isFileAccessOffered` di StoragePrefs sudah ada tapi tidak
-  pernah dipanggil.
-- **Fix: volume thumb tertimpa track saat tidak fokus** -- Pada pemutar video
-  remote, dot/thumb volume tertimpa bar karena `filter: drop-shadow` di track
-  membuat stacking context baru. Tambah `z-index: 1` di `::-webkit-slider-thumb`
-  dan `::-moz-range-thumb` supaya thumb selalu di atas track.
+- **Fix: compile error nullable receiver & const di standalone object** -- Fix syntax yang menyebabkan build gagal di CI: nullable receiver tanpa `?` di `MediaLibrary.isInGalleryFolders`, dan `companion object` yang tidak valid di top-level `SocialMediaExtractor`.
 - **Fix galeri: filter folder pakai RELATIVE_PATH & entry tanpa path tidak lolos** -- Kolom `DATA` MediaStore deprecated dan sering null di Android 11+, sehingga baris video tanpa `DATA` ikut tampil walau di luar folder galeri terpilih (filter lama melewatkan entry yang tidak punya path). Kini API 29+ memfilter di level query memakai `RELATIVE_PATH` (kolom terindeks, bukan `LIKE` di DATA), dan filter baris-baris memakai helper murni `MediaLibrary.isInGalleryFolders()` (path absolut, RELATIVE_PATH, atau kombinasi). Entry yang tidak bisa diverifikasi lokasinya juga sudah tidak dilewatkan saat filter folder aktif. + Unit test `GalleryFolderFilterTest`.
 - **Fix tampilan: progress download selesai selalu 100%** -- CDN (mis. Instagram) kadang melaporkan `Content-Length` lebih besar dari byte yang benar-benar diterima, sehingga item `COMPLETED` tampil mentok 90-95% padahal file sudah jadi. `DownloadItem.progressPercent` kini memaksa 100 saat `COMPLETED` (bar + teks persen + JSON remote), dan teks item native menampilkan `100%  <ukuran>` tanpa denominator yang tidak cocok. + Unit test `DownloadItemTest`.
 - **Test: naikkan ambang cakupan JaCoCo 5% → 8%** -- Cakupan line terukur di CI 10.7%; ambang dinaikkan bertahap menyisakan ruang fluktuasi, sekaligus permintaan regression test (filter folder galeri, cache thumbnail/durasi) mengunci perilaku yang baru diperbaiki.
