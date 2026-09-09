@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix: ikon launcher TV box / Android TV** -- Tambahkan `android:banner` (drawable `tv_banner.xml`, gradient biru + ikon download + aksen oranye) dan intent filter `LEANBACK_LAUNCHER` supaya aplikasi tampil dengan ikon banner khusus di launcher Android TV / Android box.
 - **Fix: tawaran akses storage hilang saat install pertama kali** -- Fungsi
   `offerAllFilesAccess()` kosong (hanya comment). Implementasikan dialog
   satu kali yang menawarkan "All files access" (Android 11+) saat pertama

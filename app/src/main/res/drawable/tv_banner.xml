@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Latar belakang gradient biru -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#1565C0"
+                android:centerColor="#1976D2"
+                android:endColor="#0D47A1"
+                android:angle="135" />
+        </shape>
+    </item>
+    <!-- Ikon download (putih, di tengah) -->
+    <item
+        android:gravity="center"
+        android:width="96dp"
+        android:height="96dp">
+        <vector
+            android:width="96dp"
+            android:height="96dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#FFFFFF"
+                android:strokeWidth="4"
+                android:pathData="M77,52 a23,23 0 1 1 -46,0 a23,23 0 1 1 46,0 z" />
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M48,40 h12 v16 h-12 z" />
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M40,56 h28 l-14,14 z" />
+            <path
+                android:fillColor="#F57C00"
+                android:pathData="M42,79 h24 v3 h-24 z" />
+        </vector>
+    </item>
+    <!-- Garis aksen oranye di bawah -->
+    <item
+        android:gravity="bottom"
+        android:height="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#F57C00" />
+        </shape>
+    </item>
+</layer-list>
