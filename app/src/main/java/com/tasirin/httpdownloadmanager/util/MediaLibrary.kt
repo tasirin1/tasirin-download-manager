@@ -187,7 +187,7 @@ object MediaLibrary {
         // case-sensitive (path Linux case-sensitive; Android file system umumnya
         // case-insensitive tapi relatif konsisten di MediaStore).
         val allowed = selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
-        val fp = dataPath?.trim().trimEnd('/').orEmpty()
+        val fp = dataPath?.trim()?.trimEnd('/').orEmpty()
         if (fp.isNotEmpty()) {
             return allowed.any { fp == it || fp.startsWith("$it/") }
         }

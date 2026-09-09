@@ -918,7 +918,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
     data class HttpResult(val body: String, val cookies: String = "")
 
     /** Batas max body response (16 MB) supaya redirect ke HTML raksasa tidak OOM. */
-    private companion object { const val MAX_RESPONSE_BYTES = 16L * 1024 * 1024 }
+    private const val MAX_RESPONSE_BYTES = 16L * 1024 * 1024
 
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
         val conn = URL(urlStr).openConnection() as HttpURLConnection
