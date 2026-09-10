@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix: APK installer 2-step fallback** -- Intent APK kini coba `ACTION_INSTALL_PACKAGE` dulu, lalu `ACTION_VIEW` + MIME `application/vnd.android.package-archive` sebagai fallback. Tambah `FLAG_ACTIVITY_NEW_TASK` agar kompatibel dengan service context.
 - **Fix: APK langsung panggil installer saat diklik** -- `openDownload` untuk file APK kini menggunakan `ACTION_INSTALL_PACKAGE` (langsung memanggil package installer) alih-alih `ACTION_VIEW` yang kadang hanya membuka file manager. Fallback ke `ACTION_VIEW` jika installer tidak merespons.
 - **Fix: method auto-open di StoragePrefs** -- Tambahkan `isAutoOpenComplete`/`setAutoOpenComplete` yang sebelumnya terlewat (compile error di CI).
 - **Auto-open file saat download selesai** -- Download video (mp4/mkv/webm/ts) otomatis dibuka di pemutar video; download APK otomatis memanggil installer. Toggle "Open file after download" di Settings. Guard  mencegah auto-open berulang.

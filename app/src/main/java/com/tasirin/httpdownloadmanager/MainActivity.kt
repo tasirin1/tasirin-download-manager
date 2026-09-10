@@ -1294,15 +1294,21 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
             return
         }
-        // APK → langsung panggil package installer
+        // APK → panggil package installer dengan beberapa fallback
         if (isApk) {
-            val installer = Intent(Intent.ACTION_INSTALL_PACKAGE)
-                .setData(uri)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            runCatching { startActivity(installer); return }
-            // Fallback jika ACTION_INSTALL_PACKAGE tidak ditangani
+            // 1) ACTION_INSTALL_PACKAGE (direct installer intent)
+            val installer1 = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { startActivity(installer1); return@openDownload }
+            // 2) ACTION_VIEW + MIME type (fallback umum)
+            val installer2 = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { startActivity(installer2); return@openDownload }
+            Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
+            return
         }
-        // Default: ACTION_VIEW
+        // Non-APK: ACTION_VIEW
         val intent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, mime)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
