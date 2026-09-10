@@ -4427,28 +4427,17 @@ function rebuildList(items) {
         if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32 || e.key === 'SoftLeft' || e.key === 'DPadCenter') { e.preventDefault(); e.stopPropagation(); openItemSheet(it); }
       });
     }
-    // Item row → buka sheet aksi (semua input: click, tap, D-pad, remote, controller)
+    // Item row → buka sheet aksi
     function openSheetGuard(e) {
       if (e && e.target && (e.target.closest('.item-menu-btn') || e.target.closest('.item-retry') || e.target.closest('.batch-check'))) return;
       openItemSheet(it);
     }
     li.addEventListener('click', openSheetGuard);
-    li.addEventListener('auxclick', openSheetGuard);
-    li.addEventListener('dblclick', openSheetGuard);
     li.addEventListener('keydown', function (e) {
       var ok = e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32 ||
         e.key === 'SoftLeft' || e.key === 'DPadCenter' || e.key === 'Accept' || e.key === 'Ok';
-      if (ok) { e.preventDefault(); openSheetGuard(e); }
+      if (ok) { e.preventDefault(); e.stopPropagation(); openSheetGuard(e); }
     });
-    li.addEventListener('keyup', function (e) {
-      var ok = e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32;
-      if (ok) { e.preventDefault(); openSheetGuard(e); }
-    });
-    li.addEventListener('mousedown', function (e) { openSheetGuard(e); });
-    li.addEventListener('mouseup', function (e) { openSheetGuard(e); });
-    li.addEventListener('pointerdown', function (e) { openSheetGuard(e); });
-    li.addEventListener('pointerup', function (e) { openSheetGuard(e); });
-    // touchend ditangani oleh attachSwipe untuk swipe gesture; click event akan handle tap biasa
     const retryBtn = li.querySelector('.item-retry');
     if (retryBtn) {
       retryBtn.addEventListener('click', function (e) {
