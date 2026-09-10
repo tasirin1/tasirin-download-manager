@@ -2555,9 +2555,11 @@ bgL.style.opacity = 0;
 bgR.style.opacity = 0;
 var itemId = li.dataset.id;
 if (dx < -80) {
+li._swiped = true;
 var it = currentItems.find(function (x) { return x.id === itemId; });
 if (it) doAction(itemId, it.state === 'DOWNLOADING' ? 'pause' : 'resume');
 } else if (dx > 80) {
+li._swiped = true;
 showConfirm('Delete', 'Delete this download?', 'Delete', function () { doAction(itemId, 'delete'); });
 }
 }, {passive: true});
@@ -2795,6 +2797,11 @@ if (batchMode) li.classList.add('batch-mode');
 rowNodes.set(it.id, li);
 list.appendChild(li);
 attachSwipe(li);
+li.addEventListener('touchend', function (e) {
+if (e.target.closest('.item-menu-btn') || e.target.closest('.item-retry') || e.target.closest('.batch-check')) return;
+if (li._swiped) { li._swiped = false; return; }
+openItemSheet(it);
+}, { passive: true });
 var cb = document.createElement('input');
 cb.type = 'checkbox';
 cb.className = 'batch-check';

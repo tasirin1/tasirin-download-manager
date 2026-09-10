@@ -4201,9 +4201,11 @@ function attachSwipe(li) {
     bgR.style.opacity = 0;
     var itemId = li.dataset.id;
     if (dx < -80) {
+      li._swiped = true;
       var it = currentItems.find(function (x) { return x.id === itemId; });
       if (it) doAction(itemId, it.state === 'DOWNLOADING' ? 'pause' : 'resume');
     } else if (dx > 80) {
+      li._swiped = true;
       showConfirm('Delete', 'Delete this download?', 'Delete', function () { doAction(itemId, 'delete'); });
     }
   }, {passive: true});
@@ -4438,6 +4440,7 @@ function rebuildList(items) {
         e.key === 'SoftLeft' || e.key === 'DPadCenter' || e.key === 'Accept' || e.key === 'Ok';
       if (ok) { e.preventDefault(); e.stopPropagation(); openSheetGuard(e); }
     });
+
     const retryBtn = li.querySelector('.item-retry');
     if (retryBtn) {
       retryBtn.addEventListener('click', function (e) {
@@ -4453,6 +4456,12 @@ function rebuildList(items) {
     rowNodes.set(it.id, li);
     list.appendChild(li);
     attachSwipe(li);
+    // Touch: sheet buka di touchend SETELAH attachSwipe agar _swiped bisa dicek
+    li.addEventListener('touchend', function (e) {
+      if (e.target.closest('.item-menu-btn') || e.target.closest('.item-retry') || e.target.closest('.batch-check')) return;
+      if (li._swiped) { li._swiped = false; return; }
+      openItemSheet(it);
+    }, { passive: true });
     var cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'batch-check';
