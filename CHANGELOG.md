@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix: APK tidak bisa install di Android 5-6** -- `openDownload()` selalu pakai FileProvider yang tidak punya akses ke public Download folder (`/storage/emulated/0/Download/`). File di public Download kini pakai `Uri.fromFile()` langsung (masih jalan untuk package installer di Android 5-6). File internal app tetap pakai FileProvider. Urutan fallback APK: `ACTION_VIEW`+MIME APK → `ACTION_INSTALL_PACKAGE` (Android 7+) → generic viewer.
 - **Revert: hapus remote web D-pad/keyboard handler yang tidak perlu** -- Remote web tidak butuh D-pad navigation. Kembalikan ke kondisi awal.
 - **Fix: item download bisa di-Klik pakai TV remote** -- Pindah  +  dari LinearLayout dalam ke root FrameLayout. D-pad OK sekarang trigger  yang benar.
 - **D-pad navigation di remote web (SmartTube-inspired)** -- Panah atas/bawah pindah fokus antar item. OK/Enter = buka sheet aksi. Escape = tutup sheet/media. Auto-focus item pertama via MutationObserver.

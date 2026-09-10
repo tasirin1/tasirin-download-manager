@@ -1281,48 +1281,26 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         if (item.state != DownloadState.COMPLETED) return
         val mime = MimeTypes.forFile(item.fileName)
         val isApk = item.fileName.lowercase().endsWith(".apk")
+        val file = item.filePath?.let { File(it) }
+
+        // contentUri (MediaStore SAF) → selalu pakai content://
+        // filePath → FileProvider untuk file internal/custom; Uri.fromFile untuk
+        //   public Download folder (FileProvider tidak punya akses, dan
+        //   Uri.fromFile() masih jalan untuk package installer di Android 5-6).
         val uri: Uri? = when {
             !item.contentUri.isNullOrEmpty() -> item.contentUri.toUri()
-            !item.filePath.isNullOrEmpty() -> {
-                FileProvider.getUriForFile(
-                    this, "$packageName.fileprovider", File(item.filePath)
-                )
-            }
+            file != null && file.exists() && isFileInternal(file) ->
+                FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            file != null && file.exists() ->
+                Uri.fromFile(file)
             else -> null
         }
         if (uri == null) {
             Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
             return
         }
-        // APK → panggil package installer dengan beberapa fallback
         if (isApk) {
-            // 1) ACTION_INSTALL_PACKAGE (direct installer intent)
-            try {
-                val i1 = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                startActivity(i1)
-                return
-            } catch (e: Exception) {
-            }
-            // 2) ACTION_VIEW + explicit MIME type
-            try {
-                val i2 = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                startActivity(i2)
-                return
-            } catch (e: Exception) {
-            }
-            // 3) Generic file viewer
-            try {
-                val i3 = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, mime)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                startActivity(i3)
-                return
-            } catch (e: Exception) {
-            }
-            Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
+            openApk(uri)
             return
         }
         // Non-APK: ACTION_VIEW
@@ -1334,6 +1312,45 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         } catch (_: Exception) {
             Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /** Buka APK dengan beberapa fallback intent. */
+    private fun openApk(uri: Uri) {
+        // 1) ACTION_VIEW + MIME khusus APK (paling kompatibel lintas versi)
+        try {
+            val i = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(i)
+            return
+        } catch (_: Exception) { }
+        // 2) ACTION_INSTALL_PACKAGE (Android 7+)
+        try {
+            val i = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(i)
+            return
+        } catch (_: Exception) { }
+        // 3) Generic viewer
+        try {
+            val i = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, MimeTypes.forFile("x.apk"))
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(i)
+            return
+        } catch (_: Exception) { }
+        Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * File di folder internal app (FileProvider punya akses) → true.
+     * File di public Download / custom folder lain → false (pakai
+     * Uri.fromFile langsung supaya Android 5-6 bisa instal APK).
+     */
+    private fun isFileInternal(file: File): Boolean {
+        val canonical = runCatching { file.canonicalFile }.getOrNull() ?: return false
+        val dl = runCatching { File(filesDir, "downloads").canonicalFile }.getOrNull()
+        return dl != null && canonical.path.startsWith(dl.path)
     }
 
     private fun openFolder(item: DownloadItem) {
