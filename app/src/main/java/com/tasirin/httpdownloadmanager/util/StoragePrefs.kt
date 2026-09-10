@@ -156,6 +156,15 @@ object StoragePrefs {
         }
     }
 
+    fun isAutoOpenComplete(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_AUTO_OPEN_COMPLETE, false)
+
+    fun setAutoOpenComplete(context: Context, enabled: Boolean) {
+        prefs(context).edit {
+            putBoolean(KEY_AUTO_OPEN_COMPLETE, enabled)
+        }
+    }
+
     fun getServerPin(context: Context): String? =
         prefs(context)
             .getString(KEY_SERVER_PIN, null)?.takeIf { it.isNotBlank() }
