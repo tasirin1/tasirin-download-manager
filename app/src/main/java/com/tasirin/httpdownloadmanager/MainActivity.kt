@@ -1280,26 +1280,36 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private fun openDownload(item: DownloadItem) {
         if (item.state != DownloadState.COMPLETED) return
         val mime = MimeTypes.forFile(item.fileName)
-        val intent = when {
-            !item.contentUri.isNullOrEmpty() -> {
-                Intent(Intent.ACTION_VIEW).setDataAndType(item.contentUri.toUri(), mime)
-            }
+        val isApk = item.fileName.lowercase().endsWith(".apk")
+        val uri: Uri? = when {
+            !item.contentUri.isNullOrEmpty() -> item.contentUri.toUri()
             !item.filePath.isNullOrEmpty() -> {
-                val uri = FileProvider.getUriForFile(
+                FileProvider.getUriForFile(
                     this, "$packageName.fileprovider", File(item.filePath)
                 )
-                Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, mime)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             else -> null
         }
-        if (intent != null) {
-            try {
-                startActivity(intent)
-            } catch (_: Exception) {
-                Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
-            }
+        if (uri == null) {
+            Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
+            return
+        }
+        // APK → langsung panggil package installer
+        if (isApk) {
+            val installer = Intent(Intent.ACTION_INSTALL_PACKAGE)
+                .setData(uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            runCatching { startActivity(installer); return }
+            // Fallback jika ACTION_INSTALL_PACKAGE tidak ditangani
+        }
+        // Default: ACTION_VIEW
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, mime)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
         }
     }
 

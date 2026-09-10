@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix: APK langsung panggil installer saat diklik** -- `openDownload` untuk file APK kini menggunakan `ACTION_INSTALL_PACKAGE` (langsung memanggil package installer) alih-alih `ACTION_VIEW` yang kadang hanya membuka file manager. Fallback ke `ACTION_VIEW` jika installer tidak merespons.
 - **Fix: method auto-open di StoragePrefs** -- Tambahkan `isAutoOpenComplete`/`setAutoOpenComplete` yang sebelumnya terlewat (compile error di CI).
 - **Auto-open file saat download selesai** -- Download video (mp4/mkv/webm/ts) otomatis dibuka di pemutar video; download APK otomatis memanggil installer. Toggle "Open file after download" di Settings. Guard  mencegah auto-open berulang.
 - **Fix: ikon launcher TV box / Android TV** -- Tambahkan `android:banner` (drawable `tv_banner.xml`, gradient biru + ikon download + aksen oranye) dan intent filter `LEANBACK_LAUNCHER` supaya aplikasi tampil dengan ikon banner khusus di launcher Android TV / Android box.
