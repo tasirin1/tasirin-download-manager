@@ -1924,16 +1924,6 @@ e.preventDefault();
 t.click();
 }
 });
-document.addEventListener('pointerdown', function (e) {
-var li = e.target.closest && e.target.closest('li.item');
-if (!li) return;
-var btn = e.target.closest('.item-menu-btn,.item-retry,.batch-check');
-if (btn) return; // biarkan click handler asli tangani
-var id = li.dataset && li.dataset.id;
-if (!id) return;
-var it = currentItems && currentItems.find(function (x) { return x.id === id; });
-if (it) openItemSheet(it);
-});
 document.addEventListener('keydown', function (e) {
 if (!mediaModal.classList.contains('open')) return;
 const tag = (e.target && e.target.tagName) || '';
