@@ -34,7 +34,7 @@ updates:
         update-types: ["version-update:semver-major"]
       # Semua material > 1.12 menuntut minSdk 23; proyek wajib minSdk 21 (Android 5+).
       - dependency-name: "com.google.android.material:material"
-      # androidx.core 1.17+ menuntut compileSdk 36/37; proyek di compileSdk 35.
+      # androidx.core 1.17+ menuntut compileSdk 37; proyek di compileSdk 36.
       # Buka lagi manual setelah upgrade AGP + compileSdk siap.
       - dependency-name: "androidx.core:core"
       # Versi terbaru activity/lifecycle menuntut minSdk 23 (proyek wajib 21/Android 5+).

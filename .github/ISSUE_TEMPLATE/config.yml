@@ -1,1 +1,11 @@
 blank_issues_enabled: true
+contact_links:
+  - name: Bug Report
+    url: https://github.com/tasirin1/tasirin-download-manager/issues/new?template=bug_report.md
+    about: Laporkan masalah atau bug di aplikasi
+  - name: Feature Request
+    url: https://github.com/tasirin1/tasirin-download-manager/issues/new?template=feature_request.md
+    about: Usulkan fitur atau perbaikan
+  - name: Security Vulnerability
+    url: https://github.com/tasirin1/tasirin-download-manager/security/advisories/new
+    about: Laporkan kerentanan keamanan secara privat (jangan buat issue publik)

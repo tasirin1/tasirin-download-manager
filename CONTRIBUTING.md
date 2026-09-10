@@ -70,6 +70,8 @@ unit test bila Java/Gradle tersedia.
 ```bash
 python3 scripts/check_repo.py                # semua guard cepat repo
 python3 scripts/check_repo.py --android      # tambah lint + unit test Android
+python3 scripts/security_audit.py --self-test # audit statis bug/error/keamanan
+python3 scripts/prepare_remote.py --check     # verifikasi sinkron remote web
 ```
 
 Kerentanan keamanan tidak boleh dibuat sebagai issue publik; ikuti

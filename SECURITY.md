@@ -11,7 +11,7 @@ Sertakan:
 - dampak yang mungkin terjadi;
 - proof-of-concept bila tersedia.
 
-Laporan akan ditinjau dan pemilik repository akan menindaklanjuti lewat GitHub.
+Laporan akan ditinjau dan pemilik repository akan menindaklanjuti lewat GitHub dalam waktu 7 hari kerja. Kerentanan kritis akan diprioritaskan.
 
 ## Cakupan
 
