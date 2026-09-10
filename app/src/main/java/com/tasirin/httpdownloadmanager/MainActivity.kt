@@ -1323,14 +1323,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(i)
             return
-        } catch (_: Exception) { }
+        } catch (e: Exception) { App.logEvent("APK VIEW failed: ${e.message}") }
         // 2) ACTION_INSTALL_PACKAGE (Android 7+)
         try {
             val i = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(i)
             return
-        } catch (_: Exception) { }
+        } catch (e: Exception) { App.logEvent("APK INSTALL failed: ${e.message}") }
         // 3) Generic viewer
         try {
             val i = Intent(Intent.ACTION_VIEW)
@@ -1338,7 +1338,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             startActivity(i)
             return
-        } catch (_: Exception) { }
+        } catch (e: Exception) { App.logEvent("APK GENERIC failed: ${e.message}") }
         Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
     }
 
