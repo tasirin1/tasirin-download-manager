@@ -941,6 +941,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     override fun onTap(item: DownloadItem) {
+        android.util.Log.d("OPEN", "onTap: id=${item.id} state=${item.state} file=${item.fileName}")
         when (item.state) {
             DownloadState.DOWNLOADING, DownloadState.PENDING -> App.engine.pause(item.id)
             DownloadState.PAUSED, DownloadState.FAILED -> App.engine.resume(item.id)
@@ -1278,6 +1279,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     private fun openDownload(item: DownloadItem) {
+        android.util.Log.d("OPEN", "openDownload: state=${item.state} file=${item.fileName} path=${item.filePath} uri=${item.contentUri}")
         if (item.state != DownloadState.COMPLETED) return
         val mime = MimeTypes.forFile(item.fileName)
         val isApk = item.fileName.lowercase().endsWith(".apk")
@@ -1296,15 +1298,27 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
         // APK → panggil package installer dengan beberapa fallback
         if (isApk) {
+            android.util.Log.d("OPEN", "APK detected: uri=$uri")
             // 1) ACTION_INSTALL_PACKAGE (direct installer intent)
             val installer1 = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { startActivity(installer1); return@openDownload }
+            runCatching {
+                android.util.Log.d("OPEN", "Trying ACTION_INSTALL_PACKAGE")
+                startActivity(installer1)
+                android.util.Log.d("OPEN", "ACTION_INSTALL_PACKAGE success")
+                return@openDownload
+            }
             // 2) ACTION_VIEW + MIME type (fallback umum)
             val installer2 = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { startActivity(installer2); return@openDownload }
+            runCatching {
+                android.util.Log.d("OPEN", "Trying ACTION_VIEW")
+                startActivity(installer2)
+                android.util.Log.d("OPEN", "ACTION_VIEW success")
+                return@openDownload
+            }
+            android.util.Log.e("OPEN", "Both APK intents failed")
             Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
             return
         }
