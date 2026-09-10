@@ -1388,10 +1388,17 @@ doAction(it.id, a.op);
 list.appendChild(b);
 });
 itemSheet.classList.remove('hidden');
+requestAnimationFrame(function () {
+var first = itemSheet.querySelector('.sheet-list button');
+if (first) first.focus();
+});
 }
 function closeItemSheet() {
 itemSheet.classList.add('hidden');
 }
+itemSheet.addEventListener('keydown', function (e) {
+if (e.key === 'Escape') { closeItemSheet(); e.stopPropagation(); }
+});
 document.getElementById('itemSheetCancel').addEventListener('click', closeItemSheet);
 itemSheet.addEventListener('click', function (e) {
 if (e.target === itemSheet) closeItemSheet();
@@ -2757,16 +2764,26 @@ menuBtn.addEventListener('click', function (e) {
 e.stopPropagation();
 openItemSheet(it);
 });
+menuBtn.addEventListener('keydown', function (e) {
+if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openItemSheet(it); }
+});
 }
-li.addEventListener('click', function (e) {
+function openSheetIfNoSwiping(e) {
 if (e.target.closest('.item-menu-btn') || e.target.closest('.item-retry') || e.target.closest('.batch-check')) return;
 openItemSheet(it);
+}
+li.addEventListener('click', openSheetIfNoSwiping);
+li.addEventListener('keydown', function (e) {
+if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheetIfNoSwiping(e); }
 });
 const retryBtn = li.querySelector('.item-retry');
 if (retryBtn) {
 retryBtn.addEventListener('click', function (e) {
 e.stopPropagation();
 doAction(it.id, 'resume');
+});
+retryBtn.addEventListener('keydown', function (e) {
+if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); doAction(it.id, 'resume'); }
 });
 }
 if (compactMode) li.classList.add('compact');
