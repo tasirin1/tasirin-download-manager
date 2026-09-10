@@ -1914,13 +1914,25 @@ menu.classList.add('hidden');
 }
 });
 document.addEventListener('keydown', function (e) {
-if (e.key !== 'Enter' && e.key !== ' ') return;
-const t = e.target;
+var isOk = e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32 ||
+e.key === 'SoftLeft' || e.key === 'DPadCenter' || e.key === 'Accept' || e.key === 'Ok';
+if (!isOk) return;
+var t = e.target;
 if (t && t.getAttribute && t.getAttribute('tabindex') === '0' &&
 !t.closest('button,a,input,select,textarea')) {
 e.preventDefault();
 t.click();
 }
+});
+document.addEventListener('pointerdown', function (e) {
+var li = e.target.closest && e.target.closest('li.item');
+if (!li) return;
+var btn = e.target.closest('.item-menu-btn,.item-retry,.batch-check');
+if (btn) return; // biarkan click handler asli tangani
+var id = li.dataset && li.dataset.id;
+if (!id) return;
+var it = currentItems && currentItems.find(function (x) { return x.id === id; });
+if (it) openItemSheet(it);
 });
 document.addEventListener('keydown', function (e) {
 if (!mediaModal.classList.contains('open')) return;
@@ -2765,7 +2777,7 @@ e.stopPropagation();
 openItemSheet(it);
 });
 menuBtn.addEventListener('keydown', function (e) {
-if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openItemSheet(it); }
+if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32 || e.key === 'SoftLeft' || e.key === 'DPadCenter') { e.preventDefault(); e.stopPropagation(); openItemSheet(it); }
 });
 }
 function openSheetIfNoSwiping(e) {
@@ -2774,7 +2786,7 @@ openItemSheet(it);
 }
 li.addEventListener('click', openSheetIfNoSwiping);
 li.addEventListener('keydown', function (e) {
-if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheetIfNoSwiping(e); }
+if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32 || e.key === 'SoftLeft' || e.key === 'DPadCenter') { e.preventDefault(); openSheetIfNoSwiping(e); }
 });
 const retryBtn = li.querySelector('.item-retry');
 if (retryBtn) {
@@ -2783,7 +2795,7 @@ e.stopPropagation();
 doAction(it.id, 'resume');
 });
 retryBtn.addEventListener('keydown', function (e) {
-if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); doAction(it.id, 'resume'); }
+if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32 || e.key === 'SoftLeft' || e.key === 'DPadCenter') { e.preventDefault(); e.stopPropagation(); doAction(it.id, 'resume'); }
 });
 }
 if (compactMode) li.classList.add('compact');

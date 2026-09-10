@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix: D-pad/remote fallback** -- Tangkap semua variasi OK key (Enter/Space/DPadCenter/SoftLeft/Accept/Ok/keyCode 13/32). Global pointerdown handler sebagai fallback untuk TV remote yang tidak kirim keydown.
 - **Fix: D-pad/remote control di remote web** -- Tambahkan keyboard handler (Enter/Space) di item row, menu button, dan retry button. Focus management: sheet buka → fokus ke tombol pertama. Escape tutup sheet. Sekarang bisa di-OK dari TV remote/D-pad.
 - **Fix: klik item di remote web buka sheet aksi** -- Klik di mana saja pada item row (bukan hanya tombol "...") sekarang membuka sheet aksi (pause/resume/delete/stream). Sebelumnya hanya tombol "..." yang berfungsi.
 - **Fix: restore strings.xml** -- Plurals resource tidak bisa dihapus sebarisan karena XML jadi tidak valid. Resource dikembalikan.
