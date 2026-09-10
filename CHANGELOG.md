@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Maintenance: bersihkan debug logs & unused resources** -- Hapus 13 baris debug Log.d/Log.e (OPEN) di MainActivity (install APK sudah jalan). Hapus 3 string resource tidak terpakai (summary_count_active/done/failed).
 - **Fix: APK tidak bisa install di Android 8+** -- Tambahkan `REQUEST_INSTALL_PACKAGES` permission yang wajib di Android 8+ agar app bisa memanggil package installer saat user klik file APK. Tanpa izin ini, intent APK diam-diam gagal.
 - **Debug: log APK intent** -- Tambahkan Log.d("OPEN") di onTap/openDownload untuk melacak alur klik APK di Logcat.
 - **Fix: APK installer 2-step fallback** -- Intent APK kini coba `ACTION_INSTALL_PACKAGE` dulu, lalu `ACTION_VIEW` + MIME `application/vnd.android.package-archive` sebagai fallback. Tambah `FLAG_ACTIVITY_NEW_TASK` agar kompatibel dengan service context.
