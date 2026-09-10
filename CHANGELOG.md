@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix: klik item di remote web buka sheet aksi** -- Klik di mana saja pada item row (bukan hanya tombol "...") sekarang membuka sheet aksi (pause/resume/delete/stream). Sebelumnya hanya tombol "..." yang berfungsi.
 - **Fix: restore strings.xml** -- Plurals resource tidak bisa dihapus sebarisan karena XML jadi tidak valid. Resource dikembalikan.
 - **Maintenance: bersihkan debug logs & unused resources** -- Hapus 13 baris debug Log.d/Log.e (OPEN) di MainActivity (install APK sudah jalan). Hapus 3 string resource tidak terpakai (summary_count_active/done/failed).
 - **Fix: APK tidak bisa install di Android 8+** -- Tambahkan `REQUEST_INSTALL_PACKAGES` permission yang wajib di Android 8+ agar app bisa memanggil package installer saat user klik file APK. Tanpa izin ini, intent APK diam-diam gagal.

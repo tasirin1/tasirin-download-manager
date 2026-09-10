@@ -2758,6 +2758,10 @@ e.stopPropagation();
 openItemSheet(it);
 });
 }
+li.addEventListener('click', function (e) {
+if (e.target.closest('.item-menu-btn') || e.target.closest('.item-retry') || e.target.closest('.batch-check')) return;
+openItemSheet(it);
+});
 const retryBtn = li.querySelector('.item-retry');
 if (retryBtn) {
 retryBtn.addEventListener('click', function (e) {
