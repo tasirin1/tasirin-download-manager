@@ -265,6 +265,7 @@
     <string name="settings_server_read_only">Read-only server</string>
     <string name="remote_storage_btn">Enable file access (storage permission)</string>
     <string name="remote_pin_required">Set a PIN in Settings first before starting the server (for network security)</string>
+    <string name="settings_auto_open">Open file after download completes</string>
     <string name="settings_server_autostart">Start server automatically after device restart</string>
     <string name="settings_section_storage">Storage</string>
     <string name="settings_saved">Settings saved</string>

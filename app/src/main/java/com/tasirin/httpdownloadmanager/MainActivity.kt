@@ -167,6 +167,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         lifecycleScope.launch {
             App.engine.items.collect { items ->
                 lastItems = items
+                // Auto-open file yang baru selesai (video → player, APK → installer)
+                if (StoragePrefs.isAutoOpenComplete(this@MainActivity)) {
+                    autoOpenCompleted(items)
+                }
                 runCatching {
                     adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
                     updateStickyHeader()
@@ -1227,6 +1231,52 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     /** Ekspor log error (crash + error server) ke file .txt di folder Download. */
+    /** Set yang sudah di-set COMPLETED supaya tidak auto-open berulang. */
+    private val autoOpenedIds = mutableSetOf<String>()
+
+    private fun autoOpenCompleted(items: List<DownloadItem>) {
+        for (item in items) {
+            if (item.state == DownloadState.COMPLETED &&
+                item.id !in autoOpenedIds &&
+                item.filePath != null
+            ) {
+                autoOpenedIds.add(item.id)
+                val ext = item.fileName.substringAfterLast('.', "").lowercase()
+                val mime = MimeTypes.forFile(item.fileName)
+                when {
+                    // APK → installer
+                    ext == "apk" -> {
+                        val uri = if (item.contentUri != null) {
+                            item.contentUri.toUri()
+                        } else {
+                            FileProvider.getUriForFile(
+                                this, "$packageName.fileprovider", File(item.filePath)
+                            )
+                        }
+                        val intent = Intent(Intent.ACTION_VIEW)
+                            .setDataAndType(uri, "application/vnd.android.package-archive")
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        runCatching { startActivity(intent) }
+                    }
+                    // Video → pemutar video
+                    mime.startsWith("video/") || ext in setOf("mp4","mkv","webm","ts","avi","mov","flv") -> {
+                        val uri = if (item.contentUri != null) {
+                            item.contentUri.toUri()
+                        } else {
+                            FileProvider.getUriForFile(
+                                this, "$packageName.fileprovider", File(item.filePath)
+                            )
+                        }
+                        val intent = Intent(Intent.ACTION_VIEW)
+                            .setDataAndType(uri, mime)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        runCatching { startActivity(intent) }
+                    }
+                }
+            }
+        }
+    }
+
     private fun openDownload(item: DownloadItem) {
         if (item.state != DownloadState.COMPLETED) return
         val mime = MimeTypes.forFile(item.fileName)

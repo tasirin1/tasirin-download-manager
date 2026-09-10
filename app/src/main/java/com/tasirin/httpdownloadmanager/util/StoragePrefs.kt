@@ -35,6 +35,7 @@ object StoragePrefs {
     private const val KEY_SERVER_AUTOSTART = "server_autostart_boot"
     private const val KEY_SERVER_READ_ONLY = "server_read_only"
     private const val KEY_TEXT_FOLDER = "text_folder_path"
+    private const val KEY_AUTO_OPEN_COMPLETE = "auto_open_on_complete"
     private const val KEY_BATTERY_EXEMPT = "battery_exempt"
     private const val KEY_SERVER_PIN = "server_pin"
     private const val KEY_MAX_CONCURRENT = "max_concurrent"

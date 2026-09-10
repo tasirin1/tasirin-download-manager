@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Auto-open file saat download selesai** -- Download video (mp4/mkv/webm/ts) otomatis dibuka di pemutar video; download APK otomatis memanggil installer. Toggle "Open file after download" di Settings. Guard  mencegah auto-open berulang.
 - **Fix: ikon launcher TV box / Android TV** -- Tambahkan `android:banner` (drawable `tv_banner.xml`, gradient biru + ikon download + aksen oranye) dan intent filter `LEANBACK_LAUNCHER` supaya aplikasi tampil dengan ikon banner khusus di launcher Android TV / Android box.
 - **Fix: lint error TV launcher** -- Tambahkan `uses-feature` optional untuk `touchscreen` dan `leanback` (wajib saat pakai LEANBACK_LAUNCHER). Tambahkan `tools:ignore="UnusedAttribute"` di `tv_banner.xml` untuk menekan warning width/height vector di API <23.
 - **Fix: tawaran akses storage hilang saat install pertama kali** -- Fungsi

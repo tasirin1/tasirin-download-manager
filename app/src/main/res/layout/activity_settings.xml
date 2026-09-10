@@ -418,6 +418,18 @@
                     </LinearLayout>
 
                     <Button
+                        android:id="@+id/check_auto_open"
+                        style="@style/TvOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="40dp"
+                        android:gravity="start|center_vertical"
+                        android:paddingHorizontal="10dp"
+                        android:text="@string/settings_auto_open"
+                        android:textSize="13sp" />
+
+                    <Button
                         android:id="@+id/check_battery"
                         style="@style/TvOutlinedButton"
                         android:layout_width="match_parent"

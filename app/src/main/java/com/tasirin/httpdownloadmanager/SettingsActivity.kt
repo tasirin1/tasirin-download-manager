@@ -471,6 +471,11 @@ class SettingsActivity : AppCompatActivity() {
             getString(R.string.settings_battery)
         )
         renderToggle(
+            binding.checkAutoOpen,
+            StoragePrefs.isAutoOpenComplete(this),
+            getString(R.string.settings_auto_open)
+        )
+        renderToggle(
             binding.checkAutoSort,
             StoragePrefs.isAutoSortEnabled(this),
             getString(R.string.settings_auto_sort)
@@ -538,6 +543,10 @@ class SettingsActivity : AppCompatActivity() {
             val next = !StoragePrefs.isBatteryExemptEnabled(this)
             StoragePrefs.setBatteryExemptEnabled(this, next)
             if (next) requestBatteryExemption()
+            renderChecks()
+        }
+        binding.checkAutoOpen.setOnClickListener {
+            StoragePrefs.setAutoOpenComplete(this, !StoragePrefs.isAutoOpenComplete(this))
             renderChecks()
         }
         binding.checkAutoSort.setOnClickListener {
