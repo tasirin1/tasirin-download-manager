@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **D-pad navigation di remote web (SmartTube-inspired)** -- Panah atas/bawah pindah fokus antar item. OK/Enter = buka sheet aksi. Escape = tutup sheet/media. Auto-focus item pertama via MutationObserver.
 - **Fix: touchscreen tap buka sheet di remote web** -- Touchend handler dipindah SETELAH attachSwipe supaya flag _swiped bisa dicek. Tap biasa = buka sheet; swipe = pause/resume/delete.
 - **Fix: item remote web buka sheet dari semua input** -- Tangkap semua event (click, auxclick, dblclick, keydown/up, mousedown/up, pointerdown/up) di item row. Xbox controller A Button = Enter → sudah jalan.
 - **Fix: D-pad/remote fallback** -- Tangkap semua variasi OK key (Enter/Space/DPadCenter/SoftLeft/Accept/Ok/keyCode 13/32). Global pointerdown handler sebagai fallback untuk TV remote yang tidak kirim keydown.

@@ -5008,6 +5008,59 @@ if (typeof EventSource !== 'undefined') {
   sseGaveUp = true;
   pollTimer = setTimeout(pollTick, nextPollMs());
 }
+
+// === D-PAD NAVIGATION (SmartTube-inspired) ===
+(function () {
+  var focused = null;
+  function getVisibleItems() {
+    return Array.from(dlList.querySelectorAll('li.item')).filter(function (el) {
+      return el.offsetParent !== null && !el.classList.contains('hidden');
+    });
+  }
+  function focusItem(el) {
+    if (focused) focused.style.outline = '';
+    focused = el;
+    if (el) {
+      el.tabIndex = 0;
+      el.focus();
+      el.style.outline = '3px solid var(--accent)';
+      el.style.outlineOffset = '-3px';
+      el.style.borderRadius = '12px';
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+  document.addEventListener('keydown', function (e) {
+    var items = getVisibleItems();
+    if (!items.length) return;
+    var idx = focused ? items.indexOf(focused) : -1;
+    if (e.key === 'ArrowDown' || e.key === 'DPadDown') {
+      e.preventDefault();
+      var next = idx < items.length - 1 ? idx + 1 : 0;
+      focusItem(items[next]);
+    } else if (e.key === 'ArrowUp' || e.key === 'DPadUp') {
+      e.preventDefault();
+      var prev = idx > 0 ? idx - 1 : items.length - 1;
+      focusItem(items[prev]);
+    } else if ((e.key === 'Enter' || e.key === ' ' || e.key === 'DPadCenter' ||
+        e.keyCode === 13 || e.keyCode === 32 || e.key === 'Ok' || e.key === 'Accept') && focused) {
+      e.preventDefault();
+      focused.click();
+    } else if (e.key === 'Escape') {
+      closeItemSheet();
+      closeMedia();
+    }
+  });
+  // Focus pertama kali item muncul
+  if (typeof MutationObserver !== 'undefined') {
+    var observer = new MutationObserver(function () {
+      if (!focused) {
+        var first = dlList.querySelector('li.item');
+        if (first) focusItem(first);
+      }
+    });
+    observer.observe(dlList, { childList: true, subtree: true });
+  }
+})();
 </script>
 </body>
 </html>
