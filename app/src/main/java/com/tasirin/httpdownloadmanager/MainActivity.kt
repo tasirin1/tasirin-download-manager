@@ -1298,27 +1298,43 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
         // APK → panggil package installer dengan beberapa fallback
         if (isApk) {
-            android.util.Log.d("OPEN", "APK detected: uri=$uri")
+            android.util.Log.d("OPEN", "APK: uri=$uri path=${item.filePath}")
             // 1) ACTION_INSTALL_PACKAGE (direct installer intent)
-            val installer1 = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching {
+            try {
+                val i1 = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 android.util.Log.d("OPEN", "Trying ACTION_INSTALL_PACKAGE")
-                startActivity(installer1)
-                android.util.Log.d("OPEN", "ACTION_INSTALL_PACKAGE success")
-                return@openDownload
+                startActivity(i1)
+                android.util.Log.d("OPEN", "ACTION_INSTALL_PACKAGE OK")
+                return
+            } catch (e: Exception) {
+                android.util.Log.e("OPEN", "ACTION_INSTALL_PACKAGE FAIL: ${e.message}", e)
             }
-            // 2) ACTION_VIEW + MIME type (fallback umum)
-            val installer2 = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching {
-                android.util.Log.d("OPEN", "Trying ACTION_VIEW")
-                startActivity(installer2)
-                android.util.Log.d("OPEN", "ACTION_VIEW success")
-                return@openDownload
+            // 2) ACTION_VIEW + explicit MIME type
+            try {
+                val i2 = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                android.util.Log.d("OPEN", "Trying ACTION_VIEW APK")
+                startActivity(i2)
+                android.util.Log.d("OPEN", "ACTION_VIEW APK OK")
+                return
+            } catch (e: Exception) {
+                android.util.Log.e("OPEN", "ACTION_VIEW APK FAIL: ${e.message}", e)
             }
-            android.util.Log.e("OPEN", "Both APK intents failed")
+            // 3) Generic file viewer
+            try {
+                val i3 = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, mime)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                android.util.Log.d("OPEN", "Trying ACTION_VIEW generic")
+                startActivity(i3)
+                android.util.Log.d("OPEN", "ACTION_VIEW generic OK")
+                return
+            } catch (e: Exception) {
+                android.util.Log.e("OPEN", "ACTION_VIEW generic FAIL: ${e.message}", e)
+            }
+            android.util.Log.e("OPEN", "ALL APK intents failed")
             Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
             return
         }
