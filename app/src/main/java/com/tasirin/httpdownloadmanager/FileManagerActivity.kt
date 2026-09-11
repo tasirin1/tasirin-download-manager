@@ -335,11 +335,14 @@ class FileManagerActivity : AppCompatActivity() {
     ) : RecyclerView.Adapter<FileAdapter.VH>() {
         private var items: List<FileEntry> = emptyList()
         fun submitList(n: List<FileEntry>) {
-            val d = DiffUtil.calculate object : DiffUtil.Callback() {
-                override fun getOldListSize() = items.size; override fun getNewListSize() = n.size
+            val d = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                override fun getOldListSize() = items.size
+                override fun getNewListSize() = n.size
                 override fun areItemsTheSame(a: Int, b: Int) = items[a].file.path == n[b].file.path
                 override fun areContentsTheSame(a: Int, b: Int) = items[a] == n[b]
-            }; items = n; d.dispatchUpdatesTo(this)
+            })
+            items = n
+            d.dispatchUpdatesTo(this)
         }
         override fun onCreateViewHolder(p: ViewGroup, v: Int) = VH(LayoutInflater.from(p.context).inflate(R.layout.item_file_manager, p, false))
         override fun getItemCount() = items.size
