@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix: RTL padding di activity_main** -- Ganti `paddingLeft`/`paddingRight` menjadi `paddingStart`/`paddingEnd` untuk kompatibilitas layout RTL.
 - **Fix: lint warning SetTextI18n di summary stats** -- Ganti `Int.toString()` dengan `String.format(Locale.US, "%d")` di updateSummaryStats() agar lint tidak warning "Number formatting does not take into account locale".
 - **Fix: hapus warna chip tidak terpakai** -- `chip_done_bg` dan `chip_failed_bg` tidak lagi direferensikan setelah kolom statistik menggantikan chip. Menghapus 2 lint warning CI.
 - **Fix: hapus resource drawable tidak terpakai** -- `bg_fab_circle.xml` (diganti `bg_fab_pill.xml`) dan `bg_chip_pill.xml` (diganti kolom statistik). Menghapus 2 lint warning CI.
