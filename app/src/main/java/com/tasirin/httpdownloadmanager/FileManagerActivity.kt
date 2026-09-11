@@ -259,7 +259,7 @@ class FileManagerActivity : AppCompatActivity() {
             holder.meta.text = when {
                 entry.isDir -> {
                     val n = entry.children ?: 0
-                    getString(R.string.file_manager_files_count, n)
+                    ctx.getString(R.string.file_manager_files_count, n)
                 }
                 entry.size != null -> Formats.bytes(entry.size)
                 else -> ""
