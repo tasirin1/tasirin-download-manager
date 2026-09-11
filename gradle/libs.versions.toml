@@ -11,7 +11,6 @@ activityKtx = "1.9.0"
 coroutinesAndroid = "1.11.0"
 desugarJdkLibs = "2.1.5"
 junit = "4.13.2"
-zxing = "3.5.4"
 orgJson = "20240303"
 
 [libraries]
@@ -24,7 +23,6 @@ androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", ve
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutinesAndroid" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 
 [plugins]

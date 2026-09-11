@@ -34,7 +34,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -172,10 +171,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
     private val serverLog = ServerLog()
     private val mediaMetaCache = ConcurrentHashMap<String, Pair<Long, MediaMeta>>()
-    // Cache QR PNG: /api/qr jarang berubah isinya (URL server + PIN),
-    // render bitmap 520x520 tiap panggilan itu boros CPU/RAM.
-    private val qrCache = ConcurrentHashMap<String, Pair<Long, ByteArray>>()
-
 
     // Cache snapshot terakhir untuk throttle: throttled request mengembalikan
     // JSON yang sama tanpa rebuild, sehingga UI tetap responsif.
@@ -262,7 +257,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     session.method == Method.GET && session.uri == "/api/snapshot" -> snapshotJson()
                     session.method == Method.GET && session.uri == "/api/events" -> sseResponse()
                     session.method == Method.POST && session.uri == "/api/share" -> createShare(session)
-                    session.method == Method.GET && session.uri == "/api/qr" -> qrPngResponse(session)
                     session.method == Method.GET && session.uri == "/api/gallery" -> galleryJson(session)
                     session.method == Method.GET && session.uri == "/api/fs" -> fsList(session)
                     session.method == Method.GET && session.uri == "/api/thumb" -> serveThumb(session)
@@ -435,11 +429,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             uploadLocks.entries.removeIf {
                 now - it.value.lastUse.get() > 30 * 60 * 1000L
             }
-        }
-        // qrCache: entry > 15 menit
-        if (qrCache.size > 8) {
-            val qrCutoff = now - 15 * 60 * 1000L
-            qrCache.entries.removeIf { it.value.first < qrCutoff }
         }
         // shareTokens: entry > 24 jam
         if (shareTokens.size > 8) {
@@ -2672,33 +2661,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
-    // ---------- QR code ----------
-
-    private fun qrPngResponse(session: IHTTPSession): Response {
-        val text = session.param("text").orEmpty()
-        if (text.isEmpty() || text.length > MAX_QR_TEXT_LENGTH) return notFound()
-        val now = System.currentTimeMillis()
-        val cached = qrCache[text]
-        val bytes = if (cached != null && now - cached.first < QR_CACHE_TTL_MS) {
-            cached.second
-        } else {
-            QrCode.generate(text)?.also { generated ->
-                // Batasi isi cache: evict yang paling lama bila penuh.
-                if (qrCache.size >= QR_CACHE_MAX) {
-                    val oldest = qrCache.entries.minByOrNull { it.value.first }
-                    oldest?.let { qrCache.remove(it.key) }
-                }
-                qrCache[text] = now to generated
-            } ?: return notFound()
-        }
-        return newFixedLengthResponse(
-            Response.Status.OK,
-            "image/png",
-            ByteArrayInputStream(bytes),
-            bytes.size.toLong()
-        ).also { it.addHeader("Cache-Control", "no-store") }
-    }
-
     /** Jalur thumbnail bersama untuk remote dan galeri native agar decode,
      * lock per-file, dan cache disk tidak diduplikasi dua implementasi. */
     fun galleryThumbFile(raw: String): File? = safeRun("galleryThumb") {
@@ -2801,8 +2763,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_MEDIA_ZIP_TOKENS = 256
         private const val FS_STATS_TTL_MS = 10_000L
         private const val SSE_MIN_INTERVAL_MS = 1_000L
-        private const val QR_CACHE_MAX = 8
-        private const val QR_CACHE_TTL_MS = 300_000L
         private const val MAX_QR_TEXT_LENGTH = 2_000
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu
         // koneksi hidup (dan fallback polling klien tidak ikut jalan).

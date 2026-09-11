@@ -9,8 +9,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -46,7 +44,6 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.UpdateInfo
 import com.tasirin.httpdownloadmanager.util.Updater
-import com.tasirin.httpdownloadmanager.util.QrEncoder
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
@@ -114,19 +111,6 @@ class SettingsActivity : AppCompatActivity() {
         setupQuickNav()
         binding.btnOpenRemote.setOnClickListener { openRemoteNow() }
         binding.btnCopyUrl.setOnClickListener { copyRemoteUrl() }
-        binding.btnShowQr.setOnClickListener {
-            val card = findViewById<View>(R.id.section_qr)
-            val show = !card.isVisible
-            card.isVisible = show
-            if (show) {
-                binding.qr.visibility = View.VISIBLE
-                // Isi QR jika belum ada gambar
-                if (binding.qr.drawable == null) {
-                    val url = remoteUrl()
-                    url?.let { generateQrCode(it, 640)?.let { bmp -> binding.qr.setImageBitmap(bmp) } }
-                }
-            }
-        }
     }
 
     override fun onResume() {
@@ -366,12 +350,6 @@ class SettingsActivity : AppCompatActivity() {
             binding.urls.text = urls.joinToString("\n").ifEmpty {
                 getString(R.string.remote_no_url)
             }
-            urls.firstOrNull()?.let { address ->
-                generateQrCode(address, 640)?.let { binding.qr.setImageBitmap(it) }
-            }
-            binding.btnShowQr.isEnabled = true
-            // Reset QR visibility (bisa GONE dari stop server sebelumnya)
-            binding.qr.visibility = View.VISIBLE
         } else {
             badge.isVisible = true
             badge.setText(R.string.settings_badge_off)
@@ -380,11 +358,6 @@ class SettingsActivity : AppCompatActivity() {
 
             binding.serverStatus.setText(R.string.remote_stopped)
             binding.urls.text = getString(R.string.remote_no_url)
-            binding.qr.visibility = View.GONE
-            binding.btnShowQr.isEnabled = false
-            // Sembunyikan QR card jika server mati
-            val qrCard = findViewById<View>(R.id.section_qr)
-            if (qrCard.isVisible) qrCard.isVisible = false
         }
     }
 
@@ -976,27 +949,6 @@ class SettingsActivity : AppCompatActivity() {
         if (!anyActive) {
             runCatching { stopService(Intent(this, DownloadService::class.java)) }
         }
-    }
-
-    private fun generateQrCode(content: String, size: Int): Bitmap? {
-        return runCatching {
-            val matrix = QrEncoder.encode(content) ?: return null
-            val quiet = 1 // quiet zone 1 modul biar mudah discan
-            val dim = matrix.size + quiet * 2
-            val scale = (size / dim).coerceAtLeast(1)
-            val offset = (size - matrix.size * scale) / 2
-            val pixels = IntArray(size * size)
-            for (y in 0 until size) {
-                for (x in 0 until size) {
-                    val mx = (x - offset) / scale
-                    val my = (y - offset) / scale
-                    val dark = mx in 0 until matrix.size && my in 0 until matrix.size &&
-                        matrix.get(mx, my)
-                    pixels[y * size + x] = if (dark) Color.BLACK else Color.WHITE
-                }
-            }
-            Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
-        }.getOrNull()
     }
 
     companion object {

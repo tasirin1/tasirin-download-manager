@@ -31,7 +31,7 @@ Releases are built by GitHub Actions and signed with the official release key. I
 ## Remote Web
 
 1. Open **Settings → Remote (HTTP)**.
-2. Start the server, then scan the QR code or open `http://<device-ip>:<port>/`.
+2. Open `http://<device-ip>:<port>/` in a browser on another device on the same network.
 3. Enter the PIN when remote PIN protection is enabled.
 
 The server is intended for local networks. Use a PIN on shared devices or unsecured Wi-Fi.

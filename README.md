@@ -31,7 +31,7 @@ APK dirilis lewat GitHub Actions dan ditandatangani dengan kunci rilis resmi. Pe
 ## Remote Web
 
 1. Buka **Settings → Remote (HTTP)**.
-2. Jalankan server, lalu pindai QR code atau buka `http://<ip-perangkat>:<port>/`.
+2. Buka `http://<ip-perangkat>:<port>/` di browser perangkat lain di jaringan yang sama.
 3. Masukkan PIN bila PIN remote diaktifkan.
 
 Server hanya dimaksudkan untuk jaringan lokal. Gunakan PIN saat perangkat dipakai bersama atau Wi-Fi tidak terlindungi.

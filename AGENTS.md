@@ -61,7 +61,6 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │       ├── remote/ServerSecurity.kt  # Logika keamanan murni (path, PIN lock, upload, share)
 │       ├── remote/ServerStreams.kt   # Stream gabungan partial, upload stream, delete-on-close
 │       ├── remote/ShareToken.kt      # Token berbagi file sementara
-│       ├── remote/QrCode.kt          # QR PNG untuk /api/qr (pakai util/QrEncoder)
 │       ├── ui/DownloadAdapter.kt     # RecyclerView adapter daftar download
 │       └── util/
 │           ├── Updater.kt            # Cek & unduh APK update (tanpa auto-install) + verifikasi tanda tangan
@@ -69,13 +68,12 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │           ├── MediaLibrary.kt       # Scan video + thumbnail (kondisional API 29+)
 │           ├── StoragePrefs.kt       # Semua kunci SharedPreferences ("storage_settings")
 │           ├── StorageCleanup.kt     # Auto-cleanup saat storage menipis (partial, thumbs, upload tmp)
-│           ├── QrEncoder.kt          # Encoder QR mandiri (tanpa zxing di APK)
 │           ├── BitmapUtil.kt         # scaleDown bersama (galeri + server remote)
 │           ├── Spinners.kt, Streams.kt  # Helper spinner + baca stream terbatas
 │           ├── MimeTypes.kt, Crypto.kt, Formats.kt, FileNames.kt,
 │           ├── NotificationHelper.kt, TlsCompat.kt            # Pendukung
 ├── app/src/test/                     # Unit test JVM (junit4): download queue/HLS/resume/speed,
-│                                     # item codec, formats/names/mime/hex/pin/QR,
+│                                     # item codec, formats/names/mime/hex/pin,
 │                                     # checksums, streams, scan cache, server log/security/stream
 ├── gradle/verification-metadata.xml  # Checksum sha256 semua dependensi (verifikasi strict di CI)
 └── gradle wrapper                    # build via ./gradlew (CI saja untuk rilis)
@@ -130,8 +128,10 @@ kuat dan tanpa diskusi:
   ditangani `applyServerStatus()`.
 - **Endpoint `/api/status`** — dihapus (tidak ada klien lagi); status cukup
   lewat `snapshotJson`/SSE.
-- **zxing di runtime** — hanya `testImplementation`; encoder QR sendiri
-  (`util/QrEncoder.kt`).
+- **QR code & zxing** — dihapus total (2026-09-11): tombol QR di Settings,
+  endpoint `/api/qr`, `QrCode.kt`, `QrEncoder.kt`, QR di modal share remote,
+  dan dependency test zxing sudah tidak ada. JANGAN hidupkan kembali tanpa
+  alasan kuat dan diskusi.
 - **`values-en`** — tidak ada; default `values/strings.xml` = Inggris.
 - **minSdk** — tetap 21 (Android 5+), jangan naikkan.
 - **Tombol tab Downloads** — butuh handler klik sendiri (pola
@@ -215,9 +215,6 @@ kuat dan tanpa diskusi:
 7. **Remote web = UI utama**: setiap perubahan halaman remote (dan endpoint API)
    harus tetap mobile-first dan ramah D-pad TV; jangan menambah dependensi berat
    (APK tetap kecil); hindari *switch* di remote — pakai tombol biasa.
-   Catatan: zxing hanya di `testImplementation` (verifikasi decode QR) — APK
-   memakai encoder sendiri (`util/QrEncoder.kt`), jangan kembalikan zxing ke
-   runtime tanpa alasan kuat.
    `assets/remote.html` sengaja di-minify (hemat ukuran; gzip transfer sudah
    otomatis di nanohttpd). **Sumber readable = `remote.src.html` di root repo**:
    ubah di sana, lalu jalankan `python3 scripts/prepare_remote.py` dan commit
@@ -441,8 +438,6 @@ jangan digabung dengan PR fitur lain.
 3. **Pertahankan minSdk 21** — semua fitur harus punya fallback untuk
    Android 5. Jangan gunakan API yang hanya tersedia di API 23+ tanpa guard.
 4. **Jangan menambah dependensi** — APK harus tetap kecil (< 3.5 MB).
-  zxing hanya di `testImplementation`. QR encoder sendiri sudah ada di
-   `util/QrEncoder.kt`.
 
 ### Saat memperbaiki bug
 

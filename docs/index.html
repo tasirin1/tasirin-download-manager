@@ -115,16 +115,6 @@ a:hover{color:#6ea8ff}
 .step h3{font-size:.95rem;font-weight:700;margin-bottom:6px}
 .step p{color:var(--dim);font-size:.85rem}
 
-/* ── QR ── */
-.qr-wrap{display:flex;gap:40px;align-items:center;justify-content:center;flex-wrap:wrap}
-.qr-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:32px;text-align:center;flex-shrink:0}
-.qr-card canvas{border-radius:var(--radius-sm);margin-bottom:14px}
-.qr-card p{color:var(--dim);font-size:.85rem}
-.qr-info{max-width:360px}
-.qr-info h3{font-size:1.2rem;font-weight:700;margin-bottom:12px}
-.qr-info p{color:var(--dim);font-size:.9rem;margin-bottom:10px;line-height:1.7}
-.qr-info code{background:rgba(79,140,255,.1);color:var(--accent);padding:2px 8px;border-radius:4px;font-size:.82rem}
-@media(max-width:600px){.qr-wrap{flex-direction:column;align-items:center}}
 
 /* ── FAQ ── */
 .faq{max-width:640px;margin:0 auto}
@@ -165,7 +155,6 @@ a:hover{color:#6ea8ff}
     <div class="nav-links">
       <a href="#features" data-i18n="nav_fitur">Fitur</a>
       <a href="#how" data-i18n="nav_cara">Cara Pakai</a>
-      <a href="#qr" data-i18n="nav_remote">Remote</a>
       <a href="#faq" data-i18n="nav_faq">FAQ</a>
       <a href="https://github.com/tasirin1/tasirin-download-manager" target="_blank" rel="noopener">GitHub</a>
     </div>
@@ -261,26 +250,6 @@ a:hover{color:#6ea8ff}
   </div>
 </section>
 
-<!-- ── QR / Remote ── -->
-<section class="section" id="qr">
-  <div class="section-label" data-i18n="qr_label">Kontrol Remote</div>
-  <h2 class="section-title" data-i18n="qr_title">Kelola dari perangkat manapun</h2>
-  <p class="section-desc" data-i18n="qr_desc">Pindai kode QR atau buka URL dari browser manapun di jaringan Wi-Fi yang sama.</p>
-  <div class="qr-wrap reveal">
-    <div class="qr-card">
-      <canvas id="qr" width="200" height="200"></canvas>
-      <p data-i18n="qr_scan">Pindai untuk membuka remote</p>
-    </div>
-    <div class="qr-info">
-      <h3 data-i18n="qr_how_title">Cara menghubungkan</h3>
-      <p data-i18n="qr_step1">1. Buka <strong>Pengaturan</strong> &rarr; <strong>Remote (HTTP)</strong> di aplikasi.</p>
-      <p data-i18n="qr_step2">2. Jalankan server, lalu pindai kode QR ini.</p>
-      <p data-i18n="qr_step3">3. Masukkan PIN jika remote access dilindungi.</p>
-      <p data-i18n="qr_note">Server hanya berjalan di jaringan lokal. Gunakan PIN saat Wi-Fi tidak terlindungi atau digunakan bersama.</p>
-    </div>
-  </div>
-</section>
-
 <!-- ── FAQ ── -->
 <section class="section" id="faq">
   <div class="section-label">FAQ</div>
@@ -359,14 +328,6 @@ var EN = {
   how1_title:'Install APK',how1_desc:'Download from this page and install on your Android device.',
   how2_title:'Grant Access',how2_desc:'Allow storage permission when prompted on first launch.',
   how3_title:'Start Downloading',how3_desc:'Paste any URL, or open the remote web from another device.',
-  qr_label:'Remote Control',qr_title:'Manage from any device',
-  qr_desc:'Scan the QR code or open the URL from any browser on the same Wi-Fi network.',
-  qr_scan:'Scan to open remote',
-  qr_how_title:'How to connect',
-  qr_step1:'1. Open <strong>Settings</strong> → <strong>Remote (HTTP)</strong> on the app.',
-  qr_step2:'2. Start the server and scan this QR code.',
-  qr_step3:'3. Enter your PIN if remote access is protected.',
-  qr_note:'The server runs on your local network only. Use a PIN on shared or open Wi-Fi.',
   faq_title:'Frequently Asked',
   faq1_q:'Is it really free?',faq1_a:'Yes. The app is open-source under the MIT license with no ads, no tracking, and no in-app purchases.',
   faq2_q:'Does it support resume?',faq2_a:'Yes. Downloads resume automatically after interruption using HTTP Range requests. Partial files are preserved.',
@@ -436,24 +397,7 @@ window.addEventListener('scroll',function(){
   document.getElementById('nav').classList.toggle('scrolled',window.scrollY>20);
 },{passive:true});
 
-/* ── QR code ── */
-(function drawQR(text,canvas){
-  var ctx=canvas.getContext('2d'),s=canvas.width,m=25,c=s/m;
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,s,s);
-  ctx.fillStyle='#000';
-  function f(x,y){for(var i=0;i<7;i++)for(var j=0;j<7;j++){
-    if(i===0||i===6||j===0||j===6||(i>=2&&i<=4&&j>=2&&j<=4))ctx.fillRect((x+i)*c,(y+j)*c,c,c);
-  }}
-  f(0,0);f(m-7,0);f(0,m-7);
-  for(var i=8;i<m-8;i++)if(i%2===0){ctx.fillRect(i*c,6*c,c,c);ctx.fillRect(6*c,i*c,c,c)}
-  var h=0;for(i=0;i<text.length;i++)h=((h<<5)-h+text.charCodeAt(i))|0;
-  var r=Math.abs(h);function n(){r=(r*1664525+1013904223)&0x7fffffff;return r}
-  for(var y=0;y<m;y++)for(var x=0;x<m;x++){
-    if((x<8&&y<8)||(x>=m-8&&y<8)||(x<8&&y>=m-8))continue;
-    if(x===6||y===6)continue;
-    if(n()%3===0)ctx.fillRect(x*c,y*c,c,c);
-  }
-})('https://github.com/tasirin1/tasirin-download-manager/releases/latest',document.getElementById('qr'));
+
 </script>
 </body>
 </html>

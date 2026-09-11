@@ -1,4 +1,6 @@
 ## [Unreleased]
+- **Hapus fitur QR code total** -- QR tidak dipakai lagi. Dihapus: tombol Show QR + card QR di Settings, endpoint `/api/qr` + `QrCode.kt` di server, QR di modal share remote web, encoder `util/QrEncoder.kt` + `QrEncoderTest.kt` + dependency test zxing, string `settings_qr_title`/`remote_qr_desc`, dan section QR di docs/README.
+
 - **Fix: QR card kosong setelah server restart** --  di-reset ke VISIBLE saat server hidup, dan dipastikan VISIBLE saat user tap Show QR. Sebelumnya, setelah server stop lalu start, QR card muncul kosong karena ImageView masih GONE.
 
 - **Fix: 11 warning lint desain Settings** -- (4x) android:drawableStart ke app:drawableStartCompat di nav chip. (2x) Hapus warna badge_on_bg/badge_off_bg tidak terpakai. (1x) Suppress TooManyViews. (1x) Badge textSize 10sp ke 11sp. (2x) String ON/OFF ke resource. (1x) Judul QR Code ke settings_qr_title.

@@ -22,7 +22,6 @@
     <string name="save_fab_label">Save</string>
     <string name="settings_badge_on">ON</string>
     <string name="settings_badge_off">OFF</string>
-    <string name="settings_qr_title">QR Code</string>
 
     <string name="update_check">Check for Updates</string>
     <string name="update_checking">Checking for updates&#8230;</string>
@@ -96,7 +95,6 @@
     <string name="remote_stopped">Stopped</string>
     <string name="remote_no_url">No network address available</string>
     <string name="remote_started">Server running on port %1$d</string>
-        <string name="remote_qr_desc">Remote server address (QR)</string>
     <string name="remote_start_failed">Failed to start server: %1$s</string>
 
     <string name="action_settings">Settings</string>

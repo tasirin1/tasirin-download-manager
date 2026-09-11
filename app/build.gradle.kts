@@ -115,9 +115,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     testImplementation(libs.junit)
-    // zxing hanya untuk verifikasi decode QR di unit test — tidak ikut ke APK
-    // (encoder QR asli ada di util/QrEncoder.kt).
-    testImplementation(libs.zxing.core)
     // org.json asli untuk unit test JVM (android.jar hanya stub). Test-only:
     // tidak ikut ke APK.
     testImplementation(libs.org.json)

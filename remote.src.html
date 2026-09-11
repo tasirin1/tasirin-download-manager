@@ -933,9 +933,6 @@
   .sheet-cancel {
  width: 100%; margin-top: 8px; padding: 13px; border: 0; border-radius: 12px; background: var(--bg-soft); color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
 
-  .share-qr {
- display: block; width: 190px; height: 190px; margin: 0 auto 12px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
-
   .fab {
  display: none; position: fixed; right: 18px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); z-index: 55; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--primary); color: #fff; font-size: 27px; font-weight: 600; box-shadow: 0 4px 14px rgba(67,83,230,.32); cursor: pointer; align-items: center; justify-content: center; transition: transform .15s ease, box-shadow .15s ease; }
 
@@ -1461,7 +1458,6 @@
   <div class="cm-box">
     <div class="cm-title">Share file</div>
     <div class="cm-text" id="shareText"></div>
-    <img id="shareQr" class="share-qr" alt="QR" title="Share link QR">
     <input id="shareLink" type="text" readonly class="cm-input" autocomplete="off">
     <div class="cm-row">
       <button id="shareCopy" type="button" class="btn-ghost">Copy</button>
@@ -4549,7 +4545,6 @@ async function shareItem(id) {
     document.getElementById('shareText').textContent =
       'Link valid for ' + data.expiresInHours + ' hours. Anyone with this link can download the file without a PIN.';
     document.getElementById('shareLink').value = url;
-    document.getElementById('shareQr').src = API + '/api/qr?text=' + encodeURIComponent(url);
     shareModal.classList.remove('hidden');
   } catch (e) {
     showConfirm('Failed to create link', String(e), 'OK', function () {});
@@ -4557,7 +4552,6 @@ async function shareItem(id) {
 }
 function closeShare() {
   shareModal.classList.add('hidden');
-  document.getElementById('shareQr').removeAttribute('src');
 }
 document.getElementById('shareClose').addEventListener('click', closeShare);
 shareModal.addEventListener('click', function (e) {
