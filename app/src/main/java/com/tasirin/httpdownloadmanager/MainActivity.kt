@@ -77,6 +77,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private var summaryActive = 0
     private var summaryPaused = 0
     private var summaryFailed = 0
+    private var summaryDone = 0
     private var lastItems: List<DownloadItem> = emptyList()
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -800,6 +801,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         menu.findItem(R.id.action_resume_all)?.isVisible = summaryPaused > 0 || summaryFailed > 0
         menu.findItem(R.id.action_retry_failed)?.isVisible = summaryFailed > 0
         menu.findItem(R.id.action_clear_failed)?.isVisible = summaryFailed > 0
+        menu.findItem(R.id.action_clear_completed)?.isVisible = summaryDone > 0
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -835,7 +837,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 true
             }
             R.id.action_clear_completed -> {
-                lifecycleScope.launch(Dispatchers.IO) { App.engine.clearCompleted() }
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.action_clear_completed)
+                    .setMessage(R.string.confirm_clear_completed)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        lifecycleScope.launch(Dispatchers.IO) { App.engine.clearCompleted() }
+                    }
+                    .show()
                 true
             }
             R.id.action_about -> {
@@ -1171,6 +1180,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         summaryActive = active
         summaryPaused = paused
         summaryFailed = failed
+        summaryDone = done
         updateSummaryStats(active, paused, done, failed)
     }
 

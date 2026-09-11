@@ -99,6 +99,7 @@
     <string name="action_clear_completed">Clear Completed</string>
     <string name="action_clear_failed">Clear Failed</string>
     <string name="confirm_clear_failed">Delete all failed downloads and their partial files?</string>
+    <string name="confirm_clear_completed">Delete all completed downloads from the list?</string>
     <string name="settings_background">Automatically resume interrupted downloads (background)</string>
     <string name="settings_autostart">Start automatically on device boot</string>
     <string name="settings_concurrent">Concurrent downloads (queue)</string>
