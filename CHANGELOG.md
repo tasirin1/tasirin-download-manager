@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **UI: percantik desain (3 item)** -- (1) Summary card pakai gradien halus biru muda→putih + shadow + border. (2) Empty state pulse lebih jelas: scale 0.95→1.05 + fade 0.6→1.0, durasi 1200ms + interpolator accelerate_decelerate. (3) Item card tap ripple: foreground `<ripple>` biru muda lembut di semua item download.
 - **Fitur: Clear Failed di menu utama** -- Tambah opsi "Clear Failed" di titik tiga menu (hanya tampil bila ada item gagal). Konfirmasi dialog sebelum menghapus semua item gagal + file parsial. Engine `clearFailed()` sudah ada, tinggal UI-nya.
 - **Fix: RTL padding di activity_main** -- Ganti `paddingLeft`/`paddingRight` menjadi `paddingStart`/`paddingEnd` untuk kompatibilitas layout RTL.
 - **Fix: lint warning SetTextI18n di summary stats** -- Ganti `Int.toString()` dengan `String.format(Locale.US, "%d")` di updateSummaryStats() agar lint tidak warning "Number formatting does not take into account locale".
