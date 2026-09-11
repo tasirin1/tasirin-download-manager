@@ -1,13 +1,5 @@
 ## [Unreleased]
-- **Fix: syntax error di MainActivity + getString adapter** -- Hapus duplikat closing brace + fix getString di adapter File Manager.
-- **FM: long-press menu + mode pindah + fix buka file** -- Hapus tombol ⋮; long-press → Open/Move/Rename/Delete. Mode pindah: pilih → navigate → Paste. Fix buka APK installer.
-- **Fix: Cannot open file di Android 11+** -- file URI ditolak app lain di Android 11+. File Manager kini query MediaStore untuk content URI dulu, fallback ke FileProvider.
-- **FM: tambah fitur + anti double-launch** -- singleTop launchMode. Tambah: Create Folder, Share, Sort (Name/Date/Size). Share via ACTION_SEND.
-- **Fix: DiffUtil syntax error di File Manager** -- Perbaiki DiffUtil.calculateDiff call.
-- **Fix: hapus debounce + paste selalu tampil** -- Hapus debounce 500ms yang bikin perlu double tap. Paste button selalu tampil, disabled saat bukan move mode.
-- **Fix: debounce buka File Manager** -- Tambah debounce 500ms + FLAG_ACTIVITY_CLEAR_TOP agar tidak double launch.
-- **Fix: debug logging open file + fallback URI** -- Tambah logging FM DEBUG saat buka file; fallback ke file URI bila MediaStore dan FileProvider gagal.
-- **Fitur: File Manager sederhana** -- Browsing file/folder lokal dari menu titik tiga > File Manager. Fitur: navigasi folder, info ukuran/bebas storage, buka file dengan app bawaan, rename, hapus. File tersembunyi otomatis disaring. Layout: toolbar + breadcrumb + RecyclerView.
+- **Revert: hapus File Manager dari aplikasi** -- Fitur File Manager native dihapus total (simpel lebih baik). Browsing file tetap tersedia di remote web.
 - **Perf: StorageCleanup — hapus duplikasi FileSaver** -- `runIfLow()` sebelumnya membuat dua instance `FileSaver(context)`. Kini cukup satu variabel `saver` yang dipakai untuk `destinationFreeBytes()` dan `cleanupOrphanPartials()`.
 - **Perf: MediaLibrary — pakai FilenameFilter** -- `scanUncached()` untuk folder teks sekarang pakai `FilenameFilter` saat `listFiles()` supaya file non-video difilter langsung di OS layer, bukan satu per satu di JVM.
 - **Perf: HttpControlServer — batas failedUploads 400→50** -- Map `failedUploads` dibatasi 50 entry (dari 400); cukup untuk LAN-only use case.
@@ -43,7 +35,6 @@
 - **Fix: APK tidak bisa install di Android 8+** -- Tambahkan `REQUEST_INSTALL_PACKAGES` permission yang wajib di Android 8+ agar app bisa memanggil package installer saat user klik file APK. Tanpa izin ini, intent APK diam-diam gagal.
 - **Debug: log APK intent** -- Tambahkan Log.d("OPEN") di onTap/openDownload untuk melacak alur klik APK di Logcat.
 - **Fix: APK installer 2-step fallback** -- Intent APK kini coba `ACTION_INSTALL_PACKAGE` dulu, lalu `ACTION_VIEW` + MIME `application/vnd.android.package-archive` sebagai fallback. Tambah `FLAG_ACTIVITY_NEW_TASK` agar kompatibel dengan service context.
-- **Fix: APK langsung panggil installer saat diklik** -- `openDownload` untuk file APK kini menggunakan `ACTION_INSTALL_PACKAGE` (langsung memanggil package installer) alih-alih `ACTION_VIEW` yang kadang hanya membuka file manager. Fallback ke `ACTION_VIEW` jika installer tidak merespons.
 - **Fix: method auto-open di StoragePrefs** -- Tambahkan `isAutoOpenComplete`/`setAutoOpenComplete` yang sebelumnya terlewat (compile error di CI).
 - **Auto-open file saat download selesai** -- Download video (mp4/mkv/webm/ts) otomatis dibuka di pemutar video; download APK otomatis memanggil installer. Toggle "Open file after download" di Settings. Guard  mencegah auto-open berulang.
 - **Fix: ikon launcher TV box / Android TV** -- Tambahkan `android:banner` (drawable `tv_banner.xml`, gradient biru + ikon download + aksen oranye) dan intent filter `LEANBACK_LAUNCHER` supaya aplikasi tampil dengan ikon banner khusus di launcher Android TV / Android box.
@@ -93,7 +84,6 @@
 - **Fix audio HLS: prioritaskan audio original vs dubbing** -- `HlsRendition` sekarang parse `LANGUAGE` dan `NAME` dari `#EXT-X-MEDIA`. Urutan prioritas: (1) default + bukan dubbing, (2) default + dubbing, (3) non-default + bukan dubbing, (4) sisanya. Filter deteksi nama "dub"/"dubbed"/"dubbing". Log detail: `lang=` dan `name=` di tiap pemilihan audio.
 - **Sederhanakan bg_btn_filled** -- Drawable selector diganti shape solid; state handling lewat theme.
 
-- **Perbaikan Play Protect (4 item)** -- (1) Hapus `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dari manifest; izin baterai hanya diminta lewat intent runtime saat user klik tombol di Settings. (2) Hapus dialog auto-offer "All files access" dari MainActivity; user aktifkan manual dari Settings → Storage → File Manager. (3) Server auto-start saat boot default ke `false`; user harus aktifkan manual. (4) Cleartext tetap diizinkan (download manager butuh HTTP untuk URL user) tapi tidak ada perubahan manifest yang mencurigakan.
 
 - **Tombol prioritas di remote web** -- Item sheet sekarang punya tombol High/Normal/Low priority yang bisa diklik langsung tanpa input manual. Berguna untuk mengatur urutan download saat antrian panjang.
 - **Badge retry count** -- Item yang pernah retry menampilkan badge kecil (e.g. "BB2") di samping nama file. Info retry juga tersedia di JSON API (`retryCount`).
@@ -149,7 +139,6 @@
 - **Audio ADTS jadi streaming (hemat RAM saat remux HLS)** - Sebelumnya seluruh file audio ADTS dibaca ke RAM (`AdtsAac.parse(audioAdts.readBytes())`) lalu `AdtsAac.parse` membangun `List<ByteArray>` dengan `copyOfRange` per frame; untuk video 1-2 jam beban bisa 150-300 MB sesaat → risiko low-memory kill di HP kelas menengah. Kini `AdtsAac` membuka frame AAC secara lazy satu per satu dari `File` (antarmuka `Stream` ber-`frameCount`/`isEmpty`/`forEachFrame`), tidak menahan semua audio di memori; `HlsMp4Muxer.writeAacFrames` menulis tiap frame langsung ke MediaMuxer. Pembaca stream membaca header 10 byte per kandidat frame sehingga tag ID3 (10 byte) yang menyela aliran ADTS gabungan dilewati utuh tanpa `ArrayIndexOutOfBoundsException`. Unit test diperbarui ke API baru + uji `open` dari file termasuk ID3 bersela.
 - **Total HLS lebih akurat & stabil** - Sebelumnya denom progress HLS = estimasi "rata-rata ukuran segmen x jumlah segmen" yang bergoyang tiap segmen selesai. Kini setiap segmen melaporkan `Content-Length` aslinya (`exactBytes`), total = jumlah ukuran pasti segmen yang selesai + estimasi stabil `refSegBytes` (ukuran segmen data pertama) untuk sisa. Angka denominator tidak naik-turun lagi dan mendekati mutlak saat selesai — tanpa request HEAD tambahan.
 - **ETA & denom penet progress HLS** - Unduhan HLS YouTube tidak punya Content-Length per segmen, sehingga `totalBytes` di-switch ke 0 dan progress menampilkan hanya "N%" tanpa denominator "/6MB" serta ETA selalu 0 (bar tampak mentok di 98%). Kini `reportHlsProgress` mengestimasi total = rata-rata ukuran segmen selesai x jumlah segmen; denominator "/≈MB" tampil di UI dan ETA dihitung dari sisa byte / kecepatan EMA. Hanya untuk segmen HLS (`total==0`); file adaptive MP4 tetap memakai Content-Length riil.
-- **Auto-aktifkan "Full access to main storage" setelah izin diberikan** - Sebelumnya menekan Enable pada dialog/ tombol izin hanya membuka halaman "All files access" sistem; setelah kembali, pref `fs_full_access` tetap mati sehingga File Manager remote belum bisa membaca seluruh storage sampai user toggle manual di Settings. Kini `requestAllFilesAccess()` menandai niat (`fs_full_access_pending`), lalu `onResume` MainActivity & SettingsActivity menjalankan `Permissions.syncFullAccessAfterGrant()`: bila izin sistem benar-benar diberikan, `fs_full_access` otomatis ON dan toggle di Settings ikut ter-refresh. Flag pending dibersihkan baik saat berhasil maupun ditolak, sehingga toggle manual tetap dihormati.
 - **Larangan install Android SDK lokal (aturan repo)** - AGENTS.md (aturan pengembangan #1) dan CONTRIBUTING.md kini melarang instalasi Android SDK (sdkmanager/platform/build-tools) di mesin kerja karena boros RAM/disk; build, lint, dan unit test resmi tetap via GitHub Actions. `scripts/check_repo.py` mendapat guard baru `no local SDK`: mendeteksi penanda SDK lokal (`ANDROID_HOME`/`ANDROID_SDK_ROOT`, `sdkmanager` di PATH, `local.properties`, direktori SDK umum) dan membuat `check_repo.py` GAGAL dengan pesan jelas bila ditemukan di luar CI (`CI=true` di GitHub Actions tidak terpengaruh).
 - **Tawarkan aktivasi akses file saat pertama kali buka** — Setelah install, saat aplikasi pertama kali dibuka dan "All files access" (Android 11+) belum aktif, muncul dialog sekali (flag `file_access_offered` di `StoragePrefs`) dengan tombol Enable yang langsung membuka halaman pengaturan khusus aplikasi (fallback ke daftar umum). Kalau ditolak tidak muncul lagi; user bisa mengaktifkannya kapan pun dari Settings. Logika dipusatkan di `Permissions.needsAllFilesAccess()`/`requestAllFilesAccess()` dan dipakai ulang oleh tombol Storage di SettingsActivity (duplikasi query `Environment.isExternalStorageManager()` dihapus).
 - **Kenali ekstensi .ts/.m2ts sebagai video** — Hasil unduhan YouTube HLS sering berformat `.ts` tapi `MimeTypes.forFile`, daftar ekstensi video galeri (`MediaLibrary.VIDEO_EXTS`), serta daftar video remote web (`FS_MEDIA_EXTS`/`FILE_ICON_VIDEO`) tidak mengenalinya sehingga file tampil dengan ikon "generic" dan tidak dikenali sebagai video di galeri/pemutar remote. Kini `.ts`/`.m2ts` dipetakan ke `video/mp2t` (ikut memperbaiki deteksi galeri, ikon file, dan streaming). Tambah uji unit `MimeTypesTest` untuk `.ts`/`.m2ts` dan `extensionFor("video/mp2t")`.
@@ -318,7 +307,6 @@
 - **Upload resource cap** — Batasi jumlah lock upload aktif dan finalisasi paralel untuk menahan lonjakan request di perangkat RAM kecil.
 - **Download queue race** — Pemeriksaan batas unduhan paralel dipindah ke dalam sinkronisasi peluncuran job.
 - **Segment progress leak** — Progres segmen dibersihkan saat pause/resume agar tidak menyisa atau menulis status basi.
-- **File Manager ordering** — Respons navigasi/load-more lama dibuang bila pengguna sudah berpindah folder.
 ## [v1.0 — 2026-08-24] — Audit resource dan ZIP token
 - **ZIP authorization** — Validasi ulang semua token media pada endpoint batch ZIP agar path/URI buatan tidak bisa melewati root yang diizinkan.
 - **Share limits** — Batasi jumlah tautan berbagi aktif dan kunci pembaruannya untuk mencegah penumpukan token.
@@ -377,7 +365,6 @@
 ## [v1.0 — 2026-08-22] — Perbaikan hasil audit
 - **Download queue** — Cegah race kecil pada start/complete job sehingga slot antre tidak bisa tergantung atau dobel.
 - **Server lifecycle** — Hentikan auto-heal pool statistik saat server sedang di-stop agar thread tidak hidup ulang tanpa perlu.
-- **Remote actions** — Aksi batch File Manager berhenti saat satu operasi gagal dan menyegarkan daftar sesuai kondisi nyata.
 - **SSE fallback** — Perbaiki state reconnect sekali saat stream diam, termasuk grace window sebelum EventSource ditutup.
 - **Upload retry** — Reset baseline progres agregat saat file diulang dari awal agar persentase tidak macet/mundur palsu.
 - **ZIP efficiency** — Serialisasi pembuatan ZIP per selection key untuk beberapa request Range paralel.
@@ -406,19 +393,16 @@
 - **Gallery & actions** — CTA galeri kosong selalu aktif, aksi remote menampilkan error nyata, dan form tidak dibersihkan saat gagal.
 - **Media scan race** — Cache scan MediaStore dan invalidasinya disinkronkan untuk mencegah scan paralel duplikat.
 - **Settings lifecycle** — Port tidak valid menghentikan penyimpanan lebih awal, port pembanding memakai nilai tersimpan, dan operasi server keluar dari main thread.
-- **Open folder fallback** — Coba intent file manager secara langsung sebelum membuka aplikasi Downloads sistem.
 - **Compile follow-up** — Perbaiki urutan status server pada toggle Settings referensi utilitas pembanding token, dan kurung unit test keamanan.
 ## [v1.0 — 2026-08-22] — Perbaiki tampilan pemutar video
 - **Adaptive player** — Video portrait/4:3 memakai rasio asli dan area player dibatasi di layar pendek agar judul serta saran video tetap terlihat.
 - **Viewport & safe-area** — Modal memakai dynamic viewport; overlay atas/bawah menghormati notch dan gesture bar.
 - **D-pad aksesibilitas** — Baris saran video menjadi tombol fokusabel dengan fokus terlihat, dan shortcut keyboard tidak menimpa aktivasi tombol.
-- **Playlist context** — Klik saran dan auto-next tetap memakai playlist Gallery/File Manager yang aktif.
 - **Up next order** — Saran dimulai dari video berikutnya sebelum melengkapi video sebelumnya.
 - **Control layout** — Waktu pemutar tidak menyusut sampai hilang pada layar sempit.
 - **Fullscreen orientation** — Lock landscape dipanggil setelah fullscreen benar-benar aktif.
 ## [v1.0 — 2026-08-21] — Stabilkan tombol pemutar video
 - **Player controls** — Cegah klik close membocorkan event play ke player, duplikasi sentuhan di WebView lama, dan konflik shortcut keyboard saat tombol pemutar sedang fokus.
-- **Playlist konteks** — Pisahkan urutan video Gallery dan File Manager sehingga next/prev serta auto-next tidak melompat ke galeri yang tidak berhubungan.
 - **Mute state** — Perbaiki ikon mute dan sinkronkan tampilannya dengan volume nol.
 - **Navigasi video** — Nonaktifkan prev/next di batas playlist dan tambahkan fallback fullscreen untuk browser terbatas.
 - **Control layout** — Perbesar target seek, cegah overflow kontrol di layar sempit, tampilkan fokus D-pad dengan jelas, stabilkan lebar tombol speed, dan hormati safe-area.
@@ -456,19 +440,16 @@
 - **ServerThumbnail.kt** — Extract thumbnail functions (`getOrCreateThumb`, `generateThumb`, `videoThumb`, `imageThumb`) dari `HttpControlServer.kt` ke file terpisah.
 - **silent runCatching** — Tambah `safeRun()` helper: error otomatis logged (sebelumnya hilang diam-diam).
 - **Gallery upload progress** — Gallery sekarang `collect` download flow → progress update real-time saat upload via remote web.
-- **cachedFsRoots invalidation** — Settings save sekarang panggil `invalidateFsRootsCache()` + `invalidateStatusCache()` (sebelumnya file manager pakai cache lama).
 ## [v1.0 — 2026-08-20] — Fix ThreadPool crash, video read-ahead, gallery scan efficiency
 - **ThreadPool crash** — `rejectedExecutionHandler` sekarang re-submit task gagal ke pool baru (sebelumnya task hilang → HTTP 500). Hapus `@Volatile` dari `statPool` (akses selalu via `@Synchronized`).
 - **Gallery scan berulang** — Tambah debounce ContentObserver dari 3 detik ke 10 detik supaya scan tidak berulang tiap perubahan media kecil.
 - **Video player boros request** — Tambah read-ahead buffering di server: chunk < 512 KB diperbesar otomatis (max 2 MB) supaya browser tidak langsung minta lagi → jumlah HTTP range request berkurang signifikan.
 ### Existing
-- **Batch operations File Manager** — Tombol Download, Move, Delete sudah ada di mode Select.
 ## [v1.0 — 2026-08-20] — Remove unused imports and dead string
 ### Removed
 - Unused `SuppressLint` and `App` imports from `MediaLibrary.kt` (leftover from gallery folder removal).
 - Dead string resource `filter_videos` (gallery filter removed earlier).
 ## [v1.0 — 2026-08-19] — Add Stream button to File Manager
-- **Stream button** — Tombol ▶ di setiap baris file di File Manager. Sekali klik membuka file di tab baru: foto ditampilkan browser, video/audio pakai player. Hanya muncul untuk file (bukan folder), tersembunyi saat mode Select.
 - **CSS `.fs-stream-btn`** — Tombol bulat 36px, warna abu-abu, hover biru (konsisten dengan tombol actions).
 ## [v1.0 — 2026-08-19] — Remove all dead code: photo viewer remnants, gallery settings, deleteMedia
 ### Dihapus
@@ -531,7 +512,6 @@
 - **Pemutar video: judul tertutup kontrol** — `#mmPlayer` tidak punya batas tinggi, sehingga `::before` (padding-top 56.25% = rasio 16:9) bisa membuat player sangat tinggi di layar lebar, mendorong `#mmDesc` (judul) ke bawah hingga tertutup gradient kontrol. Fix: tambah `max-height:56vh; overflow:hidden; position:relative` ke `#mmPlayer`.
 - **Pemutar video hilang** — `mmVideoWrap` disembunyikan saat reset tapi tidak pernah di-unhide di jalur video `openMedia()`. Fix: tambah `mmVideoWrap.classList.remove("hidden")` di jalur video.
 ## [v1.0 — 2026-08-18] — Fix statPool race condition causing File Manager HTTP 500
-- **File Manager HTTP 500 (RejectedExecutionException)** — `statPool` (thread pool untuk statistik subfolder) mengalami race condition TOCTOU: `liveStatPool()` mengecek `isShutdown` dan mengembalikan pool, tapi antara pengecekan dan `submit()`, `stopServer()` memanggil `shutdownNow()` yang mematikan pool. Pool tetap terminated selamanya karena tidak ada yang membuat pool baru, menyebabkan SEMUA request `/api/fs?path=<sdcard>` gagal dengan HTTP 500 dan `completed tasks = 169`. Fix: tambah `rejectedExecutionHandler` ke `ThreadPoolExecutor` yang auto-heal — bila pool di-shutdown, pool baru otomatis dibuat sehingga request berikutnya langsung pulih.
 ### Ditambah
 - **Dokumentasi `stopServer()` upload finalization** — Jelaskan bahwa coroutine upload finalization di `serverScope` sengaja dibiarkan selesai natural (beberapa ms) saat server stop, bukan di-cancel, untuk mencegah operasi tulis file terpotong.
 ## [v1.0 — 2026-08-18] — Remove delete buttons from gallery
@@ -594,7 +574,6 @@
   saat server start, supaya perubahan folder/port/readOnly langsung berlaku.
 - **Gallery cache invalidasi tidak dipanggil setelah move download** —
   `DownloadEngine.move()` sekarang invalidate fsRoots cache.
-- **RejectedExecutionException di file manager** — `liveStatPool().submit()`
   dibungkus `runCatching` supaya pool terminated tidak crash server (HTTP 500).
 - **qrCache.clear() menghapus semua entry** — diganti evict entry paling lama
   saat cache penuh (max 8).
@@ -722,7 +701,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - **`BufferedOutputStream` di FileSaver** — upload chunk besar dibungkus
   buffer (hemat syscall kecil ke disk).
 ## [v1.0 — 2026-08-17] — Keamanan path traversal + thread safety (PR #118)
-- **Path traversal di rename/mkdir File Manager** — parameter `name` pada
   action `rename` dan `mkdir` tidak memeriksa `..`, memungkinkan aksi file
   di luar direktori yang diizinkan. Penambahan sanitasi `..` di kedua action.
 - **Path traversal di upload name** — parameter `name` upload tidak sanitasi
@@ -768,7 +746,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   pump kini dikunci dan pump yang berhenti tidak menimpa referensi pump yang
   lebih baru.
 ## [v1.0 — 2026-08-16] — Navigasi File Manager di luar root + pump SSE (PR #114)
-- **Tombol Up & breadcrumb File Manager berhenti di folder kosong di luar root
   yang diizinkan** — naik dari root (mis. `f:/storage/emulated/0`) menuju
   `f:/storage/emulated` atau `/storage` menampilkan "Empty folder" karena
   listing ditolak keamanan. Folder induk dari root sekarang bisa di-browse
@@ -784,7 +761,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   cache listing (`fsMediaCache`) dan snapshot galeri, jadi perubahan baru
   terlihat setelah 5–15 detik. Kedua cache kini di-invalidasi pada delete,
   rename, move, dan perpindahan file ↔ MediaStore.
-- **File Manager mem-fetch daftar lokasi storage berulang** — `fsLocationsLoaded`
   di-reset di tiap kunjungan tab Files dan `loadFsLocations()` bisa dipanggil
   dua kali bersamaan (applyRoute + loadFs), menghasilkan `GET /api/fs?path=`
   ganda tiap masuk tab. Flag sekarang tidak di-reset dan ada guard in-flight
@@ -814,7 +790,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   dua request yang sama-sama miss cache membuat arsip baru dan file kalah bocor di `cacheDir`;
   kini `putIfAbsent` menjamin satu ZIP per path/token dan file kalah langsung dihapus.
 ## [v1.0 — 2026-08-15] — Perbaikan bug: back File Manager, panah ganda, cache ZIP (PR #110)
-- **Menutup video/foto dari File Manager ikut naik 1–2 folder** — entry
   history "guard media" membuat handler `popstate` file manager mengira tombol
   back (atau tombol tutup) sebagai navigasi folder, lalu `mmPopGuard`
   melakukan `history.back()` kedua sehingga folder naik dua tingkat. Pop yang
@@ -851,10 +826,8 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - **Auto-next memutar video yang salah urutan** — daftar lanjutan memakai
   "video lain pertama" (misal B lanjut ke A, mundur). Kini auto-next memakai
   video berikutnya sesuai urutan galeri (`mmVideoList.slice(idx + 1)`).
-- **Media dibuka dari File Manager kehilangan prev/next & hitungan** —
   `mmVideoList`/`mmImageList` kosong karena `galleryItems` belum dimuat; item
   saat ini kini dimasukkan ke daftar sebagai fallback.
-- **File audio (mp3/m4a/aac/dll) dibuka dari File Manager malah tampil di
   penampil foto** — audio kini dibuka di pemutar (label "audio"), bukan gagal
   "Failed to load photo".
 - **Jempol slider seek melompat saat digeser** — `timeupdate` menimpa posisi
@@ -871,10 +844,8 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   (sebelumnya 1 salinan daftar + 1 emisi per segmen per detik; di item dengan
   banyak segmen ini membebani UI/notifikasi/SSE). Nilai akhir tiap segmen
   tetap ditulis langsung (verifikasi ukuran & resume tidak berubah).
-- **File manager: halaman default 1000 → 250 entri** (`FS_PAGE`) — JSON,
   statistik subfolder, dan render DOM per request jauh lebih ringan; tombol
   "Load more" menangani sisanya (server default disesuaikan ke 300).
-- **File manager media: cache listing MediaStore 5 dtk** — membrowse folder
   media tidak lagi me-query ulang seluruh koleksi tiap halaman; cache
   dibatalkan saat upload/aksi file/rename/move.
 - **Log server: polling berhenti saat layar tidak terlihat** (onStart/onStop)
@@ -977,7 +948,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - AGENTS.md — tabel **Pola bug & guard-nya** ditambah: pool `statPool`
   mati setelah stop/start server (PR #91) dan scan galeri berulang.
 ## [v1.0 — 2026-08-14] — Fix: listing file manager 500 setelah restart server (PR #91)
-- **File Manager HTTP 500 setelah stop/start server** — `stopServer()` men-shutdown
   `statPool`, tapi toggle server memakai instance `HttpControlServer` yang sama,
   jadi pool tetap `Terminated` dan semua `GET /api/fs?path=<subfolder>` gagal
   dengan `RejectedExecutionException`. `liveStatPool()` kini membuat pool baru
@@ -1065,7 +1035,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - **Pencarian log tanpa alokasi** — `highlightLog` memakai
   `indexOf(ignoreCase = true)` alih-alih membuat salinan `lowercase()` per
   baris.
-- **Fix i18n** — teks "terpakai" pada kapasitas root File Manager diganti
   "used" (guard kata Indonesia tidak menangkap kata ini sebelumnya).
 ## [v1.0 — 2026-08-13] — Perbaikan pan penampil foto saat zoom
 - **Geser foto saat zoom** — gambar yang diperbesar kini bisa digeser untuk
@@ -1076,7 +1045,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   clamp tidak mengembalikan gambar ke tengah saat digeser dan tepi tetap
   terkunci (guard CI).
 ## [v1.0 — 2026-08-13] — Tampilan utama remote web: bottom nav, hero status, ikon state, persen di bar, tanggal selesai & retry
-- **Bottom navigation** — akses Gallery & File Manager pindah dari pill atas ke
   bar navigasi tetap di bawah (Downloads/Gallery/Files) ber-ikon + label,
   dengan badge jumlah download aktif di tab Downloads; ramah jempol dan D-pad.
 - **Hero status card** — kartu status perangkat menyatu dengan free storage dan
@@ -1091,7 +1059,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - **Tombol Retry di kartu gagal** — item FAILED kini punya tombol Retry
   langsung di bawah pesan error.
 ## [v1.0 — 2026-08-13] — Audit efisiensi: cache row FS, sort tanpa lowercase, hoist format/escape, wakelock guard
-- **Cache baris File Manager** — `fsFindFsRow()` kini memakai cache
   `fsRowCache` sehingga pencarian baris oleh pembaruan langsung (snapshot)
   tidak perlu memindai seluruh daftar setiap kali; cache di-reset saat
   render/skeleton dan diisi saat baris ditambahkan.
@@ -1131,7 +1098,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - **Indikator volume & brightness saat swipe vertikal** — pemutar video kini
   menampilkan indikator ala YouTube (ikon + persen + bar vertikal) saat
   menggeser sisi kiri layar untuk brightness dan sisi kanan untuk volume.
-- **Smoke test navigasi File Manager** — `upload_smoke_test.js` kini juga
   memverifikasi `parentFsPath`, breadcrumb (`fsCrumbParts`/`collapseCrumbs`),
   back-stack + Back, tombol Up/Home, dan badge NEW; mencegah regresi di CI.
 ## [v1.0 — 2026-08-12] — File Manager: Back naik folder, lokasi tersimpan, progress upload inline, badge NEW
@@ -1150,11 +1116,9 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   selama ada transfer aktif (download/upload), tanpa syarat "data berubah"
   lagi; idle tetap 10 detik. SSE tetap sumber utama; polling hanya pengaman.
   Blok penanda perubahan yang tidak terpakai ikut dihapus.
-- **Tombol Search File Manager selebar baris** — tidak lagi menyisakan
   kolom sempit saat membungkus di layar sempit; baris input pencarian tetap
   muncul di bawahnya saat tombol ditekan.
 ## [v1.0 — 2026-08-12] — Status bar kontras, pencarian File Manager, scan VirusTotal di PR
-- **Pencarian File Manager di remote web** — tombol kecil "Search" di toolbar
   membuka satu baris input; filter berjalan di sisi klien (hanya baris yang
   sudah dimuat), tanpa beban RAM/endpoint server.
 - **VirusTotal ikut di-scan pada PR** — tidak hanya push `main`; APK PR ikut
@@ -1195,7 +1159,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   tetap hijau.
 - **Ikon launcher round dihapus** — cukup satu set ikon launcher biasa.
 ## [v1.0 — 2026-08-12] — Hemat RAM: pagination file manager, cache galeri terbatas, cleanup thumbnail terjadwal
-- **File Manager remote di-paginate (1000 entri/request + tombol "Load more")** —
   folder raksasa tidak lagi membangun JSON semua entri + statistik semua
   subfolder sekaligus di memori server.
 - **Cache galeri dibatasi halaman aktif + 1 buffer** — scan tidak lagi menahan
@@ -1204,7 +1167,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - **Pembersihan thumbnail cache maksimal 1x per 7 hari** — tidak lagi memindai
   folder thumb setiap kali aplikasi start.
 ## [v1.0 — 2026-08-11] — Remote web: tombol Select sejajar Upload di File Manager
-- **Tombol Select File Manager kini sejajar dengan tombol Upload** — di layar
   sempit (≤600px) Select tidak lagi turun ke baris sendiri selebar penuh; grid
   toolbar dirapikan dari 5 ke 4 kolom (hilangkan kolom kosong di kanan).
 ## [v1.0 — 2026-08-11] — Pengaturan: kurangi jumlah view (hilangkan warning lint)
@@ -1224,7 +1186,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   paralel.
 - **SSE ticker status diperlambat jadi 10 dtk** (sebelumnya 3 dtk) — client
   yang butuh data segar memakai `/api/snapshot`.
-- **Statistik subfolder dihitung paralel** di File Manager remote — listing
   folder besar tidak lagi menunggu N `listFiles()` berurutan di storage lambat.
 - **Remote web**: cache node daftar download per id (tanpa `querySelectorAll`
   tiap poll), cache posisi video per render galeri (baca `localStorage`
@@ -1233,11 +1194,9 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   per bind).
 - **R8**: flag `-mergeinterfacesaggressively` — APK sedikit lebih kecil.
 ## [v1.0 — 2026-08-11] — Download batch mode select
-- **Tombol Download di mode select File Manager remote**: pilih beberapa file
   dan/atau folder sekaligus, lalu unduh sekali sebagai ZIP (folder di-zip
   rekursif; endpoint `/api/media_zip` kini menerima `paths`).
 ## [v1.0 — 2026-08-11] — Remote web: hapus tombol unduh cepat per baris
-- **Tombol ⬇ Download di tiap baris File Manager remote dihapus** — rawan
   tertekan tidak sengaja (apalagi saat dikontrol dari remote TV / D-pad).
   Aksi download tetap tersedia lewat menu **⋯** pada baris yang sama
   (Stream / Download / Download folder ZIP).
@@ -1301,7 +1260,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
   dan `/api/pin_enabled` (status 200) tidak lagi dicatat — buffer 300 baris
   terisi kejadian penting (download, upload, aksi) saja; request gagal tetap
   dicatat.
-- **File Manager tidak memanggil `/api/fs?path=` berulang** saat buka halaman
   root (3-4x menjadi 1-2x).
 - **Upload folder di browser tanpa `webkitdirectory`**: kini muncul peringatan
   jelas bahwa struktur folder tidak dipertahankan (sebelumnya diam-diam
@@ -1371,7 +1329,6 @@ APK terbaru selalu ada di [GitHub Releases](https://github.com/tasirin1/tasirin-
 - Encoder QR mandiri tanpa zxing di runtime (decode tetap diverifikasi di test).
 - Tombol jeda/lanjut semua di notifikasi.
 ## [v1.0 — 2026-08-09] — Desain UI remote & pemutar video
-- Desain ulang file manager: ikon tipe, sticky bar, batch action, detail upload,
   info root.
 - Galeri remote & pemutar video ala YouTube: lightbox, multi-select, kontrol
   ramping, top bar back, navigasi foto/video.

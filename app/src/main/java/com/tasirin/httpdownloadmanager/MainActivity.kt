@@ -809,13 +809,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 startActivity(Intent(this, SettingsActivity::class.java))
                 true
             }
-            R.id.action_file_manager -> {
-                startActivity(
-                    Intent(this, FileManagerActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                )
-                true
-            }
             R.id.action_pause_all -> {
                 App.engine.pauseAll()
                 Toast.makeText(this, R.string.pause_all, Toast.LENGTH_SHORT).show()
