@@ -1044,7 +1044,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val cutoff2 = completedUploads.values.map { it.second }.minOrNull() ?: cutoff
             completedUploads.entries.removeIf { it.value.second <= cutoff2 }
         }
-        if (failedUploads.size > 400) {
+        if (failedUploads.size > 50) {
             val cutoff2 = failedUploads.values.map { it.second }.minOrNull() ?: cutoff
             failedUploads.entries.removeIf { it.value.second <= cutoff2 }
         }

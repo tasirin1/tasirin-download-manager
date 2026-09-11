@@ -1,4 +1,7 @@
 ## [Unreleased]
+- **Perf: StorageCleanup — hapus duplikasi FileSaver** -- `runIfLow()` sebelumnya membuat dua instance `FileSaver(context)`. Kini cukup satu variabel `saver` yang dipakai untuk `destinationFreeBytes()` dan `cleanupOrphanPartials()`.
+- **Perf: MediaLibrary — pakai FilenameFilter** -- `scanUncached()` untuk folder teks sekarang pakai `FilenameFilter` saat `listFiles()` supaya file non-video difilter langsung di OS layer, bukan satu per satu di JVM.
+- **Perf: HttpControlServer — batas failedUploads 400→50** -- Map `failedUploads` dibatasi 50 entry (dari 400); cukup untuk LAN-only use case.
 - **Hapus fitur QR code total** -- QR tidak dipakai lagi. Dihapus: tombol Show QR + card QR di Settings, endpoint `/api/qr` + `QrCode.kt` di server, QR di modal share remote web, encoder `util/QrEncoder.kt` + `QrEncoderTest.kt` + dependency test zxing, string `settings_qr_title`/`remote_qr_desc`, dan section QR di docs/README.
 
 - **Fix: QR card kosong setelah server restart** --  di-reset ke VISIBLE saat server hidup, dan dipastikan VISIBLE saat user tap Show QR. Sebelumnya, setelah server stop lalu start, QR card muncul kosong karena ImageView masih GONE.

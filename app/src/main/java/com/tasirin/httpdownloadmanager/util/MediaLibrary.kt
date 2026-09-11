@@ -295,7 +295,8 @@ object MediaLibrary {
 
         // 1) Folder teks (Android 5-7 / folder kustom lewat path)
         StoragePrefs.getTextFolder(context)?.let { tf ->
-            runCatching { File(tf).listFiles()?.forEach { addFile(it) } }
+            val videoFilter = java.io.FilenameFilter { _, name -> isGalleryVideo(name) }
+            runCatching { File(tf).listFiles(videoFilter)?.forEach { addFile(it) } }
         }
 
         // 2) Folder kustom (SAF tree)

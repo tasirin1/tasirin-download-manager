@@ -26,11 +26,12 @@ object StorageCleanup {
         now: Long = System.currentTimeMillis()
     ): Long {
         if (now - lastRunAt < MIN_INTERVAL_MS) return 0L
-        val free = FileSaver(context).destinationFreeBytes()
+        val saver = FileSaver(context)
+        val free = saver.destinationFreeBytes()
         if (free > LOW_THRESHOLD_BYTES) return 0L
         lastRunAt = now
         var freed = 0L
-        freed += FileSaver(context).cleanupOrphanPartials(items)
+        freed += saver.cleanupOrphanPartials(items)
         freed += MediaLibrary.cleanupOldThumbs(context)
         freed += cleanupUploadTemps(context)
         if (freed > 0) {
