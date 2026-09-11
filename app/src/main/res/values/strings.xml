@@ -29,7 +29,6 @@
     <string name="update_latest">You are on the latest version</string>
     <string name="update_available">Update available: %1$s (build %2$d)</string>
     <string name="update_title">Update available</string>
-    <string name="update_message">Version %1$s (build %2$d) is available (%3$s).\nDownload now?</string>
     <string name="update_download">Download</string>
     <string name="update_downloading">Downloading update&#8230;</string>
     <string name="update_progress_detail">%1$s / %2$s</string>
