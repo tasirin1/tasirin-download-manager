@@ -799,6 +799,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         menu.findItem(R.id.action_pause_all)?.isVisible = summaryActive > 0
         menu.findItem(R.id.action_resume_all)?.isVisible = summaryPaused > 0 || summaryFailed > 0
         menu.findItem(R.id.action_retry_failed)?.isVisible = summaryFailed > 0
+        menu.findItem(R.id.action_clear_failed)?.isVisible = summaryFailed > 0
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -822,7 +823,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 App.engine.retryFailed()
                 true
             }
-
+            R.id.action_clear_failed -> {
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.action_clear_failed)
+                    .setMessage(R.string.confirm_clear_failed)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        lifecycleScope.launch(Dispatchers.IO) { App.engine.clearFailed() }
+                    }
+                    .show()
+                true
+            }
             R.id.action_clear_completed -> {
                 lifecycleScope.launch(Dispatchers.IO) { App.engine.clearCompleted() }
                 true
