@@ -64,6 +64,18 @@
         android:clipToPadding="false"
         android:paddingBottom="16dp" />
 
+    <!-- Paste button (muncul saat mode pindah) -->
+    <Button
+        android:id="@+id/paste_button"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginBottom="12dp"
+        android:text="@string/file_manager_paste_here"
+        android:textColor="@android:color/white"
+        android:background="@color/primary"
+        android:visibility="gone" />
+
     <!-- Empty state -->
     <LinearLayout
         android:id="@+id/empty_state"

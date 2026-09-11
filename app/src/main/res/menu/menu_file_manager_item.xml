@@ -4,6 +4,9 @@
         android:id="@+id/fm_open"
         android:title="@string/file_manager_open" />
     <item
+        android:id="@+id/fm_move"
+        android:title="@string/file_manager_move" />
+    <item
         android:id="@+id/fm_rename"
         android:title="@string/file_manager_rename" />
     <item

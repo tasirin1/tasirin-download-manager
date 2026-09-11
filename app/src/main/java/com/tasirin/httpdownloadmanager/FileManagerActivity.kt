@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.StatFs
 import android.view.LayoutInflater
+import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
@@ -31,9 +32,14 @@ class FileManagerActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityFileManagerBinding
     private var currentDir: File = File("/storage/emulated/0/Download")
+
+    // Mode pindah
+    private var moveSource: File? = null
+    private var isMoveMode = false
+
     private val adapter = FileAdapter(
         onClick = { entry -> onItemClicked(entry) },
-        onMenu = { entry, anchor -> showItemMenu(entry, anchor) }
+        onLongClick = { entry, view -> showItemMenu(entry, view) }
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,28 +55,54 @@ class FileManagerActivity : AppCompatActivity() {
         binding.fileList.layoutManager = LinearLayoutManager(this)
         binding.fileList.adapter = adapter
 
-        // Mulai dari folder download default
         val startDir = File(StoragePrefs.getTextFolder(this)
             ?: currentDir.absolutePath)
         if (startDir.isDirectory) currentDir = startDir
         loadDir(currentDir)
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Tombol Cancel saat mode pindah
+        return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        if (isMoveMode) {
+            menu.clear()
+            menu.add(0, R.id.action_cancel_move, 0, R.string.cancel)
+        }
+        return super.onPrepareOptionsMenu(menu)
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == android.R.id.home) {
-            val parent = currentDir.parentFile
-            if (parent != null && parent.canRead()) {
-                loadDir(parent)
+        when (item.itemId) {
+            android.R.id.home -> {
+                if (isMoveMode) {
+                    exitMoveMode()
+                    return true
+                }
+                val parent = currentDir.parentFile
+                if (parent != null && parent.canRead()) {
+                    loadDir(parent)
+                    return true
+                }
+                finish()
                 return true
             }
-            finish()
-            return true
+            R.id.action_cancel_move -> {
+                exitMoveMode()
+                return true
+            }
         }
         return super.onOptionsItemSelected(item)
     }
 
     private val backCallback = object : androidx.activity.OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
+            if (isMoveMode) {
+                exitMoveMode()
+                return
+            }
             val parent = currentDir.parentFile
             if (parent != null && parent.canRead()) {
                 loadDir(parent)
@@ -81,13 +113,77 @@ class FileManagerActivity : AppCompatActivity() {
         }
     }
 
+    // ── Mode Pindah ────────────────────────────────────────────────────
+
+    private fun enterMoveMode(source: File) {
+        isMoveMode = true
+        moveSource = source
+        supportActionBar?.let {
+            it.title = getString(R.string.file_manager_moving, source.name)
+            it.setDisplayHomeAsUpEnabled(true)
+        }
+        invalidateOptionsMenu()
+        Toast.makeText(this, getString(R.string.file_manager_move_navigate), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun exitMoveMode() {
+        isMoveMode = false
+        moveSource = null
+        supportActionBar?.title = getString(R.string.action_file_manager)
+        invalidateOptionsMenu()
+    }
+
+    private fun executeMove() {
+        val src = moveSource ?: return
+        val dest = File(currentDir, src.name)
+        if (dest.exists()) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.file_manager_move_conflict)
+                .setMessage(getString(R.string.file_manager_move_conflict_detail, dest.name))
+                .setPositiveButton(R.string.overwrite) { _, _ ->
+                    performMove(src, dest, overwrite = true)
+                }
+                .setNegativeButton(R.string.cancel) { _, _ ->
+                    // User batal — tetap di mode pindah
+                }
+                .show()
+        } else {
+            performMove(src, dest, overwrite = false)
+        }
+    }
+
+    private fun performMove(src: File, dest: File, overwrite: Boolean) {
+        if (overwrite && dest.exists()) dest.delete()
+        val ok = src.renameTo(dest)
+        if (ok) {
+            Toast.makeText(this, getString(R.string.file_manager_moved, src.name), Toast.LENGTH_SHORT).show()
+            exitMoveMode()
+            loadDir(currentDir)
+        } else {
+            // Fallback: copy + delete (cross-filesystem)
+            runCatching {
+                src.inputStream().use { input ->
+                    dest.outputStream().use { output -> input.copyTo(output) }
+                }
+                src.delete()
+                exitMoveMode()
+                loadDir(currentDir)
+                Toast.makeText(this, getString(R.string.file_manager_moved, src.name), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(this, R.string.file_manager_move_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ── Navigasi ───────────────────────────────────────────────────────
+
     private fun loadDir(dir: File) {
         currentDir = dir
         binding.breadcrumb.text = dir.absolutePath
 
         val children = dir.listFiles()
         val files = children
-            ?.filter { it.name.startsWith(".").not() } // Sembunyikan file tersembunyi
+            ?.filter { it.name.startsWith(".").not() }
             ?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() })
             ?: emptyList()
 
@@ -115,7 +211,13 @@ class FileManagerActivity : AppCompatActivity() {
         adapter.submitList(entries)
         binding.fileList.visibility = if (entries.isEmpty()) View.GONE else View.VISIBLE
         binding.emptyState.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
+
+        // Tampilkan tombol paste jika di mode pindah
+        binding.pasteButton.visibility = if (isMoveMode) View.VISIBLE else View.GONE
+        binding.pasteButton.setOnClickListener { executeMove() }
     }
+
+    // ── Klik item ──────────────────────────────────────────────────────
 
     private fun onItemClicked(entry: FileEntry) {
         if (entry.isDir) {
@@ -136,6 +238,7 @@ class FileManagerActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(Intent.createChooser(intent, file.name))
         } catch (_: Exception) {
@@ -143,12 +246,17 @@ class FileManagerActivity : AppCompatActivity() {
         }
     }
 
+    // ── Context menu (long press) ──────────────────────────────────────
+
     private fun showItemMenu(entry: FileEntry, anchor: View) {
         val popup = PopupMenu(this, anchor)
         popup.menuInflater.inflate(R.menu.menu_file_manager_item, popup.menu)
+        // Sembunyikan "Open" untuk folder
+        popup.menu.findItem(R.id.fm_open)?.isVisible = !entry.isDir
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.fm_open -> { openFile(entry.file); true }
+                R.id.fm_move -> { enterMoveMode(entry.file); true }
                 R.id.fm_rename -> { renameFile(entry); true }
                 R.id.fm_delete -> { confirmDelete(entry); true }
                 else -> false
@@ -206,10 +314,10 @@ class FileManagerActivity : AppCompatActivity() {
             ext in setOf("mp4", "mkv", "webm", "avi", "ts", "m4v") -> "video/*"
             ext in setOf("mp3", "m4a", "aac", "ogg", "wav", "flac") -> "audio/*"
             ext in setOf("jpg", "jpeg", "png", "gif", "webp", "bmp") -> "image/*"
-            ext in setOf("pdf") -> "application/pdf"
-            ext in setOf("apk") -> "application/vnd.android.package-archive"
+            ext == "pdf" -> "application/pdf"
+            ext == "apk" -> "application/vnd.android.package-archive"
             ext in setOf("zip", "rar", "7z", "tar", "gz") -> "application/zip"
-            ext in setOf("txt", "log", "json", "xml", "html", "csv") -> "text/*"
+            ext in setOf("txt", "log", "json", "xml", "html", "csv") -> "text/plain"
             ext in setOf("doc", "docx") -> "application/msword"
             ext in setOf("xls", "xlsx") -> "application/vnd.ms-excel"
             else -> "*/*"
@@ -227,7 +335,7 @@ class FileManagerActivity : AppCompatActivity() {
 
     private class FileAdapter(
         private val onClick: (FileEntry) -> Unit,
-        private val onMenu: (FileEntry, View) -> Unit
+        private val onLongClick: (FileEntry, View) -> Unit
     ) : RecyclerView.Adapter<FileAdapter.VH>() {
 
         private var items: List<FileEntry> = emptyList()
@@ -259,7 +367,7 @@ class FileManagerActivity : AppCompatActivity() {
             holder.meta.text = when {
                 entry.isDir -> {
                     val n = entry.children ?: 0
-                    ctx.getString(R.string.file_manager_files_count, n)
+                    ctx.resources.getQuantityString(R.plurals.file_manager_items_count, n, n)
                 }
                 entry.size != null -> Formats.bytes(entry.size)
                 else -> ""
@@ -271,27 +379,29 @@ class FileManagerActivity : AppCompatActivity() {
                 holder.meta.text = "${holder.meta.text} · $dateStr"
             }
             holder.itemView.setOnClickListener { onClick(entry) }
-            holder.menuBtn.setOnClickListener { onMenu(entry, it) }
+            holder.itemView.setOnLongClickListener { v ->
+                onLongClick(entry, v)
+                true
+            }
         }
 
         class VH(view: View) : RecyclerView.ViewHolder(view) {
             val icon: android.widget.TextView = view.findViewById(R.id.file_icon)
             val name: android.widget.TextView = view.findViewById(R.id.file_name)
             val meta: android.widget.TextView = view.findViewById(R.id.file_meta)
-            val menuBtn: android.widget.ImageButton = view.findViewById(R.id.file_menu)
         }
 
         private fun iconForFile(name: String): String {
             val ext = name.substringAfterLast('.', "").lowercase()
             return when (ext) {
-                "mp4", "mkv", "webm", "avi", "ts", "m4v" -> "\uD83C\uDFA5"   // 🎥
-                "mp3", "m4a", "aac", "ogg", "wav", "flac" -> "\uD83C\uDFB5"  // 🎵
-                "jpg", "jpeg", "png", "gif", "webp", "bmp" -> "\uD83D\uDDBC" // 🖼
-                "pdf" -> "\uD83D\uDCC4"                                       // 📄
-                "apk" -> "\uD83D\uDCE6"                                       // 📦
-                "zip", "rar", "7z", "tar", "gz" -> "\uD83D\uDCE6"            // 📦
-                "txt", "log" -> "\uD83D\uDCC3"                                // 📃
-                else -> "\uD83D\uDCC4"                                        // 📄
+                "mp4", "mkv", "webm", "avi", "ts", "m4v" -> "\uD83C\uDFA5"
+                "mp3", "m4a", "aac", "ogg", "wav", "flac" -> "\uD83C\uDFB5"
+                "jpg", "jpeg", "png", "gif", "webp", "bmp" -> "\uD83D\uDDBC"
+                "pdf" -> "\uD83D\uDCC4"
+                "apk" -> "\uD83D\uDCE6"
+                "zip", "rar", "7z", "tar", "gz" -> "\uD83D\uDCE6"
+                "txt", "log" -> "\uD83D\uDCC3"
+                else -> "\uD83D\uDCC4"
             }
         }
     }
