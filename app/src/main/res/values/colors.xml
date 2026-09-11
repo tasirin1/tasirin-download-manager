@@ -20,8 +20,6 @@
     <color name="chip_pressed_blue">#1A1565C0</color>
     <color name="status_off_soft">#FDE8E7</color>
     <color name="chip_active_bg">#E3F0FB</color>
-    <color name="chip_done_bg">#E6F6EE</color>
-    <color name="chip_failed_bg">#FDE8E7</color>
 
     <!-- Lingkaran ikon tipe file (item download). -->
     <color name="icon_circle_video">#E3F0FB</color>
