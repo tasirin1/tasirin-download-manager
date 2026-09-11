@@ -10,6 +10,9 @@
         android:id="@+id/fm_rename"
         android:title="@string/file_manager_rename" />
     <item
+        android:id="@+id/fm_share"
+        android:title="@string/file_manager_share" />
+    <item
         android:id="@+id/fm_delete"
         android:title="@string/file_manager_delete" />
 </menu>

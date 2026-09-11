@@ -314,4 +314,12 @@
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
     </plurals>
+    <string name="file_manager_new_folder">New folder</string>
+    <string name="file_manager_new_folder_hint">Folder name</string>
+    <string name="file_manager_folder_created">Folder created</string>
+    <string name="file_manager_share">Share</string>
+    <string name="file_manager_sort">Sort</string>
+    <string name="file_manager_sort_name">Name</string>
+    <string name="file_manager_sort_date">Date</string>
+    <string name="file_manager_sort_size">Size</string>
 </resources>
