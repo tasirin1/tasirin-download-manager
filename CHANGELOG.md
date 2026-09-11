@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **UI: bar durasi pemutar video jadi putih** -- Fill bar seek (#mmFill) diubah dari biru `#2596ff` menjadi putih agar kontras dengan track semi-transparan.
 - **Fix: empty catch di openApk APK installer** -- Tambahkan `App.logEvent()` di tiap fallback catch block supaya error tercatat di log server realtime (memperbaiki CI lint warning).
 - **Fix: APK tidak bisa install di Android 5-6** -- `openDownload()` selalu pakai FileProvider yang tidak punya akses ke public Download folder (`/storage/emulated/0/Download/`). File di public Download kini pakai `Uri.fromFile()` langsung (masih jalan untuk package installer di Android 5-6). File internal app tetap pakai FileProvider. Urutan fallback APK: `ACTION_VIEW`+MIME APK → `ACTION_INSTALL_PACKAGE` (Android 7+) → generic viewer.
 - **Revert: hapus remote web D-pad/keyboard handler yang tidak perlu** -- Remote web tidak butuh D-pad navigation. Kembalikan ke kondisi awal.
