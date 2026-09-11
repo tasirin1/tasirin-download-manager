@@ -22,4 +22,13 @@
     <color name="chip_active_bg">#E3F0FB</color>
     <color name="chip_done_bg">#E6F6EE</color>
     <color name="chip_failed_bg">#FDE8E7</color>
+
+    <!-- Lingkaran ikon tipe file (item download). -->
+    <color name="icon_circle_video">#E3F0FB</color>
+    <color name="icon_circle_audio">#E6F6EE</color>
+    <color name="icon_circle_image">#F3E8FD</color>
+    <color name="icon_circle_pdf">#FDE8E7</color>
+    <color name="icon_circle_apk">#FFF3E0</color>
+    <color name="icon_circle_archive">#EDF1F5</color>
+    <color name="icon_circle_generic">#EDF1F5</color>
 </resources>

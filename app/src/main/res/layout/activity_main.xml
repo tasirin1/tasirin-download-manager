@@ -6,14 +6,19 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- Toolbar: gradien halus primary → primary_dark + subtitle versi. -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         style="@style/Toolbar.Theme.HttpDownloadManager"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
+        android:background="@drawable/bg_toolbar_gradient"
+        app:subtitle="@string/app_name"
+        app:subtitleTextColor="@color/white"
+        app:subtitleTextAppearance="@style/TextAppearance.AppCompat.Caption"
         app:title="@string/app_name" />
 
-    <!-- Kartu ringkasan: statistik aktif/selesai/gagal + aksi cepat. -->
+    <!-- Kartu ringkasan: 3 kolom statistik (Active / Done / Attention). -->
     <LinearLayout
         android:id="@+id/summary_card"
         android:layout_width="match_parent"
@@ -24,59 +29,105 @@
         android:background="@drawable/bg_card_shadow"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="12dp">
+        android:paddingVertical="10dp"
+        android:visibility="gone">
 
-        <TextView
-            android:id="@+id/chip_active"
-            android:layout_width="wrap_content"
+        <!-- Kolom Active -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_chip_pill"
-            android:backgroundTint="@color/chip_active_bg"
-            android:paddingLeft="10dp"
-            android:paddingTop="3dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="3dp"
-            android:textColor="@color/primary"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            tools:text="2 active"
-            android:visibility="gone" />
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/chip_done"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/text_summary_active"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/primary"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                tools:text="2" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/summary_active"
+                android:textAllCaps="true"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Divider vertikal tipis -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="32dp"
+            android:background="@color/line" />
+
+        <!-- Kolom Done -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:background="@drawable/bg_chip_pill"
-            android:backgroundTint="@color/chip_done_bg"
-            android:paddingLeft="10dp"
-            android:paddingTop="3dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="3dp"
-            android:textColor="@color/status_on"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            tools:text="5 done"
-            android:visibility="gone" />
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/chip_failed"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/text_summary_done"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/status_on"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                tools:text="5" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/summary_done"
+                android:textAllCaps="true"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Divider vertikal tipis -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="32dp"
+            android:background="@color/line" />
+
+        <!-- Kolom Attention (failed + paused) -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:background="@drawable/bg_chip_pill"
-            android:backgroundTint="@color/chip_failed_bg"
-            android:paddingLeft="10dp"
-            android:paddingTop="3dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="3dp"
-            android:textColor="@color/status_off"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            tools:text="1 failed"
-            android:visibility="gone" />
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
 
+            <TextView
+                android:id="@+id/text_summary_attention"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/status_off"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                tools:text="1" />
 
+            <TextView
+                android:id="@+id/text_summary_attention_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/summary_attention"
+                android:textAllCaps="true"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 
     <FrameLayout
@@ -93,13 +144,13 @@
             android:focusableInTouchMode="true"
             android:paddingBottom="88dp" />
 
-        <!-- Header section sticky: menampilkan judul section saat scroll. -->
+        <!-- Header section sticky: judul section saat scroll + garis bawah. -->
         <TextView
             android:id="@+id/text_section_sticky"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="top"
-            android:background="@color/window_bg"
+            android:background="@drawable/bg_sticky_header"
             android:paddingLeft="18dp"
             android:paddingTop="6dp"
             android:paddingRight="18dp"
@@ -120,17 +171,24 @@
             android:padding="24dp"
             android:visibility="gone">
 
-            <ImageView
-                android:id="@+id/empty_icon"
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:contentDescription="@string/empty_hint"
-                android:src="@drawable/ic_download_big" />
+            <FrameLayout
+                android:layout_width="112dp"
+                android:layout_height="112dp"
+                android:background="@drawable/bg_empty_icon_circle">
+
+                <ImageView
+                    android:id="@+id/empty_icon"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/empty_hint"
+                    android:src="@drawable/ic_download_big" />
+            </FrameLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="18dp"
                 android:gravity="center"
                 android:text="@string/empty_hint"
                 android:textColor="@color/text_primary"
@@ -151,7 +209,8 @@
                 style="@style/AppButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="26dp"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/bg_btn_accent"
                 android:minHeight="58dp"
                 android:paddingHorizontal="32dp"
                 android:text="@string/add_download"
@@ -189,25 +248,37 @@
             </LinearLayout>
         </LinearLayout>
 
-
-        <FrameLayout
+        <!-- FAB ramping: pill dengan ikon + label "Add". -->
+        <LinearLayout
             android:id="@+id/fab_add"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
             android:layout_gravity="bottom|end"
             android:layout_margin="16dp"
-            android:background="@drawable/bg_fab_circle"
+            android:background="@drawable/bg_fab_pill"
             android:clickable="true"
             android:focusable="true"
-            android:elevation="6dp">
+            android:elevation="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="16dp"
+            android:paddingRight="20dp">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_gravity="center"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
                 android:contentDescription="@string/add_download"
                 android:src="@drawable/ic_add"
                 app:tint="@color/white" />
-        </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/fab_add_label"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </FrameLayout>
 </LinearLayout>

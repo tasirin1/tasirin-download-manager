@@ -22,13 +22,21 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <ImageView
-                android:id="@+id/file_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+            <FrameLayout
+                android:id="@+id/file_icon_circle"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_marginEnd="10dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_file_generic" />
+                android:background="@drawable/bg_icon_circle">
+
+                <ImageView
+                    android:id="@+id/file_icon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_file_generic" />
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/text_name"
@@ -84,8 +92,9 @@
                 android:gravity="end"
                 android:maxLines="1"
                 android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="@color/primary"
+                android:textColor="@color/accent"
                 android:textSize="12sp"
+                android:textStyle="bold"
                 tools:text="2.1 MB/s · ETA 00:12"
                 android:visibility="gone" />
         </LinearLayout>
@@ -98,6 +107,7 @@
             android:layout_height="10dp"
             android:layout_marginTop="8dp"
             android:max="100"
+            android:progressDrawable="@drawable/bg_progress_rounded"
             android:progressBackgroundTint="@color/line" />
 
         <!-- Baris error (gagal / pending dengan pesan) -->

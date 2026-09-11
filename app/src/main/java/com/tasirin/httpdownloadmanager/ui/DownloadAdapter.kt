@@ -96,7 +96,10 @@ class DownloadAdapter(private val listener: Listener) :
         b.textName.text = item.fileName
         b.fileIcon.setImageResource(fileIconRes(item.fileName))
         b.fileIcon.imageTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(ctx, R.color.text_hint)
+            ContextCompat.getColor(ctx, R.color.text_primary)
+        )
+        b.fileIconCircle.backgroundTintList = ColorStateList.valueOf(
+            ContextCompat.getColor(ctx, fileIconCircleColor(item.fileName))
         )
         b.statusBadge.text = badgeText(item, ctx)
         b.statusBadge.backgroundTintList = ColorStateList.valueOf(
@@ -221,6 +224,22 @@ class DownloadAdapter(private val listener: Listener) :
         } else {
             bar.progress = to
             bar.setTag(R.id.progress_animator, null)
+        }
+    }
+
+    /** Warna lingkaran ikon per tipe file (lembut, kontras dengan ikon gelap). */
+    private fun fileIconCircleColor(fileName: String): Int {
+        val mime = MimeTypes.forFile(fileName)
+        return when {
+            mime.startsWith("video") -> R.color.icon_circle_video
+            mime.startsWith("audio") -> R.color.icon_circle_audio
+            mime.startsWith("image") -> R.color.icon_circle_image
+            mime == "application/pdf" -> R.color.icon_circle_pdf
+            mime == "application/vnd.android.package-archive" -> R.color.icon_circle_apk
+            mime == "application/zip" ||
+                mime == "application/x-rar-compressed" ||
+                mime == "application/x-7z-compressed" -> R.color.icon_circle_archive
+            else -> R.color.icon_circle_generic
         }
     }
 

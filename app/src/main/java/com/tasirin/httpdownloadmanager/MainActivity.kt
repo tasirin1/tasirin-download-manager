@@ -109,6 +109,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val overflowColor = ContextCompat.getColor(this, R.color.white)
         binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
             ?.apply { setTint(overflowColor) }
+        // Subtitle toolbar: versi app (contoh "v1.0 · build 100995").
+        val pkgInfo = runCatching { packageManager.getPackageInfo(packageName, 0) }.getOrNull()
+        binding.toolbar.subtitle = getString(
+            R.string.app_version_subtitle,
+            (pkgInfo?.versionName ?: "1.0") + " · build " + (pkgInfo?.versionCodeCompat() ?: 0L)
+        )
 
         adapter = DownloadAdapter(this)
         listLayoutManager = LinearLayoutManager(this)
@@ -1153,35 +1159,24 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         summaryActive = active
         summaryPaused = paused
         summaryFailed = failed
-        updateSummaryChips(active, paused, done, failed)
+        updateSummaryStats(active, paused, done, failed)
     }
 
-    /** 2. Summary jadi 3 chip kecil berwarna (Active/Paused/Done/Failed).
-     *  Chip hanya tampil bila jumlah > 0 supaya ringkas. */
-    private fun updateSummaryChips(active: Int, paused: Int, done: Int, failed: Int) {
-        binding.chipActive.visibility =
-            if (active > 0) View.VISIBLE else View.GONE
-        if (active > 0) binding.chipActive.text =
-            resources.getQuantityString(R.plurals.summary_count_active, active, active)
-        binding.chipDone.visibility =
-            if (done > 0) View.VISIBLE else View.GONE
-        if (done > 0) binding.chipDone.text =
-            resources.getQuantityString(R.plurals.summary_count_done, done, done)
-        binding.chipFailed.visibility =
-            if (failed > 0 || paused > 0) View.VISIBLE else View.GONE
-        // Sembunyikan seluruh summary card bila tidak ada chip aktif
-        val anyVisible = active > 0 || done > 0 || failed > 0 || paused > 0
+    /** 2. Summary jadi 3 kolom statistik modern (Active / Done / Attention).
+     *  Attention menggabungkan failed + paused. Kartu hanya tampil bila ada
+     *  minimal satu item agar tidak memakan ruang kosong. */
+    private fun updateSummaryStats(active: Int, paused: Int, done: Int, failed: Int) {
+        val attention = failed + paused
+        val anyVisible = active > 0 || done > 0 || attention > 0
         binding.summaryCard.visibility = if (anyVisible) View.VISIBLE else View.GONE
-        // Gabung failed + paused jadi satu chip status tersendiri biar ringkas;
-        // jumlahnya menunjukkan item yang butuh perhatian.
-        if (failed > 0 || paused > 0) {
-            val total = failed + paused
-            val label = if (failed > 0) {
-                getString(R.string.summary_failed_label)
-            } else {
-                getString(R.string.summary_paused_label)
-            }
-            binding.chipFailed.text = resources.getQuantityString(R.plurals.summary_count_failed, total, total, label)
+        binding.textSummaryActive.text = active.toString()
+        binding.textSummaryDone.text = done.toString()
+        binding.textSummaryAttention.text = attention.toString()
+        binding.textSummaryAttentionLabel.text = when {
+            failed > 0 && paused > 0 -> getString(R.string.summary_attention)
+            failed > 0 -> getString(R.string.summary_failed_label)
+            paused > 0 -> getString(R.string.summary_paused_label)
+            else -> getString(R.string.summary_attention)
         }
     }
 
