@@ -59,8 +59,8 @@ object Updater {
     ): File? = runCatching {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(dir, "update-${info.versionCode}.apk")
-        if (info.apkSize <= 0 || info.apkSize > MAX_UPDATE_BYTES) return null
-        if (target.exists() && target.length() == info.apkSize) return target
+        if (info.apkSize > MAX_UPDATE_BYTES) return null
+        if (target.exists() && info.apkSize > 0 && target.length() == info.apkSize) return target
 
         if (!info.apkUrl.startsWith("https://", ignoreCase = true)) return null
         var url = info.apkUrl
@@ -96,7 +96,7 @@ object Updater {
                             if (n < 0) break
                             out.write(buf, 0, n)
                             done += n
-                            if (done > info.apkSize) throw SecurityException("Update size mismatch")
+                            if (info.apkSize > 0 && done > info.apkSize) throw SecurityException("Update size mismatch")
                             onProgress(done, total)
                         }
                     }
