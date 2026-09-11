@@ -213,8 +213,10 @@ class FileManagerActivity : AppCompatActivity() {
         })
         binding.fileList.visibility = if (files.isEmpty()) View.GONE else View.VISIBLE
         binding.emptyState.visibility = if (files.isEmpty()) View.VISIBLE else View.GONE
-        binding.pasteButton.visibility = if (isMoveMode) View.VISIBLE else View.GONE
-        binding.pasteButton.setOnClickListener { executeMove() }
+        binding.pasteButton.visibility = View.VISIBLE
+        binding.pasteButton.isEnabled = isMoveMode
+        binding.pasteButton.alpha = if (isMoveMode) 1.0f else 0.4f
+        binding.pasteButton.setOnClickListener { if (isMoveMode) executeMove() }
     }
 
     // ── Klik & Buka File ───────────────────────────────────────────────

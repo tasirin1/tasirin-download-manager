@@ -74,7 +74,7 @@
         android:text="@string/file_manager_paste_here"
         android:textColor="@android:color/white"
         android:background="@color/primary"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
     <!-- Empty state -->
     <LinearLayout
@@ -84,7 +84,7 @@
         android:layout_weight="1"
         android:gravity="center"
         android:orientation="vertical"
-        android:visibility="gone">
+        android:visibility="visible">
 
         <TextView
             android:layout_width="wrap_content"

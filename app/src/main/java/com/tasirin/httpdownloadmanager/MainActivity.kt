@@ -790,8 +790,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .show()
     }
 
-    private var lastFmClick = 0L
-
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
         return true
@@ -812,13 +810,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 true
             }
             R.id.action_file_manager -> {
-                val now = System.currentTimeMillis()
-                if (now - lastFmClick > 500) {
-                    lastFmClick = now
-                    val i = Intent(this, FileManagerActivity::class.java)
-                    i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    startActivity(i)
-                }
+                startActivity(
+                    Intent(this, FileManagerActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                )
                 true
             }
             R.id.action_pause_all -> {
