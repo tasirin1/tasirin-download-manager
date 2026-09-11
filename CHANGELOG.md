@@ -1,3 +1,4 @@
+- **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 - **Revert: hapus File Manager dari aplikasi** -- Fitur File Manager native dihapus total (simpel lebih baik). Browsing file tetap tersedia di remote web.
