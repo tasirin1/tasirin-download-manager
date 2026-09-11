@@ -1,4 +1,5 @@
 ## [Unreleased]
+- **Fix: syntax error di MainActivity setelah tambah File Manager** -- Hapus duplikat closing brace.
 - **Fitur: File Manager sederhana** -- Browsing file/folder lokal dari menu titik tiga > File Manager. Fitur: navigasi folder, info ukuran/bebas storage, buka file dengan app bawaan, rename, hapus. File tersembunyi otomatis disaring. Layout: toolbar + breadcrumb + RecyclerView.
 - **Perf: StorageCleanup — hapus duplikasi FileSaver** -- `runIfLow()` sebelumnya membuat dua instance `FileSaver(context)`. Kini cukup satu variabel `saver` yang dipakai untuk `destinationFreeBytes()` dan `cleanupOrphanPartials()`.
 - **Perf: MediaLibrary — pakai FilenameFilter** -- `scanUncached()` untuk folder teks sekarang pakai `FilenameFilter` saat `listFiles()` supaya file non-video difilter langsung di OS layer, bukan satu per satu di JVM.
