@@ -62,7 +62,7 @@ unit test bila Java/Gradle tersedia.
 
 - Workflow `Labeler` memberi label otomatis per path (remote-web, gallery,
   download-engine, settings, ci, docs).
-- Workflow `Stale` menandai issue/PR tidak aktif 60/30 hari dan menutupnya
+- Workflow `Stale` menandai issue/PR tidak aktif 45/21 hari dan menutupnya
   bila 14 hari tidak ada respons (label `dependencies` dikecualikan).
 
 ## Menjalankan guard lokal

@@ -1,3 +1,4 @@
+- **repo: tingkatkan pengelolaan (4 item)** -- (1) Naikkan ambang JaCoCo 8%→10% (151 test cukup kuat). (2) CODEOWNERS granular per-directory. (3) Stale bot lebih agresif (issue 45 hari, PR 21 hari). (4) Update komentar & docs sinkron.
 - **fix: update download tidak jalan bila GitHub API ukuran tidak diketahui** -- Guard `apkSize <= 0` dibatalkan karena GitHub API kadang tidak melaporkan ukuran APK. Download sekarang tetap jalan meski ukuran tidak diketahui.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.

@@ -1,2 +1,28 @@
 # Pemilik review default seluruh perubahan repository.
 * @tasirin1
+
+# CI/CD — workflow & dependabot
+.github/ @tasirin1
+
+# Remote web
+remote.src.html @tasirin1
+assets/remote.html @tasirin1
+scripts/prepare_remote.py @tasirin1
+
+# Download engine — inti unduhan
+app/src/main/java/com/tasirin/httpdownloadmanager/download/ @tasirin1
+
+# Keamanan server
+app/src/main/java/com/tasirin/httpdownloadmanager/remote/ @tasirin1
+
+# Scripts — guard, audit, smoke test
+scripts/ @tasirin1
+
+# Dokumentasi
+AGENTS.md @tasirin1
+README.md @tasirin1
+README.en.md @tasirin1
+CHANGELOG.md @tasirin1
+SECURITY.md @tasirin1
+CONTRIBUTING.md @tasirin1
+docs/ @tasirin1

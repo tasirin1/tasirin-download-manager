@@ -167,9 +167,8 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                // Naik bertahap: ukuran terukur di CI ~10.7% (LINE) — ambang 8%
-                // menyisakan ruang untuk fluktuasi dari kode baru yang belum teruji.
-                minimum = "0.08".toBigDecimal()
+                // Naik bertahap: sekarang ~151 test, ambang dinaikkan ke 10%
+                minimum = "0.10".toBigDecimal()
             }
         }
     }
