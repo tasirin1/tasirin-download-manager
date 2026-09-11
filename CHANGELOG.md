@@ -4,6 +4,7 @@
 - **Fix: Cannot open file di Android 11+** -- file URI ditolak app lain di Android 11+. File Manager kini query MediaStore untuk content URI dulu, fallback ke FileProvider.
 - **FM: tambah fitur + anti double-launch** -- singleTop launchMode. Tambah: Create Folder, Share, Sort (Name/Date/Size). Share via ACTION_SEND.
 - **Fix: DiffUtil syntax error di File Manager** -- Perbaiki DiffUtil.calculateDiff call.
+- **Fix: debounce buka File Manager** -- Tambah debounce 500ms + FLAG_ACTIVITY_CLEAR_TOP agar tidak double launch.
 - **Fix: debug logging open file + fallback URI** -- Tambah logging FM DEBUG saat buka file; fallback ke file URI bila MediaStore dan FileProvider gagal.
 - **Fitur: File Manager sederhana** -- Browsing file/folder lokal dari menu titik tiga > File Manager. Fitur: navigasi folder, info ukuran/bebas storage, buka file dengan app bawaan, rename, hapus. File tersembunyi otomatis disaring. Layout: toolbar + breadcrumb + RecyclerView.
 - **Perf: StorageCleanup — hapus duplikasi FileSaver** -- `runIfLow()` sebelumnya membuat dua instance `FileSaver(context)`. Kini cukup satu variabel `saver` yang dipakai untuk `destinationFreeBytes()` dan `cleanupOrphanPartials()`.
