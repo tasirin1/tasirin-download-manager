@@ -239,7 +239,7 @@ kuat dan tanpa diskusi:
     aktif) mengawal API >21 jangan sampai lolos, `testDebugUnitTest` menjaga
     logika murni (`Formats`, `FileNames`, `MimeTypes`, `DownloadItem`,
     `ServerSecurity`). Cakupan unit test (JaCoCo) di CI: `jacocoTestReport` +
-    `jacocoTestCoverageVerification` (ambang LINE 10%, lihat
+    `jacocoTestCoverageVerification` (ambang LINE 8%, lihat
     `app/build.gradle.kts` — naikkan seiring bertambahnya test); ringkasan
     cakupan dicetak di job summary.
 13. **Website (`docs/index.html`)**: situs GitHub Pages dari folder `/docs`
