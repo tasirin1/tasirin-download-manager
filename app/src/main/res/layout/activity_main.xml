@@ -151,9 +151,9 @@
             android:layout_height="wrap_content"
             android:layout_gravity="top"
             android:background="@drawable/bg_sticky_header"
-            android:paddingLeft="18dp"
+            android:paddingStart="18dp"
             android:paddingTop="6dp"
-            android:paddingRight="18dp"
+            android:paddingEnd="18dp"
             android:paddingBottom="6dp"
             android:textColor="@color/text_primary"
             android:textSize="13sp"
@@ -261,8 +261,8 @@
             android:elevation="6dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingLeft="16dp"
-            android:paddingRight="20dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="20dp">
 
             <ImageView
                 android:layout_width="22dp"
