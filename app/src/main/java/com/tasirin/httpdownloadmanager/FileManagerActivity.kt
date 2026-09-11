@@ -2,6 +2,7 @@ package com.tasirin.httpdownloadmanager
 
 import android.content.ContentUris
 import android.content.Intent
+import com.tasirin.httpdownloadmanager.App
 import android.os.Bundle
 import android.os.StatFs
 import android.provider.MediaStore
@@ -223,15 +224,21 @@ class FileManagerActivity : AppCompatActivity() {
     }
 
     private fun openFile(file: File) {
+        if (!file.exists()) {
+            Toast.makeText(this, R.string.file_manager_error, Toast.LENGTH_SHORT).show()
+            return
+        }
         try {
             val mime = guessMime(file)
             val uri = resolveContentUri(file)
+            App.logEvent("FM DEBUG: open ${file.name} mime=$mime uri=$uri")
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            startActivity(Intent.createChooser(intent, file.name))
-        } catch (_: Exception) {
+            startActivity(intent)
+        } catch (e: Exception) {
+            App.logEvent("FM DEBUG: open failed ${file.name}: ${e.message}")
             Toast.makeText(this, R.string.file_manager_error, Toast.LENGTH_SHORT).show()
         }
     }
@@ -252,9 +259,23 @@ class FileManagerActivity : AppCompatActivity() {
     }
 
     private fun resolveContentUri(file: File): android.net.Uri {
+        // 1) MediaStore content URI — bisa diakses app lain
         val mediaUri = queryMediaStore(file)
-        if (mediaUri != null) return mediaUri
-        return FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        if (mediaUri != null) {
+            App.logEvent("FM DEBUG: ${file.name} → MediaStore $mediaUri")
+            return mediaUri
+        }
+        // 2) FileProvider — cover internal + path terdaftar
+        val fpUri = runCatching {
+            FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        }.getOrNull()
+        if (fpUri != null) {
+            App.logEvent("FM DEBUG: ${file.name} → FileProvider $fpUri")
+            return fpUri
+        }
+        // 3) Terakhir: content URI dari file:// (Android 11+ mungkin gagal)
+        App.logEvent("FM DEBUG: ${file.name} → fallback file URI")
+        return android.net.Uri.fromFile(file)
     }
 
     private fun queryMediaStore(file: File): android.net.Uri? {
