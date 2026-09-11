@@ -13,6 +13,7 @@ import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import android.content.ContentUris
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.recyclerview.widget.DiffUtil
@@ -230,11 +231,10 @@ class FileManagerActivity : AppCompatActivity() {
     private fun openFile(file: File) {
         try {
             val mime = guessMime(file)
-            val uri = if (file.absolutePath.startsWith(filesDir.absolutePath)) {
-                FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-            } else {
-                file.toUri()
-            }
+            // Android 11+ (API 30): file:// URI ditolak oleh app lain.
+            // Cari content URI via MediaStore dulu; bila tidak ketemu,
+            // pakai FileProvider (cover internal + Download publik).
+            val uri = resolveContentUri(file)
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -243,6 +243,30 @@ class FileManagerActivity : AppCompatActivity() {
             startActivity(Intent.createChooser(intent, file.name))
         } catch (_: Exception) {
             Toast.makeText(this, R.string.file_manager_error, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Cari content URI file: MediaStore dulu, lalu FileProvider. */
+    private fun resolveContentUri(file: File): android.net.Uri {
+        // 1) MediaStore — punya content URI yang bisa diakses app lain
+        val mediaUri = queryMediaStore(file)
+        if (mediaUri != null) return mediaUri
+        // 2) FileProvider — cover file internal + path yang terdaftar di file_paths.xml
+        return FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+    }
+
+    /** Query MediaStore berdasarkan DATA path → content URI. */
+    private fun queryMediaStore(file: File): android.net.Uri? {
+        val path = file.absolutePath
+        val collection = android.provider.MediaStore.Files.getContentUri("external")
+        val projection = arrayOf(android.provider.MediaStore.MediaColumns._ID)
+        val selection = "${android.provider.MediaStore.MediaColumns.DATA} = ?"
+        val selectionArgs = arrayOf(path)
+        return contentResolver.query(collection, projection, selection, selectionArgs, null)?.use { c ->
+            if (c.moveToFirst()) {
+                val id = c.getLong(c.getColumnIndexOrThrow(android.provider.MediaStore.MediaColumns._ID))
+                android.content.ContentUris.withAppendedId(collection, id)
+            } else null
         }
     }
 
