@@ -22,6 +22,7 @@ import android.view.Menu
 import android.view.Window
 import android.view.WindowManager
 import android.view.MenuItem
+import java.util.Locale
 import android.view.View
 import android.view.animation.AnimationUtils
 import androidx.core.view.isVisible
@@ -1169,9 +1170,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val attention = failed + paused
         val anyVisible = active > 0 || done > 0 || attention > 0
         binding.summaryCard.visibility = if (anyVisible) View.VISIBLE else View.GONE
-        binding.textSummaryActive.text = active.toString()
-        binding.textSummaryDone.text = done.toString()
-        binding.textSummaryAttention.text = attention.toString()
+        binding.textSummaryActive.text = String.format(Locale.US, "%d", active)
+        binding.textSummaryDone.text = String.format(Locale.US, "%d", done)
+        binding.textSummaryAttention.text = String.format(Locale.US, "%d", attention)
         binding.textSummaryAttentionLabel.text = when {
             failed > 0 && paused > 0 -> getString(R.string.summary_attention)
             failed > 0 -> getString(R.string.summary_failed_label)
