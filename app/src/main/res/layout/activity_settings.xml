@@ -1,774 +1,963 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="Autofill"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
-        style="@style/Toolbar.Theme.HttpDownloadManager"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        app:title="@string/action_settings" />
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:clipToPadding="false"
-        android:scrollbars="none">
+        <!-- 1. Toolbar gradien -->
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            style="@style/Toolbar.Theme.HttpDownloadManager"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@drawable/bg_toolbar_gradient"
+            app:title="@string/action_settings" />
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp">
-
-            <TextView
-                android:id="@+id/nav_server"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_chip"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:layout_marginEnd="6dp"
-                android:minHeight="36dp"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="6dp"
-                android:text="@string/settings_section_server"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/nav_download"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_chip"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:layout_marginEnd="6dp"
-                android:minHeight="36dp"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="6dp"
-                android:text="@string/settings_section_download"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/nav_storage"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_chip"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:layout_marginEnd="6dp"
-                android:minHeight="36dp"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="6dp"
-                android:text="@string/settings_section_storage"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/nav_other"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_chip"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:layout_marginEnd="6dp"
-                android:minHeight="36dp"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="6dp"
-                android:text="@string/settings_nav_other"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </HorizontalScrollView>
-
-    <ScrollView
-        android:id="@+id/scroll_settings"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true">
-
-        <LinearLayout
-            android:id="@+id/settings_content"
+        <!-- 2. Nav chip dengan ikon -->
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingHorizontal="12dp"
-            android:paddingBottom="16dp">
+            android:clipToPadding="false"
+            android:scrollbars="none">
 
-            <!-- ===== SEKSI: SERVER ===== -->
             <LinearLayout
-                android:id="@+id/section_server"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_status_card"
-                android:orientation="vertical"
-                android:paddingHorizontal="14dp"
-                android:paddingBottom="12dp">
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp">
 
                 <TextView
-                    android:id="@+id/header_server"
+                    android:id="@+id/nav_server"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:drawableStart="@drawable/ic_server"
+                    android:drawablePadding="6dp"
+                    android:gravity="center"
+                    android:layout_marginEnd="6dp"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="6dp"
+                    android:text="@string/settings_section_server"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/nav_download"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:drawableStart="@drawable/ic_download_section"
+                    android:drawablePadding="6dp"
+                    android:gravity="center"
+                    android:layout_marginEnd="6dp"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="6dp"
+                    android:text="@string/settings_section_download"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/nav_storage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:drawableStart="@drawable/ic_storage"
+                    android:drawablePadding="6dp"
+                    android:gravity="center"
+                    android:layout_marginEnd="6dp"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="6dp"
+                    android:text="@string/settings_section_storage"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/nav_other"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:drawableStart="@drawable/ic_settings_gear"
+                    android:drawablePadding="6dp"
+                    android:gravity="center"
+                    android:layout_marginEnd="6dp"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="6dp"
+                    android:text="@string/settings_nav_other"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Scroll content -->
+        <ScrollView
+            android:id="@+id/scroll_settings"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/settings_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="12dp"
+                android:paddingBottom="80dp">
+
+                <!-- ===== SEKSI: SERVER ===== -->
+                <LinearLayout
+                    android:id="@+id/section_server"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="-14dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    app:drawableEndCompat="@drawable/ic_chevron"
-                    android:drawablePadding="6dp"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="44dp"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp"
-                    android:text="@string/settings_section_server"
-                    android:textColor="@color/primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_status_card"
+                    android:elevation="2dp"
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/server_status"
+                    <!-- 3. Header dengan accent bar + ikon + badge -->
+                    <LinearLayout
+                        android:id="@+id/header_server"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textAppearance="?android:attr/textAppearanceSmall" />
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="48dp"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="10dp">
+
+                        <View
+                            android:layout_width="4dp"
+                            android:layout_height="24dp"
+                            android:layout_marginEnd="10dp"
+                            android:background="@drawable/bg_settings_accent_bar"
+                            android:backgroundTint="@color/section_accent_server" />
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_marginEnd="8dp"
+                            android:src="@drawable/ic_server"
+                            android:importantForAccessibility="no"
+                            app:tint="@color/section_accent_server" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/settings_section_server"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <!-- 6. Server status badge -->
+                        <TextView
+                            android:id="@+id/server_badge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:background="@drawable/bg_badge_off"
+                            android:textAllCaps="true"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <ImageView
+                            android:id="@+id/chevron_server"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            app:srcCompat="@drawable/ic_chevron"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
+                        android:orientation="vertical"
+                        android:paddingHorizontal="14dp"
+                        android:paddingBottom="12dp">
+
+                        <TextView
+                            android:id="@+id/server_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?android:attr/textAppearanceSmall" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/btn_open_remote"
+                                style="@style/TvOutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="4dp"
+                                android:minHeight="40dp"
+                                android:text="@string/open_remote"
+                                android:textSize="12sp" />
+
+                            <Button
+                                android:id="@+id/btn_copy_url"
+                                style="@style/TvOutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="4dp"
+                                android:minHeight="40dp"
+                                android:text="@string/copy_address"
+                                android:textSize="12sp" />
+                        </LinearLayout>
 
                         <Button
-                            android:id="@+id/btn_open_remote"
+                            android:id="@+id/storage_btn"
                             style="@style/TvOutlinedButton"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="4dp"
-                            android:minHeight="40dp"
-                            android:text="@string/open_remote"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/remote_storage_btn"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/urls"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:textIsSelectable="true"
+                            android:textAppearance="?android:attr/textAppearanceSmall" />
+
+                        <Button
+                            android:id="@+id/btn_show_qr"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center_horizontal"
+                            android:layout_marginTop="8dp"
+                            android:minHeight="36dp"
+                            android:text="@string/remote_qr_desc"
                             android:textSize="12sp" />
 
                         <Button
-                            android:id="@+id/btn_copy_url"
+                            android:id="@+id/server_switch"
                             style="@style/TvOutlinedButton"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="4dp"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/server_start" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="8dp"
+                            android:background="@color/line" />
+
+                        <Button
+                            android:id="@+id/check_server_autostart"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
                             android:minHeight="40dp"
-                            android:text="@string/copy_address"
-                            android:textSize="12sp" />
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_server_autostart"
+                            android:textSize="13sp" />
+
+                        <EditText
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:id="@+id/input_pin"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:hint="@string/settings_pin_hint"
+                            android:importantForAutofill="no"
+                            android:inputType="textPassword"
+                            android:minHeight="40dp"
+                            android:textSize="14sp"
+                            tools:ignore="TextFields" />
+
+                        <Button
+                            android:id="@+id/check_pin_enforced"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_pin_enforced"
+                            android:textSize="13sp" />
+
+                        <Button
+                            android:id="@+id/check_fs_full_access"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_fs_full_access"
+                            android:textSize="13sp" />
+
+                        <Button
+                            android:id="@+id/check_server_read_only"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_server_read_only"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/settings_server_port"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <EditText
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:id="@+id/input_port"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:hint="@string/settings_port_hint"
+                            android:importantForAutofill="no"
+                            android:inputType="number"
+                            android:minHeight="40dp"
+                            android:textSize="14sp"
+                            tools:ignore="TextFields" />
+
+                        <Button
+                            android:id="@+id/btn_log"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/settings_view_log"
+                            android:textSize="13sp" />
                     </LinearLayout>
+                </LinearLayout>
 
-                    <Button
-                        android:id="@+id/storage_btn"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/remote_storage_btn"
-                        android:visibility="gone" />
+                <!-- 8. QR Code dalam card terpisah -->
+                <LinearLayout
+                    android:id="@+id/section_qr"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_status_card"
+                    android:elevation="2dp"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="14dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="14dp"
+                    android:visibility="gone">
 
                     <TextView
-                        android:id="@+id/urls"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:textIsSelectable="true"
-                        android:textAppearance="?android:attr/textAppearanceSmall" />
-
-                    <!-- QR collapsible -->
-                    <Button
-                        android:id="@+id/btn_show_qr"
-                        style="@style/TvOutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="8dp"
-                        android:minHeight="36dp"
-                        android:text="@string/remote_qr_desc"
-                        android:textSize="12sp" />
+                        android:text="QR Code"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
                     <ImageView
                         android:id="@+id/qr"
                         android:layout_width="180dp"
                         android:layout_height="180dp"
-                        android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="6dp"
-                        android:contentDescription="@string/remote_qr_desc"
-                        android:visibility="gone" />
-
-                    <Button
-                        android:id="@+id/server_switch"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="@string/server_start" />
+                        android:contentDescription="@string/remote_qr_desc" />
+                </LinearLayout>
 
-                    <!-- Divider -->
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginVertical="8dp"
-                        android:background="@color/line" />
-
-                    <!-- Server toggle group: 2 columns -->
-                    <Button
-                        android:id="@+id/check_server_autostart"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="40dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="10dp"
-                        android:text="@string/settings_server_autostart"
-                        android:textSize="13sp" />
-
-                    <EditText
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        android:id="@+id/input_pin"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:hint="@string/settings_pin_hint"
-                        android:importantForAutofill="no"
-                        android:inputType="textPassword"
-                        android:minHeight="40dp"
-                        android:textSize="14sp"
-                        tools:ignore="TextFields" />
-
-                    <Button
-                        android:id="@+id/check_pin_enforced"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="40dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="10dp"
-                        android:text="@string/settings_pin_enforced"
-                        android:textSize="13sp" />
-
-                    <Button
-                        android:id="@+id/check_fs_full_access"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="40dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="10dp"
-                        android:text="@string/settings_fs_full_access"
-                        android:textSize="13sp" />
-
-                    <Button
-                        android:id="@+id/check_server_read_only"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="40dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="10dp"
-                        android:text="@string/settings_server_read_only"
-                        android:textSize="13sp" />
-
-                    <!-- Port input -->
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/settings_port_label"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <EditText
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        android:id="@+id/input_port"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:hint="@string/settings_port_hint"
-                        android:importantForAutofill="no"
-                        android:inputType="number"
-                        android:minHeight="40dp"
-                        android:textSize="14sp" />
-
-                    <Button
-                        android:id="@+id/btn_log"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:minHeight="40dp"
-                        android:text="@string/remote_log_label"
-                        android:textSize="13sp" />
-            </LinearLayout>
-
-            <!-- ===== SEKSI: UNDUHAN ===== -->
-            <LinearLayout
-                android:id="@+id/section_download"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_status_card"
-                android:orientation="vertical"
-                android:paddingHorizontal="14dp"
-                android:paddingBottom="12dp">
-
-                <TextView
-                    android:id="@+id/header_download"
+                <!-- ===== SEKSI: DOWNLOAD ===== -->
+                <LinearLayout
+                    android:id="@+id/section_download"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="-14dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    app:drawableEndCompat="@drawable/ic_chevron"
-                    android:drawablePadding="6dp"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="44dp"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp"
-                    android:text="@string/settings_section_download"
-                    android:textColor="@color/primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_status_card"
+                    android:elevation="2dp"
+                    android:orientation="vertical">
 
-                    <!-- Download toggles: 2 column grid -->
                     <LinearLayout
+                        android:id="@+id/header_download"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:orientation="horizontal">
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="48dp"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="10dp">
 
-                        <Button
-                            android:id="@+id/check_background"
-                            style="@style/TvOutlinedButton"
+                        <View
+                            android:layout_width="4dp"
+                            android:layout_height="24dp"
+                            android:layout_marginEnd="10dp"
+                            android:background="@drawable/bg_settings_accent_bar"
+                            android:backgroundTint="@color/section_accent_download" />
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_marginEnd="8dp"
+                            android:src="@drawable/ic_download_section"
+                            android:importantForAccessibility="no"
+                            app:tint="@color/section_accent_download" />
+
+                        <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:layout_marginEnd="3dp"
-                            android:minHeight="40dp"
-                            android:gravity="start|center_vertical"
-                            android:paddingHorizontal="8dp"
-                            android:text="@string/settings_background"
-                            android:textSize="12sp" />
+                            android:text="@string/settings_section_download"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
 
-                        <Button
-                            android:id="@+id/check_autostart"
-                            style="@style/TvOutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="3dp"
-                            android:minHeight="40dp"
-                            android:gravity="start|center_vertical"
-                            android:paddingHorizontal="8dp"
-                            android:text="@string/settings_autostart"
-                            android:textSize="12sp" />
+                        <ImageView
+                            android:id="@+id/chevron_download"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            app:srcCompat="@drawable/ic_chevron"
+                            android:importantForAccessibility="no" />
                     </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:orientation="horizontal">
+                        android:orientation="vertical"
+                        android:paddingHorizontal="14dp"
+                        android:paddingBottom="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/check_background"
+                                style="@style/TvOutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="3dp"
+                                android:minHeight="40dp"
+                                android:gravity="start|center_vertical"
+                                android:paddingHorizontal="8dp"
+                                android:text="@string/settings_background"
+                                android:textSize="12sp" />
+
+                            <Button
+                                android:id="@+id/check_autostart"
+                                style="@style/TvOutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="3dp"
+                                android:minHeight="40dp"
+                                android:gravity="start|center_vertical"
+                                android:paddingHorizontal="8dp"
+                                android:text="@string/settings_autostart"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/check_auto_sort"
+                                style="@style/TvOutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="3dp"
+                                android:minHeight="40dp"
+                                android:gravity="start|center_vertical"
+                                android:paddingHorizontal="8dp"
+                                android:text="@string/settings_auto_sort"
+                                android:textSize="12sp" />
+
+                            <Button
+                                android:id="@+id/check_small_first"
+                                style="@style/TvOutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="3dp"
+                                android:minHeight="40dp"
+                                android:gravity="start|center_vertical"
+                                android:paddingHorizontal="8dp"
+                                android:text="@string/settings_small_first"
+                                android:textSize="12sp" />
+                        </LinearLayout>
 
                         <Button
-                            android:id="@+id/check_auto_sort"
+                            android:id="@+id/check_auto_open"
                             style="@style/TvOutlinedButton"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="3dp"
+                            android:layout_marginTop="4dp"
                             android:minHeight="40dp"
                             android:gravity="start|center_vertical"
-                            android:paddingHorizontal="8dp"
-                            android:text="@string/settings_auto_sort"
-                            android:textSize="12sp" />
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_auto_open"
+                            android:textSize="13sp" />
 
                         <Button
-                            android:id="@+id/check_small_first"
+                            android:id="@+id/check_battery"
                             style="@style/TvOutlinedButton"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="3dp"
+                            android:layout_marginTop="4dp"
                             android:minHeight="40dp"
                             android:gravity="start|center_vertical"
-                            android:paddingHorizontal="8dp"
-                            android:text="@string/settings_small_first"
-                            android:textSize="12sp" />
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_battery"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:layout_marginBottom="2dp"
+                            android:text="@string/settings_hint_battery"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <Button
+                            android:id="@+id/check_delete_partial"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_delete_partial_on_cancel"
+                            android:textSize="13sp" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="8dp"
+                            android:background="@color/line" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_concurrent"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <Spinner
+                            android:id="@+id/spinner_concurrent"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:minHeight="40dp"
+                            android:paddingHorizontal="10dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/settings_speed_limit"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <Spinner
+                            android:id="@+id/spinner_speed"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:minHeight="40dp"
+                            android:paddingHorizontal="10dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/settings_segments"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <Spinner
+                            android:id="@+id/spinner_segments"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:minHeight="40dp"
+                            android:paddingHorizontal="10dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/settings_retry"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <Spinner
+                            android:id="@+id/spinner_retry"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:minHeight="40dp"
+                            android:paddingHorizontal="10dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/settings_connect_timeout"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <Spinner
+                            android:id="@+id/spinner_connect_timeout"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:minHeight="40dp"
+                            android:paddingHorizontal="10dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/settings_read_timeout"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <Spinner
+                            android:id="@+id/spinner_read_timeout"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:minHeight="40dp"
+                            android:paddingHorizontal="10dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/label_user_agent"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <Spinner
+                            android:id="@+id/spinner_user_agent"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:minHeight="40dp"
+                            android:paddingHorizontal="10dp" />
+
+                        <EditText
+                            android:id="@+id/edit_user_agent"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:hint="@string/hint_custom_user_agent"
+                            android:importantForAutofill="no"
+                            android:inputType="text"
+                            android:maxLines="2"
+                            android:visibility="gone"
+                            android:textSize="13sp" />
                     </LinearLayout>
+                </LinearLayout>
 
-                    <Button
-                        android:id="@+id/check_auto_open"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="40dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="10dp"
-                        android:text="@string/settings_auto_open"
-                        android:textSize="13sp" />
-
-                    <Button
-                        android:id="@+id/check_battery"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="40dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="10dp"
-                        android:text="@string/settings_battery"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:layout_marginBottom="2dp"
-                        android:text="@string/settings_hint_battery"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <Button
-                        android:id="@+id/check_delete_partial"
-                        style="@style/TvOutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="40dp"
-                        android:gravity="start|center_vertical"
-                        android:paddingHorizontal="10dp"
-                        android:text="@string/settings_delete_partial_on_cancel"
-                        android:textSize="13sp" />
-
-                    <!-- Divider before spinners -->
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginVertical="8dp"
-                        android:background="@color/line" />
-
-                    <!-- Spinner group with labels -->
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_concurrent"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <Spinner
-                        android:id="@+id/spinner_concurrent"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:minHeight="40dp"
-                        android:paddingHorizontal="10dp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/settings_speed_limit"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <Spinner
-                        android:id="@+id/spinner_speed"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:minHeight="40dp"
-                        android:paddingHorizontal="10dp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/settings_segments"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <Spinner
-                        android:id="@+id/spinner_segments"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:minHeight="40dp"
-                        android:paddingHorizontal="10dp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/settings_retry"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <Spinner
-                        android:id="@+id/spinner_retry"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:minHeight="40dp"
-                        android:paddingHorizontal="10dp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/settings_connect_timeout"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <Spinner
-                        android:id="@+id/spinner_connect_timeout"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:minHeight="40dp"
-                        android:paddingHorizontal="10dp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/settings_read_timeout"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <Spinner
-                        android:id="@+id/spinner_read_timeout"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:minHeight="40dp"
-                        android:paddingHorizontal="10dp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/label_user_agent"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
-
-                    <Spinner
-                        android:id="@+id/spinner_user_agent"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:minHeight="40dp"
-                        android:paddingHorizontal="10dp" />
-
-                    <EditText
-                        android:id="@+id/edit_user_agent"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_input_tv"
-                        android:hint="@string/hint_custom_user_agent"
-                        android:importantForAutofill="no"
-                        android:inputType="text"
-                        android:maxLines="2"
-                        android:visibility="gone"
-                        android:textSize="13sp" />
-            </LinearLayout>
-
-            <!-- ===== SEKSI: STORAGE ===== -->
-            <LinearLayout
-                android:id="@+id/section_storage"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_status_card"
-                android:orientation="vertical"
-                android:paddingHorizontal="14dp"
-                android:paddingBottom="12dp">
-
-                <TextView
-                    android:id="@+id/header_storage"
+                <!-- ===== SEKSI: STORAGE ===== -->
+                <LinearLayout
+                    android:id="@+id/section_storage"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="-14dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    app:drawableEndCompat="@drawable/ic_chevron"
-                    android:drawablePadding="6dp"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="44dp"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp"
-                    android:text="@string/settings_section_storage"
-                    android:textColor="@color/primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                    <include layout="@layout/view_storage_section" />
-
-                    <!-- Divider before gallery folders -->
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginVertical="10dp"
-                        android:background="@color/line" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/gallery_folder_title"
-                        android:textAppearance="?android:attr/textAppearanceMedium" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/gallery_folder_hint"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_status_card"
+                    android:elevation="2dp"
+                    android:orientation="vertical">
 
                     <LinearLayout
-                        android:id="@+id/gallery_folders_container"
+                        android:id="@+id/header_storage"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="48dp"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="10dp">
 
-                    <Button
-                        android:id="@+id/btn_add_gallery_folder"
+                        <View
+                            android:layout_width="4dp"
+                            android:layout_height="24dp"
+                            android:layout_marginEnd="10dp"
+                            android:background="@drawable/bg_settings_accent_bar"
+                            android:backgroundTint="@color/section_accent_storage" />
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_marginEnd="8dp"
+                            android:src="@drawable/ic_storage"
+                            android:importantForAccessibility="no"
+                            app:tint="@color/section_accent_storage" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/settings_section_storage"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/chevron_storage"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            app:srcCompat="@drawable/ic_chevron"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:background="@drawable/bg_btn_tv"
-                        android:backgroundTint="@null"
-                        android:text="@string/storage_add_folder" />
-            </LinearLayout>
+                        android:orientation="vertical"
+                        android:paddingHorizontal="14dp"
+                        android:paddingBottom="12dp">
 
-            <!-- ===== SEKSI: LAINNYA ===== -->
-            <LinearLayout
-                android:id="@+id/section_other"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_status_card"
-                android:orientation="vertical"
-                android:paddingHorizontal="14dp"
-                android:paddingBottom="12dp">
+                        <include layout="@layout/view_storage_section" />
 
-                <TextView
-                    android:id="@+id/header_other"
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="10dp"
+                            android:background="@color/line" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/gallery_folder_title"
+                            android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/gallery_folder_hint"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <LinearLayout
+                            android:id="@+id/gallery_folders_container"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+
+                        <Button
+                            android:id="@+id/btn_add_gallery_folder"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/bg_btn_tv"
+                            android:backgroundTint="@null"
+                            android:text="@string/storage_add_folder" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- ===== SEKSI: LAINNYA ===== -->
+                <LinearLayout
+                    android:id="@+id/section_other"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="-14dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    app:drawableEndCompat="@drawable/ic_chevron"
-                    android:drawablePadding="6dp"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="44dp"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp"
-                    android:text="@string/settings_nav_other"
-                    android:textColor="@color/primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_status_card"
+                    android:elevation="2dp"
+                    android:orientation="vertical">
 
-                    <Button
-                        android:id="@+id/btn_cleanup"
-                        style="@style/TvOutlinedButton"
+                    <LinearLayout
+                        android:id="@+id/header_other"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="40dp"
-                        android:text="@string/cleanup_button"
-                        android:textSize="13sp" />
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="48dp"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="10dp">
 
-                    <TextView
-                        android:id="@+id/cleanup_result"
+                        <View
+                            android:layout_width="4dp"
+                            android:layout_height="24dp"
+                            android:layout_marginEnd="10dp"
+                            android:background="@drawable/bg_settings_accent_bar"
+                            android:backgroundTint="@color/section_accent_other" />
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_marginEnd="8dp"
+                            android:src="@drawable/ic_settings_gear"
+                            android:importantForAccessibility="no"
+                            app:tint="@color/section_accent_other" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/settings_nav_other"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/chevron_other"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            app:srcCompat="@drawable/ic_chevron"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:orientation="vertical"
+                        android:paddingHorizontal="14dp"
+                        android:paddingBottom="12dp">
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
+                        <Button
+                            android:id="@+id/btn_cleanup"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:text="@string/cleanup_button"
+                            android:textSize="13sp" />
 
-                    <Button
-                        android:id="@+id/btn_check_update"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_btn_tv"
-                        android:backgroundTint="@null"
-                        android:minHeight="40dp"
-                        android:text="@string/update_check"
-                        android:textSize="13sp" />
+                        <TextView
+                            android:id="@+id/cleanup_result"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
 
-                    <TextView
-                        android:id="@+id/update_status"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
-                        android:textColor="?android:attr/textColorSecondary" />
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="10dp"
+                            android:background="@color/line" />
+
+                        <Button
+                            android:id="@+id/btn_check_update"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_btn_tv"
+                            android:backgroundTint="@null"
+                            android:minHeight="40dp"
+                            android:text="@string/update_check"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/update_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+                    </LinearLayout>
+                </LinearLayout>
+
             </LinearLayout>
-        </LinearLayout>
-    </ScrollView>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/card_bg"
-        android:elevation="6dp"
-        android:orientation="vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="10dp">
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/line" />
-
-        <Button
-            android:id="@+id/btn_save"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_btn_tv"
-            android:backgroundTint="@null"
-            android:text="@string/save" />
+        </ScrollView>
     </LinearLayout>
-</LinearLayout>
+
+    <!-- 5. Save FAB pill (floating) -->
+    <LinearLayout
+        android:id="@+id/btn_save"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:background="@drawable/bg_fab_pill"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="20dp">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:contentDescription="@string/save"
+            android:src="@drawable/ic_save" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/save_fab_label"
+            android:textColor="@color/white"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</FrameLayout>

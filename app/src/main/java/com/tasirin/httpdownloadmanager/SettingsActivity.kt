@@ -26,6 +26,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.Spinner
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,7 +35,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
-import androidx.core.widget.TextViewCompat
 import androidx.lifecycle.lifecycleScope
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
@@ -115,7 +115,16 @@ class SettingsActivity : AppCompatActivity() {
         binding.btnOpenRemote.setOnClickListener { openRemoteNow() }
         binding.btnCopyUrl.setOnClickListener { copyRemoteUrl() }
         binding.btnShowQr.setOnClickListener {
-            binding.qr.isVisible = !binding.qr.isVisible
+            val card = findViewById<View>(R.id.section_qr)
+            val show = !card.isVisible
+            card.isVisible = show
+            if (show) {
+                // Isi QR jika belum ada gambar
+                if (binding.qr.drawable == null) {
+                    val url = remoteUrl()
+                    url?.let { generateQrCode(it, 640)?.let { bmp -> binding.qr.setImageBitmap(bmp) } }
+                }
+            }
         }
     }
 
@@ -130,14 +139,15 @@ class SettingsActivity : AppCompatActivity() {
     private class SectionSpec(
         val sectionId: Int,
         val headerId: Int,
+        val chevronId: Int,
         val key: String
     )
 
     private val sections = listOf(
-        SectionSpec(R.id.section_server, R.id.header_server, "server"),
-        SectionSpec(R.id.section_download, R.id.header_download, "download"),
-        SectionSpec(R.id.section_storage, R.id.header_storage, "storage"),
-        SectionSpec(R.id.section_other, R.id.header_other, "other")
+        SectionSpec(R.id.section_server, R.id.header_server, R.id.chevron_server, "server"),
+        SectionSpec(R.id.section_download, R.id.header_download, R.id.chevron_download, "download"),
+        SectionSpec(R.id.section_storage, R.id.header_storage, R.id.chevron_storage, "storage"),
+        SectionSpec(R.id.section_other, R.id.header_other, R.id.chevron_other, "other")
     )
 
     private val navMap = mapOf(
@@ -150,18 +160,19 @@ class SettingsActivity : AppCompatActivity() {
     private fun setupCollapsibleSections() {
         sections.forEach { spec ->
             val section = findViewById<ViewGroup>(spec.sectionId)
-            val header = findViewById<TextView>(spec.headerId)
+            val header = findViewById<View>(spec.headerId)
+            val chevron = findViewById<ImageView>(spec.chevronId)
             val collapsed = StoragePrefs.isSectionCollapsed(this, spec.key)
-            setSectionExpanded(section, header, !collapsed)
+            setSectionExpanded(section, header, chevron, !collapsed)
             header.setOnClickListener {
                 val nowExpanded = isSectionExpanded(section, header)
-                setSectionExpanded(section, header, !nowExpanded)
+                setSectionExpanded(section, header, chevron, !nowExpanded)
                 StoragePrefs.setSectionCollapsed(this, spec.key, nowExpanded)
             }
         }
     }
 
-    private fun isSectionExpanded(section: ViewGroup, header: TextView): Boolean {
+    private fun isSectionExpanded(section: ViewGroup, header: View): Boolean {
         for (i in 0 until section.childCount) {
             val child = section.getChildAt(i)
             if (child !== header && child.isVisible) return true
@@ -169,17 +180,17 @@ class SettingsActivity : AppCompatActivity() {
         return false
     }
 
-    private fun setSectionExpanded(section: ViewGroup, header: TextView, expanded: Boolean) {
+    private fun setSectionExpanded(
+        section: ViewGroup, header: View, chevron: ImageView, expanded: Boolean
+    ) {
         for (i in 0 until section.childCount) {
             val child = section.getChildAt(i)
             if (child !== header) {
                 child.isVisible = expanded
             }
         }
-        TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            header, 0, 0,
-            if (expanded) R.drawable.ic_chevron_up else R.drawable.ic_chevron,
-            0
+        chevron.setImageResource(
+            if (expanded) R.drawable.ic_chevron_up else R.drawable.ic_chevron
         )
     }
 
@@ -194,8 +205,9 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun expandSection(spec: SectionSpec) {
         val section = findViewById<ViewGroup>(spec.sectionId)
-        val header = findViewById<TextView>(spec.headerId)
-        setSectionExpanded(section, header, true)
+        val header = findViewById<View>(spec.headerId)
+        val chevron = findViewById<ImageView>(spec.chevronId)
+        setSectionExpanded(section, header, chevron, true)
         StoragePrefs.setSectionCollapsed(this, spec.key, false)
     }
 
@@ -338,7 +350,15 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.btnOpenRemote.isEnabled = server.isAlive
         binding.btnCopyUrl.isEnabled = server.isAlive
+
+        // 6. Server status badge (hijau ON / merah OFF)
+        val badge = binding.serverBadge
         if (server.isAlive) {
+            badge.isVisible = true
+            badge.text = "ON"
+            badge.setTextColor(ContextCompat.getColor(this, R.color.badge_on_text))
+            badge.setBackgroundResource(R.drawable.bg_badge_on)
+
             binding.serverStatus.setText(R.string.remote_running)
             val urls = HttpControlServer.ipv4Addresses()
                 .map { "http://$it:${server.listeningPort}/" }
@@ -350,10 +370,18 @@ class SettingsActivity : AppCompatActivity() {
             }
             binding.btnShowQr.isEnabled = true
         } else {
+            badge.isVisible = true
+            badge.text = "OFF"
+            badge.setTextColor(ContextCompat.getColor(this, R.color.badge_off_text))
+            badge.setBackgroundResource(R.drawable.bg_badge_off)
+
             binding.serverStatus.setText(R.string.remote_stopped)
             binding.urls.text = getString(R.string.remote_no_url)
             binding.qr.visibility = View.GONE
             binding.btnShowQr.isEnabled = false
+            // Sembunyikan QR card jika server mati
+            val qrCard = findViewById<View>(R.id.section_qr)
+            if (qrCard.isVisible) qrCard.isVisible = false
         }
     }
 

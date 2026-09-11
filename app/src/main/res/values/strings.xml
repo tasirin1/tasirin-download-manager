@@ -19,6 +19,7 @@
     <string name="download">Download</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
+    <string name="save_fab_label">Save</string>
 
     <string name="update_check">Check for Updates</string>
     <string name="update_checking">Checking for updates&#8230;</string>
