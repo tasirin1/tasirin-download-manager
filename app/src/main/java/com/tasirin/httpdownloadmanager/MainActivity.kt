@@ -849,8 +849,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             else -> super.onOptionsItemSelected(item)
         }
     }
-        }
-    }
 
     @SuppressLint("InflateParams")
     private fun showAboutDialog() {
