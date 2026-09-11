@@ -119,6 +119,7 @@ class SettingsActivity : AppCompatActivity() {
             val show = !card.isVisible
             card.isVisible = show
             if (show) {
+                binding.qr.visibility = View.VISIBLE
                 // Isi QR jika belum ada gambar
                 if (binding.qr.drawable == null) {
                     val url = remoteUrl()
@@ -369,6 +370,8 @@ class SettingsActivity : AppCompatActivity() {
                 generateQrCode(address, 640)?.let { binding.qr.setImageBitmap(it) }
             }
             binding.btnShowQr.isEnabled = true
+            // Reset QR visibility (bisa GONE dari stop server sebelumnya)
+            binding.qr.visibility = View.VISIBLE
         } else {
             badge.isVisible = true
             badge.setText(R.string.settings_badge_off)

@@ -1,4 +1,6 @@
 ## [Unreleased]
+- **Fix: QR card kosong setelah server restart** --  di-reset ke VISIBLE saat server hidup, dan dipastikan VISIBLE saat user tap Show QR. Sebelumnya, setelah server stop lalu start, QR card muncul kosong karena ImageView masih GONE.
+
 - **Fix: 11 warning lint desain Settings** -- (4x) android:drawableStart ke app:drawableStartCompat di nav chip. (2x) Hapus warna badge_on_bg/badge_off_bg tidak terpakai. (1x) Suppress TooManyViews. (1x) Badge textSize 10sp ke 11sp. (2x) String ON/OFF ke resource. (1x) Judul QR Code ke settings_qr_title.
 
 - **UI: percantik desain halaman Settings (8 item)** -- (1) Toolbar gradien `primary→primary_dark` seragam dengan halaman utama. (2) Nav chip Server/Download/Storage/Lainnya dilengkapi ikon (`ic_server`, `ic_download_section`, `ic_storage`, `ic_settings_gear`). (3) Section header pakai accent bar berwarna di kiri + ikon section — warna berbeda per seksi (biru/hijau/oranye/ungu). (4) Card `elevation="2dp"` lebih timbul dan rapi. (5) Tombol Save dari panel bawah tetap berubah jadi FAB pill floating (ikon ✓ + "Save") — hemat ruang. (6) Server status badge hijau "ON" / merah "OFF" langsung terbaca. (7) QR code dipindah ke card terpisah (collapse/expand terpisah dari section server). (8) Ikon chip nav beri tint otomatis sesuai warna section.
