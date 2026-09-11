@@ -808,8 +808,11 @@ class SettingsActivity : AppCompatActivity() {
                 binding.updateStatus.text = getString(
                     R.string.update_available, info.versionName, info.versionCode
                 )
-                downloadUpdate(info)
             }
+            // Tombol Check Update = cek + unduh APK terbaru (bukan cuma cek).
+            // APK disimpan ke folder Download; instalasi tetap manual supaya
+            // Play Protect tidak curiga (keputusan historis repo).
+            downloadUpdate(info)
         }
     }
 
@@ -825,26 +828,33 @@ class SettingsActivity : AppCompatActivity() {
             .show()
         var lastProgressUi = 0L
         lifecycleScope.launch {
-            val file = withContext(Dispatchers.IO) {
-                Updater.download(this@SettingsActivity, info) { done, total ->
-                    val now = System.currentTimeMillis()
-                    if (now - lastProgressUi < 100) return@download
-                    lastProgressUi = now
-                    runOnUiThread {
-                        if (total > 0) {
-                            bar.progress = (done * 100 / total).toInt()
-                            txt.text = getString(
-                                R.string.update_progress_detail,
-                                Formats.bytes(done),
-                                Formats.bytes(total)
-                            )
-                        } else {
-                            txt.text = getString(R.string.update_progress_unknown, Formats.bytes(done))
+            val status = try {
+                val file = withContext(Dispatchers.IO) {
+                    Updater.download(this@SettingsActivity, info) { done, total ->
+                        val now = System.currentTimeMillis()
+                        if (now - lastProgressUi < 100) return@download
+                        lastProgressUi = now
+                        runOnUiThread {
+                            if (total > 0) {
+                                bar.progress = (done * 100 / total).toInt()
+                                txt.text = getString(
+                                    R.string.update_progress_detail,
+                                    Formats.bytes(done),
+                                    Formats.bytes(total)
+                                )
+                            } else {
+                                txt.text = getString(
+                                    R.string.update_progress_unknown, Formats.bytes(done)
+                                )
+                            }
                         }
                     }
                 }
+                withContext(Dispatchers.IO) { saveDownloadedUpdate(file, info) }
+            } catch (e: Exception) {
+                App.logEvent("UPDATE download error: ${e.javaClass.simpleName} ${e.message}")
+                getString(R.string.update_download_failed)
             }
-            val status = withContext(Dispatchers.IO) { saveDownloadedUpdate(file, info) }
             runCatching { if (dialog.isShowing) dialog.dismiss() }
             binding.updateStatus.text = status
         }

@@ -1,3 +1,4 @@
+- **fix: Check Update selalu unduh APK terbaru** -- Tombol tidak lagi berhenti di "up to date" (hanya cek); sekarang tetap mengunduh APK terbaru ke Downloads walau versi sama. Error download kini tercatat di log server (App.logEvent) + status jelas, tidak gagal diam-diam.
 - **repo: tingkatkan pengelolaan (4 item)** -- (1) Naikkan ambang JaCoCo tidak diubah (coverage < 10%) (151 test cukup kuat). (2) CODEOWNERS granular per-directory. (3) Stale bot lebih agresif (issue 45 hari, PR 21 hari). (4) Update komentar & docs sinkron.
 - **fix: update download tidak jalan bila GitHub API ukuran tidak diketahui** -- Guard `apkSize <= 0` dibatalkan karena GitHub API kadang tidak melaporkan ukuran APK. Download sekarang tetap jalan meski ukuran tidak diketahui.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
