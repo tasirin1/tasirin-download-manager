@@ -17,7 +17,7 @@
         <item>Remote web: manage downloads, files and videos from a browser</item>
         <item>Security: PIN protection, signed updates and local-first access</item>
         <item>Performance: lightweight build optimized for low-memory devices</item>
-        <item>Storage: download manager, file manager and video gallery</item>
+        <item>Storage: download manager and video gallery</item>
         <item>Transparency: sideloaded apps may trigger a Play Protect warning</item>
     </string-array>
 </resources>
