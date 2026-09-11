@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/fm_open"
+        android:title="@string/file_manager_open" />
+    <item
+        android:id="@+id/fm_rename"
+        android:title="@string/file_manager_rename" />
+    <item
+        android:id="@+id/fm_delete"
+        android:title="@string/file_manager_delete" />
+</menu>

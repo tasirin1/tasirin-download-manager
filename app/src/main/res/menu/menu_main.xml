@@ -6,6 +6,10 @@
         android:title="@string/action_settings"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_file_manager"
+        android:title="@string/action_file_manager"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_pause_all"
         android:title="@string/pause_all"
         app:showAsAction="never" />

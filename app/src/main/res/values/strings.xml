@@ -288,4 +288,18 @@
     <string name="gallery_thumb_desc">Media preview</string>
     <string name="label_user_agent">User-Agent</string>
     <string name="hint_custom_user_agent">Or type custom User-Agent</string>
+    <string name="action_file_manager">File Manager</string>
+    <string name="file_manager_empty">No files here</string>
+    <string name="file_manager_parent">Parent folder</string>
+    <string name="file_manager_open">Open</string>
+    <string name="file_manager_delete">Delete</string>
+    <string name="file_manager_rename">Rename</string>
+    <string name="file_manager_confirm_delete">Delete "%1$s"?</string>
+    <string name="file_manager_confirm_delete_detail">This file will be permanently removed.</string>
+    <string name="file_manager_storage">Storage</string>
+    <string name="file_manager_empty_folder">This folder is empty</string>
+    <string name="file_manager_files_count">%1$d files</string>
+    <string name="file_manager_freed">%1$s free</string>
+    <string name="file_manager_path">%1$s</string>
+    <string name="file_manager_error">Cannot open file</string>
 </resources>
