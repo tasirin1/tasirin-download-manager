@@ -808,21 +808,7 @@ class SettingsActivity : AppCompatActivity() {
                 binding.updateStatus.text = getString(
                     R.string.update_available, info.versionName, info.versionCode
                 )
-                AlertDialog.Builder(this@SettingsActivity)
-                    .setTitle(R.string.update_title)
-                    .setMessage(
-                        getString(
-                            R.string.update_message,
-                            info.versionName,
-                            info.versionCode,
-                            Formats.bytes(info.apkSize)
-                        )
-                    )
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(R.string.update_download) { _, _ ->
-                        downloadUpdate(info)
-                    }
-                    .show()
+                downloadUpdate(info)
             }
         }
     }
