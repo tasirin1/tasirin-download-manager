@@ -343,7 +343,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="10dp"
-                            android:text="@string/settings_server_port"
+                            android:text="@string/settings_port_label"
                             android:textAppearance="?android:attr/textAppearanceSmall"
                             android:textColor="?android:attr/textColorSecondary" />
 
@@ -368,7 +368,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:text="@string/settings_view_log"
+                            android:text="@string/remote_log_label"
                             android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
