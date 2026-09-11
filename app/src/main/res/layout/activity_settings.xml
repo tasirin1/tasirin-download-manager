@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    tools:ignore="Autofill"
+    tools:ignore="Autofill,TooManyViews"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -41,7 +41,7 @@
                     android:background="@drawable/bg_chip"
                     android:clickable="true"
                     android:focusable="true"
-                    android:drawableStart="@drawable/ic_server"
+                    app:drawableStartCompat="@drawable/ic_server"
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
@@ -59,7 +59,7 @@
                     android:background="@drawable/bg_chip"
                     android:clickable="true"
                     android:focusable="true"
-                    android:drawableStart="@drawable/ic_download_section"
+                    app:drawableStartCompat="@drawable/ic_download_section"
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
@@ -77,7 +77,7 @@
                     android:background="@drawable/bg_chip"
                     android:clickable="true"
                     android:focusable="true"
-                    android:drawableStart="@drawable/ic_storage"
+                    app:drawableStartCompat="@drawable/ic_storage"
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
@@ -95,7 +95,7 @@
                     android:background="@drawable/bg_chip"
                     android:clickable="true"
                     android:focusable="true"
-                    android:drawableStart="@drawable/ic_settings_gear"
+                    app:drawableStartCompat="@drawable/ic_settings_gear"
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
@@ -180,7 +180,7 @@
                             android:layout_marginEnd="8dp"
                             android:background="@drawable/bg_badge_off"
                             android:textAllCaps="true"
-                            android:textSize="10sp"
+                            android:textSize="11sp"
                             android:textStyle="bold"
                             android:visibility="gone" />
 
@@ -391,7 +391,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="QR Code"
+                        android:text="@string/settings_qr_title"
                         android:textColor="@color/text_primary"
                         android:textSize="14sp"
                         android:textStyle="bold" />

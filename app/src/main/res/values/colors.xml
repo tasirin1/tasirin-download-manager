@@ -31,8 +31,6 @@
     <color name="icon_circle_generic">#EDF1F5</color>
 
     <!-- Settings: badge server & section accent -->
-    <color name="badge_on_bg">#E6F6EE</color>
-    <color name="badge_off_bg">#FDE8E7</color>
     <color name="badge_on_text">#2E7D32</color>
     <color name="badge_off_text">#C62828</color>
     <color name="section_accent_server">#1565C0</color>

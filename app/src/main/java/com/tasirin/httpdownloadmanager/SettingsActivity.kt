@@ -355,7 +355,7 @@ class SettingsActivity : AppCompatActivity() {
         val badge = binding.serverBadge
         if (server.isAlive) {
             badge.isVisible = true
-            badge.text = "ON"
+            badge.setText(R.string.settings_badge_on)
             badge.setTextColor(ContextCompat.getColor(this, R.color.badge_on_text))
             badge.setBackgroundResource(R.drawable.bg_badge_on)
 
@@ -371,7 +371,7 @@ class SettingsActivity : AppCompatActivity() {
             binding.btnShowQr.isEnabled = true
         } else {
             badge.isVisible = true
-            badge.text = "OFF"
+            badge.setText(R.string.settings_badge_off)
             badge.setTextColor(ContextCompat.getColor(this, R.color.badge_off_text))
             badge.setBackgroundResource(R.drawable.bg_badge_off)
 
