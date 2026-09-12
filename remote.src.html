@@ -937,6 +937,18 @@
   .move-row button:disabled {
  opacity: .5; cursor: default; }
 
+  .task-box .cm-text {
+ margin-bottom: 10px; }
+
+  .task-box .bar {
+ height: 6px; border-radius: 999px; background: var(--primary-soft); overflow: hidden; margin: 2px 0 6px; }
+
+  .task-box .fill {
+ height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--primary), #7a5cff); transition: width .2s ease; }
+
+  .cm-row.task-foot {
+ margin-top: 14px; }
+
   .sheet {
  position: fixed; inset: 0; z-index: 85; background: rgba(8,12,22,.45); display: flex; align-items: flex-end; justify-content: center; }
 
@@ -1540,6 +1552,17 @@
       <button id="moveNewFolder" type="button" class="btn-ghost">New Folder</button>
       <button id="moveCancel" type="button" class="btn-ghost">Cancel</button>
       <button id="moveYes" type="button" class="btn-main">Move here</button>
+    </div>
+  </div>
+</div>
+
+<div id="fsTaskModal" class="cm-overlay hidden">
+  <div class="cm-box task-box">
+    <div class="cm-title" id="fsTaskTitle">Working&#8230;</div>
+    <div class="cm-text" id="fsTaskText"></div>
+    <div class="bar"><div class="fill" id="fsTaskBar"></div></div>
+    <div class="cm-row task-foot">
+      <button id="fsTaskCancel" type="button" class="btn-ghost">Cancel</button>
     </div>
   </div>
 </div>
@@ -2841,14 +2864,12 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
   if (!fsSelected.size) return;
   showConfirm('Delete ' + fsSelected.size + ' item(s)?', 'The folder will be deleted along with its contents.', 'Delete', function () {
     (async function () {
-      try {
-        for (const it of fsSelected) {
-          await postFsAction({action: 'delete', path: it.path});
-        }
-      } catch (e) {
-        loadFs();
-        return;
-      }
+      const items = Array.from(fsSelected);
+      const res = await runFsActions('Deleting', items, function (it) {
+        return {action: 'delete', path: it.path};
+      });
+      if (res.done) mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items'), 2500);
+      if (res.failed) mmShowToast('Delete failed \u2014 check the status message', 3000);
       exitFsSelect();
     })();
   });
@@ -3076,7 +3097,9 @@ async function doFsOp(it, op) {
       'Delete \"' + it.name + '\" from the device? The folder will be deleted along with its contents.',
       'Delete',
       function () {
-        postFsAction({action: 'delete', path: it.path}).then(loadFs).catch(function() {});
+        runFsActions('Deleting', [it], function (x) {
+          return {action: 'delete', path: x.path};
+        }).then(loadFs);
       });
   } else if (op === 'rename') {
     showInput('Rename', it.name, 'New name for \"' + it.name + '\"', 'Rename',
@@ -3206,19 +3229,19 @@ async function moveHere() {
   }
   const yesBtn = document.getElementById('moveYes');
   yesBtn.disabled = true;
-  try {
-    for (const it of moveItems) {
-      await postFsAction({action: 'move', path: it.path, dest: dest});
-    }
-    const count = moveItems.length;
-    closeMovePicker();
+  const res = await runFsActions('Moving', moveItems, function (it) {
+    return {action: 'move', path: it.path, dest: dest};
+  });
+  const count = res.done;
+  closeMovePicker();
+  if (res.failed) {
+    mmShowToast('Move failed \u2014 check the status message', 3000);
+  } else if (res.cancelled) {
+    mmShowToast('Move cancelled \u2014 ' + count + (count === 1 ? ' item' : ' items') + ' moved', 3000);
+  } else {
     mmShowToast('Moved ' + count + (count === 1 ? ' item' : ' items'), 2500);
-    if (fsSelectMode) exitFsSelect(); else loadFs();
-  } catch (e) {
-    mmShowToast('Move failed: ' + e.message, 3000);
-    closeMovePicker();
-    loadFs();
   }
+  if (fsSelectMode) exitFsSelect(); else loadFs();
 }
 
 document.getElementById('moveCancel').addEventListener('click', closeMovePicker);
@@ -3241,6 +3264,81 @@ document.getElementById('moveNewFolder').addEventListener('click', function () {
     });
   });
 });
+
+// Indikator progres untuk aksi FS yang lama (Move/Delete, batch & single).
+// Ditampilkan dengan delay pendek supaya aksi cepat tidak berkedip layar.
+const fsTaskModal = document.getElementById('fsTaskModal');
+const fsTaskTitleEl = document.getElementById('fsTaskTitle');
+const fsTaskTextEl = document.getElementById('fsTaskText');
+const fsTaskBarEl = document.getElementById('fsTaskBar');
+const fsTaskCancelBtn = document.getElementById('fsTaskCancel');
+let fsTaskBusy = false;
+let fsTaskCancelFlag = false;
+let fsTaskShowTimer = null;
+
+function showFsTask(title) {
+  clearTimeout(fsTaskShowTimer);
+  fsTaskShowTimer = setTimeout(function () {
+    if (!fsTaskBusy) return;
+    fsTaskTitleEl.textContent = title;
+    fsTaskTextEl.textContent = 'Starting\u2026';
+    fsTaskBarEl.style.width = '0%';
+    fsTaskCancelBtn.disabled = false;
+    fsTaskModal.classList.remove('hidden');
+  }, 220);
+}
+
+function updateFsTask(text, pct) {
+  if (fsTaskModal.classList.contains('hidden')) return;
+  fsTaskTextEl.textContent = text;
+  fsTaskBarEl.style.width = Math.max(4, Math.min(100, pct)) + '%';
+}
+
+function hideFsTask() {
+  clearTimeout(fsTaskShowTimer);
+  fsTaskModal.classList.add('hidden');
+}
+
+fsTaskCancelBtn.addEventListener('click', function () {
+  fsTaskCancelFlag = true;
+  fsTaskCancelBtn.disabled = true;
+  fsTaskTextEl.textContent = 'Stopping\u2026';
+});
+
+// Jalankan sederet fs_action berurutan. Return {done, cancelled, failed}:
+// done = jumlah item sukses, cancelled = dihentikan user, failed = error.
+async function runFsActions(title, items, makeParams) {
+  if (fsTaskBusy) {
+    mmShowToast('Another operation is already running', 2500);
+    return {done: 0, cancelled: false, failed: true};
+  }
+  fsTaskBusy = true;
+  fsTaskCancelFlag = false;
+  const total = items.length;
+  let done = 0;
+  const out = {done: 0, cancelled: false, failed: false};
+  showFsTask(title);
+  try {
+    for (const it of items) {
+      if (fsTaskCancelFlag) break;
+      const label = it.name || it.path || '';
+      updateFsTask((done + 1) + ' of ' + total + ' \u2014 ' + label, total > 1 ? (done / total) * 100 : 15);
+      await postFsAction(makeParams(it));
+      done++;
+      updateFsTask(done + ' of ' + total + ' done', total > 1 ? (done / total) * 100 : 100);
+    }
+  } catch (e) {
+    out.failed = true;
+    mmShowToast('Failed: ' + e.message, 3000);
+  } finally {
+    hideFsTask();
+    fsTaskBusy = false;
+    fsTaskCancelFlag = false;
+  }
+  out.done = done;
+  out.cancelled = done < total && !out.failed;
+  return out;
+}
 
 document.getElementById('fsMkdirBtn').addEventListener('click', async function () {
   if (!fsPath) {
