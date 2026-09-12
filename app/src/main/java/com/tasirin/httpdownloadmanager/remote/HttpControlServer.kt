@@ -791,6 +791,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         var h = items.size
         items.forEach { item ->
             h = h * 31 + item.id.hashCode() * 7 + item.state.hashCode() * 13 +
+                // fileName/url/totalBytes ikut signature: rename atau ganti URL
+                // (mis. hasil resolveFinalName dari Content-Disposition) wajib
+                // memicu rebuild cache JSON remote, bukan menampilkan nama lama.
+                item.fileName.hashCode() * 17 + item.url.hashCode() * 23 +
+                item.totalBytes.hashCode() * 21 +
                 item.bytesDownloaded.hashCode() * 19 + item.speedBps.hashCode() * 29 +
                 item.etaSeconds.hashCode() * 31 + item.finishedAt.hashCode() * 41 +
                 item.priority.hashCode() * 43 + item.retryCount.hashCode() * 53 +
@@ -815,7 +820,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         items.forEachIndexed { idx, item ->
             val oldObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
             if (oldObj != null && oldObj.optString("id") == item.id) {
-                // Update hanya field yang berubah — hemat ~40% GC alloc
+                // Update hanya field yang berubah — hemat ~40% GC alloc.
+                // fileName/url ikut disegarkan: item bisa di-rename saat download
+                // mulai (Content-Disposition) atau lewat aksi Rename/mirror.
+                if (oldObj.optString("fileName") != item.fileName) oldObj.put("fileName", item.fileName)
+                if (oldObj.optString("url") != item.url) oldObj.put("url", item.url)
                 oldObj.put("state", item.state.name)
                 oldObj.put("bytesDownloaded", item.bytesDownloaded)
                 oldObj.put("totalBytes", item.totalBytes)

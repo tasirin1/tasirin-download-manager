@@ -185,6 +185,7 @@ kuat dan tanpa diskusi:
 | Batch fs action tetap lanjut setelah gagal | `postFsAction()` menelan error sehingga promise selalu resolved | helper melaporkan error lalu rethrow; caller berhenti dan refresh state |
 | `Accept-Ranges` header case-sensitive | `getHeaderField("Accept-Ranges") == "bytes"` tidak menangani server yang mengembalikan `Bytes`/`BYTES` → multi-segmen dilewati walau server mendukung Range | gunakan `.equals("bytes", ignoreCase = true)` di `DownloadEngine` |
 | Gallery select mode rebuild DOM | `galSetSelectMode()` memanggil `reRenderGalleryLoaded()` yang menghapus semua cell lalu rebuild dari awal (flash & alokasi DOM berulang pada galeri besar) | in-place toggle: tambah/hapus `.gal-check` per cell tanpa membongkar grid; `reRenderGalleryLoaded()` sudah dihapus |
+| Nama item remote tidak pernah update setelah rename/resolve nama | cache JSON remote meng-reuse JSONObject statis tanpa menyegarkan `fileName`/`url`, dan `itemsSignature()` tidak memuat `fileName` | `itemsSignature()` wajib memasukkan `fileName`/`url`/`totalBytes`; reuse path di `itemsJson()` wajib refresh `fileName`/`url` |
 | SSE reconnect diam bisa gagal masuk state "give up" | flag diberi nilai `true` sebelum reconnect manual | pakai counter percobaan sekali + grace window sebelum menutup EventSource |
 
 ## Aturan pengembangan
