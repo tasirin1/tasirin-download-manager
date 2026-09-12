@@ -1,11 +1,14 @@
 package com.tasirin.httpdownloadmanager.remote
 
+import android.Manifest
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.annotation.SuppressLint
 import androidx.core.net.toUri
+import androidx.core.content.ContextCompat
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -1893,14 +1896,27 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         ) return cached.third
         val result = MediaLibrary.scan(context, maxEntries = maxEntries, selectedFolders = folders)
         galleryCache = Triple(now, folders, result)
-        // Diagnostik: filter folder aktif tapi tidak ada satu pun video yang
-        // cocok — kemungkinan folder salah ketik/mismatch path (lihat
-        // MediaLibrary.pathMatchesFolder). Dicatat agar mudah ditelusuri.
-        if (folders.isNotEmpty() && result.items.isEmpty()) {
+        // Diagnostik galeri kosong (throttle 5 menit): bedakan "filter tidak
+        // cocok" (folder salah/mismatch path) vs "storage kosong/tanpa izin"
+        // (permission Android 5-9) supaya penyebabnya langsung terlihat.
+        if (result.items.isEmpty()) {
             val t = System.currentTimeMillis()
             if (t - lastGalleryEmptyLog > 300_000L) {
                 lastGalleryEmptyLog = t
-                App.logEvent("GALLERY FILTER EMPTY: folders=${folders.joinToString("|")}")
+                val storageOk = if (Build.VERSION.SDK_INT >= 23) {
+                    ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    true
+                }
+                if (folders.isNotEmpty()) {
+                    App.logEvent(
+                        "GALLERY FILTER EMPTY: folders=${folders.joinToString("|")}, storagePermission=$storageOk"
+                    )
+                } else {
+                    App.logEvent("GALLERY EMPTY (no filter): storagePermission=$storageOk")
+                }
             }
         }
         return result

@@ -385,6 +385,9 @@ object MediaLibrary {
         } else {
             emptyList()
         }
+        // Penghitung baris MediaStore mentah (sebelum filter) untuk deteksi
+        // "indeks MediaStore rusak/kosong" — memicu fallback scan filesystem.
+        var mediaStoreRows = 0
         runCatching {
             val resolver = context.contentResolver
             val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
@@ -452,6 +455,7 @@ object MediaLibrary {
                     -1
                 }
                 while (c.moveToNext()) {
+                    mediaStoreRows++
                     val name = c.getString(iName) ?: continue
                     val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
                     val relativePath = if (iRel >= 0) {
@@ -475,6 +479,22 @@ object MediaLibrary {
                             relativePath = relativePath
                         )
                     )
+                }
+            }
+        }
+
+        // 4b) MediaStore kosong/rusak (umum di Android 5-6 setelah file dicolok
+        //     via USB/PC — indeks tidak pernah ter-scan): fallback scan
+        //     filesystem seluruh storage primer supaya mode "scan semua" tetap
+        //     menemukan video tanpa bergantung pada baris MediaStore.
+        if (!folderFilterActive && mediaStoreRows == 0) {
+            runCatching {
+                val root = File(galleryRoot)
+                if (root.isDirectory) {
+                    root.walkTopDown()
+                        .filter { it.isFile && isGalleryVideo(it.name) }
+                        .take(GALLERY_MAX_ENTRIES)
+                        .forEach { addFile(it) }
                 }
             }
         }
