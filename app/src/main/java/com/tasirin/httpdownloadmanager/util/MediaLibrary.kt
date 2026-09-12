@@ -490,6 +490,28 @@ object MediaLibrary {
             }
         }
 
+        // 6) Folder galeri terpilih dipindai LANGSUNG dari filesystem
+        //    (rekursif). MediaStore kadang tidak mengindeks file yang dicolok
+        //    via USB/PC di Android 5-6, atau melaporkan kolom DATA dengan root
+        //    berbeda dari folder yang diketik user — scan langsung menjamin
+        //    video di folder pilihan tetap tampil apa pun isi MediaStore.
+        //    Dedupe di bawah memakai filePath, jadi baris MediaStore yang sama
+        //    tidak akan dobel (durasi dari MediaStore tetap menang karena
+        //    section 4 lebih dulu). Dibatasi GALLERY_MAX_ENTRIES agar traversal
+        //    berhenti lebih awal pada folder raksasa.
+        if (folderFilterActive) {
+            for (folder in allowedFolders) {
+                val dir = File(folder)
+                if (!dir.isDirectory) continue
+                runCatching {
+                    dir.walkTopDown()
+                        .filter { it.isFile && isGalleryVideo(it.name) }
+                        .take(GALLERY_MAX_ENTRIES)
+                        .forEach { addFile(it) }
+                }
+            }
+        }
+
         // Hapus duplikat: file yang sama bisa muncul sebagai path (f:) dan
         // sebagai MediaStore (u:) — dedupe berdasar path file bila ada.
         // Filter folder (sebelum dedupe): item dengan path absolut dicocokkan
