@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager.util
 
+import android.annotation.SuppressLint
 import android.content.ContentUris
 import android.content.Context
 import android.database.ContentObserver
@@ -193,7 +194,10 @@ object MediaLibrary {
 
     /** Alias root penyimpanan primer Android 5-6: kolom DATA MediaStore kadang
      *  memakai symlink lama (/sdcard, /mnt/sdcard, /storage/emulated/legacy)
-     *  padahal folder galeri disimpan dengan externalRoot (/storage/emulated/0). */
+     *  padahal folder galeri disimpan dengan externalRoot (/storage/emulated/0).
+     *  Suppress SdCardPath: daftar ini hanya dipakai untuk PENCARIAN prefix
+     *  pada string path, bukan untuk I/O langsung ke /sdcard. */
+    @SuppressLint("SdCardPath")
     private val PRIMARY_STORAGE_ALIASES = arrayOf(
         "/storage/emulated/0", "/storage/emulated/legacy", "/sdcard", "/mnt/sdcard"
     )
