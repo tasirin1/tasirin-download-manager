@@ -2810,7 +2810,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_MEDIA_ZIP_TOKENS = 256
         private const val FS_STATS_TTL_MS = 10_000L
         private const val SSE_MIN_INTERVAL_MS = 1_000L
-        private const val MAX_QR_TEXT_LENGTH = 2_000
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu
         // koneksi hidup (dan fallback polling klien tidak ikut jalan).
         private const val SSE_HEARTBEAT_MS = 3_000L
