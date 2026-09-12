@@ -2865,7 +2865,7 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
   showConfirm('Delete ' + fsSelected.size + ' item(s)?', 'The folder will be deleted along with its contents.', 'Delete', function () {
     (async function () {
       const items = Array.from(fsSelected);
-      const res = await runFsActions('Deleting', items, function (it) {
+      const res = await runFsActions('Deleting', 'deleted', items, function (it) {
         return {action: 'delete', path: it.path};
       });
       if (res.done) mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items'), 2500);
@@ -3097,7 +3097,7 @@ async function doFsOp(it, op) {
       'Delete \"' + it.name + '\" from the device? The folder will be deleted along with its contents.',
       'Delete',
       function () {
-        runFsActions('Deleting', [it], function (x) {
+        runFsActions('Deleting', 'deleted', [it], function (x) {
           return {action: 'delete', path: x.path};
         }).then(loadFs);
       });
@@ -3229,7 +3229,7 @@ async function moveHere() {
   }
   const yesBtn = document.getElementById('moveYes');
   yesBtn.disabled = true;
-  const res = await runFsActions('Moving', moveItems, function (it) {
+  const res = await runFsActions('Moving', 'moved', moveItems, function (it) {
     return {action: 'move', path: it.path, dest: dest};
   });
   const count = res.done;
@@ -3265,27 +3265,24 @@ document.getElementById('moveNewFolder').addEventListener('click', function () {
   });
 });
 
-// Indikator progres untuk aksi FS yang lama (Move/Delete, batch & single).
-// Ditampilkan dengan delay pendek supaya aksi cepat tidak berkedip layar.
+// Indikator progres untuk aksi FS (Move/Delete, batch & single). Overlay
+// tampil langsung saat mulai dan bertahan minimal FS_TASK_MIN_MS supaya aksi
+// cepat (rename dalam volume yang sama) tetap terlihat sebagai proses.
 const fsTaskModal = document.getElementById('fsTaskModal');
 const fsTaskTitleEl = document.getElementById('fsTaskTitle');
 const fsTaskTextEl = document.getElementById('fsTaskText');
 const fsTaskBarEl = document.getElementById('fsTaskBar');
 const fsTaskCancelBtn = document.getElementById('fsTaskCancel');
+const FS_TASK_MIN_MS = 600;
 let fsTaskBusy = false;
 let fsTaskCancelFlag = false;
-let fsTaskShowTimer = null;
 
 function showFsTask(title) {
-  clearTimeout(fsTaskShowTimer);
-  fsTaskShowTimer = setTimeout(function () {
-    if (!fsTaskBusy) return;
-    fsTaskTitleEl.textContent = title;
-    fsTaskTextEl.textContent = 'Starting\u2026';
-    fsTaskBarEl.style.width = '0%';
-    fsTaskCancelBtn.disabled = false;
-    fsTaskModal.classList.remove('hidden');
-  }, 220);
+  fsTaskTitleEl.textContent = title;
+  fsTaskTextEl.textContent = 'Starting\u2026';
+  fsTaskBarEl.style.width = '4%';
+  fsTaskCancelBtn.disabled = false;
+  fsTaskModal.classList.remove('hidden');
 }
 
 function updateFsTask(text, pct) {
@@ -3295,7 +3292,6 @@ function updateFsTask(text, pct) {
 }
 
 function hideFsTask() {
-  clearTimeout(fsTaskShowTimer);
   fsTaskModal.classList.add('hidden');
 }
 
@@ -3305,9 +3301,14 @@ fsTaskCancelBtn.addEventListener('click', function () {
   fsTaskTextEl.textContent = 'Stopping\u2026';
 });
 
+function delayMs(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+}
+
 // Jalankan sederet fs_action berurutan. Return {done, cancelled, failed}:
 // done = jumlah item sukses, cancelled = dihentikan user, failed = error.
-async function runFsActions(title, items, makeParams) {
+// verbDone = kata kerja lampau untuk pesan akhir (mis. "moved"/"deleted").
+async function runFsActions(title, verbDone, items, makeParams) {
   if (fsTaskBusy) {
     mmShowToast('Another operation is already running', 2500);
     return {done: 0, cancelled: false, failed: true};
@@ -3315,28 +3316,39 @@ async function runFsActions(title, items, makeParams) {
   fsTaskBusy = true;
   fsTaskCancelFlag = false;
   const total = items.length;
-  let done = 0;
+  const t0 = Date.now();
   const out = {done: 0, cancelled: false, failed: false};
   showFsTask(title);
   try {
+    let done = 0;
     for (const it of items) {
       if (fsTaskCancelFlag) break;
       const label = it.name || it.path || '';
       updateFsTask((done + 1) + ' of ' + total + ' \u2014 ' + label, total > 1 ? (done / total) * 100 : 15);
       await postFsAction(makeParams(it));
       done++;
-      updateFsTask(done + ' of ' + total + ' done', total > 1 ? (done / total) * 100 : 100);
+      updateFsTask(done + ' of ' + total, total > 1 ? (done / total) * 100 : 15);
     }
+    out.done = done;
+    out.cancelled = done < total;
   } catch (e) {
     out.failed = true;
     mmShowToast('Failed: ' + e.message, 3000);
-  } finally {
-    hideFsTask();
-    fsTaskBusy = false;
-    fsTaskCancelFlag = false;
   }
-  out.done = done;
-  out.cancelled = done < total && !out.failed;
+  const doneLabel = out.done + (out.done === 1 ? ' item ' + verbDone : ' items ' + verbDone);
+  fsTaskCancelBtn.disabled = true;
+  if (out.failed) {
+    updateFsTask('Failed \u2014 ' + (out.done ? doneLabel : 'nothing ' + verbDone), out.done ? 100 : 4);
+  } else if (out.cancelled) {
+    updateFsTask('Stopped \u2014 ' + doneLabel, total > 1 ? (out.done / total) * 100 : 100);
+  } else {
+    updateFsTask('Done \u2014 ' + doneLabel, 100);
+  }
+  const remain = FS_TASK_MIN_MS - (Date.now() - t0);
+  if (remain > 0) await delayMs(remain);
+  hideFsTask();
+  fsTaskBusy = false;
+  fsTaskCancelFlag = false;
   return out;
 }
 
