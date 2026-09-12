@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="@color/card_bg" />
-    <stroke android:width="1dp" android:color="@color/line" />
-    <corners android:radius="16dp" />
-</shape>
+<!-- Section card Settings: timbul lembut (shadow + border), konsisten dengan
+     kartu di halaman utama. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="3dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#1A10141C" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+    <item android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/card_bg" />
+            <stroke android:width="1dp" android:color="@color/line" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</layer-list>
