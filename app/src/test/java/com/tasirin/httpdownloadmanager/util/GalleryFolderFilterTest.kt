@@ -29,6 +29,30 @@ class GalleryFolderFilterTest {
     }
 
     @Test
+    fun `path absolut - beda huruf besar masih cocok (SQLite LIKE & FAT)`() {
+        // Android 6 MediaStore DATA kadang beda kapitalisasi dari folder
+        // yang diketik user; SQLite LIKE sendiri case-insensitive.
+        assertTrue(MediaLibrary.isInGalleryFolders("$root/dcim/camera/VID.mp4", null, root, listOf(folder)))
+        assertTrue(MediaLibrary.isInGalleryFolders("$root/DCIM/Camera/Sub/VID.mp4", null, root, listOf(folder.lowercase())))
+    }
+
+    @Test
+    fun `path absolut - alias root primer cocok dengan folder asli`() {
+        // Android 5-6: DATA kadang memakai symlink /sdcard atau /mnt/sdcard
+        // padahal folder galeri disimpan dengan /storage/emulated/0.
+        assertTrue(MediaLibrary.isInGalleryFolders("/sdcard/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
+        assertTrue(MediaLibrary.isInGalleryFolders("/mnt/sdcard/DCIM/Camera/sub/VID.mp4", null, root, listOf(folder)))
+        assertTrue(MediaLibrary.isInGalleryFolders("/storage/emulated/legacy/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
+    }
+
+    @Test
+    fun `path absolut - volume lain dengan nama folder sama tidak ikut`() {
+        // Folder galeri hanya bisa di bawah root primer; jangan menyeret
+        // video dari USB/SD eksternal yang kebetulan punya folder senama.
+        assertFalse(MediaLibrary.isInGalleryFolders("/storage/9999-ABCD/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
+    }
+
+    @Test
     fun `relative path MediaStore - cocok walau DATA null`() {
         // Android 11+: DATA bisa null, RELATIVE_PATH = "DCIM/Camera/"
         assertTrue(MediaLibrary.isInGalleryFolders(null, "DCIM/Camera/VID.mp4", root, listOf(folder)))
@@ -40,6 +64,11 @@ class GalleryFolderFilterTest {
     fun `relative path MediaStore - di luar folder terpilih ditolak`() {
         assertFalse(MediaLibrary.isInGalleryFolders(null, "Movies/VID.mp4", root, listOf(folder)))
         assertFalse(MediaLibrary.isInGalleryFolders(null, "Download/VID.mp4", root, listOf(folder)))
+    }
+
+    @Test
+    fun `relative path MediaStore - beda huruf besar masih cocok`() {
+        assertTrue(MediaLibrary.isInGalleryFolders(null, "dcim/camera/VID.mp4", root, listOf(folder)))
     }
 
     @Test

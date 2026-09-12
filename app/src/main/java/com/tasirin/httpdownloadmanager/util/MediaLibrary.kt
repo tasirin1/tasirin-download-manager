@@ -183,12 +183,20 @@ object MediaLibrary {
         selectedFolders: List<String>
     ): Boolean {
         if (selectedFolders.isEmpty()) return true
-        // Normalisasi semua path: trim whitespace + trailing slash, komparasi
-        // case-sensitive (path Linux case-sensitive; Android file system umumnya
-        // case-insensitive tapi relatif konsisten di MediaStore).
+        // Normalisasi semua path: trim whitespace + trailing slash. Komparasi
+        // dilakukan case-insensitive: konsisten dengan SQLite LIKE (NOCASE)
+        // yang dipakai MediaStore API < 29, dan aman untuk filesystem
+        // FAT/SD yang case-insensitive.
         val allowed = selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
         return inSelectedFolders(dataPath, relativePath, externalRoot, allowed)
     }
+
+    /** Alias root penyimpanan primer Android 5-6: kolom DATA MediaStore kadang
+     *  memakai symlink lama (/sdcard, /mnt/sdcard, /storage/emulated/legacy)
+     *  padahal folder galeri disimpan dengan externalRoot (/storage/emulated/0). */
+    private val PRIMARY_STORAGE_ALIASES = arrayOf(
+        "/storage/emulated/0", "/storage/emulated/legacy", "/sdcard", "/mnt/sdcard"
+    )
 
     /** Bagian murni filter folder galeri; [allowed] sudah ternormalisasi
      *  (trim + tanpa trailing slash). Dipakai scanUncached per-entry tanpa
@@ -201,15 +209,44 @@ object MediaLibrary {
     ): Boolean {
         val fp = dataPath?.trim()?.trimEnd('/').orEmpty()
         if (fp.isNotEmpty()) {
-            return allowed.any { fp == it || fp.startsWith("$it/") }
+            return allowed.any { pathMatchesFolder(fp, it, externalRoot) }
         }
         val rel = relativePath?.trim('/')?.trimEnd('/').orEmpty()
         if (rel.isNotEmpty()) {
             val root = externalRoot.trim().trimEnd('/')
+            val relLc = rel.lowercase()
             return allowed.any { folder ->
                 if (folder == root) return@any true
                 val relFolder = folder.removePrefix(root).trim('/')
-                relFolder.isEmpty() || rel == relFolder || rel.startsWith("$relFolder/")
+                val relFolderLc = relFolder.lowercase()
+                relFolderLc.isEmpty() || relLc == relFolderLc || relLc.startsWith("$relFolderLc/")
+            }
+        }
+        return false
+    }
+
+    /** Cocokkan path absolut file dengan folder galeri. Tiga strategi:
+     *  1) awalan langsung (kasus standar);
+     *  2) case-insensitive — konsisten dengan SQLite LIKE NOCASE di API < 29
+     *     dan filesystem FAT/SD;
+     *  3) bila path memakai alias root primer (/sdcard, /mnt/sdcard, ...),
+     *     bandingkan bagian relatifnya terhadap folder — menutup DATA Android
+     *     5-6 yang memakai symlink lama. */
+    private fun pathMatchesFolder(fp: String, folder: String, externalRoot: String): Boolean {
+        if (fp == folder || fp.startsWith("$folder/")) return true
+        val folderLc = folder.lowercase()
+        val fpLc = fp.lowercase()
+        if (fpLc == folderLc || fpLc.startsWith("$folderLc/")) return true
+        val root = externalRoot.trim().trimEnd('/')
+        if (folder.startsWith(root)) {
+            val folderRel = folder.removePrefix(root).trim('/')
+            if (folderRel.isEmpty()) return true // seluruh root dipilih
+            val folderRelLc = folderRel.lowercase()
+            for (alias in PRIMARY_STORAGE_ALIASES) {
+                if (fp.startsWith("$alias/")) {
+                    val rel = fp.substring(alias.length + 1).lowercase()
+                    return rel == folderRelLc || rel.startsWith("$folderRelLc/")
+                }
             }
         }
         return false
@@ -360,7 +397,10 @@ object MediaLibrary {
             // RELATIVE_PATH (kolom diindeks; DATA deprecated & sering null di
             // Android 11+ — LIKE di kolom null tidak menjaring apa pun dan
             // membuat video di luar folder terpilih ikut tampil). API < 29
-            // tetap pakai DATA = path absolut.
+            // TIDAK memakai pre-filter SQL: kolom DATA di Android 5-6 kadang
+            // memakai alias root (/sdcard, /mnt/sdcard) yang tidak cocok dengan
+            // LIKE path absolut, jadi semua baris video diambil dan filter
+            // final diserahkan ke pathMatchesFolder (alias + case-insensitive).
             val selection: String?
             val selectionArgs: Array<String>?
             if (selectedFolders.isNotEmpty()) {
@@ -385,8 +425,8 @@ object MediaLibrary {
                         selectionArgs = args.toTypedArray()
                     }
                 } else {
-                    selection = selectedFolders.joinToString(" OR ") { "${MediaStore.MediaColumns.DATA} LIKE ?" }
-                    selectionArgs = selectedFolders.map { "$it/%" }.toTypedArray()
+                    selection = null
+                    selectionArgs = null
                 }
             } else {
                 selection = null

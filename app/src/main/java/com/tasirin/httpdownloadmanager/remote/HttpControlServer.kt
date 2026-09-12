@@ -77,6 +77,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
     private val shareLock = Any()
     @Volatile private var galleryCache: Triple<Long, List<String>, MediaLibrary.MediaScanResult>? = null
+    // Throttle log "galeri kosong karena filter folder" (maks 1x / 5 menit per
+    // sesi server) supaya LogActivity tidak kebanjiran saat pengguna menatap
+    // galeri kosong.
+    @Volatile private var lastGalleryEmptyLog = 0L
     private val loginAttempts = ConcurrentHashMap<String, LoginAttempt>()
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Pair<Int, Long>>>()
     private val fsStatsCacheTtlMs = 60_000L
@@ -1889,6 +1893,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         ) return cached.third
         val result = MediaLibrary.scan(context, maxEntries = maxEntries, selectedFolders = folders)
         galleryCache = Triple(now, folders, result)
+        // Diagnostik: filter folder aktif tapi tidak ada satu pun video yang
+        // cocok — kemungkinan folder salah ketik/mismatch path (lihat
+        // MediaLibrary.pathMatchesFolder). Dicatat agar mudah ditelusuri.
+        if (folders.isNotEmpty() && result.items.isEmpty()) {
+            val t = System.currentTimeMillis()
+            if (t - lastGalleryEmptyLog > 300_000L) {
+                lastGalleryEmptyLog = t
+                App.logEvent("GALLERY FILTER EMPTY: folders=${folders.joinToString("|")}")
+            }
+        }
         return result
     }
 
