@@ -104,7 +104,7 @@ object MediaLibrary {
         )
     }.getOrNull()
 
-    /** Scan dengan cache 15 detik + auto-invalidasi saat MediaStore berubah.
+    /** Scan dengan cache 30 detik + auto-invalidasi saat MediaStore berubah.
      *  [maxEntries] membatasi berapa entry di-hold di memori; galeri mulai dari
      *  halaman kecil lalu menaikkan limit saat pengguna scroll (load-more). */
     fun scan(

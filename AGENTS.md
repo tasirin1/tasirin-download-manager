@@ -96,7 +96,7 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
   wajib punya ID dan diserialisasi per-ID, ZIP folder, streaming Range, galeri
   video-only, thumbnail, serta stream parsial bertoken.
 - **MediaLibrary** memindai **video saja** dari MediaStore/file (kolom `DURATION`
-  bila tersedia; `RELATIVE_PATH` hanya API ≥ 29), TTL 15 detik, thumbnail 16:9
+  bila tersedia; `RELATIVE_PATH` hanya API ≥ 29), TTL 30 detik, thumbnail 16:9
   di-cache, dan akses cache scan dilindungi lock agar tidak scan paralel duplikat.
 - **Updater** membaca release GitHub, memilih asset APK dengan kode tertinggi,
   memverifikasi SHA-256 sertifikat release, lalu **hanya mengunduh APK**. Instalasi

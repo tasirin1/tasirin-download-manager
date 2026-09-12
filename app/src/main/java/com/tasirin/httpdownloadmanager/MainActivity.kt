@@ -1252,6 +1252,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private val autoOpenedIds = mutableSetOf<String>()
 
     private fun autoOpenCompleted(items: List<DownloadItem>) {
+        // autoOpenedIds tumbuh sepanjang sesi; buang id yang sudah tidak ada di
+        // daftar agar tidak bocor memori setelah banyak download selesai.
+        if (autoOpenedIds.size > items.size * 2 + 16) {
+            val keep = items.asSequence().map { it.id }.toSet()
+            autoOpenedIds.retainAll(keep)
+        }
         for (item in items) {
             if (item.state == DownloadState.COMPLETED &&
                 item.id !in autoOpenedIds &&
@@ -1276,7 +1282,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         runCatching { startActivity(intent) }
                     }
                     // Video → pemutar video
-                    mime.startsWith("video/") || ext in setOf("mp4","mkv","webm","ts","avi","mov","flv") -> {
+                    mime.startsWith("video/") || ext in AUTO_OPEN_VIDEO_EXTS -> {
                         val uri = if (item.contentUri != null) {
                             item.contentUri.toUri()
                         } else {
@@ -1437,6 +1443,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     companion object {
+        private val AUTO_OPEN_VIDEO_EXTS = setOf("mp4", "mkv", "webm", "ts", "avi", "mov", "flv")
         private val URL_PATTERN = Regex("https?://[^\\s\"'<>]+")
         private fun extractUrls(text: String): List<String> =
             URL_PATTERN.findAll(text)
