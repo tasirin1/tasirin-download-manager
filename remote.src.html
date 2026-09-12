@@ -892,6 +892,51 @@
   .cm-box input.cm-input {
  margin-bottom: 6px; }
 
+  .move-box {
+ width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; max-height: min(82vh, 640px); }
+
+  .move-title {
+ font-size: 16.5px; font-weight: 800; margin-bottom: 2px; }
+
+  .move-sub {
+ font-size: 12.5px; color: var(--muted); margin-bottom: 10px; word-break: break-word; }
+
+  .move-path {
+ display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 8px; overflow-x: auto; scrollbar-width: none; }
+
+  .move-path .fs-crumb {
+ background: var(--card); }
+
+  .move-list {
+ flex: 1; min-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; margin: 10px 0; }
+
+  .move-folder {
+ display: flex; width: 100%; align-items: center; gap: 9px; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 13.5px; font-weight: 600; text-align: left; cursor: pointer; }
+
+  .move-folder:hover {
+ border-color: var(--primary); color: var(--primary); }
+
+  .move-folder .mv-name {
+ flex: 1; min-width: 0; word-break: break-all; }
+
+  .move-folder .mv-meta {
+ flex: 0 0 auto; font-size: 11px; font-weight: 400; color: var(--muted); }
+
+  .move-empty {
+ padding: 18px 6px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  .move-row {
+ display: flex; gap: 8px; margin-top: 2px; }
+
+  .move-row button {
+ flex: 1; padding: 11px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+
+  .move-row .btn-main {
+ border: 0; }
+
+  .move-row button:disabled {
+ opacity: .5; cursor: default; }
+
   .sheet {
  position: fixed; inset: 0; z-index: 85; background: rgba(8,12,22,.45); display: flex; align-items: flex-end; justify-content: center; }
 
@@ -1481,6 +1526,20 @@
     <div class="cm-row">
       <button id="inputNo" type="button" class="btn-ghost">Cancel</button>
       <button id="inputYes" type="button" class="danger">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="moveModal" class="cm-overlay hidden">
+  <div class="move-box">
+    <div class="move-title">Move to</div>
+    <div class="move-sub" id="moveSub"></div>
+    <div id="movePath" class="move-path"></div>
+    <div id="moveList" class="move-list"></div>
+    <div class="move-row">
+      <button id="moveNewFolder" type="button" class="btn-ghost">New Folder</button>
+      <button id="moveCancel" type="button" class="btn-ghost">Cancel</button>
+      <button id="moveYes" type="button" class="btn-main">Move here</button>
     </div>
   </div>
 </div>
@@ -2797,20 +2856,7 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
 
 document.getElementById('fsBatchMove').addEventListener('click', function () {
   if (!fsSelected.size) return;
-  showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move', function (dest) {
-    if (!dest) return;
-    (async function () {
-      try {
-        for (const it of fsSelected) {
-          await postFsAction({action: 'move', path: it.path, dest: dest});
-        }
-      } catch (e) {
-        loadFs();
-        return;
-      }
-      exitFsSelect();
-    })();
-  });
+  openMovePicker(Array.from(fsSelected));
 });
 
 function exitFsSelect() {
@@ -3039,11 +3085,7 @@ async function doFsOp(it, op) {
         postFsAction({action: 'rename', path: it.path, name: name}).then(loadFs).catch(function() {});
       });
   } else if (op === 'move') {
-    showInput('Move', fsPath, 'Destination folder path on device\nExample: f:/storage/emulated/0/Download/sub\nor: m:Download/sub', 'Move',
-      function (dest) {
-        if (!dest) return;
-        postFsAction({action: 'move', path: it.path, dest: dest}).then(loadFs).catch(function() {});
-      });
+    openMovePicker([it]);
   }
 }
 
@@ -3066,6 +3108,139 @@ async function postFsAction(params) {
     throw e;
   }
 }
+
+// Picker folder untuk Move: ganti input path manual dengan browsable tree
+// (storage root -> subfolder). Tujuan akhir = folder yang sedang dibuka.
+const moveModal = document.getElementById('moveModal');
+let moveItems = [];
+let movePath = '';
+let movePickSeq = 0;
+
+function openMovePicker(items) {
+  moveItems = items;
+  const label = items.length === 1
+    ? 'Destination for: ' + items[0].name
+    : 'Destination for ' + items.length + ' selected item(s)';
+  document.getElementById('moveSub').textContent = label;
+  movePickOpen(fsPath || '');
+  moveModal.classList.remove('hidden');
+}
+
+function closeMovePicker() {
+  moveModal.classList.add('hidden');
+  moveItems = [];
+}
+
+function renderMoveCrumbs(p, el) {
+  if (!p) {
+    el.innerHTML = '<span class="fs-crumb on">Storage roots</span>';
+    return;
+  }
+  const parts = collapseCrumbs(fsCrumbParts(p));
+  el.innerHTML = parts.map(function (part, i) {
+    const last = i === parts.length - 1;
+    if (part.dots) {
+      return '<span class="fs-crumb-dots">\u2026</span>' + (last ? '' : '<span class="fs-crumb-sep">\u203A</span>');
+    }
+    const chip = '<span class="fs-crumb' + (last ? ' on' : '') + '" data-path="' + encodeURIComponent(part.path) + '">' + escapeHtml(part.label) + '</span>';
+    return chip + (last ? '' : '<span class="fs-crumb-sep">\u203A</span>');
+  }).join('');
+  el.querySelectorAll('.fs-crumb[data-path]').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      movePickOpen(decodeURIComponent(chip.dataset.path));
+    });
+  });
+}
+
+function renderMoveFolders(dirs, list) {
+  list.innerHTML = '';
+  if (!dirs.length) {
+    list.innerHTML = '<div class="move-empty">No subfolders in this location</div>';
+    return;
+  }
+  dirs.forEach(function (it) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'move-folder';
+    let meta = '';
+    if (it.itemCount >= 0) meta = '<span class="mv-meta">' + it.itemCount + ' item</span>';
+    b.innerHTML = '<span class="mv-ico">\u{1F4C1}</span><span class="mv-name">' + escapeHtml(it.name) + '</span>' + meta;
+    b.addEventListener('click', function () { movePickOpen(it.path); });
+    list.appendChild(b);
+  });
+}
+
+async function movePickOpen(path) {
+  const seq = ++movePickSeq;
+  movePath = path || '';
+  const pathEl = document.getElementById('movePath');
+  const list = document.getElementById('moveList');
+  pathEl.innerHTML = '';
+  list.innerHTML = '<div class="move-empty">Loading\u2026</div>';
+  renderMoveCrumbs(movePath, pathEl);
+  try {
+    const res = await fetch(API + '/api/fs?path=' + encodeURIComponent(movePath) + '&offset=0&limit=250');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (seq !== movePickSeq) return;
+    const items = data.items || [];
+    renderMoveFolders(movePath ? items.filter(function (it) { return it.kind === 'dir'; }) : items, list);
+  } catch (e) {
+    if (seq !== movePickSeq) return;
+    list.innerHTML = '<div class="move-empty">Failed to load: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+async function moveHere() {
+  if (!moveItems.length) return;
+  const dest = movePath;
+  for (const it of moveItems) {
+    if (dest === it.path) {
+      mmShowToast('Can\'t move a folder into itself', 3000);
+      return;
+    }
+    if (it.kind === 'dir' && dest.indexOf(it.path + '/') === 0) {
+      mmShowToast('Can\'t move a folder into its own subfolder', 3000);
+      return;
+    }
+  }
+  const yesBtn = document.getElementById('moveYes');
+  yesBtn.disabled = true;
+  try {
+    for (const it of moveItems) {
+      await postFsAction({action: 'move', path: it.path, dest: dest});
+    }
+    const count = moveItems.length;
+    closeMovePicker();
+    mmShowToast('Moved ' + count + (count === 1 ? ' item' : ' items'), 2500);
+    if (fsSelectMode) exitFsSelect(); else loadFs();
+  } catch (e) {
+    mmShowToast('Move failed: ' + e.message, 3000);
+    closeMovePicker();
+    loadFs();
+  }
+}
+
+document.getElementById('moveCancel').addEventListener('click', closeMovePicker);
+moveModal.addEventListener('click', function (e) {
+  if (e.target === moveModal) closeMovePicker();
+});
+document.getElementById('moveYes').addEventListener('click', moveHere);
+document.getElementById('moveNewFolder').addEventListener('click', function () {
+  if (!movePath) return;
+  if (movePath.indexOf('m:') === 0) {
+    mmShowToast('MediaStore: folders cannot be created manually', 2500);
+    return;
+  }
+  showInput('Create new folder', 'New Folder', 'New folder name in: ' + movePath, 'Create', function (name) {
+    if (!name) return;
+    postFsAction({action: 'mkdir', path: movePath, name: name}).then(function () {
+      movePickOpen(movePath);
+    }).catch(function (e) {
+      mmShowToast('Failed: ' + e.message, 3000);
+    });
+  });
+});
 
 document.getElementById('fsMkdirBtn').addEventListener('click', async function () {
   if (!fsPath) {
