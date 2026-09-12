@@ -437,6 +437,19 @@
   .fs-tools button:hover {
  border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
 
+  .fs-tools button.on {
+ background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  .fs-tools button.on:hover {
+ color: #fff; background: var(--primary); }
+
+  .fs-selecting .fs-loc-wrap,
+  .fs-selecting #fsMkdirBtn,
+  .fs-selecting .fs-up-wrap,
+  .fs-selecting #fsSearchBtn,
+  .fs-selecting .fs-search-row {
+ opacity: .4; pointer-events: none; }
+
   #fsSearchBtn {
  grid-column: 1 / -1; }
 
@@ -510,25 +523,41 @@
  color: var(--red); }
 
   .fs-batch {
- display: flex; align-items: center; gap: 8px; background: var(--primary-soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; position: sticky; bottom: 0; z-index: 28; box-shadow: 0 -6px 16px rgba(23,32,58,.08); }
+ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+ position: fixed; left: 0; right: 0; z-index: 48;
+ bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+ padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+ background: rgba(255,255,255,.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+ border-top: 1px solid var(--line); border-radius: 16px 16px 0 0;
+ box-shadow: 0 -8px 24px rgba(23,32,58,.16); }
 
-  .fs-batch span {
- font-size: 13px; font-weight: 700; }
+  .fs-batch .fs-batch-count-box {
+ display: flex; align-items: center; gap: 8px; margin-right: auto; min-width: 0; }
 
   .fs-batch #fsBatchCount {
- margin-right: auto; }
+ padding: 4px 12px; border-radius: 999px; background: var(--primary-soft); color: var(--primary);
+ font-size: 12.5px; font-weight: 700; white-space: nowrap; }
 
   .fs-batch #fsBatchSize {
- font-size: 11.5px; font-weight: 600; color: var(--muted); }
+ font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 
   .fs-batch button {
- padding: 6px 11px; font-size: 12px; font-weight: 600; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+ padding: 8px 13px; font-size: 12.5px; font-weight: 600; border-radius: 999px;
+ border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer;
+ transition: all .15s ease; white-space: nowrap; }
 
   .fs-batch button:hover {
- border-color: var(--primary); }
+ border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
 
   .fs-batch button.danger {
- color: var(--red); }
+ color: var(--red); border-color: rgba(220,38,38,.35); }
+
+  .fs-batch button.danger:hover {
+ background: var(--red-bg); color: var(--red); }
+
+  .fs-batch .fs-batch-close {
+ width: 34px; height: 34px; padding: 0; border-radius: 50%;
+ display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
 
   .fs-check {
  flex: 0 0 22px; height: 22px; border-radius: 50%; border: 2px solid var(--muted); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; line-height: 1; }
@@ -1150,6 +1179,9 @@
     .fs-batch button {
  flex: 1 1 auto; }
 
+    .fs-batch .fs-batch-close {
+ flex: 0 0 auto; }
+
     .item {
  padding: 14px; }
 
@@ -1332,13 +1364,12 @@
   <input id="fsUploadFile" type="file" class="hidden" multiple>
   <input id="fsUploadDir" type="file" class="hidden" webkitdirectory multiple>
     <div id="fsBatch" class="fs-batch hidden">
-      <span id="fsBatchCount"></span>
-      <span id="fsBatchSize"></span>
+      <span class="fs-batch-count-box"><b id="fsBatchCount"></b><span id="fsBatchSize"></span></span>
       <button id="fsBatchAll" type="button">Select all</button>
-      <button id="fsBatchDownload" type="button">Download</button>
-      <button id="fsBatchMove" type="button">Move</button>
-      <button id="fsBatchDelete" type="button" class="danger">Delete</button>
-      <button id="fsBatchCancel" type="button">Cancel</button>
+      <button id="fsBatchDownload" type="button">&#11015; Download</button>
+      <button id="fsBatchMove" type="button">&#8644; Move</button>
+      <button id="fsBatchDelete" type="button" class="danger">&#128465; Delete</button>
+      <button id="fsBatchCancel" type="button" class="fs-batch-close" title="Close selection">&#10005;</button>
     </div>
     <div id="fsStatus"></div>
     <div id="fsProgressBox" class="fs-upload hidden">
@@ -2163,10 +2194,7 @@ function applyRoute() {
   } else if (route === 'files') {
     restartAnim(fsView);
     toggleAddForm(false);
-    fsSelectMode = false;
-    fsSelected.clear();
-    fsSelectBtn.textContent = 'Select';
-    fsBatch.classList.add('hidden');
+    resetFsSelection();
     if (!fsPath && localStorage.getItem(FS_LAST_PATH_KEY)) {
       fsPath = localStorage.getItem(FS_LAST_PATH_KEY);
       fsRestoredOnce = true;
@@ -2232,6 +2260,7 @@ function fsRestoreScroll() {
 
 function fsNavigate(path) {
   if (path === fsPath) return;
+  if (fsSelectMode) resetFsSelection();
   fsSaveScroll();
   fsBackStack.push(fsPath);
   if (fsBackStack.length > 60) fsBackStack.shift();
@@ -2681,8 +2710,7 @@ function attachFsLongPress(row, it) {
     clearTimeout(fsLpTimer);
     fsLpTimer = setTimeout(function () {
       fsLpFired = true;
-      fsSelectMode = true;
-      fsSelectBtn.textContent = 'Cancel selection';
+      enterFsSelect();
       fsSelected.clear();
       fsSelected.add(it);
       renderFs(fsItems);
@@ -2722,11 +2750,30 @@ function updateFsBatch() {
   document.getElementById('fsBatchAll').textContent = (fsItems || []).length > 0 && fsSelected.size === fsItems.length ? 'Cancel all' : 'Select all';
 }
 
+function resetFsSelection() {
+  fsSelectMode = false;
+  fsSelected.clear();
+  fsSelectBtn.textContent = 'Select';
+  fsSelectBtn.classList.remove('on');
+  fsView.classList.remove('fs-selecting');
+  fsBatch.classList.add('hidden');
+}
+
+function enterFsSelect() {
+  fsSelectMode = true;
+  fsSelectBtn.textContent = 'Cancel selection';
+  fsSelectBtn.classList.add('on');
+  fsView.classList.add('fs-selecting');
+}
+
 fsSelectBtn.addEventListener('click', function () {
   if (!fsPath) return;
-  fsSelectMode = !fsSelectMode;
+  if (fsSelectMode) {
+    exitFsSelect();
+    return;
+  }
+  enterFsSelect();
   fsSelected.clear();
-  fsSelectBtn.textContent = fsSelectMode ? 'Cancel selection' : 'Select';
   fsBatch.classList.add('hidden');
   loadFs();
 });
@@ -2743,8 +2790,7 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
         loadFs();
         return;
       }
-      fsSelected.clear();
-      loadFs();
+      exitFsSelect();
     })();
   });
 });
@@ -2762,17 +2808,13 @@ document.getElementById('fsBatchMove').addEventListener('click', function () {
         loadFs();
         return;
       }
-      fsSelected.clear();
-      loadFs();
+      exitFsSelect();
     })();
   });
 });
 
 function exitFsSelect() {
-  fsSelectMode = false;
-  fsSelected.clear();
-  fsSelectBtn.textContent = 'Select';
-  fsBatch.classList.add('hidden');
+  resetFsSelection();
   loadFs();
 }
 
