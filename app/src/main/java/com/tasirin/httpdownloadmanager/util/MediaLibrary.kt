@@ -18,20 +18,33 @@ import java.io.File
 object MediaLibrary {
 
     private const val SCAN_TTL_MS = 30_000L
+    /** Cache lebih lama untuk hasil fallback scan filesystem (MediaStore
+     *  kosong): traversal seluruh storage mahal (~2-3 dtk di TV box). Aman
+     *  karena perubahan MediaStore tetap membatalkan cache via ContentObserver
+     *  dan notification. */
+    private const val FALLBACK_SCAN_TTL_MS = 600_000L
     /** Batas absolut entry yang di-hold di memori (galeri + remote web). */
     const val GALLERY_MAX_ENTRIES = 3000
     private const val THUMB_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
     @Volatile
     private var scanCache: Triple<Long, List<MediaEntry>, Int>? = null
+    @Volatile private var scanCacheTtlMs = SCAN_TTL_MS
     private var scanCacheFolderKey: List<String> = emptyList()
     private val scanLock = Any()
     @Volatile private var observerRegistered = false
 
-    /** Hasil scan galeri: [items] dibatasi sesuai [maxEntries] (halaman aktif +
-     *  buffer, bukan 3000 entri penuh), [total] = jumlah entry unik sebenarnya
-     *  — dipakai server untuk menghitung `hasMore` tanpa menahan daftar penuh. */
-    class MediaScanResult(val items: List<MediaEntry>, val total: Int)
+    /** Hasil scan galeri: [items] = daftar lengkap hingga GALLERY_MAX_ENTRIES
+     *  (cache; pemotongan per halaman dilakukan di scanCached/scan),
+     *  [total] = jumlah entry unik sebenarnya — dipakai server untuk
+     *  menghitung `hasMore` tanpa menahan daftar penuh. */
+    class MediaScanResult(
+        val items: List<MediaEntry>,
+        val total: Int,
+        /** true bila hasil berasal dari fallback scan filesystem (MediaStore
+         *  kosong) — cache harus lebih lama karena traversal-nya mahal. */
+        val usedFallback: Boolean = false
+    )
 
     /** Koleksi MediaStore untuk root folder media (dipakai saat browsing). */
     fun mediaCollectionForRoot(root: String): Uri {
@@ -125,6 +138,19 @@ object MediaLibrary {
             }
         }
         return MediaScanResult(items, base.total)
+    }
+
+    /** Isi cache scan galeri di background (dipanggil server saat start) supaya
+     *  request galeri pertama tidak menunggu scan penuh — terutama saat fallback
+     *  filesystem berjalan (~2-3 dtk di TV box dengan MediaStore kosong). */
+    fun prewarm(context: Context) {
+        runCatching {
+            scan(
+                context,
+                maxEntries = GALLERY_MAX_ENTRIES,
+                selectedFolders = StoragePrefs.getGalleryFolders(context)
+            )
+        }
     }
 
     /** Beri tahu MediaStore ada file baru/berubah + invalidasi cache scan,
@@ -264,14 +290,15 @@ object MediaLibrary {
             // Cache hanya valid bila folder selection sama (kosong = semua)
             scanCache?.let { (ts, items, total) ->
                 if (scanCacheFolderKey == selectedFolders &&
-                    scanCacheUsable(now - ts, SCAN_TTL_MS, items.size, total, limit)) {
+                    scanCacheUsable(now - ts, scanCacheTtlMs, items.size, total, limit)) {
                     return MediaScanResult(items.take(limit), total)
                 }
             }
-            val result = scanUncached(context, limit, selectedFolders)
+            val result = scanUncached(context, selectedFolders)
             scanCache = Triple(now, result.items, result.total)
+            scanCacheTtlMs = if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS
             scanCacheFolderKey = selectedFolders
-            return result
+            return MediaScanResult(result.items.take(limit), result.total, result.usedFallback)
         }
     }
 
@@ -308,7 +335,7 @@ object MediaLibrary {
         }
     }
 
-    private fun scanUncached(context: Context, maxEntries: Int, selectedFolders: List<String> = emptyList()): MediaScanResult {
+    private fun scanUncached(context: Context, selectedFolders: List<String> = emptyList()): MediaScanResult {
         val list = mutableListOf<MediaEntry>()
 
         fun addFile(f: File, isPartial: Boolean = false) {
@@ -544,12 +571,16 @@ object MediaLibrary {
                 inSelectedFolders(entry.filePath, entry.relativePath, galleryRoot, allowedFolders)
             }
         }
-        // Batasi jumlah entry yang di-hold di memori: cukup untuk 30 halaman
-        // galeri (100/halaman) dan membatasi beban RAM di device Android 5+.
+        // Simpan sampai GALLERY_MAX_ENTRIES (bukan hanya maxEntries halaman):
+        // fallback scan filesystem mahal, jadi cache harus bisa melayani
+        // load-more berikutnya tanpa scan ulang. Pemakaian aktual tetap
+        // dipotong per halaman di scanCached/scan.
         val deduped = list
             .distinctBy { it.filePath ?: it.contentUri ?: it.token }
             .sortedByDescending { it.modified }
-        return MediaScanResult(deduped.take(maxEntries), deduped.size)
+            .take(GALLERY_MAX_ENTRIES)
+        val usedFallback = !folderFilterActive && mediaStoreRows == 0
+        return MediaScanResult(deduped, deduped.size, usedFallback)
     }
 
 

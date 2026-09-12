@@ -351,6 +351,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 lastError = null
                 cleanupCache()
                 startPeriodicCleanup()
+                // Panaskan cache scan galeri di background supaya request
+                // /api/gallery pertama tidak menunggu scan penuh (fallback
+                // filesystem di TV box dengan MediaStore kosong ~2-3 dtk).
+                runCatching {
+                    liveStatPool().submit {
+                        MediaLibrary.prewarm(context)
+                    }
+                }
                 appendLog(
                     "SERVER STARTED on port $listeningPort (Android ${Build.VERSION.RELEASE} " +
                         "API ${Build.VERSION.SDK_INT}, ${Build.MANUFACTURER} ${Build.MODEL}, " +
