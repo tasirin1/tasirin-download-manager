@@ -119,8 +119,11 @@ kuat dan tanpa diskusi:
 - **Android SDK lokal** — DILARANG meng-install SDK (sdkmanager/platform/
   build-tools) di mesin kerja: boros RAM/disk; build/lint/test resmi via CI.
   `scripts/check_repo.py` memblokir bila penanda SDK lokal terdeteksi (non-CI).
-- **Auto-install APK** (`REQUEST_INSTALL_PACKAGES`) — dihapus; `Updater.kt`
-  download-only + verifikasi tanda tangan (kurangi sinyal berbahaya Play Protect).
+- **Auto-install APK via Updater** — dihapus; `Updater.kt` download-only +
+  verifikasi tanda tangan (kurangi sinyal berbahaya Play Protect). Izin
+  `REQUEST_INSTALL_PACKAGES` tetap ADA di manifest: dipakai untuk membuka
+  installer saat user mengetuk item APK di daftar download (manual), bukan
+  auto-install. Jangan hapus izin ini.
 - **Tema gelap native** (`values-night`) — dihapus; app selalu tema terang.
 - **Bilah status remote web** (`#deviceStatus`, `renderStatus`,
   `refreshStatus`, `renderSpeedTotal`) — dihapus 2026-08-13; info redundan
@@ -371,8 +374,9 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
   (simpan kunci baru di sana) + `remote.html` bila perlu ditampilkan remote.
 - **Self-update APK** → `Updater.kt` — **download-only** (format nama asset
   `-<code>.apk` wajib dipertahankan agar versi terbaca). Jangan kembalikan
-  auto-install (`REQUEST_INSTALL_PACKAGES`): sengaja dihapus untuk menurunkan
-  sinyal berbahaya bagi Play Protect aplikasi sideload.
+  auto-install di Updater; izin `REQUEST_INSTALL_PACKAGES` di manifest HANYA
+  untuk membuka installer manual saat user mengetuk item APK (MainActivity),
+  dan tidak dipakai oleh Updater.
 - **Log server** → `LogActivity.kt` + buffer log (lihat `App.kt`/engine).
 - **Versi app** → jangan manual; CI yang mengatur (lihat aturan di atas).
 
