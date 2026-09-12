@@ -6,8 +6,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -981,7 +979,24 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
             if (code !in 200..299) return null
-            return BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+            // Baca terbatas (sama seperti httpGetWithCookies): server API yang
+            // tidak sehat tidak boleh membuat response raksasa OOM aplikasi.
+            val input = conn.inputStream
+            return try {
+                val buf = java.io.ByteArrayOutputStream()
+                val chunk = ByteArray(8192)
+                var total = 0L
+                while (true) {
+                    val n = input.read(chunk)
+                    if (n < 0) break
+                    total += n
+                    if (total > MAX_RESPONSE_BYTES) break
+                    buf.write(chunk, 0, n)
+                }
+                buf.toString("UTF-8")
+            } finally {
+                runCatching { input.close() }
+            }
         } catch (_: Exception) { return null } finally { conn.disconnect() }
     }
 }
