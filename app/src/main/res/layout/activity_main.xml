@@ -13,6 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@drawable/bg_toolbar_gradient"
+        android:elevation="4dp"
         app:subtitle="@string/app_name"
         app:subtitleTextColor="@color/white"
         app:subtitleTextAppearance="@style/TextAppearance.AppCompat.Caption"
@@ -39,6 +40,22 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginBottom="2dp"
+                android:background="@drawable/bg_icon_circle"
+                android:backgroundTint="@color/chip_active_bg">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_download_section"
+                    app:tint="@color/primary" />
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/text_summary_active"
@@ -74,6 +91,22 @@
             android:gravity="center"
             android:orientation="vertical">
 
+            <FrameLayout
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginBottom="2dp"
+                android:background="@drawable/bg_icon_circle"
+                android:backgroundTint="@color/icon_circle_audio">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_check"
+                    app:tint="@color/status_on" />
+            </FrameLayout>
+
             <TextView
                 android:id="@+id/text_summary_done"
                 android:layout_width="wrap_content"
@@ -107,6 +140,22 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginBottom="2dp"
+                android:background="@drawable/bg_icon_circle"
+                android:backgroundTint="@color/status_off_soft">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_alert"
+                    app:tint="@color/status_off" />
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/text_summary_attention"
