@@ -2032,7 +2032,7 @@ class DownloadEngine(appContext: Context) {
             runCatching { output.close() }
         }
 
-        verifySize(item.id, downloaded, total)
+        verifySize(downloaded, total)
 
         val published0 = publishItem(saver, partialFile, fileName, item)
         val finalName = published0.fileName ?: fileName
@@ -2175,7 +2175,7 @@ class DownloadEngine(appContext: Context) {
         }
 
         val current = _items.value.find { it.id == item.id } ?: return
-        verifySize(item.id, current.bytesDownloaded, current.totalBytes)
+        verifySize(current.bytesDownloaded, current.totalBytes)
 
         val merged = saver.mergeSegments(fileName, segments.size)
         val published0 = publishItem(saver, merged, fileName, item)
@@ -2395,13 +2395,17 @@ class DownloadEngine(appContext: Context) {
         segFlushJobs.remove(id)?.cancel()
     }
 
-    private fun verifySize(id: String, downloaded: Long, total: Long) {
-        if (total > 0 && downloaded != total) {
-            // CDN kadang kirim Content-Length beda sedikit — toleransi 5%
-            val diff = kotlin.math.abs(total - downloaded)
+    private fun verifySize(downloaded: Long, total: Long) {
+        // total = klaim Content-Length. CDN kadang tidak konsisten:
+        // - underrun kecil (<=5%) sah — stream terpotong di akhir segmen
+        // - overrun (byte diterima > klaim) selalu sah — file menerima semua
+        //   byte klaim plus lebih; memakai abs() di sini membuat overrun
+        //   dianggap korup padahal justru bukti file utuh.
+        if (total > 0 && downloaded < total) {
+            val shortage = total - downloaded
             val tolerance = total / 20  // 5%
-            if (diff > tolerance) {
-                throw IOException("Size mismatch: expected $total, received $downloaded")
+            if (shortage > tolerance) {
+                throw IOException("Size mismatch: expected $total (Content-Length), received $downloaded")
             }
         }
     }
