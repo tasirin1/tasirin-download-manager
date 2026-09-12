@@ -60,16 +60,25 @@ object StoragePrefs {
     private const val KEY_FILE_ACCESS_OFFERED = "file_access_offered"
     private const val KEY_GALLERY_FOLDERS = "gallery_folders"
 
+    // Cache set section collapsed: dibaca 4x per emisi StateFlow (buildSections
+    // tiap group) — getStringSet mengembalikan salinan baru setiap panggilan,
+    // jadi cache mencegah alokasi berulang saat progress download aktif.
+    @Volatile private var collapsedCache: Set<String>? = null
+
     /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
-    fun isSectionCollapsed(context: Context, key: String): Boolean =
-        prefs(context)
-            .getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
-            ?.contains(key) == true
+    fun isSectionCollapsed(context: Context, key: String): Boolean {
+        val cached = collapsedCache
+        if (cached != null) return key in cached
+        val set = prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
+        collapsedCache = set
+        return key in (set ?: emptySet())
+    }
 
     fun setSectionCollapsed(context: Context, key: String, collapsed: Boolean) {
-        val stored = prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
+        val stored = collapsedCache ?: prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
         val set = (stored ?: emptySet()).toMutableSet()
         if (collapsed) set.add(key) else set.remove(key)
+        collapsedCache = set
         prefs(context)
             .edit {
                 putStringSet(KEY_COLLAPSED_SECTIONS, set)

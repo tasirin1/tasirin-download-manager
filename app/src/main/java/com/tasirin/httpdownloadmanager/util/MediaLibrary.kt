@@ -187,6 +187,18 @@ object MediaLibrary {
         // case-sensitive (path Linux case-sensitive; Android file system umumnya
         // case-insensitive tapi relatif konsisten di MediaStore).
         val allowed = selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
+        return inSelectedFolders(dataPath, relativePath, externalRoot, allowed)
+    }
+
+    /** Bagian murni filter folder galeri; [allowed] sudah ternormalisasi
+     *  (trim + tanpa trailing slash). Dipakai scanUncached per-entry tanpa
+     *  menormalisasi ulang daftar folder untuk ribuan baris MediaStore. */
+    private fun inSelectedFolders(
+        dataPath: String?,
+        relativePath: String?,
+        externalRoot: String,
+        allowed: List<String>
+    ): Boolean {
         val fp = dataPath?.trim()?.trimEnd('/').orEmpty()
         if (fp.isNotEmpty()) {
             return allowed.any { fp == it || fp.startsWith("$it/") }
@@ -322,6 +334,16 @@ object MediaLibrary {
         // 4) Hanya video dari MediaStore. Penampil foto sengaja dihapus, jadi
         //    query Images tidak perlu dan hanya memboroskan RAM/CPU.
         //    Filter berdasarkan selectedFolders (relative path) bila ada.
+        //    Root + folder ternormalisasi dihitung SEKALI untuk scan ini
+        //    (query loop & retainAll memanggil filter per-entry; galeri bisa
+        //    berisi ribuan video, jadi hindari alokasi string berulang).
+        val galleryRoot = externalRootPath()
+        val folderFilterActive = selectedFolders.isNotEmpty()
+        val allowedFolders = if (folderFilterActive) {
+            selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
+        } else {
+            emptyList()
+        }
         runCatching {
             val resolver = context.contentResolver
             val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
@@ -347,7 +369,7 @@ object MediaLibrary {
                 if (relCol != null) {
                     val clauses = mutableListOf<String>()
                     val args = mutableListOf<String>()
-                    val root = externalRootPath()
+                    val root = galleryRoot
                     for (folder in selectedFolders) {
                         val rel = folder.trimEnd('/').removePrefix(root).trim('/')
                         if (rel.isEmpty()) continue // seluruh root dipilih → tanpa batasan
@@ -395,7 +417,7 @@ object MediaLibrary {
                     }
                     val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
                     if (!isMediaEntryReadable(filePath, uri)) continue
-                    if (!isInGalleryFolders(filePath, relativePath, externalRootPath(), selectedFolders)) continue
+                    if (folderFilterActive && !inSelectedFolders(filePath, relativePath, galleryRoot, allowedFolders)) continue
                     list.add(
                         MediaEntry(
                             name = name,
@@ -431,10 +453,9 @@ object MediaLibrary {
         // Android 11+) hanya lolos bila folder asalnya cocok via RELATIVE_PATH.
         // Item tanpa keduanya tidak ditampilkan saat filter aktif (bukan
         // dilewatkan seperti bug lama).
-        if (selectedFolders.isNotEmpty()) {
-            val root = externalRootPath()
+        if (folderFilterActive) {
             list.retainAll { entry ->
-                isInGalleryFolders(entry.filePath, entry.relativePath, root, selectedFolders)
+                inSelectedFolders(entry.filePath, entry.relativePath, galleryRoot, allowedFolders)
             }
         }
         // Batasi jumlah entry yang di-hold di memori: cukup untuk 30 halaman
