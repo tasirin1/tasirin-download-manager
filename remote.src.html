@@ -321,7 +321,7 @@
  border: 0; border-radius: 999px; background: #fff; color: #b00020; font-weight: 700; font-size: 12.5px; padding: 6px 14px; cursor: pointer; }
 
   .gal-toolbar {
- display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+ display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
 
   .gal-toolbar h2 {
  margin: 0; font-size: 16px; }
@@ -517,8 +517,6 @@
   .btn-ghost:disabled {
  opacity: .45; cursor: default; }
 
-  .fs-tools {
- display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
   .fs-search-row {
  display: flex; gap: 6px; margin-bottom: 8px; }
 
@@ -526,27 +524,9 @@
  flex: 1; min-width: 0; padding: 8px 12px; font-size: 13px; border-radius: 999px;
  border: 1px solid var(--line); background: var(--card); color: var(--ink); }
 
-  .fs-tools button {
- width: 100%; min-width: 0; min-height: 40px; padding: 9px 12px; font-size: 12.5px; font-weight: 600; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; transition: all .15s ease; }
-
-  .fs-tools button:hover {
- border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
-
-  .fs-tools button.on {
- background: var(--primary); border-color: var(--primary); color: #fff; }
-
-  .fs-tools button.on:hover {
- color: #fff; background: var(--primary); }
-
-  .fs-selecting .fs-loc-wrap,
-  .fs-selecting #fsMkdirBtn,
-  .fs-selecting .fs-up-wrap,
-  .fs-selecting #fsSearchBtn,
+  .fs-selecting #fsToolsBtn,
   .fs-selecting .fs-search-row {
  opacity: .4; pointer-events: none; }
-
-  #fsSearchBtn {
- grid-column: 1 / -1; }
 
   .fs-loc-wrap {
  min-width: 0; display: flex; }
@@ -554,26 +534,41 @@
   .fs-loc-wrap select {
  width: 100%; min-width: 0; padding: 7px 8px; font-size: 12px; font-weight: 600; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; outline: none; }
 
-  .fs-up-wrap {
- position: relative; min-width: 0; display: flex; }
-
-  .fs-up-wrap > button {
- width: 100%; }
-
   .fs-load-more {
  width: 100%; padding: 10px 12px; font-size: 13px; font-weight: 600; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; transition: all .15s ease; }
 
   .fs-load-more:hover {
  border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
 
-  #fsUpMenu {
- position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow); }
+  .fs-more-wrap {
+ position: relative; }
 
-  #fsUpMenu button {
- display: block; width: 100%; padding: 9px 10px; font-size: 12.5px; font-weight: 600; border: 0; border-radius: 8px; background: transparent; color: var(--ink); cursor: pointer; text-align: left; }
+  .fs-more-btn:disabled {
+ opacity: .45; cursor: default; }
 
-  #fsUpMenu button:hover {
+  .fs-tools-menu {
+ position: absolute; top: calc(100% + 8px); right: 0; z-index: 61; min-width: 244px; max-height: calc(100vh - 80px); overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px; box-shadow: var(--shadow); }
+
+  .fs-tools-menu.hidden {
+ display: none; }
+
+  .fs-tools-menu button {
+ display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 11px 12px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 600; text-align: left; cursor: pointer; }
+
+  .fs-tools-menu button:hover {
  background: var(--bg-soft); color: var(--primary); }
+
+  .fs-tools-menu button.on {
+ color: var(--primary); }
+
+  .fs-tools-menu .fs-loc-wrap {
+ display: block; padding: 2px 4px 6px; }
+
+  .fs-tools-menu .fs-loc-wrap select {
+ width: 100%; min-width: 0; padding: 9px 10px; font-size: 13px; font-weight: 600; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; outline: none; }
+
+  .fs-tools-menu .fs-sep {
+ height: 1px; margin: 6px 8px; background: var(--line); }
 
   .fs-drag {
  outline: 2px dashed var(--primary); outline-offset: -3px; border-radius: 10px; }
@@ -1311,12 +1306,6 @@
     .fs-path {
  font-size: 12px; }
 
-    .fs-tools {
- grid-template-columns: repeat(2, 1fr); }
-
-    .fs-tools button {
- min-width: 0; }
-
     .fs-loc-wrap select {
  font-size: 12px; padding: 7px 8px; }
 
@@ -1491,26 +1480,25 @@
     <span class="count" id="fsCount"></span>
     <button id="fsHomeBtn" type="button" class="btn-ghost">Home</button>
     <button id="fsUpBtn" type="button" class="btn-ghost" style="margin-left:auto">Up</button>
+    <span class="fs-more-wrap">
+      <button id="fsToolsBtn" class="fs-more-btn" type="button" aria-label="File manager tools" aria-haspopup="true" aria-expanded="false">&#8942;</button>
+      <div id="fsToolsMenu" class="fs-tools-menu hidden">
+        <span class="fs-loc-wrap">
+          <select id="fsLocation" title="Jump to location">
+            <option value="">Location&hellip;</option>
+          </select>
+        </span>
+        <button id="fsMkdirBtn" type="button">New Folder</button>
+        <button type="button" data-up="file">Upload file&hellip;</button>
+        <button type="button" data-up="dir">Upload folder&hellip;</button>
+        <div class="fs-sep"></div>
+        <button id="fsSelectBtn" type="button">Select</button>
+        <button id="fsSearchBtn" type="button">Search</button>
+      </div>
+    </span>
   </div>
   <div id="fsSticky" class="fs-sticky">
   <div id="fsPath" class="fs-path"></div>
-  <div class="fs-tools" id="fsToolsRow">
-    <span class="fs-loc-wrap">
-      <select id="fsLocation" title="Move to location">
-        <option value="">Location&hellip;</option>
-      </select>
-    </span>
-    <button id="fsMkdirBtn" type="button">New Folder</button>
-    <span class="fs-up-wrap">
-      <button id="fsUploadBtn" type="button">Upload</button>
-      <div id="fsUpMenu" class="hidden">
-        <button type="button" data-up="file">Upload file&hellip;</button>
-        <button type="button" data-up="dir">Upload folder&hellip;</button>
-      </div>
-    </span>
-    <button id="fsSelectBtn" type="button">Select</button>
-    <button id="fsSearchBtn" type="button">Search</button>
-  </div>
   <div id="fsSearchRow" class="fs-search-row hidden">
     <input id="fsSearchInput" type="search" placeholder="Search this folder\u2026" aria-label="Search files">
   </div>
@@ -2382,10 +2370,10 @@ const fsStatus = document.getElementById('fsStatus');
 const fsUpBtn = document.getElementById('fsUpBtn');
 const fsSelectBtn = document.getElementById('fsSelectBtn');
 const fsBatch = document.getElementById('fsBatch');
-const fsToolsRow = document.getElementById('fsToolsRow');
+const fsToolsBtn = document.getElementById('fsToolsBtn');
+const fsToolsMenu = document.getElementById('fsToolsMenu');
 const fsLocation = document.getElementById('fsLocation');
 const fsMkdirBtn = document.getElementById('fsMkdirBtn');
-const fsUploadBtn = document.getElementById('fsUploadBtn');
 const fsUploadFile = document.getElementById('fsUploadFile');
 const fsUploadDir = document.getElementById('fsUploadDir');
 let fsLocations = [];
@@ -2454,6 +2442,7 @@ function applyRoute() {
   if (wrap) wrap.classList.toggle('gal-wrap', route === 'gallery');
   document.getElementById('fabNewBtn').classList.toggle('hidden', route !== 'downloads');
   closeMoreMenu();
+  closeFsToolsMenu();
   restoringRoute = route;
   if (route === 'gallery') {
     restartAnim(galleryView);
@@ -2633,7 +2622,55 @@ fsLocation.addEventListener('change', function () {
   const v = fsLocation.value;
   if (!v) return;
   fsLocation.value = '';
+  closeFsToolsMenu();
   fsNavigate(v);
+});
+
+// Menu "tools" File Manager: aksi jarang dipakai (lokasi, buat folder,
+// upload, pilih, cari) dipindah ke dropdown ⋮ supaya area file tidak penuh
+// deretan tombol. Search tetap membuka baris input di bawah breadcrumb.
+let fsToolsMenuOpen = false;
+function closeFsToolsMenu() {
+  if (!fsToolsMenuOpen) return;
+  fsToolsMenuOpen = false;
+  fsToolsMenu.classList.add('hidden');
+  fsToolsBtn.setAttribute('aria-expanded', 'false');
+}
+function toggleFsToolsMenu() {
+  fsToolsMenuOpen = !fsToolsMenuOpen;
+  fsToolsMenu.classList.toggle('hidden', !fsToolsMenuOpen);
+  fsToolsBtn.setAttribute('aria-expanded', String(fsToolsMenuOpen));
+}
+fsToolsBtn.addEventListener('click', function (e) {
+  e.stopPropagation();
+  toggleFsToolsMenu();
+});
+fsToolsMenu.addEventListener('click', function (e) {
+  const up = e.target.closest('button[data-up]');
+  if (up) {
+    closeFsToolsMenu();
+    if (!fsPath) {
+      fsMsg('Open the destination folder first', true);
+      return;
+    }
+    if (up.getAttribute('data-up') === 'dir') {
+      fsUploadDir.value = '';
+      fsUploadDir.click();
+    } else {
+      fsUploadFile.value = '';
+      fsUploadFile.click();
+    }
+    return;
+  }
+  // Select lokasi butuh tetap terbuka saat memilih; ditutup lewat onchange.
+  if (e.target.closest('.fs-loc-wrap')) return;
+  closeFsToolsMenu();
+});
+document.addEventListener('click', function (e) {
+  if (fsToolsMenuOpen && !fsToolsMenu.contains(e.target) && e.target !== fsToolsBtn) closeFsToolsMenu();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && fsToolsMenuOpen) closeFsToolsMenu();
 });
 
 // Lokasi storage hanya perlu dimuat sekali saat masuk File Manager; tanpa
@@ -2655,10 +2692,12 @@ async function loadFs() {
     fsStatus.textContent = '';
     renderFsCrumbs(fsPath);
     fsUpBtn.disabled = !fsPath;
-    fsToolsRow.classList.toggle('hidden', !fsPath);
+    fsToolsBtn.classList.toggle('hidden', !fsPath);
     fsSelectBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
     fsMkdirBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
-    fsUploadBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
+    fsToolsMenu.querySelectorAll('[data-up]').forEach(function (b) {
+      b.classList.toggle('hidden', !fsPath || serverReadOnly);
+    });
     fsItems = data.items || [];
     fsTotal = data.total || fsItems.length;
     fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
@@ -3031,6 +3070,7 @@ function resetFsSelection() {
 }
 
 function enterFsSelect() {
+  closeFsToolsMenu();
   fsSelectMode = true;
   fsSelectBtn.textContent = 'Cancel selection';
   fsSelectBtn.classList.add('on');
@@ -4031,7 +4071,7 @@ function startFsUpload(jobs) {
     fsMsg('Server is read-only — upload disabled', true);
     return;
   }
-  const btn = document.getElementById('fsUploadBtn');
+  const btn = fsToolsBtn;
   btn.disabled = true;
   try {
     uploadFiles(
@@ -4067,46 +4107,6 @@ function startFsUpload(jobs) {
     fsMsg('Upload failed to start: ' + ((err && err.message) ? err.message : err), true);
   }
 }
-
-document.getElementById('fsUploadBtn').addEventListener('click', function () {
-  if (!fsPath) {
-    fsMsg('Open the destination folder first', true);
-    return;
-  }
-  const menu = document.getElementById('fsUpMenu');
-  menu.classList.toggle('hidden');
-  clearTimeout(fsUpMenuTimer);
-  if (!menu.classList.contains('hidden')) {
-    fsUpMenuTimer = setTimeout(function () { menu.classList.add('hidden'); }, 5000);
-  }
-});
-
-let fsUpMenuTimer = null;
-document.getElementById('fsUpMenu').addEventListener('click', function (e) {
-  const item = e.target.closest('button[data-up]');
-  if (!item) return;
-  clearTimeout(fsUpMenuTimer);
-  this.classList.add('hidden');
-  if (!fsPath) {
-    fsMsg('Open the destination folder first', true);
-    return;
-  }
-  if (item.getAttribute('data-up') === 'dir') {
-    fsUploadDir.value = '';
-    fsUploadDir.click();
-  } else {
-    fsUploadFile.value = '';
-    fsUploadFile.click();
-  }
-});
-
-document.addEventListener('click', function (e) {
-  const menu = document.getElementById('fsUpMenu');
-  if (!menu.classList.contains('hidden') && !e.target.closest('.fs-up-wrap')) {
-    clearTimeout(fsUpMenuTimer);
-    menu.classList.add('hidden');
-  }
-});
 
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Enter' && e.key !== ' ') return;
