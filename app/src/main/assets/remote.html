@@ -269,7 +269,7 @@ document.getElementById('tabDownloads').addEventListener('click', function () {
 location.hash = '#/';
 });
 galleryBtn.addEventListener('click', function () {
-location.hash = (currentRoute() === 'gallery') ? '#/' : '#/gallery';
+location.hash = '#/gallery';
 });
 function mmFmtTime(t) {
 if (!isFinite(t) || t < 0) t = 0;
@@ -734,7 +734,7 @@ const FS_ICON_OFF = ['doc','docx','xls','xlsx','ppt','pptx','odt','rtf'];
 let fsLpTimer = null;
 let fsLpFired = false;
 fsBtn.addEventListener('click', function () {
-location.hash = (currentRoute() === 'files') ? '#/' : '#/files';
+location.hash = '#/files';
 });
 const DOWNLOADS_VIEW = ['dlPageHead', 'filtersSticky', 'addSheet', 'status', 'list'];
 function currentRoute() {

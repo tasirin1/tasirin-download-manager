@@ -2056,7 +2056,7 @@ document.getElementById('tabDownloads').addEventListener('click', function () {
   location.hash = '#/';
 });
 galleryBtn.addEventListener('click', function () {
-  location.hash = (currentRoute() === 'gallery') ? '#/' : '#/gallery';
+  location.hash = '#/gallery';
 });
 
 function mmFmtTime(t) {
@@ -2565,7 +2565,7 @@ let fsLpTimer = null;
 let fsLpFired = false;
 
 fsBtn.addEventListener('click', function () {
-  location.hash = (currentRoute() === 'files') ? '#/' : '#/files';
+  location.hash = '#/files';
 });
 
 const DOWNLOADS_VIEW = ['dlPageHead', 'filtersSticky', 'addSheet', 'status', 'list'];
