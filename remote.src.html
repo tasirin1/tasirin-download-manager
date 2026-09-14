@@ -104,7 +104,12 @@
  width: 18px; height: 18px; display: block; }
 
   .brand-word {
- font-weight: 800; font-size: 16px; line-height: 1.25; background: linear-gradient(90deg, var(--primary), #8b5cf6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+ font-weight: 800; font-size: 16px; line-height: 1.25; color: var(--ink); }
+
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+ .brand-word {
+ background: linear-gradient(90deg, var(--primary), #8b5cf6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+ }
 
   .brand-word small {
  display: block; font-weight: 500; font-size: 10.5px; opacity: .62; letter-spacing: .3px; }
@@ -351,7 +356,7 @@
  margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
 
   .page-head {
- display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 2px 0 0; }
+ display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 2px 0 10px; }
 
   .page-head h2 {
  margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
@@ -1206,13 +1211,13 @@
  transform: scale(.985); }
 
   .toast {
- position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 200; max-width: min(92vw, 420px); padding: 10px 16px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.25); pointer-events: none; }
+ position: fixed; left: 50%; bottom: calc(200px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 200; max-width: min(92vw, 420px); padding: 10px 16px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.25); pointer-events: none; }
 
   .toast.hidden {
  display: none; }
 
   #filtersSticky {
- position: sticky; z-index: 30; background: var(--bg); padding: 8px 0 12px; margin: -8px 0 4px; }
+ position: sticky; z-index: 30; background: var(--bg); padding: 8px 0 12px; margin: 0 0 4px; }
 
   #filtersSticky .seg {
  margin-bottom: 0; }
