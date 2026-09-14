@@ -176,7 +176,7 @@
  height: 1px; margin: 6px 8px; background: var(--line); }
 
   .wrap {
- max-width: 880px; margin: 18px auto 0; padding: 0 16px; }
+ max-width: 880px; margin: 18px auto 0; padding: 0 16px 80px; }
 
   .wrap.gal-wrap {
  max-width: 1200px; }
@@ -227,16 +227,16 @@
  display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 
   .b-done {
- background: var(--green-bg); color: var(--green); }
+ background: var(--green-bg); color: var(--green); border: 1px solid rgba(15,157,88,.25); }
 
   .b-active {
- background: var(--blue-bg); color: var(--primary); }
+ background: var(--blue-bg); color: var(--primary); border: 1px solid rgba(67,83,230,.25); }
 
   .b-paused {
- background: var(--amber-bg); color: var(--amber); }
+ background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(255,169,77,.25); }
 
   .b-fail {
- background: var(--red-bg); color: var(--red); }
+ background: var(--red-bg); color: var(--red); border: 1px solid rgba(217,48,37,.25); }
 
   ul.list {
  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -273,6 +273,10 @@
 
   .icon.i-paused {
  background: var(--amber-bg); }
+ .icon-wrap { position: relative; }
+ .icon-wrap .pause-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: rgba(0,0,0,.5); color: #fff; font-size: 15px; opacity: 0; transition: opacity .15s ease; cursor: pointer; pointer-events: none; }
+ .icon-wrap:hover .pause-overlay { opacity: 1; pointer-events: auto; }
+ @media (hover: none) { .icon-wrap .pause-overlay { opacity: .85; pointer-events: auto; } }
 
   .icon.i-active {
  background: var(--blue-bg); }
@@ -324,7 +328,7 @@
  100% { transform: translateX(200%); }
  }
 
-  .bar.downloading .fill { background: linear-gradient(90deg, #4353e6, #6c7cff, var(--primary)); }
+  .bar.downloading .fill { background: linear-gradient(90deg, #4353e6, #6c7cff, var(--primary)); } .bar.downloading .fill::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(255,255,255,.15) 4px, rgba(255,255,255,.15) 8px); animation: barStripes .6s linear infinite; z-index: 1; } @keyframes barStripes { from { background-position: 0 0; } to { background-position: 16px 0; } }
   .bar.paused .fill { background: var(--amber); opacity: .7; }
   .bar.paused .fill::after { animation: none; }
 
@@ -1324,7 +1328,7 @@
  }
 
   li.item.anim {
- animation: itemIn .28s ease both; }
+ animation: itemIn .28s cubic-bezier(.2,.7,.3,1) both; }
 
   @media (prefers-reduced-motion: reduce) {
  .view-anim, li.item.anim, .skeleton, .srv-chip i {
@@ -2319,8 +2323,8 @@ function renderGalleryReset(items, total, hasMore) {
   if (!items.length) {
     galleryGrid.innerHTML = emptyHtml(
       'search',
-      'No videos yet',
-      'Files in the download folder will appear here.'
+      'No videos found',
+      'Download videos or check your gallery folder in Settings.'
     );
     const cta = document.createElement('div');
     cta.className = 'empty-cta';
@@ -5146,6 +5150,28 @@ function patchRowSub(li, it) {
   }
   const pct = sub._pct || (sub._pct = sub.querySelector('.bar-pct'));
   if (pct) pct.textContent = prog + '%';
+  // Update pause/resume overlay based on state
+  var iconWrap = li.querySelector('.icon-wrap');
+  if (iconWrap) {
+    var existingOv = iconWrap.querySelector('.pause-overlay');
+    var needsOv = it.state === 'DOWNLOADING' || it.state === 'PAUSED';
+    if (needsOv && !existingOv) {
+      var ov = document.createElement('div');
+      ov.className = 'pause-overlay';
+      ov.setAttribute('data-action', it.state === 'DOWNLOADING' ? 'pause' : 'resume');
+      ov.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
+      ov.textContent = it.state === 'DOWNLOADING' ? '\u23F8' : '\u25B6';
+      ov.addEventListener('click', function (e) { e.stopPropagation(); doAction(it.id, ov.getAttribute('data-action')); });
+      iconWrap.appendChild(ov);
+    } else if (needsOv && existingOv) {
+      var action = it.state === 'DOWNLOADING' ? 'pause' : 'resume';
+      existingOv.setAttribute('data-action', action);
+      existingOv.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
+      existingOv.textContent = it.state === 'DOWNLOADING' ? '\u23F8' : '\u25B6';
+    } else if (!needsOv && existingOv) {
+      existingOv.remove();
+    }
+  }
 }
 
 function updateRows(items) {
@@ -5226,7 +5252,7 @@ function rebuildList(items) {
       ? '<span class="retry-badge" title="Retried \u00d7' + it.retryCount + '">&#x21BB;' + it.retryCount + '</span>' : '';
     const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
     li.innerHTML =
-      '<div class="item-top"><div class="icon ' + iconStateCls(it.state) + '">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div><div class="item-body">' +
+      '<div class="item-top"><div class="icon-wrap"><div class="icon ' + iconStateCls(it.state) + '">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div>' + ((it.state === 'DOWNLOADING' || it.state === 'PAUSED') ? '<div class="pause-overlay" data-action="' + (it.state === 'DOWNLOADING' ? 'pause' : 'resume') + '" title="' + (it.state === 'DOWNLOADING' ? 'Pause' : 'Resume') + '">' + (it.state === 'DOWNLOADING' ? '\u23F8' : '\u25B6') + '</div>' : '') + '</div><div class="item-body">' +
       '<div class="name">' + escapeHtml(it.fileName) + '</div>' + okBadge + retryBadge + err + retry +
       '</div>' +
       '<button class="item-menu-btn" type="button" title="Actions">\u22EF</button>' +
@@ -5245,6 +5271,13 @@ function rebuildList(items) {
       retryBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         doAction(it.id, 'resume');
+      });
+    }
+    const pauseOv = li.querySelector('.pause-overlay');
+    if (pauseOv) {
+      pauseOv.addEventListener('click', function (e) {
+        e.stopPropagation();
+        doAction(it.id, pauseOv.getAttribute('data-action'));
       });
     }
     if (compactMode) li.classList.add('compact');
