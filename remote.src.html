@@ -119,6 +119,12 @@
   .srv-chip.hidden {
  display: none; }
 
+  .ro-chip {
+ display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(217,48,37,.35); background: var(--red-bg); color: var(--red); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+
+  .ro-chip.hidden {
+ display: none; }
+
   .more-wrap {
  position: relative; }
 
@@ -1118,6 +1124,12 @@
   .fab:hover {
  background: var(--primary-2); }
 
+  .toast {
+ position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 200; max-width: min(92vw, 420px); padding: 10px 16px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.25); pointer-events: none; }
+
+  .toast.hidden {
+ display: none; }
+
   #filtersSticky {
  position: sticky; z-index: 30; background: var(--bg); padding: 8px 0 12px; margin: -8px 0 4px; }
 
@@ -1373,6 +1385,7 @@
   <div class="topbar-in">
     <div class="brand"><span>Tasirin Download Manager<small>Remote Control</small></span></div>
     <span id="serverChip" class="srv-chip hidden"><i></i><span id="serverChipText">Server</span></span>
+    <span id="roChip" class="ro-chip hidden">Read-only</span>
     <button id="newBtn" class="pill primary" type="button">+ New Download</button>
     <div class="more-wrap">
       <button id="moreBtn" class="more-btn" type="button" aria-label="More actions" aria-haspopup="true" aria-expanded="false">&#8942;</button>
@@ -1460,6 +1473,7 @@
 
   <div id="galleryView" class="hidden">
     <div class="gal-toolbar"><h2>Device Gallery</h2><span class="count" id="galleryCount"></span>
+      <button id="galRefreshBtn" type="button" class="btn-ghost" title="Refresh gallery">&#8635;</button>
       <button id="galSelectBtn" type="button" class="btn-ghost" style="margin-left:auto">Select</button>
     </div>
 
@@ -1540,6 +1554,8 @@
 </nav>
 
 <button id="fabNewBtn" class="fab" type="button" title="Add download">+</button>
+
+<div id="toast" class="toast hidden"></div>
 
 <div id="mediaModal">
   <div id="mmTop">
@@ -1753,15 +1769,22 @@ document.addEventListener('keydown', function (e) {
 let failCount = 0;
 let currentItems = [];
 let webFilter = 'ALL';
+try { webFilter = localStorage.getItem('dl_filter') || 'ALL'; } catch (e) {}
 const WEB_FILTERS = {ALL:'webFilterAll', ACTIVE:'webFilterActive', COMPLETED:'webFilterCompleted', FAILED:'webFilterFailed'};
+if (!WEB_FILTERS[webFilter]) webFilter = 'ALL';
 Object.entries(WEB_FILTERS).forEach(function (e) {
   document.getElementById(e[1]).addEventListener('click', function () {
     webFilter = e[0];
+    try { localStorage.setItem('dl_filter', webFilter); } catch (err) {}
     Object.entries(WEB_FILTERS).forEach(function (f) {
       document.getElementById(f[1]).classList.toggle('on', f[0] === webFilter);
     });
     refresh();
   });
+});
+// Sinkronkan tombol filter dengan nilai tersimpan saat halaman dimuat.
+Object.entries(WEB_FILTERS).forEach(function (f) {
+  document.getElementById(f[1]).classList.toggle('on', f[0] === webFilter);
 });
 
 const addForm = document.getElementById('addForm');
@@ -1824,6 +1847,8 @@ function applyServerStatus(st) {
     chip.classList.remove('hidden');
     chipText.textContent = 'v' + st.appVersion + (st.appBuild ? ' (' + st.appBuild + ')' : '');
   }
+  const roChip = document.getElementById('roChip');
+  if (roChip) roChip.classList.toggle('hidden', !serverReadOnly);
   const footer = document.getElementById('appFooter');
   if (footer && st.appVersion) {
     footer.textContent = 'Server v' + st.appVersion + (st.appBuild ? ' (build ' + st.appBuild + ')' : '') + ' \u00b7 Tasirin Download Manager';
@@ -1845,6 +1870,10 @@ let gallerySentinel = null;
 let galleryPage = 0;
 let galleryHasMore = false;
 let galleryRetryDone = false;
+// Cache halaman pertama galeri (TTL singkat) supaya pindah tab Gallery tidak
+// selalu scan ulang; tombol refresh memaksa muat ulang dari jaringan.
+const GALLERY_CACHE_TTL_MS = 30000;
+let galleryCache = null; // {items, total, hasMore, at}
 // Batasi jumlah thumbnail yang dimuat serentak agar tidak boros RAM.
 (function() {
   const MAX_CONCURRENT = 10;
@@ -1936,7 +1965,23 @@ function mmFmtTime(t) {
   return h ? h + ':' + String(m).padStart(2, '0') + ':' + mm : m + ':' + mm;
 }
 
+const toastEl = document.getElementById('toast');
+function showToast(text, ms) {
+  if (!toastEl) return;
+  toastEl.textContent = text;
+  toastEl.classList.remove('hidden');
+  clearTimeout(toastEl._t);
+  toastEl._t = setTimeout(function () { toastEl.classList.add('hidden'); }, ms || 2200);
+}
 function mmShowToast(text, ms) {
+  // Toast pemutar hanya relevan saat player terbuka; di luar itu tampilkan
+  // toast global agar pesan galeri/fs (mis. "ZIP too large") benar-benar
+  // terlihat (sebelumnya tersembunyi di dalam #mediaModal yang display:none).
+  const modal = document.getElementById('mediaModal');
+  if (!modal || !modal.classList.contains('open')) {
+    showToast(text, ms);
+    return;
+  }
   mmToast.textContent = text;
   mmToast.classList.remove('hidden');
   clearTimeout(mmToast._t);
@@ -2110,6 +2155,47 @@ async function loadGallery(reset) {
   }
 }
 
+function galleryCacheFresh() {
+  return !!(galleryCache && Date.now() - galleryCache.at < GALLERY_CACHE_TTL_MS);
+}
+
+// Render ulang seluruh galeri dari data (hasil fetch atau cache memori).
+function renderGalleryReset(items, total, hasMore) {
+  galleryItems = items;
+  galleryVideoPos = {};
+  for (const v of items) {
+    if (v.isVideo) galleryVideoPos[v.token] = loadVideoPos(v.token);
+  }
+  galleryPage = 1;
+  galleryLoaded = 0;
+  galleryHasMore = !!hasMore;
+  galleryRetryDone = false;
+  galSelected.clear();
+  if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
+  galleryGrid.innerHTML = '';
+  const totalVideos = total || items.length;
+  galleryCount.textContent = totalVideos === 1 ? '1 video' : totalVideos + ' videos';
+  if (!items.length) {
+    galleryGrid.innerHTML = emptyHtml(
+      'search',
+      'No videos yet',
+      'Files in the download folder will appear here.'
+    );
+    const cta = document.createElement('div');
+    cta.className = 'empty-cta';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pill primary';
+    b.textContent = 'Open File Manager';
+    b.addEventListener('click', function () { location.hash = '#/files'; });
+    cta.appendChild(b);
+    galleryGrid.appendChild(cta);
+    galleryHasMore = false;
+    return;
+  }
+  loadMoreGallery();
+}
+
 async function loadGalleryRequest(reset) {
   const seq = ++gallerySeq;
   if (reset) showGallerySkeleton();
@@ -2131,46 +2217,15 @@ async function loadGalleryRequest(reset) {
     galleryStatus.textContent = '';
     const items = data.items || [];
     if (reset) {
-      galleryItems = items;
-      galleryVideoPos = {};
-      for (const v of items) {
-        if (v.isVideo) galleryVideoPos[v.token] = loadVideoPos(v.token);
-      }
-      galleryPage = 1;
-      galleryLoaded = 0;
-      galSelected.clear();
-      if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
-      galleryGrid.innerHTML = '';
-      const totalVideos = data.total || items.length;
-      galleryCount.textContent = totalVideos === 1 ? '1 video' : totalVideos + ' videos';
-      if (!items.length) {
-
-        galleryGrid.innerHTML = emptyHtml(
-          'search',
-          'No videos yet',
-          'Files in the download folder will appear here.'
-        );
-        {
-          const cta = document.createElement('div');
-          cta.className = 'empty-cta';
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'pill primary';
-          b.textContent = 'Open File Manager';
-          b.addEventListener('click', function () { location.hash = '#/files'; });
-          cta.appendChild(b);
-          galleryGrid.appendChild(cta);
-        }
-        galleryHasMore = false;
-        return;
-      }
+      galleryCache = {items: items, total: data.total || items.length, hasMore: !!data.hasMore, at: Date.now()};
+      renderGalleryReset(items, data.total || items.length, data.hasMore);
     } else {
       galleryItems = galleryItems.concat(items);
       galleryPage++;
+      galleryHasMore = !!data.hasMore;
+      galleryRetryDone = false;
+      loadMoreGallery();
     }
-    galleryHasMore = !!data.hasMore;
-    galleryRetryDone = false;
-    loadMoreGallery();
   } catch (e) {
     if (seq !== gallerySeq) return;
     if (reset) {
@@ -2178,10 +2233,18 @@ async function loadGalleryRequest(reset) {
       if (!galleryRetryDone) {
         galleryRetryDone = true;
         setTimeout(function () { loadGallery(true); }, 2000);
+      } else if (galleryCacheFresh()) {
+        // Jaringan bermasalah tapi masih ada salinan terakhir: pakai cache
+        // sambil memberi tahu supaya pengguna tahu datanya bisa basi.
+        mmShowToast('Failed to refresh — showing cached gallery', 3000);
+        galleryStatus.textContent = '';
+        renderGalleryReset(galleryCache.items, galleryCache.total, galleryCache.hasMore);
       } else {
         galleryStatus.textContent = 'Failed to load gallery: ' + e;
         if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
-        galleryGrid.innerHTML = emptyHtml('warn', 'Failed to load gallery', String(e));
+        galleryGrid.innerHTML = emptyHtml('warn', 'Failed to load gallery', String(e), 'Retry');
+        const rb = galleryGrid.querySelector('.cta button');
+        if (rb) rb.addEventListener('click', function () { loadGallery(true); });
       }
     }
   }
@@ -2309,6 +2372,10 @@ function updateGalBatch() {
 
 document.getElementById('galSelectBtn').addEventListener('click', function () {
   galSetSelectMode(!galSelectMode);
+});
+document.getElementById('galRefreshBtn').addEventListener('click', function () {
+  galleryCache = null;
+  loadGallery(true);
 });
 document.getElementById('galBatchCancel').addEventListener('click', function () {
   galSetSelectMode(false);
@@ -2447,7 +2514,13 @@ function applyRoute() {
   if (route === 'gallery') {
     restartAnim(galleryView);
     toggleAddForm(false);
-    loadGallery(true).then(function () { restoreRouteScroll('gallery'); });
+    if (galleryCacheFresh()) {
+      galleryStatus.textContent = '';
+      renderGalleryReset(galleryCache.items, galleryCache.total, galleryCache.hasMore);
+      restoreRouteScroll('gallery');
+    } else {
+      loadGallery(true).then(function () { restoreRouteScroll('gallery'); });
+    }
   } else if (route === 'files') {
     restartAnim(fsView);
     toggleAddForm(false);
@@ -3187,7 +3260,7 @@ async function downloadZipWithProgress(url, label) {
     const cd = res.headers.get('Content-Disposition') || '';
     const m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="?([^";]+)"?/i.exec(cd);
     if (m) {
-      try { fileName = decodeURIComponent(m[1]); } catch (e) { fileName = m[1]; }
+      try { fileName = decodeURIComponent(m[1].trim()); } catch (e) { fileName = m[1].trim(); }
       fileName = fileName.replace(/["']/g, '');
     }
     if (!res.body || !res.body.getReader || len > ZIP_MEMORY_LIMIT) {
@@ -5487,6 +5560,14 @@ function nextPollMs() {
   return anyActiveTransfer() ? POLL_FAST_MS : POLL_IDLE_MS;
 }
 
+function schedulePoll() {
+  // Jangan jadwalkan polling saat tab tidak terlihat: hemat request & baterai
+  // (SSE tetap terbuka; saat kembali terlihat langsung snapshot + resume).
+  if (document.visibilityState === 'hidden') return;
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(pollTick, nextPollMs());
+}
+
 async function pollSnapshot() {
   try {
     const res = await fetch(API + '/api/snapshot');
@@ -5516,6 +5597,10 @@ async function pollSnapshot() {
 }
 
 function pollTick() {
+  if (document.visibilityState === 'hidden') {
+    clearTimeout(pollTimer);
+    return;
+  }
   // SSE terbuka tapi diam terus-menerus: WebView tua menahan buffer, onmessage
   // tidak pernah datang. Coba reconnect sekali; bila masih diam, matikan SSE
   // untuk sesi ini dan pakai polling adaptif saja (tidak ada reconnect storm).
@@ -5542,18 +5627,23 @@ function pollTick() {
   const stale = !sse || sse.readyState !== EventSource.OPEN ||
     Date.now() - lastSseAt > 4000;
   if (stale) pollSnapshot();
-  pollTimer = setTimeout(pollTick, nextPollMs());
+  schedulePoll();
 }
 
 function startPolling() {
   connectEvents();
-  pollTimer = setTimeout(pollTick, nextPollMs());
+  schedulePoll();
 }
 
-// Tab kembali terlihat (habis tidur/minimize): segarkan segera tanpa nunggu
-// interval polling berikutnya.
+// Tab kembali terlihat (habis tidur/minimize): segarkan segera dan resume
+// polling; saat tersembunyi hentikan timer polling sementara.
 document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState === 'visible') pollSnapshot();
+  if (document.visibilityState === 'visible') {
+    pollSnapshot();
+    schedulePoll();
+  } else {
+    clearTimeout(pollTimer);
+  }
 });
 
 if (typeof EventSource !== 'undefined') {
@@ -5562,7 +5652,7 @@ if (typeof EventSource !== 'undefined') {
   // Browser tanpa EventSource (sangat tua): polling adaptif saja.
   sse = null;
   sseGaveUp = true;
-  pollTimer = setTimeout(pollTick, nextPollMs());
+  schedulePoll();
 }
 </script>
 </body>
