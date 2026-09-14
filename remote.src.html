@@ -475,8 +475,6 @@
   .gal-info .n {
  font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.35; min-height: 2.7em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-  .gal-info .m {
- margin-top: 3px; font-size: 11.5px; color: var(--muted); }
 
   .gal-sentinel {
  grid-column: 1 / -1; height: 24px; }
@@ -1213,6 +1211,24 @@
   .fs-row:active, .fs-root:active {
  transform: scale(.985); }
 
+
+  .fcount{font-size:10px;opacity:.55;margin-left:3px;font-weight:700;vertical-align:1px}
+  .page-head{transition:padding .2s ease}.page-head.shrink h2{font-size:15px;transition:font-size .2s ease}.page-head.shrink{padding:2px 0 6px}
+  .gal-toolbar{transition:gap .2s ease}.gal-toolbar.shrink{gap:6px;padding:0}.gal-toolbar.shrink h2{font-size:15px}.gal-toolbar.shrink .page-sub{font-size:10.5px}
+  .social-favicon{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:4px;flex:0 0 auto}
+  .social-favicon.p-youtube{background:#ff0033}
+  .social-favicon.p-tiktok{background:#010101;border:1px solid #25f4ee}
+  .social-favicon.p-instagram{background:linear-gradient(135deg,#f58529,#dd2a7b,#8134af,#515bd4);border:1px solid #fff2}
+  .social-favicon.p-x{background:#0f1419}
+  .toast{display:flex;align-items:center;justify-content:center;gap:7px;animation:toastSlideIn .25s ease}
+  .toast-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:#6d7cff}
+  .toast.ok .toast-dot{background:#35c47a}.toast.error .toast-dot{background:#ff6661}.toast.info .toast-dot{background:#6d7cff}
+  .toast.hidden{display:none !important}
+  @keyframes toastSlideIn{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+  .gal-meta-row{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:3px}
+  .gal-duration{font-size:11px;font-weight:700;background:rgba(0,0,0,.7);color:#fff;padding:1px 6px;border-radius:5px;line-height:1.4}
+  .gal-size{font-size:11px;color:var(--muted)}
+  .fs-row.compact{padding:8px 10px}.fs-row.compact .fs-icon{width:28px;height:28px}.fs-row.compact .fs-icon svg{width:14px;height:14px}.fs-row.compact .fs-name{font-size:13px}.fs-row.compact .fs-meta{font-size:10.5px}
   .toast {
  position: fixed; left: 50%; bottom: calc(200px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 200; max-width: min(92vw, 420px); padding: 10px 16px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.25); pointer-events: none; }
 
@@ -1380,8 +1396,6 @@
     .fab {
  display: flex; }
 
-    #newBtn {
- display: none; }
 
     .seg {
  width: 100%; }
@@ -1475,7 +1489,6 @@
     <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9.2"/><path d="M7.5 9.8 12 14.3l4.5-4.5"/><path d="M5 19h14"/></svg></span><span class="brand-word">Tasirin Download Manager<small>Remote Control</small></span></div>
     <span id="serverChip" class="srv-chip hidden"><i></i><span id="serverChipText">Server</span></span>
     <span id="roChip" class="ro-chip hidden">Read-only</span>
-    <button id="newBtn" class="pill primary" type="button">+ New Download</button>
   </div>
 </div>
 
@@ -1504,10 +1517,10 @@
   </div>
   <div id="filtersSticky">
     <div class="seg" id="downloadsFilters">
-      <button id="webFilterAll" type="button" class="on">All</button>
-      <button id="webFilterActive" type="button">Active</button>
-      <button id="webFilterCompleted" type="button">Completed</button>
-      <button id="webFilterFailed" type="button">Failed</button>
+      <button id="webFilterAll" type="button" class="on">All<span class="fcount" id="fAll"></span></button>
+      <button id="webFilterActive" type="button">Active<span class="fcount" id="fActive"></span></button>
+      <button id="webFilterCompleted" type="button">Completed<span class="fcount" id="fDone"></span></button>
+      <button id="webFilterFailed" type="button">Failed<span class="fcount" id="fFail"></span></button>
     </div>
   </div>
 
@@ -1600,6 +1613,7 @@
         <div class="fs-sep"></div>
         <button id="fsSelectBtn" type="button">Select</button>
         <button id="fsSearchBtn" type="button">Search</button>
+        <button id="fsCompactToggle" type="button">Compact</button>
       </div>
     </span>
   </div>
@@ -1648,7 +1662,7 @@
 <button id="fabNewBtn" class="fab" type="button" title="Add download">+</button>
 <button id="toTopBtn" class="to-top" type="button" title="Back to top" aria-label="Back to top">&#8593;</button>
 
-<div id="toast" class="toast hidden"></div>
+<div id="toast" class="toast hidden"><span class="toast-dot"></span><span id="toastMsg"></span></div>
 
 <div id="mediaModal">
   <div id="mmTop">
@@ -1882,7 +1896,6 @@ Object.entries(WEB_FILTERS).forEach(function (f) {
 
 const addForm = document.getElementById('addForm');
 const addSheet = document.getElementById('addSheet');
-const newBtn = document.getElementById('newBtn');
 const statusLine = document.getElementById('status');
 const dlList = document.getElementById('list');
 let pendingAddForm = false;
@@ -1904,13 +1917,37 @@ function onNewDownloadClick() {
     toggleAddForm(addSheet.classList.contains('hidden'));
   }
 }
-newBtn.addEventListener('click', onNewDownloadClick);
 document.getElementById('fabNewBtn').addEventListener('click', onNewDownloadClick);
 const toTopBtn = document.getElementById('toTopBtn');
 function updateToTop() {
   toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600);
 }
+function updateScrollShrink() {
+  var y = window.scrollY || 0;
+  var sh = y > 80;
+  var ph = document.getElementById('dlPageHead');
+  if (ph) ph.classList.toggle('shrink', sh);
+  var gt = document.querySelector('#galleryView .gal-toolbar');
+  if (gt) gt.classList.toggle('shrink', sh);
+  var ft = document.querySelector('#fsView .gal-toolbar');
+  if (ft) ft.classList.toggle('shrink', sh);
+}
 window.addEventListener('scroll', updateToTop, {passive: true});
+window.addEventListener('scroll', updateScrollShrink, {passive: true});
+updateScrollShrink();
+// FS compact toggle
+var fsCompact = localStorage.getItem('fs_compact') === '1';
+function applyFsCompact() {
+  document.getElementById('fsList').classList.toggle('compact', fsCompact);
+  var btn = document.getElementById('fsCompactToggle');
+  if (btn) btn.classList.toggle('on', fsCompact);
+}
+document.getElementById('fsCompactToggle').addEventListener('click', function () {
+  fsCompact = !fsCompact;
+  localStorage.setItem('fs_compact', fsCompact ? '1' : '0');
+  applyFsCompact();
+});
+applyFsCompact();
 toTopBtn.addEventListener('click', function () {
   try { window.scrollTo({top: 0, behavior: 'smooth'}); }
   catch (e) { window.scrollTo(0, 0); }
@@ -2069,10 +2106,11 @@ function mmFmtTime(t) {
 }
 
 const toastEl = document.getElementById('toast');
-function showToast(text, ms) {
+function showToast(text, ms, type) {
   if (!toastEl) return;
-  toastEl.textContent = text;
-  toastEl.classList.remove('hidden');
+  var msg = document.getElementById('toastMsg');
+  if (msg) msg.textContent = text;
+  toastEl.className = 'toast' + (type ? ' ' + type : ' info');
   clearTimeout(toastEl._t);
   toastEl._t = setTimeout(function () { toastEl.classList.add('hidden'); }, ms || 2200);
 }
@@ -2414,7 +2452,10 @@ function renderGalleryCell(it) {
     '</div>' +
     '<div class="gal-info">' +
       '<div class="n">' + escapeHtml(it.name) + '</div>' +
-      '<div class="m">' + fmt(it.size) + (it.modified > 0 ? ' \u00b7 ' + fmtDate(it.modified) : '') + '</div>' +
+      '<div class="gal-meta-row">' +
+        (it.isVideo && it.durationMs > 0 ? '<span class="gal-duration">' + mmFmtTime(it.durationMs / 1000) + '</span>' : '') +
+        '<span class="gal-size">' + fmt(it.size) + (it.modified > 0 ? ' \u00b7 ' + fmtDate(it.modified) : '') + '</span>' +
+      '</div>' +
     '</div>';
   cell.addEventListener('click', function () {
     if (galSelectMode) { toggleGalSelect(it, cell); return; }
@@ -4828,7 +4869,16 @@ function stateBadge(s) {
   return '<span class="badge ' + (map[s] || 'b-paused') + '">' + stateLabel(s) + '</span>';
 }
 
-function fileIcon(name) {
+function socialFavicon(url) {
+  if (!url) return '';
+  var u = url.toLowerCase();
+  if (u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1) return '<span class="social-favicon p-youtube"></span>';
+  if (u.indexOf('tiktok.com/') !== -1 || u.indexOf('douyin.com') !== -1) return '<span class="social-favicon p-tiktok"></span>';
+  if (u.indexOf('instagram.com') !== -1 || u.indexOf('instagr.am') !== -1) return '<span class="social-favicon p-instagram"></span>';
+  if (u.indexOf('twitter.com') !== -1 || u.indexOf('x.com') !== -1) return '<span class="social-favicon p-x"></span>';
+  return '';
+}
+function fileIcon(name, url) {
   const e = extOf(name).toLowerCase();
   if (FILE_ICON_VIDEO.indexOf(e) >= 0) return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="3" fill="#4353e6"/><polygon points="10,8.5 16,12 10,15.5" fill="#fff"/></svg>';
   if (FILE_ICON_IMG.indexOf(e) >= 0) return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" fill="#0f9d58"/><circle cx="9" cy="10" r="2" fill="#fff"/><path d="M3 17l5-5 3 3 4-4 6 6v1a3 3 0 01-3 3H6a3 3 0 01-3-3z" fill="#fff" opacity=".7"/></svg>';
@@ -4859,6 +4909,15 @@ function updateToolbar(items) {
   if (sep1) {
     sep1.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
   }
+  var total = active + pausedOrFailed + failed + completed;
+  var fAll = document.getElementById('fAll');
+  var fActive = document.getElementById('fActive');
+  var fDone = document.getElementById('fDone');
+  var fFail = document.getElementById('fFail');
+  if (fAll) fAll.textContent = total ? ' ' + total : '';
+  if (fActive) fActive.textContent = active ? ' ' + active : '';
+  if (fDone) fDone.textContent = completed ? ' ' + completed : '';
+  if (fFail) fFail.textContent = failed ? ' ' + failed : '';
   const badge = document.getElementById('navDlBadge');
   if (badge) {
     badge.textContent = active;
@@ -5167,7 +5226,7 @@ function rebuildList(items) {
       ? '<span class="retry-badge" title="Retried \u00d7' + it.retryCount + '">&#x21BB;' + it.retryCount + '</span>' : '';
     const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
     li.innerHTML =
-      '<div class="item-top"><div class="icon ' + iconStateCls(it.state) + '">' + fileIcon(it.fileName) + '</div><div class="item-body">' +
+      '<div class="item-top"><div class="icon ' + iconStateCls(it.state) + '">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div><div class="item-body">' +
       '<div class="name">' + escapeHtml(it.fileName) + '</div>' + okBadge + retryBadge + err + retry +
       '</div>' +
       '<button class="item-menu-btn" type="button" title="Actions">\u22EF</button>' +
