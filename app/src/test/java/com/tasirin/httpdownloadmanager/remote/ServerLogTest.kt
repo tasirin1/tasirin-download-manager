@@ -50,7 +50,8 @@ class ServerLogTest {
     fun `request rutin media dan polling - tidak dicatat`() {
         listOf(
             "/api/snapshot", "/api/events", "/api/pin_enabled",
-            "/api/thumb", "/api/media", "/api/fs"
+            "/api/thumb", "/api/media", "/api/fs",
+            "/api/gallery?page=0&type=video"
         ).forEach { uri ->
             assertTrue(shouldSkipRequestLog("GET", 200, uri))
             assertFalse(shouldSkipRequestLog("GET", 500, uri))

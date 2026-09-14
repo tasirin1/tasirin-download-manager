@@ -13,7 +13,8 @@ internal fun shouldSkipRequestLog(httpMethod: String, statusCode: Int, uri: Stri
     if (httpMethod != "GET" || statusCode != 200) return false
     return uri == "/api/snapshot" || uri == "/api/events" ||
         uri == "/api/pin_enabled" || uri == "/api/thumb" ||
-        uri == "/api/media" || uri == "/api/fs"
+        uri == "/api/media" || uri == "/api/fs" ||
+        uri.startsWith("/api/gallery")
 }
 
 class ServerLog(
