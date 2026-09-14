@@ -356,7 +356,10 @@
  margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
 
   .page-head {
- display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 2px 0 10px; }
+ display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 0 10px; }
+
+  .page-head .more-btn {
+ font-size: 18px; }
 
   .page-head h2 {
  margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
@@ -1473,6 +1476,17 @@
     <span id="serverChip" class="srv-chip hidden"><i></i><span id="serverChipText">Server</span></span>
     <span id="roChip" class="ro-chip hidden">Read-only</span>
     <button id="newBtn" class="pill primary" type="button">+ New Download</button>
+  </div>
+</div>
+
+<div id="connBanner" class="conn-banner hidden">
+  <span id="connBannerText">Server connection lost.</span>
+  <button id="connReloadBtn" type="button">Reload</button>
+</div>
+
+<div class="wrap">
+  <div class="page-head" id="dlPageHead">
+    <div><h2>Downloads</h2><span class="page-sub">Your download queue</span></div>
     <div class="more-wrap">
       <button id="moreBtn" class="more-btn" type="button" aria-label="More actions" aria-haspopup="true" aria-expanded="false">&#8942;</button>
       <div id="moreMenu" class="more-menu hidden">
@@ -1488,15 +1502,6 @@
       </div>
     </div>
   </div>
-</div>
-
-<div id="connBanner" class="conn-banner hidden">
-  <span id="connBannerText">Server connection lost.</span>
-  <button id="connReloadBtn" type="button">Reload</button>
-</div>
-
-<div class="wrap">
-  <div class="page-head" id="dlPageHead"><h2>Downloads</h2><span class="page-sub">Your download queue</span></div>
   <div id="filtersSticky">
     <div class="seg" id="downloadsFilters">
       <button id="webFilterAll" type="button" class="on">All</button>
@@ -2607,8 +2612,6 @@ function applyRoute() {
   const wrap = document.querySelector('.wrap');
   if (wrap) wrap.classList.toggle('gal-wrap', route === 'gallery');
   document.getElementById('fabNewBtn').classList.toggle('hidden', route !== 'downloads');
-  const dlMore = document.querySelector('.more-wrap');
-  if (dlMore) dlMore.classList.toggle('hidden', route !== 'downloads');
   closeMoreMenu();
   closeFsToolsMenu();
   restoringRoute = route;
