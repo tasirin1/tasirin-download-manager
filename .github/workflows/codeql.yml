@@ -41,6 +41,10 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          # Paket "tools" sudah dihapus dari repositori Google (deprecated);
+          # cukup platform-tools — platform/build-tools diunduh AGP saat autobuild.
+          packages: 'platform-tools'
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
