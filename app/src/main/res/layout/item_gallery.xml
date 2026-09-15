@@ -64,6 +64,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:paddingHorizontal="6dp"
+            android:paddingEnd="82dp"
             android:paddingVertical="3dp"
             android:textColor="#FFFFFF"
             android:textSize="12sp" />

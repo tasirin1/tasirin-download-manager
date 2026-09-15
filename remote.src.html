@@ -679,7 +679,7 @@
  height: 6px; border-radius: 999px; background: var(--primary-soft); overflow: hidden; }
 
   .fs-upload .fill {
- height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #7c3aed, #a78bfa, #c084fc); transition: width .2s ease; }5cff); transition: width .2s ease; }
+ height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #7c3aed, #a78bfa, #c084fc); transition: width .2s ease; }
 
   .fs-upload-list {
  display: flex; flex-direction: column; gap: 3px; margin-top: 8px; max-height: 30vh; overflow-y: auto; }
@@ -707,7 +707,7 @@
 
   .fs-batch {
  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
- position: fixed; left: 0; right: 0; z-index: 48;
+ position: fixed; left: 0; right: 0; z-index: 51;
  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
  background: var(--topbar-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -1228,7 +1228,7 @@
   .sheet-cancel {
  width: 100%; margin-top: 8px; padding: 13px; border: 0; border-radius: 12px; background: var(--bg-soft); color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
 
-  .shortcuts-fab { bottom: calc(146px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; font-size: 18px; background: var(--card); color: var(--muted); border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+  .shortcuts-fab { bottom: calc(146px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; font-size: 18px; background: var(--card); color: var(--muted); border: 1px solid var(--line); box-shadow: var(--shadow-sm); display: none; }
   .shortcuts-fab:hover { color: var(--primary); border-color: var(--primary); }
   .fab {
  display: none; position: fixed; right: 18px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); z-index: 55; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--grad); color: #fff; font-size: 27px; font-weight: 600; box-shadow: 0 4px 14px var(--grad-shadow); cursor: pointer; align-items: center; justify-content: center; transition: transform .15s ease, box-shadow .15s ease; }
@@ -1301,7 +1301,7 @@
   .gal-meta-row{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:3px}
   .gal-duration{font-size:11px;font-weight:700;background:rgba(0,0,0,.7);color:#fff;padding:1px 6px;border-radius:5px;line-height:1.4}
   .gal-size{font-size:11px;color:var(--muted)}
-  .fs-row.compact{padding:8px 10px}.fs-row.compact .fs-icon{width:28px;height:28px}.fs-row.compact .fs-icon svg{width:14px;height:14px}.fs-row.compact .fs-name{font-size:13px}.fs-row.compact .fs-meta{font-size:10.5px}
+  .fs-row.compact{padding:8px 10px}.fs-row.compact .fs-ico{width:28px;height:28px}.fs-row.compact .fs-ico svg{width:14px;height:14px}.fs-row.compact .fs-name{font-size:13px}.fs-row.compact .fs-meta{font-size:10.5px}
   .toast {
  position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 300; max-width: min(92vw, 420px); padding: 9px 14px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
@@ -1494,7 +1494,6 @@
 
     .fab {
  display: flex; }
-    .shortcuts-fab { display: flex; }
 
 
     .seg {
@@ -1562,6 +1561,10 @@
   .old-browser h2 { margin: 0 0 8px; font-size: 18px; }
   .old-browser.hidden { display: none; }
 
+
+  @media (min-width: 601px) and (hover: hover) {
+    .shortcuts-fab { display: flex; }
+  }
 </style>
 </head>
 <body>
@@ -2100,6 +2103,8 @@ function updateChromeHide() {
   var y = window.scrollY || 0;
   var fab = document.getElementById('fabNewBtn');
   if (fab) fab.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
+  var scBtn = document.getElementById('shortcutsBtn');
+  if (scBtn) scBtn.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
   var tb = document.getElementById('tabbar');
   if (tb) {
     var keyFocused = !!(tb.contains && tb.contains(document.activeElement));
@@ -2622,6 +2627,13 @@ function renderGalleryReset(items, total, hasMore) {
   galleryHasMore = !!hasMore;
   galleryRetryDone = false;
   galSelected.clear();
+  if (galSelectMode) {
+    galSelectMode = false;
+    galBatch.classList.add('hidden');
+    galleryGrid.classList.remove('gal-selecting');
+    var gsBtn = document.getElementById('galSelectBtn');
+    if (gsBtn) gsBtn.textContent = 'Select';
+  }
   if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
   galleryGrid.innerHTML = '';
   const totalVideos = total || items.length;
