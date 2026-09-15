@@ -148,6 +148,15 @@
   .ro-chip.hidden {
  display: none; }
 
+  .ro-chip i.ro-dot {
+ width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 3px var(--red-bg); flex: 0 0 auto; }
+
+  .srv-chip.chip-min, .ro-chip.chip-min {
+ padding: 5px 8px; }
+
+  .srv-chip.chip-min #serverChipText, .ro-chip.chip-min .ro-txt {
+ display: none; }
+
   .more-wrap {
  position: relative; }
 
@@ -276,7 +285,7 @@
  .icon-wrap { position: relative; }
  .icon-wrap .pause-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: rgba(0,0,0,.5); color: #fff; font-size: 15px; opacity: 0; transition: opacity .15s ease; cursor: pointer; pointer-events: none; }
  .icon-wrap:hover .pause-overlay { opacity: 1; pointer-events: auto; }
- @media (hover: none) { .icon-wrap .pause-overlay { opacity: .85; pointer-events: auto; } }
+ .icon-wrap .pause-overlay.o-shown { opacity: 1; pointer-events: auto; }
 
   .icon.i-active {
  background: var(--blue-bg); }
@@ -405,7 +414,7 @@
  position: fixed; left: 0; right: 0; bottom: 0; text-align: center; color: var(--muted); font-size: 11.5px; padding: 8px 0; background: var(--bg); border-top: 1px solid var(--line); z-index: 45; }
 
   .tabbar {
- position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 4px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--tabbar-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line); box-shadow: 0 -1px 8px rgba(23,32,58,.05); }
+ position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 4px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--tabbar-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line); box-shadow: 0 -1px 8px rgba(23,32,58,.05); transition: transform .25s ease; }
 
   .tab {
  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 46px; padding: 6px 4px 5px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); font-size: 10.5px; font-weight: 600; line-height: 1.2; cursor: pointer; transition: color .15s ease, background .15s ease; }
@@ -428,8 +437,11 @@
   .tab.on .tab-ico {
  background: var(--primary); color: #fff; box-shadow: 0 3px 8px var(--grad-shadow); }
 
+  .tabbar.tab-hide {
+ transform: translateY(calc(100% + 8px)); }
+
   .gal-cell {
- display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .15s ease, box-shadow .15s ease; }
+ display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .15s ease, box-shadow .15s ease, opacity .18s ease; }
 
   .gal-cell:hover {
  transform: translateY(-3px); box-shadow: var(--shadow); }
@@ -1179,6 +1191,9 @@
   .fab:active {
  transform: scale(.92); }
 
+  .fab.fab-hide {
+ opacity: 0; transform: translateY(24px) scale(.9); pointer-events: none; }
+
   .to-top {
  display: flex; position: fixed; right: 26px; bottom: calc(144px + env(safe-area-inset-bottom, 0px)); z-index: 54; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 18px; line-height: 1; box-shadow: var(--shadow-sm); cursor: pointer; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transform: translateY(6px); transition: opacity .2s ease, transform .2s ease, color .15s ease, box-shadow .15s ease; }
 
@@ -1238,6 +1253,12 @@
 
   .toast.hidden {
  display: none; }
+
+  .toast-close {
+ flex: 0 0 auto; width: 20px; height: 20px; margin-left: 6px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff; font-size: 13px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; pointer-events: auto; }
+
+  .toast-close:hover {
+ background: rgba(255,255,255,.3); }
 
   #filtersSticky {
  position: sticky; z-index: 30; background: var(--bg); padding: 8px 0 12px; margin: 0 0 4px; }
@@ -1492,7 +1513,7 @@
   <div class="topbar-in">
     <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9.2"/><path d="M7.5 9.8 12 14.3l4.5-4.5"/><path d="M5 19h14"/></svg></span><span class="brand-word">Tasirin Download Manager<small>Remote Control</small></span></div>
     <span id="serverChip" class="srv-chip hidden"><i></i><span id="serverChipText">Server</span></span>
-    <span id="roChip" class="ro-chip hidden">Read-only</span>
+    <span id="roChip" class="ro-chip hidden"><i class="ro-dot"></i><span class="ro-txt">Read-only</span></span>
   </div>
 </div>
 
@@ -1666,7 +1687,7 @@
 <button id="fabNewBtn" class="fab" type="button" title="Add download">+</button>
 <button id="toTopBtn" class="to-top" type="button" title="Back to top" aria-label="Back to top">&#8593;</button>
 
-<div id="toast" class="toast hidden"><span class="toast-dot"></span><span id="toastMsg"></span></div>
+<div id="toast" class="toast hidden"><span class="toast-dot"></span><span id="toastMsg"></span><button id="toastClose" type="button" class="toast-close" title="Close" aria-label="Close">&times;</button></div>
 
 <div id="mediaModal">
   <div id="mmTop">
@@ -1938,6 +1959,31 @@ function updateScrollShrink() {
 }
 window.addEventListener('scroll', updateToTop, {passive: true});
 window.addEventListener('scroll', updateScrollShrink, {passive: true});
+// FAB + tabbar auto-hide saat scroll ke bawah, muncul lagi saat scroll ke atas.
+var lastChromeY = window.scrollY || 0;
+function updateChromeHide() {
+  var y = window.scrollY || 0;
+  var fab = document.getElementById('fabNewBtn');
+  if (fab) fab.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
+  var tb = document.getElementById('tabbar');
+  if (tb) {
+    var keyFocused = !!(tb.contains && tb.contains(document.activeElement));
+    var hide = !keyFocused && y > 260 && y > lastChromeY + 8;
+    tb.classList.toggle('tab-hide', hide);
+  }
+  lastChromeY = y;
+}
+window.addEventListener('scroll', updateChromeHide, {passive: true});
+// Navigasi keyboard (D-pad TV) selalu memunculkan tabbar.
+document.addEventListener('keydown', function () {
+  var tb = document.getElementById('tabbar');
+  if (tb && tb.classList) tb.classList.remove('tab-hide');
+});
+document.addEventListener('focusin', function (e) {
+  var tb = document.getElementById('tabbar');
+  if (tb && tb.contains && tb.contains(e.target)) tb.classList.remove('tab-hide');
+});
+updateChromeHide();
 updateScrollShrink();
 // FS compact toggle
 var fsCompact = localStorage.getItem('fs_compact') === '1';
@@ -1975,6 +2021,33 @@ addSheet.addEventListener('click', function (e) {
   if (e.target === addSheet) toggleAddForm(false);
 });
 
+var chipMinT = null;
+var chipMinArmed = false;
+function armChipMin() {
+  var c = document.getElementById('serverChip');
+  var r = document.getElementById('roChip');
+  if (!chipMinArmed) {
+    chipMinArmed = true;
+    (c ? [c] : []).concat(r ? [r] : []).forEach(function (ch) {
+      ch.addEventListener('mouseenter', chipMinReset);
+      ch.addEventListener('touchstart', chipMinReset, {passive: true});
+      ch.addEventListener('focusin', chipMinReset);
+    });
+  }
+  chipMinReset();
+}
+function chipMinReset() {
+  var c = document.getElementById('serverChip');
+  var r = document.getElementById('roChip');
+  if (c) c.classList.remove('chip-min');
+  if (r) r.classList.remove('chip-min');
+  clearTimeout(chipMinT);
+  chipMinT = setTimeout(function () {
+    if (c && !c.classList.contains('hidden')) c.classList.add('chip-min');
+    if (r && !r.classList.contains('hidden')) r.classList.add('chip-min');
+  }, 6000);
+}
+
 function applyServerStatus(st) {
   serverReadOnly = !!st.readOnly;
   if (st.port && location.port && Number(st.port) !== Number(location.port)) {
@@ -1993,6 +2066,7 @@ function applyServerStatus(st) {
   }
   const roChip = document.getElementById('roChip');
   if (roChip) roChip.classList.toggle('hidden', !serverReadOnly);
+  armChipMin();
   const footer = document.getElementById('appFooter');
   if (footer && st.appVersion) {
     footer.textContent = 'Server v' + st.appVersion + (st.appBuild ? ' (build ' + st.appBuild + ')' : '') + ' \u00b7 Tasirin Download Manager';
@@ -2110,6 +2184,13 @@ function mmFmtTime(t) {
 }
 
 const toastEl = document.getElementById('toast');
+var toastCloseBtn = document.getElementById('toastClose');
+if (toastCloseBtn) {
+  toastCloseBtn.addEventListener('click', function () {
+    toastEl.classList.add('hidden');
+    clearTimeout(toastEl._t);
+  });
+}
 function showToast(text, ms, type) {
   if (!toastEl) return;
   var msg = document.getElementById('toastMsg');
@@ -2320,6 +2401,11 @@ function renderGalleryReset(items, total, hasMore) {
   galleryGrid.innerHTML = '';
   const totalVideos = total || items.length;
   galleryCount.textContent = totalVideos === 1 ? '1 video' : totalVideos + ' videos';
+  var galHasItems = items.length > 0;
+  var galRefreshBtn = document.getElementById('galRefreshBtn');
+  var galSelectBtn = document.getElementById('galSelectBtn');
+  if (galRefreshBtn) galRefreshBtn.classList.toggle('hidden', !galHasItems);
+  if (galSelectBtn) galSelectBtn.classList.toggle('hidden', !galHasItems || galSelectMode);
   if (!items.length) {
     galleryGrid.innerHTML = emptyHtml(
       'search',
@@ -2913,7 +2999,9 @@ async function loadFs() {
     if (seq !== fsLoadSeq) return;
     fsStatus.textContent = '';
     renderFsCrumbs(fsPath);
-    fsUpBtn.disabled = !fsPath;
+    // Up & Home hanya berguna saat berada di dalam folder; sembunyi di root.
+    fsUpBtn.classList.toggle('hidden', !fsPath);
+    document.getElementById('fsHomeBtn').classList.toggle('hidden', !fsPath);
     fsToolsBtn.classList.toggle('hidden', !fsPath);
     fsSelectBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
     fsMkdirBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
@@ -4922,6 +5010,23 @@ function updateToolbar(items) {
   if (fActive) fActive.textContent = active ? ' ' + active : '';
   if (fDone) fDone.textContent = completed ? ' ' + completed : '';
   if (fFail) fFail.textContent = failed ? ' ' + failed : '';
+  // Bar filter menyempit: sembunyi penuh saat daftar kosong, atau sembunyikan
+  // chip yang kosong bila hanya satu filter yang punya item (kecuali filter aktif).
+  var fSticky = document.getElementById('filtersSticky');
+  if (fSticky) fSticky.classList.toggle('hidden', total === 0);
+  var fBtnId = {fActive: 'webFilterActive', fDone: 'webFilterCompleted', fFail: 'webFilterFailed'};
+  var keys = ['fActive', 'fDone', 'fFail'];
+  var counts = {fActive: active, fDone: completed, fFail: failed};
+  var onlyOne = [active > 0, completed > 0, failed > 0].filter(Boolean).length <= 1;
+  keys.forEach(function (k) {
+    var btn = document.getElementById(fBtnId[k]);
+    if (!btn) return;
+    if (!onlyOne) { btn.classList.remove('hidden'); return; }
+    var isCur = (webFilter === 'ACTIVE' && k === 'fActive') ||
+      (webFilter === 'COMPLETED' && k === 'fDone') ||
+      (webFilter === 'FAILED' && k === 'fFail');
+    btn.classList.toggle('hidden', counts[k] === 0 && !isCur);
+  });
   const badge = document.getElementById('navDlBadge');
   if (badge) {
     badge.textContent = active;
@@ -5163,6 +5268,7 @@ function patchRowSub(li, it) {
       ov.textContent = it.state === 'DOWNLOADING' ? '\u23F8' : '\u25B6';
       ov.addEventListener('click', function (e) { e.stopPropagation(); doAction(it.id, ov.getAttribute('data-action')); });
       iconWrap.appendChild(ov);
+      armPauseOverlay(ov, iconWrap);
     } else if (needsOv && existingOv) {
       var action = it.state === 'DOWNLOADING' ? 'pause' : 'resume';
       existingOv.setAttribute('data-action', action);
@@ -5189,6 +5295,21 @@ function updateRows(items) {
     patchRowSub(li, it);
   });
   updateToolbar(items);
+}
+
+function armPauseOverlay(ov, wrap) {
+  if (!ov || !wrap) return;
+  // Auto-hide overlay hanya relevan di perangkat touch (hover tidak tersedia).
+  if (!window.matchMedia || !window.matchMedia('(hover: none)').matches) return;
+  var t = null;
+  function show(restart) {
+    ov.classList.add('o-shown');
+    if (t) clearTimeout(t);
+    if (restart !== false) t = setTimeout(function () { ov.classList.remove('o-shown'); }, 2000);
+  }
+  wrap.addEventListener('touchstart', function () { show(true); }, {passive: true});
+  wrap.addEventListener('pointerdown', function () { show(true); });
+  show(true);
 }
 
 function rebuildList(items) {
@@ -5279,6 +5400,7 @@ function rebuildList(items) {
         e.stopPropagation();
         doAction(it.id, pauseOv.getAttribute('data-action'));
       });
+      armPauseOverlay(pauseOv, li.querySelector('.icon-wrap'));
     }
     if (compactMode) li.classList.add('compact');
     if (batchMode) li.classList.add('batch-mode');
