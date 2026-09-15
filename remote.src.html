@@ -296,6 +296,8 @@
   .name {
  font-weight: 700; font-size: 14.5px; word-break: break-all; }
 
+  .pin-indicator { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 6px; vertical-align: middle; }
+  .pin-indicator svg { width: 12px; height: 12px; }
   .f-type {
  display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: 800; letter-spacing: .4px; vertical-align: 2px; background: var(--bg-soft); color: var(--muted); border: 1px solid var(--line); line-height: 1.5; }
   .f-type.t-video { background: #e8ecff; color: #2f44d8; border-color: #b9c4ff; }
@@ -1226,6 +1228,8 @@
   .sheet-cancel {
  width: 100%; margin-top: 8px; padding: 13px; border: 0; border-radius: 12px; background: var(--bg-soft); color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
 
+  .shortcuts-fab { bottom: calc(146px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; font-size: 18px; background: var(--card); color: var(--muted); border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+  .shortcuts-fab:hover { color: var(--primary); border-color: var(--primary); }
   .fab {
  display: none; position: fixed; right: 18px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); z-index: 55; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--grad); color: #fff; font-size: 27px; font-weight: 600; box-shadow: 0 4px 14px var(--grad-shadow); cursor: pointer; align-items: center; justify-content: center; transition: transform .15s ease, box-shadow .15s ease; }
 
@@ -1490,6 +1494,7 @@
 
     .fab {
  display: flex; }
+    .shortcuts-fab { display: flex; }
 
 
     .seg {
@@ -2014,6 +2019,8 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && moreMenuOpen) closeMoreMenu();
 });
 document.addEventListener('keydown', function (e) {
+  var _tag = (e.target && e.target.tagName) || '';
+  if (_tag === 'INPUT' || _tag === 'TEXTAREA' || _tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
   if (e.key === '?') { e.preventDefault(); toggleShortcuts(); }
 });
 
@@ -2063,6 +2070,12 @@ function onNewDownloadClick() {
     toggleAddForm(addSheet.classList.contains('hidden'));
   }
 }
+var shortcutsOverlay = document.getElementById('shortcutsOverlay');
+var shortcutsBtnEl = document.getElementById('shortcutsBtn');
+var shortcutsCloseEl = document.getElementById('shortcutsClose');
+if (shortcutsCloseEl) shortcutsCloseEl.addEventListener('click', function () { shortcutsOverlay.classList.add('hidden'); });
+if (shortcutsOverlay) shortcutsOverlay.addEventListener('click', function (e) { if (e.target === shortcutsOverlay) shortcutsOverlay.classList.add('hidden'); });
+function toggleShortcuts() { if (shortcutsOverlay) shortcutsOverlay.classList.toggle('hidden'); }
 document.getElementById('fabNewBtn').addEventListener('click', onNewDownloadClick);
 if (shortcutsBtnEl) shortcutsBtnEl.addEventListener('click', toggleShortcuts);
 const toTopBtn = document.getElementById('toTopBtn');
@@ -2188,12 +2201,6 @@ document.getElementById('cancelAdd').addEventListener('click', function () {
 document.getElementById('addSheetClose').addEventListener('click', function () {
   toggleAddForm(false);
 });
-var shortcutsOverlay = document.getElementById('shortcutsOverlay');
-var shortcutsBtnEl = document.getElementById('shortcutsBtn');
-var shortcutsCloseEl = document.getElementById('shortcutsClose');
-if (shortcutsCloseEl) shortcutsCloseEl.addEventListener('click', function () { shortcutsOverlay.classList.add('hidden'); });
-if (shortcutsOverlay) shortcutsOverlay.addEventListener('click', function (e) { if (e.target === shortcutsOverlay) shortcutsOverlay.classList.add('hidden'); });
-function toggleShortcuts() { if (shortcutsOverlay) shortcutsOverlay.classList.toggle('hidden'); }
 document.getElementById('dlMethod').addEventListener('change', function () {
   var isPost = this.value === 'POST';
   document.getElementById('dlPostBody').classList.toggle('hidden', !isPost);
@@ -5560,6 +5567,17 @@ function patchRowSub(li, it) {
   }
   const pct = sub._pct || (sub._pct = sub.querySelector('.bar-pct'));
   if (pct) pct.textContent = prog + '%';
+  // Update bar class based on state (remove downloading/hls when done)
+  const barEl = sub._bar || (sub._bar = sub.querySelector('.bar'));
+  if (barEl) {
+    var isHlsU = it.state === 'DOWNLOADING' && (it.progressPercentOverride || -1) >= 0;
+    var wantCls = it.state === 'DOWNLOADING' ? ('downloading' + (isHlsU ? ' hls' : '')) : (it.state === 'PAUSED' ? 'paused' : '');
+    if (barEl._barCls !== wantCls) {
+      barEl.classList.remove('downloading', 'hls', 'paused');
+      if (wantCls) wantCls.split(' ').forEach(function (c) { barEl.classList.add(c); });
+      barEl._barCls = wantCls;
+    }
+  }
   // Update pause/resume overlay based on state
   var iconWrap = li.querySelector('.icon-wrap');
   if (iconWrap) {
@@ -5694,7 +5712,7 @@ function rebuildList(items) {
     const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
     li.innerHTML =
       '<div class="item-top"><div class="icon-wrap"><div class="icon ' + iconStateCls(it.state) + '">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div>' + ((it.state === 'DOWNLOADING' || it.state === 'PAUSED') ? '<div class="pause-overlay" data-action="' + (it.state === 'DOWNLOADING' ? 'pause' : 'resume') + '" title="' + (it.state === 'DOWNLOADING' ? 'Pause' : 'Resume') + '">' + (it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play) + '</div>' : '') + '</div><div class="item-body">' +
-      '<div class="name">' + escapeHtml(it.fileName) + fileTypeBadge(it.fileName) + '</div>' + okBadge + retryBadge + err + retry +
+      '<div class="name">' + (dlPinned.has(it.id) ? '<span class="pin-indicator">' + UI_ICONS.checksq + ' Pinned</span>' : '') + escapeHtml(it.fileName) + fileTypeBadge(it.fileName) + '</div>' + okBadge + retryBadge + err + retry +
       '</div>' +
       '<button class="item-menu-btn" type="button" title="Actions">' + UI_ICONS.menu + '</button>' +
       '</div>' +
