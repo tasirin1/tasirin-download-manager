@@ -1228,8 +1228,6 @@
   .sheet-cancel {
  width: 100%; margin-top: 8px; padding: 13px; border: 0; border-radius: 12px; background: var(--bg-soft); color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
 
-  .shortcuts-fab { bottom: calc(146px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; font-size: 18px; background: var(--card); color: var(--muted); border: 1px solid var(--line); box-shadow: var(--shadow-sm); display: none; }
-  .shortcuts-fab:hover { color: var(--primary); border-color: var(--primary); }
   .fab {
  display: none; position: fixed; right: 18px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); z-index: 55; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--grad); color: #fff; font-size: 27px; font-weight: 600; box-shadow: 0 4px 14px var(--grad-shadow); cursor: pointer; align-items: center; justify-content: center; transition: transform .15s ease, box-shadow .15s ease; }
 
@@ -1563,8 +1561,7 @@
 
 
   @media (min-width: 601px) and (hover: hover) {
-    .shortcuts-fab { display: flex; }
-  }
+    }
 </style>
 </head>
 <body>
@@ -1776,10 +1773,9 @@
 </nav>
 
 <button id="fabNewBtn" class="fab" type="button" title="Add download">+</button>
-<button id="shortcutsBtn" class="fab shortcuts-fab" type="button" title="Keyboard shortcuts">?</button>
 <button id="toTopBtn" class="to-top" type="button" title="Back to top" aria-label="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
 
-<div id="shortcutsOverlay" class="cm-overlay hidden"><div class="cm-box"><h3>Keyboard Shortcuts</h3><table style="width:100%;font-size:13px;line-height:2"><tr><td><kbd>?</kbd></td><td>Show this help</td></tr><tr><td><kbd>/</kbd></td><td>Search downloads</td></tr><tr><td><kbd>Esc</kbd></td><td>Close overlay / sheet</td></tr><tr><td><kbd>N</kbd></td><td>New download</td></tr><tr><td><kbd>1</kbd>-<kbd>5</kbd></td><td>Switch tabs</td></tr><tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr><tr><td><kbd>&#8592;</kbd> <kbd>&#8594;</kbd></td><td>Seek video ±10s</td></tr><tr><td><kbd>&#8593;</kbd> <kbd>&#8595;</kbd></td><td>Volume ±5%</td></tr></table><button id="shortcutsClose" type="button" class="sheet-btn" style="margin-top:12px">Close</button></div></div>
+
 
 <div id="toast" class="toast hidden"><span class="toast-ring"><span class="toast-dot"></span></span><span id="toastMsg"></span><button id="toastClose" type="button" class="toast-close" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button></div>
 
@@ -2024,7 +2020,6 @@ document.addEventListener('keydown', function (e) {
 document.addEventListener('keydown', function (e) {
   var _tag = (e.target && e.target.tagName) || '';
   if (_tag === 'INPUT' || _tag === 'TEXTAREA' || _tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
-  if (e.key === '?') { e.preventDefault(); toggleShortcuts(); }
 });
 
 let failCount = 0;
@@ -2073,14 +2068,7 @@ function onNewDownloadClick() {
     toggleAddForm(addSheet.classList.contains('hidden'));
   }
 }
-var shortcutsOverlay = document.getElementById('shortcutsOverlay');
-var shortcutsBtnEl = document.getElementById('shortcutsBtn');
-var shortcutsCloseEl = document.getElementById('shortcutsClose');
-if (shortcutsCloseEl) shortcutsCloseEl.addEventListener('click', function () { shortcutsOverlay.classList.add('hidden'); });
-if (shortcutsOverlay) shortcutsOverlay.addEventListener('click', function (e) { if (e.target === shortcutsOverlay) shortcutsOverlay.classList.add('hidden'); });
-function toggleShortcuts() { if (shortcutsOverlay) shortcutsOverlay.classList.toggle('hidden'); }
 document.getElementById('fabNewBtn').addEventListener('click', onNewDownloadClick);
-if (shortcutsBtnEl) shortcutsBtnEl.addEventListener('click', toggleShortcuts);
 const toTopBtn = document.getElementById('toTopBtn');
 function updateToTop() {
   toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600);
@@ -2103,8 +2091,6 @@ function updateChromeHide() {
   var y = window.scrollY || 0;
   var fab = document.getElementById('fabNewBtn');
   if (fab) fab.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
-  var scBtn = document.getElementById('shortcutsBtn');
-  if (scBtn) scBtn.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
   var tb = document.getElementById('tabbar');
   if (tb) {
     var keyFocused = !!(tb.contains && tb.contains(document.activeElement));
