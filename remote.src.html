@@ -1455,7 +1455,7 @@
   .batch-mode li.item { display: flex; align-items: flex-start; gap: 10px; }
   .batch-mode .batch-check { display: block; }
   .batch-mode .item-top { flex: 1; min-width: 0; }
-  .batch-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: var(--tabbar-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding: 10px 16px; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .batch-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 51; background: var(--tabbar-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding: 10px 16px; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .batch-toolbar.show { display: flex; }
   .batch-toolbar button { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
   .batch-toolbar button:hover { border-color: var(--primary); color: var(--primary); }
@@ -2955,6 +2955,7 @@ function applyRoute() {
   }
   lastRoute = route;
   const showDownloads = route === 'downloads';
+  document.getElementById('batchToolbar').classList.toggle('show', showDownloads && batchMode);
   DOWNLOADS_VIEW.forEach(function (id) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('hidden', !showDownloads);
