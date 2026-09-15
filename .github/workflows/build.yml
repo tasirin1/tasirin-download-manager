@@ -77,6 +77,10 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          # Paket "tools" sudah dihapus dari repositori Google (deprecated);
+          # cukup platform-tools — platform/build-tools diunduh AGP sendiri.
+          packages: 'platform-tools'
 
       - name: Cek kesehatan keystore (fingerprint signing)
         if: env.KEYSTORE_BASE64 != ''
