@@ -939,7 +939,7 @@ let fsLpFired = false;
 fsBtn.addEventListener('click', function () {
 location.hash = '#/files';
 });
-const DOWNLOADS_VIEW = ['dlPageHead', 'filtersSticky', 'addSheet', 'status', 'list'];
+const DOWNLOADS_VIEW = ['dlPageHead', 'filtersSticky', 'dlSearchRow', 'addSheet', 'status', 'list'];
 function currentRoute() {
 const h = location.hash;
 if (h === '#/gallery') return 'gallery';
@@ -3154,7 +3154,7 @@ if (fActive) fActive.textContent = active ? ' ' + active : '';
 if (fDone) fDone.textContent = completed ? ' ' + completed : '';
 if (fFail) fFail.textContent = failed ? ' ' + failed : '';
 var fSticky = document.getElementById('filtersSticky');
-if (fSticky) fSticky.classList.toggle('hidden', total === 0);
+if (fSticky) fSticky.classList.toggle('hidden', total === 0 || currentRoute() !== 'downloads');
 var fBtnId = {fActive: 'webFilterActive', fDone: 'webFilterCompleted', fFail: 'webFilterFailed'};
 var keys = ['fActive', 'fDone', 'fFail'];
 var counts = {fActive: active, fDone: completed, fFail: failed};

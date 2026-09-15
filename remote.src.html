@@ -2900,7 +2900,7 @@ fsBtn.addEventListener('click', function () {
   location.hash = '#/files';
 });
 
-const DOWNLOADS_VIEW = ['dlPageHead', 'filtersSticky', 'addSheet', 'status', 'list'];
+const DOWNLOADS_VIEW = ['dlPageHead', 'filtersSticky', 'dlSearchRow', 'addSheet', 'status', 'list'];
 
 function currentRoute() {
   const h = location.hash;
@@ -5276,7 +5276,7 @@ function updateToolbar(items) {
   // Bar filter menyempit: sembunyi penuh saat daftar kosong, atau sembunyikan
   // chip yang kosong bila hanya satu filter yang punya item (kecuali filter aktif).
   var fSticky = document.getElementById('filtersSticky');
-  if (fSticky) fSticky.classList.toggle('hidden', total === 0);
+  if (fSticky) fSticky.classList.toggle('hidden', total === 0 || currentRoute() !== 'downloads');
   var fBtnId = {fActive: 'webFilterActive', fDone: 'webFilterCompleted', fFail: 'webFilterFailed'};
   var keys = ['fActive', 'fDone', 'fFail'];
   var counts = {fActive: active, fDone: completed, fFail: failed};
