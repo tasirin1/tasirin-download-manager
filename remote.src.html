@@ -360,6 +360,7 @@
  100% { transform: translateX(200%); }
  }
 
+  .bar.hls .fill { background: linear-gradient(90deg, #4f46e5, #6366f1, #818cf8); } .bar.hls .fill::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(255,255,255,.12) 4px, rgba(255,255,255,.12) 8px); animation: barStripes .6s linear infinite; z-index: 1; }
   .bar.downloading .fill { background: linear-gradient(90deg, #4353e6, #6c7cff, var(--primary)); } .bar.downloading .fill::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(255,255,255,.15) 4px, rgba(255,255,255,.15) 8px); animation: barStripes .6s linear infinite; z-index: 1; } @keyframes barStripes { from { background-position: 0 0; } to { background-position: 16px 0; } }
   .bar.paused .fill { background: var(--amber); opacity: .7; }
   .bar.paused .fill::after { animation: none; }
@@ -676,7 +677,7 @@
  height: 6px; border-radius: 999px; background: var(--primary-soft); overflow: hidden; }
 
   .fs-upload .fill {
- height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--primary), #7a5cff); transition: width .2s ease; }
+ height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #7c3aed, #a78bfa, #c084fc); transition: width .2s ease; }5cff); transition: width .2s ease; }
 
   .fs-upload-list {
  display: flex; flex-direction: column; gap: 3px; margin-top: 8px; max-height: 30vh; overflow-y: auto; }
@@ -1616,6 +1617,7 @@
       <button id="webFilterActive" type="button">Active<span class="fcount" id="fActive"></span></button>
       <button id="webFilterCompleted" type="button">Completed<span class="fcount" id="fDone"></span></button>
       <button id="webFilterFailed" type="button">Failed<span class="fcount" id="fFail"></span></button>
+      <button id="webFilterNew" type="button">New<span class="fcount" id="fNew"></span></button>
     </div>
   </div>
   <div id="dlSearchRow" class="fs-search-row hidden">
@@ -1766,7 +1768,10 @@
 </nav>
 
 <button id="fabNewBtn" class="fab" type="button" title="Add download">+</button>
+<button id="shortcutsBtn" class="fab shortcuts-fab" type="button" title="Keyboard shortcuts">?</button>
 <button id="toTopBtn" class="to-top" type="button" title="Back to top" aria-label="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
+
+<div id="shortcutsOverlay" class="cm-overlay hidden"><div class="cm-box"><h3>Keyboard Shortcuts</h3><table style="width:100%;font-size:13px;line-height:2"><tr><td><kbd>?</kbd></td><td>Show this help</td></tr><tr><td><kbd>/</kbd></td><td>Search downloads</td></tr><tr><td><kbd>Esc</kbd></td><td>Close overlay / sheet</td></tr><tr><td><kbd>N</kbd></td><td>New download</td></tr><tr><td><kbd>1</kbd>-<kbd>5</kbd></td><td>Switch tabs</td></tr><tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr><tr><td><kbd>&#8592;</kbd> <kbd>&#8594;</kbd></td><td>Seek video ±10s</td></tr><tr><td><kbd>&#8593;</kbd> <kbd>&#8595;</kbd></td><td>Volume ±5%</td></tr></table><button id="shortcutsClose" type="button" class="sheet-btn" style="margin-top:12px">Close</button></div></div>
 
 <div id="toast" class="toast hidden"><span class="toast-ring"><span class="toast-dot"></span></span><span id="toastMsg"></span><button id="toastClose" type="button" class="toast-close" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button></div>
 
@@ -2008,12 +2013,17 @@ document.addEventListener('click', function (e) {
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && moreMenuOpen) closeMoreMenu();
 });
+document.addEventListener('keydown', function (e) {
+  if (e.key === '?') { e.preventDefault(); toggleShortcuts(); }
+});
 
 let failCount = 0;
 let currentItems = [];
 let webFilter = 'ALL';
 try { webFilter = localStorage.getItem('dl_filter') || 'ALL'; } catch (e) {}
-const WEB_FILTERS = {ALL:'webFilterAll', ACTIVE:'webFilterActive', COMPLETED:'webFilterCompleted', FAILED:'webFilterFailed'};
+let dlPinned = new Set();
+try { var _pv = localStorage.getItem('dl_pinned'); if (_pv) dlPinned = new Set(JSON.parse(_pv)); } catch (_e) {}
+const WEB_FILTERS = {ALL:'webFilterAll', ACTIVE:'webFilterActive', COMPLETED:'webFilterCompleted', FAILED:'webFilterFailed', NEW:'webFilterNew'};
 if (!WEB_FILTERS[webFilter]) webFilter = 'ALL';
 Object.entries(WEB_FILTERS).forEach(function (e) {
   document.getElementById(e[1]).addEventListener('click', function () {
@@ -2054,6 +2064,7 @@ function onNewDownloadClick() {
   }
 }
 document.getElementById('fabNewBtn').addEventListener('click', onNewDownloadClick);
+if (shortcutsBtnEl) shortcutsBtnEl.addEventListener('click', toggleShortcuts);
 const toTopBtn = document.getElementById('toTopBtn');
 function updateToTop() {
   toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600);
@@ -2177,6 +2188,12 @@ document.getElementById('cancelAdd').addEventListener('click', function () {
 document.getElementById('addSheetClose').addEventListener('click', function () {
   toggleAddForm(false);
 });
+var shortcutsOverlay = document.getElementById('shortcutsOverlay');
+var shortcutsBtnEl = document.getElementById('shortcutsBtn');
+var shortcutsCloseEl = document.getElementById('shortcutsClose');
+if (shortcutsCloseEl) shortcutsCloseEl.addEventListener('click', function () { shortcutsOverlay.classList.add('hidden'); });
+if (shortcutsOverlay) shortcutsOverlay.addEventListener('click', function (e) { if (e.target === shortcutsOverlay) shortcutsOverlay.classList.add('hidden'); });
+function toggleShortcuts() { if (shortcutsOverlay) shortcutsOverlay.classList.toggle('hidden'); }
 document.getElementById('dlMethod').addEventListener('change', function () {
   var isPost = this.value === 'POST';
   document.getElementById('dlPostBody').classList.toggle('hidden', !isPost);
@@ -3798,7 +3815,7 @@ fsSheet.addEventListener('click', function (e) {
 
 const itemSheet = document.getElementById('itemSheet');
 function openItemSheet(it) {
-  document.getElementById('itemSheetTitle').textContent = it.fileName;
+  document.getElementById('itemSheetTitle').innerHTML = socialFavicon(it.url) + ' ' + escapeHtml(it.fileName) + ' ' + fileTypeBadge(it.fileName);
   const list = document.getElementById('itemSheetList');
   list.innerHTML = '';
   const encId = encodeURIComponent(it.id);
@@ -3824,6 +3841,7 @@ function openItemSheet(it) {
   if (it.state === 'DOWNLOADING' || it.state === 'PENDING' || it.state === 'PAUSED') {
     acts.push({icon: 'close', label: 'Cancel', op: 'cancel'});
   }
+  acts.push({icon: 'checksq', label: dlPinned.has(it.id) ? 'Unpin from top' : 'Pin to top', op: 'pin'});
   if (it.state === 'COMPLETED' || it.state === 'FAILED' || it.state === 'CANCELLED') {
     acts.push({icon: 'trash', label: 'Delete', op: 'delete', danger: true});
   }
@@ -3872,6 +3890,12 @@ function openItemSheet(it) {
       }
       if (a.op === 'priority_low') {
         doActionNow(it.id, 'limit_priority', {speedLimitKbps: it.speedLimitKbps || 0, priority: -1});
+        return;
+      }
+      if (a.op === 'pin') {
+        if (dlPinned.has(it.id)) dlPinned.delete(it.id); else dlPinned.add(it.id);
+        try { localStorage.setItem('dl_pinned', JSON.stringify(Array.from(dlPinned))); } catch (_e) {}
+        refresh();
         return;
       }
       doAction(it.id, a.op);
@@ -5255,6 +5279,7 @@ function updateToolbar(items) {
     if (it.state === 'PAUSED' || it.state === 'FAILED') pausedOrFailed++;
     if (it.state === 'FAILED') failed++;
     if (it.state === 'COMPLETED') completed++;
+    if (lockedTotalBytes.has(it.id) && (it.state === 'COMPLETED' || it.state === 'FAILED' || it.state === 'CANCELLED')) lockedTotalBytes.delete(it.id);
   });
   document.getElementById('pauseAllBtn').classList.toggle('hidden', active === 0);
   document.getElementById('resumeAllBtn').classList.toggle('hidden', pausedOrFailed === 0);
@@ -5269,25 +5294,29 @@ function updateToolbar(items) {
   var fActive = document.getElementById('fActive');
   var fDone = document.getElementById('fDone');
   var fFail = document.getElementById('fFail');
+  var fNew = document.getElementById('fNew');
   if (fAll) fAll.textContent = total ? ' ' + total : '';
   if (fActive) fActive.textContent = active ? ' ' + active : '';
   if (fDone) fDone.textContent = completed ? ' ' + completed : '';
   if (fFail) fFail.textContent = failed ? ' ' + failed : '';
+  var newCount = items.filter(function (it) { return (Date.now() - (it.addedAt || 0)) < 60000; }).length;
+  if (fNew) fNew.textContent = newCount ? ' ' + newCount : '';
   // Bar filter menyempit: sembunyi penuh saat daftar kosong, atau sembunyikan
   // chip yang kosong bila hanya satu filter yang punya item (kecuali filter aktif).
   var fSticky = document.getElementById('filtersSticky');
   if (fSticky) fSticky.classList.toggle('hidden', total === 0 || currentRoute() !== 'downloads');
-  var fBtnId = {fActive: 'webFilterActive', fDone: 'webFilterCompleted', fFail: 'webFilterFailed'};
-  var keys = ['fActive', 'fDone', 'fFail'];
-  var counts = {fActive: active, fDone: completed, fFail: failed};
-  var onlyOne = [active > 0, completed > 0, failed > 0].filter(Boolean).length <= 1;
+  var fBtnId = {fActive: 'webFilterActive', fDone: 'webFilterCompleted', fFail: 'webFilterFailed', fNew: 'webFilterNew'};
+  var keys = ['fActive', 'fDone', 'fFail', 'fNew'];
+  var counts = {fActive: active, fDone: completed, fFail: failed, fNew: newCount};
+  var onlyOne = [active > 0, completed > 0, failed > 0, newCount > 0].filter(Boolean).length <= 1;
   keys.forEach(function (k) {
     var btn = document.getElementById(fBtnId[k]);
     if (!btn) return;
     if (!onlyOne) { btn.classList.remove('hidden'); return; }
     var isCur = (webFilter === 'ACTIVE' && k === 'fActive') ||
       (webFilter === 'COMPLETED' && k === 'fDone') ||
-      (webFilter === 'FAILED' && k === 'fFail');
+      (webFilter === 'FAILED' && k === 'fFail') ||
+      (webFilter === 'NEW' && k === 'fNew');
     btn.classList.toggle('hidden', counts[k] === 0 && !isCur);
   });
   const badge = document.getElementById('navDlBadge');
@@ -5422,7 +5451,7 @@ function rowSubHtml(it) {
     meta = fmt(it.totalBytes || it.bytesDownloaded);
     if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
   } else if (it.totalBytes > 0 && (it.progressPercentOverride || -1) < 0) {
-    meta = fmt(it.bytesDownloaded) + ' / ' + fmt(it.totalBytes);
+    meta = fmt(it.bytesDownloaded) + ' / ' + fmt(getLockedTotal(it));
   } else {
     meta = fmt(it.bytesDownloaded);
   }
@@ -5430,7 +5459,8 @@ function rowSubHtml(it) {
     meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
     if (it.etaSeconds > 0) meta += ' \u00b7 ETA ' + fmtEta(it.etaSeconds);
   }
-  const barCls = it.state === 'DOWNLOADING' ? ' downloading' : (it.state === 'PAUSED' ? ' paused' : '');
+  var isHls = it.state === 'DOWNLOADING' && (it.progressPercentOverride || -1) >= 0;
+  const barCls = it.state === 'DOWNLOADING' ? (' downloading' + (isHls ? ' hls' : '')) : (it.state === 'PAUSED' ? ' paused' : '');
   return '<div class="item-sub">' +
     '<div class="meta">' + stateBadge(it.state) + '<span>' + meta + '</span></div>' +
     '<div class="bar-wrap"><div class="bar' + barCls + '"><div class="fill' + (done ? ' done' : '') + '" style="width:' + prog + '%"></div></div>' +
@@ -5470,6 +5500,17 @@ function fmtDate(ms) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
 
+const lockedTotalBytes = new Map();
+function getLockedTotal(it) {
+  if (it.state === 'COMPLETED') return it.totalBytes || it.bytesDownloaded;
+  if ((it.progressPercentOverride || -1) >= 0) return it.bytesDownloaded;
+  if (it.totalBytes > 0) {
+    var prev = lockedTotalBytes.get(it.id);
+    if (!prev || it.totalBytes > prev) lockedTotalBytes.set(it.id, it.totalBytes);
+    return lockedTotalBytes.get(it.id);
+  }
+  return it.bytesDownloaded;
+}
 let rowNodes = new Map();
 function rowMetaText(it) {
   const done = it.state === 'COMPLETED';
@@ -5482,8 +5523,9 @@ function rowMetaText(it) {
   if ((it.progressPercentOverride || -1) >= 0) {
     return fmt(it.bytesDownloaded);
   }
-  return it.totalBytes > 0
-    ? fmt(it.bytesDownloaded) + ' / ' + fmt(it.totalBytes)
+  var locked = getLockedTotal(it);
+  return locked > 0
+    ? fmt(it.bytesDownloaded) + ' / ' + fmt(locked)
     : fmt(it.bytesDownloaded);
 }
 
@@ -5593,13 +5635,18 @@ function rebuildList(items) {
     const actA = a.state === 'DOWNLOADING' || a.state === 'PENDING' ? 0 : 1;
     const actB = b.state === 'DOWNLOADING' || b.state === 'PENDING' ? 0 : 1;
     const d = actA - actB;
-    return d !== 0 ? d : ((b.addedAt || 0) - (a.addedAt || 0));
+    if (d !== 0) return d;
+    var pinA = dlPinned.has(a.id) ? 0 : 1;
+    var pinB = dlPinned.has(b.id) ? 0 : 1;
+    if (pinA !== pinB) return pinA - pinB;
+    return (b.addedAt || 0) - (a.addedAt || 0);
   });
   updateToolbar(items);
   const q = (dlSearchQuery || '').toLowerCase();
   const filtered = items.filter(function (it) {
     if (q && it.fileName && it.fileName.toLowerCase().indexOf(q) < 0) return false;
     if (webFilter === 'ALL') return true;
+    if (webFilter === 'NEW') return (Date.now() - (it.addedAt || 0)) < 60000;
     if (webFilter === 'ACTIVE') return it.state === 'DOWNLOADING' || it.state === 'PENDING';
     if (webFilter === 'COMPLETED') return it.state === 'COMPLETED';
     return it.state === 'FAILED' || it.state === 'CANCELLED';
