@@ -2811,16 +2811,17 @@ function renderGalleryCell(it) {
   cell.setAttribute('tabindex', '0');
   const thumb = API + '/api/thumb?token=' + encodeURIComponent(it.token);
   const media = API + '/api/media?token=' + encodeURIComponent(it.token);
+  const ext = extOf(it.name);
   const ratio = (it.w && it.h && !it.isVideo) ? (it.h * 100 / it.w).toFixed(2) : 56.25;
   const resume = it.isVideo ? (galleryVideoPos[it.token] || 0) : 0;
   const selOn = galSelected.has(it);
   cell.innerHTML =
     '<div class="gal-thumb" style="padding-top:' + ratio + '%">' +
       '<span class="gal-check' + (selOn ? ' on' : '') + '">' + (selOn ? '\u2713' : '') + '</span>' +
-      '<div class="ext">' + escapeHtml(extOf(it.name)) + '</div>' +
+      '<div class="ext">' + escapeHtml(ext) + '</div>' +
       '<img loading="lazy" data-thumb="' + thumb + '" alt="' + escapeHtml(it.name) + '" onerror="this.remove()">' +
       (it.isVideo ? '<div class="gal-play"><span></span></div>' : '') +
-      (it.isVideo ? '<div class="gal-badge">' + (it.durationMs > 0 ? mmFmtTime(it.durationMs / 1000) : escapeHtml(extOf(it.name))) + '</div>' : '') +
+      (it.isVideo ? '<div class="gal-badge">' + (it.durationMs > 0 ? mmFmtTime(it.durationMs / 1000) : escapeHtml(ext)) + '</div>' : '') +
       (resume > 0 ? '<div class="gal-resume">Resume from ' + mmFmtTime(resume) + '</div>' : '') +
     '</div>' +
     '<div class="gal-info">' +
@@ -3423,6 +3424,7 @@ function fsAppendRow(box, it) {
     row.className = 'fs-row';
     row.setAttribute('tabindex', '0');
     if (it.kind === 'dir') row.classList.add('fs-dir');
+    const ext = it.kind === 'file' ? extOf(it.name).toLowerCase() : '';
     let meta = '';
     if (it.kind === 'file') {
       meta = fmt(it.size);
@@ -3441,14 +3443,14 @@ function fsAppendRow(box, it) {
       '<div class="fs-main"><div class="fs-name">' + escapeHtml(it.name) +
         (fsIsNew(it.name) ? '<span class="fs-new-badge">NEW</span>' : '') + '</div>' +
       (meta ? '<div class="fs-meta">' + meta + '</div>' : '') + '</div>' +
-      (!fsSelectMode && it.kind === 'file' && FS_MEDIA_EXTS.indexOf(extOf(it.name).toLowerCase()) >= 0 ? '<button class="fs-stream-btn" type="button" title="Stream">' + UI_ICONS.play + '</button>' : '') + (!fsSelectMode ? '<button class="fs-more-btn" type="button" title="Actions">' + UI_ICONS.menu + '</button>' : '');
+      (!fsSelectMode && ext && FS_MEDIA_EXTS.indexOf(ext) >= 0 ? '<button class="fs-stream-btn" type="button" title="Stream">' + UI_ICONS.play + '</button>' : '') + (!fsSelectMode ? '<button class="fs-more-btn" type="button" title="Actions">' + UI_ICONS.menu + '</button>' : '');
     row.addEventListener('click', function () {
       if (fsLpFired) { fsLpFired = false; return; }
       if (fsSelectMode) {
         toggleFsSelect(it, row);
       } else if (it.kind === 'dir') {
         fsNavigate(it.path);
-      } else if (FS_MEDIA_EXTS.indexOf(extOf(it.name).toLowerCase()) >= 0) {
+      } else if (ext && FS_MEDIA_EXTS.indexOf(ext) >= 0) {
         fsOpenMedia(it);
       }
     });
@@ -5333,7 +5335,8 @@ function fileIcon(name, url) {
   return '\u{1F4CE}';
 }
 function fileTypeBadge(name) {
-  const ext = extOf(name) ? extOf(name).toLowerCase() : '';
+  const raw = extOf(name);
+  const ext = raw ? raw.toLowerCase() : '';
   let cls = '', label = '';
   if (FILE_ICON_VIDEO.indexOf(ext) >= 0) { cls = 't-video'; label = ext.toUpperCase(); }
   else if (FILE_ICON_AUD.indexOf(ext) >= 0) { cls = 't-audio'; label = ext.toUpperCase(); }
