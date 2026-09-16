@@ -485,7 +485,7 @@
  transform: translateY(calc(100% + 8px)); }
 
   .gal-cell {
- display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; }
+ display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; content-visibility: auto; contain: layout style paint; contain-intrinsic-size: auto 230px; }
 
   .gal-cell:hover {
  transform: translateY(-3px); box-shadow: 0 2px 4px rgba(23,32,58,.05), 0 14px 32px rgba(23,32,58,.10); }
@@ -2786,14 +2786,16 @@ function ensureGallerySentinel() {
 function loadMoreGallery() {
   if (galleryLoaded < galleryItems.length) {
     const next = galleryItems.slice(galleryLoaded, galleryLoaded + GALLERY_CHUNK);
+    const frag = document.createDocumentFragment();
     for (const it of next) {
       // Baca localStorage maksimal sekali per token (halaman pertama di-cache
       // di loadGallery; halaman berikutnya diisi di sini).
       if (it.isVideo && galleryVideoPos[it.token] === undefined) {
         galleryVideoPos[it.token] = loadVideoPos(it.token);
       }
-      renderGalleryCell(it);
+      renderGalleryCell(it, frag);
     }
+    galleryGrid.insertBefore(frag, gallerySentinel);
     galleryLoaded += next.length;
   }
   if (galleryLoaded < galleryItems.length || galleryHasMore) {
@@ -2805,7 +2807,7 @@ function loadMoreGallery() {
   }
 }
 
-function renderGalleryCell(it) {
+function renderGalleryCell(it, frag) {
   const cell = document.createElement('div');
   cell.className = 'gal-cell';
   cell.setAttribute('tabindex', '0');
@@ -2844,7 +2846,7 @@ function renderGalleryCell(it) {
     if (window._thumbQueue) _thumbQueue(img, img.dataset.thumb);
     else img.src = img.dataset.thumb;
   }
-  galleryGrid.insertBefore(cell, gallerySentinel);
+  (frag || galleryGrid).insertBefore(cell, frag ? null : gallerySentinel);
 }
 
 function galSetSelectMode(on) {
