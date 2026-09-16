@@ -2173,12 +2173,15 @@ const dlSearchBtn = document.getElementById('dlSearchBtn');
 const dlSearchRow = document.getElementById('dlSearchRow');
 const dlSearchInput = document.getElementById('dlSearchInput');
 let dlSearchQuery = '';
+let dlSearchOpen = false;
 function openDlSearch(focus) {
   if (currentRoute() !== 'downloads') location.hash = '#/';
+  dlSearchOpen = true;
   dlSearchRow.classList.remove('hidden');
   if (focus) setTimeout(function () { dlSearchInput.focus(); }, 60);
 }
 function closeDlSearch() {
+  dlSearchOpen = false;
   dlSearchRow.classList.add('hidden');
   if (dlSearchQuery) {
     dlSearchQuery = '';
@@ -3014,6 +3017,9 @@ function applyRoute() {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('hidden', !showDownloads);
   });
+  // Kolom search Downloads hanya muncul saat tombol search ditekan (openDlSearch),
+  // bukan otomatis setiap kali tab Downloads aktif.
+  if (showDownloads && dlSearchRow && !dlSearchOpen) dlSearchRow.classList.add('hidden');
   galleryView.classList.toggle('hidden', route !== 'gallery');
   fsView.classList.toggle('hidden', route !== 'files');
   const tabs = document.querySelectorAll('#tabbar .tab');
