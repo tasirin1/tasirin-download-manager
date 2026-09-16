@@ -1388,7 +1388,7 @@
   .tab .tab-ico svg { width: 19px; height: 19px; }
   .pause-overlay svg { width: 18px; height: 18px; }
   #mmBack svg, #mmPlayerTop button svg { width: 18px; height: 18px; }
-  .swipe-action { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .swipe-action { display: none; align-items: center; justify-content: center; gap: 6px; }
   .swipe-action .btn-ico { width: 16px; height: 16px; }
   .item-retry .btn-ico { width: 13px; height: 13px; margin-right: 1px; vertical-align: -2px; }
   .sheet-list button .btn-ico { color: var(--primary); }
@@ -5464,8 +5464,8 @@ function attachSwipe(li) {
     var c = Math.max(-SW, Math.min(SW, dx));
     wrap.style.transition = 'none';
     wrap.style.transform = 'translateX(' + c + 'px)';
-    actL.style.display = c < 0 ? '' : 'none';
-    actR.style.display = c > 0 ? '' : 'none';
+    actL.style.display = c < 0 ? 'flex' : 'none';
+    actR.style.display = c > 0 ? 'flex' : 'none';
   }, {passive: true});
   li.addEventListener('touchend', function () {
     var t = wrap.style.transform;
