@@ -9,6 +9,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.io.InputStream
 
 object SocialMediaExtractor {
 
@@ -918,6 +919,21 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
     /** Batas max body response (16 MB) supaya redirect ke HTML raksasa tidak OOM. */
     private const val MAX_RESPONSE_BYTES = 16L * 1024 * 1024
 
+    /** Baca body response secara terbatas — hindari OOM dari redirect/HTML raksasa. */
+    private fun readBodyLimited(input: InputStream): String {
+        val buf = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(8192)
+        var total = 0L
+        while (true) {
+            val n = input.read(chunk)
+            if (n < 0) break
+            total += n
+            if (total > MAX_RESPONSE_BYTES) break
+            buf.write(chunk, 0, n)
+        }
+        return buf.toString("UTF-8")
+    }
+
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
         val conn = URL(urlStr).openConnection() as HttpURLConnection
         try {
@@ -937,22 +953,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
                 .map { it.substringBefore(';') }
                 .joinToString("; ")
             // Baca terbatas: hindari OOM dari body redirect/HTML raksasa.
-            val input = conn.inputStream
-            val body = try {
-                val buf = java.io.ByteArrayOutputStream()
-                val chunk = ByteArray(8192)
-                var total = 0L
-                while (true) {
-                    val n = input.read(chunk)
-                    if (n < 0) break
-                    total += n
-                    if (total > MAX_RESPONSE_BYTES) break
-                    buf.write(chunk, 0, n)
-                }
-                buf.toString("UTF-8")
-            } finally {
-                runCatching { input.close() }
-            }
+            val body = readBodyLimited(conn.inputStream)
             return HttpResult(body, cookies)
         } catch (_: Exception) { return null } finally { conn.disconnect() }
     }
@@ -979,24 +980,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
             if (code !in 200..299) return null
-            // Baca terbatas (sama seperti httpGetWithCookies): server API yang
-            // tidak sehat tidak boleh membuat response raksasa OOM aplikasi.
-            val input = conn.inputStream
-            return try {
-                val buf = java.io.ByteArrayOutputStream()
-                val chunk = ByteArray(8192)
-                var total = 0L
-                while (true) {
-                    val n = input.read(chunk)
-                    if (n < 0) break
-                    total += n
-                    if (total > MAX_RESPONSE_BYTES) break
-                    buf.write(chunk, 0, n)
-                }
-                buf.toString("UTF-8")
-            } finally {
-                runCatching { input.close() }
-            }
+            return readBodyLimited(conn.inputStream)
         } catch (_: Exception) { return null } finally { conn.disconnect() }
     }
 }
