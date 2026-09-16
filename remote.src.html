@@ -255,22 +255,17 @@
  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 
   li.item {
- background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow-sm); transition: box-shadow .15s ease; }
+ position: relative; overflow: hidden; border-radius: var(--radius); box-shadow: var(--shadow-sm); transition: box-shadow .15s ease; }
 
-  li.item.st-active {
- border-left-color: var(--primary); }
+  li.item.st-active .swipe-content { border-left-color: var(--primary); }
 
-  li.item.st-done {
- border-left-color: var(--green); }
+  li.item.st-done .swipe-content { border-left-color: var(--green); }
 
-  li.item.st-fail {
- border-left-color: var(--red); }
+  li.item.st-fail .swipe-content { border-left-color: var(--red); }
 
-  li.item.st-paused {
- border-left-color: var(--amber); }
+  li.item.st-paused .swipe-content { border-left-color: var(--amber); }
 
-  li.item:hover {
- box-shadow: var(--shadow); }
+  li.item:hover { box-shadow: var(--shadow); }
 
   .item-top {
  display: flex; align-items: flex-start; gap: 10px; }
@@ -1474,12 +1469,11 @@
  animation: none !important; }
  }
 
-  li.item { position: relative; overflow: hidden; }
   li.item .swipe-bg { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 20px; font-size: 13px; font-weight: 700; color: #fff; opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 0; }
   li.item .swipe-bg.left { background: var(--amber); justify-content: flex-start; }
   li.item .swipe-bg.right { background: var(--red); justify-content: flex-end; }
-  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); transition: transform .2s ease; will-change: transform; }
-  .list.compact li.item { padding: 10px 14px; }
+  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 14px; transition: transform .2s ease; will-change: transform; }
+  .list.compact .swipe-content { padding: 10px 14px; }
   .list.compact .item-top { gap: 8px; }
   .list.compact .icon { width: 32px; height: 32px; border-radius: 8px; }
   .list.compact .icon svg { width: 18px; height: 18px; }
