@@ -314,9 +314,7 @@
   :root[data-theme="dark"] .f-type.t-arc { background: rgba(178,106,0,.2); color: #ffcf7d; border-color: rgba(178,106,0,.45); }
   :root[data-theme="dark"] .f-type.t-doc { background: rgba(26,86,219,.22); color: #9fb9ff; border-color: rgba(26,86,219,.45); }
 
-  @media (hover: hover) {
-    li.item .swipe-content { transition: transform .2s ease; }
-  }
+
 
   .checksum-ok {
  color: var(--green); font-weight: 700; font-size: 13px; margin-left: 6px; }
@@ -1389,6 +1387,7 @@
   .pause-overlay svg { width: 18px; height: 18px; }
   #mmBack svg, #mmPlayerTop button svg { width: 18px; height: 18px; }
   .swipe-action { display: none; align-items: center; justify-content: center; gap: 6px; }
+  .swipe-action .act-in { display: flex; align-items: center; justify-content: center; gap: 6px; }
   .swipe-action .btn-ico { width: 16px; height: 16px; }
   .item-retry .btn-ico { width: 13px; height: 13px; margin-right: 1px; vertical-align: -2px; }
   .sheet-list button .btn-ico { color: var(--primary); }
@@ -1468,9 +1467,13 @@
  }
 
   li.item .swipe-action { position: absolute; top: 0; bottom: 0; width: 84px; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 700; color: #fff; pointer-events: none; z-index: 0; }
-  li.item .swipe-action.left { left: 0; background: var(--amber); }
-  li.item .swipe-action.right { right: 0; background: var(--red); }
-  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 14px; transition: transform .2s ease; will-change: transform; }
+  li.item .swipe-action.left { left: 0; }
+  li.item .swipe-action.right { right: 0; }
+  li.item.swiping-l .swipe-action, li.item.swiping-r .swipe-action { display: flex; }
+  li.item.swiping-l .swipe-action { background: var(--amber); }
+  li.item.swiping-r .swipe-action { background: var(--red); }
+  li.item.swiping-l .swipe-action.right .act-in, li.item.swiping-r .swipe-action.left .act-in { display: none; }
+  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 14px; transition: transform .28s cubic-bezier(.2,.7,.3,1); will-change: transform; }
   .list.compact .swipe-content { padding: 10px 14px; }
   .list.compact .item-top { gap: 8px; }
   .list.compact .icon { width: 32px; height: 32px; border-radius: 8px; }
@@ -5443,20 +5446,23 @@ document.getElementById('compactToggleBtn').addEventListener('click', function (
 
 function attachSwipe(li) {
   var SW = 84, TH = 48;
-  var sx = 0, swiping = false;
+  var sx = 0, swiping = false, retTimer = null;
   var wrap = document.createElement('div');
   wrap.className = 'swipe-content';
   while (li.firstChild) wrap.appendChild(li.firstChild);
   var actL = document.createElement('div');
   actL.className = 'swipe-action left';
-  actL.innerHTML = UI_ICONS.pause + ' <span>Pause</span>';
+  actL.innerHTML = '<span class="act-in">' + UI_ICONS.pause + ' <span>Pause</span></span>';
   var actR = document.createElement('div');
   actR.className = 'swipe-action right';
-  actR.innerHTML = UI_ICONS.trash + ' <span>Delete</span>';
+  actR.innerHTML = '<span class="act-in">' + UI_ICONS.trash + ' <span>Delete</span></span>';
   li.appendChild(actL);
   li.appendChild(actR);
   li.appendChild(wrap);
-  li.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; swiping = false; }, {passive: true});
+  li.addEventListener('touchstart', function (e) {
+    sx = e.touches[0].clientX; swiping = false;
+    if (retTimer) { clearTimeout(retTimer); retTimer = null; }
+  }, {passive: true});
   li.addEventListener('touchmove', function (e) {
     var dx = e.touches[0].clientX - sx;
     if (!swiping && Math.abs(dx) > 8) swiping = true;
@@ -5464,16 +5470,19 @@ function attachSwipe(li) {
     var c = Math.max(-SW, Math.min(SW, dx));
     wrap.style.transition = 'none';
     wrap.style.transform = 'translateX(' + c + 'px)';
-    actL.style.display = c < 0 ? 'flex' : 'none';
-    actR.style.display = c > 0 ? 'flex' : 'none';
+    li.classList.toggle('swiping-l', c < 0);
+    li.classList.toggle('swiping-r', c > 0);
   }, {passive: true});
   li.addEventListener('touchend', function () {
     var t = wrap.style.transform;
     var dx = t ? parseFloat(t.replace(/[^\d\-]/g, '')) || 0 : 0;
     wrap.style.transition = '';
     wrap.style.transform = '';
-    actL.style.display = '';
-    actR.style.display = '';
+    if (retTimer) clearTimeout(retTimer);
+    retTimer = setTimeout(function () {
+      li.classList.remove('swiping-l');
+      li.classList.remove('swiping-r');
+    }, 320);
     var itemId = li.dataset.id;
     if (dx < -TH) {
       var it = currentItems.find(function (x) { return x.id === itemId; });
@@ -5481,6 +5490,15 @@ function attachSwipe(li) {
     } else if (dx > TH) {
       showConfirm('Delete', 'Delete this download?', 'Delete', function () { doAction(itemId, 'delete'); });
     }
+  }, {passive: true});
+  li.addEventListener('touchcancel', function () {
+    wrap.style.transition = '';
+    wrap.style.transform = '';
+    if (retTimer) clearTimeout(retTimer);
+    retTimer = setTimeout(function () {
+      li.classList.remove('swiping-l');
+      li.classList.remove('swiping-r');
+    }, 320);
   }, {passive: true});
 }
 
