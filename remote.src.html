@@ -255,7 +255,7 @@
  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 
   li.item {
- position: relative; overflow: hidden; border-radius: var(--radius); box-shadow: var(--shadow-sm); transition: box-shadow .15s ease; }
+ position: relative; overflow: hidden; touch-action: pan-y; }
 
   li.item.st-active .swipe-content { border-left-color: var(--primary); }
 
@@ -265,7 +265,6 @@
 
   li.item.st-paused .swipe-content { border-left-color: var(--amber); }
 
-  li.item:hover { box-shadow: var(--shadow); }
 
   .item-top {
  display: flex; align-items: flex-start; gap: 10px; }
@@ -316,8 +315,7 @@
   :root[data-theme="dark"] .f-type.t-doc { background: rgba(26,86,219,.22); color: #9fb9ff; border-color: rgba(26,86,219,.45); }
 
   @media (hover: hover) {
-    li.item { transition: box-shadow .2s ease, transform .2s ease; }
-    li.item:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+    li.item .swipe-content { transition: transform .2s ease; }
   }
 
   .checksum-ok {
@@ -5464,8 +5462,8 @@ function attachSwipe(li) {
     if (!swiping) return;
     var c = Math.max(-120, Math.min(120, dx));
     wrap.style.transform = 'translateX(' + c + 'px)';
-    bgL.style.opacity = c < -30 ? Math.min(1, (-c - 30) / 60) : 0;
-    bgR.style.opacity = c > 30 ? Math.min(1, (c - 30) / 60) : 0;
+    if (c < 0) { bgR.style.opacity = 0; bgL.style.opacity = 1; }
+    else { bgL.style.opacity = 0; bgR.style.opacity = 1; }
   }, {passive: true});
   li.addEventListener('touchend', function () {
     var t = wrap.style.transform;
