@@ -1388,8 +1388,8 @@
   .tab .tab-ico svg { width: 19px; height: 19px; }
   .pause-overlay svg { width: 18px; height: 18px; }
   #mmBack svg, #mmPlayerTop button svg { width: 18px; height: 18px; }
-  .swipe-bg { display: flex; align-items: center; gap: 6px; }
-  .swipe-bg .btn-ico { width: 16px; height: 16px; }
+  .swipe-action { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .swipe-action .btn-ico { width: 16px; height: 16px; }
   .item-retry .btn-ico { width: 13px; height: 13px; margin-right: 1px; vertical-align: -2px; }
   .sheet-list button .btn-ico { color: var(--primary); }
   .more-menu button .btn-ico { color: var(--muted); }
@@ -1467,9 +1467,9 @@
  animation: none !important; }
  }
 
-  li.item .swipe-bg { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 20px; font-size: 13px; font-weight: 700; color: #fff; opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 0; }
-  li.item .swipe-bg.left { background: var(--amber); justify-content: flex-start; }
-  li.item .swipe-bg.right { background: var(--red); justify-content: flex-end; }
+  li.item .swipe-action { position: absolute; top: 0; bottom: 0; width: 84px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 700; color: #fff; pointer-events: none; z-index: 0; }
+  li.item .swipe-action.left { left: 0; background: var(--amber); }
+  li.item .swipe-action.right { right: 0; background: var(--red); }
   li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 14px; transition: transform .2s ease; will-change: transform; }
   .list.compact .swipe-content { padding: 10px 14px; }
   .list.compact .item-top { gap: 8px; }
@@ -5442,40 +5442,43 @@ document.getElementById('compactToggleBtn').addEventListener('click', function (
 });
 
 function attachSwipe(li) {
+  var SW = 84, TH = 48;
   var sx = 0, swiping = false;
   var wrap = document.createElement('div');
   wrap.className = 'swipe-content';
   while (li.firstChild) wrap.appendChild(li.firstChild);
-  var bgL = document.createElement('div');
-  bgL.className = 'swipe-bg left';
-  bgL.innerHTML = UI_ICONS.pause + ' Pause';
-  var bgR = document.createElement('div');
-  bgR.className = 'swipe-bg right';
-  bgR.innerHTML = UI_ICONS.trash + ' Delete';
-  li.appendChild(bgL);
-  li.appendChild(bgR);
+  var actL = document.createElement('div');
+  actL.className = 'swipe-action left';
+  actL.innerHTML = UI_ICONS.pause + ' <span>Pause</span>';
+  var actR = document.createElement('div');
+  actR.className = 'swipe-action right';
+  actR.innerHTML = UI_ICONS.trash + ' <span>Delete</span>';
+  li.appendChild(actL);
+  li.appendChild(actR);
   li.appendChild(wrap);
   li.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; swiping = false; }, {passive: true});
   li.addEventListener('touchmove', function (e) {
     var dx = e.touches[0].clientX - sx;
     if (!swiping && Math.abs(dx) > 8) swiping = true;
     if (!swiping) return;
-    var c = Math.max(-120, Math.min(120, dx));
+    var c = Math.max(-SW, Math.min(SW, dx));
+    wrap.style.transition = 'none';
     wrap.style.transform = 'translateX(' + c + 'px)';
-    if (c < 0) { bgR.style.opacity = 0; bgL.style.opacity = 1; }
-    else { bgL.style.opacity = 0; bgR.style.opacity = 1; }
+    actL.style.display = c < 0 ? '' : 'none';
+    actR.style.display = c > 0 ? '' : 'none';
   }, {passive: true});
   li.addEventListener('touchend', function () {
     var t = wrap.style.transform;
     var dx = t ? parseFloat(t.replace(/[^\d\-]/g, '')) || 0 : 0;
+    wrap.style.transition = '';
     wrap.style.transform = '';
-    bgL.style.opacity = 0;
-    bgR.style.opacity = 0;
+    actL.style.display = '';
+    actR.style.display = '';
     var itemId = li.dataset.id;
-    if (dx < -80) {
+    if (dx < -TH) {
       var it = currentItems.find(function (x) { return x.id === itemId; });
       if (it) doAction(itemId, it.state === 'DOWNLOADING' ? 'pause' : 'resume');
-    } else if (dx > 80) {
+    } else if (dx > TH) {
       showConfirm('Delete', 'Delete this download?', 'Delete', function () { doAction(itemId, 'delete'); });
     }
   }, {passive: true});
