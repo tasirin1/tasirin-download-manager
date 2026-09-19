@@ -610,9 +610,11 @@ class DownloadEngine(appContext: Context) {
     fun rename(id: String, newName: String) {
         val item = _items.value.find { it.id == id } ?: return
         if (item.state != DownloadState.COMPLETED) return
-        val newPath = fileSaver.rename(item, newName)
+        val clean = FileNames.safe(newName.trim())
+        if (clean.isBlank() || clean == item.fileName) return
+        val newPath = fileSaver.rename(item, clean)
         if (newPath != null) {
-            updateItem(id) { it.copy(fileName = newName, filePath = newPath) }
+            updateItem(id) { it.copy(fileName = clean, filePath = newPath) }
         }
     }
 

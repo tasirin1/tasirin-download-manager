@@ -20,7 +20,9 @@ import com.tasirin.httpdownloadmanager.download.DownloadService
 import java.util.concurrent.atomic.AtomicInteger
 
 object NotificationHelper {
-    private val nextNotifId = AtomicInteger(0)
+    // Basis ID notifikasi per-item di luar ID foreground service (1001):
+    // counter dari 0 akan menabrak notifikasi ongoing setelah ~1001 item selesai.
+    private val nextNotifId = AtomicInteger(10000)
 
     const val CHANNEL_ID = "downloads"
     const val NOTIFICATION_ID = 1001
