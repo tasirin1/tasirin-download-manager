@@ -180,4 +180,15 @@ class DownloadItemCodecTest {
         assertEquals(90L, out[0].bytesDownloaded)
         assertEquals(50L, out[1].bytesDownloaded) // 5 < 50 -> diabaikan
     }
+
+    @Test
+    fun `overlayProgress - bytes lama tidak mundur saat hanya total yang tumbuh`() {
+        val items = listOf(
+            DownloadItem(id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED, bytesDownloaded = 100, totalBytes = 500)
+        )
+        val raw = "{\"a\":{\"b\":50,\"t\":1000}}"
+        val out = DownloadItemCodec.overlayProgress(items, raw)
+        assertEquals(100L, out[0].bytesDownloaded) // 50 tidak boleh menimpa mundur
+        assertEquals(1000L, out[0].totalBytes)
+    }
 }

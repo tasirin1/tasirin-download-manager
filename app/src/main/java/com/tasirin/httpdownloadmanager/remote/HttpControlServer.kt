@@ -833,8 +833,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val oldArr = cachedItems?.second
         val arr = JSONArray()
         items.forEachIndexed { idx, item ->
-            val oldObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
-            if (oldObj != null && oldObj.optString("id") == item.id) {
+            val cachedObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
+            if (cachedObj != null && cachedObj.optString("id") == item.id) {
+                // Salin dulu sebelum update: array cache lama masih diserialisasi
+                // thread request lain di luar lock — mutasi in-place merusak JSON
+                // mereka (race polling 1-2x/detik + SSE 2x/detik). Shallow copy
+                // aman karena nilainya immutable (String/Long/Boolean).
+                val oldObj = JSONObject()
+                val keys = cachedObj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    oldObj.put(k, cachedObj.get(k))
+                }
                 // Update hanya field yang berubah — hemat ~40% GC alloc.
                 // fileName/url ikut disegarkan: item bisa di-rename saat download
                 // mulai (Content-Disposition) atau lewat aksi Rename/mirror.
