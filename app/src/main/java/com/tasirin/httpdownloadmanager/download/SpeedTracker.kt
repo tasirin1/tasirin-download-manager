@@ -5,7 +5,9 @@ class SpeedTracker(
     private val clock: () -> Long = { System.currentTimeMillis() }
 ) {
     // Satu map per id (bukan 3 map): 1 lookup + 1 lock per sample multi-segmen.
-    private data class Entry(var bytes: Long, var time: Long, var ema: Double)
+    // ema null = belum ada pengukuran instan; sampel kedua langsung memakai
+    // instan penuh sebagai seed (bukan 20% dari instan karena terseret baseline 0).
+    private data class Entry(var bytes: Long, var time: Long, var ema: Double?)
     private val entries = HashMap<String, Entry>()
 
     @Synchronized
@@ -16,15 +18,20 @@ class SpeedTracker(
         val prevT = e?.time ?: now
         val instant = if (now > prevT) ((bytes - prevB) * 1000L) / (now - prevT) else 0L
         // EMA: kecepatan rata-rata bergerak supaya ETA tidak melompat-lompat
-        // akibat lonjakan kecepatan sesaat.
-        val smoothed = if (instant > 0L) {
-            val prev = e?.ema ?: instant.toDouble()
-            prev * (1.0 - EMA_ALPHA) + instant * EMA_ALPHA
+        // akibat lonjakan kecepatan sesaat. Sampel pertama belum punya delta
+        // waktu sehingga speed 0; sampel kedua menjadi seed penuh agar ETA
+        // langsung akurat, bukan terseret baseline 0.
+        // null dipertahankan (bukan 0.0) supaya sampel berikutnya tahu
+        // bahwa belum ada pengukuran instan dan memakai instan penuh.
+        val prev = e?.ema
+        val newEma: Double? = if (instant > 0L) {
+            if (prev == null) instant.toDouble()
+            else prev * (1.0 - EMA_ALPHA) + instant * EMA_ALPHA
         } else {
-            e?.ema ?: 0.0
+            prev
         }
-        entries[id] = Entry(bytes, now, smoothed)
-        val speed = smoothed.toLong()
+        entries[id] = Entry(bytes, now, newEma)
+        val speed = (newEma ?: 0.0).toLong()
         val eta = if (speed > 0 && total > bytes) (total - bytes) / speed else 0L
         return speed to eta
     }

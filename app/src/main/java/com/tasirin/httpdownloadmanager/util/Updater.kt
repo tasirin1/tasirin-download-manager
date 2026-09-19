@@ -87,9 +87,12 @@ object Updater {
                 return null
             }
             val total = conn.contentLength.toLong().coerceAtLeast(0L)
+            // Batas tulis selalu ada: bila ukuran dari API tak diketahui (0),
+            // pakai MAX_UPDATE_BYTES agar respons jahat tak memenuhi disk.
+            val writeCap = if (info.apkSize > 0) info.apkSize else MAX_UPDATE_BYTES
             try {
                 conn.inputStream.use { input ->
-                    target.outputStream().use { out ->
+                    java.io.BufferedOutputStream(target.outputStream(), 64 * 1024).use { out ->
                         val buf = ByteArray(64 * 1024)
                         var done = 0L
                         while (true) {
@@ -97,7 +100,7 @@ object Updater {
                             if (n < 0) break
                             out.write(buf, 0, n)
                             done += n
-                            if (info.apkSize > 0 && done > info.apkSize) throw SecurityException("Update size mismatch")
+                            if (done > writeCap) throw SecurityException("Update size mismatch")
                             onProgress(done, total)
                         }
                     }
