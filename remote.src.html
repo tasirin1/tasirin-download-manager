@@ -1305,7 +1305,7 @@
  transform: scale(.985); }
 
 
-  .fcount{font-size:10px;opacity:.55;margin-left:3px;font-weight:700;vertical-align:1px}
+  .fcount{font-size:10.5px;font-weight:800;margin-left:6px;padding:1px 7px;border-radius:999px;background:var(--bg-soft);border:1px solid var(--line);color:var(--muted);line-height:1.5}.seg button.on .fcount{background:var(--primary-soft);border-color:transparent;color:var(--primary)}
   .page-head{transition:padding .2s ease}.page-head.shrink h2{font-size:15px;transition:font-size .2s ease}.page-head.shrink{padding:2px 0 6px}
   .gal-toolbar{transition:gap .2s ease}.gal-toolbar.shrink{gap:6px;padding:0}.gal-toolbar.shrink h2{font-size:15px}.gal-toolbar.shrink .page-sub{font-size:10.5px}
   .social-favicon{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:4px;flex:0 0 auto}
@@ -1340,7 +1340,9 @@
  position: sticky; z-index: 30; background: var(--bg); padding: 8px 0 12px; margin: 0 0 4px; }
 
   #filtersSticky .seg {
- margin-bottom: 0; }
+ margin-bottom: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  #filtersSticky .seg::-webkit-scrollbar { display: none; }
+  #filtersSticky .seg button { flex: 0 0 auto; white-space: nowrap; display: inline-flex; align-items: center; }
 
   .empty {
  padding: 64px 16px; text-align: center; color: var(--muted); display: flex; flex-direction: column; align-items: center; }
@@ -1535,6 +1537,7 @@
 
     .seg button {
  flex: 1; padding: 7px 6px; font-size: 12.5px; }
+    #filtersSticky .seg button { flex: 0 0 auto; padding: 7px 12px; }
 
     input, select {
  font-size: 16px; padding: 12px; }
@@ -4430,7 +4433,7 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
       xhr.timeout = 120000;
       let lastUiAt = 0;
       function renderUploadProgress() {
-        const filePct = Math.min(99, Math.round((start + chunkBest) * 100 / file.size));
+        const filePct = file.size > 0 ? Math.min(99, Math.round((start + chunkBest) * 100 / file.size)) : 100;
         const pct = totalBytes > 0 ? Math.round(bestDone * 100 / totalBytes) : 0;
         progressBar.style.width = pct + '%';
         const etaSec = speed > 0 && totalBytes > bestDone
@@ -5272,6 +5275,8 @@ async function refresh() {
 }
 
 function fmt(bytes) {
+  bytes = Number(bytes);
+  if (!isFinite(bytes) || bytes < 0) bytes = 0;
   if (bytes < 1024) return bytes + ' B';
   const kb = bytes / 1024;
   if (kb < 1024) return kb.toFixed(1) + ' KB';
@@ -5281,6 +5286,8 @@ function fmt(bytes) {
 }
 
 function fmtSpeed(bps) {
+  bps = Number(bps);
+  if (!isFinite(bps) || bps < 0) bps = 0;
   if (bps < 1024) return bps + ' B/s';
   const kb = bps / 1024;
   if (kb < 1024) return kb.toFixed(1) + ' KB/s';
@@ -5288,7 +5295,8 @@ function fmtSpeed(bps) {
 }
 
 function fmtEta(seconds) {
-  if (seconds <= 0) return '0s';
+  seconds = Number(seconds);
+  if (!isFinite(seconds) || seconds <= 0) return '0s';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;

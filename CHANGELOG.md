@@ -5,6 +5,8 @@
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(remote): hilangkan tampilan NaN** -- Upload file kosong kini tampil 100% (bukan `NaN%`); `fmt`/`fmtSpeed`/`fmtEta` dipagari dari `undefined`/negatif/`NaN` sehingga tidak pernah tampil `NaN GB`/`NaN MB/s`/`NaNs`.
+- **ui(remote): rapikan tampilan filter downloads** -- Bar filter tidak lagi wrap/gepeng di layar kecil (scroll horizontal, tombol `nowrap`), badge jumlah jadi pil yang jelas (aksen primary saat aktif), dan padding tombol dijaga di media kecil.
 - **fix(gallery): hilangkan warning RtlSymmetry** -- `text_name` di `item_gallery.xml` memakai `paddingEnd` 82dp untuk memberi ruang badge durasi di sisi end; keduanya ikut mirror otomatis di RTL sehingga warning lint false positive. Tambah `tools:ignore="RtlSymmetry"` beserta alasan.
 - **chore(remote): bersihkan konflik mikro tanpa ubah tampilan** -- Hapus 3 selektor duplikat dari grup `:active`, hapus duplikat `.toast.hidden` yang lemah, dan cegah `show()` ganda overlay pause (`pointerdown` abaikan 700ms setelah `touchstart`). `.brand-word` fallback memang disengaja, tidak disentuh.
 - **ui(remote): swipe stretch ikut jari** -- Panel aksi tak lagi kotak statis 84px yang pop-in; lebarnya tumbuh 0→84px mengikuti jari (ikon 84px menempel di tepi konten), lalu menyusut mulus saat dilepas. Satu sisi tetap, radius kartu terjaga, logika Pause/Delete tidak berubah.
