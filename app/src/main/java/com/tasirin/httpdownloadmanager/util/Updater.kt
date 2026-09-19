@@ -65,6 +65,7 @@ object Updater {
         if (!info.apkUrl.startsWith("https://", ignoreCase = true)) return null
         var url = info.apkUrl
         var redirects = 0
+        var downloaded = false
         while (redirects <= MAX_REDIRECTS) {
             val conn = URL(url).openConnection() as HttpURLConnection
             if (conn is HttpsURLConnection) TlsCompat.apply(conn, context)
@@ -104,8 +105,12 @@ object Updater {
             } finally {
                 conn.disconnect()
             }
+            downloaded = true
             break
         }
+        // Redirect habis tanpa pernah mengunduh: jangan kembalikan file target
+        // yang tidak ada (terjadi bila ukuran APK tak diketahui).
+        if (!downloaded) return null
         if (info.apkSize > 0 && target.length() != info.apkSize) {
             target.delete()
             null

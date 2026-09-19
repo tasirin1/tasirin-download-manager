@@ -148,9 +148,16 @@ class FileSaver(context: Context) {
         StoragePrefs.getTextFolder(appContext)?.let { tf ->
             val dir = File(tf)
             if (dir.isDirectory || dir.mkdirs()) {
-                val target = File(dir, fileName)
-                target.outputStream().use { out -> writer(out) }
-                return PublishResult(filePath = target.absolutePath)
+                // Nama unik seperti cabang lain: impor upload jangan menimpa
+                // file senama yang sudah ada di folder teks.
+                val target = uniqueTargetFile(File(dir, fileName))
+                try {
+                    target.outputStream().use { out -> writer(out) }
+                } catch (e: Exception) {
+                    runCatching { target.delete() }
+                    throw e
+                }
+                return PublishResult(filePath = target.absolutePath, fileName = target.name)
             }
         }
         return if (Build.VERSION.SDK_INT >= 29) {

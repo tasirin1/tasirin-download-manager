@@ -1684,8 +1684,12 @@ class DownloadEngine(appContext: Context) {
     private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = ""): HlsPlan? {
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
+            // Hanya baris URI segmen (bukan tag #... / baris kosong) yang sah:
+            // tanpa filter, tag ikut jadi URL http valid lalu gagal diunduh.
             val segments = body.lines()
-                .map { HlsParser.resolveUrl(baseUrl, it.trim()) }
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && !it.startsWith("#") }
+                .map { HlsParser.resolveUrl(baseUrl, it) }
                 .filter { it.startsWith("http") }
             App.logEvent("HLS: direct media playlist, ${segments.size} segments")
             if (segments.isEmpty()) return null
