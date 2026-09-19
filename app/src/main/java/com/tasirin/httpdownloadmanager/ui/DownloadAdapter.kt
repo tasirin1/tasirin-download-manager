@@ -89,27 +89,35 @@ class DownloadAdapter(private val listener: Listener) :
         }
     }
 
+    // Cache hasil resolve warna: bind berjalan tiap tick progres (1 detik),
+    // getColor berulang hanya membuang CPU.
+    private val colorCache = HashMap<Int, Int>()
+    private fun cachedColor(ctx: android.content.Context, res: Int): Int =
+        colorCache.getOrPut(res) { ContextCompat.getColor(ctx, res) }
+
     private fun bindItem(holder: ItemHolder, item: DownloadItem) {
         val b = holder.binding
         val ctx = b.root.context
 
         b.textName.text = item.fileName
-        b.fileIcon.setImageResource(fileIconRes(item.fileName))
+        // Satu lookup mime per bind (sebelumnya 2x via fileIconRes + circle).
+        val mime = MimeTypes.forFile(item.fileName)
+        b.fileIcon.setImageResource(fileIconRes(mime, true))
         b.fileIcon.imageTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(ctx, R.color.text_primary)
+            cachedColor(ctx, R.color.text_primary)
         )
         b.fileIconCircle.backgroundTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(ctx, fileIconCircleColor(item.fileName))
+            cachedColor(ctx, fileIconCircleColor(mime, true))
         )
         b.statusBadge.text = badgeText(item, ctx)
         b.statusBadge.backgroundTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(ctx, badgeBgColor(item.state))
+            cachedColor(ctx, badgeBgColor(item.state))
         )
-        b.statusBadge.setTextColor(ContextCompat.getColor(ctx, badgeTextColor(item.state)))
+        b.statusBadge.setTextColor(cachedColor(ctx, badgeTextColor(item.state)))
         val prevProgress = b.progressBar.progress
         smoothProgress(b.progressBar, prevProgress, item.progressPercent)
         b.progressBar.progressTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(ctx, progressColor(item.state))
+            cachedColor(ctx, progressColor(item.state))
         )
 
         b.textProgress.text = if (item.state == DownloadState.COMPLETED) {
@@ -213,10 +221,11 @@ class DownloadAdapter(private val listener: Listener) :
         else -> R.color.white
     }
 
-    /** Animasi halus saat progres naik; set langsung saat turun/reset. */
+    /** Animasi hanya untuk lompatan berarti; tick kecil 1-3% di-set langsung
+     *  agar tidak membuat ObjectAnimator tiap detik per item aktif. */
     private fun smoothProgress(bar: android.widget.ProgressBar, from: Int, to: Int) {
         (bar.getTag(R.id.progress_animator) as? ObjectAnimator)?.cancel()
-        if (from >= 0 && to > from) {
+        if (from >= 0 && to > from && to - from > 3 && to - from <= 25) {
             val anim = ObjectAnimator.ofInt(bar, "progress", from, to)
                 .setDuration(350)
             bar.setTag(R.id.progress_animator, anim)
@@ -228,8 +237,10 @@ class DownloadAdapter(private val listener: Listener) :
     }
 
     /** Warna lingkaran ikon per tipe file (lembut, kontras dengan ikon gelap). */
-    private fun fileIconCircleColor(fileName: String): Int {
-        val mime = MimeTypes.forFile(fileName)
+    private fun fileIconCircleColor(fileName: String): Int =
+        fileIconCircleColor(MimeTypes.forFile(fileName), true)
+
+    private fun fileIconCircleColor(mime: String, isMime: Boolean): Int {
         return when {
             mime.startsWith("video") -> R.color.icon_circle_video
             mime.startsWith("audio") -> R.color.icon_circle_audio
@@ -244,8 +255,10 @@ class DownloadAdapter(private val listener: Listener) :
     }
 
     /** Pilih ikon tipe file berdasarkan ekstensi/nama file. */
-    private fun fileIconRes(fileName: String): Int {
-        val mime = MimeTypes.forFile(fileName)
+    private fun fileIconRes(fileName: String): Int =
+        fileIconRes(MimeTypes.forFile(fileName), true)
+
+    private fun fileIconRes(mime: String, isMime: Boolean): Int {
         return when {
             mime.startsWith("video") -> R.drawable.ic_file_video
             mime.startsWith("audio") -> R.drawable.ic_file_audio

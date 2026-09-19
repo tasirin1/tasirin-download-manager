@@ -3378,6 +3378,10 @@ toggleBatchMode();
 });
 function render(items) {
 currentItems = items;
+if (lockedTotalBytes.size > items.length + 32) {
+const alive = new Set(items.map(function (it) { return it.id; }));
+lockedTotalBytes.forEach(function (_, id) { if (!alive.has(id)) lockedTotalBytes.delete(id); });
+}
 const struct = (webFilter || '') + '::' + (dlSearchQuery || '') + '::' + structSig(items);
 if (struct !== lastStructSig) {
 lastStructSig = struct;

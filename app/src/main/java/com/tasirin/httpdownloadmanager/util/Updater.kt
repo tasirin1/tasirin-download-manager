@@ -65,6 +65,7 @@ object Updater {
         if (!info.apkUrl.startsWith("https://", ignoreCase = true)) return null
         var url = info.apkUrl
         var redirects = 0
+        var downloaded = false
         while (redirects <= MAX_REDIRECTS) {
             val conn = URL(url).openConnection() as HttpURLConnection
             if (conn is HttpsURLConnection) TlsCompat.apply(conn, context)
@@ -104,8 +105,12 @@ object Updater {
             } finally {
                 conn.disconnect()
             }
+            downloaded = true
             break
         }
+        // Redirect habis tanpa pernah mengunduh: jangan kembalikan file target
+        // yang tidak ada (terjadi bila ukuran APK tak diketahui).
+        if (!downloaded) return null
         if (info.apkSize > 0 && target.length() != info.apkSize) {
             target.delete()
             null
@@ -165,8 +170,23 @@ object Updater {
             conn.disconnect()
             return null
         }
-        val body = conn.inputStream.bufferedReader().use { it.readText() }
-        conn.disconnect()
-        body
+        try {
+            conn.inputStream.bufferedReader().use { r ->
+                val sb = StringBuilder()
+                val buf = CharArray(8192)
+                var total = 0
+                while (true) {
+                    val n = r.read(buf)
+                    if (n < 0) break
+                    total += n
+                    // Respons releases bisa besar; 512KB cukup untuk cari asset.
+                    if (total > 524_288) break
+                    sb.append(buf, 0, n)
+                }
+                sb.toString()
+            }
+        } finally {
+            conn.disconnect()
+        }
     }.getOrNull()
 }

@@ -75,14 +75,17 @@ object StoragePrefs {
     }
 
     fun setSectionCollapsed(context: Context, key: String, collapsed: Boolean) {
-        val stored = collapsedCache ?: prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
-        val set = (stored ?: emptySet()).toMutableSet()
-        if (collapsed) set.add(key) else set.remove(key)
-        collapsedCache = set
-        prefs(context)
-            .edit {
-                putStringSet(KEY_COLLAPSED_SECTIONS, set)
-            }
+        // Sinkron: dua toggle paralel bisa read-modify-write dan saling menimpa.
+        synchronized(prefsLock) {
+            val stored = collapsedCache ?: prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
+            val set = (stored ?: emptySet()).toMutableSet()
+            if (collapsed) set.add(key) else set.remove(key)
+            collapsedCache = set
+            prefs(context)
+                .edit {
+                    putStringSet(KEY_COLLAPSED_SECTIONS, set)
+                }
+        }
     }
 
     fun getFolderUri(context: Context): Uri? {

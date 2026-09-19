@@ -5563,6 +5563,11 @@ document.getElementById('batchDeleteBtn').addEventListener('click', function () 
 
 function render(items) {
   currentItems = items;
+  // Batasi pertumbuhan lockedTotalBytes: id yang sudah hilang dari daftar dibuang.
+  if (lockedTotalBytes.size > items.length + 32) {
+    const alive = new Set(items.map(function (it) { return it.id; }));
+    lockedTotalBytes.forEach(function (_, id) { if (!alive.has(id)) lockedTotalBytes.delete(id); });
+  }
   const struct = (webFilter || '') + '::' + (dlSearchQuery || '') + '::' + structSig(items);
   if (struct !== lastStructSig) {
     lastStructSig = struct;

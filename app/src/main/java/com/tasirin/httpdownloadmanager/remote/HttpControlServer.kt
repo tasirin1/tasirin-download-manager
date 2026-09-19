@@ -798,10 +798,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var lastSigItems: List<DownloadItem>? = null
     @Volatile private var lastSigResult = 0
 
-    @Synchronized
     private fun itemsSignature(items: List<DownloadItem>): Int {
-        // Cache: kalau list masih referensi yang sama (update in-place),
-        // kembalikan signature terakhir tanpa recompute.
+        // Baca cache tanpa menahan lock selama hash loop (request 1-2x/detik).
         if (items === lastSigItems) return lastSigResult
         var h = items.size
         items.forEach { item ->
@@ -818,8 +816,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 item.progressPercentOverride.hashCode() * 61 +
                 (item.error?.hashCode() ?: 0) * 47
         }
-        lastSigItems = items
-        lastSigResult = h
+        synchronized(this) {
+            lastSigItems = items
+            lastSigResult = h
+        }
         return h
     }
 
@@ -833,8 +833,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val oldArr = cachedItems?.second
         val arr = JSONArray()
         items.forEachIndexed { idx, item ->
-            val oldObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
-            if (oldObj != null && oldObj.optString("id") == item.id) {
+            val cachedObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
+            if (cachedObj != null && cachedObj.optString("id") == item.id) {
+                // Salin dulu sebelum update: array cache lama masih diserialisasi
+                // thread request lain di luar lock — mutasi in-place merusak JSON
+                // mereka (race polling 1-2x/detik + SSE 2x/detik). Shallow copy
+                // aman karena nilainya immutable (String/Long/Boolean).
+                val oldObj = JSONObject()
+                val keys = cachedObj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    oldObj.put(k, cachedObj.get(k))
+                }
                 // Update hanya field yang berubah — hemat ~40% GC alloc.
                 // fileName/url ikut disegarkan: item bisa di-rename saat download
                 // mulai (Content-Disposition) atau lewat aksi Rename/mirror.
@@ -1365,7 +1375,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     ZipCreator.zipMedia(zos, raw.removePrefix(MS_PREFIX), context)
                 } else {
                     ZipCreator.zipFile(
-                        zos, File(raw.removePrefix(FS_PREFIX)), "", ::isFsPathAllowed
+                        zos, File(raw.removePrefix(FS_PREFIX)), "",
+                        isFileAllowed = ::isFsPathAllowed
                     )
                 }
             }

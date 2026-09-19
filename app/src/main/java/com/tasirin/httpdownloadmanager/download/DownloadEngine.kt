@@ -610,9 +610,11 @@ class DownloadEngine(appContext: Context) {
     fun rename(id: String, newName: String) {
         val item = _items.value.find { it.id == id } ?: return
         if (item.state != DownloadState.COMPLETED) return
-        val newPath = fileSaver.rename(item, newName)
+        val clean = FileNames.safe(newName.trim())
+        if (clean.isBlank() || clean == item.fileName) return
+        val newPath = fileSaver.rename(item, clean)
         if (newPath != null) {
-            updateItem(id) { it.copy(fileName = newName, filePath = newPath) }
+            updateItem(id) { it.copy(fileName = clean, filePath = newPath) }
         }
     }
 
@@ -1684,8 +1686,12 @@ class DownloadEngine(appContext: Context) {
     private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = ""): HlsPlan? {
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
+            // Hanya baris URI segmen (bukan tag #... / baris kosong) yang sah:
+            // tanpa filter, tag ikut jadi URL http valid lalu gagal diunduh.
             val segments = body.lines()
-                .map { HlsParser.resolveUrl(baseUrl, it.trim()) }
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && !it.startsWith("#") }
+                .map { HlsParser.resolveUrl(baseUrl, it) }
                 .filter { it.startsWith("http") }
             App.logEvent("HLS: direct media playlist, ${segments.size} segments")
             if (segments.isEmpty()) return null
@@ -1995,6 +2001,7 @@ class DownloadEngine(appContext: Context) {
         val output = BufferedOutputStream(FileOutputStream(partialFile, true))
         val buffer = ByteArray(BUFFER_SIZE)
         var lastNotify = 0L
+        var iters = 0
         try {
             while (true) {
                 val read = input.read(buffer)
@@ -2002,6 +2009,8 @@ class DownloadEngine(appContext: Context) {
                 output.write(buffer, 0, read)
                 downloaded += read
                 throttle.sleepIfNeeded { downloaded }
+                // Cek jam tiap 8 chunk (512KB): currentTimeMillis per iterasi boros.
+                if ((iters++ and 7) != 0) continue
                 val now = System.currentTimeMillis()
                 // Progres di-throttle 1x/detik: salinan daftar + emisi StateFlow
                 // (ke UI, notifikasi, SSE) tidak perlu 2x/detik — hemat CPU/GC
@@ -2265,6 +2274,7 @@ class DownloadEngine(appContext: Context) {
             val output = BufferedOutputStream(FileOutputStream(partial, true))
             val buffer = ByteArray(BUFFER_SIZE)
             var lastNotify = 0L
+            var segIters = 0
             try {
                 while (true) {
                     val read = input.read(buffer)
@@ -2273,6 +2283,7 @@ class DownloadEngine(appContext: Context) {
                     downloaded += read
                     val sharedTotal = addThrottleTotal(id, read.toLong())
                     throttle.sleepIfNeeded { sharedTotal }
+                    if ((segIters++ and 7) != 0) continue
                     val now = System.currentTimeMillis()
                     if (now - lastNotify >= 1000) {
                         lastNotify = now
@@ -2606,7 +2617,16 @@ class DownloadEngine(appContext: Context) {
         persist: Boolean = true,
         transform: (DownloadItem) -> DownloadItem
     ) {
-        update(_items.value.map { if (it.id == id) transform(it) else it }, persist)
+        // Salin per-indeks + lewati emit bila sama: hindari map O(n) dengan
+        // transform untuk semua item pada tiap tick progres 1 detik.
+        val cur = _items.value
+        val idx = cur.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        val next = transform(cur[idx])
+        if (next == cur[idx]) return
+        val copy = ArrayList(cur)
+        copy[idx] = next
+        update(copy, persist)
     }
 
     @Synchronized

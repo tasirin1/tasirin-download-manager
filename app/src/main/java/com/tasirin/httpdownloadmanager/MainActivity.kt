@@ -61,6 +61,7 @@ import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -79,6 +80,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private var summaryFailed = 0
     private var summaryDone = 0
     private var lastItems: List<DownloadItem> = emptyList()
+    // Throttle submitList: emisi StateFlow tiap detik tidak perlu rebuild penuh
+    // bila struktur daftar sama; toolbar teks hanya update saat hitungan berubah.
+    private var lastUiSubmitMs = 0L
+    private var lastToolbarSig = Int.MIN_VALUE
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -174,13 +179,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
         lifecycleScope.launch {
             App.engine.items.collect { items ->
+                val sizeChanged = items.size != lastItems.size
                 lastItems = items
                 // Auto-open file yang baru selesai (video → player, APK → installer)
                 if (StoragePrefs.isAutoOpenComplete(this@MainActivity)) {
-                    autoOpenCompleted(items)
+                    runCatching { autoOpenCompleted(items) }
                 }
                 runCatching {
-                    adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
+                    // Rebuild daftar dibatasi 400ms sekali kecuali jumlah item berubah.
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (sizeChanged || now - lastUiSubmitMs >= 400L) {
+                        lastUiSubmitMs = now
+                        adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
+                    }
                     updateStickyHeader()
                     val showEmpty = items.isEmpty()
                     binding.emptyView.visibility =
@@ -384,6 +395,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialYoutubeHeights: IntArray = intArrayOf()
         var socialAudioLanguages: List<HlsRendition> = emptyList()
         var socialJob: Job? = null
+        var socialDebounce: Job? = null
         fun platformLabelFrom(url: String): String {
             val host = runCatching { url.toUri().host.orEmpty() }.getOrDefault("").lowercase()
             return when {
@@ -406,7 +418,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             platformBadge.isVisible = true
             platformBadge.text = getString(R.string.platform_detected, platformLabelFrom(url))
         }
-        fun probeSocialQuality() {
+        // Didefinisikan dulu: local fun tidak bisa forward-reference.
+        fun probeSocialNow() {
             socialJob?.cancel()
             val allUrls = urlInput.text?.toString().orEmpty()
             val target = extractUrls(allUrls).firstOrNull().orEmpty()
@@ -535,6 +548,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     setupSpinner(this@MainActivity, socialCarouselSpinner, photoLabels)
                     socialCarouselSection.isVisible = true
                 }
+            }
+        }
+        fun probeSocialQuality() {
+            // Tunda 450ms per ketikan: mengetik URL tidak menembakkan
+            // ekstraksi jaringan berkali-kali (tiap ekstraksi bisa s.d. 25 dtk).
+            socialDebounce?.cancel()
+            socialDebounce = lifecycleScope.launch {
+                delay(450)
+                probeSocialNow()
             }
         }
         val socialWatcher = object : TextWatcher {
@@ -1181,6 +1203,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         summaryPaused = paused
         summaryFailed = failed
         summaryDone = done
+        // Lewati setText + layout ulang bila hitungan tidak berubah (tick progres).
+        val sig = ((active * 31 + paused) * 31 + done) * 31 + failed
+        if (sig == lastToolbarSig) return
+        lastToolbarSig = sig
         updateSummaryStats(active, paused, done, failed)
     }
 

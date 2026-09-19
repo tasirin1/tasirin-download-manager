@@ -4,27 +4,26 @@ package com.tasirin.httpdownloadmanager.download
 class SpeedTracker(
     private val clock: () -> Long = { System.currentTimeMillis() }
 ) {
-    private val lastBytes = HashMap<String, Long>()
-    private val lastTime = HashMap<String, Long>()
-    private val emaSpeed = HashMap<String, Double>()
+    // Satu map per id (bukan 3 map): 1 lookup + 1 lock per sample multi-segmen.
+    private data class Entry(var bytes: Long, var time: Long, var ema: Double)
+    private val entries = HashMap<String, Entry>()
 
     @Synchronized
     fun sample(id: String, bytes: Long, total: Long): Pair<Long, Long> {
         val now = clock()
-        val prevB = lastBytes[id] ?: bytes
-        val prevT = lastTime[id] ?: now
-        lastBytes[id] = bytes
-        lastTime[id] = now
+        val e = entries[id]
+        val prevB = e?.bytes ?: bytes
+        val prevT = e?.time ?: now
         val instant = if (now > prevT) ((bytes - prevB) * 1000L) / (now - prevT) else 0L
         // EMA: kecepatan rata-rata bergerak supaya ETA tidak melompat-lompat
         // akibat lonjakan kecepatan sesaat.
         val smoothed = if (instant > 0L) {
-            val prev = emaSpeed[id] ?: instant.toDouble()
+            val prev = e?.ema ?: instant.toDouble()
             prev * (1.0 - EMA_ALPHA) + instant * EMA_ALPHA
         } else {
-            emaSpeed[id] ?: 0.0
+            e?.ema ?: 0.0
         }
-        emaSpeed[id] = smoothed
+        entries[id] = Entry(bytes, now, smoothed)
         val speed = smoothed.toLong()
         val eta = if (speed > 0 && total > bytes) (total - bytes) / speed else 0L
         return speed to eta
@@ -32,9 +31,7 @@ class SpeedTracker(
 
     @Synchronized
     fun reset(id: String) {
-        lastBytes.remove(id)
-        lastTime.remove(id)
-        emaSpeed.remove(id)
+        entries.remove(id)
     }
 
     private companion object {

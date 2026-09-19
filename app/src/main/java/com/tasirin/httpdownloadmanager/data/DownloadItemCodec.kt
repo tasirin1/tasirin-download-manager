@@ -181,8 +181,12 @@ object DownloadItemCodec {
             val p = prog.optJSONObject(item.id) ?: return@map item
             val b = p.optLong("b", item.bytesDownloaded)
             val t = p.optLong("t", item.totalBytes)
-            if (b > item.bytesDownloaded || t > item.totalBytes) {
-                item.copy(bytesDownloaded = b, totalBytes = t)
+            // Ambil max per field: bila hanya total yang tumbuh (kasus save &
+            // saveProgress balapan), bytes versi lama tidak boleh menimpa mundur.
+            val nb = maxOf(b, item.bytesDownloaded)
+            val nt = maxOf(t, item.totalBytes)
+            if (nb != item.bytesDownloaded || nt != item.totalBytes) {
+                item.copy(bytesDownloaded = nb, totalBytes = nt)
             } else {
                 item
             }
