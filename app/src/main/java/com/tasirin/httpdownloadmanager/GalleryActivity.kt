@@ -35,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -62,6 +63,10 @@ class GalleryActivity : AppCompatActivity() {
         binding.toolbar.whiteNavigationIcon()
 
         binding.recycler.layoutManager = GridLayoutManager(this, SPAN_COUNT)
+        // Cell berukuran tetap (130dp): matikan re-measure tiap scroll dan
+        // tahan view cache 4 baris agar scroll-balik tidak rebind/decode ulang.
+        binding.recycler.setHasFixedSize(true)
+        binding.recycler.setItemViewCacheSize(SPAN_COUNT * 4)
         binding.recycler.adapter = adapter
         binding.recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -285,6 +290,7 @@ class GalleryActivity : AppCompatActivity() {
                 if (thumb.length() <= 128 * 1024) {
                     val direct = BitmapFactory.decodeFile(thumb.absolutePath)
                         ?: return@withContext null
+                    ensureActive()
                     val tiny = scaleDown(direct, req)
                     if (tiny !== direct) direct.recycle()
                     cache.put(e.token, tiny)
@@ -303,6 +309,7 @@ class GalleryActivity : AppCompatActivity() {
                     thumb.absolutePath,
                     BitmapFactory.Options().apply { inSampleSize = sample }
                 ) ?: return@withContext null
+                ensureActive()
                 val bitmap = scaleDown(decoded, req)
                 if (bitmap !== decoded) decoded.recycle()
                 cache.put(e.token, bitmap)
@@ -321,18 +328,32 @@ private class GalleryAdapter(
 
     fun release() { scope.cancel() }
 
+    // DiffUtil dihitung di background: submit dipanggil tiap tick progres
+    // (throttle 800ms) dan tiap halaman loadMore — dihitung di main thread
+    // atas ribuan entry inilah yang bikin scroll patah-patah.
+    private var submitGen = 0L
+
     fun submit(list: List<MediaLibrary.MediaEntry>) {
-        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize(): Int = items.size
-            override fun getNewListSize(): Int = list.size
-            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
-                items[oldItemPosition].token == list[newItemPosition].token
-            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
-                items[oldItemPosition] == list[newItemPosition]
-        }, false)
-        items.clear()
-        items.addAll(list)
-        diff.dispatchUpdatesTo(this)
+        val old = items.toList()
+        val new = list.toList()
+        val gen = ++submitGen
+        scope.launch {
+            val diff = withContext(Dispatchers.Default) {
+                DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                    override fun getOldListSize(): Int = old.size
+                    override fun getNewListSize(): Int = new.size
+                    override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                        old[oldItemPosition].token == new[newItemPosition].token
+                    override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                        old[oldItemPosition] == new[newItemPosition]
+                }, false)
+            }
+            // Submit basi (sudah ada yang lebih baru) dibuang agar urutan tampil tetap benar.
+            if (gen != submitGen) return@launch
+            items.clear()
+            items.addAll(new)
+            diff.dispatchUpdatesTo(this@GalleryAdapter)
+        }
     }
 
     // Formatter di-cache per-locale: onBindViewHolder bisa dipanggil ratusan
@@ -360,6 +381,14 @@ private class GalleryAdapter(
     }
 
     override fun getItemCount(): Int = items.size
+
+    override fun onViewRecycled(holder: Holder) {
+        // Cell keluar layar saat fling: batalkan decode thumbnail agar
+        // Dispatchers.IO tidak menumpuk decode basi yang bikin jank.
+        holder.job?.cancel()
+        holder.job = null
+        super.onViewRecycled(holder)
+    }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val e = items[position]
