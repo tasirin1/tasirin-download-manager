@@ -1365,7 +1365,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     ZipCreator.zipMedia(zos, raw.removePrefix(MS_PREFIX), context)
                 } else {
                     ZipCreator.zipFile(
-                        zos, File(raw.removePrefix(FS_PREFIX)), "", ::isFsPathAllowed
+                        zos, File(raw.removePrefix(FS_PREFIX)), "",
+                        isFileAllowed = ::isFsPathAllowed
                     )
                 }
             }

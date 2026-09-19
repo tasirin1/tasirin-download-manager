@@ -32,9 +32,9 @@ object ZipCreator {
         zos: ZipOutputStream,
         file: File,
         prefix: String,
-        isFileAllowed: (String) -> Boolean,
         depth: Int = 0,
-        seen: MutableSet<String> = mutableSetOf()
+        seen: MutableSet<String> = mutableSetOf(),
+        isFileAllowed: (String) -> Boolean
     ) {
         if (!isFileAllowed(file.absolutePath)) return
         // Symlink melingkar (folder menunjuk leluhurnya) membuat rekursi tak
@@ -55,7 +55,7 @@ object ZipCreator {
             children.sortedWith(
                 Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
             ).forEach { child ->
-                zipFile(zos, child, entryPath, isFileAllowed, depth + 1, seen)
+                zipFile(zos, child, entryPath, depth + 1, seen, isFileAllowed)
             }
         } else if (file.isFile) {
             zos.putNextEntry(ZipEntry(entryPath))
@@ -85,7 +85,7 @@ object ZipCreator {
                         val children = runCatching { f.listFiles() }.getOrNull() ?: return@runCatching
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-                        ).forEach { child -> zipFile(zos, child, root, isFileAllowed) }
+                        ).forEach { child -> zipFile(zos, child, root, isFileAllowed = isFileAllowed) }
                         return@runCatching
                     }
                     name = f.name
