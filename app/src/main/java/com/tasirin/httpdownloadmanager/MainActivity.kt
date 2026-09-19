@@ -418,15 +418,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             platformBadge.isVisible = true
             platformBadge.text = getString(R.string.platform_detected, platformLabelFrom(url))
         }
-        fun probeSocialQuality() {
-            // Tunda 450ms per ketikan: mengetik URL tidak menembakkan
-            // ekstraksi jaringan berkali-kali (tiap ekstraksi bisa s.d. 25 dtk).
-            socialDebounce?.cancel()
-            socialDebounce = lifecycleScope.launch {
-                delay(450)
-                probeSocialNow()
-            }
-        }
+        // Didefinisikan dulu: local fun tidak bisa forward-reference.
         fun probeSocialNow() {
             socialJob?.cancel()
             val allUrls = urlInput.text?.toString().orEmpty()
@@ -556,6 +548,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     setupSpinner(this@MainActivity, socialCarouselSpinner, photoLabels)
                     socialCarouselSection.isVisible = true
                 }
+            }
+        }
+        fun probeSocialQuality() {
+            // Tunda 450ms per ketikan: mengetik URL tidak menembakkan
+            // ekstraksi jaringan berkali-kali (tiap ekstraksi bisa s.d. 25 dtk).
+            socialDebounce?.cancel()
+            socialDebounce = lifecycleScope.launch {
+                delay(450)
+                probeSocialNow()
             }
         }
         val socialWatcher = object : TextWatcher {
