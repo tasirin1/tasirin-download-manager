@@ -61,6 +61,7 @@ import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -182,7 +183,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 lastItems = items
                 // Auto-open file yang baru selesai (video → player, APK → installer)
                 if (StoragePrefs.isAutoOpenComplete(this@MainActivity)) {
-                    autoOpenCompleted(items)
+                    runCatching { autoOpenCompleted(items) }
                 }
                 runCatching {
                     // Rebuild daftar dibatasi 400ms sekali kecuali jumlah item berubah.
@@ -394,6 +395,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialYoutubeHeights: IntArray = intArrayOf()
         var socialAudioLanguages: List<HlsRendition> = emptyList()
         var socialJob: Job? = null
+        var socialDebounce: Job? = null
         fun platformLabelFrom(url: String): String {
             val host = runCatching { url.toUri().host.orEmpty() }.getOrDefault("").lowercase()
             return when {
@@ -417,6 +419,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             platformBadge.text = getString(R.string.platform_detected, platformLabelFrom(url))
         }
         fun probeSocialQuality() {
+            // Tunda 450ms per ketikan: mengetik URL tidak menembakkan
+            // ekstraksi jaringan berkali-kali (tiap ekstraksi bisa s.d. 25 dtk).
+            socialDebounce?.cancel()
+            socialDebounce = lifecycleScope.launch {
+                delay(450)
+                probeSocialNow()
+            }
+        }
+        fun probeSocialNow() {
             socialJob?.cancel()
             val allUrls = urlInput.text?.toString().orEmpty()
             val target = extractUrls(allUrls).firstOrNull().orEmpty()

@@ -13,6 +13,9 @@ import java.util.zip.ZipOutputStream
 /** Pembuat arsip ZIP (folder filesystem + folder media Android 10+). */
 object ZipCreator {
 
+    /** Kedalaman maksimum rekursi ZIP (anti symlink-cycle). */
+    private const val MAX_ZIP_DEPTH = 64
+
     /** Kontrol karakter C0 (U+0000-U+001F) yang bisa dipakai exploit nama entri. */
     private val CONTROL_CHARS_RE = Regex("[\\u0000-\\u001f]")
 
@@ -29,9 +32,18 @@ object ZipCreator {
         zos: ZipOutputStream,
         file: File,
         prefix: String,
-        isFileAllowed: (String) -> Boolean
+        isFileAllowed: (String) -> Boolean,
+        depth: Int = 0,
+        seen: MutableSet<String> = mutableSetOf()
     ) {
         if (!isFileAllowed(file.absolutePath)) return
+        // Symlink melingkar (folder menunjuk leluhurnya) membuat rekursi tak
+        // berujung -> StackOverflow; hentikan via canonical + batas kedalaman.
+        if (depth > MAX_ZIP_DEPTH) return
+        if (file.isDirectory) {
+            val canonical = runCatching { file.canonicalPath }.getOrNull() ?: return
+            if (!seen.add(canonical)) return
+        }
         val entryPath = safeEntryPath(if (prefix.isEmpty()) file.name else "$prefix/${file.name}")
         if (file.isDirectory) {
             val children = runCatching { file.listFiles() }.getOrNull()
@@ -43,7 +55,7 @@ object ZipCreator {
             children.sortedWith(
                 Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
             ).forEach { child ->
-                zipFile(zos, child, entryPath, isFileAllowed)
+                zipFile(zos, child, entryPath, isFileAllowed, depth + 1, seen)
             }
         } else if (file.isFile) {
             zos.putNextEntry(ZipEntry(entryPath))

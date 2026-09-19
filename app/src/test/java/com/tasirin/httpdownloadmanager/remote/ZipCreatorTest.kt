@@ -58,6 +58,33 @@ class ZipCreatorTest {
     }
 
     @Test
+    fun `recursive zip terminates on symlink cycle`() {
+        val root = temp.newFolder("root")
+        java.io.File(root, "a.txt").writeText("a")
+        Files.createSymbolicLink(root.toPath().resolve("loop"), root.toPath())
+        val allowedPath = root.absolutePath
+        val bytes = ByteArrayOutputStream().use { raw ->
+            ZipOutputStream(raw).use { zip ->
+                ZipCreator.zipFile(zip, root, "") { path ->
+                    path == allowedPath || path.startsWith("$allowedPath/")
+                }
+            }
+            raw.toByteArray()
+        }
+        val names = mutableListOf<String>()
+        ByteArrayInputStream(bytes).use { input ->
+            ZipInputStream(input).use { zip ->
+                while (true) {
+                    val entry: ZipEntry = zip.nextEntry ?: break
+                    names.add(entry.name)
+                    zip.closeEntry()
+                }
+            }
+        }
+        assertTrue(names.contains("root/a.txt"))
+    }
+
+    @Test
     fun `entry path blocks traversal separators and control chars`() {
         assertEquals("folder/file.txt", ZipCreator.safeEntryPath("../folder/..\\file.txt"))
         assertEquals("file.txt", ZipCreator.safeEntryPath("/../../file.txt"))
