@@ -1465,9 +1465,10 @@
  animation: none !important; }
  }
 
-  li.item .swipe-action { position: absolute; top: 0; bottom: 0; width: 84px; display: none; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; pointer-events: none; z-index: 0; }
-  li.item .swipe-action.left { left: 0; background: var(--amber); border-radius: var(--radius) 0 0 var(--radius); }
-  li.item .swipe-action.right { right: 0; background: var(--red); border-radius: 0 var(--radius) var(--radius) 0; }
+  li.item .swipe-action { position: absolute; top: 0; bottom: 0; width: 0; display: none; align-items: center; font-size: 13px; font-weight: 700; color: #fff; pointer-events: none; z-index: 0; overflow: hidden; }
+  li.item .swipe-action.left { left: 0; justify-content: flex-end; background: var(--amber); border-radius: var(--radius) 0 0 var(--radius); }
+  li.item .swipe-action.right { right: 0; justify-content: flex-start; background: var(--red); border-radius: 0 var(--radius) var(--radius) 0; }
+  li.item .swipe-action .act-in { flex: 0 0 84px; width: 84px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   li.item.swiping-l .swipe-action.left { display: flex; }
   li.item.swiping-r .swipe-action.right { display: flex; }
   li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 14px; transition: transform .28s cubic-bezier(.2,.7,.3,1); will-change: transform; }
@@ -5461,13 +5462,21 @@ function attachSwipe(li) {
   li.appendChild(actR);
   li.appendChild(wrap);
   function setSide(c) {
-    if (c < 0) { li.classList.add('swiping-l'); li.classList.remove('swiping-r'); }
-    else if (c > 0) { li.classList.add('swiping-r'); li.classList.remove('swiping-l'); }
-    else { li.classList.remove('swiping-l'); li.classList.remove('swiping-r'); }
+    if (c < 0) {
+      li.classList.add('swiping-l'); li.classList.remove('swiping-r');
+      actL.style.width = (-c) + 'px'; actR.style.width = '0px';
+    } else if (c > 0) {
+      li.classList.add('swiping-r'); li.classList.remove('swiping-l');
+      actR.style.width = c + 'px'; actL.style.width = '0px';
+    } else {
+      li.classList.remove('swiping-l'); li.classList.remove('swiping-r');
+      actL.style.width = '0px'; actR.style.width = '0px';
+    }
   }
   function resetVisual() {
     wrap.style.transition = '';
     wrap.style.transform = '';
+    actL.style.width = '0px'; actR.style.width = '0px';
     dx = 0;
     swiping = false;
     if (retTimer) clearTimeout(retTimer);
@@ -5487,6 +5496,8 @@ function attachSwipe(li) {
         open[i].classList.remove('swiping-r');
         var w = open[i].querySelector('.swipe-content');
         if (w) { w.style.transition = ''; w.style.transform = ''; }
+        var acts = open[i].querySelectorAll('.swipe-action');
+        for (var j = 0; j < acts.length; j++) acts[j].style.width = '0px';
       }
     }
   }, {passive: true});
