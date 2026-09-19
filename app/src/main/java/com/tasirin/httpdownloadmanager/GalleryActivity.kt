@@ -275,6 +275,15 @@ class GalleryActivity : AppCompatActivity() {
                     App.httpServer.galleryThumbFile(e.token)
                 }.getOrNull() ?: return@withContext null
 
+                // Thumbnail kecil: decode langsung tanpa pass bounds ganda (hemat 1x I/O).
+                if (thumb.length() <= 128 * 1024) {
+                    val direct = BitmapFactory.decodeFile(thumb.absolutePath)
+                        ?: return@withContext null
+                    val tiny = scaleDown(direct, req)
+                    if (tiny !== direct) direct.recycle()
+                    cache.put(e.token, tiny)
+                    return@withContext tiny
+                }
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(thumb.absolutePath, bounds)
                 if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null

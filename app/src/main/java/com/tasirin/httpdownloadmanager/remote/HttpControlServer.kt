@@ -798,10 +798,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var lastSigItems: List<DownloadItem>? = null
     @Volatile private var lastSigResult = 0
 
-    @Synchronized
     private fun itemsSignature(items: List<DownloadItem>): Int {
-        // Cache: kalau list masih referensi yang sama (update in-place),
-        // kembalikan signature terakhir tanpa recompute.
+        // Baca cache tanpa menahan lock selama hash loop (request 1-2x/detik).
         if (items === lastSigItems) return lastSigResult
         var h = items.size
         items.forEach { item ->
@@ -818,8 +816,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 item.progressPercentOverride.hashCode() * 61 +
                 (item.error?.hashCode() ?: 0) * 47
         }
-        lastSigItems = items
-        lastSigResult = h
+        synchronized(this) {
+            lastSigItems = items
+            lastSigResult = h
+        }
         return h
     }
 

@@ -79,6 +79,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private var summaryFailed = 0
     private var summaryDone = 0
     private var lastItems: List<DownloadItem> = emptyList()
+    // Throttle submitList: emisi StateFlow tiap detik tidak perlu rebuild penuh
+    // bila struktur daftar sama; toolbar teks hanya update saat hitungan berubah.
+    private var lastUiSubmitMs = 0L
+    private var lastToolbarSig = Int.MIN_VALUE
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -174,13 +178,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
         lifecycleScope.launch {
             App.engine.items.collect { items ->
+                val sizeChanged = items.size != lastItems.size
                 lastItems = items
                 // Auto-open file yang baru selesai (video → player, APK → installer)
                 if (StoragePrefs.isAutoOpenComplete(this@MainActivity)) {
                     autoOpenCompleted(items)
                 }
                 runCatching {
-                    adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
+                    // Rebuild daftar dibatasi 400ms sekali kecuali jumlah item berubah.
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (sizeChanged || now - lastUiSubmitMs >= 400L) {
+                        lastUiSubmitMs = now
+                        adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
+                    }
                     updateStickyHeader()
                     val showEmpty = items.isEmpty()
                     binding.emptyView.visibility =
@@ -1181,6 +1191,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         summaryPaused = paused
         summaryFailed = failed
         summaryDone = done
+        // Lewati setText + layout ulang bila hitungan tidak berubah (tick progres).
+        val sig = ((active * 31 + paused) * 31 + done) * 31 + failed
+        if (sig == lastToolbarSig) return
+        lastToolbarSig = sig
         updateSummaryStats(active, paused, done, failed)
     }
 

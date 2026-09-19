@@ -63,6 +63,12 @@ object SocialMediaExtractor {
 
     fun isSocialMediaUrl(url: String): Boolean {
         val lower = url.lowercase()
+        // Jalur cepat: URL file langsung (kasus umum) gugur tanpa regex.
+        if (!lower.contains("tiktok.com") && !lower.contains("instagram.com") &&
+            !lower.contains("twitter.com") && !lower.contains("x.com/") &&
+            !lower.contains("youtube.com") && !lower.contains("youtu.be") &&
+            !lower.contains("instagr.am")
+        ) return false
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
         return TT_HOST_RE.containsMatchIn(lower) ||

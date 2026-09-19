@@ -165,8 +165,23 @@ object Updater {
             conn.disconnect()
             return null
         }
-        val body = conn.inputStream.bufferedReader().use { it.readText() }
-        conn.disconnect()
-        body
+        try {
+            conn.inputStream.bufferedReader().use { r ->
+                val sb = StringBuilder()
+                val buf = CharArray(8192)
+                var total = 0
+                while (true) {
+                    val n = r.read(buf)
+                    if (n < 0) break
+                    total += n
+                    // Respons releases bisa besar; 512KB cukup untuk cari asset.
+                    if (total > 524_288) break
+                    sb.append(buf, 0, n)
+                }
+                sb.toString()
+            }
+        } finally {
+            conn.disconnect()
+        }
     }.getOrNull()
 }

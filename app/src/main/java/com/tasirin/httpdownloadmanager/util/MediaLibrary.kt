@@ -382,7 +382,7 @@ object MediaLibrary {
         // 2) Folder kustom (SAF tree)
         StoragePrefs.getFolderUri(context)?.let { uri ->
             runCatching {
-                DocumentFile.fromTreeUri(context, uri)?.listFiles()?.forEach { addDoc(it) }
+                DocumentFile.fromTreeUri(context, uri)?.listFiles()?.take(GALLERY_MAX_ENTRIES)?.forEach { addDoc(it) }
             }
         }
 

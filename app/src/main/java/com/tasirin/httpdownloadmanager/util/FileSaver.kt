@@ -13,6 +13,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.tasirin.httpdownloadmanager.data.DownloadItem
 import java.io.File
 import java.io.IOException
+import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.OutputStream
 
@@ -50,7 +51,7 @@ class FileSaver(context: Context) {
                 for (index in 0 until segmentCount) {
                     val part = partialFile(fileName, index)
                     if (!part.exists()) throw IOException("Segment $index not found")
-                    part.inputStream().use { input -> input.copyTo(out) }
+                    BufferedInputStream(part.inputStream()).use { input -> input.copyTo(out) }
                 }
             }
             // renameTo memakai rename(2) di Linux dan menggantikan target lama;
