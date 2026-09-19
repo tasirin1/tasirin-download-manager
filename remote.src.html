@@ -1295,7 +1295,7 @@
   html {
  scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
 
-  button:active:not(:disabled), .pill:active, .tab:active, .gal-cell:active, .fs-row:active, .fs-root:active, .move-folder:active, .more-menu button:active, .fs-tools-menu button:active, .sheet-list button:active {
+  button:active:not(:disabled), .pill:active, .tab:active, .move-folder:active, .more-menu button:active, .fs-tools-menu button:active, .sheet-list button:active {
  transform: scale(.97); }
 
   .gal-cell:active {
@@ -1329,9 +1329,6 @@
   .fs-row.compact{padding:7px 10px}.fs-row.compact .fs-ico{width:30px;height:30px;border-radius:9px}.fs-row.compact .fs-ico svg{width:15px;height:15px}.fs-row.compact .fs-name{font-size:12px}.fs-row.compact .fs-meta{font-size:10.5px;margin-top:1px}
   .toast {
  position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 300; max-width: min(92vw, 420px); padding: 9px 14px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-
-  .toast.hidden {
- display: none; }
 
   .toast-close {
  flex: 0 0 auto; width: 20px; height: 20px; margin-left: 6px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff; font-size: 13px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; pointer-events: auto; }
@@ -5747,8 +5744,9 @@ function armPauseOverlay(ov, wrap) {
     if (t) clearTimeout(t);
     if (restart !== false) t = setTimeout(function () { ov.classList.remove('o-shown'); }, 2000);
   }
-  wrap.addEventListener('touchstart', function () { show(true); }, {passive: true});
-  wrap.addEventListener('pointerdown', function () { show(true); });
+  var lastTouch = 0;
+  wrap.addEventListener('touchstart', function () { lastTouch = Date.now(); show(true); }, {passive: true});
+  wrap.addEventListener('pointerdown', function () { if (Date.now() - lastTouch < 700) return; show(true); });
   show(true);
 }
 
