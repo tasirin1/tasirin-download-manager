@@ -255,7 +255,7 @@
  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 
   li.item {
- position: relative; overflow: hidden; touch-action: pan-y; }
+ position: relative; overflow: hidden; border-radius: var(--radius); touch-action: pan-y; }
 
   li.item.st-active .swipe-content { border-left-color: var(--primary); }
 
@@ -1466,13 +1466,11 @@
  animation: none !important; }
  }
 
-  li.item .swipe-action { position: absolute; top: 0; bottom: 0; width: 84px; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 700; color: #fff; pointer-events: none; z-index: 0; }
-  li.item .swipe-action.left { left: 0; }
-  li.item .swipe-action.right { right: 0; }
-  li.item.swiping-l .swipe-action, li.item.swiping-r .swipe-action { display: flex; }
-  li.item.swiping-l .swipe-action { background: var(--amber); }
-  li.item.swiping-r .swipe-action { background: var(--red); }
-  li.item.swiping-l .swipe-action.right .act-in, li.item.swiping-r .swipe-action.left .act-in { display: none; }
+  li.item .swipe-action { position: absolute; top: 0; bottom: 0; width: 84px; display: none; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; pointer-events: none; z-index: 0; }
+  li.item .swipe-action.left { left: 0; background: var(--amber); border-radius: var(--radius) 0 0 var(--radius); }
+  li.item .swipe-action.right { right: 0; background: var(--red); border-radius: 0 var(--radius) var(--radius) 0; }
+  li.item.swiping-l .swipe-action.left { display: flex; }
+  li.item.swiping-r .swipe-action.right { display: flex; }
   li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 14px; transition: transform .28s cubic-bezier(.2,.7,.3,1); will-change: transform; }
   .list.compact .swipe-content { padding: 10px 14px; }
   .list.compact .item-top { gap: 8px; }
@@ -5445,60 +5443,81 @@ document.getElementById('compactToggleBtn').addEventListener('click', function (
 });
 
 function attachSwipe(li) {
+  if (li.dataset.swipeBound) return;
+  li.dataset.swipeBound = '1';
   var SW = 84, TH = 48;
-  var sx = 0, swiping = false, retTimer = null;
+  var sx = 0, sy = 0, dx = 0, swiping = false, retTimer = null;
   var wrap = document.createElement('div');
   wrap.className = 'swipe-content';
   while (li.firstChild) wrap.appendChild(li.firstChild);
   var actL = document.createElement('div');
   actL.className = 'swipe-action left';
+  actL.setAttribute('aria-hidden', 'true');
   actL.innerHTML = '<span class="act-in">' + UI_ICONS.pause + ' <span>Pause</span></span>';
   var actR = document.createElement('div');
   actR.className = 'swipe-action right';
+  actR.setAttribute('aria-hidden', 'true');
   actR.innerHTML = '<span class="act-in">' + UI_ICONS.trash + ' <span>Delete</span></span>';
   li.appendChild(actL);
   li.appendChild(actR);
   li.appendChild(wrap);
-  li.addEventListener('touchstart', function (e) {
-    sx = e.touches[0].clientX; swiping = false;
-    if (retTimer) { clearTimeout(retTimer); retTimer = null; }
-  }, {passive: true});
-  li.addEventListener('touchmove', function (e) {
-    var dx = e.touches[0].clientX - sx;
-    if (!swiping && Math.abs(dx) > 8) swiping = true;
-    if (!swiping) return;
-    var c = Math.max(-SW, Math.min(SW, dx));
-    wrap.style.transition = 'none';
-    wrap.style.transform = 'translateX(' + c + 'px)';
-    li.classList.toggle('swiping-l', c < 0);
-    li.classList.toggle('swiping-r', c > 0);
-  }, {passive: true});
-  li.addEventListener('touchend', function () {
-    var t = wrap.style.transform;
-    var dx = t ? parseFloat(t.replace(/[^\d\-]/g, '')) || 0 : 0;
+  function setSide(c) {
+    if (c < 0) { li.classList.add('swiping-l'); li.classList.remove('swiping-r'); }
+    else if (c > 0) { li.classList.add('swiping-r'); li.classList.remove('swiping-l'); }
+    else { li.classList.remove('swiping-l'); li.classList.remove('swiping-r'); }
+  }
+  function resetVisual() {
     wrap.style.transition = '';
     wrap.style.transform = '';
+    dx = 0;
+    swiping = false;
     if (retTimer) clearTimeout(retTimer);
     retTimer = setTimeout(function () {
       li.classList.remove('swiping-l');
       li.classList.remove('swiping-r');
-    }, 320);
+      retTimer = null;
+    }, 280);
+  }
+  li.addEventListener('touchstart', function (e) {
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; dx = 0; swiping = false;
+    if (retTimer) { clearTimeout(retTimer); retTimer = null; }
+    var open = document.querySelectorAll('li.item.swiping-l, li.item.swiping-r');
+    for (var i = 0; i < open.length; i++) {
+      if (open[i] !== li) {
+        open[i].classList.remove('swiping-l');
+        open[i].classList.remove('swiping-r');
+        var w = open[i].querySelector('.swipe-content');
+        if (w) { w.style.transition = ''; w.style.transform = ''; }
+      }
+    }
+  }, {passive: true});
+  li.addEventListener('touchmove', function (e) {
+    var t = e.touches[0];
+    var ddx = t.clientX - sx;
+    var ddy = t.clientY - sy;
+    if (!swiping) {
+      if (Math.abs(ddy) > Math.abs(ddx) || Math.abs(ddx) < 10) return;
+      swiping = true;
+    }
+    dx = Math.max(-SW, Math.min(SW, ddx));
+    if (dx === 0) { wrap.style.transform = ''; setSide(0); return; }
+    wrap.style.transition = 'none';
+    wrap.style.transform = 'translateX(' + dx + 'px)';
+    setSide(dx);
+  }, {passive: true});
+  li.addEventListener('touchend', function () {
+    var released = dx;
     var itemId = li.dataset.id;
-    if (dx < -TH) {
+    resetVisual();
+    if (released < -TH) {
       var it = currentItems.find(function (x) { return x.id === itemId; });
       if (it) doAction(itemId, it.state === 'DOWNLOADING' ? 'pause' : 'resume');
-    } else if (dx > TH) {
+    } else if (released > TH) {
       showConfirm('Delete', 'Delete this download?', 'Delete', function () { doAction(itemId, 'delete'); });
     }
   }, {passive: true});
   li.addEventListener('touchcancel', function () {
-    wrap.style.transition = '';
-    wrap.style.transform = '';
-    if (retTimer) clearTimeout(retTimer);
-    retTimer = setTimeout(function () {
-      li.classList.remove('swiping-l');
-      li.classList.remove('swiping-r');
-    }, 320);
+    resetVisual();
   }, {passive: true});
 }
 
