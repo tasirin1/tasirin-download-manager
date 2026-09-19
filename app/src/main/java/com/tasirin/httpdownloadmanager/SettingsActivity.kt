@@ -564,6 +564,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.spinnerConcurrent.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 StoragePrefs.setMaxConcurrent(this@SettingsActivity, position + 1)
+                runCatching { App.engine.refreshMaxConcurrent() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -622,6 +623,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.spinnerConnectTimeout.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 StoragePrefs.setConnectTimeoutSec(this@SettingsActivity, connectValues[position])
+                runCatching { App.engine.refreshTimeouts() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -635,6 +637,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.spinnerReadTimeout.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 StoragePrefs.setReadTimeoutSec(this@SettingsActivity, readValues[position])
+                runCatching { App.engine.refreshTimeouts() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
