@@ -1348,7 +1348,7 @@ class DownloadEngine(appContext: Context) {
         progress: HlsProgress,
         transform: (ByteArray) -> ByteArray = { it }
     ) {
-        BufferedOutputStream(FileOutputStream(target)).use { out ->
+        BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
             for (url in urls) {
                 coroutineContext.ensureActive()
                 val segBytes = fetchHlsSegmentWithRetry(
@@ -1414,7 +1414,7 @@ class DownloadEngine(appContext: Context) {
             val code = conn.responseCode
             if (code !in 200..299) return false
             val total = contentLength(conn)
-            BufferedOutputStream(FileOutputStream(target)).use { out ->
+            BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
                 val input = conn.inputStream
                 try {
                     var bytes = 0L
@@ -2000,7 +2000,7 @@ class DownloadEngine(appContext: Context) {
 
         throttle.reset(downloaded)
         val input = conn.inputStream
-        val output = BufferedOutputStream(FileOutputStream(partialFile, true))
+        val output = BufferedOutputStream(FileOutputStream(partialFile, true), BUFFER_SIZE)
         val buffer = ByteArray(BUFFER_SIZE)
         var lastNotify = 0L
         var iters = 0
@@ -2273,7 +2273,7 @@ class DownloadEngine(appContext: Context) {
             if (code != 206) throw IOException("Server does not support Range (HTTP $code)")
 
             val input = conn.inputStream
-            val output = BufferedOutputStream(FileOutputStream(partial, true))
+            val output = BufferedOutputStream(FileOutputStream(partial, true), BUFFER_SIZE)
             val buffer = ByteArray(BUFFER_SIZE)
             var lastNotify = 0L
             var segIters = 0
