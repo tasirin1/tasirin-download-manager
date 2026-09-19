@@ -67,7 +67,7 @@ class GalleryActivity : AppCompatActivity() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 val lm = recyclerView.layoutManager as? GridLayoutManager ?: return
                 if (lm.findLastVisibleItemPosition() >= adapter.itemCount - 6) {
-                    loadMore()
+                    loadMore(fromScroll = true)
                 }
             }
         })
@@ -131,12 +131,18 @@ class GalleryActivity : AppCompatActivity() {
 
     /** Naikkan batas scan bertahap (halaman per halaman) dan perbarui daftar
      *  lewat DiffUtil — galeri besar tidak pernah di-hold penuh di memori. */
-    private fun loadMore() {
+    private fun loadMore(fromScroll: Boolean = false) {
         if (loadingMore || !canLoadMore()) return
         loadingMore = true
         lifecycleScope.launch {
             try {
-                while (canLoadMore() && fullList.size < GALLERY_MIN_FILL) {
+                // Scroll mentok selalu memuat minimal satu halaman; pemuatan awal
+                // hanya mengisi sampai satu layar (MIN_FILL) agar tidak scan ganda.
+                // Sebelumnya syarat fullList.size < MIN_FILL menggagalkan semua
+                // pemuatan lanjutan sehingga galeri mentok di 300 item pertama.
+                var first = true
+                while (canLoadMore() && ((fromScroll && first) || fullList.size < GALLERY_MIN_FILL)) {
+                    first = false
                     val next = minOf(loadedCount + GALLERY_PAGE, MediaLibrary.GALLERY_MAX_ENTRIES)
                     val had = fullList.size
                     fullList = withContext(Dispatchers.IO) {
