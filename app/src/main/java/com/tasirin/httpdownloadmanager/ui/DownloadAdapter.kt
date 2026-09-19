@@ -186,6 +186,42 @@ class DownloadAdapter(private val listener: Listener) :
             b.textLocation.visibility = View.GONE
         }
 
+        // Aksi cepat kontekstual: hemat satu ketuk + ramah D-pad/TV.
+        when (item.state) {
+            DownloadState.DOWNLOADING, DownloadState.PENDING -> {
+                b.btnQuickPrimary.setText(R.string.pause)
+                b.btnQuickPrimary.setOnClickListener { listener.onAction(item, Action.PAUSE) }
+                b.btnQuickSecondary.setText(R.string.cancel)
+                b.btnQuickSecondary.setOnClickListener { listener.onAction(item, Action.CANCEL) }
+            }
+            DownloadState.PAUSED -> {
+                b.btnQuickPrimary.setText(R.string.resume)
+                b.btnQuickPrimary.setOnClickListener { listener.onAction(item, Action.RESUME) }
+                b.btnQuickSecondary.setText(R.string.cancel)
+                b.btnQuickSecondary.setOnClickListener { listener.onAction(item, Action.CANCEL) }
+            }
+            DownloadState.FAILED -> {
+                b.btnQuickPrimary.setText(R.string.retry)
+                b.btnQuickPrimary.setOnClickListener { listener.onAction(item, Action.RESUME) }
+                b.btnQuickSecondary.setText(R.string.delete)
+                b.btnQuickSecondary.setOnClickListener { listener.onAction(item, Action.DELETE) }
+            }
+            DownloadState.CANCELLED -> {
+                // resume() kini menerima CANCELLED (mulai ulang dari nol).
+                b.btnQuickPrimary.setText(R.string.retry)
+                b.btnQuickPrimary.setOnClickListener { listener.onAction(item, Action.RESUME) }
+                b.btnQuickSecondary.setText(R.string.delete)
+                b.btnQuickSecondary.setOnClickListener { listener.onAction(item, Action.DELETE) }
+            }
+            DownloadState.COMPLETED -> {
+                b.btnQuickPrimary.setText(R.string.open)
+                b.btnQuickPrimary.setOnClickListener { listener.onAction(item, Action.OPEN) }
+                b.btnQuickSecondary.setText(R.string.open_folder)
+                b.btnQuickSecondary.setOnClickListener { listener.onAction(item, Action.OPEN_FOLDER) }
+            }
+        }
+        b.quickActions.visibility = View.VISIBLE
+
         b.root.setOnClickListener { listener.onTap(item) }
         b.root.setOnLongClickListener {
             listener.onLongPress(item)

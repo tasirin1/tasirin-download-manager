@@ -976,12 +976,20 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         when (action) {
             DownloadAdapter.Action.PAUSE -> App.engine.pause(item.id)
             DownloadAdapter.Action.RESUME -> App.engine.resume(item.id)
-            DownloadAdapter.Action.CANCEL -> lifecycleScope.launch(Dispatchers.IO) {
-                App.engine.cancel(item.id)
-            }
-            DownloadAdapter.Action.DELETE -> lifecycleScope.launch(Dispatchers.IO) {
-                App.engine.remove(item.id)
-            }
+            DownloadAdapter.Action.CANCEL -> AlertDialog.Builder(this)
+                .setMessage(R.string.confirm_cancel)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.ok) { _, _ ->
+                    lifecycleScope.launch(Dispatchers.IO) { App.engine.cancel(item.id) }
+                }
+                .show()
+            DownloadAdapter.Action.DELETE -> AlertDialog.Builder(this)
+                .setMessage(R.string.confirm_delete)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.delete) { _, _ ->
+                    lifecycleScope.launch(Dispatchers.IO) { App.engine.remove(item.id) }
+                }
+                .show()
             DownloadAdapter.Action.OPEN -> openDownload(item)
             DownloadAdapter.Action.OPEN_FOLDER -> openFolder(item)
             DownloadAdapter.Action.MONITOR ->

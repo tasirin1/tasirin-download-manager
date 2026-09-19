@@ -37,6 +37,7 @@
     <string name="update_downloaded_path">Update downloaded to %1$s — install it manually</string>
     <string name="invalid_url">URL must not be empty</string>
 
+    <string name="retry">Retry</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
     <string name="open">Open</string>
@@ -53,6 +54,7 @@
     <string name="platform_x">X</string>
     <string name="platform_social">Social media</string>
     <string name="platform_detected">Detected: %1$s</string>
+    <string name="confirm_cancel">Cancel this download?</string>
     <string name="confirm_delete">Delete this download? The file will be removed.</string>
     <string name="summary_failed_label">failed</string>
     <string name="summary_paused_label">paused</string>

@@ -146,5 +146,34 @@
             android:textSize="12sp"
             android:visibility="gone" />
 
+        <!-- Baris aksi cepat: tombol kontekstual agar tak perlu long-press. -->
+        <LinearLayout
+            android:id="@+id/quick_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_quick_primary"
+                style="@style/AppButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:focusable="true"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_quick_secondary"
+                style="@style/TvOutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:focusable="true"
+                android:textSize="14sp" />
+        </LinearLayout>
+
     </LinearLayout>
 </FrameLayout>

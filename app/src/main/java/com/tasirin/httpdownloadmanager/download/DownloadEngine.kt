@@ -257,7 +257,9 @@ class DownloadEngine(appContext: Context) {
 
     fun resume(id: String) {
         val item = _items.value.find { it.id == id } ?: return
-        if (item.state != DownloadState.PAUSED && item.state != DownloadState.FAILED) return
+        if (item.state != DownloadState.PAUSED && item.state != DownloadState.FAILED &&
+            item.state != DownloadState.CANCELLED
+        ) return
         App.logEvent("DOWNLOAD RESUMED: ${item.fileName}")
         retryAttempts.remove(id)
         pendingRetries.remove(id)
