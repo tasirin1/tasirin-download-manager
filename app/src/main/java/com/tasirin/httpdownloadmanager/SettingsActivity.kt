@@ -741,11 +741,19 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun wireSave() {
         binding.btnSave.setOnClickListener {
-            val requestedPort = binding.inputPort.text?.toString()?.trim()?.toIntOrNull()
+            lifecycleScope.launch {
+                saveSettings(binding.inputPort.text?.toString()?.trim()?.toIntOrNull())
+            }
+        }
+    }
+
+    /** Isi save dipisah agar suspend (hash PIN di IO) tanpa menahan main thread. */
+    private suspend fun saveSettings(requestedPort: Int?) {
+            // Validasi port tetap di Main sebelum kerja berat apa pun.
             if (requestedPort == null || requestedPort !in 1024..65535) {
                 Toast.makeText(this, R.string.settings_port_invalid, Toast.LENGTH_LONG).show()
                 renderServer()
-                return@setOnClickListener
+                return
             }
             applyStoragePath(findViewById<EditText>(R.id.input_storage_path))
             applyExtraFolders(binding.root)
@@ -753,13 +761,20 @@ class SettingsActivity : AppCompatActivity() {
             App.httpServer.invalidateFsRootsCache()
             App.httpServer.invalidateStatusCache()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
-            val oldPinHash = StoragePrefs.storedPinHash(this)
-            if (newPin.isEmpty()) {
-                if (oldPinHash != null) App.logEvent("PIN REMOVED")
-            } else if (oldPinHash == null || !StoragePrefs.pinMatches(this, newPin)) {
-                App.logEvent("PIN SET")
+            // PBKDF2 150k iterasi berat di HP lama: hash/verify di IO agar save tak jank.
+            binding.btnSave.isEnabled = false
+            val pinEvent = withContext(Dispatchers.IO) {
+                val oldPinHash = StoragePrefs.storedPinHash(this@SettingsActivity)
+                val event = if (newPin.isEmpty()) {
+                    if (oldPinHash != null) "PIN REMOVED" else null
+                } else {
+                    if (oldPinHash == null || !StoragePrefs.pinMatches(this@SettingsActivity, newPin)) "PIN SET" else null
+                }
+                StoragePrefs.setServerPin(this@SettingsActivity, newPin)
+                event
             }
-            StoragePrefs.setServerPin(this, newPin)
+            binding.btnSave.isEnabled = true
+            if (pinEvent != null) App.logEvent(pinEvent)
             if (StoragePrefs.isPinEnforced(this) &&
                 StoragePrefs.getServerPin(this).isNullOrEmpty()
             ) {
@@ -782,7 +797,6 @@ class SettingsActivity : AppCompatActivity() {
             }
             renderServer()
             Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
-        }
     }
 
     private fun checkForUpdate() {

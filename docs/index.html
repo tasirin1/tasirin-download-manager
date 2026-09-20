@@ -379,7 +379,10 @@ fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/l
       document.getElementById('version-badge').textContent=txt;
       document.getElementById('apk-size').textContent=(apk.size/1024/1024).toFixed(1)+' MB';
     }
-  }).catch(function(){});
+  }).catch(function(){
+    var b=document.getElementById('version-badge');
+    if(b&&!b.textContent.trim())b.textContent='See GitHub Releases for the latest APK';
+  });
 
 /* ── FAQ toggle ── */
 document.querySelectorAll('.faq-q').forEach(function(q){

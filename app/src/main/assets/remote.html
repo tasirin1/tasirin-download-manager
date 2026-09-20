@@ -777,6 +777,7 @@ galleryGrid.appendChild(gallerySentinel);
 }
 function loadMoreGallery() {
 if (galleryLoaded < galleryItems.length) {
+if (galleryItems.length > 120 && typeof requestAnimationFrame !== 'undefined') {
 const next = galleryItems.slice(galleryLoaded, galleryLoaded + GALLERY_CHUNK);
 const frag = document.createDocumentFragment();
 for (const it of next) {
@@ -787,6 +788,22 @@ renderGalleryCell(it, frag);
 }
 galleryGrid.insertBefore(frag, gallerySentinel);
 galleryLoaded += next.length;
+if (galleryLoaded < galleryItems.length) {
+requestAnimationFrame(loadMoreGallery);
+return;
+}
+} else {
+const next = galleryItems.slice(galleryLoaded, galleryLoaded + GALLERY_CHUNK);
+const frag = document.createDocumentFragment();
+for (const it of next) {
+if (it.isVideo && galleryVideoPos[it.token] === undefined) {
+galleryVideoPos[it.token] = loadVideoPos(it.token);
+}
+renderGalleryCell(it, frag);
+}
+galleryGrid.insertBefore(frag, gallerySentinel);
+galleryLoaded += next.length;
+}
 }
 if (galleryLoaded < galleryItems.length || galleryHasMore) {
 ensureGallerySentinel();

@@ -122,7 +122,7 @@ class LogActivity : AppCompatActivity() {
                         // Baca dari folder data eksternal (sinkron dengan CrashLog).
                         val dir = getExternalFilesDir(null) ?: filesDir
                         val f = File(dir, App.CRASH_LOG_FILE)
-                        if (f.exists()) f.readText().trim() else ""
+                        if (f.exists()) f.readText().trim() else // audit-ignore: unbounded_read_text (crash log dibatasi 100KB oleh CrashLog) ""
                     }.getOrDefault("")
                     if (crashText.isNotEmpty()) {
                         appendLine()

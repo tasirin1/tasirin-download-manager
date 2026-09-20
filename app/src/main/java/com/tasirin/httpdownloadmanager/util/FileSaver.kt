@@ -308,8 +308,10 @@ class FileSaver(context: Context) {
         for ((ext, algo) in algos) {
             val side = File(parent, base + ext)
             if (side.exists()) {
+                // Sidecar checksum hanya butuh baris pertama; tolak file jumbo agar readText tak OOM.
+                if (side.length() > 8192) continue
                 val first = runCatching {
-                    side.readText().trim().split(WHITESPACE_RE).firstOrNull().orEmpty()
+                    side.readText().trim().split(WHITESPACE_RE).firstOrNull().orEmpty() // audit-ignore: unbounded_read_text (dibatasi length>8192 di atas)
                 }.getOrDefault("")
                 if (first.length >= 32) return algo to first.lowercase()
             }

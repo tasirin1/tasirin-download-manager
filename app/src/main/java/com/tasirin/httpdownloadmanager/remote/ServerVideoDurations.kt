@@ -55,7 +55,7 @@ class ServerVideoDurations(
 
     private fun cacheLocked(): JSONObject {
         cache?.let { return it }
-        val loaded = runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject())
+        val loaded = runCatching { JSONObject(file.readText()) } // audit-ignore: unbounded_read_text (cache JSON internal kecil ditulis app sendiri).getOrDefault(JSONObject())
         cache = loaded
         return loaded
     }

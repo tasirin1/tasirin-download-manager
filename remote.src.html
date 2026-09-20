@@ -1619,6 +1619,9 @@
 </div>
 
 <script>
+// MODULE INDEX (satu file deploy ke assets/remote.html; SEKSI di bawah = batas modul):
+// core/api, downloads/render, files/manager, gallery/windowing, upload/chunks,
+// player/modal, settings/share, sse/polling. Pecah fisik hanya saat build bila perlu.
   (function () {
     var ok = typeof fetch === 'function' && typeof Promise !== 'undefined' &&
       typeof URLSearchParams !== 'undefined' && typeof Object.assign === 'function';
@@ -2780,9 +2783,12 @@ function ensureGallerySentinel() {
 
 function loadMoreGallery() {
   if (galleryLoaded < galleryItems.length) {
-    const next = galleryItems.slice(galleryLoaded, galleryLoaded + GALLERY_CHUNK);
-    const frag = document.createDocumentFragment();
-    for (const it of next) {
+    // Windowing ringan: render per chunk dan serahkan ke frame berikutnya bila
+    // antrean besar, agar scroll di TV box / galeri ribuan video tidak jank.
+    if (galleryItems.length > 120 && typeof requestAnimationFrame !== 'undefined') {
+      const next = galleryItems.slice(galleryLoaded, galleryLoaded + GALLERY_CHUNK);
+      const frag = document.createDocumentFragment();
+      for (const it of next) {
       // Baca localStorage maksimal sekali per token (halaman pertama di-cache
       // di loadGallery; halaman berikutnya diisi di sini).
       if (it.isVideo && galleryVideoPos[it.token] === undefined) {
@@ -2790,8 +2796,24 @@ function loadMoreGallery() {
       }
       renderGalleryCell(it, frag);
     }
-    galleryGrid.insertBefore(frag, gallerySentinel);
-    galleryLoaded += next.length;
+      galleryGrid.insertBefore(frag, gallerySentinel);
+      galleryLoaded += next.length;
+      if (galleryLoaded < galleryItems.length) {
+        requestAnimationFrame(loadMoreGallery);
+        return;
+      }
+    } else {
+      const next = galleryItems.slice(galleryLoaded, galleryLoaded + GALLERY_CHUNK);
+      const frag = document.createDocumentFragment();
+      for (const it of next) {
+        if (it.isVideo && galleryVideoPos[it.token] === undefined) {
+          galleryVideoPos[it.token] = loadVideoPos(it.token);
+        }
+        renderGalleryCell(it, frag);
+      }
+      galleryGrid.insertBefore(frag, gallerySentinel);
+      galleryLoaded += next.length;
+    }
   }
   if (galleryLoaded < galleryItems.length || galleryHasMore) {
     ensureGallerySentinel();

@@ -167,8 +167,8 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                // Naik bertahap: sekarang ~151 test, ambang 8% disimpan (coverage aktual di bawah 10%)
-                minimum = "0.08".toBigDecimal()
+                // Naik bertahap seiring tambah test (ServerSecurity, SegmentPlanner): 8% -> 8.5%.
+                minimum = "0.085".toBigDecimal()
             }
         }
     }

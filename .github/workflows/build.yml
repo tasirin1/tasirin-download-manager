@@ -214,6 +214,17 @@ jobs:
             exit 1
           fi
 
+      - name: Cek ukuran remote.html (minify tidak bocor)
+        run: |
+          F="app/src/main/assets/remote.html"
+          LIMIT=307200
+          SIZE=$(stat -c %s "$F")
+          echo "Ukuran remote.html: $SIZE bytes (batas $LIMIT)"
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "::error::remote.html terlalu besar: $SIZE > $LIMIT bytes (cek minify prepare_remote.py)"
+            exit 1
+          fi
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:

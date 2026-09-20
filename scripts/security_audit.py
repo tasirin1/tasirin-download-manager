@@ -198,6 +198,21 @@ RULES = [
     ),
 
     Rule(
+        "unbounded_read_text",
+        "warning",
+        "Response/file body read without byte limit (OOM risk on bad server)",
+        "[.]readText[(][)]",
+        frozenset({"kotlin", "java"}),
+        excluded_paths=frozenset({"app/src/test/"}),
+    ),
+    Rule(
+        "header_equals_case_sensitive",
+        "warning",
+        "HTTP header compared with equals() without ignoreCase",
+                "getHeaderField[(][^;\\n]*[.]equals[(]\\s*\"[^\"]*\"\\s*[)]",
+        frozenset({"kotlin", "java"}),
+    ),
+    Rule(
         "file_scoped_catch_all",
         "warning",
         "Broad catch-all that swallows exceptions silently (no logging/throw)",
@@ -406,6 +421,8 @@ def run_self_test() -> int:
             "    fun log(token: String) = Log.d(\"x\", token)",
             "    fun empty() = runCatching { }",
             "    fun bad() { try { work() } catch (_: Exception) {} }",
+            "    fun leaky() = conn.inputStream.bufferedReader().readText()",
+            "    fun hdr(c: HttpURLConnection) = c.getHeaderField(\"Accept-Ranges\").equals(\"bytes\")",
             "}",
         ],
         Path("sample.js"): [
@@ -432,6 +449,8 @@ def run_self_test() -> int:
         "js_dynamic_exec",
         "kotlin_empty_catch",
         "maintenance_marker",
+        "unbounded_read_text",
+        "header_equals_case_sensitive",
     }
     missing = required - by_rule
     suppressed = any(

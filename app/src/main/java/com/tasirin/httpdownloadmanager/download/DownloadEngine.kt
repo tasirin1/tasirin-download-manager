@@ -2458,15 +2458,9 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun createSegments(total: Long): List<DownloadSegment> {
-        val count = StoragePrefs.segmentCount(context).coerceAtLeast(2)
-        val size = total / count
-        return (0 until count).map { i ->
-            val start = i * size
-            val end = if (i == count - 1) total - 1 else start + size - 1
-            DownloadSegment(index = i, start = start, end = end, downloaded = 0)
-        }
-    }
+    // Didelegasikan ke SegmentPlanner murni agar mudah diuji (lihat SegmentPlannerTest).
+    private fun createSegments(total: Long): List<DownloadSegment> =
+        SegmentPlanner.plan(total, StoragePrefs.segmentCount(context))
 
     private fun parseChecksum(raw: String): Pair<String, String>? {
         val clean = raw.trim()

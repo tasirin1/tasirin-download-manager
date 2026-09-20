@@ -12,7 +12,8 @@ object PinHash {
     private const val ALGORITHM = "PBKDF2WithHmacSHA1"
     private const val KEY_LENGTH_BITS = 256
     private const val SALT_BYTES = 16
-    const val ITERATIONS = 100_000
+    // Naik bertahap 100k -> 150k (hash lama 10k..500k tetap diverifikasi via parse).
+    const val ITERATIONS = 150_000
     private const val MAX_PARSED_ITERATIONS = 500_000
     private val HEX_RE = Regex("^[0-9a-f]+$")
 

@@ -263,6 +263,22 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun clampGalleryPage_mentah_diclamp() {
+        assertEquals(0, ServerSecurity.clampGalleryPage(null))
+        assertEquals(0, ServerSecurity.clampGalleryPage("abc"))
+        assertEquals(0, ServerSecurity.clampGalleryPage("-3"))
+        assertEquals(2, ServerSecurity.clampGalleryPage(" 2 "))
+    }
+
+    @Test
+    fun galleryScanLimit_query_penuh_lainnya_duaHalaman() {
+        assertEquals(3000, ServerSecurity.galleryScanLimit(0, 100, 3000, true))
+        assertEquals(200, ServerSecurity.galleryScanLimit(0, 100, 3000, false))
+        assertEquals(400, ServerSecurity.galleryScanLimit(2, 100, 3000, false))
+        assertEquals(3000, ServerSecurity.galleryScanLimit(99, 100, 3000, false))
+    }
+
+    @Test
     fun isMediaStorePathAllowed_hanya_diDalamRoot() {
         val root = tmp.newFolder("storage", "emulated", "0", "Download")
         val mediaRoot = tmp.root.resolve("storage/emulated/0").absolutePath

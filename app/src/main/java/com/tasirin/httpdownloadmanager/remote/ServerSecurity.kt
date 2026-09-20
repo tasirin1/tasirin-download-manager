@@ -126,6 +126,18 @@ object ServerSecurity {
         return Hex.encode(mac.doFinal(data.toByteArray(Charsets.UTF_8)))
     }
 
+    /** Paginasi galeri murni: clamp mentah ke >=0 agar endpoint tak duplikasi logika. */
+    fun clampGalleryPage(raw: String?): Int =
+        (raw?.trim()?.toIntOrNull() ?: 0).coerceAtLeast(0)
+
+    /** Batas scan galeri: query nama pakai penuh, selain itu cukup 2 halaman ke depan. */
+    fun galleryScanLimit(page: Int, pageSize: Int, maxEntries: Int, hasQuery: Boolean): Int {
+        if (hasQuery) return maxEntries
+        val safePage = page.coerceAtLeast(0).coerceAtMost(maxEntries)
+        val safeSize = pageSize.coerceIn(1, maxEntries)
+        return ((safePage * safeSize) + (safeSize * 2)).coerceAtMost(maxEntries)
+    }
+
     /** Lock PIN masih aktif: percobaan login ditolak. */
     fun isPinLocked(now: Long, lockUntil: Long): Boolean = now < lockUntil
 

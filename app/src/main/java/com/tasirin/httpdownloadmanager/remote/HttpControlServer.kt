@@ -777,7 +777,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // SSE (chunked) sengaja tidak di-gzip agar streaming tetap realtime.
     private fun htmlPage(): Response {
         val html = cachedHtml ?: runCatching {
-            context.assets.open("remote.html").bufferedReader().use { it.readText() }
+            context.assets.open("remote.html").bufferedReader().use { it.readText() } // audit-ignore: unbounded_read_text (aset bundel 241KB di bawah MAX_FILE_BYTES)
         }.getOrDefault("<h1>Remote page unavailable</h1>").also { cachedHtml = it }
         return newFixedLengthResponse(
             Response.Status.OK,
@@ -1837,14 +1837,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 JSONObject().put("items", JSONArray()).put("hasMore", false).put("total", 0)
             )
         }
-        val page = (session.param("page")?.toIntOrNull() ?: 0).coerceAtLeast(0)
+        // Helper murni di ServerSecurity agar clamp/batas tak diduplikasi antar endpoint.
+        val page = ServerSecurity.clampGalleryPage(session.param("page"))
         val start = page * GALLERY_PAGE_SIZE
         val pageEnd = start + GALLERY_PAGE_SIZE
         // Scanner sudah video-only; type=video bukan filter tambahan. Pencarian
         // nama tetap memakai batas penuh supaya jumlah hasil dan hasMore akurat.
-        val scanLimit = if (q.isNotEmpty()) MediaLibrary.GALLERY_MAX_ENTRIES else {
-            (pageEnd + GALLERY_PAGE_SIZE).coerceAtMost(MediaLibrary.GALLERY_MAX_ENTRIES)
-        }
+        val scanLimit = ServerSecurity.galleryScanLimit(
+            page, GALLERY_PAGE_SIZE, MediaLibrary.GALLERY_MAX_ENTRIES, q.isNotEmpty()
+        )
         val arr = JSONArray()
         var extracted = 0
         var matched = 0
