@@ -50,9 +50,7 @@ object HlsMp4Muxer {
             }
 
             muxer.start()
-            val videoBuf = runCatching {
-                vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
-            }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
+            val videoBuf = videoBufferSize(vFormat)
             val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
                 countVideoFrames(videoTs)
             } else 0
@@ -67,8 +65,7 @@ object HlsMp4Muxer {
             runCatching { outMp4.delete() }
             return false
         } finally {
-            runCatching { videoExt?.release() }
-            runCatching { muxer?.release() }
+            releaseAll(muxer, videoExt)
         }
     }
 
@@ -105,9 +102,7 @@ object HlsMp4Muxer {
             val audioTrack = muxer.addTrack(aFormat)
 
             muxer.start()
-            val videoBuf = runCatching {
-                vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
-            }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
+            val videoBuf = videoBufferSize(vFormat)
             val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
                 countVideoFrames(videoTs)
             } else 0
@@ -119,9 +114,7 @@ object HlsMp4Muxer {
             runCatching { outMp4.delete() }
             return false
         } finally {
-            runCatching { videoExt?.release() }
-            runCatching { audioExt?.release() }
-            runCatching { muxer?.release() }
+            releaseAll(muxer, videoExt, audioExt)
         }
     }
 
@@ -163,10 +156,21 @@ object HlsMp4Muxer {
             runCatching { outMp4.delete() }
             return false
         } finally {
-            runCatching { videoExt?.release() }
-            runCatching { audioExt?.release() }
-            runCatching { muxer?.release() }
+            releaseAll(muxer, videoExt, audioExt)
         }
+    }
+
+    /** Ukuran buffer video dari format track (satu tempat, tiga remux memakai sama). */
+    private fun videoBufferSize(vFormat: MediaFormat): Int {
+        return runCatching {
+            vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
+        }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
+    }
+
+    /** Lepas muxer/extractor tanpa lempar — dipakai di semua blok finally. */
+    private fun releaseAll(muxer: MediaMuxer?, vararg exts: MediaExtractor?) {
+        exts.forEach { runCatching { it?.release() } }
+        runCatching { muxer?.release() }
     }
 
     private fun selectVideoTrack(ext: MediaExtractor): Int? {

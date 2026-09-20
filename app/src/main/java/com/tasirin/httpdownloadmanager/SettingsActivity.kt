@@ -52,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.tasirin.httpdownloadmanager.util.whiteNavigationIcon
+import com.tasirin.httpdownloadmanager.util.SpeedOptions
 
 /** Halaman pengaturan: server remote, keamanan, log, unduhan, dan penyimpanan. */
 class SettingsActivity : AppCompatActivity() {
@@ -571,7 +572,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val currentSpeed = StoragePrefs.speedLimitKbps(this)
         val speedOptions = resources.getStringArray(R.array.speed_limit_options).toMutableList()
-        val speedKbps = SPEED_KBPS
+        val speedKbps = SpeedOptions.SPEED_KBPS
         if (currentSpeed !in speedKbps) {
             speedOptions.add(getString(R.string.settings_speed_custom, currentSpeed))
         }
@@ -942,6 +943,5 @@ class SettingsActivity : AppCompatActivity() {
 
     companion object {
         private val PART_PATTERN = Regex("\\.part(\\.\\d+)?$")
-        private val SPEED_KBPS = intArrayOf(0, 128, 256, 512, 1024, 2048, 5120)
     }
 }

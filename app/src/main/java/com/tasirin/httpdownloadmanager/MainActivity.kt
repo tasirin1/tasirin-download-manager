@@ -59,6 +59,7 @@ import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
+import com.tasirin.httpdownloadmanager.util.SpeedOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -346,7 +347,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val socialCarouselSpinner = view.findViewById<Spinner>(R.id.spinner_social_carousel)
         val socialAudioSection = view.findViewById<View>(R.id.social_audio_section)
         val socialAudioSpinner = view.findViewById<Spinner>(R.id.spinner_social_audio)
-        val speedKbps = SPEED_KBPS
+        val speedKbps = SpeedOptions.SPEED_KBPS
         val spinnerSpeedPer = view.findViewById<Spinner>(R.id.spinner_speed_limit_per)
         setupSpinner(
             this,
@@ -1156,7 +1157,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val view = layoutInflater.inflate(R.layout.dialog_limit_priority, null)
         val itemSpeed = item.speedLimitKbps
         val speedPerOptions = resources.getStringArray(R.array.speed_limit_per_options).toMutableList()
-        val speedKbps = SPEED_KBPS
+        val speedKbps = SpeedOptions.SPEED_KBPS
         if (itemSpeed !in speedKbps) {
             speedPerOptions.add(getString(R.string.settings_speed_custom, itemSpeed))
         }
@@ -1486,7 +1487,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 .distinct()
                 .toList()
         private const val EXTRA_ADD_DOWNLOAD = "com.tasirin.httpdownloadmanager.ADD_DOWNLOAD"
-        private val SPEED_KBPS = intArrayOf(0, 128, 256, 512, 1024, 2048, 5120)
         private val PRIORITY_VALUES = intArrayOf(-1, 0, 1)
     }
 }

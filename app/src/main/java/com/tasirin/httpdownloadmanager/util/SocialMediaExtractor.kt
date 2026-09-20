@@ -16,6 +16,21 @@ object SocialMediaExtractor {
     /** Batas total waktu ekstraksi media sosial (ms). */
     private const val EXTRACT_TOTAL_TIMEOUT_MS = 25_000L
 
+    /** Timeout HTTP halaman/API per request (dipakai 5+ situs, satu tempat). */
+    private const val PAGE_TIMEOUT_MS = 20000
+
+    /* Konstanta User-Agent — string UA diulang 7x+ di file ini; satu tempat. */
+    private const val YT_PAGE_UA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    private const val YT_UA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0"
+    private const val YT_LANG = "en-US,en;q=0.9"
+    private const val VISIONOS_UA =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15"
+    private const val API_UA = "Mozilla/5.0"
+    private const val DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    private const val MIME_MP4 = "video/mp4"
+
     /** Regex X/Twitter — x.com harus host (awal string atau setelah skema),
      *  bukan substring (mis. fbsbx.com mengandung "x.com/"). */
     private val X_URL_RE = Regex("""(?:^|https?://)(?:www\.)?x\.com/""")
@@ -148,15 +163,15 @@ object SocialMediaExtractor {
 
         val hdUrl = data.optString("hdplay", "")
         if (hdUrl.startsWith("http")) {
-            options.add(Result(hdUrl, "$namePrefix.mp4", title, "HD", "video/mp4"))
+            options.add(Result(hdUrl, "$namePrefix.mp4", title, "HD", MIME_MP4))
         }
         val sdUrl = data.optString("play", "")
         if (sdUrl.startsWith("http")) {
-            options.add(Result(sdUrl, "$namePrefix.mp4", title, "SD", "video/mp4"))
+            options.add(Result(sdUrl, "$namePrefix.mp4", title, "SD", MIME_MP4))
         }
         val wmUrl = data.optString("wmplay", "")
         if (wmUrl.startsWith("http") && wmUrl != sdUrl) {
-            options.add(Result(wmUrl, "${namePrefix}_wm.mp4", title, "SD (watermark)", "video/mp4"))
+            options.add(Result(wmUrl, "${namePrefix}_wm.mp4", title, "SD (watermark)", MIME_MP4))
         }
         return options
     }
@@ -213,7 +228,7 @@ object SocialMediaExtractor {
                 val videoUrl = extractVideoFromPage(pageHtml)
                 if (videoUrl != null) {
                     options.add(0, Result(videoUrl, "Instagram_${shortcode}.mp4",
-                        "Instagram $shortcode", "Video", "video/mp4", cookies = pageCookies))
+                        "Instagram $shortcode", "Video", MIME_MP4, cookies = pageCookies))
                 }
             }
         }
@@ -363,7 +378,7 @@ object SocialMediaExtractor {
                 if (node.optBoolean("is_video", false)) {
                     val cv = node.optString("video_url", "")
                     if (cv.startsWith("http")) {
-                        results.add(Result(cv, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4", cookies = cookies))
+                        results.add(Result(cv, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", MIME_MP4, cookies = cookies))
                     }
                 } else {
                     val img = node.optString("display_url", "")
@@ -377,7 +392,7 @@ object SocialMediaExtractor {
             // Single video atau foto
             val videoUrl = media.optString("video_url", "")
             if (videoUrl.startsWith("http")) {
-                results.add(Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", "video/mp4", cookies = cookies))
+                results.add(Result(videoUrl, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", MIME_MP4, cookies = cookies))
             }
             val displayUrl = media.optString("display_url", "")
             if (displayUrl.startsWith("http") && results.isEmpty()) {
@@ -428,10 +443,10 @@ object SocialMediaExtractor {
         val httpResult = httpGetWithCookies(
             "https://www.youtube.com/watch?v=$videoId",
             mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Accept-Language" to "en-US,en;q=0.9"
+                "User-Agent" to YT_PAGE_UA,
+                "Accept-Language" to YT_LANG
             ),
-            timeoutMs = 20000
+            timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return emptyList()
         val pageHtml = httpResult.body
         val ytCookies = httpResult.cookies
@@ -463,7 +478,7 @@ object SocialMediaExtractor {
                 val videoUrl = fmt.optString("url", "")
                 if (videoUrl.startsWith("http")) {
                     val quality = fmt.optString("qualityLabel", "Unknown")
-                    val mimeType = fmt.optString("mimeType", "video/mp4")
+                    val mimeType = fmt.optString("mimeType", MIME_MP4)
                     val ext = if (mimeType.contains("webm")) "webm" else "mp4"
                     val safeName = sanitizeFileName(title)
                     options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
@@ -508,10 +523,10 @@ object SocialMediaExtractor {
         val page = httpGetWithCookies(
             "https://www.youtube.com/shorts/$videoId",
             mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
-                "Accept-Language" to "en-US,en;q=0.9"
+                "User-Agent" to YT_UA,
+                "Accept-Language" to YT_LANG
             ),
-            timeoutMs = 20000
+            timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
         val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
             ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
@@ -524,7 +539,7 @@ object SocialMediaExtractor {
             append("\"clientVersion\":\"1.02\",")
             append("\"deviceMake\":\"Apple\",")
             append("\"deviceModel\":\"RealityDevice17,1\",")
-            append("\"userAgent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15\",")
+            append("\"userAgent\":\" + VISIONOS_UA + \",")
             append("\"osName\":\"visionOS\",")
             append("\"osVersion\":\"26.5.23O471\",")
             append("\"hl\":\"en\",")
@@ -535,14 +550,14 @@ object SocialMediaExtractor {
             "https://www.youtube.com/youtubei/v1/player",
             body,
             mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
+                "User-Agent" to YT_UA,
                 "Origin" to "https://www.youtube.com",
                 "Referer" to "https://www.youtube.com/",
                 "X-Goog-Visitor-Id" to visitor,
                 "X-YouTube-Client-Name" to "101",
                 "X-YouTube-Client-Version" to "1.02"
             ),
-            timeoutMs = 20000
+            timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
 
         return runCatching {
@@ -573,7 +588,7 @@ object SocialMediaExtractor {
                 val best = adaptiveFormatByUrl(adaptive, videoAd)
                 if (best != null) {
                     val url = best.getString("url")
-                    val mime = best.optString("mimeType", "video/mp4")
+                    val mime = best.optString("mimeType", MIME_MP4)
                     val quality = best.optString("qualityLabel", "Unknown")
                     App.logEvent("YT DEBUG: VISIONOS adaptive fallback → $quality ${mime.take(20)}")
                     val ext = if (mime.contains("webm")) "webm" else "mp4"
@@ -593,10 +608,10 @@ object SocialMediaExtractor {
         val page = httpGetWithCookies(
             "https://www.youtube.com/watch?v=$videoId",
             mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
-                "Accept-Language" to "en-US,en;q=0.9"
+                "User-Agent" to YT_UA,
+                "Accept-Language" to YT_LANG
             ),
-            timeoutMs = 20000
+            timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
         val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
             ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
@@ -607,7 +622,7 @@ object SocialMediaExtractor {
             append("\"clientVersion\":\"1.02\",")
             append("\"deviceMake\":\"Apple\",")
             append("\"deviceModel\":\"RealityDevice17,1\",")
-            append("\"userAgent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15\",")
+            append("\"userAgent\":\" + VISIONOS_UA + \",")
             append("\"osName\":\"visionOS\",")
             append("\"osVersion\":\"26.5.23O471\",")
             append("\"hl\":\"en\",")
@@ -618,14 +633,14 @@ object SocialMediaExtractor {
             "https://www.youtube.com/youtubei/v1/player",
             body,
             mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0",
+                "User-Agent" to YT_UA,
                 "Origin" to "https://www.youtube.com",
                 "Referer" to "https://www.youtube.com/",
                 "X-Goog-Visitor-Id" to visitor,
                 "X-YouTube-Client-Name" to "101",
                 "X-YouTube-Client-Version" to "1.02"
             ),
-            timeoutMs = 20000
+            timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
         return runCatching {
             val obj = JSONObject(json)
@@ -639,7 +654,7 @@ object SocialMediaExtractor {
             val (videoAd, audioAd) = bestAdaptivePair(streamingData)
             val best = adaptiveFormatByUrl(adaptive, videoAd) ?: return null
             val url = best.getString("url")
-            val mime = best.optString("mimeType", "video/mp4")
+            val mime = best.optString("mimeType", MIME_MP4)
             val quality = best.optString("qualityLabel", "Unknown")
             App.logEvent("YT DEBUG: VISIONOS adaptive → $quality ${mime.take(20)}")
             val ext = if (mime.contains("webm")) "webm" else "mp4"
@@ -657,7 +672,7 @@ object SocialMediaExtractor {
  *  kosong karena muxer MP4 tidak menerima opus. */
 /** Cari objek format adaptive berdasarkan URL (untuk mengambil mime/quality
  *  dari hasil `bestAdaptivePair`). */
-private fun adaptiveFormatByUrl(adaptive: JSONArray?, url: String): JSONObject? {
+    private fun adaptiveFormatByUrl(adaptive: JSONArray?, url: String): JSONObject? {
     if (adaptive == null || url.isEmpty()) return null
     for (i in 0 until adaptive.length()) {
         val fmt = adaptive.optJSONObject(i) ?: continue
@@ -666,7 +681,7 @@ private fun adaptiveFormatByUrl(adaptive: JSONArray?, url: String): JSONObject? 
     return null
 }
 
-private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
+    private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
     val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return "" to ""
     var videoUrl = ""
     var audioUrl = ""
@@ -714,7 +729,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
                 conn.connectTimeout = 6000
                 conn.readTimeout = 6000
                 conn.setRequestProperty("User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0")
+                    YT_UA)
                 conn.setRequestProperty("Referer", "https://www.youtube.com/")
                 if (item.cookies.isNotEmpty()) conn.setRequestProperty("Cookie", item.cookies)
                 conn.responseCode == 403
@@ -736,7 +751,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             val result = runCatching {
                 val http = httpGetWithCookies(
                     "https://$instance$videoId",
-                    mapOf("User-Agent" to "Mozilla/5.0", "Accept" to "application/json"),
+                    mapOf("User-Agent" to API_UA, "Accept" to "application/json"),
                     timeoutMs = 4000
                 ) ?: return@runCatching null
                 val obj = JSONObject(http.body)
@@ -747,11 +762,11 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
                     val s = streams.optJSONObject(i) ?: continue
                     val u = s.optString("url", "")
                     if (u.startsWith("http")) {
-                        val mime = s.optString("mimeType", "video/mp4")
+                        val mime = s.optString("mimeType", MIME_MP4)
                         val ext = if (mime.contains("webm")) "webm" else "mp4"
                         val safeName = sanitizeFileName(title)
                         val quality = s.optString("quality", "Unknown")
-                        options.add(Result(u, "${safeName}.$ext", title, quality, "video/mp4"))
+                        options.add(Result(u, "${safeName}.$ext", title, quality, MIME_MP4))
                     }
                 }
                 options
@@ -781,7 +796,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             val resolved = resolveInvidiousLatest(instance, videoId, "18")
             if (resolved != null) {
                 App.logEvent("YT DEBUG: invidious $instance resolved stream")
-                return Result(resolved, null, "YouTube_$videoId", "360p", "video/mp4")
+                return Result(resolved, null, "YouTube_$videoId", "360p", MIME_MP4)
             }
             App.logEvent("YT DEBUG: invidious $instance failed/unavailable")
         }
@@ -803,7 +818,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             val resp = httpPostJson(
                 "$instance/",
                 body,
-                mapOf("User-Agent" to "Mozilla/5.0", "Accept" to "application/json"),
+                mapOf("User-Agent" to API_UA, "Accept" to "application/json"),
                 timeoutMs = 15000
             )
             if (resp == null) {
@@ -817,7 +832,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
                 if (status.isNotEmpty() && url.startsWith("http")) {
                     val fileName = obj.optString("filename", "YouTube_$videoId.mp4")
                     App.logEvent("YT DEBUG: cobalt $instance OK → $status")
-                    Result(url, fileName, "YouTube_$videoId", "Auto", "video/mp4")
+                    Result(url, fileName, "YouTube_$videoId", "Auto", MIME_MP4)
                 } else {
                     // Cobalt v10+ bisa mengembalikan error dalam "text" field
                     val err = obj.optString("text", obj.optString("error", status))
@@ -844,8 +859,8 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
                     conn.connectTimeout = 4000
                     conn.readTimeout = 4000
                     conn.setRequestProperty("User-Agent",
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0")
-                    conn.setRequestProperty("Accept", "video/mp4,*/*")
+                        YT_UA)
+                    conn.setRequestProperty("Accept", "$MIME_MP4,*/*")
                     val code = conn.responseCode
                     if (code in 301..308) {
                         val loc = conn.getHeaderField("Location")
@@ -875,7 +890,8 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
     }
 
     private fun sanitizeFileName(name: String): String {
-        return name.replace(SANITIZE_BAD_CHARS_RE, "_")
+        // FileNames.safe menangani slash/trim/nama kosong; aturan ketat sosmed lanjut di sini.
+        return FileNames.safe(name).replace(SANITIZE_BAD_CHARS_RE, "_")
             .replace(SANITIZE_WS_RE, "_")
             .take(80)
     }
@@ -904,7 +920,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
                 "video" -> {
                     val directUrl = item.optString("url")
                     if (directUrl.startsWith("http")) {
-                        options.add(Result(directUrl, "Twitter_${user}.mp4", text, "Video", "video/mp4"))
+                        options.add(Result(directUrl, "Twitter_${user}.mp4", text, "Video", MIME_MP4))
                     }
                 }
                 "photo" -> {
@@ -925,19 +941,9 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
     /** Batas max body response (16 MB) supaya redirect ke HTML raksasa tidak OOM. */
     private const val MAX_RESPONSE_BYTES = 16L * 1024 * 1024
 
-    /** Baca body response secara terbatas — hindari OOM dari redirect/HTML raksasa. */
+    /** Baca body response secara terbatas — delegasi ke readBounded bersama. */
     private fun readBodyLimited(input: InputStream): String {
-        val buf = java.io.ByteArrayOutputStream()
-        val chunk = ByteArray(8192)
-        var total = 0L
-        while (true) {
-            val n = input.read(chunk)
-            if (n < 0) break
-            total += n
-            if (total > MAX_RESPONSE_BYTES) break
-            buf.write(chunk, 0, n)
-        }
-        return buf.toString("UTF-8")
+        return readBounded(input, MAX_RESPONSE_BYTES.toInt())
     }
 
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
@@ -949,7 +955,7 @@ private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
             headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             if (!headers.containsKey("User-Agent")) {
                 conn.setRequestProperty("User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    DEFAULT_UA)
             }
             val code = conn.responseCode
             if (code !in 200..299) return null

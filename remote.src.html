@@ -2043,20 +2043,19 @@ document.getElementById('themeBtn').addEventListener('click', function () {
 const moreBtn = document.getElementById('moreBtn');
 const moreMenu = document.getElementById('moreMenu');
 let moreMenuOpen = false;
+const menuBackdrop = document.getElementById('menuBackdrop');
 function closeMoreMenu() {
   if (!moreMenuOpen) return;
   moreMenuOpen = false;
   moreMenu.classList.add('hidden');
   moreBtn.setAttribute('aria-expanded', 'false');
-  var bd = document.getElementById('menuBackdrop');
-  if (bd) bd.classList.remove('show');
+  if (menuBackdrop) menuBackdrop.classList.remove('show');
 }
 function toggleMoreMenu() {
   moreMenuOpen = !moreMenuOpen;
   moreMenu.classList.toggle('hidden', !moreMenuOpen);
   moreBtn.setAttribute('aria-expanded', String(moreMenuOpen));
-  var bd = document.getElementById('menuBackdrop');
-  if (bd) bd.classList.toggle('show', moreMenuOpen);
+  if (menuBackdrop) menuBackdrop.classList.toggle('show', moreMenuOpen);
 }
 moreBtn.addEventListener('click', function (e) {
   e.stopPropagation();
@@ -2069,10 +2068,9 @@ document.addEventListener('click', function (e) {
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && moreMenuOpen) closeMoreMenu();
 });
-var menuBackdrop = document.getElementById('menuBackdrop');
 if (menuBackdrop) menuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeMoreMenu(); });
 document.addEventListener('keydown', function (e) {
-  var _tag = (e.target && e.target.tagName) || '';
+  const _tag = (e.target && e.target.tagName) || '';
   if (_tag === 'INPUT' || _tag === 'TEXTAREA' || _tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
 });
 
@@ -2081,7 +2079,7 @@ let currentItems = [];
 let webFilter = 'ALL';
 try { webFilter = localStorage.getItem('dl_filter') || 'ALL'; } catch (e) {}
 let dlPinned = new Set();
-try { var _pv = localStorage.getItem('dl_pinned'); if (_pv) dlPinned = new Set(JSON.parse(_pv)); } catch (_e) {}
+try { const _pv = localStorage.getItem('dl_pinned'); if (_pv) dlPinned = new Set(JSON.parse(_pv)); } catch (_e) {}
 const WEB_FILTERS = {ALL:'webFilterAll', ACTIVE:'webFilterActive', COMPLETED:'webFilterCompleted', FAILED:'webFilterFailed', NEW:'webFilterNew'};
 if (!WEB_FILTERS[webFilter]) webFilter = 'ALL';
 Object.entries(WEB_FILTERS).forEach(function (e) {
@@ -2128,27 +2126,27 @@ function updateToTop() {
   toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600);
 }
 function updateScrollShrink() {
-  var y = window.scrollY || 0;
-  var sh = y > 80;
-  var ph = document.getElementById('dlPageHead');
+  const y = window.scrollY || 0;
+  const sh = y > 80;
+  const ph = document.getElementById('dlPageHead');
   if (ph) ph.classList.toggle('shrink', sh);
-  var gt = document.querySelector('#galleryView .gal-toolbar');
+  const gt = document.querySelector('#galleryView .gal-toolbar');
   if (gt) gt.classList.toggle('shrink', sh);
-  var ft = document.querySelector('#fsView .gal-toolbar');
+  const ft = document.querySelector('#fsView .gal-toolbar');
   if (ft) ft.classList.toggle('shrink', sh);
 }
 window.addEventListener('scroll', updateToTop, {passive: true});
 window.addEventListener('scroll', updateScrollShrink, {passive: true});
 // FAB + tabbar auto-hide saat scroll ke bawah, muncul lagi saat scroll ke atas.
-var lastChromeY = window.scrollY || 0;
+let lastChromeY = window.scrollY || 0;
 function updateChromeHide() {
-  var y = window.scrollY || 0;
-  var fab = document.getElementById('fabNewBtn');
+  const y = window.scrollY || 0;
+  const fab = document.getElementById('fabNewBtn');
   if (fab) fab.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
-  var tb = document.getElementById('tabbar');
+  const tb = document.getElementById('tabbar');
   if (tb) {
-    var keyFocused = !!(tb.contains && tb.contains(document.activeElement));
-    var hide = !keyFocused && y > 260 && y > lastChromeY + 8;
+    const keyFocused = !!(tb.contains && tb.contains(document.activeElement));
+    const hide = !keyFocused && y > 260 && y > lastChromeY + 8;
     tb.classList.toggle('tab-hide', hide);
   }
   lastChromeY = y;
@@ -3224,20 +3222,19 @@ fsLocation.addEventListener('change', function () {
 // upload, pilih, cari) dipindah ke dropdown ⋮ supaya area file tidak penuh
 // deretan tombol. Search tetap membuka baris input di bawah breadcrumb.
 let fsToolsMenuOpen = false;
+const fsMenuBackdrop = document.getElementById('fsMenuBackdrop');
 function closeFsToolsMenu() {
   if (!fsToolsMenuOpen) return;
   fsToolsMenuOpen = false;
   fsToolsMenu.classList.add('hidden');
   fsToolsBtn.setAttribute('aria-expanded', 'false');
-  var bd = document.getElementById('fsMenuBackdrop');
-  if (bd) bd.classList.remove('show');
+  if (fsMenuBackdrop) fsMenuBackdrop.classList.remove('show');
 }
 function toggleFsToolsMenu() {
   fsToolsMenuOpen = !fsToolsMenuOpen;
   fsToolsMenu.classList.toggle('hidden', !fsToolsMenuOpen);
   fsToolsBtn.setAttribute('aria-expanded', String(fsToolsMenuOpen));
-  var bd = document.getElementById('fsMenuBackdrop');
-  if (bd) bd.classList.toggle('show', fsToolsMenuOpen);
+  if (fsMenuBackdrop) fsMenuBackdrop.classList.toggle('show', fsToolsMenuOpen);
 }
 fsToolsBtn.addEventListener('click', function (e) {
   e.stopPropagation();
@@ -3270,7 +3267,6 @@ document.addEventListener('click', function (e) {
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && fsToolsMenuOpen) closeFsToolsMenu();
 });
-var fsMenuBackdrop = document.getElementById('fsMenuBackdrop');
 if (fsMenuBackdrop) fsMenuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeFsToolsMenu(); });
 
 // Lokasi storage hanya perlu dimuat sekali saat masuk File Manager; tanpa

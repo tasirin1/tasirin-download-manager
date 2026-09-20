@@ -369,7 +369,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 lastEx = e
                 if (attempt < 3) {
                     appendLog("SERVER START RETRY $attempt/3: ${e.message}")
-                    try { Thread.sleep(200) } catch (_: InterruptedException) {
+                    try { Thread.sleep(SERVER_RETRY_DELAY_MS) } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt()
                     }
                 }
@@ -486,7 +486,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         super.stop()
         // Tunggu sebentar supaya NanoHTTPD internal pool benar-benar terminated
         // sebelum client request berikutnya datang (cegah RejectedExecutionException).
-        try { Thread.sleep(200) } catch (_: InterruptedException) {
+        try { Thread.sleep(SERVER_STOP_GRACE_MS) } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         }
     }
@@ -962,12 +962,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 JSONObject().put("ok", true).put("platform", "none").put("options", JSONArray())
             )
         }
-        // Platform lain: ekstrak opsi dari social media extractor
-        val results = try {
-            kotlinx.coroutines.runBlocking {
-                SocialMediaExtractor.extractAll(url)
-            }
-        } catch (_: Exception) { emptyList() }
+        // Platform lain: ekstrak opsi dari social media extractor (blokir worker NanoHTTPD, bukan main thread).
+        val results = probeSocialOptionsBlocking(url)
         val photos = JSONArray()
         val videos = JSONArray()
         for (r in results) {
@@ -990,6 +986,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 .put("photos", photos)
                 .put("videos", videos)
         )
+    }
+
+    /** Probe opsi sosmed dari thread worker HTTP (runBlocking terisolasi di satu tempat). */
+    private fun probeSocialOptionsBlocking(url: String): List<SocialMediaExtractor.Result> {
+        return try {
+            kotlinx.coroutines.runBlocking {
+                SocialMediaExtractor.extractAll(url)
+            }
+        } catch (_: Exception) { emptyList() }
     }
 
     private fun handleUpload(session: IHTTPSession): Response {
@@ -2797,6 +2802,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000
         private const val PERIODIC_CLEANUP_MS = 5 * 60 * 1000L
         private const val SNAPSHOT_RATE_MS = 1_000L
+        private const val SERVER_RETRY_DELAY_MS = 200L
+        private const val SERVER_STOP_GRACE_MS = 200L
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
         private const val FS_LISTING_TTL_MS = 3_000L
