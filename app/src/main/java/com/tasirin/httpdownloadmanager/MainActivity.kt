@@ -1317,9 +1317,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val uri = if (item.contentUri != null) {
                     item.contentUri.toUri()
                 } else {
-                    FileProvider.getUriForFile(
-                        this, "$packageName.fileprovider", File(item.filePath)
-                    )
+                    runCatching { fileUriForOpen(File(item.filePath)) }.getOrNull()
+                        ?: return
                 }
                 val intent = Intent(Intent.ACTION_VIEW)
                     .setDataAndType(uri, "application/vnd.android.package-archive")
@@ -1331,9 +1330,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val uri = if (item.contentUri != null) {
                     item.contentUri.toUri()
                 } else {
-                    FileProvider.getUriForFile(
-                        this, "$packageName.fileprovider", File(item.filePath)
-                    )
+                    runCatching { fileUriForOpen(File(item.filePath)) }.getOrNull()
+                        ?: return
                 }
                 val intent = Intent(Intent.ACTION_VIEW)
                     .setDataAndType(uri, mime)
@@ -1343,6 +1341,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
+    /** URI file untuk intent VIEW: installer/pemutar Android 5-6 hanya andal
+     *  dengan file:// (content:// FileProvider kerap tak bisa dibuka installer
+     *  lama); Android 7+ wajib FileProvider (file:// melempar
+     *  FileUriExposedException). */
+    private fun fileUriForOpen(file: File): Uri =
+        if (Build.VERSION.SDK_INT < 24) Uri.fromFile(file)
+        else FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+
     private fun openDownload(item: DownloadItem) {
         if (item.state != DownloadState.COMPLETED) return
         val mime = MimeTypes.forFile(item.fileName)
@@ -1350,14 +1356,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val file = item.filePath?.let { File(it) }
 
         // contentUri (MediaStore/SAF) → selalu pakai content://
-        // filePath → FileProvider (file_paths.xml mencakup folder app,
-        //   Download/, dan external storage); Uri.fromFile hanya untuk
-        //   Android 5-6 karena file:// melempar FileUriExposedException di 7+.
+        // filePath → fileUriForOpen(): file:// di Android 5-6 (installer lama
+        //   tak andal dengan content://), FileProvider di 7+ (file://
+        //   melempar FileUriExposedException).
         val uri: Uri? = when {
             !item.contentUri.isNullOrEmpty() -> item.contentUri.toUri()
-            file != null && file.exists() -> runCatching {
-                FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-            }.getOrNull() ?: if (Build.VERSION.SDK_INT < 24) Uri.fromFile(file) else null
+            file != null && file.exists() -> runCatching { fileUriForOpen(file) }.getOrNull()
             else -> null
         }
         if (uri == null) {
