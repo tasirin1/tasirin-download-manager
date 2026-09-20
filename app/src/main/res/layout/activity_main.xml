@@ -61,7 +61,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/primary"
-                android:textSize="24sp"
+                android:textSize="28sp"
                 android:textStyle="bold"
                 tools:text="2" />
 
@@ -111,7 +111,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/status_on"
-                android:textSize="24sp"
+                android:textSize="28sp"
                 android:textStyle="bold"
                 tools:text="5" />
 
@@ -161,7 +161,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/status_off"
-                android:textSize="24sp"
+                android:textSize="28sp"
                 android:textStyle="bold"
                 tools:text="1" />
 

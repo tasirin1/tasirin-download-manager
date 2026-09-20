@@ -6,19 +6,19 @@
         <shape android:shape="rectangle">
             <solid android:color="@color/primary_container" />
             <stroke android:width="2dp" android:color="@color/primary" />
-            <corners android:radius="12dp" />
+            <corners android:radius="20dp" />
         </shape>
     </item>
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
             <solid android:color="@color/primary_container_pressed" />
-            <corners android:radius="12dp" />
+            <corners android:radius="20dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <solid android:color="@color/primary_container" />
-            <corners android:radius="12dp" />
+            <corners android:radius="20dp" />
         </shape>
     </item>
 </selector>

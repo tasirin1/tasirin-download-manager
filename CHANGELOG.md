@@ -5,6 +5,7 @@
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **ui(theme): pill + kartu borderless M3** -- Semua tombol 12dp -> pill 20dp; kartu `bg_status_card` tanpa border + radius 16dp (item + pengaturan); angka ringkasan 24sp -> 28sp.
 - **ui(theme): modern tonal tanpa gradien** -- Toolbar flat primary + elevation 0; ringkasan jadi kartu tonal `primary_container` (ikon putih); tombol sekunder outline -> tonal terisi (`bg_btn_tv`); FAB pill flat; nama file medium; hapus `bg_toolbar_gradient` + `bg_summary_gradient` tak terpakai.
 - **ui(main): percantik item + header + pengaturan** -- Item download jadi kartu (`bg_status_card` konsisten settings), ikon file 44dp, progress bar 8dp ramping; header seksi tegas (bold + letterSpacing); chip navigasi pengaturan 40dp/bold 13sp, judul seksi 15sp, kartu elevation 3dp.
 - **perf(list): daftar utama hemat bind + engine hemat emit** -- `DownloadAdapter` pakai payload progres (tick 400ms-1s hanya update bar/teks/kecepatan, bukan rebind ikon/badge/tombol); `MainActivity` `setHasFixedSize` + cache 20; `DownloadEngine` `recordSegmentProgress` tanpa scan O(n) + sampel speed/ETA maks 1x/detik (byte tetap flush 500ms).
