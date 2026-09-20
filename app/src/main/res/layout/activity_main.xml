@@ -230,13 +230,14 @@
                     android:layout_height="56dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/empty_hint"
-                    android:src="@drawable/ic_download_big" />
+                    android:src="@drawable/ic_download_big"
+                    app:tint="@color/primary" />
             </FrameLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="16dp"
                 android:gravity="center"
                 android:text="@string/empty_hint"
                 android:textColor="@color/text_primary"
