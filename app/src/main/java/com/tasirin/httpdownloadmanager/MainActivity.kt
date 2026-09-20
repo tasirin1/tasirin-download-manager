@@ -1299,38 +1299,46 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 item.filePath != null
             ) {
                 autoOpenedIds.add(item.id)
-                val ext = item.fileName.substringAfterLast('.', "").lowercase()
-                val mime = MimeTypes.forFile(item.fileName)
-                when {
-                    // APK → installer
-                    ext == "apk" -> {
-                        val uri = if (item.contentUri != null) {
-                            item.contentUri.toUri()
-                        } else {
-                            FileProvider.getUriForFile(
-                                this, "$packageName.fileprovider", File(item.filePath)
-                            )
-                        }
-                        val intent = Intent(Intent.ACTION_VIEW)
-                            .setDataAndType(uri, "application/vnd.android.package-archive")
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        runCatching { startActivity(intent) }
-                    }
-                    // Video → pemutar video
-                    mime.startsWith("video/") || ext in AUTO_OPEN_VIDEO_EXTS -> {
-                        val uri = if (item.contentUri != null) {
-                            item.contentUri.toUri()
-                        } else {
-                            FileProvider.getUriForFile(
-                                this, "$packageName.fileprovider", File(item.filePath)
-                            )
-                        }
-                        val intent = Intent(Intent.ACTION_VIEW)
-                            .setDataAndType(uri, mime)
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        runCatching { startActivity(intent) }
-                    }
+                runCatching {
+                    autoOpenSingle(item)
                 }
+            }
+        }
+    }
+
+    /** Buka satu file selesai (dipisah agar path eksotis yang gagal tidak
+     *  menggugurkan item lain dalam batch emisi yang sama). */
+    private fun autoOpenSingle(item: DownloadItem) {
+        val ext = item.fileName.substringAfterLast('.', "").lowercase()
+        val mime = MimeTypes.forFile(item.fileName)
+        when {
+            // APK → installer
+            ext == "apk" -> {
+                val uri = if (item.contentUri != null) {
+                    item.contentUri.toUri()
+                } else {
+                    FileProvider.getUriForFile(
+                        this, "$packageName.fileprovider", File(item.filePath)
+                    )
+                }
+                val intent = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                runCatching { startActivity(intent) }
+            }
+            // Video → pemutar video
+            mime.startsWith("video/") || ext in AUTO_OPEN_VIDEO_EXTS -> {
+                val uri = if (item.contentUri != null) {
+                    item.contentUri.toUri()
+                } else {
+                    FileProvider.getUriForFile(
+                        this, "$packageName.fileprovider", File(item.filePath)
+                    )
+                }
+                val intent = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, mime)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                runCatching { startActivity(intent) }
             }
         }
     }
@@ -1341,16 +1349,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val isApk = item.fileName.lowercase().endsWith(".apk")
         val file = item.filePath?.let { File(it) }
 
-        // contentUri (MediaStore SAF) → selalu pakai content://
-        // filePath → FileProvider untuk file internal/custom; Uri.fromFile untuk
-        //   public Download folder (FileProvider tidak punya akses, dan
-        //   Uri.fromFile() masih jalan untuk package installer di Android 5-6).
+        // contentUri (MediaStore/SAF) → selalu pakai content://
+        // filePath → FileProvider (file_paths.xml mencakup folder app,
+        //   Download/, dan external storage); Uri.fromFile hanya untuk
+        //   Android 5-6 karena file:// melempar FileUriExposedException di 7+.
         val uri: Uri? = when {
             !item.contentUri.isNullOrEmpty() -> item.contentUri.toUri()
-            file != null && file.exists() && isFileInternal(file) ->
+            file != null && file.exists() -> runCatching {
                 FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-            file != null && file.exists() ->
-                Uri.fromFile(file)
+            }.getOrNull() ?: if (Build.VERSION.SDK_INT < 24) Uri.fromFile(file) else null
             else -> null
         }
         if (uri == null) {
@@ -1398,17 +1405,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             return
         } catch (e: Exception) { App.logEvent("APK GENERIC failed: ${e.message}") }
         Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
-    }
-
-    /**
-     * File di folder internal app (FileProvider punya akses) → true.
-     * File di public Download / custom folder lain → false (pakai
-     * Uri.fromFile langsung supaya Android 5-6 bisa instal APK).
-     */
-    private fun isFileInternal(file: File): Boolean {
-        val canonical = runCatching { file.canonicalFile }.getOrNull() ?: return false
-        val dl = runCatching { File(filesDir, "downloads").canonicalFile }.getOrNull()
-        return dl != null && canonical.path.startsWith(dl.path)
     }
 
     private fun openFolder(item: DownloadItem) {

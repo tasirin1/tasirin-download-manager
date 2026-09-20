@@ -499,6 +499,7 @@ class DownloadEngine(appContext: Context) {
         targets.forEach { item ->
             App.logEvent("DOWNLOAD PAUSED: ${item.fileName}")
             retryAttempts.remove(item.id)
+            pendingRetries.remove(item.id)
             speedTracker.reset(item.id)
             jobs.remove(item.id)?.cancel()
             disconnectActive(item.id)
