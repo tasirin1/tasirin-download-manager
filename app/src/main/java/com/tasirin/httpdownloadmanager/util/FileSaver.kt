@@ -22,7 +22,10 @@ class FileSaver(context: Context) {
 
     private val appContext = context.applicationContext
     private val downloadDir = File(appContext.filesDir, "downloads").apply { mkdirs() }
-    private val customFolderUri = StoragePrefs.getFolderUri(appContext)
+
+    /** URI folder kustom dibaca fresh tiap publish: user bisa ganti folder di
+     *  Settings tanpa restart proses (field val sekali-init akan basi). */
+    private fun customFolderUri(): Uri? = StoragePrefs.getFolderUri(appContext)
 
     data class PublishResult(
         val contentUri: String? = null,
@@ -92,7 +95,7 @@ class FileSaver(context: Context) {
             }
             "internal" -> return publishToInternal(partial, fileName)
         }
-        val folderUri = customFolderUri
+        val folderUri = customFolderUri()
         if (folderUri != null) {
             val result = publishToCustomFolder(partial, fileName, folderUri)
             if (result != null) return result
@@ -142,7 +145,7 @@ class FileSaver(context: Context) {
                 return writeInternal(fileName, writer)
             }
         }
-        customFolderUri?.let { uri ->
+        customFolderUri()?.let { uri ->
             writeCustomFolder(fileName, uri, writer)?.let { return it }
         }
         StoragePrefs.getTextFolder(appContext)?.let { tf ->

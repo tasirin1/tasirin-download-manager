@@ -249,6 +249,20 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun partialToken_tandaLamaSha256Ditolak_hmacWajib() {
+        // Token gaya lama sha256(payload:secret) wajib gagal setelah migrasi HMAC.
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest("vid1.2000:secret".toByteArray(Charsets.UTF_8))
+        val legacy = "vid1.2000." + digest.joinToString("") { "%02x".format(it) }
+        assertFalse(ServerSecurity.isPartialTokenValid(legacy, "vid1", 1999L, "secret"))
+        // HMAC baru round-trip tetap valid; ubahan 1 hex menggugurkan.
+        val fresh = ServerSecurity.createPartialToken("vid1", 2000L, "secret")
+        assertTrue(ServerSecurity.isPartialTokenValid(fresh, "vid1", 1999L, "secret"))
+        val tampered = fresh.dropLast(1) + (if (fresh.last() == 'a') 'b' else 'a')
+        assertFalse(ServerSecurity.isPartialTokenValid(tampered, "vid1", 1999L, "secret"))
+    }
+
+    @Test
     fun isMediaStorePathAllowed_hanya_diDalamRoot() {
         val root = tmp.newFolder("storage", "emulated", "0", "Download")
         val mediaRoot = tmp.root.resolve("storage/emulated/0").absolutePath

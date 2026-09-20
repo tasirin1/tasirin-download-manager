@@ -91,19 +91,26 @@ object Updater {
             // pakai MAX_UPDATE_BYTES agar respons jahat tak memenuhi disk.
             val writeCap = if (info.apkSize > 0) info.apkSize else MAX_UPDATE_BYTES
             try {
-                conn.inputStream.use { input ->
-                    java.io.BufferedOutputStream(target.outputStream(), 64 * 1024).use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        var done = 0L
-                        while (true) {
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                            done += n
-                            if (done > writeCap) throw SecurityException("Update size mismatch")
-                            onProgress(done, total)
+                try {
+                    conn.inputStream.use { input ->
+                        java.io.BufferedOutputStream(target.outputStream(), 64 * 1024).use { out ->
+                            val buf = ByteArray(64 * 1024)
+                            var done = 0L
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n < 0) break
+                                out.write(buf, 0, n)
+                                done += n
+                                if (done > writeCap) throw SecurityException("Update size mismatch")
+                                onProgress(done, total)
+                            }
                         }
                     }
+                } catch (e: SecurityException) {
+                    // Respons melebihi batas: buang file setengah jadi supaya
+                    // percobaan berikut tidak membaca sisa overshoot dari disk.
+                    runCatching { target.delete() }
+                    throw e
                 }
             } finally {
                 conn.disconnect()

@@ -17,12 +17,14 @@ object StoragePrefs {
     @Volatile private var cachedPrefs: android.content.SharedPreferences? = null
 
     /** Cache SharedPreferences instance untuk menghindari 58x getSharedPreferences call.
-     *  Init dijaga lock agar tidak membuat duplikat dari thread paralel. */
+     *  Init dijaga lock agar tidak membuat duplikat dari thread paralel.
+     *  Wajib applicationContext: instance statis seumur proses, Activity context akan bocor. */
     private fun prefs(context: Context): android.content.SharedPreferences {
         cachedPrefs?.let { return it }
         synchronized(prefsLock) {
             cachedPrefs?.let { return it }
-            return context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            val appCtx = context.applicationContext ?: context
+            return appCtx.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
                 .also { cachedPrefs = it }
         }
     }

@@ -1,8 +1,10 @@
 package com.tasirin.httpdownloadmanager.remote
 
+import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
-import com.tasirin.httpdownloadmanager.util.sha256Hex
 import java.io.File
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 /** Logika keamanan & validasi server remote yang murni (bisa diuji tanpa Android). */
 object ServerSecurity {
@@ -80,10 +82,11 @@ object ServerSecurity {
         return isPathAllowed(virtualPath, roots)
     }
 
-    /** Token stream parsial berumur pendek (id.expiry.signature). */
+    /** Token stream parsial berumur pendek (id.expiry.signature HMAC-SHA256).
+     *  HMAC (bukan SHA-256 polos) agar tak rentan length-extension. */
     fun createPartialToken(itemId: String, expiresAt: Long, secret: String): String {
         val payload = "$itemId.$expiresAt"
-        return "$payload.${sha256Hex(payload + ":" + secret)}"
+        return "$payload.${hmacSha256Hex(secret, payload)}"
     }
 
     fun isPartialTokenValid(token: String, itemId: String, now: Long, secret: String): Boolean {
@@ -91,14 +94,14 @@ object ServerSecurity {
         if (parts.size != 3 || parts[0] != itemId) return false
         val expiresAt = parts[1].toLongOrNull() ?: return false
         if (expiresAt < now) return false
-        val expected = sha256Hex("${parts[0]}.${parts[1]}:$secret")
+        val expected = hmacSha256Hex(secret, "${parts[0]}.${parts[1]}")
         return StoragePrefs.constantEquals(parts[2], expected)
     }
 
     /** Token status upload mencegah enumerasi ID oleh klien lain di LAN. */
     fun createUploadVerifyToken(uploadId: String, expiresAt: Long, secret: String): String {
         val payload = "$uploadId.$expiresAt"
-        return "$payload.${sha256Hex(payload + ":" + secret)}"
+        return "$payload.${hmacSha256Hex(secret, payload)}"
     }
 
     fun isUploadVerifyTokenValid(
@@ -112,8 +115,15 @@ object ServerSecurity {
         if (parts.size != 3 || parts[0] != uploadId) return false
         val expiresAt = parts[1].toLongOrNull() ?: return false
         if (expiresAt < now) return false
-        val expected = sha256Hex("${parts[0]}.${parts[1]}:$secret")
+        val expected = hmacSha256Hex(secret, "${parts[0]}.${parts[1]}")
         return StoragePrefs.constantEquals(parts[2], expected)
+    }
+
+    /** HMAC-SHA256 hex murni JVM (tanpa Android) supaya bisa diuji unit. */
+    internal fun hmacSha256Hex(secret: String, data: String): String {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+        return Hex.encode(mac.doFinal(data.toByteArray(Charsets.UTF_8)))
     }
 
     /** Lock PIN masih aktif: percobaan login ditolak. */
