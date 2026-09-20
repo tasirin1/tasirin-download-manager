@@ -22,6 +22,9 @@ class DownloadService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var lastUiUpdate = 0L
+    // ID item yang terakhir terlihat aktif — dipakai mendeteksi item selesai/
+    // mulai agar refresh notifikasi tidak ter-skip throttle (anti progress nyangkut).
+    private var lastActiveIds: Set<String> = emptySet()
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -59,9 +62,18 @@ class DownloadService : Service() {
                         stopSelf()
                     } else {
                         // Progress berubah ~4x/detik; batasi refresh UI jadi 1x/detik
-                        // agar tidak boros baterai/CPU.
+                        // agar tidak boros baterai/CPU. Tapi bila keanggotaan item
+                        // aktif berubah (ada yang selesai/mulai — mis. download
+                        // terakhir rampung saat server background masih hidup),
+                        // refresh wajib jalan: tanpa ini notifikasi beku di
+                        // tampilan progress terakhir karena tak ada emisi berikutnya.
+                        val activeIds = items.filter {
+                            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
+                        }.map { it.id }.toSet()
+                        val membershipChanged = activeIds != lastActiveIds
+                        lastActiveIds = activeIds
                         val now = System.currentTimeMillis()
-                        if (now - lastUiUpdate < 1000) return@runCatching
+                        if (!membershipChanged && now - lastUiUpdate < 1000) return@runCatching
                         lastUiUpdate = now
                         NotificationHelper.updateNotification(this@DownloadService, items, serverActive)
                     }
