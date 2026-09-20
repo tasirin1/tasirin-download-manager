@@ -70,9 +70,23 @@ class DownloadAdapter(private val listener: Listener) :
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        onBindViewHolder(holder, position, mutableListOf())
+    }
+
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>
+    ) {
         when (val row = getItem(position)) {
             is DownloadRow.Header -> bindHeader(holder as HeaderHolder, row)
-            is DownloadRow.Item -> bindItem(holder as ItemHolder, row.item)
+            is DownloadRow.Item -> {
+                val h = holder as ItemHolder
+                // Tick progres 400ms-1s hanya menyentuh bar/teks: jangan
+                // rebind ikon/badge/tombol yang mahal (mime lookup, format).
+                if (payloads.contains(PAYLOAD_PROGRESS)) bindProgress(h, row.item)
+                else bindItem(h, row.item)
+            }
         }
     }
 
@@ -114,6 +128,16 @@ class DownloadAdapter(private val listener: Listener) :
             cachedColor(ctx, badgeBgColor(item.state))
         )
         b.statusBadge.setTextColor(cachedColor(ctx, badgeTextColor(item.state)))
+        bindProgress(holder, item)
+        // Sisa bind struktural (ikon/badge/tombol) di bawah tidak tersentuh
+        // update progres parsial.
+        bindStatic(holder, item)
+    }
+
+    /** Update murah tiap tick: bar + teks progres + kecepatan saja. */
+    private fun bindProgress(holder: ItemHolder, item: DownloadItem) {
+        val b = holder.binding
+        val ctx = b.root.context
         val prevProgress = b.progressBar.progress
         smoothProgress(b.progressBar, prevProgress, item.progressPercent)
         b.progressBar.progressTintList = ColorStateList.valueOf(
@@ -160,6 +184,11 @@ class DownloadAdapter(private val listener: Listener) :
                 Formats.eta(item.etaSeconds)
             )
         }
+    }
+
+    private fun bindStatic(holder: ItemHolder, item: DownloadItem) {
+        val b = holder.binding
+        val ctx = b.root.context
 
         val error = item.error?.takeIf { it.isNotBlank() }
         b.textError.visibility = if (error != null) View.VISIBLE else View.GONE
@@ -304,6 +333,7 @@ class DownloadAdapter(private val listener: Listener) :
     companion object {
         private const val TYPE_HEADER = 0
         private const val TYPE_ITEM = 1
+        private const val PAYLOAD_PROGRESS = "progress"
 
         /** Bangun daftar ber-section: Active → Paused → Completed → Failed.
          *  Section yang collapse (StoragePrefs.collapsed_sections) memakai
@@ -351,6 +381,32 @@ class DownloadAdapter(private val listener: Listener) :
 
             override fun areContentsTheSame(oldItem: DownloadRow, newItem: DownloadRow): Boolean =
                 oldItem == newItem
+
+            override fun getChangePayload(oldItem: DownloadRow, newItem: DownloadRow): Any? {
+                if (oldItem is DownloadRow.Item && newItem is DownloadRow.Item) {
+                    val a = oldItem.item
+                    val b = newItem.item
+                    // Samakan semua kecuali field yang berubah tiap tick.
+                    val aBase = a.copy(
+                        bytesDownloaded = 0L,
+                        totalBytes = 0L,
+                        speedBps = 0L,
+                        etaSeconds = 0L,
+                        segments = emptyList(),
+                        progressPercentOverride = -1
+                    )
+                    val bBase = b.copy(
+                        bytesDownloaded = 0L,
+                        totalBytes = 0L,
+                        speedBps = 0L,
+                        etaSeconds = 0L,
+                        segments = emptyList(),
+                        progressPercentOverride = -1
+                    )
+                    if (aBase == bBase) return PAYLOAD_PROGRESS
+                }
+                return null
+            }
         }
     }
 }

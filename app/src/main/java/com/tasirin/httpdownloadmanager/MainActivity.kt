@@ -128,6 +128,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         listLayoutManager = LinearLayoutManager(this)
         binding.recycler.layoutManager = listLayoutManager
         binding.recycler.adapter = adapter
+        // Item berukuran seragam: matikan re-measure tiap tick progres 400ms
+        // + tahan cache agar scroll-balik tidak rebind/inflate ulang.
+        binding.recycler.setHasFixedSize(true)
+        binding.recycler.setItemViewCacheSize(20)
         binding.recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 updateStickyHeader()

@@ -159,6 +159,9 @@ class DownloadEngine(appContext: Context) {
     // segmen per detik) — hemat CPU/GC saat banyak segmen paralel.
     private val segProgress = ConcurrentHashMap<String, LongArray>()
     private val segFlushJobs = ConcurrentHashMap<String, Job>()
+    /** Sampel kecepatan/ETA terakhir per item (throttle 1 dtk saat flush 500ms). */
+    private val lastSpeedSampleAt = ConcurrentHashMap<String, Long>()
+    private val lastSpeedSample = ConcurrentHashMap<String, Pair<Long, Long>>()
     // Total byte bersama untuk speed limiter multi-segmen; menghindari pencarian
     // item + penjumlahan segmen di setiap chunk saat batas kecepatan aktif.
     private val throttleTotals = ConcurrentHashMap<String, AtomicLong>()
@@ -827,6 +830,11 @@ class DownloadEngine(appContext: Context) {
     private fun handleFailure(id: String, message: String?) {
         val item = _items.value.find { it.id == id } ?: return
         speedTracker.reset(id)
+        // Buang sampel speed/ETA + penyangga segmen agar retry tidak memakai
+        // angka basi sesaat (≤1 dtk) dari attempt yang gagal.
+        lastSpeedSampleAt.remove(id)
+        lastSpeedSample.remove(id)
+        clearSegProgress(id)
         val maxRetries = StoragePrefs.maxRetries(context)
         val attempts = (retryAttempts[id] ?: 0) + 1
         val rangeRejected = message?.contains("does not support Range") == true
@@ -2299,7 +2307,7 @@ class DownloadEngine(appContext: Context) {
                         lastSegAt = now
                         health.check(now, downloaded, segTotal, speed)
                         // Progres ke penyangga; updateItem nyata dilakukan flush.
-                        recordSegmentProgress(id, segment.index, downloaded)
+                        recordSegmentProgress(id, segment.index, downloaded, item.segments.size)
                     }
                 }
                 output.flush()
@@ -2325,7 +2333,19 @@ class DownloadEngine(appContext: Context) {
         updateItem(id, persist = false) { item ->
             val segs = item.segments.map { if (it.index == index) it.copy(downloaded = downloaded) else it }
             val totalDone = segs.sumOf { it.downloaded }
-            val (speed, eta) = speedTracker.sample(id, totalDone, item.totalBytes)
+            // Sampel kecepatan/ETA maks 1x/detik (EMA + format ETA mahal bila
+            // N item aktif x flush 500ms); byte/segmen tetap update tiap flush.
+            val nowMs = System.currentTimeMillis()
+            val lastAt = lastSpeedSampleAt[id] ?: 0L
+            val cached = lastSpeedSample[id]
+            val (speed, eta) = if (cached != null && nowMs - lastAt < 1000) {
+                cached
+            } else {
+                val sampled = speedTracker.sample(id, totalDone, item.totalBytes)
+                lastSpeedSampleAt[id] = nowMs
+                lastSpeedSample[id] = sampled
+                sampled
+            }
             item.copy(
                 segments = segs,
                 bytesDownloaded = totalDone,
@@ -2338,9 +2358,13 @@ class DownloadEngine(appContext: Context) {
 
     /** Tulis progres segmen ke penyangga (tanpa emisi StateFlow). Setiap indeks
      *  hanya ditulis oleh segmen yang sama, jadi aman tanpa kunci tambahan. */
-    private fun recordSegmentProgress(id: String, index: Int, downloaded: Long) {
-        val count = _items.value.find { it.id == id }?.segments?.size ?: return
-        val arr = segProgress.getOrPut(id) { LongArray(count) { -1L } }
+    // segCount diteruskan pemanggil agar hot-path tiap detik tidak memindai
+    // _items O(n) hanya untuk tahu ukuran array.
+    private fun recordSegmentProgress(id: String, index: Int, downloaded: Long, segCount: Int) {
+        if (segCount <= 0 || index < 0 || index >= segCount) return
+        val arr = segProgress.getOrPut(id) { LongArray(segCount) { -1L } }
+        // Segmen tetap (tidak berubah mid-download); abaikan bila ukuran geser.
+        if (index >= arr.size) return
         arr[index] = downloaded
         scheduleSegFlush(id)
     }
@@ -2380,7 +2404,19 @@ class DownloadEngine(appContext: Context) {
                 totalDone += next.downloaded
                 next
             }
-            val (speed, eta) = speedTracker.sample(id, totalDone, item.totalBytes)
+            // Sampel kecepatan/ETA maks 1x/detik (EMA + format ETA mahal bila
+            // N item aktif x flush 500ms); byte/segmen tetap update tiap flush.
+            val nowMs = System.currentTimeMillis()
+            val lastAt = lastSpeedSampleAt[id] ?: 0L
+            val cached = lastSpeedSample[id]
+            val (speed, eta) = if (cached != null && nowMs - lastAt < 1000) {
+                cached
+            } else {
+                val sampled = speedTracker.sample(id, totalDone, item.totalBytes)
+                lastSpeedSampleAt[id] = nowMs
+                lastSpeedSample[id] = sampled
+                sampled
+            }
             item.copy(
                 segments = segs,
                 bytesDownloaded = totalDone,
@@ -2406,6 +2442,8 @@ class DownloadEngine(appContext: Context) {
     private fun clearSegProgress(id: String) {
         segProgress.remove(id)
         throttleTotals.remove(id)
+        lastSpeedSampleAt.remove(id)
+        lastSpeedSample.remove(id)
         segFlushJobs.remove(id)?.cancel()
     }
 
