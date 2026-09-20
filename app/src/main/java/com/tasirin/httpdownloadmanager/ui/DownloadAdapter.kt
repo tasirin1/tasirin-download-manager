@@ -102,12 +102,12 @@ class DownloadAdapter(private val listener: Listener) :
         b.textName.text = item.fileName
         // Satu lookup mime per bind (sebelumnya 2x via fileIconRes + circle).
         val mime = MimeTypes.forFile(item.fileName)
-        b.fileIcon.setImageResource(fileIconRes(mime, true))
+        b.fileIcon.setImageResource(fileIconRes(mime))
         b.fileIcon.imageTintList = ColorStateList.valueOf(
             cachedColor(ctx, R.color.text_primary)
         )
         b.fileIconCircle.backgroundTintList = ColorStateList.valueOf(
-            cachedColor(ctx, fileIconCircleColor(mime, true))
+            cachedColor(ctx, fileIconCircleColor(mime))
         )
         b.statusBadge.text = badgeText(item, ctx)
         b.statusBadge.backgroundTintList = ColorStateList.valueOf(
@@ -273,10 +273,7 @@ class DownloadAdapter(private val listener: Listener) :
     }
 
     /** Warna lingkaran ikon per tipe file (lembut, kontras dengan ikon gelap). */
-    private fun fileIconCircleColor(fileName: String): Int =
-        fileIconCircleColor(MimeTypes.forFile(fileName), true)
-
-    private fun fileIconCircleColor(mime: String, isMime: Boolean): Int {
+    private fun fileIconCircleColor(mime: String): Int {
         return when {
             mime.startsWith("video") -> R.color.icon_circle_video
             mime.startsWith("audio") -> R.color.icon_circle_audio
@@ -290,11 +287,8 @@ class DownloadAdapter(private val listener: Listener) :
         }
     }
 
-    /** Pilih ikon tipe file berdasarkan ekstensi/nama file. */
-    private fun fileIconRes(fileName: String): Int =
-        fileIconRes(MimeTypes.forFile(fileName), true)
-
-    private fun fileIconRes(mime: String, isMime: Boolean): Int {
+    /** Pilih ikon tipe file berdasarkan mime (satu lookup per bind). */
+    private fun fileIconRes(mime: String): Int {
         return when {
             mime.startsWith("video") -> R.drawable.ic_file_video
             mime.startsWith("audio") -> R.drawable.ic_file_audio

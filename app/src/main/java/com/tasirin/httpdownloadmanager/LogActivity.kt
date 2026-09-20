@@ -228,11 +228,10 @@ class LogActivity : AppCompatActivity() {
         while (lineStart < sb.length) {
             val lineEnd = text.indexOf('\n', lineStart)
             val end = if (lineEnd < 0) sb.length else lineEnd
-            // contains ignoreCase: menggantikan substring().uppercase() —
-            // tanpa alokasi String baru per baris (regionMatches internal).
-            val lineStr = text.substring(lineStart, end)
-            if (lineStr.contains("ERROR", ignoreCase = true) ||
-                lineStr.contains("FAILED", ignoreCase = true)
+            // Tanpa substring per baris: regionMatches langsung di CharSequence
+            // sumber sehingga highlight pencarian tak memicu jank pada log besar.
+            if (lineContains(text, lineStart, end, "ERROR") ||
+                lineContains(text, lineStart, end, "FAILED")
             ) {
                 sb.setSpan(
                     ForegroundColorSpan(Color.RED),
@@ -243,6 +242,17 @@ class LogActivity : AppCompatActivity() {
             lineStart = lineEnd + 1
         }
         return sb
+    }
+
+    private fun lineContains(text: String, start: Int, end: Int, keyword: String): Boolean {
+        val len = keyword.length
+        if (end - start < len) return false
+        var i = start
+        while (i <= end - len) {
+            if (text.regionMatches(i, keyword, 0, len, ignoreCase = true)) return true
+            i++
+        }
+        return false
     }
 
     override fun onSupportNavigateUp(): Boolean {

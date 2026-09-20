@@ -79,6 +79,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     @Volatile private var sseLastPushAt = 0L
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
     private val shareLock = Any()
+    private val lifecycleLock = Any()
+    private val itemsCacheLock = Any()
     @Volatile private var galleryCache: Triple<Long, List<String>, MediaLibrary.MediaScanResult>? = null
     // Throttle log "galeri kosong karena filter folder" (maks 1x / 5 menit per
     // sesi server) supaya LogActivity tidak kebanjiran saat pengguna menatap
@@ -145,7 +147,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // RejectedExecutionException.
         pool.rejectedExecutionHandler =
             java.util.concurrent.RejectedExecutionHandler { cmd, _ ->
-                synchronized(this@HttpControlServer) {
+                synchronized(lifecycleLock) {
                     if (statPoolEnabled && statPool.isShutdown) statPool = newStatPool()
                 }
                 if (statPoolEnabled) {
@@ -159,10 +161,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return pool
     }
 
-    @Synchronized
     private fun liveStatPool(): ThreadPoolExecutor {
-        if (statPoolEnabled && statPool.isShutdown) statPool = newStatPool()
-        return statPool
+        synchronized(lifecycleLock) {
+            if (statPoolEnabled && statPool.isShutdown) statPool = newStatPool()
+            return statPool
+        }
     }
     private var cachedHtml: String? = null
     private val appVersion: String by lazy {
@@ -333,17 +336,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
-    @Synchronized
     fun startServer() {
-        if (isAlive) return
-        // Retry loop: NanoHTTPD internal pool bisa belum ready setelah stop();
-        // tunggu & coba lagi sampai 3x (total ~600ms) supaya tidak crash.
-        invalidateFsRootsCache()
-        invalidateStatusCache()
-        statPoolEnabled = true
-        // Bila statPool terminated (stopServer() sebelumnya), buat baru supaya
-        // request pertama setelah restart tidak gagal dengan RejectedExecutionException.
-        if (statPool.isTerminated) statPool = newStatPool()
+        synchronized(lifecycleLock) {
+            if (isAlive) return
+            // Retry loop: NanoHTTPD internal pool bisa belum ready setelah stop();
+            // tunggu & coba lagi sampai 3x (total ~600ms) supaya tidak crash.
+            invalidateFsRootsCache()
+            invalidateStatusCache()
+            statPoolEnabled = true
+            // Bila statPool terminated (stopServer() sebelumnya), buat baru supaya
+            // request pertama setelah restart tidak gagal dengan RejectedExecutionException.
+            if (statPool.isTerminated) statPool = newStatPool()
+        }
         var lastEx: IOException? = null
         for (attempt in 1..3) {
             try {
@@ -369,6 +373,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 lastEx = e
                 if (attempt < 3) {
                     appendLog("SERVER START RETRY $attempt/3: ${e.message}")
+                    // Tidur di luar lifecycleLock agar request itemsJson tak ikut terblokir.
                     try { Thread.sleep(SERVER_RETRY_DELAY_MS) } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt()
                     }
@@ -462,15 +467,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     }
 
-    @Synchronized
     fun stopServer() {
-        periodicCleanupJob?.cancel()
-        periodicCleanupJob = null
-        if (!isAlive && statPool.isTerminated) return
+        synchronized(lifecycleLock) {
+            periodicCleanupJob?.cancel()
+            periodicCleanupJob = null
+            if (!isAlive && statPool.isTerminated) return
+            statPoolEnabled = false
+            sseJob?.cancel()
+            sseJob = null
+            runCatching { statPool.shutdownNow() }
+        }
         appendLog("SERVER STOPPED (port $listeningPort)")
-        statPoolEnabled = false
-        sseJob?.cancel()
-        sseJob = null
         // upload finalization coroutine yang berjalan di serverScope akan
         // selesai secara natural (beberapa ms saja) — jangan cancel scope
         // karena bisa memutus operasi tulis file tengah jalan.
@@ -482,8 +489,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // Server bisa dimatikan lalu dinyalakan ulang (ganti port / stop-start
         // di Settings) — pool statistik ikut dihentikan; liveStatPool()
         // membuat pool baru otomatis saat dibutuhkan lagi.
-        runCatching { statPool.shutdownNow() }
         super.stop()
+        // Tunggu di luar lifecycleLock supaya request tak terblokir monitor.
         // Tunggu sebentar supaya NanoHTTPD internal pool benar-benar terminated
         // sebelum client request berikutnya datang (cegah RejectedExecutionException).
         try { Thread.sleep(SERVER_STOP_GRACE_MS) } catch (_: InterruptedException) {
@@ -816,17 +823,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 item.progressPercentOverride.hashCode() * 61 +
                 (item.error?.hashCode() ?: 0) * 47
         }
-        synchronized(this) {
+        synchronized(itemsCacheLock) {
             lastSigItems = items
             lastSigResult = h
         }
         return h
     }
 
-    @Synchronized
     private fun itemsJson(): JSONArray {
         val items = App.engine.items.value
         val sig = itemsSignature(items)
+        synchronized(itemsCacheLock) {
         cachedItems?.let { (cachedSig, json) -> if (cachedSig == sig) return json }
         // Build JSON sekali; untuk item yang sudah ada di cache lama, pertahankan
         // JSONObject statis (url, fileName, addedAt) dan update hanya field dinamis.
@@ -895,6 +902,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         cachedItems = sig to arr
         return arr
+        }
     }
 
     private fun addDownload(session: IHTTPSession): Response {
@@ -2627,6 +2635,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // Ini menutup celah lama: perubahan yang tertahan throttle tidak
                     // perlu menunggu ticker status 10 dtk.
                     var tick = 0
+                    var lastBuiltSig = 0
                     while (true) {
                         delay(1_000)
                         tick++
@@ -2642,8 +2651,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                                 return@launch
                             }
                         }
-                        if (System.currentTimeMillis() - sseLastPushAt < SSE_MIN_INTERVAL_MS) continue
+                        val nowThrottle = System.currentTimeMillis()
+                        if (nowThrottle - sseLastPushAt < SSE_MIN_INTERVAL_MS) continue
+                        // Lewati serialisasi JSON penuh bila daftar tak berubah
+                        // dan heartbeat belum jatuh tempo (hemat CPU tiap tick).
+                        val currentSig = itemsSignature(App.engine.items.value)
+                        val heartbeatDue = nowThrottle - sseLastPushAt > SSE_HEARTBEAT_MS
+                        if (!pruneTick && !heartbeatDue && currentSig == lastBuiltSig) continue
                         pushFrame(buildPayload(pruneTick))
+                        lastBuiltSig = currentSig
                     }
                 } catch (e: CancellationException) {
                     throw e
