@@ -5,6 +5,7 @@
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **ui(main): percantik item + header + pengaturan** -- Item download jadi kartu (`bg_status_card` konsisten settings), ikon file 44dp, progress bar 8dp ramping; header seksi tegas (bold + letterSpacing); chip navigasi pengaturan 40dp/bold 13sp, judul seksi 15sp, kartu elevation 3dp.
 - **perf(list): daftar utama hemat bind + engine hemat emit** -- `DownloadAdapter` pakai payload progres (tick 400ms-1s hanya update bar/teks/kecepatan, bukan rebind ikon/badge/tombol); `MainActivity` `setHasFixedSize` + cache 20; `DownloadEngine` `recordSegmentProgress` tanpa scan O(n) + sampel speed/ETA maks 1x/detik (byte tetap flush 500ms).
 - **fix(ci): suppression audit pindah ke baris sendiri** -- Komentar `audit-ignore` trailing menelan lanjutan ekspresi (`else ""`, `.getOrDefault`) sehingga `compileDebugKotlin` gagal; kini di baris sebelumnya yang tetap dihitung suppression oleh `ignored_on_line`.
 - **fix(settings): save PIN tak jank di HP lama** -- `wireSave` dipisah ke `saveSettings` suspend; verify/hash PBKDF2 150k jalan di `Dispatchers.IO`, tombol Save nonaktif sesaat agar tak double-tap.
