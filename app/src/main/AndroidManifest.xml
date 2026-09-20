@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
-    <!-- MANAGE_EXTERNAL_STORAGE sengaja: targetSdk 34 wajib "Akses semua file" (lihat AGENTS.md). -->
+    <!-- MANAGE_EXTERNAL_STORAGE sengaja: targetSdk 36 wajib "Akses semua file" (lihat AGENTS.md). -->
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />

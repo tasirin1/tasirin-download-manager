@@ -206,7 +206,7 @@ object SocialMediaExtractor {
             if (media != null) {
                 val all = extractAllFromMedia(media, shortcode, igCookies)
                 if (all.isNotEmpty()) {
-                    App.logEvent("IG DEBUG: embed carousel ${all.size} items, cookies=${igCookies.take(30)}")
+                    App.logEvent("IG DEBUG: embed carousel ${all.size} items, cookies=${igCookies.length} chars")
                     options.addAll(all)
                 }
             }
@@ -450,7 +450,7 @@ object SocialMediaExtractor {
         ) ?: return emptyList()
         val pageHtml = httpResult.body
         val ytCookies = httpResult.cookies
-        App.logEvent("YT DEBUG: page ${pageHtml.length} chars, id=$videoId, cookies=${ytCookies.take(40)}")
+        App.logEvent("YT DEBUG: page ${pageHtml.length} chars, id=$videoId, cookies=${ytCookies.length} chars")
 
         val match = YT_PLAYER_RESP_RE
             .find(pageHtml)
@@ -531,7 +531,7 @@ object SocialMediaExtractor {
         val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
             ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
             ?: return null
-        App.logEvent("YT DEBUG: VISIONOS visitorData ${visitor.take(24)}..., cookies=${page.cookies.take(24)}")
+        App.logEvent("YT DEBUG: VISIONOS ok, cookies=${page.cookies.length} chars")
 
         val body = buildString {
             append("{\"context\":{\"client\":{")

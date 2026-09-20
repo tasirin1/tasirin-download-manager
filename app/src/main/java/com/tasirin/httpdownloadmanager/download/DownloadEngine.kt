@@ -1040,7 +1040,7 @@ class DownloadEngine(appContext: Context) {
             val result = SocialMediaExtractor.extract(item.url, item.headers)
             if (result != null && result.directUrl != item.url) {
                 App.logEvent("SOCIAL: extracted direct URL from $host → ${result.directUrl.take(80)}...")
-                App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.take(50)}...")
+                App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.length} chars")
                 // Simpan URL sosial media original supaya saat HLS gagal kita
                 // bisa re-extract dari URL asli (bukan dari URL manifest HLS yang stale).
                 if (result.isHls) originalSocialUrls[item.id] = item.url
