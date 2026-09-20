@@ -20,6 +20,9 @@
     <color name="chip_pressed_blue">#1A1565C0</color>
     <color name="status_off_soft">#FDE8E7</color>
     <color name="chip_active_bg">#E3F0FB</color>
+    <!-- Kontainer tonal modern (gaya M3): tombol sekunder, kartu ringkasan. -->
+    <color name="primary_container">#D8E7FC</color>
+    <color name="primary_container_pressed">#C2D9F8</color>
 
     <!-- Lingkaran ikon tipe file (item download). -->
     <color name="icon_circle_video">#E3F0FB</color>

@@ -12,8 +12,7 @@
         style="@style/Toolbar.Theme.HttpDownloadManager"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@drawable/bg_toolbar_gradient"
-        android:elevation="4dp"
+        android:elevation="0dp"
         app:subtitle="@string/app_name"
         app:subtitleTextColor="@color/white"
         app:subtitleTextAppearance="@style/TextAppearance.AppCompat.Caption"
@@ -27,7 +26,7 @@
         android:layout_marginHorizontal="12dp"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="2dp"
-        android:background="@drawable/bg_summary_gradient"
+        android:background="@drawable/bg_summary_tonal"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingVertical="10dp"
@@ -46,7 +45,7 @@
                 android:layout_height="32dp"
                 android:layout_marginBottom="2dp"
                 android:background="@drawable/bg_icon_circle"
-                android:backgroundTint="@color/chip_active_bg">
+                android:backgroundTint="@color/white">
 
                 <ImageView
                     android:layout_width="16dp"
@@ -96,7 +95,7 @@
                 android:layout_height="32dp"
                 android:layout_marginBottom="2dp"
                 android:background="@drawable/bg_icon_circle"
-                android:backgroundTint="@color/icon_circle_audio">
+                android:backgroundTint="@color/white">
 
                 <ImageView
                     android:layout_width="16dp"
@@ -146,7 +145,7 @@
                 android:layout_height="32dp"
                 android:layout_marginBottom="2dp"
                 android:background="@drawable/bg_icon_circle"
-                android:backgroundTint="@color/status_off_soft">
+                android:backgroundTint="@color/white">
 
                 <ImageView
                     android:layout_width="16dp"

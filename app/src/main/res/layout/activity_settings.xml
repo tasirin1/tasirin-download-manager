@@ -17,8 +17,7 @@
             style="@style/Toolbar.Theme.HttpDownloadManager"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@drawable/bg_toolbar_gradient"
-            android:elevation="4dp"
+            android:elevation="0dp"
             app:title="@string/action_settings" />
 
         <!-- 2. Nav chip dengan ikon -->
