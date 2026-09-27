@@ -305,7 +305,6 @@
             android:layout_gravity="bottom|end"
             android:layout_margin="16dp"
             android:background="@drawable/bg_fab_pill"
-            android:elevation="6dp"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FAB pill: primary flat; bayangan tunggal dari elevation 6dp di layout
-     (jangan layer-list: strip bawah 2dp terpotong di ujung pil radius 24dp
-     sehingga tombol tampak tenggelam). Ring aksen saat fokus D-pad. -->
+<!-- FAB pill: primary flat tanpa elevation/bayangan (gaya 2D);
+     umpan balik tekan/fokus hanya lewat warna isi + ring D-pad. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
