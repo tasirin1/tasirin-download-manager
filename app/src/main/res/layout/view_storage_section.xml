@@ -56,5 +56,9 @@
         android:layout_marginTop="8dp"
         android:background="@drawable/bg_btn_tv"
         android:backgroundTint="@null"
-        android:text="@string/storage_add_folder" />
+        android:minHeight="40dp"
+        android:text="@string/storage_add_folder"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:textSize="13sp" />
 </LinearLayout>

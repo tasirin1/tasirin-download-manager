@@ -25,16 +25,16 @@
 
     <string name="update_check">Check for Updates</string>
     <string name="update_checking">Checking for updates&#8230;</string>
-    <string name="update_failed">Update check failed — check internet connection</string>
-    <string name="update_latest">You have the latest version — downloading APK to Downloads&#8230;</string>
+    <string name="update_failed">Update check failed — check connection</string>
+    <string name="update_latest">Latest version — downloading APK to Downloads&#8230;</string>
     <string name="update_available">Update available: %1$s (build %2$d)</string>
     <string name="update_title">Update available</string>
     <string name="update_downloading">Downloading update&#8230;</string>
     <string name="update_progress_detail">%1$s / %2$s</string>
     <string name="update_progress_unknown">%1$s downloaded</string>
     <string name="update_download_failed">Failed to download update</string>
-    <string name="update_signature_failed">Update rejected — APK signature does not match the official release key</string>
-    <string name="update_downloaded_path">Update downloaded to %1$s — install it manually</string>
+    <string name="update_signature_failed">Update rejected — signature mismatch</string>
+    <string name="update_downloaded_path">Update saved to %1$s — install manually</string>
     <string name="invalid_url">URL must not be empty</string>
 
     <string name="retry">Retry</string>
@@ -55,7 +55,7 @@
     <string name="platform_social">Social media</string>
     <string name="platform_detected">Detected: %1$s</string>
     <string name="confirm_cancel">Cancel this download?</string>
-    <string name="confirm_delete">Delete this download? The file will be removed.</string>
+    <string name="confirm_delete">Delete this download and its file?</string>
     <string name="summary_failed_label">failed</string>
     <string name="summary_paused_label">paused</string>
     <string name="section_active">Active</string>
@@ -80,14 +80,14 @@
     <string name="status_failed">Failed</string>
 
     <string name="storage_picker_error">Failed to use folder: %1$s</string>
-    <string name="storage_picker_unavailable">No app available to pick a folder on this device</string>
-    <string name="storage_download_folder">Download folder (download destination)</string>
-    <string name="storage_extra_folders">Extra folders in File Manager</string>
+    <string name="storage_picker_unavailable">No app available to pick a folder</string>
+    <string name="storage_download_folder">Download folder</string>
+    <string name="storage_extra_folders">Extra folders</string>
     <string name="storage_add_folder">+ Add folder</string>
     <string name="storage_extra_folder_hint">Folder path, e.g. /sdcard/movie</string>
     <string name="storage_remove_folder">&#10005;</string>
-    <string name="storage_text_folder_hint">Folder path (e.g. /storage/emulated/0/Download)</string>
-    <string name="storage_hint_all_files">&quot;All files access&quot; is only needed for the remote File Manager &amp; direct paths. Downloads &amp; gallery keep working via MediaStore without it.</string>
+    <string name="storage_text_folder_hint">Folder path (e.g. /sdcard/Download)</string>
+    <string name="storage_hint_all_files">&quot;All files access&quot; is only needed for the remote File Manager. Downloads &amp; gallery work without it.</string>
     <string name="storage_text_folder_invalid">Path is not valid or not a folder</string>
     <string name="storage_text_folder_saved">Folder saved: %1$s</string>
 
@@ -100,34 +100,34 @@
     <string name="action_settings">Settings</string>
     <string name="action_clear_completed">Clear Completed</string>
     <string name="action_clear_failed">Clear Failed</string>
-    <string name="confirm_clear_failed">Delete all failed downloads and their partial files?</string>
+    <string name="confirm_clear_failed">Delete failed downloads + partial files?</string>
     <string name="confirm_clear_completed">Delete all completed downloads from the list?</string>
-    <string name="settings_background">Automatically resume interrupted downloads (background)</string>
+    <string name="settings_background">Auto-resume interrupted downloads</string>
     <string name="settings_autostart">Start automatically on device boot</string>
     <string name="settings_concurrent">Concurrent downloads (queue)</string>
     <string name="settings_speed_limit">Speed limit</string>
     <string name="settings_retry">Retry attempts on failure</string>
     <string name="settings_connect_timeout">Connection timeout</string>
     <string name="settings_read_timeout">Read timeout</string>
-    <string name="settings_battery">No battery optimization (keep downloads running in background)</string>
+    <string name="settings_battery">Disable battery optimization</string>
     <string name="settings_delete_partial_on_cancel">Delete partial file when cancelled</string>
     <string name="settings_small_first">Download small files first (smart queue)</string>
     <string name="settings_section_download">Downloads</string>
     <string name="settings_section_server">Remote server</string>
     <string name="battery_request_failed">Failed to open battery settings</string>
-    <string name="notification_server_active">Remote server active (HTTP) — reachable from other devices</string>
+    <string name="notification_server_active">Remote server active (HTTP)</string>
     <string name="open_remote">Open Remote Web</string>
     <string name="server_not_running_hint">Server is off. Turn it on in Settings.</string>
     <string name="open_remote_failed">Failed to open remote web</string>
     <string name="copy_address">Copy Address</string>
     <string name="address_copied">Remote address copied to clipboard</string>
-    <string name="settings_hint_battery">Turn off battery optimization so downloads &amp; server keep running in background</string>
+    <string name="settings_hint_battery">Keep downloads &amp; server running in background</string>
     <string name="settings_nav_other">Other</string>
     <string name="about_github">Open GitHub</string>
     <string name="about_check_update">Check Update</string>
     <string name="about_tech">minSdk %1$d · targetSdk %2$d · build %3$d</string>
     <string name="action_about">About</string>
-    <string name="log_exported">Server log exported to Download folder (httpdm-serverlog-*.txt)</string>
+    <string name="log_exported">Server log exported to Download folder</string>
     <string name="log_export_failed">Failed to export log</string>
     <string name="about_title">About Tasirin Download Manager</string>
     <string name="about_version">Version %1$s</string>
@@ -152,12 +152,12 @@
     <string name="settings_segments">Parallel segments per download</string>
 
     <string name="fatal_error_title">Error opening app</string>
-    <string name="fatal_error_message">An error occurred while opening the app. Copy the message below for reporting:</string>
+    <string name="fatal_error_message">App failed to open — copy the message below:</string>
 
     <string name="gallery">Gallery</string>
 
     <string name="open_folder">Folder</string>
-    <string name="open_folder_unavailable">No file-manager app available to open the folder</string>
+    <string name="open_folder_unavailable">No app available to open the folder</string>
     <string name="settings_auto_sort">Auto-move to type subfolder (Video/Photos)</string>
     <string name="social_quality_label">Quality</string>
     <string name="social_carousel_label">Select photo</string>
@@ -169,7 +169,7 @@
     <string name="hls_direct">Download original playlist (no pick)</string>
     <string name="gallery_empty">No videos found yet.</string>
     <string name="gallery_folder_title">Select folders to scan</string>
-    <string name="gallery_folder_hint">Video folders to scan in gallery. Leave empty for all.</string>
+    <string name="gallery_folder_hint">Video folders to scan (empty = all).</string>
     <string name="gallery_open_error">No app found to open this file</string>
 
     <string name="speed_limit_per_label">Speed limit (per download)</string>
@@ -251,7 +251,7 @@
         <item>120 s</item>
     </string-array>
 
-    <string name="mirrors_hint_optional">Mirror URLs (optional, one per line) — used automatically if the main URL fails</string>
+    <string name="mirrors_hint_optional">Mirror URLs (one per line) — fallback if main URL fails</string>
     <string name="action_monitor_on">Watch for updates</string>
     <string name="action_monitor_off">Stop watching</string>
     <string name="status_monitor">watching</string>
@@ -261,25 +261,25 @@
     <string name="settings_pin_enforced">Require PIN when server runs</string>
     <string name="settings_fs_full_access">Full access to main storage (file manager)</string>
     <string name="settings_server_read_only">Read-only server</string>
-    <string name="remote_storage_btn">Enable file access (storage permission)</string>
-    <string name="remote_pin_required">Set a PIN in Settings first before starting the server (for network security)</string>
+    <string name="remote_storage_btn">Enable file access</string>
+    <string name="remote_pin_required">Set a PIN first before starting the server</string>
     <string name="settings_auto_open">Open file after download completes</string>
-    <string name="settings_server_autostart">Start server automatically after device restart</string>
+    <string name="settings_server_autostart">Auto-start server on boot</string>
     <string name="settings_section_storage">Storage</string>
     <string name="settings_saved">Settings saved</string>
-    <string name="remote_log_label">Server log (realtime)</string>
+    <string name="remote_log_label">Server log</string>
     <string name="remote_log_autoscroll">Auto-scroll to bottom</string>
     <string name="remote_log_copy">Copy</string>
     <string name="remote_log_export">Export to txt</string>
     <string name="remote_log_clear">Clear</string>
-    <string name="remote_log_empty">(No activity yet — open the remote page in a browser and try an upload)</string>
+    <string name="remote_log_empty">(No activity yet — open remote and upload)</string>
     <string name="remote_log_copied">Log copied to clipboard</string>
     <string name="remote_log_search_hint">Search in log…</string>
     <plurals name="remote_log_lines">
         <item quantity="one">%1$d line</item>
         <item quantity="other">%1$d lines</item>
     </plurals>
-    <string name="cleanup_button">Clean up junk files</string>
+    <string name="cleanup_button">Clean up junk</string>
     <plurals name="cleanup_done">
         <item quantity="one">Cleaned: %1$d file (%2$s) removed</item>
         <item quantity="other">Cleaned: %1$d files (%2$s) removed</item>

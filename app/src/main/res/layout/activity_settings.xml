@@ -262,18 +262,6 @@
                                 android:textSize="13sp" />
                         </LinearLayout>
 
-                        <Button
-                            android:id="@+id/storage_btn"
-                            style="@style/TvOutlinedButton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:minHeight="40dp"
-                            android:layout_marginTop="8dp"
-                            android:text="@string/remote_storage_btn"
-                            android:visibility="gone"
-                            android:maxLines="2"
-                            android:ellipsize="end"
-                            android:textSize="13sp" />
 
                         <View
                             android:layout_width="match_parent"
@@ -375,16 +363,6 @@
                             android:ellipsize="end"
                             android:textSize="13sp" />
 
-                        <Button
-                            android:id="@+id/btn_log"
-                            style="@style/TvOutlinedButton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="@string/remote_log_label"
-                            android:maxLines="2"
-                            android:ellipsize="end"
-                            android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -772,6 +750,19 @@
                         android:paddingHorizontal="14dp"
                         android:paddingBottom="12dp">
 
+                        <Button
+                            android:id="@+id/storage_btn"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="40dp"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/remote_storage_btn"
+                            android:visibility="gone"
+                            android:maxLines="2"
+                            android:ellipsize="end"
+                            android:textSize="13sp" />
+
                         <include layout="@layout/view_storage_section" />
 
                         <View
@@ -875,6 +866,18 @@
                         android:orientation="vertical"
                         android:paddingHorizontal="14dp"
                         android:paddingBottom="12dp">
+
+                        <Button
+                            android:id="@+id/btn_log"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:text="@string/remote_log_label"
+                            android:maxLines="2"
+                            android:ellipsize="end"
+                            android:textSize="13sp" />
 
                         <Button
                             android:id="@+id/btn_cleanup"
