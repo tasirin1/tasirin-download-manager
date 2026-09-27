@@ -739,10 +739,22 @@ class SettingsActivity : AppCompatActivity() {
         StoragePrefs.setExtraFolders(this, paths)
     }
 
+    /** Cegah save ganda: tap cepat sebelum tombol nonaktif tidak boleh
+     *  menjalankan dua saveSettings paralel (balapan tulis prefs/server). */
+    @Volatile private var savingSettings = false
+
     private fun wireSave() {
         binding.btnSave.setOnClickListener {
+            if (savingSettings) return@setOnClickListener
+            savingSettings = true
+            binding.btnSave.isEnabled = false
             lifecycleScope.launch {
-                saveSettings(binding.inputPort.text?.toString()?.trim()?.toIntOrNull())
+                try {
+                    saveSettings(binding.inputPort.text?.toString()?.trim()?.toIntOrNull())
+                } finally {
+                    savingSettings = false
+                    binding.btnSave.isEnabled = true
+                }
             }
         }
     }
@@ -762,7 +774,7 @@ class SettingsActivity : AppCompatActivity() {
             App.httpServer.invalidateStatusCache()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
             // PBKDF2 150k iterasi berat di HP lama: hash/verify di IO agar save tak jank.
-            binding.btnSave.isEnabled = false
+            // (Tombol nonaktif + re-enable dijamin wireSave via try/finally.)
             val pinEvent = withContext(Dispatchers.IO) {
                 val oldPinHash = StoragePrefs.storedPinHash(this@SettingsActivity)
                 val event = if (newPin.isEmpty()) {
@@ -773,7 +785,6 @@ class SettingsActivity : AppCompatActivity() {
                 StoragePrefs.setServerPin(this@SettingsActivity, newPin)
                 event
             }
-            binding.btnSave.isEnabled = true
             if (pinEvent != null) App.logEvent(pinEvent)
             if (StoragePrefs.isPinEnforced(this) &&
                 StoragePrefs.getServerPin(this).isNullOrEmpty()

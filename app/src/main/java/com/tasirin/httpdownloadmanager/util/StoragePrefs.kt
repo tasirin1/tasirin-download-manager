@@ -228,11 +228,22 @@ object StoragePrefs {
         return value
     }
 
+    /** Cache in-memory secret sesi: pinOk() server memanggil ini tiap request.
+     *  Aman di-cache karena SEMUA penulisan lewat rotateServerSessionSecret
+     *  (termasuk setServerPin) yang ikut memperbarui cache — tak ada basi. */
+    @Volatile private var sessionSecretCache: String? = null
+
     /** Cookie sesi remote harus token acak, bukan turunan langsung dari PIN. */
-    @Synchronized
     fun serverSessionSecret(context: Context): String {
-        prefs(context).getString(KEY_SERVER_SESSION_SECRET, null)?.takeIf { it.isNotEmpty() }?.let { return it }
-        return rotateServerSessionSecret(context)
+        sessionSecretCache?.let { return it }
+        synchronized(this) {
+            sessionSecretCache?.let { return it }
+            prefs(context).getString(KEY_SERVER_SESSION_SECRET, null)?.takeIf { it.isNotEmpty() }?.let {
+                sessionSecretCache = it
+                return it
+            }
+            return rotateServerSessionSecret(context)
+        }
     }
 
     @Synchronized
@@ -244,6 +255,7 @@ object StoragePrefs {
             Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
         )
         prefs(context).edit { putString(KEY_SERVER_SESSION_SECRET, value) }
+        sessionSecretCache = value
         return value
     }
 

@@ -11,6 +11,9 @@ import android.content.res.AssetFileDescriptor
 internal class ChainInputStream(private val files: List<File>) : InputStream() {
     private var current: InputStream? = null
     private var idx = 0
+    // Buffer skip dipakai ulang: alokasi 64KB per panggilan boros saat seek besar.
+    // Aman: stream respons dipakai satu thread oleh NanoHTTPD.
+    private val skipBuf = ByteArray(64 * 1024)
 
     private fun next(): InputStream? {
         current?.let { runCatching { it.close() } }
@@ -45,10 +48,9 @@ internal class ChainInputStream(private val files: List<File>) : InputStream() {
     override fun skip(n: Long): Long {
         if (n <= 0) return 0
         var remaining = n
-        val buf = ByteArray(64 * 1024)
         while (remaining > 0) {
-            val want = minOf(buf.size.toLong(), remaining).toInt()
-            val r = read(buf, 0, want)
+            val want = minOf(skipBuf.size.toLong(), remaining).toInt()
+            val r = read(skipBuf, 0, want)
             if (r <= 0) break
             remaining -= r
         }

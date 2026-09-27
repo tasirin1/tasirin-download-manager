@@ -2353,6 +2353,18 @@ class DownloadEngine(appContext: Context) {
         try {
             val code = conn.responseCode
             if (code != 206) throw IOException("Server does not support Range (HTTP $code)")
+            // Verifikasi server melanjutkan dari offset segmen yang benar
+            // (seperti runSingle): respons 206 tanpa Content-Range dibiarkan,
+            // tapi offset salah berarti byte korup bila diteruskan.
+            val segStart = segment.start + downloaded
+            val segCr = conn.getHeaderField("Content-Range")
+            if (segCr != null) {
+                val segActual = segCr.substringAfter("bytes ").substringBefore("-").trim().toLongOrNull()
+                if (segActual == null) throw IOException("Malformed Content-Range: $segCr")
+                if (segActual != segStart) {
+                    throw IOException("Segment ${segment.index} resumed from byte $segActual, not $segStart")
+                }
+            }
 
             val input = conn.inputStream
             val output = BufferedOutputStream(FileOutputStream(partial, true), BUFFER_SIZE)
@@ -2531,6 +2543,12 @@ class DownloadEngine(appContext: Context) {
             val tolerance = total / 20  // 5%
             if (shortage > tolerance) {
                 throw IOException("Size mismatch: expected $total (Content-Length), received $downloaded")
+            }
+            if (shortage > 0) {
+                App.logEvent(
+                    "DOWNLOAD WARNING: received $downloaded of $total bytes " +
+                        "(short ${Formats.bytes(shortage)} within 5% tolerance)"
+                )
             }
         }
     }

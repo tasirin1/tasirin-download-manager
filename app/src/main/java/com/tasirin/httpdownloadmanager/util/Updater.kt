@@ -18,9 +18,10 @@ data class UpdateInfo(
     val apkSize: Long
 )
 
-/** Cek & unduh APK rilis terbaru dari GitHub. Instalasi dilakukan manual oleh
- *  pengguna (tanpa REQUEST_INSTALL_PACKAGES — mengurangi sinyal berbahaya
- *  bagi Play Protect untuk aplikasi sideload). */
+/** Cek & unduh APK rilis terbaru dari GitHub (download-only + verifikasi
+ *  tanda tangan). Instalasi tetap manual oleh pengguna: izin
+ *  REQUEST_INSTALL_PACKAGES di manifest hanya dipakai MainActivity untuk
+ *  membuka installer saat pengguna mengetuk item APK, bukan auto-install. */
 object Updater {
     private val APK_NAME_RE = Regex("-(\\d+)\\.apk$")
     private const val LATEST_API =

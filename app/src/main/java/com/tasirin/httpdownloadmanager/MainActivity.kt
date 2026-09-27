@@ -1289,6 +1289,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     /** Ekspor log error (crash + error server) ke file .txt di folder Download. */
     /** Set yang sudah di-set COMPLETED supaya tidak auto-open berulang. */
     private val autoOpenedIds = mutableSetOf<String>()
+    /** State tiap item pada emisi sebelumnya: hanya transisi menuju COMPLETED
+     *  selama sesi berjalan yang auto-open. Item yang sudah selesai sebelum
+     *  app dibuka tidak boleh membuka player/installer sendiri. */
+    private var lastItemStates = mapOf<String, DownloadState>()
 
     private fun autoOpenCompleted(items: List<DownloadItem>) {
         // autoOpenedIds tumbuh sepanjang sesi; buang id yang sudah tidak ada di
@@ -1297,10 +1301,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             val keep = items.asSequence().map { it.id }.toSet()
             autoOpenedIds.retainAll(keep)
         }
+        val prev = lastItemStates
         for (item in items) {
             if (item.state == DownloadState.COMPLETED &&
                 item.id !in autoOpenedIds &&
-                item.filePath != null
+                item.filePath != null &&
+                prev[item.id] != null && prev[item.id] != DownloadState.COMPLETED
             ) {
                 autoOpenedIds.add(item.id)
                 runCatching {
@@ -1308,6 +1314,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
         }
+        lastItemStates = items.associate { it.id to it.state }
     }
 
     /** Buka satu file selesai (dipisah agar path eksotis yang gagal tidak

@@ -75,7 +75,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private var periodicCleanupJob: Job? = null
     private val sseClients = CopyOnWriteArrayList<SseStream>()
     @Volatile private var sseJob: Job? = null
-    @Volatile private var sseLastFrameHash = 0
+    @Volatile private var sseLastFrameHash = 0L
     @Volatile private var sseLastPushAt = 0L
     private val shareTokens = ConcurrentHashMap<String, ShareEntry>()
     private val shareLock = Any()
@@ -1731,9 +1731,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Download segmen: gabungkan potongan yang sudah terunduh secara
             // berurutan agar tetap bisa distream (Range relatif ke gabungan).
             val cleanName = FileNames.safe(item.fileName)
-            val parts = item.segments.sortedBy { it.index }.mapNotNull { seg ->
-                File(File(context.filesDir, "downloads"), "$cleanName.part.${seg.index}")
-                    .takeIf { it.isFile }
+            // Ambil hanya prefix kontinu dari indeks 0: segmen yang belum
+            // mulai (gap) membuat gabungan tak-kontinu sehingga Range dihitung
+            // dari total yang salah dan player menerima byte korup.
+            val parts = mutableListOf<File>()
+            for (seg in item.segments.sortedBy { it.index }) {
+                val part = File(File(context.filesDir, "downloads"), "$cleanName.part.${seg.index}")
+                if (!part.isFile) break
+                parts.add(part)
             }
             if (parts.isEmpty()) return notFound()
             val total = parts.sumOf { it.length() }
@@ -2667,6 +2672,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private val ssePumpLock = Any()
 
+    /** Hash 64-bit FNV-1a untuk dedup frame SSE: hashCode() 32-bit bisa
+     *  tabrakan sehingga update daftar tertunda sampai heartbeat berikutnya. */
+    private fun frameHash64(s: String): Long {
+        var h = -3750763034362895579L
+        for (i in 0 until s.length) {
+            h = h xor s[i].code.toLong()
+            h *= 1099511628211L
+        }
+        return h
+    }
+
     private fun ensureSsePump() {
         // Beberapa koneksi SSE datang bersamaan (tab/device ganda) bisa sama-
         // sama melewati cek `isActive` sebelum sseJob terisi -> dua pump kembar
@@ -2683,7 +2699,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val pushFrame = { payloadText: String ->
                     runCatching {
                         val now = System.currentTimeMillis()
-                        val frameHash = payloadText.hashCode()
+                        val frameHash = frameHash64(payloadText)
                         if (frameHash != sseLastFrameHash || now - sseLastPushAt > SSE_HEARTBEAT_MS) {
                             sseLastFrameHash = frameHash
                             sseLastPushAt = now

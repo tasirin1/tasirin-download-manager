@@ -61,8 +61,11 @@ class FileSaver(context: Context) {
             }
             // renameTo memakai rename(2) di Linux dan menggantikan target lama;
             // fallback menjaga perangkat yang menolak replace otomatis.
-            if (!staging.renameTo(target) && target.exists()) {
-                if (!target.delete() || !staging.renameTo(target)) {
+            // Bila finalisasi gagal, wajib throw: me-return target yang tidak
+            // ada sambil menghapus parts berarti data hilang diam-diam.
+            if (!staging.renameTo(target)) {
+                runCatching { target.delete() }
+                if (!staging.renameTo(target) || !target.isFile) {
                     throw IOException("Failed to finalize merged file")
                 }
             }
@@ -497,14 +500,16 @@ class FileSaver(context: Context) {
 
     private fun uniqueTargetFile(file: File): File {
         // Klaim atomik via createNewFile agar dua publish paralel dengan
-        // nama sama tidak saling menimpa target yang sama.
+        // nama sama tidak saling menimpa target yang sama. File klaim (kosong)
+        // TIDAK dihapus: pemanggil menimpanya via outputStream atau renameTo,
+        // sehingga klaim tetap berlaku sampai tulis selesai (tanpa jendela
+        // TOCTOU antara klaim dan pakai).
         val parent = file.parentFile
         if (parent != null && !parent.isDirectory) parent.mkdirs()
         var candidate = file
         repeat(1000) {
             if (!candidate.exists()) {
                 if (runCatching { candidate.createNewFile() }.getOrDefault(false)) {
-                    candidate.delete()
                     return candidate
                 }
                 if (!candidate.exists()) return candidate
