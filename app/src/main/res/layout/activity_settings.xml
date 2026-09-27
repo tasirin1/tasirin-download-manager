@@ -208,6 +208,27 @@
                             android:layout_height="wrap_content"
                             android:textAppearance="?android:attr/textAppearanceSmall" />
 
+                        <!-- Aksi utama dulu: Start/Stop, lalu alamat + buka/salin -->
+                        <Button
+                            android:id="@+id/server_switch"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="40dp"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/server_start"
+                            android:maxLines="2"
+                            android:ellipsize="end"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/urls"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:textIsSelectable="true"
+                            android:textAppearance="?android:attr/textAppearanceSmall" />
+
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -249,27 +270,7 @@
                             android:minHeight="40dp"
                             android:layout_marginTop="8dp"
                             android:text="@string/remote_storage_btn"
-                            android:visibility="gone" 
-                            android:maxLines="2"
-                            android:ellipsize="end"
-                            android:textSize="13sp" />
-
-                        <TextView
-                            android:id="@+id/urls"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:textIsSelectable="true"
-                            android:textAppearance="?android:attr/textAppearanceSmall" />
-
-                        <Button
-                            android:id="@+id/server_switch"
-                            style="@style/TvOutlinedButton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:minHeight="40dp"
-                            android:layout_marginTop="8dp"
-                            android:text="@string/server_start" 
+                            android:visibility="gone"
                             android:maxLines="2"
                             android:ellipsize="end"
                             android:textSize="13sp" />
@@ -279,6 +280,29 @@
                             android:layout_height="1dp"
                             android:layout_marginVertical="8dp"
                             android:background="@color/line" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/settings_port_label"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <EditText
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:id="@+id/input_port"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_input_tv"
+                            android:hint="@string/settings_port_hint"
+                            android:importantForAutofill="no"
+                            android:inputType="number"
+                            android:minHeight="40dp"
+                            android:textSize="14sp"
+                            tools:ignore="TextFields" />
 
                         <Button
                             android:id="@+id/check_server_autostart"
@@ -324,20 +348,6 @@
                             android:textSize="13sp" />
 
                         <Button
-                            android:id="@+id/check_fs_full_access"
-                            style="@style/TvOutlinedButton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:minHeight="40dp"
-                            android:gravity="start|center_vertical"
-                            android:paddingHorizontal="10dp"
-                            android:text="@string/settings_fs_full_access"
-                            android:maxLines="2"
-                            android:ellipsize="end"
-                            android:textSize="13sp" />
-
-                        <Button
                             android:id="@+id/check_server_read_only"
                             style="@style/TvOutlinedButton"
                             android:layout_width="match_parent"
@@ -351,28 +361,19 @@
                             android:ellipsize="end"
                             android:textSize="13sp" />
 
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:text="@string/settings_port_label"
-                            android:textAppearance="?android:attr/textAppearanceSmall"
-                            android:textColor="?android:attr/textColorSecondary" />
-
-                        <EditText
-                            android:focusable="true"
-                            android:focusableInTouchMode="true"
-                            android:id="@+id/input_port"
+                        <Button
+                            android:id="@+id/check_fs_full_access"
+                            style="@style/TvOutlinedButton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:background="@drawable/bg_input_tv"
-                            android:hint="@string/settings_port_hint"
-                            android:importantForAutofill="no"
-                            android:inputType="number"
                             android:minHeight="40dp"
-                            android:textSize="14sp"
-                            tools:ignore="TextFields" />
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_fs_full_access"
+                            android:maxLines="2"
+                            android:ellipsize="end"
+                            android:textSize="13sp" />
 
                         <Button
                             android:id="@+id/btn_log"

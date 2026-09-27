@@ -444,14 +444,14 @@ class SettingsActivity : AppCompatActivity() {
             getString(R.string.settings_pin_enforced)
         )
         renderToggle(
-            binding.checkFsFullAccess,
-            StoragePrefs.isFsFullAccessEnabled(this),
-            getString(R.string.settings_fs_full_access)
-        )
-        renderToggle(
             binding.checkServerReadOnly,
             StoragePrefs.isServerReadOnly(this),
             getString(R.string.settings_server_read_only)
+        )
+        renderToggle(
+            binding.checkFsFullAccess,
+            StoragePrefs.isFsFullAccessEnabled(this),
+            getString(R.string.settings_fs_full_access)
         )
         renderToggle(
             binding.checkBackground,
