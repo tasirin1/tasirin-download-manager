@@ -99,12 +99,14 @@ class ServerVideoDurations(
         synchronized(lock) { cache = null }
     }
 
-    /** Tulis cache ke disk (sedikit & jarang; tidak wajib thread-safe ekstra). */
+    /** Tulis cache ke disk (sedikit & jarang; tidak wajib thread-safe ekstra).
+     *  Cache kosong menghapus file: tanpa ini video_durations.json basi
+     *  tetap dibaca ulang setelah invalidate() walau tak ada durasi baru. */
     fun save() {
         synchronized(lock) {
             val c = cacheLocked()
-            if (c.length() != 0) {
-                runCatching { file.writeText(c.toString()) }
+            runCatching {
+                if (c.length() == 0) file.delete() else file.writeText(c.toString())
             }
         }
     }

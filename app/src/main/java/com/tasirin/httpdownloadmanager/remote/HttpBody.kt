@@ -41,7 +41,9 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
         while (remaining > 0) {
             val toRead = minOf(buf.size, remaining)
             val read = session.inputStream.read(buf, 0, toRead)
-            if (read == -1) break
+            // Stream putus sebelum Content-Length terpenuhi: jangan parse
+            // parsial sebagai form valid (bisa jadi login/pin terpotong).
+            if (read == -1) throw IOException("Request body truncated")
             sb.append(String(buf, 0, read, Charsets.UTF_8))
             remaining -= read
         }
@@ -72,26 +74,43 @@ internal fun NanoHTTPD.IHTTPSession.param(key: String): String? =
     getParameters()[key]?.firstOrNull()
 
 /** Habiskan body sesi tanpa memprosesnya (untuk request yang body-nya
- *  sengaja diabaikan) supaya koneksi bisa dipakai ulang. */
-internal fun drainBody(session: NanoHTTPD.IHTTPSession) {
-    val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
-        .coerceAtMost(MAX_UPLOAD_BYTES)
-    if (length <= 0) return
+ *  sengaja diabaikan) supaya koneksi bisa dipakai ulang.
+ *  Kembalikan true bila body habis terdrain; false bila body melebihi batas
+ *  atau stream terputus lebih awal — pemanggil wajib menutup koneksi
+ *  (closeConnection) agar sisa byte tidak dibaca sebagai request berikutnya. */
+internal fun drainBody(session: NanoHTTPD.IHTTPSession): Boolean {
+    val declared = session.headers["content-length"]?.toLongOrNull() ?: 0L
+    if (declared <= 0) return true
+    if (declared > MAX_UPLOAD_BYTES) return false
     val buffer = ByteArray(64 * 1024)
-    var remaining = length
+    var remaining = declared
     while (remaining > 0) {
         val chunk = minOf(buffer.size.toLong(), remaining).toInt()
         val read = session.inputStream.read(buffer, 0, chunk)
-        if (read == -1) break
+        if (read == -1) return false
         remaining -= read
     }
+    return true
 }
 
 /** Salin body upload ke OutputStream tanpa menutup session.inputStream
- *  (NanoHTTPD menutupnya sendiri setelah serve() selesai). */
+ *  (NanoHTTPD menutupnya sendiri setelah serve() selesai).
+ *  length <= 0 (chunked tanpa Content-Length): baca sampai EOF dengan batas
+ *  MAX_UPLOAD_BYTES agar body tidak tertinggal di stream keep-alive. */
 internal fun copyUploadBody(session: NanoHTTPD.IHTTPSession, length: Long, out: OutputStream) {
     val input = session.inputStream
     val buffer = ByteArray(64 * 1024)
+    if (length <= 0) {
+        var total = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read == -1) break
+            total += read
+            if (total > MAX_UPLOAD_BYTES) throw BodyTooLargeException()
+            out.write(buffer, 0, read)
+        }
+        return
+    }
     var remaining = length
     while (remaining > 0) {
         val chunk = minOf(buffer.size.toLong(), remaining).toInt()

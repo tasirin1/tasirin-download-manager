@@ -49,6 +49,17 @@ object MediaLibrary {
     )
 
     /** Koleksi MediaStore untuk root folder media (dipakai saat browsing). */
+    // Escape argumen LIKE SQLite; duplikat kecil dari ServerSecurity agar
+    // lapisan util tidak bergantung ke lapisan remote.
+    private fun escapeLike(s: String): String {
+        val sb = StringBuilder(s.length)
+        for (c in s) {
+            if (c == '\\' || c == '%' || c == '_') sb.append('\\')
+            sb.append(c)
+        }
+        return sb.toString()
+    }
+
     fun mediaCollectionForRoot(root: String): Uri {
         return when (root.trim('/').substringBefore('/').lowercase()) {
             "pictures", "dcim" -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
@@ -287,7 +298,8 @@ object MediaLibrary {
     private fun scanCached(context: Context, maxEntries: Int, selectedFolders: List<String> = emptyList()): MediaScanResult {
         ensureObserver(context)
         synchronized(scanLock) {
-            val now = System.currentTimeMillis()
+            // Jam monotonik: TTL cache tidak goyah bila jam dinding berubah.
+            val now = android.os.SystemClock.elapsedRealtime()
             val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
             // Cache hanya valid bila folder selection sama (kosong = semua)
             scanCache?.let { (ts, items, total) ->
@@ -321,7 +333,7 @@ object MediaLibrary {
                 val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
                     private var lastInvalidate = 0L
                     override fun onChange(selfChange: Boolean) {
-                        val now = System.currentTimeMillis()
+                        val now = android.os.SystemClock.elapsedRealtime()
                         if (now - lastInvalidate > 10_000L) {
                             lastInvalidate = now
                             synchronized(scanLock) { scanCache = null }
@@ -465,8 +477,10 @@ object MediaLibrary {
                     for (folder in selectedFolders) {
                         val rel = folder.trimEnd('/').removePrefix(root).trim('/')
                         if (rel.isEmpty()) continue // seluruh root dipilih → tanpa batasan
-                        clauses += "($relCol LIKE ? OR $relCol = ?)"
-                        args += "$rel/%"
+                        // Nama folder asli bisa mengandung "%"/"_" (mis. "100%"):
+                        // escape agar LIKE tidak melebar ke folder lain.
+                        clauses += "($relCol LIKE ? ESCAPE '\\' OR $relCol = ?)"
+                        args += escapeLike(rel) + "/%"
                         args += "$rel/"
                     }
                     if (clauses.isEmpty()) {
@@ -539,7 +553,10 @@ object MediaLibrary {
                     val seenDirs = mutableSetOf<String>()
                     root.walkTopDown().maxDepth(24).onEnter { dir ->
                         val canonical = runCatching { dir.canonicalPath }.getOrNull() ?: return@onEnter false
-                        seenDirs.add(canonical)
+                        // Direktori kanonis yang sudah dikunjungi = siklus
+                        // symlink: pangkas subtree agar tidak fan-out eksponensial.
+                        if (!seenDirs.add(canonical)) return@onEnter false
+                        true
                     }
                         .filter { it.isFile && isGalleryVideo(it.name) }
                         .take(GALLERY_MAX_ENTRIES)
@@ -576,7 +593,8 @@ object MediaLibrary {
                     val seenDirs = mutableSetOf<String>()
                     dir.walkTopDown().maxDepth(24).onEnter { d ->
                         val canonical = runCatching { d.canonicalPath }.getOrNull() ?: return@onEnter false
-                        seenDirs.add(canonical)
+                        if (!seenDirs.add(canonical)) return@onEnter false
+                        true
                     }
                         .filter { it.isFile && isGalleryVideo(it.name) }
                         .take(GALLERY_MAX_ENTRIES)

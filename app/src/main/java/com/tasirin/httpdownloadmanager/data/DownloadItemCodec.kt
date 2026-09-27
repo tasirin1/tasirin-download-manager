@@ -77,6 +77,8 @@ object DownloadItemCodec {
     private fun parseItem(o: JSONObject?, coerceActiveToPaused: Boolean): DownloadItem? {
         if (o == null) return null
         return runCatching {
+            // State tak dikenal berarti entri korup: lewati entri ini saja
+            // (sesuai kontrak tes) agar tidak meracuni daftar dan lapisan hilir.
             val rawState = DownloadState.valueOf(o.getString("state"))
             // Hanya DOWNLOADING yang di-coerce: PENDING adalah antrean sah
             // yang harus lanjut otomatis setelah restart, bukan ikut dijeda.
@@ -146,14 +148,14 @@ object DownloadItemCodec {
             buildList {
                 for (j in 0 until segArr.length()) {
                     val so = segArr.getJSONObject(j)
-                    add(
-                        DownloadSegment(
-                            index = so.getInt("index"),
-                            start = so.getLong("start"),
-                            end = so.getLong("end"),
-                            downloaded = so.getLong("downloaded")
-                        )
-                    )
+                    val index = so.getInt("index")
+                    val start = so.getLong("start")
+                    val end = so.getLong("end")
+                    val downloaded = so.getLong("downloaded")
+                    // Entri segmen korup (negatif/terbalik) dilewati agar tidak
+                    // meracuni resume multi-segmen; segmen valid tetap dipakai.
+                    if (index < 0 || start < 0 || end < start || downloaded < 0) continue
+                    add(DownloadSegment(index, start, end, downloaded))
                 }
             }
         }.getOrDefault(emptyList())

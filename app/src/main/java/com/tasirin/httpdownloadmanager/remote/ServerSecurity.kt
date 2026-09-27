@@ -155,6 +155,18 @@ object ServerSecurity {
         return now + lockMs
     }
 
+    /** Escape argumen LIKE SQLite (`\`, `%`, `_`): path dari request
+     *  tidak boleh menjadi wildcard yang menjaring folder lain. Dipakai
+     *  bersama klausa `ESCAPE '\\'`. */
+    fun escapeLike(s: String): String {
+        val sb = StringBuilder(s.length)
+        for (c in s) {
+            if (c == '\\' || c == '%' || c == '_') sb.append('\\')
+            sb.append(c)
+        }
+        return sb.toString()
+    }
+
     /** Offset chunk upload valid: non-negatif dan tidak melebihi batas file. */
     fun isChunkOffsetAllowed(offset: Long, maxFileBytes: Long): Boolean = offset in 0..maxFileBytes
 

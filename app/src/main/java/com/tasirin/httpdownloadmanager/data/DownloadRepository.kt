@@ -3,6 +3,7 @@ package com.tasirin.httpdownloadmanager.data
 import android.content.Context
 import androidx.core.content.edit
 import com.tasirin.httpdownloadmanager.util.Crypto
+import java.security.MessageDigest
 import java.util.Collections
 
 class DownloadRepository(context: Context) {
@@ -38,13 +39,23 @@ class DownloadRepository(context: Context) {
     }
 
     fun save(items: List<DownloadItem>) {
+        persistItems(items, blocking = false)
+    }
+
+    // Tulis sinkron (commit) untuk jalur flush: pause/cancel/selesai/add.
+    // apply() async bisa hilang bila proses mati sebelum antrean tulis jalan.
+    fun saveImmediate(items: List<DownloadItem>) {
+        persistItems(items, blocking = true)
+    }
+
+    private fun persistItems(items: List<DownloadItem>, blocking: Boolean) {
         val encItems = items.map { item ->
             val (encUser, encPass, encHeaders, encBody) = encryptedCreds(item)
             item.copy(username = encUser, password = encPass, headers = encHeaders, postBody = encBody)
         }
         // Snapshot penuh sudah memuat progres terbaru -> hapus progres ringan
         // supaya tidak menimpa data yang lebih lama saat load berikutnya.
-        prefs.edit {
+        prefs.edit(commit = blocking) {
             putString(KEY_ITEMS, DownloadItemCodec.encode(encItems))
             remove(KEY_PROGRESS)
         }
@@ -52,9 +63,10 @@ class DownloadRepository(context: Context) {
 
     private fun encryptedCreds(item: DownloadItem): Quad {
         // headers/postBody bisa memuat token Authorization dan secret POST,
-        // jadi ikut dienkripsi; kunci cache mencakup keempatnya.
-        val plain = item.username + "\u0000" + item.password + "\u0000" + item.headers + "\u0000" + item.postBody
-        credCache[plain]?.let { return it }
+        // jadi ikut dienkripsi. Kunci cache adalah hash SHA-256 agar plaintext
+        // kredensial tidak tertahan lama di memori sebagai kunci HashMap.
+        val cacheKey = cacheKeyOf(item.username, item.password, item.headers, item.postBody)
+        credCache[cacheKey]?.let { return it }
         val pair = Quad(
             Crypto.encrypt(item.username),
             Crypto.encrypt(item.password),
@@ -72,9 +84,18 @@ class DownloadRepository(context: Context) {
                 val iter = credCache.keys.iterator()
                 while (iter.hasNext() && removed < half) { iter.next(); iter.remove(); removed++ }
             }
-            credCache[plain] = pair
+            credCache[cacheKey] = pair
         }
         return pair
+    }
+
+    private fun cacheKeyOf(vararg parts: String): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        parts.forEachIndexed { i, s ->
+            if (i > 0) md.update(0)
+            md.update(s.toByteArray(Charsets.UTF_8))
+        }
+        return md.digest().joinToString("") { "%02x".format(java.util.Locale.US, it) }
     }
 
     // Nilai terenkripsi empat field sensitif; dipakai sebagai value cache.

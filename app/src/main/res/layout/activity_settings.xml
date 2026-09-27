@@ -135,7 +135,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_status_card"
-                    android:elevation="3dp"
                     android:orientation="vertical">
 
                     <!-- 3. Header dengan accent bar + ikon + badge -->
@@ -373,7 +372,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_status_card"
-                    android:elevation="3dp"
                     android:orientation="vertical">
 
                     <LinearLayout
@@ -685,7 +683,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_status_card"
-                    android:elevation="3dp"
                     android:orientation="vertical">
 
                     <LinearLayout
@@ -786,7 +783,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_status_card"
-                    android:elevation="3dp"
                     android:orientation="vertical">
 
                     <LinearLayout
@@ -900,7 +896,6 @@
         android:background="@drawable/bg_fab_pill"
         android:clickable="true"
         android:focusable="true"
-        android:elevation="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="16dp"

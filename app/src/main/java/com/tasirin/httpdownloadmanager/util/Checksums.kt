@@ -54,7 +54,12 @@ object Checksums {
             return v.lowercase()
         }
         val decoded = base64Decode(v) ?: return null
-        if (decoded.isEmpty()) return null
+        val expectLen = when (algo) {
+            "MD5" -> 16
+            "SHA-1" -> 20
+            else -> 32
+        }
+        if (decoded.size != expectLen) return null
         return Hex.encode(decoded)
     }
 
@@ -62,6 +67,10 @@ object Checksums {
     fun base64Decode(input: String): ByteArray? {
         val clean = input.filter { !it.isWhitespace() }.map { if (it == '-') '+' else if (it == '_') '/' else it }.joinToString("")
         if (clean.isEmpty() || clean.length % 4 == 1) return null
+        val firstPad = clean.indexOf('=')
+        if (firstPad >= 0 && firstPad < clean.length - 2) return null
+        if (clean.count { it == '=' } > 2) return null
+        if (clean.length >= 2 && clean[clean.length - 2] == '=' && clean[clean.length - 1] != '=') return null
         var s = clean
         while (s.length % 4 != 0) s += "="
         // Ukuran pasti: setiap 4 char base64 = 3 byte output (tanpa padding).

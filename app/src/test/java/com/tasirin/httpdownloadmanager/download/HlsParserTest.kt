@@ -77,6 +77,18 @@ class HlsParserTest {
     }
 
     @Test
+    fun `resolveUrl - query basis tidak merusak direktori`() {
+        assertEquals(
+            "https://cdn.example.com/videos/low.m3u8",
+            HlsParser.resolveUrl("https://cdn.example.com/videos/master.m3u8?token=abc", "low.m3u8")
+        )
+        assertEquals(
+            "https://cdn.example.com/videos/low.m3u8",
+            HlsParser.resolveUrl("https://cdn.example.com/videos/master.m3u8?next=a/b", "low.m3u8")
+        )
+    }
+
+    @Test
     fun `parse master - frameRate dibaca dari atribut FRAME-RATE`() {
         val master = """
             #EXTM3U

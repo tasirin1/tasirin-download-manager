@@ -46,6 +46,10 @@ object AdtsAac {
 
     /** Ukuran tag ID3v2 di posisi offset (0 bila tidak ada). Video/audio segmen
      *  HLS YouTube sering diawali tag ID3 berisi timestamp transport stream. */
+    // Batas wajar tag ID3 di segmen HLS (biasanya < 1 KB timestamp);
+    // di atas ini hampir pasti "ID3" kebetulan di payload audio.
+    internal const val MAX_ID3_BYTES = 1024 * 1024
+
     fun id3TagSize(data: ByteArray, offset: Int): Int {
         if (offset + 10 > data.size) return 0
         if (data[offset] != 0x49.toByte() || data[offset + 1] != 0x44.toByte() ||
@@ -53,10 +57,16 @@ object AdtsAac {
         ) return 0
         var size = 0
         for (i in 0 until 4) {
-            size = (size shl 7) or (data[offset + 6 + i].toInt() and 0x7F)
+            // Syncsafe: bit teratas tiap byte ukuran harus 0. Tanpa ini,
+            // payload AAC kebetulan berawalan "ID3" dihitung raksasa (2^28)
+            // lalu dilewati — audio valid terbuang diam-diam.
+            val b = data[offset + 6 + i].toInt() and 0xFF
+            if (b and 0x80 != 0) return 0
+            size = (size shl 7) or b
         }
         var total = 10 + size
         if (data[offset + 5].toInt() and 0x10 != 0) total += 10 // footer
+        if (total < 10 || total > MAX_ID3_BYTES) return 0
         return total
     }
 
@@ -198,10 +208,16 @@ object AdtsAac {
             // Tag ID3 (10 byte) bisa menyela aliran ADTS gabungan segmen.
             if (hdr[0] == 0x49.toByte() && hdr[1] == 0x44.toByte() && hdr[2] == 0x33.toByte()) {
                 var size = 0
-                for (i in 0 until 4) size = (size shl 7) or (hdr[6 + i].toInt() and 0x7F)
+                var validSyncsafe = true
+                for (i in 0 until 4) {
+                    val b = hdr[6 + i].toInt() and 0xFF
+                    if (b and 0x80 != 0) { validSyncsafe = false; break }
+                    size = (size shl 7) or b
+                }
+                if (!validSyncsafe) return null
                 var total = 10 + size
                 if (hdr[5].toInt() and 0x10 != 0) total += 10 // footer
-                if (total < 10) return null
+                if (total < 10 || total > MAX_ID3_BYTES) return null
                 if (!skipExact(input, total - 10)) return null
                 continue
             }

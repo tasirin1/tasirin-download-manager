@@ -445,9 +445,6 @@
   .item:focus-visible, .fs-row:focus-visible, .fs-root:focus-visible, .gal-cell:focus-visible {
  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
 
-  .app-footer {
- position: fixed; left: 0; right: 0; bottom: 0; text-align: center; color: var(--muted); font-size: 11.5px; padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--bg); border-top: 1px solid var(--line); z-index: 45; }
-
   .tabbar {
  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 4px; padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--tabbar-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line); box-shadow: 0 -1px 8px rgba(23,32,58,.05); transition: transform .25s ease; }
 
@@ -1808,7 +1805,6 @@
 
   <div id="status"></div>
   <ul id="list" class="list"></ul>
-  <div class="app-footer" id="appFooter"></div>
 </div>
 
 <nav class="tabbar" id="tabbar" aria-label="Primary">
@@ -2303,18 +2299,10 @@ function applyServerStatus(st) {
     );
   }
   const chip = document.getElementById('serverChip');
-  const chipText = document.getElementById('serverChipText');
-  if (chip && st.appVersion) {
-    chip.classList.remove('hidden');
-    chipText.textContent = 'v' + st.appVersion + (st.appBuild ? ' (' + st.appBuild + ')' : '');
-  }
+  if (chip) chip.classList.remove('hidden');
   const roChip = document.getElementById('roChip');
   if (roChip) roChip.classList.toggle('hidden', !serverReadOnly);
   armChipMin();
-  const footer = document.getElementById('appFooter');
-  if (footer && st.appVersion) {
-    footer.textContent = 'Server v' + st.appVersion + (st.appBuild ? ' (build ' + st.appBuild + ')' : '') + ' \u00b7 Tasirin Download Manager';
-  }
 }
 
 const galleryView = document.getElementById('galleryView');
@@ -2841,7 +2829,9 @@ function renderGalleryCell(it, frag) {
   const thumb = API + '/api/thumb?token=' + encodeURIComponent(it.token);
   const media = API + '/api/media?token=' + encodeURIComponent(it.token);
   const ext = extOf(it.name);
-  const ratio = (it.w && it.h && !it.isVideo) ? (it.h * 100 / it.w).toFixed(2) : 56.25;
+  var ratio = 56.25;
+  if (it.w > 0 && it.h > 0 && !it.isVideo) { ratio = Math.min(200, Math.max(25, it.h * 100 / it.w)); }
+  ratio = ratio.toFixed(2);
   const resume = it.isVideo ? (galleryVideoPos[it.token] || 0) : 0;
   const selOn = galSelected.has(it);
   cell.innerHTML =

@@ -127,6 +127,12 @@ object Updater {
         if (info.apkSize > 0 && target.length() != info.apkSize) {
             target.delete()
             null
+        } else if (!isSignatureValid(context, target)) {
+            // Pertahanan berlapis: caller juga memverifikasi, tapi file yang
+            // lolos dari sini harus selalu bertanda tangan resmi (aman bila
+            // fungsi dipakai ulang di tempat lain).
+            runCatching { target.delete() }
+            null
         } else {
             target
         }

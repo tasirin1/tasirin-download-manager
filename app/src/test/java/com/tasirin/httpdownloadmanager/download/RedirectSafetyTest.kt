@@ -19,6 +19,29 @@ class RedirectSafetyTest {
     }
 
     @Test
+    fun `redirect target blocks loopback and metadata hosts`() {
+        assertNull(redirectTarget("https://example.com/a", "http://127.0.0.1/x"))
+        assertNull(redirectTarget("https://example.com/a", "http://localhost:8080/x"))
+        assertNull(redirectTarget("https://example.com/a", "http://169.254.169.254/latest"))
+        assertNull(redirectTarget("https://example.com/a", "http://2130706433/x"))
+        // LAN privat tetap diizinkan (unduhan NAS lokal sah)
+        assertEquals(
+            "http://192.168.1.10/file.bin",
+            redirectTarget("https://example.com/a", "http://192.168.1.10/file.bin")
+        )
+    }
+
+    @Test
+    fun `blocked redirect host covers numeric and local variants`() {
+        assertTrue(isBlockedRedirectHost("127.0.0.1"))
+        assertTrue(isBlockedRedirectHost("localhost"))
+        assertTrue(isBlockedRedirectHost("0.0.0.0"))
+        assertTrue(isBlockedRedirectHost("169.254.169.254"))
+        assertFalse(isBlockedRedirectHost("192.168.1.10"))
+        assertFalse(isBlockedRedirectHost("example.com"))
+    }
+
+    @Test
     fun `same origin ignores default ports but rejects cross origin`() {
         assertTrue(isSameOrigin("https://example.com/a", "https://EXAMPLE.com/b"))
         assertTrue(isSameOrigin("http://example.com/a", "http://example.com:80/b"))

@@ -31,6 +31,8 @@ internal class ChainInputStream(private val files: List<File>) : InputStream() {
     }
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
+        // Kontrak InputStream: tolak argumen di luar batas sebelum menyentuh file.
+        if (off < 0 || len < 0 || off > b.size || len > b.size - off) throw IndexOutOfBoundsException()
         if (len == 0) return 0
         while (true) {
             val cur = current ?: next() ?: return -1

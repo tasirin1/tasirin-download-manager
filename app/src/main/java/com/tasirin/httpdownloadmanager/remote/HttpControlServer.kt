@@ -1044,7 +1044,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // Indeks di luar rentang tak pernah finalisasi namun tetap menulis tmp:
         // tolak sejak awal agar tak jadi tmp yatim penahan disk.
         if (chunkIdx >= chunks) {
-            drainBody(session)
+            // Body gagal terdrain tuntas (terlalu besar/terputus): tutup koneksi
+            // agar sisa byte tidak dibaca sebagai request keep-alive berikutnya.
+            if (!drainBody(session)) {
+                return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid chunk index")).closeConnection()
+            }
             return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid chunk index"))
         }
         val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
@@ -1148,21 +1152,28 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     ): Response {
         val rawId = session.param("id")?.trim().orEmpty()
         if (rawId.length > 64) {
-            drainBody(session)
+            if (!drainBody(session)) {
+                return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id")).closeConnection()
+            }
             return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id"))
         }
         val id = rawId.takeIf { ServerSecurity.isUploadIdAllowed(it) }
         ?: run {
-                drainBody(session)
+                if (!drainBody(session)) {
+                    return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id")).closeConnection()
+                }
                 return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id"))
             }
         if (!canAcceptUploadLock(id)) {
-            drainBody(session)
+            val drained = drainBody(session)
             appendLog("UPLOAD #$id REJECTED: too many active upload locks")
-            return jsonResponse(JSONObject().put("ok", false).put("error", "Too many uploads in progress"))
+            val resp = jsonResponse(JSONObject().put("ok", false).put("error", "Too many uploads in progress"))
+            return if (drained) resp else resp.closeConnection()
         }
         if (chunkIdx < 0 || chunkIdx >= chunks || chunks > MAX_UPLOAD_CHUNKS) {
-            drainBody(session)
+            if (!drainBody(session)) {
+                return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid chunk range")).closeConnection()
+            }
             return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid chunk range"))
         }
         // Upload sudah selesai / sedang difinalisasi: balas cepat. Body tetap
@@ -1170,14 +1181,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // tidak menganggap permintaan gagal (menutup koneksi saat body masih
         // dikirim = XHR error di client).
         completedUploads[id]?.let { done ->
-            drainBody(session)
+            val drained = drainBody(session)
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks already done -> ok")
-            return jsonResponse(JSONObject().put("ok", true).put("name", done.first))
+            val resp = jsonResponse(JSONObject().put("ok", true).put("name", done.first))
+            return if (drained) resp else resp.closeConnection()
         }
         finalizingUploads[id]?.let { pendingName ->
-            drainBody(session)
+            val drained = drainBody(session)
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks finalizing -> pending")
-            return jsonResponse(JSONObject().put("ok", true).put("pending", true).put("name", pendingName))
+            val resp = jsonResponse(JSONObject().put("ok", true).put("pending", true).put("name", pendingName))
+            return if (drained) resp else resp.closeConnection()
         }
         if (length > MAX_UPLOAD_BYTES) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: chunk too large")
@@ -2184,8 +2197,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     MediaStore.MediaColumns.DATE_MODIFIED,
                     MediaStore.MediaColumns.RELATIVE_PATH
                 )
-                val selection = if (folder.isEmpty()) null else "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
-                val selArgs = if (folder.isEmpty()) null else arrayOf("$folder%")
+                // folder dari request: escape wildcard LIKE agar "%"/"_" tidak melebar ke folder lain.
+                val selection = if (folder.isEmpty()) null else "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? ESCAPE '\\'"
+                val selArgs = if (folder.isEmpty()) null else arrayOf(ServerSecurity.escapeLike(folder) + "%")
                 val dirs = LinkedHashSet<String>()
                 // Entri file ringan dulu; JSONObject + token Base64 baru dibuat
                 // untuk halaman aktif (hemat alokasi saat folder ribuan file).

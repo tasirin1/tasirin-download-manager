@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Looper
 import android.util.Base64
 import androidx.core.content.edit
 import androidx.core.net.toUri
@@ -234,7 +235,12 @@ class DownloadEngine(appContext: Context) {
             return ""
         }
         val customName = fileName?.trim().orEmpty()
-        val name = FileNames.safe(customName.ifEmpty { guessFileName(cleanUrl) })
+        // Nama dipakai sebagai kunci file partial (.part): dua item bernama
+        // sama (mis. fallback timestamp sedetik yang sama) akan menulis file
+        // yang sama dan saling merusak. Unikkan saat antre.
+        val name = FileNames.unique(FileNames.safe(customName.ifEmpty { guessFileName(cleanUrl) })) { n ->
+            _items.value.any { it.fileName == n }
+        }
         val item = DownloadItem(
             id = UUID.randomUUID().toString(),
             url = cleanUrl,
@@ -443,7 +449,7 @@ class DownloadEngine(appContext: Context) {
     ): UrlProbe? {
         val clean = url.trim()
         if (clean.isEmpty()) return null
-        if (!clean.startsWith("http://") && !clean.startsWith("https://")) return null
+        if (!clean.startsWith("http://", ignoreCase = true) && !clean.startsWith("https://", ignoreCase = true)) return null
         return runCatching {
             val conn = openAuthenticatedConnection(
                 clean, method = "HEAD",
@@ -472,9 +478,15 @@ class DownloadEngine(appContext: Context) {
             try {
                 val fcode = fallback.responseCode
                 if (fcode != 200 && fcode != 206) return null
+                val totalFromRange = if (fcode == 206) {
+                    // 206 untuk Range bytes=0-0 membawa total di Content-Range (bytes 0-0/<total>),
+                    // bukan di Content-Length (=1). Tanpa ini probe lapor 1 byte lalu monitor
+                    // mengira versi baru dan mengunduh ulang tiap 30 menit.
+                    fallback.getHeaderField("Content-Range")?.substringAfter('/')?.trim()?.toLongOrNull()?.takeIf { it > 0 }
+                } else null
                 UrlProbe(
                     fileName = contentDispositionName(fallback.getHeaderField("Content-Disposition")),
-                    sizeBytes = contentLength(fallback).takeIf { it > 0 } ?: -1L,
+                    sizeBytes = totalFromRange ?: contentLength(fallback).takeIf { it > 0 } ?: -1L,
                     contentType = fallback.getHeaderField("Content-Type"),
                     etag = fallback.getHeaderField("ETag")
                 )
@@ -523,7 +535,9 @@ class DownloadEngine(appContext: Context) {
             }
             configure(conn, current)
             val code = conn.responseCode
-            if (code !in 301..308) return conn
+            // Hanya redirect asli yang diikuti: 304 (Not Modified) serta
+            // 305/306 (proxy/unused) bukan redirect dan tidak punya Location.
+            if (code != 301 && code != 302 && code != 303 && code != 307 && code != 308) return conn
 
             val location = conn.getHeaderField("Location")
             conn.disconnect()
@@ -659,7 +673,11 @@ class DownloadEngine(appContext: Context) {
     fun rename(id: String, newName: String) {
         val item = _items.value.find { it.id == id } ?: return
         if (item.state != DownloadState.COMPLETED) return
-        val clean = FileNames.safe(newName.trim())
+        // Unikkan terhadap item lain agar file hasil rename tidak menimpa
+        // milik item lain (renameTo Linux menggantikan target diam-diam).
+        val clean = FileNames.unique(FileNames.safe(newName.trim())) { n ->
+            n != item.fileName && _items.value.any { it.fileName == n }
+        }
         if (clean.isBlank() || clean == item.fileName) return
         val newPath = fileSaver.rename(item, clean)
         if (newPath != null) {
@@ -2214,20 +2232,18 @@ class DownloadEngine(appContext: Context) {
                     )
                 }
                 clearSegProgress(item.id)
-                val fallbackConn = openConn(item.url)
+                // Wajib lewat koneksi terautentikasi: redirect manual dengan
+                // strip kredensial beda-origin + blokir SSRF (seperti jalur
+                // utama). openConn mentah mengikuti redirect otomatis sistem
+                // dan mengirim ulang Authorization/Cookie ke host asing.
+                // UA/Accept/Referer/YouTube-Instagram sudah dipasang di dalam.
+                val fallbackConn = openAuthenticatedConnection(
+                    item.url, method = "GET",
+                    username = item.username, password = item.password, headers = item.headers
+                )
                 try {
-                    fallbackConn.requestMethod = "GET"
                     fallbackConn.connectTimeout = connectTimeoutMs
                     fallbackConn.readTimeout = readTimeoutMs
-                    fallbackConn.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
-                    fallbackConn.setRequestProperty("Accept", "*/*")
-                    fallbackConn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
-                    val ua = StoragePrefs.getUserAgent(context)
-                    if (ua.isNotEmpty()) fallbackConn.setRequestProperty("User-Agent", ua)
-                    try {
-                        val origin = java.net.URL(item.url).let { "${it.protocol}://${it.host}" }
-                        fallbackConn.setRequestProperty("Referer", "$origin/")
-                    } catch (_: Exception) { /* Referer opsional, tidak wajib */ }
                     // Terapkan cookie dari CookieManager (situs yang butuh session)
                     try {
                         val cookieHeader = cookieManager.cookieStore.cookies
@@ -2753,7 +2769,17 @@ class DownloadEngine(appContext: Context) {
     private fun flushSave() {
         saveJob?.cancel()
         saveJob = null
-        repository.save(_items.value)
+        // Sinkron: state pause/cancel/selesai/add tidak boleh hilang bila
+        // proses mati sebelum antrean apply() SharedPreferences jalan.
+        // Tapi commit() sinkron di main thread = ANR saat daftar besar,
+        // jadi di main thread tulis apply dulu lalu commit di IO.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            val snapshot = _items.value
+            repository.save(snapshot)
+            scope.launch { repository.saveImmediate(snapshot) }
+        } else {
+            repository.saveImmediate(_items.value)
+        }
     }
 
     private fun guessFileName(url: String): String {
@@ -2761,7 +2787,7 @@ class DownloadEngine(appContext: Context) {
         val path = noQuery.toUri().lastPathSegment.orEmpty()
         val candidate = path.trim()
         if (candidate.isNotEmpty() && !candidate.contains('=')) return candidate
-        return "download_${DEFAULT_NAME_FORMAT.format(Date())}"
+        return "download_${(DEFAULT_NAME_FORMAT.get() ?: SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)).format(Date())}"
     }
 
     private val cookiePrefs by lazy {
@@ -2826,7 +2852,9 @@ class DownloadEngine(appContext: Context) {
         private val HLS_CODECS_RE = Regex("CODECS=\"([^\"]+)\"")
         private val HLS_FPS_RE = Regex("FRAME-RATE=([\\d.]+)")
         private val CONTENT_DISPOSITION_STAR = Regex("filename\\*=([^;]+)")
-        private val DEFAULT_NAME_FORMAT = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+        private val DEFAULT_NAME_FORMAT: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
+            SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+        }
         private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")
         private const val BUFFER_SIZE = 64 * 1024
         private const val MAX_REDIRECTS = 5
@@ -2856,7 +2884,51 @@ internal fun redirectTarget(base: String, location: String?): String? {
     return runCatching {
         val target = URL(URL(base), location)
         if (target.protocol != "http" && target.protocol != "https") return null
+        if (isBlockedRedirectHost(target.host.orEmpty())) return null
         target.toString()
+    }.getOrNull()
+}
+
+/** Host literal yang tidak boleh dituju redirect: loopback, unspecified,
+ *  dan metadata cloud. Bukan blokir DNS umum agar unduhan LAN (NAS
+ *  192.168.x/10.x) tetap jalan; hanya literal berbahaya yang ditolak. */
+internal fun isBlockedRedirectHost(host: String): Boolean {
+    val h = host.trim().trimEnd('.').lowercase()
+    if (h.isEmpty()) return true
+    if (h == "localhost" || h.endsWith(".localhost")) return true
+    if (h == "0.0.0.0" || h == "::" || h == "::1" || h == "[::1]" || h == "[::]") return true
+    if (h == "169.254.169.254" || h == "metadata.google.internal") return true
+    if (h.startsWith("127.")) return true
+    if (h.startsWith("[::ffff:127.")) return true
+    // Bentuk numerik IPv4 (desimal penuh/okt/heks, mis. 2130706433 = 127.0.0.1):
+    // tolak bila oktet pertama 127 atau link-local 169.254.x.x.
+    val numeric = h.removePrefix("[").removeSuffix("]")
+    val parts = numeric.split('.')
+    if (parts.size == 4) {
+        val first = parseIpv4Part(parts[0])
+        val second = parseIpv4Part(parts[1])
+        if (first == 127) return true
+        if (first == 169 && second == 254) return true
+    } else if (parts.size == 1) {
+        val long = parseIpv4Part(numeric)
+        if (long != null) {
+            if ((long ushr 24) == 127) return true
+            if ((long ushr 16) == ((169 shl 8) or 254)) return true
+        }
+    }
+    return false
+}
+
+internal fun parseIpv4Part(part: String): Int? {
+    val p = part.trim().lowercase()
+    if (p.isEmpty()) return null
+    return runCatching {
+        when {
+            p.startsWith("0x") -> p.substring(2).toLong(16)
+            p.length > 1 && p.startsWith("0") && p.all { it in '0'..'7' } -> p.toLong(8)
+            p.all { it.isDigit() } -> p.toLong(10)
+            else -> return null
+        }.takeIf { it in 0..4294967295L }?.toInt()
     }.getOrNull()
 }
 

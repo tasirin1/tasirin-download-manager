@@ -25,6 +25,26 @@ class SegmentPlannerTest {
     }
 
     @Test
+    fun plan_countMelebihiTotal_dibatasiTotal() {
+        val segs = SegmentPlanner.plan(4, 16)
+        assertEquals(4, segs.size)
+        assertEquals(0L, segs.first().start)
+        assertEquals(3L, segs.last().end)
+        for (i in 1 until segs.size) {
+            assertEquals(segs[i - 1].end + 1, segs[i].start)
+        }
+        for (sg in segs) assertTrue(sg.end >= sg.start)
+    }
+
+    @Test
+    fun plan_totalSatu_satuSegmen() {
+        val segs = SegmentPlanner.plan(1, 8)
+        assertEquals(1, segs.size)
+        assertEquals(0L, segs[0].start)
+        assertEquals(0L, segs[0].end)
+    }
+
+    @Test
     fun plan_countKecil_dipaksaDua() {
         assertEquals(2, SegmentPlanner.plan(100, 1).size)
     }

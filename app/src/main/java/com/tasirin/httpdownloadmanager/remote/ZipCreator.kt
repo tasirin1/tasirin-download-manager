@@ -163,11 +163,14 @@ object ZipCreator {
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.RELATIVE_PATH
         )
+        // folder dari request: escape wildcard LIKE agar "%"/"_" di nama
+        // folder tidak menjaring direktori lain di luar folder terpilih.
+        val likeArg = ServerSecurity.escapeLike(folder) + "%"
         runCatching {
             resolver.query(
                 collection, projection,
-                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
-                arrayOf("$folder%"), null
+                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? ESCAPE '\\'",
+                arrayOf(likeArg), null
             )?.use { c ->
                 val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)

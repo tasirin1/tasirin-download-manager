@@ -305,6 +305,15 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun escapeLike_backslashPersenUnderscore_diescape() {
+        assertEquals("abc", ServerSecurity.escapeLike("abc"))
+        assertEquals("100\\% hits", ServerSecurity.escapeLike("100% hits"))
+        assertEquals("a\\_b", ServerSecurity.escapeLike("a_b"))
+        assertEquals("a\\\\b", ServerSecurity.escapeLike("a\\b"))
+        assertEquals("", ServerSecurity.escapeLike(""))
+    }
+
+    @Test
     fun isFileNameValid_menolakSeparatorDanTraversal() {
         assertTrue(ServerSecurity.isFileNameValid("video.mp4"))
         assertTrue(ServerSecurity.isFileNameValid("file (1).mp4"))

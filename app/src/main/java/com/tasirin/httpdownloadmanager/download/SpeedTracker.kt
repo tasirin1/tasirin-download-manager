@@ -20,9 +20,16 @@ class SpeedTracker(
     fun sample(id: String, bytes: Long, total: Long): Pair<Long, Long> {
         val now = clock()
         val e = entries[id]
+        // Byte mundur (retry/resume dari awal): anggap pengukuran baru agar
+        // EMA lama tidak membeku dan ETA tidak memakai kecepatan basi.
+        if (e != null && bytes < e.bytes) {
+            entries[id] = Entry(bytes, now, null)
+            return 0L to 0L
+        }
         val prevB = e?.bytes ?: bytes
         val prevT = e?.time ?: now
-        val instant = if (now > prevT) ((bytes - prevB) * 1000L) / (now - prevT) else 0L
+        val deltaB = (bytes - prevB).coerceAtLeast(0L)
+        val instant = if (now > prevT) (deltaB * 1000L) / (now - prevT) else 0L
         // EMA: kecepatan rata-rata bergerak supaya ETA tidak melompat-lompat
         // akibat lonjakan kecepatan sesaat. Sampel pertama belum punya delta
         // waktu sehingga speed 0; sampel kedua menjadi seed penuh agar ETA

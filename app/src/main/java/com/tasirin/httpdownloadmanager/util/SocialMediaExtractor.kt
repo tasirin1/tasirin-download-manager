@@ -587,7 +587,10 @@ object SocialMediaExtractor {
                 val (videoAd, audioAd) = bestAdaptivePair(streamingData)
                 val best = adaptiveFormatByUrl(adaptive, videoAd)
                 if (best != null) {
-                    val url = best.getString("url")
+                    // optString: kunci url kadang absen di respons TV client;
+                    // jangan lempar agar fallback HLS/adaptif lain tetap jalan.
+                    val url = best.optString("url", "")
+                    if (url.isEmpty()) return@runCatching null
                     val mime = best.optString("mimeType", MIME_MP4)
                     val quality = best.optString("qualityLabel", "Unknown")
                     App.logEvent("YT DEBUG: VISIONOS adaptive fallback → $quality ${mime.take(20)}")
@@ -920,13 +923,13 @@ object SocialMediaExtractor {
                 "video" -> {
                     val directUrl = item.optString("url")
                     if (directUrl.startsWith("http")) {
-                        options.add(Result(directUrl, "Twitter_${user}.mp4", text, "Video", MIME_MP4))
+                        options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}.mp4", text, "Video", MIME_MP4))
                     }
                 }
                 "photo" -> {
                     val directUrl = item.optString("url")
                     if (directUrl.startsWith("http")) {
-                        options.add(Result(directUrl, "Twitter_${user}.jpg", text, "Photo", "image/jpeg"))
+                        options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}.jpg", text, "Photo", "image/jpeg"))
                     }
                 }
             }

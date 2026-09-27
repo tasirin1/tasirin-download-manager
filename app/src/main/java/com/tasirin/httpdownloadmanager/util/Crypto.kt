@@ -15,6 +15,10 @@ object Crypto {
 
     private const val ALIAS = "httpdm_cred_v1"
     private const val PREFIX = "v1:"
+    // Penanda eksplisit penyimpanan plaintext (API 21-22 tanpa Keystore AES
+    // atau fallback saat enkripsi gagal) agar bisa diaudit dan dimigrasi,
+    // bukan plaintext diam-diam yang dikira terenkripsi.
+    internal const val PLAIN_PREFIX = "plain:"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private val KEY_LOCK = Any()
     @Volatile private var cachedKey: SecretKey? = null
@@ -24,20 +28,21 @@ object Crypto {
      *  jadi nilai disimpan apa adanya. */
     fun encrypt(plain: String): String {
         if (plain.isEmpty()) return ""
-        if (Build.VERSION.SDK_INT < 23) return plain
+        if (Build.VERSION.SDK_INT < 23) return PLAIN_PREFIX + plain
         return runCatching {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, key())
             PREFIX + b64(cipher.iv) + ":" + b64(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)))
         }.getOrElse { e ->
             runCatching { android.util.Log.w("Crypto", "encrypt fallback to plaintext", e) }
-            plain
+            PLAIN_PREFIX + plain
         }
     }
 
     /** Dekripsi; nilai lama tanpa prefix dianggap plaintext (data lama). */
     fun decrypt(payload: String?): String {
         if (payload.isNullOrEmpty()) return ""
+        if (payload.startsWith(PLAIN_PREFIX)) return payload.removePrefix(PLAIN_PREFIX)
         if (!payload.startsWith(PREFIX)) return payload
         if (Build.VERSION.SDK_INT < 23) return ""
         return runCatching {

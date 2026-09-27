@@ -263,8 +263,15 @@ class FileSaver(context: Context) {
             ?: return null
         val output = appContext.contentResolver.openOutputStream(target.uri, "wt")
             ?: return null
-        output.use { out ->
-            partial.inputStream().use { input -> input.copyTo(out) }
+        try {
+            output.use { out ->
+                partial.inputStream().use { input -> input.copyTo(out) }
+            }
+        } catch (e: Exception) {
+            // Salinan gagal di tengah jalan: buang target setengah-tulis agar
+            // tidak jadi file korup yatim (sama seperti writeCustomFolder).
+            runCatching { target.delete() }
+            throw e
         }
         partial.delete()
         PublishResult(contentUri = target.uri.toString(), fileName = unique)
@@ -448,7 +455,9 @@ class FileSaver(context: Context) {
                 }
                 !item.filePath.isNullOrEmpty() -> {
                     val file = File(item.filePath)
-                    val target = File(file.parentFile, clean)
+                    // uniqueTargetFile: renameTo menimpa target yang ada tanpa
+                    // peringatan — file item lain bisa hilang diam-diam.
+                    val target = uniqueTargetFile(File(file.parentFile, clean))
                     if (file.exists() && file.renameTo(target)) {
                         MediaLibrary.notifyMediaChanged(appContext, file.absolutePath, target.absolutePath)
                         target.absolutePath

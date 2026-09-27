@@ -57,9 +57,10 @@ data class DownloadItem(
             // selesai, jadi tampilan harus 100%, bukan 90-95% yang "mentok".
             100
         } else if (progressPercentOverride >= 0) {
-            progressPercentOverride
+            // Server kadang under-report total sehingga hitungan bisa >100.
+            progressPercentOverride.coerceIn(0, 100)
         } else if (totalBytes > 0) {
-            ((bytesDownloaded * 100) / totalBytes).toInt()
+            ((bytesDownloaded * 100) / totalBytes).toInt().coerceIn(0, 100)
         } else {
             0
         }

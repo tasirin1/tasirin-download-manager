@@ -36,8 +36,8 @@ class LogActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLogBinding
 
     private companion object {
-        val EXPORT_TIME = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-        val EXPORT_STAMP = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
+        private const val EXPORT_TIME_PATTERN = "yyyy-MM-dd HH:mm:ss"
+        private const val EXPORT_STAMP_PATTERN = "yyyyMMdd-HHmmss"
     }
     private var logAutoScroll = false
     private var logSearch = ""
@@ -107,7 +107,7 @@ class LogActivity : AppCompatActivity() {
                 val log = App.httpServer.snapshotLog()
                 val header = buildString {
                     appendLine("=== Tasirin Download Manager - Log Server (realtime) ===")
-                    appendLine("Time: ${EXPORT_TIME.format(Date())}")
+                    appendLine("Time: ${SimpleDateFormat(EXPORT_TIME_PATTERN, Locale.US).format(Date())}")
                     appendLine(
                         "App version: " + runCatching {
                             val info = packageManager.getPackageInfo(packageName, 0)
@@ -132,7 +132,7 @@ class LogActivity : AppCompatActivity() {
                     }
                     appendLine()
                 }
-                val stamp = EXPORT_STAMP.format(Date())
+                val stamp = SimpleDateFormat(EXPORT_STAMP_PATTERN, Locale.US).format(Date())
                 runCatching {
                     if (Build.VERSION.SDK_INT >= 29) {
                         val resolver = contentResolver

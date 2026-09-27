@@ -106,11 +106,15 @@ object HlsParser {
      *  agar parser murni tidak men-crash pemanggil engine. */
     fun resolveUrl(base: String, relative: String): String {
         if (relative.startsWith("http://") || relative.startsWith("https://")) return relative
+        // Basis dipisahkan dari query/fragment dulu: '/' di dalam query
+        // (mis. "?next=a/b") tidak boleh dianggap pemisah direktori, dan
+        // query basis tidak diwariskan ke segmen (sesuai RFC 3986).
+        val cleanBase = base.substringBefore('?').substringBefore('#')
         if (relative.startsWith("/")) {
             // Root-relative butuh host valid; base rusak -> kembalikan
             // relative agar pemanggil memutuskan, bukan crash di sini.
             val root = runCatching {
-                val u = java.net.URL(base)
+                val u = java.net.URL(cleanBase)
                 "${u.protocol}://${u.host}${if (u.port > 0) ":${u.port}" else ""}"
             }.getOrNull() ?: return relative
             return root + relative
@@ -118,10 +122,10 @@ object HlsParser {
         // Direktori = sampai '/' terakhir, tapi harus di belakang otoritas:
         // pada base tanpa path (mis. "https://host") lastIndexOf jatuh di
         // "//" skema dan akan menelan host bila tidak dijaga.
-        val schemeEnd = base.indexOf("://")
+        val schemeEnd = cleanBase.indexOf("://")
         val authEnd = if (schemeEnd >= 0) schemeEnd + 3 else 0
-        val idx = base.lastIndexOf('/')
-        if (idx < authEnd) return "$base/$relative"
-        return base.substring(0, idx + 1) + relative
+        val idx = cleanBase.lastIndexOf('/')
+        if (idx < authEnd) return "$cleanBase/$relative"
+        return cleanBase.substring(0, idx + 1) + relative
     }
 }
