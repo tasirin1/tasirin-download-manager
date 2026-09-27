@@ -23,7 +23,7 @@ class DownloadItemTest {
     }
 
     @Test
-    fun `progressPercent - dijepit 0..100 saat server under-report total`() {
+    fun `progressPercent - dijepit 0-100 saat server under-report total`() {
         assertEquals(100, item(bytesDownloaded = 1200, totalBytes = 1000).progressPercent)
         assertEquals(100, item(bytesDownloaded = 500, totalBytes = 1000)
             .copy(progressPercentOverride = 150).progressPercent)
