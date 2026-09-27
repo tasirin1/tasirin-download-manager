@@ -45,12 +45,12 @@
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
-                    android:minHeight="40dp"
-                    android:paddingHorizontal="14dp"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="12dp"
                     android:paddingVertical="6dp"
                     android:text="@string/settings_section_server"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -64,12 +64,12 @@
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
-                    android:minHeight="40dp"
-                    android:paddingHorizontal="14dp"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="12dp"
                     android:paddingVertical="6dp"
                     android:text="@string/settings_section_download"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -83,12 +83,12 @@
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
-                    android:minHeight="40dp"
-                    android:paddingHorizontal="14dp"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="12dp"
                     android:paddingVertical="6dp"
                     android:text="@string/settings_section_storage"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -102,12 +102,12 @@
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
-                    android:minHeight="40dp"
-                    android:paddingHorizontal="14dp"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="12dp"
                     android:paddingVertical="6dp"
                     android:text="@string/settings_nav_other"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </HorizontalScrollView>
@@ -146,10 +146,10 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="48dp"
+                        android:minHeight="44dp"
                         android:orientation="horizontal"
                         android:paddingHorizontal="14dp"
-                        android:paddingVertical="10dp">
+                        android:paddingVertical="8dp">
 
                         <View
                             android:layout_width="4dp"
@@ -172,7 +172,7 @@
                             android:layout_weight="1"
                             android:text="@string/settings_section_server"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
 
                         <!-- 6. Server status badge -->
@@ -382,10 +382,10 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="48dp"
+                        android:minHeight="44dp"
                         android:orientation="horizontal"
                         android:paddingHorizontal="14dp"
-                        android:paddingVertical="10dp">
+                        android:paddingVertical="8dp">
 
                         <View
                             android:layout_width="4dp"
@@ -408,7 +408,7 @@
                             android:layout_weight="1"
                             android:text="@string/settings_section_download"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -693,10 +693,10 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="48dp"
+                        android:minHeight="44dp"
                         android:orientation="horizontal"
                         android:paddingHorizontal="14dp"
-                        android:paddingVertical="10dp">
+                        android:paddingVertical="8dp">
 
                         <View
                             android:layout_width="4dp"
@@ -719,7 +719,7 @@
                             android:layout_weight="1"
                             android:text="@string/settings_section_storage"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -793,10 +793,10 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="48dp"
+                        android:minHeight="44dp"
                         android:orientation="horizontal"
                         android:paddingHorizontal="14dp"
-                        android:paddingVertical="10dp">
+                        android:paddingVertical="8dp">
 
                         <View
                             android:layout_width="4dp"
@@ -819,7 +819,7 @@
                             android:layout_weight="1"
                             android:text="@string/settings_nav_other"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -890,7 +890,7 @@
     <LinearLayout
         android:id="@+id/btn_save"
         android:layout_width="wrap_content"
-        android:layout_height="48dp"
+        android:layout_height="44dp"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
         android:background="@drawable/bg_fab_pill"
@@ -898,12 +898,12 @@
         android:focusable="true"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="20dp">
+        android:paddingStart="14dp"
+        android:paddingEnd="16dp">
 
         <ImageView
-            android:layout_width="22dp"
-            android:layout_height="22dp"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
             android:contentDescription="@string/save"
             android:src="@drawable/ic_save" />
 
@@ -913,7 +913,7 @@
             android:layout_marginStart="8dp"
             android:text="@string/save_fab_label"
             android:textColor="@color/white"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
 
