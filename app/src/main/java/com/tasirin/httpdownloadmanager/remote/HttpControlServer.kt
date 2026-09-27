@@ -536,10 +536,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return MessageDigest.isEqual(pin.toByteArray(Charsets.UTF_8), expectedBytes)
     }
 
-    // computeIfAbsent atomik: getOrPut Kotlin tidak atomik di ConcurrentHashMap
-    // sehingga brute-force paralel bisa membuat dua instans dan merusak hitungan throttle.
-    private fun loginAttempt(ip: String): LoginAttempt =
-        loginAttempts.computeIfAbsent(ip.ifEmpty { "unknown" }) { LoginAttempt() }
+    // getOrPut Kotlin tidak atomik di ConcurrentHashMap sehingga brute-force
+    // paralel bisa membuat dua instans dan merusak hitungan throttle; kunci
+    // eksplisit di bawah lock (aman minSdk 21, tanpa API 24+).
+    private fun loginAttempt(ip: String): LoginAttempt {
+        val key = ip.ifEmpty { "unknown" }
+        loginAttempts[key]?.let { return it }
+        synchronized(loginAttempts) {
+            return loginAttempts.getOrPut(key) { LoginAttempt() }
+        }
+    }
 
     private fun pruneLoginAttempts(now: Long) {
         if (loginAttempts.isEmpty()) return

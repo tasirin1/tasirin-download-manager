@@ -35,7 +35,7 @@ internal fun streamMedia(
     } else {
         "inline; filename=\"$fallbackName\"; filename*=UTF-8''$encodedName"
     }
-    if (total > 0 && rangeHeader != null && parseRange(rangeHeader, total) == null && isSatisfiableRange(rangeHeader)) {
+    if (total > 0 && rangeHeader != null && parseRange(rangeHeader, total) == null && isSatisfiableRange(rangeHeader, total)) {
         runCatching { input.close() }
         return NanoHTTPD.newFixedLengthResponse(
             NanoHTTPD.Response.Status.RANGE_NOT_SATISFIABLE,
