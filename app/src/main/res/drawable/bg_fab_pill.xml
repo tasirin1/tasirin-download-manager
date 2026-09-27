@@ -1,9 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FAB pill: primary flat; bayangan tunggal dari elevation 6dp di layout.
-     Lapisan bayangan layer-list dihapus: strip bawah 2dp terpotong di
-     ujung pil (radius 24dp) sehingga tombol tampak tenggelam. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="@color/primary" />
-    <corners android:radius="24dp" />
-</shape>
+<!-- FAB pill: primary flat; bayangan tunggal dari elevation 6dp di layout
+     (jangan layer-list: strip bawah 2dp terpotong di ujung pil radius 24dp
+     sehingga tombol tampak tenggelam). Ring aksen saat fokus D-pad. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/primary" />
+            <stroke android:width="2dp" android:color="@color/accent" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/primary_dark" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/primary" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+</selector>

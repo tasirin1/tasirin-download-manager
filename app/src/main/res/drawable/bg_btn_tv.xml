@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Tombol tonal gaya M3: terisi primary_container + teks primary (di style),
-     tanpa outline. Fokus D-pad tetap tegas via stroke 2dp. -->
+<!-- Tombol tonal gaya M3: terisi primary_container + teks primary (di style).
+     Stroke 1dp primary di state normal/pressed agar tak menyatu dengan kartu
+     putih; fokus D-pad tetap tegas via stroke 2dp. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
@@ -12,12 +13,14 @@
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
             <solid android:color="@color/primary_container_pressed" />
+            <stroke android:width="1dp" android:color="@color/primary" />
             <corners android:radius="20dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <solid android:color="@color/primary_container" />
+            <stroke android:width="1dp" android:color="@color/primary" />
             <corners android:radius="20dp" />
         </shape>
     </item>

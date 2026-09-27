@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Kartu seksi/item: flat tanpa bayangan (strip layer-list terpotong di
-     sudut rounded sehingga tampak tenggelam); borderless radius 16dp (M3). -->
+<!-- Kartu seksi/item: putih + stroke garis tipis agar terangkat dari window_bg.
+     Tanpa layer-list: strip bayangan terpotong di sudut rounded (tenggelam). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <solid android:color="@color/card_bg" />
+    <stroke android:width="1dp" android:color="@color/line" />
     <corners android:radius="16dp" />
 </shape>
