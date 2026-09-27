@@ -474,14 +474,14 @@ class SettingsActivity : AppCompatActivity() {
             getString(R.string.settings_auto_open)
         )
         renderToggle(
-            binding.checkAutoSort,
-            StoragePrefs.isAutoSortEnabled(this),
-            getString(R.string.settings_auto_sort)
-        )
-        renderToggle(
             binding.checkSmallFirst,
             StoragePrefs.isSmallFirstEnabled(this),
             getString(R.string.settings_small_first)
+        )
+        renderToggle(
+            binding.checkAutoSort,
+            StoragePrefs.isAutoSortEnabled(this),
+            getString(R.string.settings_auto_sort)
         )
         renderToggle(
             binding.checkDeletePartial,
