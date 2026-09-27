@@ -76,9 +76,9 @@ class DownloadItemTest {
     }
 
     @Test
-    fun `progressPercent - overshoot tetap hitung`() {
-        // bytesDownloaded > totalBytes → persentase > 100
-        assertEquals(150, item(bytesDownloaded = 1500, totalBytes = 1000).progressPercent)
+    fun `progressPercent - overshoot dijepit 100`() {
+        // bytesDownloaded > totalBytes (server under-report) dijepit ke 100
+        assertEquals(100, item(bytesDownloaded = 1500, totalBytes = 1000).progressPercent)
     }
 
     @Test
