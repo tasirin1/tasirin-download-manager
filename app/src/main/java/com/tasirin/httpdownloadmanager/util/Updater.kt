@@ -45,7 +45,7 @@ object Updater {
             val code = APK_NAME_RE.find(name)?.groupValues?.get(1)?.toIntOrNull()
                 ?: continue
             val url = a.optString("browser_download_url", "")
-            if (url.isEmpty()) continue
+            if (url.isEmpty() || !url.startsWith("https://", ignoreCase = true)) continue
             val info = UpdateInfo(code, tag, url, a.optLong("size"))
             if (best == null || code > best.versionCode) best = info
         }
@@ -60,13 +60,16 @@ object Updater {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(dir, "update-${info.versionCode}.apk")
         if (info.apkSize > MAX_UPDATE_BYTES) return null
-        if (target.exists() && info.apkSize > 0 && target.length() == info.apkSize) return target
+        if (target.exists() && info.apkSize > 0 && target.length() == info.apkSize) {
+            if (isSignatureValid(context, target)) return target
+            runCatching { target.delete() }
+        }
 
         if (!info.apkUrl.startsWith("https://", ignoreCase = true)) return null
         var url = info.apkUrl
         var redirects = 0
         var downloaded = false
-        while (redirects <= MAX_REDIRECTS) {
+        while (redirects < MAX_REDIRECTS) {
             val conn = URL(url).openConnection() as HttpURLConnection
             if (conn is HttpsURLConnection) TlsCompat.apply(conn, context)
             conn.connectTimeout = 15_000
@@ -190,7 +193,9 @@ object Updater {
                     if (n < 0) break
                     total += n
                     // Respons releases bisa besar; 512KB cukup untuk cari asset.
-                    if (total > 524_288) break
+                    // Respons terpotong tidak dikembalikan agar JSON setengah jadi
+                    // tidak salah memilih asset.
+                    if (total > 524_288) return null
                     sb.append(buf, 0, n)
                 }
                 sb.toString()

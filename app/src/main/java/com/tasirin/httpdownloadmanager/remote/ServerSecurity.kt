@@ -55,12 +55,14 @@ object ServerSecurity {
         val clean = path.trim()
         if (clean.isEmpty()) return true
         if (clean.startsWith("m:")) {
-            val relative = clean.removePrefix("m:")
+            val relative = clean.removePrefix("m:").trim().trim('/')
             if (relative.isEmpty()) return true
             if (relative.contains('\\')) return false
             return relative.split('/').none { it.isEmpty() || it == "." || it == ".." }
         }
-        val filePath = if (clean.startsWith("f:")) clean.removePrefix("f:") else clean
+        // Trim ulang setelah prefix dilepas: "f: /sdcard/x" sah dan
+        // tidak boleh ditolak hanya karena spasi pemisah prefix.
+        val filePath = if (clean.startsWith("f:")) clean.removePrefix("f:").trim() else clean
         return isPathAllowed(filePath, roots)
     }
 
@@ -89,7 +91,12 @@ object ServerSecurity {
         return "$payload.${hmacSha256Hex(secret, payload)}"
     }
 
+    // Batas panjang token: HMAC dihitung setelah validasi bentuk agar
+    // string raksasa tidak memaksa alokasi/split mahal (DoS murah via LAN).
+    private const val MAX_TOKEN_LEN = 512
+
     fun isPartialTokenValid(token: String, itemId: String, now: Long, secret: String): Boolean {
+        if (token.length > MAX_TOKEN_LEN || itemId.length > MAX_TOKEN_LEN) return false
         val parts = token.split('.')
         if (parts.size != 3 || parts[0] != itemId) return false
         val expiresAt = parts[1].toLongOrNull() ?: return false
@@ -111,6 +118,7 @@ object ServerSecurity {
         secret: String
     ): Boolean {
         val cleanToken = token?.trim().orEmpty()
+        if (cleanToken.length > MAX_TOKEN_LEN || uploadId.length > MAX_TOKEN_LEN) return false
         val parts = cleanToken.split('.')
         if (parts.size != 3 || parts[0] != uploadId) return false
         val expiresAt = parts[1].toLongOrNull() ?: return false
@@ -169,4 +177,35 @@ object ServerSecurity {
 
     /** Token share kedaluwarsa (expiresAt == now masih dianggap valid). */
     fun isShareExpired(expiresAt: Long, now: Long): Boolean = expiresAt < now
+
+    /** Ambil nilai cookie persis per nama dari header Cookie. Pencarian
+     *  substring mentah (indexOf) bisa cocok di dalam nama/nilai cookie lain
+     *  (mis. "adm_pin=" mengandung "dm_pin=") sehingga auth gagal atau salah;
+     *  parse per segmen yang dipisah ';' agar hanya nama yang pas yang dipakai. */
+    fun sessionCookieValue(header: String?, name: String): String? {
+        if (header.isNullOrBlank() || name.isBlank()) return null
+        val prefix = "${name.trim()}="
+        // Loop tanpa split() — hindari alokasi list per request HTTP.
+        var start = 0
+        while (start <= header.length) {
+            val semi = header.indexOf(';', start)
+            val end = if (semi >= 0) semi else header.length
+            if (end > start) {
+                val seg = header.substring(start, end).trim()
+                if (seg.startsWith(prefix)) {
+                    return seg.substring(prefix.length).trim().takeIf { it.isNotEmpty() }
+                }
+            }
+            if (semi < 0) break
+            start = semi + 1
+        }
+        return null
+    }
+
+    /** Validasi nama file dari remote/native: tidak kosong, tanpa separator
+     *  path, dan bukan traversal (".." / "../" / "..\\"). Satu definisi di sini
+     *  agar endpoint tidak memakai aturan inline yang berbeda-beda. */
+    fun isFileNameValid(name: String): Boolean =
+        name.isNotBlank() && '/' !in name && '\\' !in name &&
+        name != "." && name != ".." && !name.startsWith("../") && !name.startsWith("..\\")
 }

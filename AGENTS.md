@@ -8,7 +8,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 
 ```
 .
-├── .github/workflows/build.yml       # CI: guard CHANGELOG → cek remote web → bump versionCode → build APK → release
+├── .github/workflows/build.yml       # CI: guard CHANGELOG → cek remote web → bump versi (name+code) → build APK → release
 ├── .github/workflows/update-deps-verification.yml  # (manual) generate gradle/verification-metadata.xml
 ├── .github/workflows/auto-merge.yml  # Auto-merge PR Dependabot yang aman (non-Gradle)
 ├── .github/workflows/codeql.yml       # CodeQL: analisis keamanan statis Java/Kotlin (push, PR, mingguan)
@@ -210,8 +210,9 @@ kuat dan tanpa diskusi:
 3. **Gaya commit**: `type(scope): deskripsi` — tipe yang dipakai di repo ini:
    `feat`, `fix`, `ui`, `perf`, `refactor`, `docs`, `chore`, `rebrand`
    (contoh: `ui(remote): ...`, `perf(gallery): ...`). Satu commit satu tujuan.
-4. **Jangan ubah `versionName`/`versionCode` manual** — `versionName` tetap
-   `"1.0"`; `versionCode` di-bump otomatis oleh CI (`100000 + run_number`).
+4. **Jangan ubah `versionName`/`versionCode` manual** — CI menaikkan keduanya
+   otomatis per build: `versionName = "1.0.<run_number>"`, `versionCode = 100000 + run_number`.
+   Nilai di `app/build.gradle.kts` (`"1.0"`/`1`) hanya fallback build lokal/debug.
 5. **Jaga kompatibilitas Android 5 (minSdk 21)**: API baru harus punya fallback
    (contoh: `RELATIVE_PATH`, `NetworkCallback`); jangan naikkan minSdk.
 6. **`targetSdk 36`**: storage di Android 11+ wajib `MANAGE_EXTERNAL_STORAGE`
@@ -263,7 +264,7 @@ kuat dan tanpa diskusi:
     jangan campur fitur + refactor besar + docs.
 16. **Jangan berhenti di tengah alur rilis** — setiap push rilis ke `main` wajib
     dipantau sampai workflow Build APK sukses dan asset APK terbaru ada di release
-    `v1.0` (lihat "Cara cek rilis terbaru"). Normal flow adalah PR; owner boleh push
+    terbaru (lihat "Cara cek rilis terbaru"). Normal flow adalah PR; owner boleh push
     hotfix/docs langsung hanya jika CI tetap dipantau penuh.
 17. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
     .githooks` (memanggil `scripts/check_repo.py --pre-commit`; unit test
@@ -277,10 +278,11 @@ kuat dan tanpa diskusi:
 
 - **Normal flow**: PR → build verifikasi tanpa publish → merge ke `main`.
 - **Hotfix owner**: push langsung ke `main` diperbolehkan bila memang disengaja,
-  tapi workflow tetap wajib dipantau sampai sukses dan release ter-refresh.
+  tapi workflow tetap wajib dipantau sampai sukses dan release baru terbit.
 - **Push sukses ke `main`** → workflow `build.yml` menjalankan guard, test,
-  build/release, lalu me-refresh release `v1.0` dengan APK
-  `tasirin-download-manager-v1.0-<code>.apk` (`code = 100000 + run_number`).
+  build/release, lalu membuat release baru `v<versi>` dengan APK
+  `tasirin-download-manager-v<versi>-<code>.apk` (`versi = 1.0.<run_number>`,
+  `code = 100000 + run_number`; rilis lama dipertahankan sebagai riwayat).
 - **Dependabot** → update dikelompokkan (`androidx`, `kotlinx`,
   `gradle-tools`, `actions`). PR yang TIDAK menyentuh dependensi Gradle
   (mis. update GitHub Actions) di-**auto-merge** setelah CI hijau (workflow
@@ -308,14 +310,14 @@ kuat dan tanpa diskusi:
    keystore** (fingerprint `c2785a61...` + **masa berlaku**: error < 90 hari,
    warning < 180 hari) → Android SDK → Gradle (cache + verifikasi wrapper +
    **verifikasi dependensi strict** lewat `gradle/verification-metadata.xml`).
-2. **Bump versionCode**: `100000 + run_number` ditulis ke `app/build.gradle.kts`.
+2. **Bump versi**: `versionName = "1.0.<run_number>"` + `versionCode = 100000 + run_number` ditulis ke `app/build.gradle.kts` (nilai dasar hanya fallback lokal).
 3. `assembleDebug` (artifact `app-debug`).
 4. **Lint + unit test**: `lintDebug` (abortOnError) + `testDebugUnitTest`.
 5. `assembleRelease` **hanya bila `KEYSTORE_BASE64` terisi** (artifact `app-release`).
 6. **Verifikasi tanda tangan APK release** (`keytool -printcert -jarfile`
    dibandingkan `c2785a61...`) — membuktikan APK benar ditandatangani kunci resmi.
 7. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
-8. Publish release `v1.0`: APK signed + **`mapping.txt`** (deobfuscation R8).
+8. Publish release baru `v<versi>`: APK signed + **`mapping.txt`** (deobfuscation R8); rilis lama tidak dihapus.
 9. **VirusTotal scan** (opsional, hanya bila `VT_API_KEY` terisi) — submit APK
    rilis/debug, polling sampai analisis selesai, lalu ringkasan deteksi (X/Y
    engine) dicetak di log + job summary; jalan di push `main` DAN di PR
@@ -326,7 +328,7 @@ kuat dan tanpa diskusi:
 
 Catatan: workflow memakai `concurrency` (run lama di ref sama dibatalkan) dan
 ada **build terjadwal mingguan** (Senin 03:00 UTC) yang hanya memverifikasi
-build sekaligus mengaudit kesehatan asset release `v1.0` — tidak mem-publish
+build sekaligus mengaudit kesehatan asset release terbaru — tidak mem-publish
 release. **CodeQL** (Java/Kotlin) dan **gitleaks**
 (deteksi secret) berjalan di tiap push/PR; temuan CodeQL muncul di tab
 Security & alerts repositori.
@@ -382,15 +384,16 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
 
 ## Cara cek rilis terbaru & verifikasi build
 
-- Release `v1.0` di-refresh tiap push ke `main`; asset APK selalu
-  `tasirin-download-manager-v1.0-<code>.apk` dengan `code = 100000 + run_number`.
-- Jangan ubah `versionName`/`versionCode` manual (di-bump CI).
+- Tiap push ke `main` membuat release baru `v<versi>`; asset APK selalu
+  `tasirin-download-manager-v<versi>-<code>.apk` dengan `versi = 1.0.<run_number>`,
+  `code = 100000 + run_number`.
+- Jangan ubah `versionName`/`versionCode` manual (keduanya di-bump CI).
 
 ```bash
 gh run list --branch main --limit 1            # build terakhir
 gh run watch <run-id> --exit-status
 gh run view <run-id> --json status,conclusion
-gh release view v1.0 --json assets -q '.assets[].name'
+gh release view $(gh release view --json tagName -q .tagName) --json assets -q '.assets[].name'
 ```
 
 Pastikan conclusion `success`, CodeQL/Gitleaks tidak gagal, dan release punya APK

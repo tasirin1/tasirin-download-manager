@@ -33,7 +33,7 @@ object HlsMp4Muxer {
             // --- Track video (MPEG-TS AVC) via MediaExtractor ---
             videoExt = MediaExtractor()
             videoExt.setDataSource(videoTs.absolutePath)
-            val vIndex = selectVideoTrack(videoExt) ?: return false
+            val vIndex = selectVideoTrack(videoExt) ?: run { runCatching { outMp4.delete() }; return false }
             val vFormat = videoExt.getTrackFormat(vIndex)
             videoExt.selectTrack(vIndex)
             val videoTrack = muxer.addTrack(vFormat)
@@ -88,7 +88,7 @@ object HlsMp4Muxer {
             // --- Track video (MPEG-TS AVC) via MediaExtractor ---
             videoExt = MediaExtractor()
             videoExt.setDataSource(videoTs.absolutePath)
-            val vIndex = selectVideoTrack(videoExt) ?: return false
+            val vIndex = selectVideoTrack(videoExt) ?: run { runCatching { outMp4.delete() }; return false }
             val vFormat = videoExt.getTrackFormat(vIndex)
             videoExt.selectTrack(vIndex)
             val videoTrack = muxer.addTrack(vFormat)
@@ -96,7 +96,7 @@ object HlsMp4Muxer {
             // --- Track audio (AAC dalam MP4/M4A) via MediaExtractor ---
             audioExt = MediaExtractor()
             audioExt.setDataSource(audioMp4.absolutePath)
-            val aIndex = selectAudioTrack(audioExt) ?: return false
+            val aIndex = selectAudioTrack(audioExt) ?: run { runCatching { outMp4.delete() }; return false }
             val aFormat = audioExt.getTrackFormat(aIndex)
             audioExt.selectTrack(aIndex)
             val audioTrack = muxer.addTrack(aFormat)
@@ -136,14 +136,14 @@ object HlsMp4Muxer {
             // --- Track video (MP4 video-only) via MediaExtractor ---
             videoExt = MediaExtractor()
             videoExt.setDataSource(videoMp4.absolutePath)
-            val vIndex = selectVideoTrack(videoExt) ?: return false
+            val vIndex = selectVideoTrack(videoExt) ?: run { runCatching { outMp4.delete() }; return false }
             videoExt.selectTrack(vIndex)
             val videoTrack = muxer.addTrack(videoExt.getTrackFormat(vIndex))
 
             // --- Track audio (AAC dalam MP4/M4A) via MediaExtractor ---
             audioExt = MediaExtractor()
             audioExt.setDataSource(audioMp4.absolutePath)
-            val aIndex = selectAudioTrack(audioExt) ?: return false
+            val aIndex = selectAudioTrack(audioExt) ?: run { runCatching { outMp4.delete() }; return false }
             audioExt.selectTrack(aIndex)
             val audioTrack = muxer.addTrack(audioExt.getTrackFormat(aIndex))
 

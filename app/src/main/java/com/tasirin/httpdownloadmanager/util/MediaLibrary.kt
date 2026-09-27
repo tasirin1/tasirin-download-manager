@@ -390,7 +390,17 @@ object MediaLibrary {
         // 2) Folder kustom (SAF tree)
         StoragePrefs.getFolderUri(context)?.let { uri ->
             runCatching {
-                DocumentFile.fromTreeUri(context, uri)?.listFiles()?.take(GALLERY_MAX_ENTRIES)?.forEach { addDoc(it) }
+                val tree = DocumentFile.fromTreeUri(context, uri) ?: return@runCatching
+                fun addDocTree(doc: DocumentFile, depth: Int) {
+                    if (list.size >= GALLERY_MAX_ENTRIES || depth > 16) return
+                    val children = runCatching { doc.listFiles() }.getOrNull() ?: return
+                    for (child in children) {
+                        if (list.size >= GALLERY_MAX_ENTRIES) return
+                        if (child.isDirectory) addDocTree(child, depth + 1)
+                        else addDoc(child)
+                    }
+                }
+                addDocTree(tree, 0)
             }
         }
 
@@ -526,7 +536,11 @@ object MediaLibrary {
             runCatching {
                 val root = File(galleryRoot)
                 if (root.isDirectory) {
-                    root.walkTopDown()
+                    val seenDirs = mutableSetOf<String>()
+                    root.walkTopDown().maxDepth(24).onEnter { dir ->
+                        val canonical = runCatching { dir.canonicalPath }.getOrNull() ?: return@onEnter false
+                        seenDirs.add(canonical)
+                    }
                         .filter { it.isFile && isGalleryVideo(it.name) }
                         .take(GALLERY_MAX_ENTRIES)
                         .forEach { addFile(it) }
@@ -559,7 +573,11 @@ object MediaLibrary {
                 val dir = File(folder)
                 if (!dir.isDirectory) continue
                 runCatching {
-                    dir.walkTopDown()
+                    val seenDirs = mutableSetOf<String>()
+                    dir.walkTopDown().maxDepth(24).onEnter { d ->
+                        val canonical = runCatching { d.canonicalPath }.getOrNull() ?: return@onEnter false
+                        seenDirs.add(canonical)
+                    }
                         .filter { it.isFile && isGalleryVideo(it.name) }
                         .take(GALLERY_MAX_ENTRIES)
                         .forEach { addFile(it) }

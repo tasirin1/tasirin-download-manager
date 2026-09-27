@@ -58,9 +58,9 @@ object Checksums {
         return Hex.encode(decoded)
     }
 
-    /** Decode base64 standar (alphabet A-Za-z0-9+/), padding opsional. */
+    /** Decode base64 standar maupun URL-safe (alphabet A-Za-z0-9+/ dan -_), padding opsional. */
     fun base64Decode(input: String): ByteArray? {
-        val clean = input.filter { !it.isWhitespace() }
+        val clean = input.filter { !it.isWhitespace() }.map { if (it == '-') '+' else if (it == '_') '/' else it }.joinToString("")
         if (clean.isEmpty() || clean.length % 4 == 1) return null
         var s = clean
         while (s.length % 4 != 0) s += "="
@@ -95,6 +95,8 @@ object Checksums {
         in '0'..'9' -> c - '0' + 52
         '+' -> 62
         '/' -> 63
+        '-' -> 62
+        '_' -> 63
         else -> null
     }
 }

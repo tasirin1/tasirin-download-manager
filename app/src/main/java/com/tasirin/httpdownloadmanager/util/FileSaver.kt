@@ -48,7 +48,9 @@ class FileSaver(context: Context) {
 
     fun mergeSegments(fileName: String, segmentCount: Int): File {
         val target = partialFile(fileName)
-        val staging = File(target.parentFile, target.name + ".merge")
+        // Staging unik per proses agar dua item bernama sama yang merge
+        // paralel tidak saling menimpa file staging yang sama.
+        val staging = File(target.parentFile, target.name + ".merge." + System.nanoTime())
         try {
             BufferedOutputStream(staging.outputStream()).use { out ->
                 for (index in 0 until segmentCount) {
@@ -287,16 +289,28 @@ class FileSaver(context: Context) {
     }.getOrDefault(Long.MAX_VALUE)
 
     fun destinationFreeBytes(): Long {
+        // Partial download ditulis di downloadDir internal dan tmp upload di
+        // cacheDir; folder teks hanya salah satu tujuan publish. Guard
+        // storage-menipis harus memakai volume tersempit di antaranya,
+        // bukan hanya folder teks (volume adopted bisa berbeda-beda).
+        var free = freeBytes()
+        free = minOf(
+            free,
+            runCatching { StatFs(appContext.cacheDir.absolutePath).availableBytes }
+                .getOrDefault(Long.MAX_VALUE)
+        )
         val textFolder = StoragePrefs.getTextFolder(appContext)
         if (textFolder != null) {
             val dir = File(textFolder)
             if (dir.isDirectory) {
-                return runCatching {
-                    StatFs(dir.absolutePath).availableBytes
-                }.getOrDefault(freeBytes())
+                free = minOf(
+                    free,
+                    runCatching { StatFs(dir.absolutePath).availableBytes }
+                        .getOrDefault(Long.MAX_VALUE)
+                )
             }
         }
-        return freeBytes()
+        return free
     }
 
     fun sidecarChecksum(item: DownloadItem): Pair<String, String>? {
@@ -408,7 +422,9 @@ class FileSaver(context: Context) {
         // Sanitasi: nama dari dialog user bisa mengandung '/' sehingga File(parent, name)
         // lolos ke subpath dan fileName tersimpan merusak pemetaan partialFile.
         val clean = FileNames.safe(newName.trim())
-        if (clean.isBlank() || clean == item.fileName) return null
+        // Tolak traversal (".." tanpa separator lolos FileNames.safe);
+        // pemanggil remote sudah divalidasi, ini lapis kedua untuk dialog native.
+        if (clean.isBlank() || clean == item.fileName || clean.startsWith("..")) return null
         return runCatching {
             when {
                 !item.contentUri.isNullOrEmpty() -> {
@@ -455,10 +471,15 @@ class FileSaver(context: Context) {
                 !item.filePath.isNullOrEmpty() -> File(item.filePath).inputStream()
                 else -> null
             } ?: return null
-            input.use { src ->
-                val out = appContext.contentResolver.openOutputStream(target.uri, "wt")
-                    ?: return null
-                out.use { dst -> src.copyTo(dst) }
+            try {
+                input.use { src ->
+                    val out = appContext.contentResolver.openOutputStream(target.uri, "wt")
+                        ?: throw java.io.IOException("Failed to open move destination")
+                    out.use { dst -> src.copyTo(dst) }
+                }
+            } catch (e: Exception) {
+                runCatching { target.delete() }
+                throw e
             }
             deleteFiles(item)
             PublishResult(contentUri = target.uri.toString(), fileName = target.name)
@@ -466,10 +487,23 @@ class FileSaver(context: Context) {
     }
 
     private fun uniqueTargetFile(file: File): File {
-        if (!file.exists()) return file
+        // Klaim atomik via createNewFile agar dua publish paralel dengan
+        // nama sama tidak saling menimpa target yang sama.
         val parent = file.parentFile
-        val unique = FileNames.unique(file.name) { File(parent, it).exists() }
-        return File(parent, unique)
+        if (parent != null && !parent.isDirectory) parent.mkdirs()
+        var candidate = file
+        repeat(1000) {
+            if (!candidate.exists()) {
+                if (runCatching { candidate.createNewFile() }.getOrDefault(false)) {
+                    candidate.delete()
+                    return candidate
+                }
+                if (!candidate.exists()) return candidate
+            }
+            val next = FileNames.unique(candidate.name) { File(parent, it).exists() }
+            candidate = if (parent != null) File(parent, next) else File(next)
+        }
+        return candidate
     }
 
     private fun uniqueDocumentName(tree: DocumentFile, fileName: String): String {

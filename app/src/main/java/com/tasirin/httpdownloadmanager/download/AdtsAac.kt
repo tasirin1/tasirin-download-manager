@@ -97,6 +97,9 @@ object AdtsAac {
         if (pos + 7 > data.size) return null
         val first = header(data, pos) ?: return null
         if (first.sfIndex >= SAMPLE_RATES.size) return null
+        // channels 0 tak valid dan profil 3 reserved: gagalkan di sini agar
+        // tak meledak obscure di MediaFormat/muxer jauh dari sumbernya.
+        if (first.channels !in 1..7 || first.profile == 3) return null
         if (first.frameLen < first.headerLen || pos + first.frameLen > data.size) return null
         return Stream(
             SAMPLE_RATES[first.sfIndex],
@@ -115,6 +118,7 @@ object AdtsAac {
             val first = readFrame(input) ?: return null
             val h = first.header
             if (h.sfIndex >= SAMPLE_RATES.size) return null
+            if (h.channels !in 1..7 || h.profile == 3) return null
             return Stream(
                 SAMPLE_RATES[h.sfIndex],
                 h.channels,

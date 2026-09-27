@@ -120,11 +120,17 @@ jobs:
       - name: Set up Gradle (cache + verifikasi wrapper)
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Bump versionCode otomatis per build
+      - name: Bump versi otomatis per build (versionName + versionCode)
+        # versionName dibangkitkan dari run_number (1.0.<run_number>) supaya
+        # versi tampil naik tiap rilis; versionCode = 100000 + run_number
+        # (monotonik untuk Play/PackageManager). Nilai dasar di
+        # app/build.gradle.kts hanya fallback build lokal.
         run: |
           CODE=$((100000 + ${{ github.run_number }}))
+          VER="1.0.${{ github.run_number }}"
           sed -i "s/versionCode = [0-9]*/versionCode = ${CODE}/" app/build.gradle.kts
-          echo "versionCode baru: ${CODE}"
+          sed -i "s/versionName = \"[0-9.]*\"/versionName = \"${VER}\"/" app/build.gradle.kts
+          echo "Versi baru: ${VER} (code ${CODE})"
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
@@ -256,6 +262,8 @@ jobs:
           if [ -z "$NOTES" ]; then
             NOTES="APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box."
           fi
+          # Tag unik per build (v1.0.<run_number>) — rilis lama dipertahankan
+          # sebagai riwayat; delete hanya untuk idempotensi bila job rerun.
           gh release delete "v${VER}" --yes --cleanup-tag || true
           # Lampirkan mapping.txt (deobfuscation R8) bila ada — tidak masuk APK.
           MAPPING_ARGS=""

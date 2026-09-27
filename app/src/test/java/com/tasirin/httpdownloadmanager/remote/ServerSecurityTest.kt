@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.remote
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -288,5 +289,31 @@ class ServerSecurityTest {
         assertFalse(ServerSecurity.isMediaStorePathAllowed("../Rahasia", listOf(root), false, mediaRoot))
         assertFalse(ServerSecurity.isMediaStorePathAllowed("Download//x", listOf(root), false, mediaRoot))
         assertTrue(ServerSecurity.isMediaStorePathAllowed("Movies/private.mp4", listOf(root), true, mediaRoot))
+    }
+
+    @Test
+    fun sessionCookieValue_hanyaNamaPas_dipakai() {
+        assertEquals("abc123", ServerSecurity.sessionCookieValue("dm_pin=abc123", "dm_pin"))
+        assertEquals("abc123", ServerSecurity.sessionCookieValue("other=1; dm_pin=abc123; x=2", "dm_pin"))
+        assertEquals("abc123", ServerSecurity.sessionCookieValue("dm_pin=abc123; other=2", "dm_pin"))
+        // Substring di nama/nilai cookie lain tidak boleh cocok.
+        assertNull(ServerSecurity.sessionCookieValue("adm_pin=abc123", "dm_pin"))
+        assertEquals("real", ServerSecurity.sessionCookieValue("adm_pin=junk; dm_pin=real", "dm_pin"))
+        assertNull(ServerSecurity.sessionCookieValue("dm_pin=; other=1", "dm_pin"))
+        assertNull(ServerSecurity.sessionCookieValue(null, "dm_pin"))
+        assertNull(ServerSecurity.sessionCookieValue("dm_pin=abc", ""))
+    }
+
+    @Test
+    fun isFileNameValid_menolakSeparatorDanTraversal() {
+        assertTrue(ServerSecurity.isFileNameValid("video.mp4"))
+        assertTrue(ServerSecurity.isFileNameValid("file (1).mp4"))
+        assertFalse(ServerSecurity.isFileNameValid(""))
+        assertFalse(ServerSecurity.isFileNameValid("   "))
+        assertFalse(ServerSecurity.isFileNameValid("a/b.mp4"))
+        assertFalse(ServerSecurity.isFileNameValid("a\\b.mp4"))
+        assertFalse(ServerSecurity.isFileNameValid(".."))
+        assertFalse(ServerSecurity.isFileNameValid("../x.mp4"))
+        assertFalse(ServerSecurity.isFileNameValid("..\\x.mp4"))
     }
 }

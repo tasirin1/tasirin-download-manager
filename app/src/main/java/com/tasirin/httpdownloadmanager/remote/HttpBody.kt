@@ -19,6 +19,16 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
     session.getParameters().forEach { (k, v) ->
         v.firstOrNull()?.let { map[k] = it }
     }
+    val contentType = session.headers["content-type"].orEmpty()
+    if (contentType.startsWith("multipart/form-data", ignoreCase = true)) {
+        runCatching {
+            val files = mutableMapOf<String, String>()
+            session.parseBody(files)
+            session.getParameters().forEach { (k, v) -> v.firstOrNull()?.let { map[k] = it } }
+            files.values.forEach { tmp -> runCatching { java.io.File(tmp).delete() } }
+        }
+        return map
+    }
     val rawLength = session.headers["content-length"]?.toLongOrNull() ?: 0L
     if (rawLength > MAX_BODY_SIZE) throw BodyTooLargeException()
     val length = rawLength.toInt()
@@ -44,9 +54,9 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
             if (end > start) {
                 val eq = body.indexOf('=', start)
                 if (eq > start && eq < end) {
-                    val key = URLDecoder.decode(body.substring(start, eq), "UTF-8")
-                    val value = URLDecoder.decode(body.substring(eq + 1, end), "UTF-8")
-                    map[key] = value
+                    val key = runCatching { URLDecoder.decode(body.substring(start, eq), "UTF-8") }.getOrNull()
+                    val value = runCatching { URLDecoder.decode(body.substring(eq + 1, end), "UTF-8") }.getOrNull()
+                    if (key != null && value != null) map[key] = value
                 }
             }
             if (amp < 0) break

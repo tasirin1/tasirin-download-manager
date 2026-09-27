@@ -204,8 +204,12 @@ object StoragePrefs {
         if (PinHash.isModern(stored)) return PinHash.verify(pin, stored)
 
         // Nilai lama dimigrasikan sekali setelah PIN benar, tanpa memaksa logout.
+        // PIN plaintext yang kebetulan 64 char hex ambigu dengan hash lama:
+        // coba cocok hash dulu, lalu cocok plaintext langsung.
         val expected = normalizePinHash(stored) ?: return false
-        if (!constantEquals(sha256Hex(pin), expected)) return false
+        val hashOk = constantEquals(sha256Hex(pin), expected)
+        val plainOk = stored.length == 64 && stored.all { it in HEX_CHARS } && constantEquals(pin, stored)
+        if (!hashOk && !plainOk) return false
         prefs(context).edit { putString(KEY_SERVER_PIN, PinHash.hash(pin)) }
         return true
     }

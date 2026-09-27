@@ -8,19 +8,22 @@ import java.util.Collections
 class DownloadRepository(context: Context) {
 
     private val prefs = context.getSharedPreferences("downloads", Context.MODE_PRIVATE)
-    // Cache hasil enkripsi kredensial per pasangan plaintext: menghindari AES
+    // Cache hasil enkripsi kredensial per kombinasi empat field sensitif: menghindari AES
     // + IV acak diulang tiap kali save penuh (hot path download aktif).
     // synchronizedMap: save bisa dipanggil dari thread UI (flush) dan IO (job).
-    private val credCache = Collections.synchronizedMap(HashMap<String, Pair<String, String>>())
+    private val credCache = Collections.synchronizedMap(HashMap<String, Quad>())
 
     fun load(): List<DownloadItem> {
         val raw = prefs.getString(KEY_ITEMS, null) ?: return emptyList()
         val items = DownloadItemCodec.decode(raw).map { item ->
-            // Kredensial disimpan terenkripsi (API 23+); Android 5.0-5.1
-            // menyimpan plaintext (Keystore AES belum tersedia) — aman di-dekripsi.
+            // Kredensial dan secret header/body disimpan terenkripsi (API 23+);
+            // Android 5.0-5.1 menyimpan plaintext (Keystore AES belum tersedia)
+            // dan nilai lama tanpa prefix lolos apa adanya lewat decrypt.
             item.copy(
                 username = Crypto.decrypt(item.username),
-                password = Crypto.decrypt(item.password)
+                password = Crypto.decrypt(item.password),
+                headers = Crypto.decrypt(item.headers),
+                postBody = Crypto.decrypt(item.postBody)
             )
         }
         return DownloadItemCodec.overlayProgress(items, prefs.getString(KEY_PROGRESS, null))
@@ -36,8 +39,8 @@ class DownloadRepository(context: Context) {
 
     fun save(items: List<DownloadItem>) {
         val encItems = items.map { item ->
-            val (encUser, encPass) = encryptedCreds(item)
-            item.copy(username = encUser, password = encPass)
+            val (encUser, encPass, encHeaders, encBody) = encryptedCreds(item)
+            item.copy(username = encUser, password = encPass, headers = encHeaders, postBody = encBody)
         }
         // Snapshot penuh sudah memuat progres terbaru -> hapus progres ringan
         // supaya tidak menimpa data yang lebih lama saat load berikutnya.
@@ -47,10 +50,17 @@ class DownloadRepository(context: Context) {
         }
     }
 
-    private fun encryptedCreds(item: DownloadItem): Pair<String, String> {
-        val plain = item.username + "\u0000" + item.password
+    private fun encryptedCreds(item: DownloadItem): Quad {
+        // headers/postBody bisa memuat token Authorization dan secret POST,
+        // jadi ikut dienkripsi; kunci cache mencakup keempatnya.
+        val plain = item.username + "\u0000" + item.password + "\u0000" + item.headers + "\u0000" + item.postBody
         credCache[plain]?.let { return it }
-        val pair = Crypto.encrypt(item.username) to Crypto.encrypt(item.password)
+        val pair = Quad(
+            Crypto.encrypt(item.username),
+            Crypto.encrypt(item.password),
+            Crypto.encrypt(item.headers),
+            Crypto.encrypt(item.postBody)
+        )
         // Cache dibatasi: sesi panjang dengan banyak kredensial unik tidak
         // boleh menumpuk (entries lama yang tidak terpakai dibuang).
         // synchronized(credCache): eviction (size + iterator + remove) harus atomic
@@ -66,6 +76,9 @@ class DownloadRepository(context: Context) {
         }
         return pair
     }
+
+    // Nilai terenkripsi empat field sensitif; dipakai sebagai value cache.
+    private data class Quad(val first: String, val second: String, val third: String, val fourth: String)
 
     companion object {
         private const val KEY_ITEMS = "items"

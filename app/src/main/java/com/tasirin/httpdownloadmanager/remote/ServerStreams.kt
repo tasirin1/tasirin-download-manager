@@ -40,6 +40,19 @@ internal class ChainInputStream(private val files: List<File>) : InputStream() {
         }
     }
 
+    override fun skip(n: Long): Long {
+        if (n <= 0) return 0
+        var remaining = n
+        val buf = ByteArray(64 * 1024)
+        while (remaining > 0) {
+            val want = minOf(buf.size.toLong(), remaining).toInt()
+            val r = read(buf, 0, want)
+            if (r <= 0) break
+            remaining -= r
+        }
+        return n - remaining
+    }
+
     override fun close() {
         current?.let { runCatching { it.close() } }
         current = null
@@ -52,8 +65,15 @@ internal class PositionedAssetInputStream(
     private val assetDescriptor: AssetFileDescriptor,
     startPosition: Long
 ) : InputStream() {
-    private val stream = FileInputStream(assetDescriptor.fileDescriptor).apply {
-        runCatching { channel.position(assetDescriptor.startOffset + startPosition) }
+    private val stream: FileInputStream = run {
+        val s = FileInputStream(assetDescriptor.fileDescriptor)
+        val ok = runCatching { s.channel.position(assetDescriptor.startOffset + startPosition); true }.getOrDefault(false)
+        if (!ok) {
+            runCatching { s.close() }
+            runCatching { assetDescriptor.close() }
+            throw java.io.IOException("Failed to position media stream")
+        }
+        s
     }
 
     override fun read(): Int = stream.read()

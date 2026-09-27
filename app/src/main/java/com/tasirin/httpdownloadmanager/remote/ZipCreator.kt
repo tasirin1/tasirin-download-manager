@@ -36,7 +36,11 @@ object ZipCreator {
         seen: MutableSet<String> = mutableSetOf(),
         isFileAllowed: (String) -> Boolean
     ) {
-        if (!isFileAllowed(file.absolutePath)) return
+        // Izin dicek terhadap canonical path: symlink file di dalam root
+        // yang menunjuk ke luar root lolos bila hanya absolutePath (lokasi
+        // link) yang diperiksa, lalu inputStream() membaca target luar.
+        val canonicalForAllow = runCatching { file.canonicalPath }.getOrNull()
+        if (canonicalForAllow == null || !isFileAllowed(canonicalForAllow)) return
         // Symlink melingkar (folder menunjuk leluhurnya) membuat rekursi tak
         // berujung -> StackOverflow; hentikan via canonical + batas kedalaman.
         if (depth > MAX_ZIP_DEPTH) return
@@ -58,9 +62,14 @@ object ZipCreator {
                 zipFile(zos, child, entryPath, depth + 1, seen, isFileAllowed)
             }
         } else if (file.isFile) {
-            zos.putNextEntry(ZipEntry(entryPath))
-            file.inputStream().use { it.copyTo(zos) }
-            zos.closeEntry()
+            runCatching {
+                zos.putNextEntry(ZipEntry(entryPath))
+                try {
+                    file.inputStream().use { it.copyTo(zos) }
+                } finally {
+                    runCatching { zos.closeEntry() }
+                }
+            }
         }
     }
 
@@ -70,7 +79,8 @@ object ZipCreator {
         zos: ZipOutputStream,
         tokens: List<String>,
         context: Context,
-        isFileAllowed: (String) -> Boolean
+        isFileAllowed: (String) -> Boolean,
+        isUriAllowed: (android.net.Uri) -> Boolean = { false }
     ) {
         val used = mutableMapOf<String, Int>()
         tokens.forEach { token ->
@@ -80,6 +90,8 @@ object ZipCreator {
                 val input: java.io.InputStream?
                 if (raw.startsWith("f:")) {
                     val f = File(raw.removePrefix("f:"))
+                    val canon = runCatching { f.canonicalPath }.getOrNull()
+                    if (canon == null || !isFileAllowed(canon)) return@forEach
                     if (f.isDirectory) {
                         val root = uniqueZipName(f.name, used)
                         val children = runCatching { f.listFiles() }.getOrNull() ?: return@runCatching
@@ -89,9 +101,12 @@ object ZipCreator {
                         return@runCatching
                     }
                     name = f.name
-                    input = if (f.isFile) f.inputStream() else null
+                    val canonFile = runCatching { f.canonicalPath }.getOrNull()
+                    input = if (f.isFile && canonFile != null && isFileAllowed(canonFile)) f.inputStream() else null
                 } else {
+                    if (!raw.startsWith("u:")) return@forEach
                     val uri = raw.removePrefix("u:").toUri()
+                    if (!isUriAllowed(uri)) return@forEach
                     name = displayNameFor(context, uri)
                     input = context.contentResolver.openInputStream(uri)
                 }
@@ -99,9 +114,14 @@ object ZipCreator {
                     return@runCatching
                 }
                 val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
-                zos.putNextEntry(ZipEntry(entry))
-                input.use { it.copyTo(zos) }
-                zos.closeEntry()
+                runCatching {
+                    zos.putNextEntry(ZipEntry(entry))
+                    try {
+                        input.use { it.copyTo(zos) }
+                    } finally {
+                        runCatching { zos.closeEntry() }
+                    }
+                }
             }
         }
     }
@@ -161,9 +181,14 @@ object ZipCreator {
                     resolver.openInputStream(
                         ContentUris.withAppendedId(collection, c.getLong(iId))
                     )?.use { input ->
-                        zos.putNextEntry(ZipEntry(entry))
-                        input.copyTo(zos)
-                        zos.closeEntry()
+                        runCatching {
+                            zos.putNextEntry(ZipEntry(entry))
+                            try {
+                                input.copyTo(zos)
+                            } finally {
+                                runCatching { zos.closeEntry() }
+                            }
+                        }
                     }
                 }
             }

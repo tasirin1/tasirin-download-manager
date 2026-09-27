@@ -29,7 +29,10 @@ object Crypto {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, key())
             PREFIX + b64(cipher.iv) + ":" + b64(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)))
-        }.getOrDefault(plain)
+        }.getOrElse { e ->
+            runCatching { android.util.Log.w("Crypto", "encrypt fallback to plaintext", e) }
+            plain
+        }
     }
 
     /** Dekripsi; nilai lama tanpa prefix dianggap plaintext (data lama). */

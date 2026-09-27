@@ -23,7 +23,7 @@ Aplikasi unduhan untuk Android dengan kontrol web realtime, file manager jarak j
 ## Unduh APK
 
 1. Buka [halaman rilis terbaru](https://github.com/tasirin1/tasirin-download-manager/releases/latest).
-2. Unduh APK `tasirin-download-manager-v1.0-<code>.apk`.
+2. Unduh APK `tasirin-download-manager-v<versi>-<code>.apk` (versi naik tiap rilis, mis. `v1.0.123`).
 3. Instal aplikasi dan berikan izin penyimpanan yang diminta.
 
 APK dirilis lewat GitHub Actions dan ditandatangani dengan kunci rilis resmi. Pembaruan dalam aplikasi hanya mengunduh APK; instalasi tetap dilakukan pengguna.
@@ -69,8 +69,8 @@ Peta file yang lebih detail, arsitektur, keputusan historis, dan pola bug ada di
 ## Membangun & Rilis
 
 Rilis resmi hanya dibuat melalui GitHub Actions — push ke `main` menjalankan
-test, lint, build APK signed, dan me-refresh release `v1.0`. Jangan ubah
-`versionName`/`versionCode` manual.
+test, lint, build APK signed, dan membuat release baru `v<versi>` (riwayat lama dipertahankan). Jangan ubah
+`versionName`/`versionCode` manual (CI menaikkan keduanya otomatis).
 
 Untuk debug lokal:
 

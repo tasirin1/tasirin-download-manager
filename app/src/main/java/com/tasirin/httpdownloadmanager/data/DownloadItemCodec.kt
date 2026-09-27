@@ -63,7 +63,8 @@ object DownloadItemCodec {
 
     /** Parse daftar dari JSON; satu entry korup tidak menghapus daftar
      *  (entry itu dilewati). Bila coerceActiveToPaused, download yang sedang
-     *  berjalan saat proses restart dianggap dijeda. */
+     *  berjalan saat proses restart dianggap dijeda. Antrean PENDING bukan
+     *  status berjalan sehingga dibiarkan agar queue lanjut otomatis. */
     fun decode(raw: String, coerceActiveToPaused: Boolean = true): List<DownloadItem> {
         val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
         val items = mutableListOf<DownloadItem>()
@@ -77,20 +78,25 @@ object DownloadItemCodec {
         if (o == null) return null
         return runCatching {
             val rawState = DownloadState.valueOf(o.getString("state"))
-            val state = if (coerceActiveToPaused &&
-                (rawState == DownloadState.DOWNLOADING || rawState == DownloadState.PENDING)
-            ) {
+            // Hanya DOWNLOADING yang di-coerce: PENDING adalah antrean sah
+            // yang harus lanjut otomatis setelah restart, bukan ikut dijeda.
+            val state = if (coerceActiveToPaused && rawState == DownloadState.DOWNLOADING) {
                 DownloadState.PAUSED
             } else {
                 rawState
             }
+            // Entri tanpa id/url atau byte negatif adalah data korup:
+            // lewati agar tidak meracuni daftar dan lapisan hilir.
+            val id = o.optString("id")
+            val url = o.optString("url")
+            if (id.isBlank() || url.isBlank()) return null
             DownloadItem(
-                id = o.optString("id"),
-                url = o.optString("url"),
+                id = id,
+                url = url,
                 fileName = o.optString("fileName", "unknown"),
                 state = state,
-                bytesDownloaded = o.optLong("bytesDownloaded", 0),
-                totalBytes = o.optLong("totalBytes", 0),
+                bytesDownloaded = o.optLong("bytesDownloaded", 0).coerceAtLeast(0),
+                totalBytes = o.optLong("totalBytes", 0).coerceAtLeast(0),
                 error = o.optString("error").ifEmpty { null },
                 contentUri = o.optString("contentUri").ifEmpty { null },
                 filePath = o.optString("filePath").ifEmpty { null },
@@ -183,8 +189,10 @@ object DownloadItemCodec {
             val t = p.optLong("t", item.totalBytes)
             // Ambil max per field: bila hanya total yang tumbuh (kasus save &
             // saveProgress balapan), bytes versi lama tidak boleh menimpa mundur.
-            val nb = maxOf(b, item.bytesDownloaded)
+            // Clamp bytes ke total: progres basi yang lebih besar dari total
+            // (mis. setelah reset resume) tidak boleh membuat persen >100%.
             val nt = maxOf(t, item.totalBytes)
+            val nb = maxOf(b, item.bytesDownloaded).let { if (nt > 0) minOf(it, nt) else it }
             if (nb != item.bytesDownloaded || nt != item.totalBytes) {
                 item.copy(bytesDownloaded = nb, totalBytes = nt)
             } else {

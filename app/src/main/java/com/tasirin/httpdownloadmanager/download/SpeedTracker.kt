@@ -1,8 +1,14 @@
 package com.tasirin.httpdownloadmanager.download
 
 /** Pelacak kecepatan EMA + ETA (murni, bisa diuji JVM; jam bisa di-inject). */
+// Jam default monotonik (elapsedRealtime): jam dinding yang melompat
+// (NTP/zona) merusak delta kecepatan dan ETA yang dihitung dari selisihnya.
+// try/catch agar konstruktor default tetap bisa dipakai di unit test JVM
+// yang tidak punya framework Android.
 class SpeedTracker(
-    private val clock: () -> Long = { System.currentTimeMillis() }
+    private val clock: () -> Long = {
+        runCatching { android.os.SystemClock.elapsedRealtime() }.getOrDefault(System.currentTimeMillis())
+    }
 ) {
     // Satu map per id (bukan 3 map): 1 lookup + 1 lock per sample multi-segmen.
     // ema null = belum ada pengukuran instan; sampel kedua langsung memakai

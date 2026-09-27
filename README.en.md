@@ -23,7 +23,7 @@ A download manager for Android with realtime web control, a remote file manager,
 ## Download APK
 
 1. Open the [latest release page](https://github.com/tasirin1/tasirin-download-manager/releases/latest).
-2. Download the `tasirin-download-manager-v1.0-<code>.apk` asset.
+2. Download the `tasirin-download-manager-v<version>-<code>.apk` asset (version rises each release, e.g. `v1.0.123`).
 3. Install the app and grant the requested storage permissions.
 
 Releases are built by GitHub Actions and signed with the official release key. In-app updates only download the APK; installation remains manual.
@@ -69,8 +69,8 @@ patterns live in [AGENTS.md](AGENTS.md).
 ## Building & Releases
 
 Official releases are built only through GitHub Actions — pushing to `main` runs
-tests, lint, a signed APK build, and refreshes release `v1.0`. Do not change
-`versionName`/`versionCode` manually.
+tests, lint, a signed APK build, and creates a new `v<version>` release (older releases are kept). Do not change
+`versionName`/`versionCode` manually (CI bumps both automatically).
 
 For a local debug build:
 

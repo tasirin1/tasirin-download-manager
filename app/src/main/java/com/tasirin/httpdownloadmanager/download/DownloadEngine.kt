@@ -76,7 +76,12 @@ class DownloadEngine(appContext: Context) {
     // can carry server-set session cookies (helps sites that require cookies,
     // but does not bypass Cloudflare JS challenges).
     private val cookieManager = CookieManager(null, CookiePolicy.ACCEPT_ALL).also {
-        java.net.CookieHandler.setDefault(it)
+        // Jangan menimpa CookieHandler global bila sudah dipegang pihak lain
+        // (mis. WebView/test); klaim hanya bila belum ada atau milik sendiri.
+        val current = runCatching { java.net.CookieHandler.getDefault() }.getOrNull()
+        if (current == null || current === it) {
+            runCatching { java.net.CookieHandler.setDefault(it) }
+        }
         loadPersistedCookies()
     }
 
@@ -174,14 +179,23 @@ class DownloadEngine(appContext: Context) {
         scope.launch { monitorLoop() }
     }
 
+    private val cancelledConns = ConcurrentHashMap.newKeySet<String>()
     private fun disconnectActive(id: String) {
+        cancelledConns.add(id)
         activeConns.remove(id)?.forEach { connection ->
             runCatching { connection.disconnect() }
         }
     }
 
     private fun trackConnection(id: String, connection: HttpURLConnection): HttpURLConnection {
+        if (cancelledConns.contains(id)) {
+            runCatching { connection.disconnect() }
+            return connection
+        }
         activeConns.getOrPut(id) { Collections.newSetFromMap(ConcurrentHashMap()) }.add(connection)
+        if (cancelledConns.contains(id)) {
+            untrackConnection(id, connection)
+        }
         return connection
     }
 
@@ -208,9 +222,17 @@ class DownloadEngine(appContext: Context) {
         monitor: Boolean = false,
         preferredHeight: Int = 0,
         preferredAudioLang: String = ""
-    ) {
+    ): String {
         val cleanUrl = url.trim()
-        if (cleanUrl.isEmpty()) return
+        // Hanya http(s) yang didukung engine; skema lain (file/ftp/…) hanya
+        // gagal obscure di openConnection — tolak sejak antre (defense in depth
+        // bersama validasi endpoint remote).
+        if (cleanUrl.isEmpty() ||
+            (!cleanUrl.startsWith("http://", ignoreCase = true) &&
+                !cleanUrl.startsWith("https://", ignoreCase = true))
+        ) {
+            return ""
+        }
         val customName = fileName?.trim().orEmpty()
         val name = FileNames.safe(customName.ifEmpty { guessFileName(cleanUrl) })
         val item = DownloadItem(
@@ -240,8 +262,9 @@ class DownloadEngine(appContext: Context) {
         update(listOf(item) + _items.value)
         flushSave()
         val host = runCatching { URL(cleanUrl).host }.getOrDefault("")
-        App.logEvent("DOWNLOAD ADDED: $name (${host.ifEmpty { "local/custom URL" }})")
+        App.logEvent("DOWNLOAD ADDED: $name (${host.ifEmpty { "custom URL" }})")
         attemptStart(item.id)
+        return item.id
     }
 
     fun pause(id: String) {
@@ -426,17 +449,37 @@ class DownloadEngine(appContext: Context) {
                 clean, method = "HEAD",
                 username = username, password = password, headers = headers
             )
+            var headCode = 0
+            var headProbe: UrlProbe? = null
             try {
-                val code = conn.responseCode
-                if (code !in 200..299) return null
-                UrlProbe(
-                    fileName = contentDispositionName(conn.getHeaderField("Content-Disposition")),
-                    sizeBytes = contentLength(conn),
-                    contentType = conn.getHeaderField("Content-Type"),
-                    etag = conn.getHeaderField("ETag")
-                )
+                headCode = conn.responseCode
+                if (headCode in 200..299) {
+                    headProbe = UrlProbe(
+                        fileName = contentDispositionName(conn.getHeaderField("Content-Disposition")),
+                        sizeBytes = contentLength(conn),
+                        contentType = conn.getHeaderField("Content-Type"),
+                        etag = conn.getHeaderField("ETag")
+                    )
+                }
             } finally {
                 conn.disconnect()
+            }
+            if (headProbe != null) return headProbe
+            if (headCode in 200..299) return null
+            val fallback = openAuthenticatedConnection(
+                clean, method = "GET", username = username, password = password, headers = headers
+            ) { c, _ -> c.setRequestProperty("Range", "bytes=0-0") }
+            try {
+                val fcode = fallback.responseCode
+                if (fcode != 200 && fcode != 206) return null
+                UrlProbe(
+                    fileName = contentDispositionName(fallback.getHeaderField("Content-Disposition")),
+                    sizeBytes = contentLength(fallback).takeIf { it > 0 } ?: -1L,
+                    contentType = fallback.getHeaderField("Content-Type"),
+                    etag = fallback.getHeaderField("ETag")
+                )
+            } finally {
+                fallback.disconnect()
             }
         }.getOrNull()
     }
@@ -686,7 +729,9 @@ class DownloadEngine(appContext: Context) {
                         "MONITOR: new version detected for ${item.fileName} " +
                             "(${Formats.bytes(probe.sizeBytes)})"
                     )
-                    addDownload(
+                    // Monitoring diteruskan ke item baru; item lama dimatikan
+                    // agar tick berikutnya tidak mengantre duplikat penuh lagi.
+                    val newId = addDownload(
                         url = item.url,
                         fileName = item.fileName,
                         username = item.username,
@@ -698,24 +743,30 @@ class DownloadEngine(appContext: Context) {
                         priority = item.priority,
                         checksum = item.checksum,
                         destination = item.destination,
-                        folderPath = item.folderPath
+                        folderPath = item.folderPath,
+                        monitor = true
                     )
+                    if (newId.isNotEmpty()) {
+                        updateItem(item.id) { it.copy(monitor = false) }
+                        scheduleSave()
+                    }
                 }
             }
         }
     }
 
     @Volatile private var sharedLimiter: GlobalRateLimiter? = null
+    private val limiterLock = Any()
 
     private fun globalRateLimiter(): GlobalRateLimiter? {
         val limit = StoragePrefs.speedLimitKbps(context)
         if (limit <= 0) {
             // Batalkan throttle global bila pengguna mematikan limit
             // supaya download baru tidak terkena throttle sisa sesi lama.
-            synchronized(this) { sharedLimiter = null }
+            synchronized(limiterLock) { sharedLimiter = null }
             return null
         }
-        synchronized(this) {
+        synchronized(limiterLock) {
             val current = sharedLimiter
             if (current != null) return current
             val created = GlobalRateLimiter(limit)
@@ -752,6 +803,7 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun canStartNow(): Boolean {
+        if (jobs.size < cachedMaxConcurrent) return true
         return jobs.values.count { it.isActive } < cachedMaxConcurrent
     }
 
@@ -774,9 +826,10 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun launchItem(item: DownloadItem): Boolean {
+        cancelledConns.remove(item.id)
         synchronized(jobs) {
             if (jobs[item.id]?.isActive == true) return false
-            if (jobs.values.count { it.isActive } >= cachedMaxConcurrent) {
+            if (jobs.size >= cachedMaxConcurrent && jobs.values.count { it.isActive } >= cachedMaxConcurrent) {
                 return false
             }
             val job = scope.launch {
@@ -1991,10 +2044,14 @@ class DownloadEngine(appContext: Context) {
             // Verifikasi server benar-benar melanjutkan dari posisi kita.
             val cr = conn.getHeaderField("Content-Range")
             val actualStart = cr?.substringAfter("bytes ")?.substringBefore("-")?.trim()?.toLongOrNull()
+            if (cr != null && actualStart == null) {
+                throw IOException("Malformed Content-Range: $cr")
+            }
             if (actualStart != null && actualStart != downloaded) {
                 throw IOException("Server resumed from byte $actualStart, not $downloaded")
             }
-            total += downloaded
+            val crTotal = cr?.substringAfter('/')?.trim()?.toLongOrNull()?.takeIf { it > 0 }
+            total = crTotal ?: (total + downloaded)
         } else if (downloaded > 0) {
             // Server tidak mendukung resume; mulai dari awal.
             downloaded = 0
@@ -2726,18 +2783,22 @@ class DownloadEngine(appContext: Context) {
         try {
             val arr = JSONArray()
             cookieManager.cookieStore.cookies.forEach { c ->
+                // Lewati yang sudah kedaluwarsa; simpan sisa umur agar cookie
+                // sesi situs tidak hidup selamanya di disk (basi -> 403 misterius).
+                if (c.hasExpired()) return@forEach
                 arr.put(JSONObject().apply {
                     put("name", c.name)
                     put("value", c.value)
                     put("domain", c.domain.orEmpty())
                     put("path", c.path.orEmpty())
+                    put("maxAge", c.maxAge)
                 })
             }
             cookiePrefs.edit { putString("cookies", arr.toString()) }
         } catch (_: Exception) { /* cookie persist is best-effort */ }
     }
 
-    /** Muat cookie dari SharedPreferences. */
+    /** Muat cookie dari SharedPreferences; yang kedaluwarsa dibuang. */
     private fun loadPersistedCookies() {
         try {
             val raw = cookiePrefs.getString("cookies", null) ?: return
@@ -2747,6 +2808,12 @@ class DownloadEngine(appContext: Context) {
                 val cookie = HttpCookie(obj.getString("name"), obj.getString("value"))
                 cookie.domain = obj.getString("domain")
                 cookie.path = obj.getString("path")
+                // Batas umur agar tidak abadi: format lama tanpa maxAge dan
+                // cookie sesi (maxAge < 0) diberi umur 7 hari; entri baru memakai
+                // maxAge asli server bila positif.
+                val storedAge = obj.optLong("maxAge", COOKIE_LEGACY_MAX_AGE_SEC)
+                cookie.maxAge = if (storedAge < 0) COOKIE_LEGACY_MAX_AGE_SEC else storedAge
+                if (cookie.hasExpired()) continue
                 cookieManager.cookieStore.add(null, cookie)
             }
         } catch (_: Exception) { /* cookie persist is best-effort */ }
@@ -2775,6 +2842,8 @@ class DownloadEngine(appContext: Context) {
         private const val PROGRESS_SAVE_INTERVAL_MS = 2_000L
         private const val SEG_FLUSH_INTERVAL_MS = 500L
         private const val COOKIE_WRITE_DEBOUNCE_MS = 2_000L
+        /** Umur fallback cookie format lama (tanpa maxAge tersimpan). */
+        private const val COOKIE_LEGACY_MAX_AGE_SEC = 7L * 24 * 60 * 60
         private const val MONITOR_INTERVAL_MS = 30 * 60 * 1000L
         // User-Agent realistis agar situs download tidak memblokir koneksi.
         private const val DEFAULT_USER_AGENT =

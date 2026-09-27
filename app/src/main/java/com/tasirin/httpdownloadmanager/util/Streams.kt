@@ -8,7 +8,9 @@ import java.io.InputStream
  *  diuji unit di CI (murni JVM). */
 fun readBounded(input: InputStream, max: Int): String {
     val buf = ByteArray(16 * 1024)
-    val out = ByteArrayOutputStream(max)
+    // Kapasitas awal kecil lalu tumbuh: ByteArrayOutputStream(max) mengalokasi
+    // penuh di muka (s.d. 16MB) untuk tiap probe walau body aslinya kecil.
+    val out = ByteArrayOutputStream(minOf(max, 16 * 1024))
     var remaining = max
     while (remaining > 0) {
         val n = input.read(buf, 0, minOf(buf.size, remaining))

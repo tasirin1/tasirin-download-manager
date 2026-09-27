@@ -1607,6 +1607,7 @@
 
   @media (min-width: 601px) and (hover: hover) {
     }
+.thumb-broken{visibility:hidden}
 </style>
 </head>
 <body>
@@ -2523,15 +2524,24 @@ function saveVideoPos(token) {
   }
   try {
     if (localStorage.length >= MAX_VIDEO_POSITIONS) {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
+      const victims = [];
+      for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key !== vposKey(token) && key.indexOf('dm_vpos_') === 0 &&
-            localStorage.length >= MAX_VIDEO_POSITIONS) {
-          localStorage.removeItem(key);
-        }
+        if (key && key !== vposKey(token) && key.indexOf('dm_vpos_') === 0) victims.push(key);
+      }
+      for (let v = 0; v < victims.length && localStorage.length >= MAX_VIDEO_POSITIONS; v++) {
+        try { localStorage.removeItem(victims[v]); } catch (e) {}
       }
     }
-    localStorage.setItem(vposKey(token), JSON.stringify({ t: t, d: d }));
+    try { localStorage.setItem(vposKey(token), JSON.stringify({ t: t, d: d })); } catch (e) {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.indexOf('dm_vpos_') === 0) { localStorage.removeItem(key); break; }
+        }
+        localStorage.setItem(vposKey(token), JSON.stringify({ t: t, d: d }));
+      } catch (e2) {}
+    }
   } catch (e) {}
   galleryVideoPos[token] = t;
 }
@@ -2838,7 +2848,7 @@ function renderGalleryCell(it, frag) {
     '<div class="gal-thumb" style="padding-top:' + ratio + '%">' +
       '<span class="gal-check' + (selOn ? ' on' : '') + '">' + (selOn ? '\u2713' : '') + '</span>' +
       '<div class="ext">' + escapeHtml(ext) + '</div>' +
-      '<img loading="lazy" data-thumb="' + thumb + '" alt="' + escapeHtml(it.name) + '" onerror="this.remove()">' +
+      '<img loading="lazy" data-thumb="' + thumb + '" alt="' + escapeHtml(it.name) + '" onerror="this.classList.add(\'thumb-broken\');this.removeAttribute(\'src\');">' +
       (it.isVideo ? '<div class="gal-play"><span></span></div>' : '') +
       (it.isVideo ? '<div class="gal-badge">' + (it.durationMs > 0 ? mmFmtTime(it.durationMs / 1000) : escapeHtml(ext)) + '</div>' : '') +
       (resume > 0 ? '<div class="gal-resume">Resume from ' + mmFmtTime(resume) + '</div>' : '') +
@@ -4333,11 +4343,14 @@ function sliceFile(file, start, end) {
 }
 
 function randomUploadId() {
+  // Hex tetap per byte (2 char/byte): encode base36 per byte itu ambigu
+  // ([1,35] dan [71] sama-sama jadi "1z") sehingga ruang ID menyusut dan dua
+  // upload beda file berisiko berbagi ID tmp yang sama di server.
   const source = window.crypto || window.msCrypto;
   if (source && source.getRandomValues) {
     const bytes = new Uint8Array(16);
     source.getRandomValues(bytes);
-    return Array.from(bytes, function (byte) { return byte.toString(36); }).join('');
+    return Array.from(bytes, function (byte) { return ('0' + byte.toString(16)).slice(-2); }).join('');
   }
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
@@ -4922,7 +4935,7 @@ function renderRelated(current) {
     const media = API + '/api/media?token=' + encodeURIComponent(v.token);
     row.innerHTML =
       '<span class="mm-rel-thumb">' +
-        '<img loading="lazy" src="' + thumb + '" alt="' + escapeHtml(v.name) + '" onerror="this.remove()">' +
+        '<img loading="lazy" src="' + thumb + '" alt="' + escapeHtml(v.name) + '" onerror="this.classList.add(\'thumb-broken\');this.removeAttribute(\'src\');">' +
         '<span class="mm-rel-play">&#9654;</span>' +
       '</span>' +
       '<span class="mm-rel-info">' +
@@ -5335,13 +5348,22 @@ function stateBadge(s) {
   return '<span class="badge ' + (map[s] || 'b-paused') + '">' + stateLabel(s) + '</span>';
 }
 
+function socialHost(url) {
+  // Host persis (bukan substring): 'notyoutube.com' tidak boleh dikira YouTube.
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch (e) {
+    return '';
+  }
+}
 function socialFavicon(url) {
   if (!url) return '';
-  var u = url.toLowerCase();
-  if (u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1) return '<span class="social-favicon p-youtube"></span>';
-  if (u.indexOf('tiktok.com/') !== -1 || u.indexOf('douyin.com') !== -1) return '<span class="social-favicon p-tiktok"></span>';
-  if (u.indexOf('instagram.com') !== -1 || u.indexOf('instagr.am') !== -1) return '<span class="social-favicon p-instagram"></span>';
-  if (u.indexOf('twitter.com') !== -1 || u.indexOf('x.com') !== -1) return '<span class="social-favicon p-x"></span>';
+  var h = socialHost(url);
+  if (!h) return '';
+  if (h === 'youtube.com' || h === 'm.youtube.com' || h === 'music.youtube.com' || h === 'youtu.be') return '<span class="social-favicon p-youtube"></span>';
+  if (h === 'tiktok.com' || h === 'm.tiktok.com' || h === 'vm.tiktok.com' || h === 'douyin.com') return '<span class="social-favicon p-tiktok"></span>';
+  if (h === 'instagram.com' || h === 'instagr.am') return '<span class="social-favicon p-instagram"></span>';
+  if (h === 'twitter.com' || h === 'x.com') return '<span class="social-favicon p-x"></span>';
   return '';
 }
 function fileIcon(name, url) {
@@ -5915,7 +5937,7 @@ function rebuildList(items) {
 
 var HTML_ENT = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => HTML_ENT[c]);
+  return String(s).replace(/[&<>"']/g, function (c) { return HTML_ENT[c]; });
 }
 
 const confirmModal = document.getElementById('confirmModal');
@@ -6194,7 +6216,7 @@ function probeSocialQuality() {
 document.getElementById('url').addEventListener('input', probeSocialQuality);
 probeSocialQuality();
 
-document.getElementById('addForm').addEventListener('submit', async (e) => {
+document.getElementById('addForm').addEventListener('submit', async function (e) {
   e.preventDefault();
   const rawUrl = document.getElementById('url').value.trim();
   if (!rawUrl) return;

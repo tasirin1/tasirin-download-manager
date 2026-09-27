@@ -57,9 +57,10 @@ object HlsParser {
                         .find(line)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
                     val height = RESOLUTION_HEIGHT_RE
                         .find(line)?.groupValues?.let { g ->
-                            val w = g[1].toIntOrNull()
-                            val h = g[2].toIntOrNull()
-                            if (w != null && h != null) minOf(w, h) else 0
+                            // Tinggi = komponen kedua apa adanya; minOf dulu
+                            // salah melabeli stream portrait sehingga
+                            // pencocokan preferredHeight meleset.
+                            g[2].toIntOrNull() ?: 0
                         } ?: 0
                     val codecs = CODECS_RE
                         .find(line)?.groupValues?.get(1).orEmpty()
@@ -99,14 +100,27 @@ object HlsParser {
         return renditions
     }
 
-    /** Gabungkan URL varian relatif dengan URL base playlist. */
+    /** Gabungkan URL varian relatif dengan URL base playlist.
+     *  Tak pernah melempar: base malformed mengembalikan relative apa adanya
+     *  agar parser murni tidak men-crash pemanggil engine. */
     fun resolveUrl(base: String, relative: String): String {
         if (relative.startsWith("http://") || relative.startsWith("https://")) return relative
         if (relative.startsWith("/")) {
-            val u = java.net.URL(base)
-            return "${u.protocol}://${u.host}${if (u.port > 0) ":${u.port}" else ""}$relative"
+            // Root-relative butuh host valid; base rusak -> kembalikan
+            // relative agar pemanggil memutuskan, bukan crash di sini.
+            val root = runCatching {
+                val u = java.net.URL(base)
+                "${u.protocol}://${u.host}${if (u.port > 0) ":${u.port}" else ""}"
+            }.getOrNull() ?: return relative
+            return root + relative
         }
+        // Direktori = sampai '/' terakhir, tapi harus di belakang otoritas:
+        // pada base tanpa path (mis. "https://host") lastIndexOf jatuh di
+        // "//" skema dan akan menelan host bila tidak dijaga.
+        val schemeEnd = base.indexOf("://")
+        val authEnd = if (schemeEnd >= 0) schemeEnd + 3 else 0
         val idx = base.lastIndexOf('/')
-        return if (idx > 0) base.substring(0, idx + 1) + relative else relative
+        if (idx < authEnd) return "$base/$relative"
+        return base.substring(0, idx + 1) + relative
     }
 }

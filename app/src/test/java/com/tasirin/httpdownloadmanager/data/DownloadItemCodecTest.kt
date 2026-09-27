@@ -182,6 +182,18 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `overlayProgress - bytes basi tidak melebihi total (clamp persen)`() {
+        val items = listOf(
+            DownloadItem(id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED, bytesDownloaded = 0, totalBytes = 100)
+        )
+        // Progres basi 500 byte dari sesi sebelum reset tidak boleh membuat persen >100%.
+        val raw = "{\"a\":{\"b\":500,\"t\":100}}"
+        val out = DownloadItemCodec.overlayProgress(items, raw)
+        assertEquals(100L, out[0].bytesDownloaded)
+        assertEquals(100L, out[0].totalBytes)
+    }
+
+    @Test
     fun `overlayProgress - bytes lama tidak mundur saat hanya total yang tumbuh`() {
         val items = listOf(
             DownloadItem(id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED, bytesDownloaded = 100, totalBytes = 500)

@@ -56,6 +56,15 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `isSocialMediaUrl - subdomain mobile ikut terdeteksi`() {
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://m.youtube.com/watch?v=abc"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://music.youtube.com/watch?v=abc"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://m.tiktok.com/@user/video/123"))
+        // Subdomain asing tetap ditolak (bukan m./music./www.).
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://evil.youtube.com/watch?v=abc"))
+    }
+
+    @Test
     fun `isSocialMediaUrl - HTTP juga terdeteksi`() {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://youtube.com/watch?v=abc"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://tiktok.com/@user/video/123"))

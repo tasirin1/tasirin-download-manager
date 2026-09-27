@@ -44,7 +44,7 @@ class DownloadService : Service() {
                 runCatching { App.httpServer.startServer() }
             }
         }
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             App.engine.items.collect { items ->
                 runCatching {
                     val active = items.any {
@@ -104,14 +104,18 @@ class DownloadService : Service() {
     }
 
     override fun onDestroy() {
-        runCatching { wakeLock?.release() }
+        val lock = wakeLock
         wakeLock = null
+        if (lock != null && runCatching { lock.isHeld }.getOrDefault(false)) {
+            runCatching { lock.release() }
+        }
         scope.cancel()
         super.onDestroy()
     }
 
-    /** PARTIAL_WAKE_LOCK hanya selama ada item aktif, timeout 15 menit sebagai
-     *  pengaman (tick berikutnya meng-akuisisi ulang) supaya tidak boros baterai. */
+    private var lastWakeAcquireAt = 0L
+    /** PARTIAL_WAKE_LOCK selama ada item aktif; diperbarui tiap 10 menit agar
+     *  unduhan macet tanpa tick progres tak kehilangan lock saat timeout habis. */
     private fun updateWakeLock(active: Boolean) {
         if (active) {
             if (wakeLock == null) {
@@ -120,12 +124,21 @@ class DownloadService : Service() {
                     .apply { setReferenceCounted(false) }
             }
             val lock = wakeLock
-            if (lock != null && !lock.isHeld) {
+            // Jam monotonik: jam dinding yang mundur/maju (NTP/zona) tidak
+            // boleh memicu acquire berulang atau membiarkan lock kedaluwarsa.
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (lock != null && (!lock.isHeld || now - lastWakeAcquireAt > 10 * 60 * 1000L)) {
                 runCatching { lock.acquire(15 * 60 * 1000L) }
+                lastWakeAcquireAt = now
             }
         } else {
-            runCatching { wakeLock?.release() }
+            val lock = wakeLock
             wakeLock = null
+            // Cek isHeld: release lock yang sudah kedaluwarsa/dilepas
+            // melempar RuntimeException yang hanya berisik di log.
+            if (lock != null && runCatching { lock.isHeld }.getOrDefault(false)) {
+                runCatching { lock.release() }
+            }
         }
     }
 }

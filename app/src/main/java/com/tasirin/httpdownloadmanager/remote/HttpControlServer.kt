@@ -201,13 +201,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Alamat IP client dari NanoHTTPD session (tanpa port). */
     private fun clientAddress(session: IHTTPSession): String {
         val remoteIp = session.remoteIpAddress.orEmpty()
-        // Hanya percaya X-Forwarded-For jika remote IP adalah reverse proxy LAN
-        // (127.x, 10.x, 172.16-31.x, 192.168.x). Tanpa reverse proxy,
-        // header ini bisa dipalsukan oleh client untuk bypass rate-limit.
-        val trustForwarded = remoteIp.startsWith("127.") ||
-            remoteIp.startsWith("10.") ||
-            (remoteIp.startsWith("172.") && remoteIp.substringAfter("172.").substringBefore(".").toIntOrNull()?.let { it in 16..31 } == true) ||
-            remoteIp.startsWith("192.168.")
+        // Hanya percaya X-Forwarded-For dari loopback. Klien LAN bisa memalsukan
+        // header ini untuk bypass rate-limit per-IP bila dipercaya.
+        val trustForwarded = remoteIp.startsWith("127.") || remoteIp == "::1"
         return if (trustForwarded) {
             session.headers["x-forwarded-for"]?.substringBefore(",")?.trim().orEmpty()
                 .ifEmpty { remoteIp }
@@ -217,10 +213,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     override fun serve(session: IHTTPSession): Response {
         // NanoHTTPD internal pool bisa terminated saat stop/start server;
         // tangkap RejectedExecutionException supaya tidak crash.
-        if (!isAlive) return newFixedLengthResponse(
-            Response.Status.SERVICE_UNAVAILABLE,
-            "text/plain; charset=utf-8", "Server restarting"
-        )
+        if (!isAlive) {
+            val restarting = newFixedLengthResponse(
+                Response.Status.SERVICE_UNAVAILABLE,
+                "text/plain; charset=utf-8", "Server restarting"
+            )
+            secureHeaders(session.uri, restarting)
+            return restarting
+        }
         val startedAt = System.currentTimeMillis()
         if (!ServerSecurity.isStateChangeAllowed(
                 session.method.name, session.uri, session.headers["x-requested-with"]
@@ -231,12 +231,19 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 "text/plain; charset=utf-8",
                 "Forbidden"
             )
+            secureHeaders(session.uri, denied)
             appendRequestLog(session, denied, System.currentTimeMillis() - startedAt)
             return denied
         }
         // Rate-limit per-IP untuk endpoint polling/cache yang sering: mencegah
         // klien/script hammering menguras CPU server saat banyak device meloop.
         if (session.method == Method.GET && session.uri == "/api/snapshot") {
+            if (!pinOk(session)) {
+                val un = unauthorized()
+                secureHeaders(session.uri, un)
+                appendRequestLog(session, un, System.currentTimeMillis() - startedAt)
+                return un
+            }
             val ip = clientAddress(session).ifEmpty { "unknown" }
             val now = System.currentTimeMillis()
             val last = snapshotLastHit.getOrDefault(ip, 0L)
@@ -247,6 +254,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     "application/json; charset=utf-8",
                     snapshotPayloadCached()
                 )
+                secureHeaders(session.uri, throttled)
                 appendRequestLog(session, throttled, System.currentTimeMillis() - startedAt)
                 return throttled
             }
@@ -501,8 +509,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun pinEnabled(): Boolean =
         !StoragePrefs.getServerPin(context).isNullOrEmpty()
 
-    /** PIN tersimpan sudah dinormalisasi jadi hash SHA-256 oleh StoragePrefs;
-     *  bandingkan dengan timing konstan (anti bocor lewat timing attack). */
+    /** PIN tersimpan sebagai hash PBKDF2 (lihat StoragePrefs/PinHash);
+     *  cookie sesi berisi token acak yang dibandingkan timing-konstan. */
     private fun storedPinHash(): String? = StoragePrefs.storedPinHash(context)
 
     /** Cache secret cookie sesi agar prefs tidak dibaca pada tiap request. */
@@ -521,19 +529,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 cachedSessionSecretBytes = it
             }
         }
-        val cookie = session.headers["cookie"] ?: return false
-        val pin = run {
-            var start = cookie.indexOf("dm_pin=")
-            if (start < 0) return@run null
-            start += 7 // "dm_pin=".length
-            val end = cookie.indexOf(';', start)
-            if (end > start) cookie.substring(start, end).trim() else cookie.substring(start).trim()
-        } ?: return false
+        // Parse per nama cookie (bukan indexOf mentah) agar tidak cocok
+        // di dalam nama/nilai cookie lain.
+        val pin = ServerSecurity.sessionCookieValue(session.headers["cookie"], "dm_pin")
+            ?: return false
         return MessageDigest.isEqual(pin.toByteArray(Charsets.UTF_8), expectedBytes)
     }
 
+    // computeIfAbsent atomik: getOrPut Kotlin tidak atomik di ConcurrentHashMap
+    // sehingga brute-force paralel bisa membuat dua instans dan merusak hitungan throttle.
     private fun loginAttempt(ip: String): LoginAttempt =
-        loginAttempts.getOrPut(ip.ifEmpty { "unknown" }) { LoginAttempt() }
+        loginAttempts.computeIfAbsent(ip.ifEmpty { "unknown" }) { LoginAttempt() }
 
     private fun pruneLoginAttempts(now: Long) {
         if (loginAttempts.isEmpty()) return
@@ -574,7 +580,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             )
             r.addHeader(
                 "Set-Cookie",
-                "dm_pin=$sessionSecret; Max-Age=2592000; Path=/; HttpOnly; SameSite=Strict"
+                "dm_pin=$sessionSecret; Max-Age=604800; Path=/; HttpOnly; SameSite=Strict"
             )
             r.addHeader("Location", "/")
             r
@@ -911,6 +917,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (url.isEmpty()) {
             return jsonResponse(JSONObject().put("ok", false).put("error", "empty url"))
         }
+        // Engine hanya mendukung http(s); skema lain (file/ftp/…) ditolak
+        // di sini agar klien dapat pesan jelas, bukan item FAILED misterius.
+        if (!url.startsWith("http://", ignoreCase = true) &&
+            !url.startsWith("https://", ignoreCase = true)
+        ) {
+            return jsonResponse(JSONObject().put("ok", false).put("error", "only http(s) URLs supported"))
+        }
         val speed = params["speedLimitKbps"]?.toIntOrNull()?.coerceIn(0, 100_000) ?: 0
         val priority = params["priority"]?.toIntOrNull()?.coerceIn(-1, 1) ?: 0
         val checksum = params["checksum"]?.trim().orEmpty()
@@ -1022,6 +1035,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         val chunkIdx = session.param("chunk")?.toIntOrNull() ?: -1
         val chunks = (session.param("chunks")?.toIntOrNull() ?: 1).coerceAtLeast(1)
+        // Indeks di luar rentang tak pernah finalisasi namun tetap menulis tmp:
+        // tolak sejak awal agar tak jadi tmp yatim penahan disk.
+        if (chunkIdx >= chunks) {
+            drainBody(session)
+            return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid chunk index"))
+        }
         val length = (session.headers["content-length"]?.toLongOrNull() ?: 0L)
 
         if (chunkIdx >= 0) {
@@ -1045,9 +1064,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val published = App.engine.importStream(finalName, storage, folderPath, length) { out ->
                 copyUploadBody(session, length, out)
             }
-            jsonResponse(JSONObject().put("ok", true).put("name", published.fileName ?: finalName))
+            jsonResponse(JSONObject().put("ok", true).put("name", published.fileName ?: finalName)).closeConnection()
         }.getOrElse {
-            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "upload failed"))
+            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "upload failed")).closeConnection()
         }
     }
 
@@ -1084,16 +1103,21 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val cutoff = System.currentTimeMillis() - 30 * 60 * 1000L
         completedUploads.entries.removeIf { it.value.second < cutoff }
         failedUploads.entries.removeIf { it.value.second < cutoff }
-        // Bila masih melebihi batas, buang yang paling lama.
-        // Pakai minOrNull() alih-alih sortedDescending() supaya tidak
-        // mengalokasi List sementara tiap kali dipanggil.
-        if (completedUploads.size > 400) {
-            val cutoff2 = completedUploads.values.map { it.second }.minOrNull() ?: cutoff
-            completedUploads.entries.removeIf { it.value.second <= cutoff2 }
+        // Bila masih melebihi batas, pangkas kelebihan tertua sampai target.
+        // Alokasi List hanya di jalur langka over-cap ini, bukan tiap panggilan.
+        if (completedUploads.size > MAX_COMPLETED_UPLOADS) {
+            val drop = completedUploads.entries
+                .sortedBy { it.value.second }
+                .take(completedUploads.size - TARGET_COMPLETED_UPLOADS)
+                .map { it.key }
+            drop.forEach { completedUploads.remove(it) }
         }
-        if (failedUploads.size > 50) {
-            val cutoff2 = failedUploads.values.map { it.second }.minOrNull() ?: cutoff
-            failedUploads.entries.removeIf { it.value.second <= cutoff2 }
+        if (failedUploads.size > MAX_FAILED_UPLOADS) {
+            val drop = failedUploads.entries
+                .sortedBy { it.value.second }
+                .take(failedUploads.size - TARGET_FAILED_UPLOADS)
+                .map { it.key }
+            drop.forEach { failedUploads.remove(it) }
         }
     }
 
@@ -1116,8 +1140,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         chunks: Int,
         length: Long
     ): Response {
-        val id = session.param("id")?.trim()?.take(64)
-            ?.takeIf { ServerSecurity.isUploadIdAllowed(it) }
+        val rawId = session.param("id")?.trim().orEmpty()
+        if (rawId.length > 64) {
+            drainBody(session)
+            return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id"))
+        }
+        val id = rawId.takeIf { ServerSecurity.isUploadIdAllowed(it) }
         ?: run {
                 drainBody(session)
                 return jsonResponse(JSONObject().put("ok", false).put("error", "Invalid upload id"))
@@ -1542,7 +1570,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val key = "tokens:" + tokens.sorted().joinToString(",")
         val tmp = zipCached(key) {
             createTempZip { zos ->
-                ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed)
+                ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
             }
         } ?: return notFound()
         if (tmp.length() == 0L) {
@@ -1585,7 +1613,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             "rename" -> {
                 if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))
                 val name = params["name"]?.trim().orEmpty()
-                if (name.isBlank() || name.contains('/') || name.contains('\\')) {
+                if (!ServerSecurity.isFileNameValid(name)) {
                     return jsonResponse(JSONObject().put("ok", false).put("error", "invalid name"))
                 }
                 App.engine.rename(id, name)
@@ -1630,7 +1658,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (!isMediaUriAllowed(uri)) return notFound()
             val resolver = context.contentResolver
             val rawStream = resolver.openInputStream(uri) ?: return notFound()
-            val len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+            var len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+            if (len < 0) {
+                len = runCatching {
+                    resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) c.getLong(0) else -1L
+                    }
+                }.getOrNull() ?: -1L
+            }
             stream = rawStream
             total = len
         } else {
@@ -1781,8 +1816,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (!file.isFile || !isFsPathAllowed(file.absolutePath)) return notFound()
                 total = file.length()
                 val range = parseRange(rangeHeader, total)
-                val stream = FileInputStream(file).apply {
-                    runCatching { channel.position(range?.first ?: 0L) }
+                val stream = FileInputStream(file)
+                val seekTo = range?.first ?: 0L
+                if (seekTo > 0) {
+                    val positioned = runCatching { stream.channel.position(seekTo); true }.getOrDefault(false)
+                    if (!positioned) {
+                        runCatching { stream.close() }
+                        return newFixedLengthResponse(
+                            Response.Status.INTERNAL_ERROR,
+                            "text/plain; charset=utf-8",
+                            "Streaming error"
+                        )
+                    }
                 }
                 val meta = cachedMediaMeta(raw)
                 return try {
@@ -2101,10 +2146,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return this
     }
 
-    /** Validasi nama file: tidak kosong, tidak ada separator path, tidak traversal. */
-    private fun isNameValid(name: String): Boolean =
-        name.isNotBlank() && '/' !in name && '\\' !in name &&
-        name != ".." && !name.startsWith("../") && !name.startsWith("..\\")
+    /** Validasi nama file: satu definisi di ServerSecurity. */
+    private fun isNameValid(name: String): Boolean = ServerSecurity.isFileNameValid(name)
 
     private fun isFsBrowseAncestor(path: String): Boolean =
         ServerSecurity.isBrowseableAncestor(path, allowedFsRoots())
@@ -2628,6 +2671,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             val closed = sseClients.filter { it.isClosed }
                             if (closed.isNotEmpty()) sseClients.removeAll(closed)
                             sseClients.forEach { it.push(frame) }
+                            val newlyClosed = sseClients.filter { it.isClosed }
+                            if (newlyClosed.isNotEmpty()) sseClients.removeAll(newlyClosed)
                         }
                     }
                 }
@@ -2726,7 +2771,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (!isMediaUriAllowed(uri)) return notFound()
             val resolver = context.contentResolver
             val stream = resolver.openInputStream(uri) ?: return notFound()
-            total = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+            var shareLen = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+            if (shareLen < 0) {
+                shareLen = runCatching {
+                    resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) c.getLong(0) else -1L
+                    }
+                }.getOrNull() ?: -1L
+            }
+            total = shareLen
             input = stream
         } else {
             return notFound()
@@ -2796,9 +2849,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private class LoginAttempt {
-        var failures = 0
-        var lockedUntil = 0L
-        var updatedAt = 0L
+        @Volatile var failures = 0
+        @Volatile var lockedUntil = 0L
+        @Volatile var updatedAt = 0L
     }
 
     companion object {
@@ -2814,6 +2867,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_UPLOAD_CHUNKS = 1024
         private const val MAX_UPLOAD_LOCKS = 512
         private const val MAX_UPLOAD_FINALIZING = 8
+        private const val MAX_COMPLETED_UPLOADS = 400
+        private const val TARGET_COMPLETED_UPLOADS = 300
+        private const val MAX_FAILED_UPLOADS = 50
+        private const val TARGET_FAILED_UPLOADS = 40
         private const val SHARE_TTL_HOURS = 24
         private const val PARTIAL_STREAM_TTL_MS = 60 * 60 * 1000L
         private const val SHARE_TTL_MS = SHARE_TTL_HOURS * 60L * 60 * 1000

@@ -14,7 +14,7 @@ import java.io.InputStream
 object SocialMediaExtractor {
 
     /** Batas total waktu ekstraksi media sosial (ms). */
-    private const val EXTRACT_TOTAL_TIMEOUT_MS = 25_000L
+    private const val EXTRACT_TOTAL_TIMEOUT_MS = 60_000L
 
     /** Timeout HTTP halaman/API per request (dipakai 5+ situs, satu tempat). */
     private const val PAGE_TIMEOUT_MS = 20000
@@ -35,8 +35,8 @@ object SocialMediaExtractor {
      *  bukan substring (mis. fbsbx.com mengandung "x.com/"). */
     private val X_URL_RE = Regex("""(?:^|https?://)(?:www\.)?x\.com/""")
     /** Regex presisi untuk deteksi domain — mencegah false-positive (mis. notyoutube.com) */
-    private val YT_HOST_RE = Regex("""(?:https?://)(?:www\.)?youtube\.com/|(?:https?://)youtu\.be/""")
-    private val TT_HOST_RE = Regex("""(?:https?://)(?:www\.)?tiktok\.com/|(?:https?://)vm\.tiktok\.com/""")
+    private val YT_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|music\.)?youtube\.com/|(?:https?://)youtu\.be/""")
+    private val TT_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.)?tiktok\.com/|(?:https?://)vm\.tiktok\.com/""")
     private val IG_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/(?:p|reel|tv)/|(?:https?://)instagr\.am/(?:p|reel)/""")
     private val TW_HOST_RE = Regex("""(?:https?://)(?:www\.)?twitter\.com/""")
     private val IG_BROAD_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/|(?:https?://)instagr\.am/""")

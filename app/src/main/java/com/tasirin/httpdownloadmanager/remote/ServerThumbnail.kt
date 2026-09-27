@@ -45,10 +45,20 @@ private val thumbLocks = ConcurrentHashMap<String, ThumbLock>()
 private fun thumbLockFor(key: String): ThumbLock {
     val now = System.currentTimeMillis()
     if (thumbLocks.size > 512) {
-        val allTimes = LongArray(thumbLocks.size) { thumbLocks.values.elementAt(it).lastUse.get() }
-        allTimes.sort()
-        val cutoff = allTimes.getOrNull(allTimes.size / 2) ?: now
-        thumbLocks.entries.removeIf { it.value.lastUse.get() < cutoff }
+        // Satu pass O(n) di atas snapshot iterator: values.elementAt(i) per
+        // indeks di ConcurrentHashMap adalah O(n) per panggilan sehingga
+        // eviksi lama berbiaya kuadratik saat browsing ribuan media.
+        var cutoff = now
+        var seen = 0
+        for (lock in thumbLocks.values) {
+            val last = lock.lastUse.get()
+            if (last < cutoff) cutoff = last
+            seen++
+        }
+        if (seen > 0) {
+            val evictBefore = cutoff
+            thumbLocks.entries.removeIf { it.value.lastUse.get() <= evictBefore && it.key != key }
+        }
     }
     return thumbLocks.getOrPut(key) { ThumbLock() }.also { it.lastUse.set(now) }
 }
@@ -60,7 +70,9 @@ internal fun getOrCreateThumb(
     isMediaUriAllowed: (Uri) -> Boolean
 ): File? {
     if (!isThumbSourceAllowed(ctx, raw, isFsPathAllowed, isMediaUriAllowed)) return null
-    val key = sha256Hex(raw).take(16)
+    // Kunci cache memakai hash penuh 256-bit: 16 hex char (64 bit) bisa
+    // tabrakan antar file dan menyajikan thumbnail milik video lain.
+    val key = sha256Hex(raw)
     thumbFailures[key]?.let { at ->
         if (isThumbFailureFresh(at, System.currentTimeMillis())) return null
     }

@@ -17,7 +17,11 @@ object StorageCleanup {
     /** Umur maksimal sisa upload chunk (up_*.tmp) di cache. */
     private const val UPLOAD_TMP_MAX_AGE_MS = 24L * 60 * 60 * 1000
 
-    @Volatile private var lastRunAt = 0L
+    // Throttle memakai jam monotonik agar lompatan jam dinding (NTP/zona)
+    // tidak merusak interval; dipasang di bawah lock agar dua pemanggil
+    // paralel tidak lolos dan membersihkan ganda.
+    private val throttleLock = Any()
+    @Volatile private var lastRunElapsed = 0L
 
     /** Jalankan bila free space di bawah ambang; kembalikan byte yang dibebaskan. */
     fun runIfLow(
@@ -25,11 +29,13 @@ object StorageCleanup {
         items: List<DownloadItem>,
         now: Long = System.currentTimeMillis()
     ): Long {
-        if (now - lastRunAt < MIN_INTERVAL_MS) return 0L
+        synchronized(throttleLock) {
+            if (android.os.SystemClock.elapsedRealtime() - lastRunElapsed < MIN_INTERVAL_MS) return 0L
+            lastRunElapsed = android.os.SystemClock.elapsedRealtime()
+        }
         val saver = FileSaver(context)
         val free = saver.destinationFreeBytes()
         if (free > LOW_THRESHOLD_BYTES) return 0L
-        lastRunAt = now
         var freed = 0L
         freed += saver.cleanupOrphanPartials(items)
         freed += MediaLibrary.cleanupOldThumbs(context)
