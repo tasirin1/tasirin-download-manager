@@ -57,10 +57,11 @@ object HlsParser {
                         .find(line)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
                     val height = RESOLUTION_HEIGHT_RE
                         .find(line)?.groupValues?.let { g ->
-                            // Tinggi = komponen kedua apa adanya; minOf dulu
-                            // salah melabeli stream portrait sehingga
-                            // pencocokan preferredHeight meleset.
-                            g[2].toIntOrNull() ?: 0
+                            // Label kualitas = dimensi terkecil: video portrait
+                            // 720x1280 tetap "720p" (sesuai HlsParserTest).
+                            val w = g[1].toIntOrNull()
+                            val h = g[2].toIntOrNull()
+                            if (w != null && h != null) minOf(w, h) else 0
                         } ?: 0
                     val codecs = CODECS_RE
                         .find(line)?.groupValues?.get(1).orEmpty()
