@@ -54,6 +54,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
+        android:stateListAnimator="@null"
         android:background="@drawable/bg_btn_tv"
         android:backgroundTint="@null"
         android:minHeight="40dp"

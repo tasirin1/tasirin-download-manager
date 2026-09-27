@@ -25,6 +25,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="6dp"
         android:layout_gravity="center_vertical"
+        android:stateListAnimator="@null"
         android:background="@drawable/bg_btn_tv"
         android:backgroundTint="@null"
         android:minHeight="40dp"
