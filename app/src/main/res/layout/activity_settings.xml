@@ -223,6 +223,8 @@
                                 android:layout_marginEnd="4dp"
                                 android:minHeight="40dp"
                                 android:text="@string/open_remote"
+                                android:maxLines="2"
+                                android:ellipsize="end"
                                 android:textSize="13sp" />
 
                             <Button
@@ -234,6 +236,8 @@
                                 android:layout_marginStart="4dp"
                                 android:minHeight="40dp"
                                 android:text="@string/copy_address"
+                                android:maxLines="2"
+                                android:ellipsize="end"
                                 android:textSize="13sp" />
                         </LinearLayout>
 
@@ -246,6 +250,8 @@
                             android:layout_marginTop="8dp"
                             android:text="@string/remote_storage_btn"
                             android:visibility="gone" 
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <TextView
@@ -264,6 +270,8 @@
                             android:minHeight="40dp"
                             android:layout_marginTop="8dp"
                             android:text="@string/server_start" 
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <View
@@ -282,6 +290,8 @@
                             android:gravity="start|center_vertical"
                             android:paddingHorizontal="10dp"
                             android:text="@string/settings_server_autostart"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <EditText
@@ -309,6 +319,8 @@
                             android:gravity="start|center_vertical"
                             android:paddingHorizontal="10dp"
                             android:text="@string/settings_pin_enforced"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <Button
@@ -321,6 +333,8 @@
                             android:gravity="start|center_vertical"
                             android:paddingHorizontal="10dp"
                             android:text="@string/settings_fs_full_access"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <Button
@@ -333,6 +347,8 @@
                             android:gravity="start|center_vertical"
                             android:paddingHorizontal="10dp"
                             android:text="@string/settings_server_read_only"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <TextView
@@ -365,6 +381,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
                             android:text="@string/remote_log_label"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -447,6 +465,8 @@
                                 android:gravity="start|center_vertical"
                                 android:paddingHorizontal="8dp"
                                 android:text="@string/settings_background"
+                                android:maxLines="2"
+                                android:ellipsize="end"
                                 android:textSize="13sp" />
 
                             <Button
@@ -460,6 +480,8 @@
                                 android:gravity="start|center_vertical"
                                 android:paddingHorizontal="8dp"
                                 android:text="@string/settings_autostart"
+                                android:maxLines="2"
+                                android:ellipsize="end"
                                 android:textSize="13sp" />
                         </LinearLayout>
 
@@ -480,6 +502,8 @@
                                 android:gravity="start|center_vertical"
                                 android:paddingHorizontal="8dp"
                                 android:text="@string/settings_auto_sort"
+                                android:maxLines="2"
+                                android:ellipsize="end"
                                 android:textSize="13sp" />
 
                             <Button
@@ -493,6 +517,8 @@
                                 android:gravity="start|center_vertical"
                                 android:paddingHorizontal="8dp"
                                 android:text="@string/settings_small_first"
+                                android:maxLines="2"
+                                android:ellipsize="end"
                                 android:textSize="13sp" />
                         </LinearLayout>
 
@@ -506,6 +532,8 @@
                             android:gravity="start|center_vertical"
                             android:paddingHorizontal="10dp"
                             android:text="@string/settings_auto_open"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <Button
@@ -518,6 +546,8 @@
                             android:gravity="start|center_vertical"
                             android:paddingHorizontal="10dp"
                             android:text="@string/settings_battery"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <TextView
@@ -539,6 +569,8 @@
                             android:gravity="start|center_vertical"
                             android:paddingHorizontal="10dp"
                             android:text="@string/settings_delete_partial_on_cancel"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <View
@@ -778,6 +810,8 @@
                             android:background="@drawable/bg_btn_tv"
                             android:backgroundTint="@null"
                             android:text="@string/storage_add_folder" 
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -851,6 +885,8 @@
                             android:layout_marginTop="4dp"
                             android:minHeight="40dp"
                             android:text="@string/cleanup_button"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <TextView
@@ -876,6 +912,8 @@
                             android:backgroundTint="@null"
                             android:minHeight="40dp"
                             android:text="@string/update_check"
+                            android:maxLines="2"
+                            android:ellipsize="end"
                             android:textSize="13sp" />
 
                         <TextView

@@ -415,10 +415,13 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun renderToggle(btn: Button, on: Boolean, label: String) {
         btn.text = label
+        // Teks selalu gelap (text_primary): abu/hijau di atas tonal biru muda
+        // kontrasnya rendah (<4.5:1) sehingga tampak tenggelam; status ON/OFF
+        // cukup lewat ikon ujung (check hijau / close abu).
+        btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
         val color = ContextCompat.getColor(
             this, if (on) R.color.status_on else R.color.text_secondary
         )
-        btn.setTextColor(color)
         val icon = ContextCompat.getDrawable(
             this, if (on) R.drawable.ic_check else R.drawable.ic_close
         )

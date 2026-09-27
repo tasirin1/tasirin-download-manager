@@ -68,6 +68,8 @@
             android:paddingStart="14dp"
             android:paddingEnd="14dp"
             android:text="@string/paste"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="13sp" />
 
         <TextView
@@ -406,6 +408,8 @@
             android:layout_marginEnd="10dp"
             android:layout_weight="1"
             android:text="@string/cancel"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="13sp" />
 
         <Button
@@ -415,6 +419,8 @@
             android:layout_height="40dp"
             android:layout_weight="1"
             android:text="@string/download"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="13sp" />
     </LinearLayout>
 
