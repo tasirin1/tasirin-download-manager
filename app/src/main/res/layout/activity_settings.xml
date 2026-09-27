@@ -45,12 +45,12 @@
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
-                    android:minHeight="36dp"
+                    android:minHeight="40dp"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="6dp"
                     android:text="@string/settings_section_server"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -64,12 +64,12 @@
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
-                    android:minHeight="36dp"
+                    android:minHeight="40dp"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="6dp"
                     android:text="@string/settings_section_download"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -83,12 +83,12 @@
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
-                    android:minHeight="36dp"
+                    android:minHeight="40dp"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="6dp"
                     android:text="@string/settings_section_storage"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -102,12 +102,12 @@
                     android:drawablePadding="6dp"
                     android:gravity="center"
                     android:layout_marginEnd="6dp"
-                    android:minHeight="36dp"
+                    android:minHeight="40dp"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="6dp"
                     android:text="@string/settings_nav_other"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </HorizontalScrollView>
@@ -146,7 +146,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="44dp"
+                        android:minHeight="40dp"
                         android:orientation="horizontal"
                         android:paddingHorizontal="14dp"
                         android:paddingVertical="8dp">
@@ -172,7 +172,7 @@
                             android:layout_weight="1"
                             android:text="@string/settings_section_server"
                             android:textColor="@color/text_primary"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <!-- 6. Server status badge -->
@@ -223,7 +223,7 @@
                                 android:layout_marginEnd="4dp"
                                 android:minHeight="40dp"
                                 android:text="@string/open_remote"
-                                android:textSize="12sp" />
+                                android:textSize="13sp" />
 
                             <Button
                                 android:id="@+id/btn_copy_url"
@@ -234,7 +234,7 @@
                                 android:layout_marginStart="4dp"
                                 android:minHeight="40dp"
                                 android:text="@string/copy_address"
-                                android:textSize="12sp" />
+                                android:textSize="13sp" />
                         </LinearLayout>
 
                         <Button
@@ -242,9 +242,11 @@
                             style="@style/TvOutlinedButton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:minHeight="40dp"
                             android:layout_marginTop="8dp"
                             android:text="@string/remote_storage_btn"
-                            android:visibility="gone" />
+                            android:visibility="gone" 
+                            android:textSize="13sp" />
 
                         <TextView
                             android:id="@+id/urls"
@@ -259,8 +261,10 @@
                             style="@style/TvOutlinedButton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:minHeight="40dp"
                             android:layout_marginTop="8dp"
-                            android:text="@string/server_start" />
+                            android:text="@string/server_start" 
+                            android:textSize="13sp" />
 
                         <View
                             android:layout_width="match_parent"
@@ -382,7 +386,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="44dp"
+                        android:minHeight="40dp"
                         android:orientation="horizontal"
                         android:paddingHorizontal="14dp"
                         android:paddingVertical="8dp">
@@ -408,7 +412,7 @@
                             android:layout_weight="1"
                             android:text="@string/settings_section_download"
                             android:textColor="@color/text_primary"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -443,7 +447,7 @@
                                 android:gravity="start|center_vertical"
                                 android:paddingHorizontal="8dp"
                                 android:text="@string/settings_background"
-                                android:textSize="12sp" />
+                                android:textSize="13sp" />
 
                             <Button
                                 android:id="@+id/check_autostart"
@@ -456,7 +460,7 @@
                                 android:gravity="start|center_vertical"
                                 android:paddingHorizontal="8dp"
                                 android:text="@string/settings_autostart"
-                                android:textSize="12sp" />
+                                android:textSize="13sp" />
                         </LinearLayout>
 
                         <LinearLayout
@@ -476,7 +480,7 @@
                                 android:gravity="start|center_vertical"
                                 android:paddingHorizontal="8dp"
                                 android:text="@string/settings_auto_sort"
-                                android:textSize="12sp" />
+                                android:textSize="13sp" />
 
                             <Button
                                 android:id="@+id/check_small_first"
@@ -489,7 +493,7 @@
                                 android:gravity="start|center_vertical"
                                 android:paddingHorizontal="8dp"
                                 android:text="@string/settings_small_first"
-                                android:textSize="12sp" />
+                                android:textSize="13sp" />
                         </LinearLayout>
 
                         <Button
@@ -693,7 +697,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="44dp"
+                        android:minHeight="40dp"
                         android:orientation="horizontal"
                         android:paddingHorizontal="14dp"
                         android:paddingVertical="8dp">
@@ -719,7 +723,7 @@
                             android:layout_weight="1"
                             android:text="@string/settings_section_storage"
                             android:textColor="@color/text_primary"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -769,10 +773,12 @@
                             android:id="@+id/btn_add_gallery_folder"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:minHeight="40dp"
                             android:layout_marginTop="8dp"
                             android:background="@drawable/bg_btn_tv"
                             android:backgroundTint="@null"
-                            android:text="@string/storage_add_folder" />
+                            android:text="@string/storage_add_folder" 
+                            android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -793,7 +799,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="44dp"
+                        android:minHeight="40dp"
                         android:orientation="horizontal"
                         android:paddingHorizontal="14dp"
                         android:paddingVertical="8dp">
@@ -819,7 +825,7 @@
                             android:layout_weight="1"
                             android:text="@string/settings_nav_other"
                             android:textColor="@color/text_primary"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -890,7 +896,7 @@
     <LinearLayout
         android:id="@+id/btn_save"
         android:layout_width="wrap_content"
-        android:layout_height="44dp"
+        android:layout_height="40dp"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
         android:background="@drawable/bg_fab_pill"
@@ -913,7 +919,7 @@
             android:layout_marginStart="8dp"
             android:text="@string/save_fab_label"
             android:textColor="@color/white"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
 

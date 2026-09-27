@@ -64,11 +64,11 @@
             android:id="@+id/btn_paste_url"
             style="@style/TvOutlinedButton"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="40dp"
             android:paddingStart="14dp"
             android:paddingEnd="14dp"
             android:text="@string/paste"
-            android:textSize="12sp" />
+            android:textSize="13sp" />
 
         <TextView
             android:id="@+id/text_social_platform"
