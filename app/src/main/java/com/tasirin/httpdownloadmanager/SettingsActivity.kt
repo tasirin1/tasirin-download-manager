@@ -789,6 +789,8 @@ class SettingsActivity : AppCompatActivity() {
                 event
             }
             if (pinEvent != null) App.logEvent(pinEvent)
+            // PIN tidak boleh tertinggal terlihat di field setelah disimpan.
+            binding.inputPin.setText("")
             if (StoragePrefs.isPinEnforced(this) &&
                 StoragePrefs.getServerPin(this).isNullOrEmpty()
             ) {

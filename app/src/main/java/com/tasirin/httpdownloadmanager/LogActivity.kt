@@ -144,9 +144,22 @@ class LogActivity : AppCompatActivity() {
                         }
                         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                             ?: return@runCatching false
-                        runCatching {
-                            resolver.openOutputStream(uri)?.use { it.write(header.toByteArray()) }
-                        }.onFailure { resolver.delete(uri, null, null) }
+                        // Stream null (tanpa exception) atau tulis gagal tidak
+                        // boleh lolos sebagai sukses: hapus entri yatim dan
+                        // laporkan gagal agar user tidak menerima file 0-byte.
+                        val stream = resolver.openOutputStream(uri)
+                        if (stream == null) {
+                            resolver.delete(uri, null, null)
+                            return@runCatching false
+                        }
+                        val wrote = runCatching {
+                            stream.use { it.write(header.toByteArray()) }
+                            true
+                        }.getOrDefault(false)
+                        if (!wrote) {
+                            resolver.delete(uri, null, null)
+                            return@runCatching false
+                        }
                         val done = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
                         resolver.update(uri, done, null, null) > 0
                     } else {

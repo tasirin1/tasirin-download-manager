@@ -89,6 +89,23 @@ class HlsParserTest {
     }
 
     @Test
+    fun `resolveUrl - skema kapital dan protocol-relative`() {
+        val base = "https://cdn.example.com/videos/master.m3u8"
+        assertEquals(
+            "HTTPS://cdn.example.com/videos/low.m3u8",
+            HlsParser.resolveUrl(base, "HTTPS://cdn.example.com/videos/low.m3u8")
+        )
+        assertEquals(
+            "https://cdn.example.com/videos/low.m3u8",
+            HlsParser.resolveUrl(base, "//cdn.example.com/videos/low.m3u8")
+        )
+        assertEquals(
+            "http://cdn.example.com/low.m3u8",
+            HlsParser.resolveUrl("http://cdn.example.com/master.m3u8", "//cdn.example.com/low.m3u8")
+        )
+    }
+
+    @Test
     fun `parse master - frameRate dibaca dari atribut FRAME-RATE`() {
         val master = """
             #EXTM3U

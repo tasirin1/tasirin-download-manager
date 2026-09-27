@@ -105,11 +105,20 @@ object HlsParser {
      *  Tak pernah melempar: base malformed mengembalikan relative apa adanya
      *  agar parser murni tidak men-crash pemanggil engine. */
     fun resolveUrl(base: String, relative: String): String {
-        if (relative.startsWith("http://") || relative.startsWith("https://")) return relative
+        if (relative.startsWith("http://", ignoreCase = true) ||
+            relative.startsWith("https://", ignoreCase = true)
+        ) return relative
         // Basis dipisahkan dari query/fragment dulu: '/' di dalam query
         // (mis. "?next=a/b") tidak boleh dianggap pemisah direktori, dan
         // query basis tidak diwariskan ke segmen (sesuai RFC 3986).
         val cleanBase = base.substringBefore('?').substringBefore('#')
+        if (relative.startsWith("//")) {
+            // Protocol-relative: warisi skema basis (default https aman
+            // bila basis rusak; hanya http/https yang diizinkan).
+            val scheme = cleanBase.substringBefore("://", "https").lowercase()
+                .takeIf { it == "http" || it == "https" } ?: "https"
+            return "$scheme:$relative"
+        }
         if (relative.startsWith("/")) {
             // Root-relative butuh host valid; base rusak -> kembalikan
             // relative agar pemanggil memutuskan, bukan crash di sini.

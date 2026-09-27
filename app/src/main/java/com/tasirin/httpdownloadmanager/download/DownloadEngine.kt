@@ -2043,7 +2043,9 @@ class DownloadEngine(appContext: Context) {
         if (code !in 200..299) throw IOException("HTTP $code")
         captureHeaderChecksum(item, conn)
 
-        val resolvedName = resolveFinalName(item, headersOf(conn))
+        val resolvedName = FileNames.unique(resolveFinalName(item, headersOf(conn))) { n ->
+            _items.value.any { it.id != item.id && it.fileName == n }
+        }
         if (resolvedName != fileName) {
             val newPartial = saver.partialFile(resolvedName)
             val keepOld = downloaded > 0 && partialFile.exists()
@@ -2132,6 +2134,7 @@ class DownloadEngine(appContext: Context) {
         val published0 = publishItem(saver, partialFile, fileName, item)
         val finalName = published0.fileName ?: fileName
         verifyChecksum(item.id, published0, saver)?.let {
+            deletePublished(published0)
             throw IOException(it)
         }
         val published = organizeIfEnabled(saver, published0, finalName)
@@ -2175,7 +2178,9 @@ class DownloadEngine(appContext: Context) {
         var fileName = item.fileName
         var segments = item.segments
         if (segments.isEmpty()) {
-            val resolvedName = resolveFinalName(item, headers)
+            val resolvedName = FileNames.unique(resolveFinalName(item, headers)) { n ->
+                _items.value.any { it.id != item.id && it.fileName == n }
+            }
             fileName = resolvedName
             segments = createSegments(total)
             if (total > 0 && saver.freeBytes() < total) {
@@ -2274,6 +2279,7 @@ class DownloadEngine(appContext: Context) {
         val published0 = publishItem(saver, merged, fileName, item)
         val finalName = published0.fileName ?: fileName
         verifyChecksum(item.id, published0, saver)?.let {
+            deletePublished(published0)
             throw IOException(it)
         }
         val published = organizeIfEnabled(saver, published0, finalName)
@@ -2603,6 +2609,20 @@ class DownloadEngine(appContext: Context) {
         val value = rest.trim().lowercase()
         if (value.length < 16) return null
         return algo to value
+    }
+
+    /** Hapus file yang baru terpublish bila checksum gagal: tanpa ini file korup
+     *  tertinggal di pustaka dan retry membuat duplikat "nama (1)"
+     *  via uniqueTargetFile. */
+    private fun deletePublished(published: FileSaver.PublishResult) {
+        runCatching {
+            val path = published.filePath
+            if (!path.isNullOrEmpty()) File(path).delete()
+        }
+        runCatching {
+            val uri = published.contentUri
+            if (!uri.isNullOrEmpty()) context.contentResolver.delete(uri.toUri(), null, null)
+        }
     }
 
     private fun verifyChecksum(

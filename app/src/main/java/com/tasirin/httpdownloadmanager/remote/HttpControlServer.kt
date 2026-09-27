@@ -1028,8 +1028,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (StoragePrefs.isServerReadOnly(context)) {
             return readOnlyDenied().closeConnection()
         }
+        // Separator nama upload sudah menjadi "_", jadi sisa ".." tak bisa traversal;
+        // nama sah seperti "my..video.mp4" dipertahankan utuh (satu segmen path).
         val name = session.param("name")?.trim()?.filterNot { it.isISOControl() }?.take(180)
-            ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")?.replace("..", "_")
+            ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")
             ?.takeIf { it.isNotEmpty() }
             ?: "upload_${System.currentTimeMillis()}"
         val storage = session.param("storage")?.trim().orEmpty()
@@ -1225,7 +1227,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 chunkIdx, chunks, length
             )
         } finally {
-            reservedUploadBytes.addAndGet(-length)
+            // Byte sudah di disk tapi pemindaian cache bisa basi hingga 10 dtk:
+            // pindahkan ke hitungan cache agar tidak undercount (fail-open)
+            // sebelum refresh berikutnya (refresh memutakhirkan dari disk).
+            synchronized(uploadBufferReservation) {
+                reservedUploadBytes.addAndGet(-length)
+                cachedUploadBufferBytes += length
+            }
         }
     }
 
