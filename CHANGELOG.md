@@ -16,6 +16,7 @@
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(main): bayangan ganda FAB pill dihapus** -- `bg_fab_pill` memakai strip bayangan layer-list 2dp + `elevation` 6dp; strip terpotong di ujung pil (radius 24dp) sehingga FAB tampak tenggelam. Kini bentuk flat, bayangan tunggal dari elevation (berlaku untuk FAB utama + tombol Save Settings).
 - **fix(remote): bayangan tombol filter aktif tak lagi kepotong** -- `#filtersSticky .seg` (`overflow-x: auto`) memotong `box-shadow` tombol `.on` yang ber-badge sehingga tampak tenggelam; padding 8px + `scroll-padding` memberi ruang bayangan.
 - **ui(empty): bayangan ikon lingkaran tipis + tonal** -- Shadow 4dp/#1A -> 2dp/#0D, badan gradien -> flat `primary_container`, glyph abu -> tint `primary`, judul 18dp -> 16dp.
 - **ui(theme): pill + kartu borderless M3** -- Semua tombol 12dp -> pill 20dp; kartu `bg_status_card` tanpa border + radius 16dp (item + pengaturan); angka ringkasan 24sp -> 28sp.

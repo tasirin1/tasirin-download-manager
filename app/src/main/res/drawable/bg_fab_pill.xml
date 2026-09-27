@@ -1,18 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FAB pill: primary flat + bayangan (tanpa gradien, gaya modern). -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Bayangan bawah -->
-    <item android:top="3dp">
-        <shape android:shape="rectangle">
-            <solid android:color="#330D1B2E" />
-            <corners android:radius="24dp" />
-        </shape>
-    </item>
-    <!-- Badan primary flat -->
-    <item android:bottom="2dp">
-        <shape android:shape="rectangle">
-            <solid android:color="@color/primary" />
-            <corners android:radius="24dp" />
-        </shape>
-    </item>
-</layer-list>
+<!-- FAB pill: primary flat; bayangan tunggal dari elevation 6dp di layout.
+     Lapisan bayangan layer-list dihapus: strip bawah 2dp terpotong di
+     ujung pil (radius 24dp) sehingga tombol tampak tenggelam. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/primary" />
+    <corners android:radius="24dp" />
+</shape>
