@@ -32,8 +32,6 @@ object MediaLibrary {
     @Volatile private var scanCacheTtlMs = SCAN_TTL_MS
     private var scanCacheFolderKey: List<String> = emptyList()
     private val scanLock = Any()
-    /** Durasi scan terakhir (ms) untuk diagnosis; volatile agar aman dibaca antar thread. */
-    @Volatile var lastScanMs: Long = 0L
     @Volatile private var observerRegistered = false
 
     /** Hasil scan galeri: [items] = daftar lengkap hingga GALLERY_MAX_ENTRIES
@@ -49,8 +47,8 @@ object MediaLibrary {
     )
 
     /** Koleksi MediaStore untuk root folder media (dipakai saat browsing). */
-    // Escape argumen LIKE SQLite; duplikat kecil dari ServerSecurity agar
-    // lapisan util tidak bergantung ke lapisan remote.
+    // Escape LIKE lokal (duplikat disengaja 10 baris agar util tak bergantung ke remote;
+    // ServerSecurity punya versi sendiri untuk jalur server).
     private fun escapeLike(s: String): String {
         val sb = StringBuilder(s.length)
         for (c in s) {
@@ -308,13 +306,7 @@ object MediaLibrary {
                     return MediaScanResult(items.take(limit), total)
                 }
             }
-            // Metrik durasi scan untuk diagnosis galeri lambat (fallback FS ~2-3 detik di TV box).
-            val t0 = android.os.SystemClock.elapsedRealtime()
             val result = scanUncached(context, selectedFolders)
-            lastScanMs = android.os.SystemClock.elapsedRealtime() - t0
-            if (lastScanMs > 500) {
-                android.util.Log.d("MediaLibrary", "scan " + result.items.size + " item dalam " + lastScanMs + "ms fallback=" + result.usedFallback)
-            }
             scanCache = Triple(now, result.items, result.total)
             scanCacheTtlMs = if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS
             scanCacheFolderKey = selectedFolders
@@ -626,7 +618,6 @@ object MediaLibrary {
         val usedFallback = !folderFilterActive && mediaStoreRows == 0
         return MediaScanResult(deduped, deduped.size, usedFallback)
     }
-
 
     /** Hapus thumbnail disk yang sudah lama tak terpakai (> 7 hari). Dipanggil
      *  saat aplikasi mulai; server remote punya pembersih serupa saat start. */

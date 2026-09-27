@@ -1295,7 +1295,6 @@ class DownloadEngine(appContext: Context) {
             ?: throw IOException("Cannot fetch HLS manifest")
         val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang)
         if (plan == null || plan.videoSegments.isEmpty()) {
-            App.logEvent("HLS DEBUG: master ${master.length} chars, stream-inf=${master.contains("#EXT-X-STREAM-INF")}, url=${item.url.take(90)}")
             throw IOException("No HLS segments found")
         }
         App.logEvent(
@@ -1849,10 +1848,8 @@ class DownloadEngine(appContext: Context) {
         }
         val audioRenditions = HlsParser.parseAudioRenditions(body, baseUrl)
         for (candidate in candidates) {
-            App.logEvent("HLS DEBUG: trying variant ${candidate.codecs} ${candidate.bandwidth/1000}kbps ${candidate.height}p ${candidate.frameRate}fps, url=${candidate.url.take(80)}")
             val videoSegs = mediaSegmentsWithDurations(candidate.url, headers)
             if (videoSegs == null) {
-                App.logEvent("HLS DEBUG: variant ${candidate.height}p failed, trying next...")
                 continue
             }
             val videoSegments = videoSegs.map { it.first }
@@ -1882,10 +1879,8 @@ class DownloadEngine(appContext: Context) {
                     val segs = runCatching { mediaSegments(rendition.url, headers) }.getOrNull()
                     if (!segs.isNullOrEmpty()) {
                         audioResult = segs
-                        App.logEvent("HLS DEBUG: audio selected: group=${rendition.groupId} lang=${rendition.language} name=${rendition.name} default=${rendition.isDefault}")
                         break
                     }
-                    App.logEvent("HLS DEBUG: audio rendition ${rendition.groupId} lang=${rendition.language} name=${rendition.name} failed (default=${rendition.isDefault}), trying next...")
                 }
                 audioResult
             }
@@ -1901,13 +1896,12 @@ class DownloadEngine(appContext: Context) {
                 estimateTotalBytes = estimateBytes(videoDurations, candidate.bandwidth) + audioBytes
             )
         }
-        App.logEvent("HLS DEBUG: all ${candidates.size} variants failed (media playlist 404/error)")
         return null
     }
 
     /** Parse segmen dari media playlist, mengembalikan (url, durasi_us). */
     private fun mediaSegmentsWithDurations(playlistUrl: String, headers: String = ""): List<Pair<String, Long>>? {
-        // Fetch media playlist dengan logging detail untuk diagnosa 403/404/exception
+        // Ambil media playlist; gagal HTTP/exception = null agar kandidat berikut dicoba.
         val body: String? = try {
             val conn = openAuthenticatedConnection(
                 playlistUrl, method = "GET", username = "", password = "", headers = headers
@@ -1915,15 +1909,12 @@ class DownloadEngine(appContext: Context) {
             try {
                 val code = conn.responseCode
                 if (code !in 200..299) {
-                    val errBody = try { readBounded(conn.errorStream ?: conn.inputStream, 300) } catch (_: Exception) { "" }
-                    App.logEvent("HLS DEBUG: media playlist HTTP $code from ${playlistUrl.take(70)}, err=${errBody.take(150)}")
                     return null
                 }
                 val b = readBounded(conn.inputStream, HLS_PROBE_MAX_BYTES)
-                App.logEvent("HLS DEBUG: media playlist ${b.length} chars, $code from ${playlistUrl.take(70)}")
                 b
             } finally { conn.disconnect() }
-        } catch (e: Exception) { App.logEvent("HLS DEBUG: media playlist exception: ${e.javaClass.simpleName}: ${e.message?.take(100)}"); null }
+        } catch (_: Exception) { null }
         if (body == null) return null
         val result = mutableListOf<Pair<String, Long>>()
         val lines = body.lines()

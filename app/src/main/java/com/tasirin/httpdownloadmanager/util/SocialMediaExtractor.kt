@@ -1,6 +1,5 @@
 package com.tasirin.httpdownloadmanager.util
 
-import com.tasirin.httpdownloadmanager.App
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -149,10 +148,8 @@ object SocialMediaExtractor {
                 obj = parsed
                 break
             }
-            App.logEvent("TIKTOK DEBUG: $host code=${parsed.optInt("code", -1)} msg=${parsed.optString("msg", "")}")
         }
         val data = obj?.optJSONObject("data") ?: return emptyList()
-        App.logEvent("TIKTOK DEBUG: ok id=${data.optString("id", "")} play=${data.optString("play", "").take(30)}")
         val title = data.optString("title", "")
         val author = try {
             data.optJSONObject("author")?.optString("unique_id", "")
@@ -200,13 +197,11 @@ object SocialMediaExtractor {
         )
         val embedHtml = embedResult?.body
         val igCookies = embedResult?.cookies.orEmpty()
-        App.logEvent("IG DEBUG: embed page ${embedHtml?.length ?: 0} chars, shortcode=$shortcode")
         if (embedHtml != null && embedHtml.length > 1000) {
             val media = extractContextJson(embedHtml)
             if (media != null) {
                 val all = extractAllFromMedia(media, shortcode, igCookies)
                 if (all.isNotEmpty()) {
-                    App.logEvent("IG DEBUG: embed carousel ${all.size} items, cookies=${igCookies.length} chars")
                     options.addAll(all)
                 }
             }
@@ -217,10 +212,8 @@ object SocialMediaExtractor {
             val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", IG_HEADERS)
             val pageCookies = httpResult?.cookies.orEmpty()
             val pageHtml = httpResult?.body
-            App.logEvent("IG DEBUG: main page ${pageHtml?.length ?: 0} chars, shortcode=$shortcode")
             if (pageHtml != null && pageHtml.length > 1000) {
                 val displayUrls = extractAllDisplayUrlsFromPage(pageHtml)
-                App.logEvent("IG DEBUG: found ${displayUrls.size} image URLs, video=${extractVideoFromPage(pageHtml) != null}")
                 displayUrls.forEachIndexed { idx, imgUrl ->
                     options.add(Result(imgUrl, "Instagram_${shortcode}_${idx+1}.jpg",
                         "Instagram $shortcode", "Photo ${idx+1}", "image/jpeg", cookies = pageCookies))
@@ -402,7 +395,6 @@ object SocialMediaExtractor {
         return results
     }
 
-
     // ── YouTube ────────────────────────────────────────────────────────
 
     private fun extractYouTube(url: String): Result? {
@@ -417,7 +409,6 @@ object SocialMediaExtractor {
         // URL adaptif/HLS dari client ini bisa langsung di-download (tidak 403).
         val vision = extractYouTubeViaVisionos(videoId)
         if (vision != null) {
-            App.logEvent("YT DEBUG: VISIONOS OK → HLS ${vision.directUrl.take(80)}...")
             return listOf(vision)
         }
 
@@ -450,13 +441,11 @@ object SocialMediaExtractor {
         ) ?: return emptyList()
         val pageHtml = httpResult.body
         val ytCookies = httpResult.cookies
-        App.logEvent("YT DEBUG: page ${pageHtml.length} chars, id=$videoId, cookies=${ytCookies.length} chars")
 
         val match = YT_PLAYER_RESP_RE
             .find(pageHtml)
             ?: YT_PLAYER_RESP_LAX_RE.find(pageHtml)
             ?: run {
-                App.logEvent("YT DEBUG: ytInitialPlayerResponse not found")
                 return emptyList()
             }
 
@@ -472,7 +461,6 @@ object SocialMediaExtractor {
             adaptiveFormats?.let { for (i in 0 until it.length()) it.optJSONObject(i)?.let { f -> allFormats.add(f) } }
             if (allFormats.isEmpty()) return emptyList()
             val options = mutableListOf<Result>()
-            App.logEvent("YT DEBUG: formats=${muxedFormats?.length() ?: 0}, adaptive=${adaptiveFormats?.length() ?: 0}")
 
             for (fmt in allFormats) {
                 val videoUrl = fmt.optString("url", "")
@@ -489,23 +477,14 @@ object SocialMediaExtractor {
             if (options.isEmpty() || options.firstOrNull()?.let { isUrlForbidden(it) } == true) {
                 val piped = extractYouTubeViaPiped(videoId)
                 if (piped.isNotEmpty()) {
-                    App.logEvent("YT DEBUG: using Piped fallback (${piped.size} stream)")
                     return piped
                 }
-                val invidious = runCatching { extractYouTubeViaInvidious(videoId) }.getOrElse { e ->
-                    App.logEvent("YT DEBUG: invidious error: ${e.message?.take(80)}")
-                    null
-                }
+                val invidious = runCatching { extractYouTubeViaInvidious(videoId) }.getOrNull()
                 if (invidious != null) {
-                    App.logEvent("YT DEBUG: using Invidious fallback")
                     return listOf(invidious)
                 }
-                val cobalt = runCatching { extractYouTubeViaCobalt(videoId) }.getOrElse { e ->
-                    App.logEvent("YT DEBUG: cobalt error: ${e.message?.take(80)}")
-                    null
-                }
+                val cobalt = runCatching { extractYouTubeViaCobalt(videoId) }.getOrNull()
                 if (cobalt != null) {
-                    App.logEvent("YT DEBUG: using Cobalt fallback")
                     return listOf(cobalt)
                 }
             }
@@ -531,7 +510,6 @@ object SocialMediaExtractor {
         val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
             ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
             ?: return null
-        App.logEvent("YT DEBUG: VISIONOS ok, cookies=${page.cookies.length} chars")
 
         val body = buildString {
             append("{\"context\":{\"client\":{")
@@ -593,7 +571,6 @@ object SocialMediaExtractor {
                     if (url.isEmpty()) return@runCatching null
                     val mime = best.optString("mimeType", MIME_MP4)
                     val quality = best.optString("qualityLabel", "Unknown")
-                    App.logEvent("YT DEBUG: VISIONOS adaptive fallback → $quality ${mime.take(20)}")
                     val ext = if (mime.contains("webm")) "webm" else "mp4"
                     return@runCatching Result(
                         url, "YouTube_$safeName.$ext", title, quality, mime,
@@ -659,7 +636,6 @@ object SocialMediaExtractor {
             val url = best.getString("url")
             val mime = best.optString("mimeType", MIME_MP4)
             val quality = best.optString("qualityLabel", "Unknown")
-            App.logEvent("YT DEBUG: VISIONOS adaptive → $quality ${mime.take(20)}")
             val ext = if (mime.contains("webm")) "webm" else "mp4"
             Result(
                 url, "YouTube_$safeName.$ext", title, quality, mime,
@@ -775,10 +751,8 @@ object SocialMediaExtractor {
                 options
             }.getOrNull()
             if (!result.isNullOrEmpty()) {
-                App.logEvent("YT DEBUG: piped $instance OK (${result.size} stream)")
                 return result
             }
-            App.logEvent("YT DEBUG: piped $instance failed/unavailable")
         }
         return emptyList()
     }
@@ -798,10 +772,8 @@ object SocialMediaExtractor {
         for (instance in INVIDIOUS_INSTANCES) {
             val resolved = resolveInvidiousLatest(instance, videoId, "18")
             if (resolved != null) {
-                App.logEvent("YT DEBUG: invidious $instance resolved stream")
                 return Result(resolved, null, "YouTube_$videoId", "360p", MIME_MP4)
             }
-            App.logEvent("YT DEBUG: invidious $instance failed/unavailable")
         }
         return null
     }
@@ -817,7 +789,6 @@ object SocialMediaExtractor {
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
         val body = """{"url":"$watchUrl","filenameStyle":"pretty","downloadMode":"auto"}"""
         for (instance in COBALT_INSTANCES) {
-            App.logEvent("YT DEBUG: cobalt trying $instance")
             val resp = httpPostJson(
                 "$instance/",
                 body,
@@ -825,7 +796,6 @@ object SocialMediaExtractor {
                 timeoutMs = 15000
             )
             if (resp == null) {
-                App.logEvent("YT DEBUG: cobalt $instance failed/unavailable")
                 continue
             }
             return runCatching {
@@ -834,12 +804,8 @@ object SocialMediaExtractor {
                 val url = obj.optString("url", "")
                 if (status.isNotEmpty() && url.startsWith("http")) {
                     val fileName = obj.optString("filename", "YouTube_$videoId.mp4")
-                    App.logEvent("YT DEBUG: cobalt $instance OK → $status")
                     Result(url, fileName, "YouTube_$videoId", "Auto", MIME_MP4)
                 } else {
-                    // Cobalt v10+ bisa mengembalikan error dalam "text" field
-                    val err = obj.optString("text", obj.optString("error", status))
-                    App.logEvent("YT DEBUG: cobalt $instance no url: status=$status err=$err")
                     null
                 }
             }.getOrNull()?.let { return it }
