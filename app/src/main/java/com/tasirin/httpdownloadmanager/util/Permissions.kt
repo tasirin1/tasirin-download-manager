@@ -38,13 +38,17 @@ object Permissions {
 
     /** Sinkronkan "Full access to main storage" dengan izin sistem: bila user baru
      *  saja menekan Enable lalu benar-benar memberi izin "All files access", aktifkan
-     *  `fs_full_access` otomatis. Dipanggil di onResume MainActivity & SettingsActivity. */
-    fun syncFullAccessAfterGrant(context: Context) {
-        if (!StoragePrefs.isFullAccessPending(context)) return
+     *  `fs_full_access` otomatis. Dipanggil di onResume MainActivity & SettingsActivity.
+     *  Kembalikan true bila pref baru diaktifkan (pemanggil wajib invalidasi cache
+     *  root server karena daftar root berubah). */
+    fun syncFullAccessAfterGrant(context: Context): Boolean {
+        if (!StoragePrefs.isFullAccessPending(context)) return false
         StoragePrefs.setFullAccessPending(context, false)
         if (!needsAllFilesAccess(context)) {
             StoragePrefs.setFsFullAccessEnabled(context, true)
+            return true
         }
+        return false
     }
 
     /** Buka halaman "All files access" khusus aplikasi (fallback ke daftar umum). */

@@ -10,11 +10,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
 import android.app.DownloadManager
 import android.provider.DocumentsContract
 import android.provider.MediaStore
-import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
@@ -231,7 +229,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
 
         requestPermissionsIfNeeded()
-        offerAllFilesAccess()
         runCatching {
             if (StoragePrefs.isBackgroundEnabled(this)) {
                 App.engine.resumeInterrupted()
@@ -243,9 +240,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             lifecycleScope.launch(Dispatchers.IO) {
                 runCatching { App.httpServer.startServer() }
             }
-        }
-        if (StoragePrefs.isBatteryExemptEnabled(this)) {
-            requestBatteryExemption()
         }
         handleIncomingIntent(intent)
         } catch (t: Throwable) {
@@ -302,7 +296,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         super.onResume()
         // Setelah kembali dari halaman izin sistem: auto-aktifkan "Full access to
         // main storage" bila izin "All files access" baru saja diberikan.
-        Permissions.syncFullAccessAfterGrant(this)
+        if (Permissions.syncFullAccessAfterGrant(this)) {
+            runCatching { App.httpServer.invalidateFsRootsCache() }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -314,21 +310,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private fun requestPermissionsIfNeeded() {
         val needed = Permissions.missingRuntime(this)
         if (needed.isNotEmpty()) permissionLauncher.launch(needed)
-    }
-
-    /** Tawarkan aktivasi "All files access" sekali saja saat pertama kali dibuka. */
-    private fun offerAllFilesAccess() {
-        if (StoragePrefs.isFileAccessOffered(this)) return
-        if (!Permissions.needsAllFilesAccess(this)) return
-        StoragePrefs.setFileAccessOffered(this, true)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.settings_fs_full_access)
-            .setMessage(R.string.storage_hint_all_files)
-            .setPositiveButton(R.string.ok) { _, _ ->
-                Permissions.requestAllFilesAccess(this)
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
@@ -1350,23 +1331,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }.getOrNull()
     }
 
-
-    @SuppressLint("BatteryLife") // Penjelasan izin baterai jelas bagi pengguna TV box/HP.
-    private fun requestBatteryExemption() {
-        if (Build.VERSION.SDK_INT < 23) return
-        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        if (pm.isIgnoringBatteryOptimizations(packageName)) return
-        runCatching {
-            startActivity(
-                Intent(
-                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                    "package:$packageName".toUri()
-                )
-            )
-        }.onFailure {
-            Toast.makeText(this, R.string.battery_request_failed, Toast.LENGTH_LONG).show()
-        }
-    }
 
     @SuppressLint("InflateParams")
     private fun showLimitPriorityDialog(item: DownloadItem) {

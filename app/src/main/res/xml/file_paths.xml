@@ -3,5 +3,13 @@
     <files-path name="downloads" path="downloads/" />
     <cache-path name="updates" path="updates/" />
     <external-path name="public_downloads" path="Download/" />
-    <external-path name="external_storage" path="." />
+    <!-- Cakupan sempit: hanya folder unduhan/media, bukan seluruh storage
+         (external-path "." mengekspos semua file publik via URI grant). -->
+    <external-path name="public_downloads_dl" path="Download/" />
+    <external-path name="public_movies" path="Movies/" />
+    <external-path name="public_dcim" path="DCIM/" />
+    <external-path name="public_music" path="Music/" />
+    <external-path name="public_pictures" path="Pictures/" />
+    <external-path name="public_documents" path="Documents/" />
+    <external-path name="public_podcasts" path="Podcasts/" />
 </paths>

@@ -4,6 +4,9 @@
      Cleartext diizinkan secara umum (download manager memang butuh HTTP),
      tapi trust anchor TLS kustom tetap ditambah untuk server remote. -->
 <network-security-config>
+    <!-- Cleartext global = fungsi inti (URL unduhan milik pengguna bisa HTTP).
+         Domain pihak-pertama dikunci HTTPS di bawah; tools:ignore hanya untuk
+         peringatan InsecureBaseConfiguration agar lint tetap hijau. -->
     <base-config
         xmlns:tools="http://schemas.android.com/tools"
         tools:ignore="InsecureBaseConfiguration"
@@ -14,4 +17,10 @@
             <certificates src="@raw/isrg_root_x1" />
         </trust-anchors>
     </base-config>
+    <!-- Lalu lintas aplikasi sendiri (update, dsb.) wajib HTTPS + system trust. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
+        <domain includeSubdomains="true">githubassets.com</domain>
+    </domain-config>
 </network-security-config>

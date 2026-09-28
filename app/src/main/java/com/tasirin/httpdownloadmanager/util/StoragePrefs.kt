@@ -162,9 +162,12 @@ object StoragePrefs {
         }
     }
 
+    // Default mati: jangan meminta "abaikan optimasi baterai" saat pertama
+    // dibuka (permintaan otomatis = sinyal persistence ala malware bagi
+    // Play Protect); hanya diminta setelah pengguna menyalakan toggle.
     fun isBatteryExemptEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_BATTERY_EXEMPT, true)
+            .getBoolean(KEY_BATTERY_EXEMPT, false)
 
     fun setBatteryExemptEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {

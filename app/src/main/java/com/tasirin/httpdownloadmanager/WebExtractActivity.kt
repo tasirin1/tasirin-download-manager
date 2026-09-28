@@ -5,8 +5,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.net.Uri
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -49,6 +51,7 @@ class WebExtractActivity : AppCompatActivity() {
     private var loopStarted = false
     private var manualGrab = false
     private var lastEpisodesJson = ""
+    private var allowedHost = ""
     private val handler = Handler(Looper.getMainLooper())
 
     private val grabLoop = object : Runnable {
@@ -76,7 +79,14 @@ class WebExtractActivity : AppCompatActivity() {
         setContentView(R.layout.activity_web_extract)
         applyEdgeToEdge(findViewById(R.id.web_extract_root))
         watchUrl = intent.getStringExtra(EXTRA_URL).orEmpty()
-        if (watchUrl.isBlank()) {
+        // Kunci masuk: hanya URL http(s) dengan host. WebView ekstraksi bukan
+        // browser umum (tidak ada address bar), jadi jangan muat skema aneh
+        // (intent:, file:, javascript:) yang bisa disalahgunakan pemanggil.
+        allowedHost = runCatching { Uri.parse(watchUrl) }.getOrNull()?.host.orEmpty()
+        if (watchUrl.isBlank() ||
+            !(watchUrl.startsWith("http://") || watchUrl.startsWith("https://")) ||
+            allowedHost.isEmpty()
+        ) {
             setResult(RESULT_CANCELED)
             finish()
             return
@@ -89,6 +99,9 @@ class WebExtractActivity : AppCompatActivity() {
         statusText.text = getString(R.string.web_extract_loading)
         val settings = webView.settings
         settings.javaScriptEnabled = true
+        // domStorage tetap aktif: challenge Cloudflare + player video butuh
+        // localStorage/sessionStorage; tanpa JS bridge sehingga JS halaman
+        // tak bisa memanggil kode aplikasi (hanya dibaca via evaluateJavascript).
         settings.domStorageEnabled = true
         settings.loadsImagesAutomatically = false
         settings.setSupportMultipleWindows(false)
@@ -96,6 +109,22 @@ class WebExtractActivity : AppCompatActivity() {
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false)
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
+            // true = host tujuan sama dengan halaman awal ( challenge
+            // Cloudflare/redirect login selalu satu host, jadi ini cukup).
+            fun isAllowedTarget(url: String): Boolean =
+                runCatching { Uri.parse(url) }.getOrNull()?.host == allowedHost
+
+            // Signature lama melayani API 21-23; versi request melayani 24+.
+            // Blokir navigasi keluar host (iklan/redirect): ekstraksi cukup
+            // membaca DOM halaman awal, tak perlu menjelajah situs lain.
+            @Suppress("DEPRECATION")
+            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
+                !isAllowedTarget(url)
+
+            @SuppressLint("NewApi") // Override API 24+; aman di minSdk 21 (tak pernah dipanggil di bawah 24).
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+                !isAllowedTarget(request.url.toString())
+
             override fun onPageFinished(view: WebView, url: String) {
                 statusText.text = getString(R.string.web_extract_ready)
                 startGrabLoop()

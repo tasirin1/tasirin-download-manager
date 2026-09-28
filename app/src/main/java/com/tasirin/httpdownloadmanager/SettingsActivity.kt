@@ -113,9 +113,25 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        Permissions.syncFullAccessAfterGrant(this)
+        if (Permissions.syncFullAccessAfterGrant(this)) {
+            runCatching { App.httpServer.invalidateFsRootsCache() }
+        }
         renderServer()
         renderChecks()
+    }
+
+    /** Dialog penjelasan sebelum membuka halaman izin "All files access" sistem:
+     *  justifikasi harus kontekstual (saat pengguna meminta fitur file manager),
+     *  bukan prompt otomatis saat aplikasi dibuka (pola yang dicurigai Play Protect). */
+    private fun offerSystemAllFilesAccess() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_fs_full_access)
+            .setMessage(R.string.storage_hint_all_files)
+            .setPositiveButton(R.string.ok) { _, _ ->
+                Permissions.requestAllFilesAccess(this)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /** Seksi kartu yang bisa dilipat (state disimpan di StoragePrefs). */
@@ -314,7 +330,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         binding.storageBtn.setOnClickListener {
             if (Build.VERSION.SDK_INT >= 30) {
-                Permissions.requestAllFilesAccess(this)
+                offerSystemAllFilesAccess()
             } else {
                 requestPermissionsIfNeeded()
             }
@@ -510,7 +526,20 @@ class SettingsActivity : AppCompatActivity() {
             renderChecks()
         }
         binding.checkFsFullAccess.setOnClickListener {
-            StoragePrefs.setFsFullAccessEnabled(this, !StoragePrefs.isFsFullAccessEnabled(this))
+            if (!StoragePrefs.isFsFullAccessEnabled(this)) {
+                // Menyalakan butuh izin sistem di Android 11+: jelaskan dulu,
+                // lalu minta izin; pref aktif otomatis saat kembali dari
+                // halaman izin bila pengguna menyetujui (lihat onResume).
+                if (Permissions.needsAllFilesAccess(this)) {
+                    offerSystemAllFilesAccess()
+                } else {
+                    StoragePrefs.setFsFullAccessEnabled(this, true)
+                    runCatching { App.httpServer.invalidateFsRootsCache() }
+                }
+            } else {
+                StoragePrefs.setFsFullAccessEnabled(this, false)
+                runCatching { App.httpServer.invalidateFsRootsCache() }
+            }
             renderChecks()
         }
         binding.checkServerReadOnly.setOnClickListener {

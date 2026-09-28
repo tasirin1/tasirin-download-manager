@@ -73,13 +73,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="http" />
-                <data android:scheme="https" />
-            </intent-filter>
+            <!-- SENGAJA tanpa filter BROWSABLE http/https: klaim semua link web
+                 memicu chooser tiap URL dan dicurigai Play Protect sebagai
+                 pembajak link. Berbagi URL tetap lewat Share (ACTION_SEND). -->
         </activity>
 
         <activity
