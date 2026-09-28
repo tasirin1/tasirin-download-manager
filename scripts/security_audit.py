@@ -46,6 +46,9 @@ class Rule:
     languages: frozenset[str]
     flags: int = re.IGNORECASE
     excluded_paths: frozenset[str] = frozenset()
+    # True = abaikan match yang jatuh di dalam string "..." (mis. pola
+    # `catch(e){}` pada JavaScript yang ditempel di literal string Kotlin).
+    skip_in_strings: bool = False
 
 
 RULES = [
@@ -160,6 +163,7 @@ RULES = [
         "Empty exception handler can hide runtime failures",
         r"\bcatch\s*\([^)]*\)\s*\{\s*\}",
         frozenset({"kotlin", "java"}),
+        skip_in_strings=True,
     ),
     Rule(
         "debug_stack_trace",
@@ -309,6 +313,23 @@ def read_lines(path: Path) -> list[str] | None:
         return None
 
 
+def _in_string(line: str, pos: int) -> bool:
+    # True bila posisi jatuh di dalam literal string "..." (hitung kutip
+    # tak-escaped sebelumnya; ganjil = di dalam). Cukup untuk string
+    # sebaris Kotlin/Java; triple-quote multi-baris tidak dilacak.
+    in_str = False
+    i = 0
+    while i < pos:
+        char = line[i]
+        if char == "\\":
+            i += 2
+            continue
+        if char == '"':
+            in_str = not in_str
+        i += 1
+    return in_str
+
+
 def ignored_on_line(line: str, previous: str | None, rule_id: str) -> bool:
     markers: list[str] = []
     for source in (line, previous):
@@ -347,6 +368,8 @@ def scan_text(
                 continue
             match = pattern.search(line)
             if not match:
+                continue
+            if rule.skip_in_strings and _in_string(line, match.start()):
                 continue
             if (rule.rule_id, relative_posix) in ACCEPTED_RISKS:
                 continue
@@ -425,6 +448,11 @@ def run_self_test() -> int:
             "    fun hdr(c: HttpURLConnection) = c.getHeaderField(\"Accept-Ranges\").equals(\"bytes\")",
             "}",
         ],
+        Path("sample_str.kt"): [
+            "class Grab {",
+            '    val js = "(function(){try{work();}catch(e){}})"',
+            "}",
+        ],
         Path("sample.js"): [
             "const value = eval(userInput);",
             "// audit-ignore-next: js_dynamic_exec",
@@ -457,9 +485,14 @@ def run_self_test() -> int:
         item["rule_id"] == "js_dynamic_exec" and item["line"] == 1
         for item in findings
     )
-    if missing or suppressed:
+    str_leak = [
+        item
+        for item in findings
+        if item["rule_id"] == "kotlin_empty_catch" and item["path"] == "sample_str.kt"
+    ]
+    if missing or suppressed or str_leak:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0

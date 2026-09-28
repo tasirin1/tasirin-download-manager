@@ -682,7 +682,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             if (next == null) {
                 Toast.makeText(
                     this,
-                    getString(R.string.batch_episodes_added, added, total),
+                    resources.getQuantityString(R.plurals.batch_episodes_added, added, added, total),
                     Toast.LENGTH_LONG
                 ).show()
                 return
@@ -727,7 +727,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         ) {
             AlertDialog.Builder(this)
                 .setTitle(R.string.batch_episodes_title)
-                .setMessage(getString(R.string.batch_episodes_message, episodes.size))
+                .setMessage(resources.getQuantityString(R.plurals.batch_episodes_message, episodes.size, episodes.size))
                 .setPositiveButton(R.string.batch_episodes_all) { _, _ ->
                     runEpisodeBatch(ArrayDeque(episodes), episodes.size, 0)
                 }

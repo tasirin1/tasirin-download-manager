@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager.download
 
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -117,7 +118,10 @@ class DownloadService : Service() {
      *  hanya terjadi saat flow items meng-emit, sehingga timeout 15 menit bisa
      *  kedaluwarsa diam-diam saat koneksi stall tanpa tick progres. Lock tanpa
      *  timeout tetap aman: ikut lepas saat proses mati dan dilepas eksplisit
-     *  saat antrean idle (cabang else di bawah). */
+     *  saat antrean idle (cabang else di bawah) serta saat service destroy. */
+    // Acquire/release lintas callback lifecycle (bukan try/finally satu
+    // metode) dan tanpa timeout adalah desain sengaja — bukan kebocoran.
+    @SuppressLint("Wakelock", "WakelockTimeout")
     private fun updateWakeLock(active: Boolean) {
         if (active) {
             if (wakeLock == null) {
