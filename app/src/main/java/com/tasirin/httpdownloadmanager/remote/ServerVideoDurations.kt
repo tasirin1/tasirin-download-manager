@@ -5,6 +5,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.core.net.toUri
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
+import com.tasirin.httpdownloadmanager.util.readBounded
 import org.json.JSONObject
 import java.io.File
 
@@ -55,12 +56,12 @@ class ServerVideoDurations(
 
     private fun cacheLocked(): JSONObject {
         cache?.let { return it }
-        // Batas 512KB: file ditulis app sendiri, bila korup membengkak jangan
-        // baca utuh ke memori — mulai dari cache kosong.
-        // audit-ignore: unbounded_read_text (dibatasi file.length di atas)
+        // Batas 512KB: baca selalu bounded (readBounded) agar file korup yang
+        // membengkak di antara cek length dan baca tak membuat OOM; mulai dari
+        // cache kosong bila JSON terpotong/gagal parse.
         val loaded = runCatching {
             if (file.length() > 524_288L) JSONObject()
-            else JSONObject(file.readText())
+            else JSONObject(file.inputStream().use { readBounded(it, 524_288) })
         }.getOrDefault(JSONObject())
         cache = loaded
         return loaded

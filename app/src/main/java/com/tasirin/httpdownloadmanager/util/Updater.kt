@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.util
 
 import android.content.Context
+import androidx.core.content.edit
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -95,10 +96,10 @@ object Updater {
                 runCatching {
                     // Cap waktu ikut disimpan: fallback oversize tak boleh memakai
                     // body berumur berminggu-minggu (cache parsed dibatasi 24 jam).
-                    context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit()
-                        .putString("raw", raw)
-                        .putLong("raw_at", System.currentTimeMillis())
-                        .apply()
+                    context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit {
+                        putString("raw", raw)
+                        putLong("raw_at", System.currentTimeMillis())
+                    }
                 }
                 raw
             }
@@ -112,14 +113,14 @@ object Updater {
 
     private fun saveCached(context: Context, info: UpdateInfo) {
         runCatching {
-            context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit()
-                .putInt("code", info.versionCode)
-                .putString("name", info.versionName)
-                .putString("url", info.apkUrl)
-                .putLong("size", info.apkSize)
-                .putString("page", info.pageUrl)
-                .putLong("at", System.currentTimeMillis())
-                .apply()
+            context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit {
+                putInt("code", info.versionCode)
+                putString("name", info.versionName)
+                putString("url", info.apkUrl)
+                putLong("size", info.apkSize)
+                putString("page", info.pageUrl)
+                putLong("at", System.currentTimeMillis())
+            }
         }
     }
 

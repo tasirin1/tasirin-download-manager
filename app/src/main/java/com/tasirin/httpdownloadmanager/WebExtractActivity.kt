@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.net.Uri
+import androidx.core.net.toUri
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -84,7 +84,7 @@ class WebExtractActivity : AppCompatActivity() {
         // Kunci masuk: hanya URL http(s) dengan host. WebView ekstraksi bukan
         // browser umum (tidak ada address bar), jadi jangan muat skema aneh
         // (intent:, file:, javascript:) yang bisa disalahgunakan pemanggil.
-        allowedHost = runCatching { Uri.parse(watchUrl) }.getOrNull()?.host.orEmpty()
+        allowedHost = runCatching { watchUrl.toUri() }.getOrNull()?.host.orEmpty()
         if (watchUrl.isBlank() ||
             !(watchUrl.startsWith("http://") || watchUrl.startsWith("https://")) ||
             allowedHost.isEmpty()
@@ -114,7 +114,7 @@ class WebExtractActivity : AppCompatActivity() {
             // true = host tujuan sama dengan halaman awal ( challenge
             // Cloudflare/redirect login selalu satu host, jadi ini cukup).
             fun isAllowedTarget(url: String): Boolean =
-                runCatching { Uri.parse(url) }.getOrNull()?.host == allowedHost
+                runCatching { url.toUri() }.getOrNull()?.host == allowedHost
 
             // Signature lama melayani API 21-23; versi request melayani 24+.
             // Blokir navigasi keluar host (iklan/redirect): ekstraksi cukup

@@ -433,8 +433,8 @@ class SettingsActivity : AppCompatActivity() {
         // Status harus kentara tanpa mengandalkan warna saja: ON = tombol terisi
         // + label "ON", OFF = tombol tonal + label "OFF", plus ikon ujung.
         val state = getString(if (on) R.string.settings_badge_on else R.string.settings_badge_off)
-        btn.text = "$label \u2014 $state"
-        btn.contentDescription = "$label: $state"
+        btn.text = getString(R.string.settings_toggle_state, label, state)
+        btn.contentDescription = getString(R.string.settings_toggle_state_desc, label, state)
         if (on) {
             btn.setBackgroundResource(R.drawable.bg_btn_filled)
             btn.setTextColor(ContextCompat.getColor(this, R.color.white))

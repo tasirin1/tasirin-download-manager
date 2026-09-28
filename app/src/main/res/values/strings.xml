@@ -22,6 +22,8 @@
     <string name="save_fab_label">Save</string>
     <string name="settings_badge_on">ON</string>
     <string name="settings_badge_off">OFF</string>
+    <string name="settings_toggle_state">%1$s — %2$s</string>
+    <string name="settings_toggle_state_desc">%1$s: %2$s</string>
 
     <string name="update_check">Check for Updates</string>
     <string name="update_checking">Checking for updates&#8230;</string>

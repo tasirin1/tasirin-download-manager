@@ -575,7 +575,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 // Section pemilihan foto carousel
                 if (hasPhotos) {
                     val photoLabels = if (socialPhotoOptions.size > 1) {
-                        listOf(String.format(getString(R.string.social_carousel_all), socialPhotoOptions.size)) +
+                        listOf(getString(R.string.social_carousel_all, socialPhotoOptions.size)) +
                             socialPhotoOptions.mapIndexed { i, opt ->
                                 val label = opt.quality.takeIf { it.isNotBlank() }
                                     ?: opt.mimeType.takeIf { it.isNotBlank() }
