@@ -53,8 +53,7 @@ object CrashLog {
                         // bisa membelah karakter UTF-8 multi-byte dan baris.
                         // Batas newline (0x0A ASCII) selalu aman untuk UTF-8.
                         var start = 0
-                        while (start < buf.size && buf[start] != '
-'.code.toByte()) start++
+                        while (start < buf.size && buf[start] != '\n'.code.toByte()) start++
                         if (start < buf.size) start++
                         val keep = buf.size - start
                         raf.setLength(keep.toLong())
