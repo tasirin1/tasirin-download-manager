@@ -59,14 +59,15 @@ object ZipCreator {
         return out.toString()
     }
 
+    // isFileAllowed wajib terakhir agar trailing lambda tetap jalan.
     fun zipFile(
         zos: ZipOutputStream,
         file: File,
         prefix: String,
         depth: Int = 0,
         seen: MutableSet<String> = mutableSetOf(),
-        isFileAllowed: (String) -> Boolean,
-        budget: ZipBudget = ZipBudget()
+        budget: ZipBudget = ZipBudget(),
+        isFileAllowed: (String) -> Boolean
     ) {
         // Izin dicek terhadap canonical path: symlink file di dalam root
         // yang menunjuk ke luar root lolos bila hanya absolutePath (lokasi
@@ -93,7 +94,7 @@ object ZipCreator {
                 Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
             ).forEach { child ->
                 if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
-                zipFile(zos, child, entryPath, depth + 1, seen, isFileAllowed, budget)
+                zipFile(zos, child, entryPath, depth + 1, seen, budget, isFileAllowed)
             }
         } else if (file.isFile) {
             runCatching {
