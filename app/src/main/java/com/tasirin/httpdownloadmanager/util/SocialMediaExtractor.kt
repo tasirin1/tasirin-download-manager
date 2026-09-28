@@ -5,12 +5,36 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
+import android.content.Context
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.io.InputStream
+import javax.net.ssl.HttpsURLConnection
 
 object SocialMediaExtractor {
+
+    /** Context aplikasi untuk trust anchor tambahan (Sectigo R46 dkk) pada
+     *  API 21-23 yang mengabaikan network-security-config. Diisi sekali dari
+     *  [App.onCreate] / [DownloadEngine]; null = pakai trust bawaan sistem. */
+    @Volatile
+    private var appContext: Context? = null
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /** Buka koneksi HTTP; untuk HTTPS terapkan trust anchor bundle bila ada
+     *  context (tanpa ini halaman watch + API di perangkat lama / root
+     *  Sectigo hilang gagal dengan Trust anchor not found). */
+    private fun openTlsConn(urlStr: String): HttpURLConnection {
+        val conn = URL(urlStr).openConnection() as HttpURLConnection
+        val ctx = appContext
+        if (ctx != null && conn is HttpsURLConnection) {
+            runCatching { TlsCompat.apply(conn, ctx) }
+        }
+        return conn
+    }
 
     /** Batas total waktu ekstraksi media sosial (ms). */
     private const val EXTRACT_TOTAL_TIMEOUT_MS = 60_000L
@@ -806,7 +830,7 @@ object SocialMediaExtractor {
 
     private fun isUrlForbidden(item: Result): Boolean {
         return runCatching {
-            val conn = URL(item.directUrl).openConnection() as HttpURLConnection
+            val conn = openTlsConn(item.directUrl)
             try {
                 conn.requestMethod = "HEAD"
                 conn.connectTimeout = 6000
@@ -929,7 +953,7 @@ object SocialMediaExtractor {
         var current = start
         for (i in 0 until 6) {
             runCatching {
-                val conn = URL(current).openConnection() as HttpURLConnection
+                val conn = openTlsConn(current)
                 try {
                     conn.instanceFollowRedirects = false
                     conn.connectTimeout = 4000
@@ -1345,7 +1369,7 @@ object SocialMediaExtractor {
         var current = urlStr
         var activeHeaders = headers
         repeat(6) {
-            val conn = URL(current).openConnection() as HttpURLConnection
+            val conn = openTlsConn(current)
             try {
                 conn.connectTimeout = timeoutMs
                 conn.readTimeout = timeoutMs
@@ -1396,7 +1420,7 @@ object SocialMediaExtractor {
         var payload: ByteArray? = body.toByteArray(Charsets.UTF_8)
         var activeHeaders = headers
         repeat(6) {
-            val conn = URL(current).openConnection() as HttpURLConnection
+            val conn = openTlsConn(current)
             try {
                 conn.requestMethod = method
                 conn.connectTimeout = timeoutMs

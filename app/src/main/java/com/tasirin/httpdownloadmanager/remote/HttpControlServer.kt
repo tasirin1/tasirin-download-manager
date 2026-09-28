@@ -2763,16 +2763,24 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             StoragePrefs.isFsFullAccessEnabled(context)
         )
 
-    /** URI konten hanya sah bila berasal dari MediaStore Download (area aplikasi)
-     *  atau dokumen SAF yang memang diberi izin oleh pengguna. */
+    /** URI konten hanya sah bila berasal dari MediaStore (koleksi video yang
+     *  sama dengan yang ditampilkan galeri) atau dokumen SAF yang memang diberi
+     *  izin oleh pengguna. Batasan top-folder lama (Download/Pictures/Movies/
+     *  DCIM) dihapus: galeri memindai SEMUA video MediaStore sehingga thumb/
+     *  media video di folder lain (ScreenRecordings, WhatsApp, Telegram, ...)
+     *  selalu 404 walau daftarnya tampil. Endpoint ini sudah di belakang
+     *  login PIN ([pinOk]), jadi menyajikan video yang memang terdaftar di
+     *  galeri adalah perilaku yang benar. */
     private fun isMediaUriAllowed(uri: Uri): Boolean {
         return runCatching {
             when (uri.authority) {
                 MediaStore.AUTHORITY -> {
                     if (Build.VERSION.SDK_INT >= 29) {
-                        val rel = mediaStoreRelativePath(uri) ?: return@runCatching false
-                        val top = rel.trim('/').substringBefore('/')
-                        top == "Download" || top == "Pictures" || top == "Movies" || top == "DCIM"
+                        // URI ada (RELATIVE_PATH terbaca) = entri MediaStore valid.
+                        // Koleksi video boleh di folder mana pun; validasi baca
+                        // penuh tetap malas saat serve/thumbnail (openInputStream
+                        // gagal -> notFound + invalidasi cache galeri).
+                        mediaStoreRelativePath(uri) != null
                     } else {
                         // Di bawah API 29 MediaStore.Downloads belum ada; file sah
                         // aplikasi disimpan lewat path/SAF. Token u: MediaStore

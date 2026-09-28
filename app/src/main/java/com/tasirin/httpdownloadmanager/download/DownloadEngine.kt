@@ -72,6 +72,7 @@ class DownloadEngine(appContext: Context) {
     // Application context saja, jangan pernah Activity (anti-leak).
     @SuppressLint("StaticFieldLeak")
     private val context: Context = appContext.applicationContext
+        .also { SocialMediaExtractor.init(it) }
     private val fileSaver by lazy { FileSaver(context) }
 
     // Cookie manager in-memory: store per-host cookies so subsequent requests

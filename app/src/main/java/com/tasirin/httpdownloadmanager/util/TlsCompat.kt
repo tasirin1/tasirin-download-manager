@@ -15,13 +15,20 @@ import javax.net.ssl.X509TrustManager
 /**
  * Android 6-7 tidak menyimpan root CA Let's Encrypt (ISRG Root X1) dan beberapa
  * root modern lain, jadi HTTPS ke GitHub (release-assets, api, dll) gagal dengan
- * "Trust anchor for certification path not found". Util ini menambah root CA
- * yang di-bundle sebagai anchor tambahan. Hostname verification tetap aktif —
- * hanya menambah trust anchor, tidak menonaktifkan verifikasi apa pun.
+ * "Trust anchor for certification path not found". CDN XVideos/XNXX memakai rantai
+ * Sectigo R46 yang juga belum ada di sebagian perangkat (termasuk yang dimatikan
+ * manual di Trusted credentials), sehingga unduhan gagal dengan error yang sama.
+ * Util ini menambah root CA yang di-bundle sebagai anchor tambahan. Hostname
+ * verification tetap aktif — hanya menambah trust anchor, tidak menonaktifkan
+ * verifikasi apa pun.
  */
 object TlsCompat {
 
-    private val EXTRA_ROOTS = listOf(R.raw.isrg_root_x1, R.raw.digicert_global_root_g2)
+    private val EXTRA_ROOTS = listOf(
+        R.raw.isrg_root_x1,
+        R.raw.digicert_global_root_g2,
+        R.raw.sectigo_public_server_auth_root_r46
+    )
 
     @Volatile
     private var sslContext: SSLContext? = null

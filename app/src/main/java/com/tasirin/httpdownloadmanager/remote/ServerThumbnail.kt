@@ -132,8 +132,18 @@ private fun isThumbSourceAllowed(
         }
         raw.startsWith("u:") -> {
             val uri = raw.substring(2).toUri()
-            isMediaUriAllowed(uri) &&
-                MediaLibrary.mediaKind(DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()) == "video"
+            if (!isMediaUriAllowed(uri)) return false
+            var name = DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()
+            if (name.isBlank()) {
+                name = runCatching {
+                    ctx.contentResolver.query(
+                        uri,
+                        arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME),
+                        null, null, null
+                    )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                }.getOrNull().orEmpty()
+            }
+            MediaLibrary.mediaKind(name) == "video"
         }
         else -> false
     }
@@ -156,7 +166,19 @@ internal fun generateThumb(
             raw.startsWith("u:") -> {
                 val uri = raw.substring(2).toUri()
                 if (!isMediaUriAllowed(uri)) return null
-                val name = DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()
+                // DocumentFile bisa mengembalikan nama kosong untuk URI
+                // MediaStore di sebagian perangkat (thumb selalu 404 walau
+                // video valid): fallback ke kolom DISPLAY_NAME langsung.
+                var name = DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()
+                if (name.isBlank()) {
+                    name = runCatching {
+                        ctx.contentResolver.query(
+                            uri,
+                            arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME),
+                            null, null, null
+                        )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                    }.getOrNull().orEmpty()
+                }
                 if (MediaLibrary.mediaKind(name) != "video") return null
                 videoThumb(ctx, uri = uri)
             }
