@@ -322,31 +322,24 @@ class FileSaver(context: Context) {
         // storage-menipis harus memakai volume tersempit di antaranya,
         // bukan hanya folder teks (volume adopted bisa berbeda-beda).
         var free = freeBytes()
-        free = minOf(
-            free,
-            runCatching { StatFs(appContext.cacheDir.absolutePath).availableBytes }
-                .getOrDefault(0L)
-        )
+        // Stat gagal (volume tak terpasang) jangan meracuni hitungan jadi 0
+        // (semua download ditolak palsu): abaikan volume yang gagal dibaca.
+        runCatching { StatFs(appContext.cacheDir.absolutePath).availableBytes }
+            .getOrNull()?.let { free = minOf(free, it) }
         val textFolder = StoragePrefs.getTextFolder(appContext)
         if (textFolder != null) {
             val dir = File(textFolder)
             if (dir.isDirectory) {
-                free = minOf(
-                    free,
-                    runCatching { StatFs(dir.absolutePath).availableBytes }
-                        .getOrDefault(0L)
-                )
+                runCatching { StatFs(dir.absolutePath).availableBytes }
+                    .getOrNull()?.let { free = minOf(free, it) }
             }
         }
         // Tujuan custom `f:` bisa berada di volume lain (SD card): tanpa ini,
         // guard memakai angka volume internal sehingga lolos saat kartu penuh
         // atau menolak palsu saat internal sempit tapi kartu lega.
         statFsDirForFolderPath(folderPath)?.let { dir ->
-            free = minOf(
-                free,
-                runCatching { StatFs(dir.absolutePath).availableBytes }
-                    .getOrDefault(0L)
-            )
+            runCatching { StatFs(dir.absolutePath).availableBytes }
+                .getOrNull()?.let { free = minOf(free, it) }
         }
         return free
     }
