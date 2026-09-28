@@ -11,7 +11,7 @@ permissions:
 jobs:
   label:
     name: Label otomatis berdasarkan path
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/labeler@v7
         with:
