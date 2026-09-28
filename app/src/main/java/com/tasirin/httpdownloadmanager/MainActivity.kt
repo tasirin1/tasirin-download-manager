@@ -414,6 +414,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     getString(R.string.platform_x)
                 host.contains("xvideos.com") ->
                     getString(R.string.platform_xvideos)
+                host.contains("xnxx.com") || host.contains("xnxxvideos.me") ->
+                    getString(R.string.platform_xnxx)
                 else -> getString(R.string.platform_social)
             }
         }

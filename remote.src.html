@@ -1230,12 +1230,14 @@
   .platform-badge.p-instagram { background: #fdeef6; border-color: #e1306c; color: #c02a5d; }
   .platform-badge.p-x { background: #eef1f4; border-color: #0f1419; color: #1a2029; }
   .platform-badge.p-xvideos { background: #fde8e8; border-color: #c00; color: #a00; }
+  .platform-badge.p-xnxx { background: #e8f1fd; border-color: #06c; color: #05a; }
   .platform-badge.p-social { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
   :root[data-theme="dark"] .platform-badge.p-youtube { background: #3a1220; border-color: #ff3355; color: #ff8099; }
   :root[data-theme="dark"] .platform-badge.p-tiktok { background: #3a1420; border-color: #fe2c55; color: #ff8099; }
   :root[data-theme="dark"] .platform-badge.p-instagram { background: #351526; border-color: #e1306c; color: #ff8ab8; }
   :root[data-theme="dark"] .platform-badge.p-x { background: #1e232b; border-color: #8f9cb8; color: #eef1fb; }
   :root[data-theme="dark"] .platform-badge.p-xvideos { background: #3a1414; border-color: #f66; color: #ffb3b3; }
+  :root[data-theme="dark"] .platform-badge.p-xnxx { background: #14243a; border-color: #66aaff; color: #b3d4ff; }
 
   .sheet-title {
  font-size: 13px; font-weight: 700; color: var(--muted); padding: 6px 8px 10px; word-break: break-word; }
@@ -1313,6 +1315,7 @@
   .social-favicon.p-instagram{background:linear-gradient(135deg,#f58529,#dd2a7b,#8134af,#515bd4);border:1px solid #fff2}
   .social-favicon.p-x{background:#0f1419}
   .social-favicon.p-xvideos{background:#c00}
+  .social-favicon.p-xnxx{background:#06c}
   .toast{display:flex;align-items:center;justify-content:center;gap:8px;animation:toastSlideIn .25s ease}
   .toast-ring{position:relative;width:24px;height:24px;border-radius:50%;background:conic-gradient(rgba(255,255,255,.95) var(--ring,0deg),rgba(255,255,255,.18) 0);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
   .toast-dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;background:#6d7cff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff}
@@ -5364,6 +5367,7 @@ function socialFavicon(url) {
   if (h === 'instagram.com' || h === 'instagr.am') return '<span class="social-favicon p-instagram"></span>';
   if (h === 'twitter.com' || h === 'x.com') return '<span class="social-favicon p-x"></span>';
   if (h === 'xvideos.com' || h === 'm.xvideos.com' || h === 'mobile.xvideos.com') return '<span class="social-favicon p-xvideos"></span>';
+  if (h === 'xnxx.com' || h === 'm.xnxx.com' || h === 'mobile.xnxx.com' || h === 'xnxxvideos.me') return '<span class="social-favicon p-xnxx"></span>';
   return '';
 }
 function fileIcon(name, url) {
@@ -6102,7 +6106,7 @@ function isSocialUrl(u) {
     l.indexOf('instagram.com/tv/') !== -1 || l.indexOf('instagr.am/') !== -1 ||
     l.indexOf('twitter.com/') !== -1 || l.indexOf('x.com/') !== -1 ||
     l.indexOf('youtube.com/') !== -1 || l.indexOf('youtu.be/') !== -1 ||
-    l.indexOf('xvideos.com/') !== -1;
+    l.indexOf('xvideos.com/') !== -1 || l.indexOf('xnxx.com/') !== -1 || l.indexOf('xnxxvideos.me/') !== -1;
 }
 
 function socialPlatformLabel(u) {
@@ -6111,6 +6115,7 @@ function socialPlatformLabel(u) {
   if (u.indexOf('instagram.com') !== -1 || u.indexOf('instagr.am') !== -1) return 'Instagram';
   if (u.indexOf('twitter.com') !== -1 || u.indexOf('x.com') !== -1) return 'X';
   if (u.indexOf('xvideos.com/') !== -1) return 'XVideos';
+  if (u.indexOf('xnxx.com/') !== -1 || u.indexOf('xnxxvideos.me/') !== -1) return 'XNXX';
   return 'Social media';
 }
 function platformBadgeKey(label) {
@@ -6119,6 +6124,7 @@ function platformBadgeKey(label) {
   if (label === 'Instagram') return 'p-instagram';
   if (label === 'X') return 'p-x';
   if (label === 'XVideos') return 'p-xvideos';
+  if (label === 'XNXX') return 'p-xnxx';
   return 'p-social';
 }
 function platformBadgeIcon(label) {
@@ -6127,6 +6133,7 @@ function platformBadgeIcon(label) {
   if (label === 'Instagram') return '\ud83d\udcf8';
   if (label === 'X') return '\ud835\udd4f';
   if (label === 'XVideos') return '\u25b6';
+  if (label === 'XNXX') return '\u25b6';
   return '\ud83c\udf10';
 }
 function setPlatformBadge(u) {

@@ -81,6 +81,29 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `isSocialMediaUrl - xnxx terdeteksi`() {
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.xnxx.com/video-abc/judul"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://m.xnxx.com/video-abc/judul"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.xnxxvideos.me/video-abc/judul"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://notxnxx.com/video/123"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://xnxx.com"))
+    }
+
+    @Test
+    fun `parseXnxxPage - prefix XNXX dan suffix judul`() {
+        val html = "<html><head><title>Great video - XNXX.COM</title></head><body>" +
+            "<script>html5player.setVideoUrlHigh('https://cdn.xnxx-cdn.com/high.mp4');" +
+            "html5player.setVideoUrlLow('https://cdn.xnxx-cdn.com/low.mp4');</script></body></html>"
+        val opts = SocialMediaExtractor.parseXnxxPage(html)
+        assertEquals(2, opts.size)
+        assertEquals("Great video", opts[0].title)
+        assertTrue(opts[0].fileName!!.startsWith("XNXX_"))
+        assertTrue(opts[0].fileName!!.endsWith("_HD.mp4"))
+        assertEquals("HD", opts[0].quality)
+        assertEquals("SD", opts[1].quality)
+    }
+
+    @Test
     fun `parseXVideosPage - high low hls`() {
         val html = "<html><head><title>Cool video - XVIDEOS.COM</title></head><body>" +
             "<script>html5player.setVideoTitle('Cool video');" +
