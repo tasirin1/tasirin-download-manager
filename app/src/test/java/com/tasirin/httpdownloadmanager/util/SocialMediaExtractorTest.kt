@@ -266,7 +266,29 @@ class SocialMediaExtractorTest {
     }
 
     @Test
-    fun `parsePornhubPage - quality tanpa kutip dan ber-akhiran p`() {
+    fun `parsePornhubPage - quality angka tanpa kutip`() {
+        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
+            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":480}]}" +
+            "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(1, opts.size)
+        assertTrue(opts[0].directUrl.endsWith("a.mp4"))
+        assertEquals("480p", opts[0].quality)
+    }
+
+    @Test
+    fun `parsePornhubPage - quality ber-akhiran p`() {
+        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
+            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/b.mp4\",\"quality\":\"720p\"}]}" +
+            "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(1, opts.size)
+        assertTrue(opts[0].directUrl.endsWith("b.mp4"))
+        assertEquals("HD", opts[0].quality)
+    }
+
+    @Test
+    fun `parsePornhubPage - quality campuran urut menurun`() {
         val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
             "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":480}," +
             "{\"videoUrl\":\"https://cdn.ph.com/b.mp4\",\"quality\":\"720p\"}]}" +

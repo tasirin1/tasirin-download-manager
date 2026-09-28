@@ -75,7 +75,7 @@ object SocialMediaExtractor {
     private val HP_OG_VIDEO_RE = Regex("""<meta[^>]+property\s*=\s*["']og:video["'][^>]+content\s*=\s*["'](https?://[^"']+)["']""")
     private val HP_OG_TITLE_RE = Regex("""<meta[^>]+property\s*=\s*["']og:title["'][^>]+content\s*=\s*["'](.+?)["']""")
     private val HP_TITLE_TAG_RE = Regex("""<title>(.+?)</title>""")
-    private val PH_MEDIA_DEF_RE = Regex("\"videoUrl\"\\s*:\\s*\"(https?:[^\"]+)\"[^}]*?\"quality\"\\s*:\\s*\"?(\\d+)p?\"")
+    private val PH_MEDIA_DEF_RE = Regex("\"videoUrl\"\\s*:\\s*\"(https?:[^\"]+)\"[^}]*?\"quality\"\\s*:\\s*\"?(\\d+)")
     private val PH_FLASHVARS_Q_RE = Regex("\"quality_(\\d+)p\"\\s*:\\s*\"(https?:[^\"]+)\"")
     private val PH_VIDEO_URL_RE = Regex("\"video_url\"\\s*:\\s*\"(https?:[^\"]+)\"")
     private val HH_VIDEO_TAG_RE = Regex("""<video[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
