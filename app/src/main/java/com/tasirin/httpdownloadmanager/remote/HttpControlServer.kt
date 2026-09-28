@@ -1053,7 +1053,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // nama sah seperti "my..video.mp4" dipertahankan utuh (satu segmen path).
         // Nama tetap divalidasi isFileNameValid: tolak ".", "..", trailing dot/space
         // (tabrakan FAT/SD) dan fallback aman dengan ekstensi dipertahankan.
-        val rawName = session.param("name")?.trim()?.filterNot { it.isISOControl() }?.take(180)
+        // Selain kontrol ISO, buang pemformat arah Unicode (U+200E/F,
+        // U+202A-202E, U+2066-2069): tak terlihat tapi bisa membalik tampilan
+        // nama file (spoofing "video.mp4" yang sebenarnya berekstensi lain).
+        val rawName = session.param("name")?.trim()?.filterNot { c ->
+            c.isISOControl() || c in '\u200E'..'\u200F' || c in '\u202A'..'\u202E' ||
+                c in '\u2066'..'\u2069'
+        }?.take(180)
             ?.replace("/", "_")?.replace("\\", "_")?.replace("\"", "_")
             ?.takeIf { it.isNotEmpty() }
             ?: "upload_${System.currentTimeMillis()}"

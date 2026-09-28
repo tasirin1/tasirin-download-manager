@@ -113,6 +113,7 @@
     <string name="storage_remove_folder">&#10005;</string>
     <string name="storage_text_folder_hint">Folder path (e.g. /sdcard/Download)</string>
     <string name="storage_hint_all_files">&quot;All files access&quot; is only needed for the remote File Manager. Downloads &amp; gallery work without it.</string>
+    <string name="settings_open_system_failed">Failed to open system settings</string>
     <string name="storage_text_folder_invalid">Path is not valid or not a folder</string>
     <string name="storage_text_folder_saved">Folder saved: %1$s</string>
 

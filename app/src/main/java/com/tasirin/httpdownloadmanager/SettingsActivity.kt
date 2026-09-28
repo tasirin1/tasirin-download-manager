@@ -128,7 +128,9 @@ class SettingsActivity : AppCompatActivity() {
             .setTitle(R.string.settings_fs_full_access)
             .setMessage(R.string.storage_hint_all_files)
             .setPositiveButton(R.string.ok) { _, _ ->
-                Permissions.requestAllFilesAccess(this)
+                if (!Permissions.requestAllFilesAccess(this)) {
+                    Toast.makeText(this, R.string.settings_open_system_failed, Toast.LENGTH_LONG).show()
+                }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()

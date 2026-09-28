@@ -51,23 +51,27 @@ object Permissions {
         return false
     }
 
-    /** Buka halaman "All files access" khusus aplikasi (fallback ke daftar umum). */
-    fun requestAllFilesAccess(context: Context) {
-        if (Build.VERSION.SDK_INT < 30) return
+    /** Buka halaman "All files access" khusus aplikasi (fallback ke daftar umum).
+     *  Kembalikan false bila halaman sistem gagal dibuka sama sekali (pemanggil
+     *  wajib memberi tahu user, jangan diam). */
+    fun requestAllFilesAccess(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < 30) return false
         // Tandai niat: auto-aktifkan "Full access to main storage" begitu izin
         // sistem "All files access" benar-benar diberikan (lihat onResume sinkron).
         StoragePrefs.setFullAccessPending(context, true)
-        runCatching {
+        val launched = runCatching {
             context.startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                     "package:${context.packageName}".toUri()
                 )
             )
-        }.onFailure {
-            runCatching {
-                context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-            }
-        }
+            true
+        }.getOrDefault(false) || runCatching {
+            context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            true
+        }.getOrDefault(false)
+        if (!launched) StoragePrefs.setFullAccessPending(context, false)
+        return launched
     }
 }
