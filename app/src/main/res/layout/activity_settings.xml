@@ -357,20 +357,6 @@
                             android:ellipsize="end"
                             android:textSize="13sp" />
 
-                        <Button
-                            android:id="@+id/check_fs_full_access"
-                            style="@style/TvOutlinedButton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:minHeight="40dp"
-                            android:gravity="start|center_vertical"
-                            android:paddingHorizontal="10dp"
-                            android:text="@string/settings_fs_full_access"
-                            android:maxLines="2"
-                            android:ellipsize="end"
-                            android:textSize="13sp" />
-
                     </LinearLayout>
                 </LinearLayout>
 

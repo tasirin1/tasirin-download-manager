@@ -2727,9 +2727,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         roots.add(File(context.filesDir, "downloads"))
         StoragePrefs.getTextFolder(context)?.let { roots.add(File(it)) }
         StoragePrefs.getExtraFolders(context).forEach { roots.add(File(it)) }
-        if (StoragePrefs.isFsFullAccessEnabled(context)) {
-            roots.add(File("/storage/emulated/0"))
-        }
+        // Tanpa MANAGE_EXTERNAL_STORAGE: tidak ada root seluruh storage.
+        // File manager remote hanya folder aplikasi + folder pilihan pengguna.
         if (Build.VERSION.SDK_INT < 29) {
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 ?.let { roots.add(it) }
@@ -2744,9 +2743,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun isRemoteDestinationAllowed(path: String): Boolean {
         if (!ServerSecurity.isRemoteDestinationAllowed(path, allowedFsRoots())) return false
         if (!path.startsWith(MS_PREFIX)) return true
+        // fullAccess=false: path MediaStore wajib di dalam root yang sah.
         return ServerSecurity.isMediaStorePathAllowed(
-            path.removePrefix(MS_PREFIX), allowedFsRoots(),
-            StoragePrefs.isFsFullAccessEnabled(context)
+            path.removePrefix(MS_PREFIX), allowedFsRoots(), false
         )
     }
 
@@ -2754,7 +2753,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         ServerSecurity.isMediaStorePathAllowed(
             relativePath,
             allowedFsRoots(),
-            StoragePrefs.isFsFullAccessEnabled(context)
+            false
         )
 
     /** URI konten hanya sah bila berasal dari MediaStore Download (area aplikasi)
@@ -2794,11 +2793,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return runCatching {
             when (uri.authority) {
                 MediaStore.AUTHORITY -> {
-                    val fullAccess = StoragePrefs.isFsFullAccessEnabled(context)
                     if (Build.VERSION.SDK_INT >= 29) {
                         val relative = mediaStoreRelativePath(uri) ?: return@runCatching false
                         ServerSecurity.isMediaStorePathAllowed(
-                            relative.trim('/'), allowedFsRoots(), fullAccess
+                            relative.trim('/'), allowedFsRoots(), false
                         )
                     } else {
                         val data = mediaStoreData(uri) ?: return@runCatching false

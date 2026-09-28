@@ -12,10 +12,10 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
-    <!-- MANAGE_EXTERNAL_STORAGE sengaja: targetSdk 36 wajib "Akses semua file" (lihat AGENTS.md). -->
-    <uses-permission
-        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
+    <!-- SENGAJA tanpa MANAGE_EXTERNAL_STORAGE: izin "All files access" adalah
+         sinyal PHA terkuat bagi Play Protect pada aplikasi sideload + downloader.
+         File manager remote/server hanya melayani folder aplikasi, folder pilihan
+         pengguna (SAF/teks/ekstra), dan MediaStore — tanpa akses seluruh storage. -->
     <!-- SENGAJA tanpa REQUEST_INSTALL_PACKAGES: aplikasi tidak memicu installer
          APK agar tidak dicurigai Play Protect sebagai dropper. Berkas APK
          dipasang manual oleh pengguna dari file manager. -->

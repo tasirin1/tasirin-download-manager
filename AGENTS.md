@@ -115,11 +115,11 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
 - **Kunci SharedPreferences aktif** (`storage_settings`): `folder_uri`, `folder_name`,
   `text_folder_path`, `extra_folders`, `background_download`, `auto_start_boot`,
   `server_background`, `server_autostart_boot`, `server_port`, `server_pin`,
-  `pin_enforced`, `fs_full_access`, `server_read_only`, `max_concurrent`, `segments`,
+  `pin_enforced`, `server_read_only`, `max_concurrent`, `segments`,
   `speed_limit_kbps`, `max_retries`, `connect_timeout_sec`, `read_timeout_sec`,
   `small_first`, `delete_partial_on_cancel`, `recent_urls`, `sort_mode`,
   `auto_sort`, `battery_exempt`, `collapsed_sections`, `thumb_cleanup_last`, `partial_stream_secret`,
-  `server_session_secret`, `file_access_offered`, `fs_full_access_pending`.
+  `server_session_secret`.
   Kunci galeri foto/video terpisah sudah tidak dipakai; scanner galeri sekarang video-only.
 
 ## Keputusan & larangan historis
@@ -229,8 +229,10 @@ kuat dan tanpa diskusi:
    Nilai di `app/build.gradle.kts` (`"1.0"`/`1`) hanya fallback build lokal/debug.
 5. **Jaga kompatibilitas Android 5 (minSdk 21)**: API baru harus punya fallback
    (contoh: `RELATIVE_PATH`, `NetworkCallback`); jangan naikkan minSdk.
-6. **`targetSdk 36`**: storage di Android 11+ wajib `MANAGE_EXTERNAL_STORAGE`
-   ("Akses semua file") — jangan turunkan tanpa strategi storage pengganti.
+6. **`targetSdk 36`**: `MANAGE_EXTERNAL_STORAGE` DILARANG (sinyal PHA terkuat
+   bagi Play Protect pada aplikasi sideload + downloader; dicabut 2026-09-28).
+   Server/file manager hanya melayani folder aplikasi, folder pilihan pengguna
+   (SAF/teks/ekstra), dan MediaStore. Jangan kembalikan tanpa diskusi.
 7. **Remote web = UI utama**: setiap perubahan halaman remote (dan endpoint API)
    harus tetap mobile-first dan ramah D-pad TV; jangan menambah dependensi berat
    (APK tetap kecil); hindari *switch* di remote — pakai tombol biasa.

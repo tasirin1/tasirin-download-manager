@@ -49,8 +49,6 @@ object StoragePrefs {
     private const val KEY_SMALL_FIRST = "small_first"
     private const val KEY_DELETE_PARTIAL_ON_CANCEL = "delete_partial_on_cancel"
     private const val KEY_PIN_ENFORCED = "pin_enforced"
-    private const val KEY_FS_FULL_ACCESS = "fs_full_access"
-    private const val KEY_FS_FULL_ACCESS_PENDING = "fs_full_access_pending"
     private const val KEY_EXTRA_FOLDERS = "extra_folders"
     private const val KEY_CONNECT_TIMEOUT_SEC = "connect_timeout_sec"
     private const val KEY_READ_TIMEOUT_SEC = "read_timeout_sec"
@@ -59,7 +57,6 @@ object StoragePrefs {
     private const val KEY_PARTIAL_STREAM_SECRET = "partial_stream_secret"
     private const val KEY_SERVER_SESSION_SECRET = "server_session_secret"
     private const val KEY_USER_AGENT = "user_agent"
-    private const val KEY_FILE_ACCESS_OFFERED = "file_access_offered"
     private const val KEY_GALLERY_FOLDERS = "gallery_folders"
 
     // Cache set section collapsed: dibaca 4x per emisi StateFlow (buildSections
@@ -273,28 +270,6 @@ object StoragePrefs {
             putBoolean(KEY_PIN_ENFORCED, enabled)
         }
     }
-
-    fun isFsFullAccessEnabled(context: Context): Boolean =
-        prefs(context)
-            .getBoolean(KEY_FS_FULL_ACCESS, false)
-
-    fun setFsFullAccessEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit {
-            putBoolean(KEY_FS_FULL_ACCESS, enabled)
-        }
-    }
-
-    /** true = user baru saja menekan Enable (halaman izin sistem dibuka); dipakai
-     *  untuk auto-aktifkan "Full access to main storage" setelah izin diberikan. */
-    fun isFullAccessPending(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_FS_FULL_ACCESS_PENDING, false)
-
-    fun setFullAccessPending(context: Context, pending: Boolean) {
-        prefs(context).edit {
-            putBoolean(KEY_FS_FULL_ACCESS_PENDING, pending)
-        }
-    }
-
     /** Server remote read-only: upload, ubah file, dan hapus media ditolak. */
     fun isServerReadOnly(context: Context): Boolean =
         prefs(context)
@@ -449,13 +424,6 @@ object StoragePrefs {
     }
 
     /** true = dialog tawaran akses file sudah pernah ditampilkan (sekali saja). */
-    fun isFileAccessOffered(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_FILE_ACCESS_OFFERED, false)
-
-    fun setFileAccessOffered(context: Context, offered: Boolean) {
-        prefs(context).edit { putBoolean(KEY_FILE_ACCESS_OFFERED, offered) }
-    }
-
     /** Folder yang disertakan di galeri (path absolut, e.g. "/storage/emulated/0/DCIM/Camera").
      *  String kosong = semua folder (default). Disimpan sebagai baris per folder. */
     fun getGalleryFolders(context: Context): List<String> =

@@ -113,25 +113,8 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (Permissions.syncFullAccessAfterGrant(this)) {
-            runCatching { App.httpServer.invalidateFsRootsCache() }
-        }
         renderServer()
         renderChecks()
-    }
-
-    /** Dialog penjelasan sebelum membuka halaman izin "All files access" sistem:
-     *  justifikasi harus kontekstual (saat pengguna meminta fitur file manager),
-     *  bukan prompt otomatis saat aplikasi dibuka (pola yang dicurigai Play Protect). */
-    private fun offerSystemAllFilesAccess() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.settings_fs_full_access)
-            .setMessage(R.string.storage_hint_all_files)
-            .setPositiveButton(R.string.ok) { _, _ ->
-                Permissions.requestAllFilesAccess(this)
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     /** Seksi kartu yang bisa dilipat (state disimpan di StoragePrefs). */
@@ -319,21 +302,16 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun renderServer() {
         val server = App.httpServer
-        binding.storageBtn.visibility = when {
-            Build.VERSION.SDK_INT >= 30 -> if (Permissions.needsAllFilesAccess(this))
-                View.VISIBLE else View.GONE
-            Build.VERSION.SDK_INT >= 23 ->
-                if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
-                        PackageManager.PERMISSION_GRANTED
-                ) View.VISIBLE else View.GONE
-            else -> View.GONE
-        }
+        // Tanpa MANAGE_EXTERNAL_STORAGE: tombol hanya relevan di Android 6-10
+        // yang belum memberi WRITE_EXTERNAL_STORAGE (Android 11+ memakai
+        // MediaStore/SAF/folder pilihan tanpa izin khusus).
+        binding.storageBtn.visibility =
+            if (Build.VERSION.SDK_INT in 23..29 &&
+                checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                    PackageManager.PERMISSION_GRANTED
+            ) View.VISIBLE else View.GONE
         binding.storageBtn.setOnClickListener {
-            if (Build.VERSION.SDK_INT >= 30) {
-                offerSystemAllFilesAccess()
-            } else {
-                requestPermissionsIfNeeded()
-            }
+            requestPermissionsIfNeeded()
         }
         binding.serverSwitch.text = getString(
             if (server.isAlive) R.string.server_stop else R.string.server_start
@@ -463,11 +441,6 @@ class SettingsActivity : AppCompatActivity() {
             getString(R.string.settings_server_read_only)
         )
         renderToggle(
-            binding.checkFsFullAccess,
-            StoragePrefs.isFsFullAccessEnabled(this),
-            getString(R.string.settings_fs_full_access)
-        )
-        renderToggle(
             binding.checkBackground,
             StoragePrefs.isBackgroundEnabled(this),
             getString(R.string.settings_background)
@@ -522,23 +495,6 @@ class SettingsActivity : AppCompatActivity() {
                         renderServer()
                     }
                 }
-            }
-            renderChecks()
-        }
-        binding.checkFsFullAccess.setOnClickListener {
-            if (!StoragePrefs.isFsFullAccessEnabled(this)) {
-                // Menyalakan butuh izin sistem di Android 11+: jelaskan dulu,
-                // lalu minta izin; pref aktif otomatis saat kembali dari
-                // halaman izin bila pengguna menyetujui (lihat onResume).
-                if (Permissions.needsAllFilesAccess(this)) {
-                    offerSystemAllFilesAccess()
-                } else {
-                    StoragePrefs.setFsFullAccessEnabled(this, true)
-                    runCatching { App.httpServer.invalidateFsRootsCache() }
-                }
-            } else {
-                StoragePrefs.setFsFullAccessEnabled(this, false)
-                runCatching { App.httpServer.invalidateFsRootsCache() }
             }
             renderChecks()
         }
