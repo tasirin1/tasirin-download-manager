@@ -33,6 +33,15 @@ object HlsParser {
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
     private val LANGUAGE_RE: Regex = Regex("LANGUAGE=\"([^\"]+)\"")
 
+    /** True bila body adalah media playlist HLS (daftar segmen langsung),
+     *  bukan master playlist: tidak ada STREAM-INF tapi ada tag media/segmen.
+     *  Murni; dipakai probe agar playlist single-quality tidak disangka
+     *  "bukan HLS" (null) melainkan "HLS tanpa pilihan kualitas" (kosong). */
+    fun isMediaPlaylist(body: String): Boolean {
+        if (body.contains("#EXT-X-STREAM-INF")) return false
+        return body.contains("#EXTINF") || body.contains("#EXT-X-TARGETDURATION")
+    }
+
     /** Parse isi master playlist. baseUrl dipakai untuk melengkapi URL varian
      *  yang relatif. Hasil diurutkan menurun menurut bandwidth. */
     fun parseMaster(body: String, baseUrl: String): List<HlsVariant>? {

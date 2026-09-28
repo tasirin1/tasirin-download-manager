@@ -316,7 +316,7 @@ class FileSaver(context: Context) {
         StatFs(downloadDir.absolutePath).availableBytes
     }.getOrDefault(0L)
 
-    fun destinationFreeBytes(): Long {
+    fun destinationFreeBytes(folderPath: String = ""): Long {
         // Partial download ditulis di downloadDir internal dan tmp upload di
         // cacheDir; folder teks hanya salah satu tujuan publish. Guard
         // storage-menipis harus memakai volume tersempit di antaranya,
@@ -337,6 +337,16 @@ class FileSaver(context: Context) {
                         .getOrDefault(0L)
                 )
             }
+        }
+        // Tujuan custom `f:` bisa berada di volume lain (SD card): tanpa ini,
+        // guard memakai angka volume internal sehingga lolos saat kartu penuh
+        // atau menolak palsu saat internal sempit tapi kartu lega.
+        statFsDirForFolderPath(folderPath)?.let { dir ->
+            free = minOf(
+                free,
+                runCatching { StatFs(dir.absolutePath).availableBytes }
+                    .getOrDefault(0L)
+            )
         }
         return free
     }
@@ -690,4 +700,19 @@ class FileSaver(context: Context) {
         }
     }
 
+}
+
+/** Direktori untuk StatFs bila tujuan custom berupa path file: pakai direktori
+ *  itu bila ada, kalau tidak naik ke induk terdekat yang ada (satu filesystem
+ *  yang sama). Kosong / `m:` (MediaStore) / SAF / relatif -> null = pakai
+ *  volume default. StatFs hanya membaca, jadi traversal tak relevan di sini.
+ *  Murni JVM agar bisa di-unit-test. */
+internal fun statFsDirForFolderPath(folderPath: String): java.io.File? {
+    val clean = folderPath.trim().removePrefix("f:").trim()
+    if (clean.isEmpty() || clean.startsWith("m:")) return null
+    val dir = java.io.File(clean)
+    if (!dir.isAbsolute) return null
+    var cur: java.io.File? = dir
+    while (cur != null && !cur.exists()) cur = cur.parentFile
+    return cur?.takeIf { it.isDirectory }
 }

@@ -12,12 +12,51 @@ object ServerSecurity {
     private val UPLOAD_ID_RE = Regex("^[A-Za-z0-9_-]{8,64}$")
 
     /** Aksi POST dari remote wajib lewat fetch/XHR; header ini memaksa
-     *  request lintas situs melewati preflight CORS sebelum sampai server. */
+     *  request lintas situs melewati preflight CORS sebelum sampai server.
+     *  GET pembuat ZIP juga dijaga: file ZIP ditulis ke disk (efek samping),
+     *  sehingga tanpa header ini bisa dipicu CSRF via tag img/media. */
     fun isStateChangeAllowed(method: String, uri: String, requestedWith: String?): Boolean {
-        if (!method.equals("POST", ignoreCase = true)) return true
-        if (uri == "/api/login") return true
-        return requestedWith == "XMLHttpRequest"
+        if (method.equals("POST", ignoreCase = true)) {
+            if (uri == "/api/login") return true
+            return requestedWith == "XMLHttpRequest"
+        }
+        if (method.equals("GET", ignoreCase = true) && isHeaderRequiredGetUri(uri)) {
+            return requestedWith == "XMLHttpRequest"
+        }
+        return true
     }
+
+    /** GET yang wajib membawa header XHR: pembuat ZIP (efek samping disk) dan
+     *  penerbit token unduh ZIP (tanpanya CSRF bisa mencetak token — walau
+     *  token tak bisa dibaca lintas-origin tanpa CORS, tolak sejak awal). */
+    fun isHeaderRequiredGetUri(uri: String): Boolean {
+        val path = uri.substringBefore('?').trimEnd('/')
+        return isZipSideEffectUri(uri) || path == "/api/zip_token"
+    }
+
+    /** Endpoint GET yang menulis file ZIP ke cache disk. */
+    fun isZipSideEffectUri(uri: String): Boolean {
+        val path = uri.substringBefore('?').trimEnd('/')
+        return path == "/api/fs_zip" || path == "/api/media_zip"
+    }
+
+    /** Redaksi secret pada query untuk log request: token sesi/media, PIN,
+     *  token verifikasi upload, token unduh ZIP, dan kredensial generik
+     *  disamarkan; ID item/upload bukan rahasia sehingga tetap tampil agar
+     *  log bisa dikorelasikan saat debug. Delimiter wajib ([?&] atau awal):
+     *  versi lama opsional sehingga `mytoken=x` ikut teredaksi. */
+    private val LOG_SECRET_RE =
+        Regex("(^|[?&])((?:token|pin|verify|zt|password|secret|auth)=)[^&]*", RegexOption.IGNORE_CASE)
+
+    fun redactQueryForLog(query: String?): String {
+        if (query.isNullOrEmpty()) return ""
+        return "?" + LOG_SECRET_RE.replace(query.trimStart('?'), "$1$2<redacted>")
+    }
+
+    /** True bila salah satu segmen path adalah ".." (traversal), tanpa menolak
+     *  nama sah yang hanya mengandung titik ganda seperti "my..video". */
+    fun containsTraversalSegment(path: String): Boolean =
+        path.split('/').any { it.trim() == ".." }
 
     /** ID internal upload hanya boleh token aman; larang separator dan traversal. */
     fun isUploadIdAllowed(id: String): Boolean = UPLOAD_ID_RE.matches(id)

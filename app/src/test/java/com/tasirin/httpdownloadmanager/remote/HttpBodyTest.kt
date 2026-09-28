@@ -14,4 +14,15 @@ class HttpBodyTest {
         assertFalse(isChunkedBody(mapOf("content-length" to "100")))
         assertFalse(isChunkedBody(emptyMap()))
     }
+
+    @Test
+    fun `unsafe multipart ditolak sebelum parseBody`() {
+        // Negatif = invalid; nol + chunked = tmp tanpa batas sampai EOF.
+        assertTrue(isUnsafeMultipartLength(-5, emptyMap()))
+        assertTrue(isUnsafeMultipartLength(0, mapOf("transfer-encoding" to "chunked")))
+        // Nol non-chunked (form kosong) dan panjang valid tetap diproses.
+        assertFalse(isUnsafeMultipartLength(0, emptyMap()))
+        assertFalse(isUnsafeMultipartLength(0, mapOf("content-length" to "0")))
+        assertFalse(isUnsafeMultipartLength(100, emptyMap()))
+    }
 }

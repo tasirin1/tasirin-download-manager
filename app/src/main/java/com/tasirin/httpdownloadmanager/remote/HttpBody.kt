@@ -16,6 +16,13 @@ internal class BodyTooLargeException : IOException("Request body too large")
  *  muka, jadi pemanggil tak boleh mengasumsikan body sudah habis (desync
  *  keep-alive) atau mengabaikannya diam-diam (form terpotong). Murni agar
  *  bisa di-unit-test tanpa sesi HTTP. */
+/** Panjang body multipart yang tak boleh masuk parseBody: negatif berarti
+ *  invalid, nol + chunked berarti tmp tanpa batas sampai EOF (DoS disk).
+ *  Nol non-chunked (form kosong) tetap diproses seperti sebelumnya.
+ *  Murni agar bisa di-unit-test tanpa sesi HTTP. */
+internal fun isUnsafeMultipartLength(declared: Long, headers: Map<String, String>): Boolean =
+    declared < 0 || (declared == 0L && isChunkedBody(headers))
+
 internal fun isChunkedBody(headers: Map<String, String>): Boolean {
     val encoding = headers.entries
         .firstOrNull { it.key.equals("transfer-encoding", ignoreCase = true) }
@@ -35,6 +42,14 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
         // parseBody NanoHTTPD menulis file tmp tanpa batas internal — tolak
         // sejak awal bila Content-Length deklarasi melebihi batas form.
         val declared = session.headers["content-length"]?.toLongOrNull() ?: 0L
+        if (isUnsafeMultipartLength(declared, session.headers)) {
+            // Tanpa Content-Length valid (negatif/chunked), parseBody menyedot
+            // body sampai EOF ke tmp tanpa batas: POST chunked raksasa ke
+            // /api/login (pra-auth) bisa memenuhi disk sebelum cek ukuran tmp
+            // di bawah berjalan. Tolak eksplisit seperti cabang urlencoded.
+            if (declared < 0) throw IOException("Invalid content length")
+            throw BodyTooLargeException()
+        }
         if (declared > MAX_BODY_SIZE) throw BodyTooLargeException()
         // parseBody melempar saat body rusak/terpotong: teruskan sebagai
         // IOException agar pemanggil menutup koneksi, bukan diam-diam memakai

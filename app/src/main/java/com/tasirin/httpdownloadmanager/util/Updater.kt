@@ -30,11 +30,11 @@ object Updater {
     private const val UA = "TasirinDownloadManager"
 
     fun checkLatest(context: Context): UpdateInfo? = runCatching {
-        val body = get(context, LATEST_API) ?: return null
+        val body = get(context, LATEST_API) ?: return loadCached(context)
         val json = JSONObject(body)
         val tag = json.optString("tag_name")
         val page = json.optString("html_url")
-        val assets = json.optJSONArray("assets") ?: return null
+        val assets = json.optJSONArray("assets") ?: return loadCached(context)
         var best: UpdateInfo? = null
         for (i in 0 until assets.length()) {
             val a = assets.optJSONObject(i) ?: continue
@@ -46,8 +46,9 @@ object Updater {
             val info = UpdateInfo(code, tag, url, a.optLong("size"), page)
             if (best == null || code > best.versionCode) best = info
         }
-        best
-    }.getOrNull()
+        if (best != null) saveCached(context, best)
+        best ?: loadCached(context)
+    }.getOrNull() ?: loadCached(context)
 
     /** Kode versi dari nama asset lawas atau tag rilis.
      *  Murni (tanpa Android) agar bisa di-unit-test; pemanggil wajib
@@ -81,16 +82,69 @@ object Updater {
                     val n = r.read(buf)
                     if (n < 0) break
                     total += n
-                    // Respons releases bisa besar; 512KB cukup untuk cari asset.
-                    // Respons terpotong tidak dikembalikan agar JSON setengah jadi
-                    // tidak salah memilih asset.
-                    if (total > 524_288) return null
+                    // Respons > 512 KB ditolak agar JSON setengah jadi tak salah
+                    // pilih asset; tapi jangan gagal senyap: catat + fallback cache
+                    // agar pengguna tak tertahan di versi lama tanpa jejak.
+                    if (total > 524_288) {
+                        android.util.Log.w(UA, "GitHub releases response > 512KB, using cache")
+                        return loadCachedBody(context)
+                    }
                     sb.append(buf, 0, n)
                 }
-                sb.toString()
+                val raw = sb.toString()
+                runCatching {
+                    // Cap waktu ikut disimpan: fallback oversize tak boleh memakai
+                    // body berumur berminggu-minggu (cache parsed dibatasi 24 jam).
+                    context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit()
+                        .putString("raw", raw.takeLast(524_288))
+                        .putLong("raw_at", System.currentTimeMillis())
+                        .apply()
+                }
+                raw
             }
         } finally {
             conn.disconnect()
         }
+    }.getOrNull()
+
+    private const val CACHE_PREFS = "updater_cache"
+    private const val CACHE_MAX_AGE_MS = 24L * 60 * 60 * 1000
+
+    private fun saveCached(context: Context, info: UpdateInfo) {
+        runCatching {
+            context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit()
+                .putInt("code", info.versionCode)
+                .putString("name", info.versionName)
+                .putString("url", info.apkUrl)
+                .putLong("size", info.apkSize)
+                .putString("page", info.pageUrl)
+                .putLong("at", System.currentTimeMillis())
+                .apply()
+        }
+    }
+
+    private fun loadCached(context: Context): UpdateInfo? = runCatching {
+        val p = context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
+        val at = p.getLong("at", 0L)
+        if (at <= 0L || System.currentTimeMillis() - at > CACHE_MAX_AGE_MS) return null
+        val code = p.getInt("code", 0)
+        val url = p.getString("url", "").orEmpty()
+        if (code <= 0 || !url.startsWith("https://", ignoreCase = true)) return null
+        UpdateInfo(
+            code,
+            p.getString("name", "").orEmpty(),
+            url,
+            p.getLong("size", 0L),
+            p.getString("page", "").orEmpty()
+        )
+    }.getOrNull()
+
+    /** Body mentah terakhir untuk dipakai ulang saat respons baru kebesaran.
+     *  Dibatasi umur yang sama dengan cache parsed agar tak memakai JSON basi. */
+    private fun loadCachedBody(context: Context): String? = runCatching {
+        val p = context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
+        val at = p.getLong("raw_at", 0L)
+        if (at <= 0L || System.currentTimeMillis() - at > CACHE_MAX_AGE_MS) return null
+        p.getString("raw", null)
     }.getOrNull()
 }

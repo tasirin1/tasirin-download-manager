@@ -464,6 +464,9 @@ class DownloadEngine(appContext: Context) {
                 // Baca terbatas: master playlist normal kecil; body raksasa dari
                 // URL nakal tidak boleh dimuat penuh ke memori.
                 val body = conn.inputStream.use { readBounded(it, HLS_PROBE_MAX_BYTES) }
+                // Media playlist (single-quality): HLS valid tanpa pilihan
+                // kualitas — daftar kosong, bukan null (null = bukan HLS).
+                if (HlsParser.isMediaPlaylist(body)) return emptyList()
                 HlsParser.parseMaster(body, conn.url.toString())
             } finally {
                 conn.disconnect()
@@ -731,6 +734,10 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun freeSpaceBytes(): Long = fileSaver.destinationFreeBytes()
+
+    /** Sisa ruang dengan mempertimbangkan volume tujuan aktual (SD card /
+     *  folder custom `f:` bisa beda volume dengan penyimpanan internal). */
+    fun freeSpaceBytesFor(folderPath: String): Long = fileSaver.destinationFreeBytes(folderPath)
 
     fun rename(id: String, newName: String) {
         val item = _items.value.find { it.id == id } ?: return
@@ -1443,11 +1450,11 @@ class DownloadEngine(appContext: Context) {
         // Estimasi dari BANDWIDTH x durasi tersedia sebelum segmen diunduh:
         // tolak awal bila jelas tak muat, bukan ENOSPC di tengah jalan.
         if (plan.estimateTotalBytes > 0 &&
-            saver.freeBytes() < plan.estimateTotalBytes + MIN_FREE_BYTES
+            saver.destinationFreeBytes(item.folderPath) < plan.estimateTotalBytes + MIN_FREE_BYTES
         ) {
             throw IOException(
                 "Not enough storage for HLS: need ~${Formats.bytes(plan.estimateTotalBytes)}, " +
-                    "available ${Formats.bytes(saver.freeBytes())}"
+                    "available ${Formats.bytes(saver.destinationFreeBytes(item.folderPath))}"
             )
         }
 
@@ -2246,10 +2253,10 @@ class DownloadEngine(appContext: Context) {
         // Resume 206: byte terunduh sudah di disk, jadi yang dibutuhkan hanya
         // sisanya (total penuh menolak resume besar yang sebenarnya muat).
         val needBytes = if (code == 206) (total - downloaded).coerceAtLeast(0) else total
-        if (needBytes > 0 && saver.freeBytes() < needBytes) {
+        if (needBytes > 0 && saver.destinationFreeBytes(item.folderPath) < needBytes) {
             throw IOException(
                 "Not enough storage: need ${Formats.bytes(needBytes)}, " +
-                    "available ${Formats.bytes(saver.freeBytes())}"
+                    "available ${Formats.bytes(saver.destinationFreeBytes(item.folderPath))}"
             )
         }
 
@@ -2352,10 +2359,10 @@ class DownloadEngine(appContext: Context) {
             }
             fileName = resolvedName
             segments = createSegments(total)
-            if (total > 0 && saver.freeBytes() < total) {
+            if (total > 0 && saver.destinationFreeBytes(item.folderPath) < total) {
                 throw IOException(
                     "Not enough storage: need ${Formats.bytes(total)}, " +
-                        "available ${Formats.bytes(saver.freeBytes())}"
+                        "available ${Formats.bytes(saver.destinationFreeBytes(item.folderPath))}"
                 )
             }
             updateItem(item.id) {
@@ -2530,19 +2537,38 @@ class DownloadEngine(appContext: Context) {
                     throw IOException("Segment ${segment.index} resumed from byte $segActual, not $segStart")
                 }
             }
+            // Ujung respons tak boleh melebihi yang diminta: server yang
+            // mengirim di luar Range (body lebih panjang) akan korup bila
+            // diserap — loop tulis di bawah dibatasi budget yang sama.
+            // Ujung lebih kecil ditoleransi (kekurangan tertangkap cek
+            // incomplete lalu retry mengisi sisa).
+            val segEnd = segCr?.substringAfter("-")?.substringBefore("/")?.substringBefore(";")
+                ?.trim()?.toLongOrNull()
+            if (!isSegmentEndAllowed(segEnd, segment.end)) {
+                throw IOException("Segment ${segment.index} returned range ending at $segEnd, not ${segment.end}")
+            }
 
             val input = conn.inputStream
             val output = BufferedOutputStream(FileOutputStream(partial, true), BUFFER_SIZE)
             val buffer = ByteArray(BUFFER_SIZE)
             var lastNotify = 0L
             var segIters = 0
+            // Sisa byte yang boleh ditulis untuk segmen ini; server nakal yang
+            // mengabaikan batas akhir Range tak boleh menumpuk byte ekstra ke
+            // file parsial (merge korup lolos verifySize yang membolehkan overrun).
+            var budget = (segment.end - segment.start + 1) - downloaded
             try {
                 while (true) {
                     val read = input.read(buffer)
                     if (read == -1) break
-                    output.write(buffer, 0, read)
-                    downloaded += read
-                    val sharedTotal = addThrottleTotal(id, read.toLong())
+                    val capped = cappedSegmentWrite(read, budget)
+                    if (capped < read) {
+                        throw IOException("Segment ${segment.index} exceeded requested range")
+                    }
+                    output.write(buffer, 0, capped)
+                    downloaded += capped
+                    budget -= capped
+                    val sharedTotal = addThrottleTotal(id, capped.toLong())
                     throttle.sleepIfNeeded { sharedTotal }
                     if ((segIters++ and 7) != 0) continue
                     val now = monotonicNow()
@@ -2980,7 +3006,9 @@ class DownloadEngine(appContext: Context) {
         val noQuery = url.substringBefore('?').substringBefore('#')
         val path = noQuery.toUri().lastPathSegment.orEmpty()
         val candidate = path.trim()
-        if (candidate.isNotEmpty() && !candidate.contains('=')) return candidate
+        // Segmen path seperti "file=123.mp4" adalah nama valid (punya ekstensi);
+        // tolak '=' hanya bila tanpa titik (kunci query nyasar ke path).
+        if (candidate.isNotEmpty() && (!candidate.contains('=') || candidate.contains('.'))) return candidate
         return "download_${(DEFAULT_NAME_FORMAT.get() ?: SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)).format(Date())}"
     }
 
@@ -3076,6 +3104,17 @@ class DownloadEngine(appContext: Context) {
 /** Jam monotonik untuk interval (throttle/watchdog/progres): jam dinding bisa
  *  melompat (NTP/ubah jam manual) dan membuat throttle macet berjam-jam atau
  *  watchdog salah vonis stall. Fallback ke currentTimeMillis di JVM unit test. */
+/** Ujung Content-Range respons segmen valid: tak dikirim (null) atau tidak
+ *  melebihi ujung yang diminta. Murni agar bisa di-unit-test. */
+internal fun isSegmentEndAllowed(returnedEnd: Long?, requestedEnd: Long): Boolean =
+    returnedEnd == null || returnedEnd <= requestedEnd
+
+/** Porsi baca yang boleh ditulis ke file parsial segmen: tak pernah melebihi
+ *  sisa budget Range. Nol/negatif berarti budget habis — pemanggil wajib gagal
+ *  eksplisit, bukan menyerap byte korup. Murni agar bisa di-unit-test. */
+internal fun cappedSegmentWrite(read: Int, budgetLeft: Long): Int =
+    minOf(read.toLong(), budgetLeft.coerceAtLeast(0)).toInt()
+
 internal fun monotonicNow(): Long =
     runCatching { SystemClock.elapsedRealtime() }.getOrDefault(System.currentTimeMillis())
 

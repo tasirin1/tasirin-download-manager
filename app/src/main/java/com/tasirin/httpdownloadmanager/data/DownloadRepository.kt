@@ -31,9 +31,12 @@ class DownloadRepository(context: Context) {
     }
 
     /** Simpan progres kompak (id -> bytes/total) tanpa enkripsi & tanpa detail
-     *  segmen; dipanggil berkala selama download aktif. */
+     *  segmen; dipanggil berkala selama download aktif. Commit sinkron (bukan
+     *  apply): apply async bisa mendarat SETELAH commit snapshot penuh
+     *  (persistItems + remove KEY_PROGRESS) sehingga progres basi menimpa
+     *  data segar saat load. Dipanggil dari thread IO engine, bukan main. */
     fun saveProgress(items: List<DownloadItem>) {
-        prefs.edit {
+        prefs.edit(commit = true) {
             putString(KEY_PROGRESS, DownloadItemCodec.encodeProgress(items))
         }
     }

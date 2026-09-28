@@ -17,6 +17,27 @@ class ServerSecurityTest {
     private fun root(): File = tmp.newFolder("root")
 
     @Test
+    fun zipToken_wajibHeader_tokenUnduhTanpaHeader() {
+        // Penerbit token tak boleh dicetak CSRF tag-img.
+        assertFalse(ServerSecurity.isStateChangeAllowed("GET", "/api/zip_token", null))
+        assertTrue(ServerSecurity.isStateChangeAllowed("GET", "/api/zip_token", "XMLHttpRequest"))
+        // ZIP tetap dijaga seperti sebelumnya.
+        assertFalse(ServerSecurity.isStateChangeAllowed("GET", "/api/fs_zip?path=x", null))
+        assertTrue(ServerSecurity.isHeaderRequiredGetUri("/api/zip_token"))
+        assertTrue(ServerSecurity.isHeaderRequiredGetUri("/api/media_zip"))
+        assertFalse(ServerSecurity.isHeaderRequiredGetUri("/api/downloads"))
+    }
+
+    @Test
+    fun redactQuery_tokenUnduhDisamarkan_substringAman() {
+        // zt ikut disamarkan (token sekali-pakai tak boleh bocor di log).
+        assertEquals("?a=1&zt=<redacted>", ServerSecurity.redactQueryForLog("?a=1&zt=abc123"))
+        // Delimiter wajib: mytoken= bukan nama param.
+        assertEquals("?name=mytoken%3Dx", ServerSecurity.redactQueryForLog("?name=mytoken%3Dx"))
+        assertEquals("?pin=<redacted>", ServerSecurity.redactQueryForLog("pin=1234"))
+    }
+
+    @Test
     fun isStateChangeAllowed_postWajibHeaderKhusus() {
         assertTrue(ServerSecurity.isStateChangeAllowed("GET", "/api/downloads", null))
         assertTrue(ServerSecurity.isStateChangeAllowed("POST", "/api/login", null))

@@ -65,6 +65,48 @@ object SocialMediaExtractor {
     private val YT_PLAYER_RESP_LAX_RE = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""")
     private val YT_VISITOR_DATA_RE = Regex("""VISITOR_DATA"\s*:\s*"([^"]+)""")
     private val YT_VISITOR_DATA_LOW_RE = Regex("""visitorData"\s*:\s*"([^"]+)""")
+    /** Ambil objek JSON `ytInitialPlayerResponse` dengan pencocokan kurung
+     *  seimbang (hormati string '"..."' dan escape): regex malas berhenti di
+     *  kurung tutup pertama sehingga JSON bersarang selalu terpotong. Murni. */
+    internal fun extractBalancedPlayerResponse(pageHtml: String): String? {
+        val key = "ytInitialPlayerResponse"
+        val keyIdx = pageHtml.indexOf(key)
+        if (keyIdx < 0) return null
+        // Jangan cocok prefix identifier lebih panjang (mis. ...ResponseFoo):
+        // pasangan regex di bawah yang menangani kasus ambigu ini.
+        val afterKey = keyIdx + key.length
+        if (afterKey < pageHtml.length) {
+            val c = pageHtml[afterKey]
+            if (c.isLetterOrDigit() || c == '_' || c == '$') return null
+        }
+        val eqIdx = pageHtml.indexOf('=', keyIdx + key.length)
+        if (eqIdx < 0) return null
+        var i = eqIdx + 1
+        while (i < pageHtml.length && pageHtml[i].isWhitespace()) i++
+        if (i >= pageHtml.length || pageHtml[i] != '{') return null
+        var depth = 0
+        var inString = false
+        var escaped = false
+        val start = i
+        while (i < pageHtml.length) {
+            val c = pageHtml[i]
+            if (inString) {
+                if (escaped) escaped = false
+                else if (c == '\\') escaped = true
+                else if (c == '"') inString = false
+            } else {
+                if (c == '"') inString = true
+                else if (c == '{') depth++
+                else if (c == '}') {
+                    depth--
+                    if (depth == 0) return pageHtml.substring(start, i + 1)
+                }
+            }
+            i++
+        }
+        return null
+    }
+
     private val YT_ID_SHORTS_RE = Regex("/shorts/([A-Za-z0-9_-]{11})")
     private val YT_ID_V_RE = Regex("[?&]v=([A-Za-z0-9_-]{11})")
     private val YT_ID_YOUTU_RE = Regex("youtu\\.be/([A-Za-z0-9_-]{11})")
@@ -486,15 +528,15 @@ object SocialMediaExtractor {
         val pageHtml = httpResult.body
         val ytCookies = httpResult.cookies
 
-        val match = YT_PLAYER_RESP_RE
-            .find(pageHtml)
-            ?: YT_PLAYER_RESP_LAX_RE.find(pageHtml)
+        val playerJson = extractBalancedPlayerResponse(pageHtml)
+            ?: YT_PLAYER_RESP_RE.find(pageHtml)?.groupValues?.get(1)
+            ?: YT_PLAYER_RESP_LAX_RE.find(pageHtml)?.groupValues?.get(1)
             ?: run {
                 return emptyList()
             }
 
         try {
-            val data = JSONObject(match.groupValues[1])
+            val data = JSONObject(playerJson)
             val title = data.optString("title", "YouTube_$videoId")
             val streamingData = data.optJSONObject("streamingData") ?: return emptyList()
             // Baca both formats (muxed) AND adaptiveFormats (separate video/audio)

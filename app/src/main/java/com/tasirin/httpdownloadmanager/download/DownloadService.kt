@@ -73,7 +73,9 @@ class DownloadService : Service() {
                         }.map { it.id }.toSet()
                         val membershipChanged = activeIds != lastActiveIds
                         lastActiveIds = activeIds
-                        val now = System.currentTimeMillis()
+                        // Monotonik (bukan wall-clock): perubahan jam sistem maju/mundur
+                        // tak boleh membuat throttle macet lama atau spam refresh.
+                        val now = android.os.SystemClock.elapsedRealtime()
                         if (!membershipChanged && now - lastUiUpdate < 1000) return@runCatching
                         lastUiUpdate = now
                         NotificationHelper.updateNotification(this@DownloadService, items, serverActive)

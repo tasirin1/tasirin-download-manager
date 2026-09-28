@@ -446,7 +446,25 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         fun probeSocialNow() {
             socialJob?.cancel()
             val allUrls = urlInput.text?.toString().orEmpty()
-            val target = extractUrls(allUrls).firstOrNull().orEmpty()
+            val foundUrls = extractUrls(allUrls)
+            // Batch multi-URL: opsi kualitas/audio hanya milik URL pertama bila
+            // di-probe, sehingga spinner menyesatkan untuk URL ke-2 dst.
+            // Sembunyikan semua section sosial agar tiap URL memakai default.
+            if (foundUrls.size > 1) {
+                socialJob = null
+                socialOptions = emptyList()
+                socialVideoOptions = emptyList()
+                socialPhotoOptions = emptyList()
+                socialYoutubeHeights = intArrayOf()
+                socialAudioLanguages = emptyList()
+                socialAudioSection.isVisible = false
+                socialQualitySection.isVisible = false
+                socialCarouselSection.isVisible = false
+                platformBadge.isVisible = false
+                btnWebExtract.isVisible = false
+                return
+            }
+            val target = foundUrls.firstOrNull().orEmpty()
             val isSocial = target.isNotEmpty() && SocialMediaExtractor.isSocialMediaUrl(target)
             if (!isSocial) {
                 socialJob = null
