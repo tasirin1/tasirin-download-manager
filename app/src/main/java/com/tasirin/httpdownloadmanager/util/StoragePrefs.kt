@@ -204,12 +204,11 @@ object StoragePrefs {
         if (PinHash.isModern(stored)) return PinHash.verify(pin, stored)
 
         // Nilai lama dimigrasikan sekali setelah PIN benar, tanpa memaksa logout.
-        // PIN plaintext yang kebetulan 64 char hex ambigu dengan hash lama:
-        // coba cocok hash dulu, lalu cocok plaintext langsung.
+        // Hash yang bocor tidak boleh dipakai sebagai PIN: hanya terima hash
+        // SHA-256 dari input, jangan pernah bandingkan input langsung dengan
+        // nilai tersimpan 64-hex (itu membuat hash menjadi password).
         val expected = normalizePinHash(stored) ?: return false
-        val hashOk = constantEquals(sha256Hex(pin), expected)
-        val plainOk = stored.length == 64 && stored.all { it in HEX_CHARS } && constantEquals(pin, stored)
-        if (!hashOk && !plainOk) return false
+        if (!constantEquals(sha256Hex(pin), expected)) return false
         prefs(context).edit { putString(KEY_SERVER_PIN, PinHash.hash(pin)) }
         return true
     }
@@ -398,7 +397,9 @@ object StoragePrefs {
 
     fun getConnectTimeoutSec(context: Context): Int =
         prefs(context)
-            .getInt(KEY_CONNECT_TIMEOUT_SEC, 15)
+            // Nilai lama/korup (0/hiperbesar) tanpa clamp membuat connect
+            // langsung gagal atau menggantung: fail-closed ke rentang valid.
+            .getInt(KEY_CONNECT_TIMEOUT_SEC, 15).coerceIn(5, 120)
 
     fun setConnectTimeoutSec(context: Context, sec: Int) {
         prefs(context).edit {
@@ -408,7 +409,7 @@ object StoragePrefs {
 
     fun getReadTimeoutSec(context: Context): Int =
         prefs(context)
-            .getInt(KEY_READ_TIMEOUT_SEC, 30)
+            .getInt(KEY_READ_TIMEOUT_SEC, 30).coerceIn(10, 300)
 
     fun setReadTimeoutSec(context: Context, sec: Int) {
         prefs(context).edit {

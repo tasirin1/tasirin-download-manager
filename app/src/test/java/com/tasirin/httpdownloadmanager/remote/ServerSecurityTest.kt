@@ -324,5 +324,8 @@ class ServerSecurityTest {
         assertFalse(ServerSecurity.isFileNameValid(".."))
         assertFalse(ServerSecurity.isFileNameValid("../x.mp4"))
         assertFalse(ServerSecurity.isFileNameValid("..\\x.mp4"))
+        assertFalse(ServerSecurity.isFileNameValid("video."))
+        assertFalse(ServerSecurity.isFileNameValid("video "))
+        assertFalse(ServerSecurity.isFileNameValid("..."))
     }
 }

@@ -146,17 +146,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // dibuat supaya request berikutnya tidak selalu gagal dengan
         // RejectedExecutionException.
         pool.rejectedExecutionHandler =
-            java.util.concurrent.RejectedExecutionHandler { cmd, _ ->
-                synchronized(lifecycleLock) {
-                    if (statPoolEnabled && statPool.isShutdown) statPool = newStatPool()
-                }
-                if (statPoolEnabled) {
-                    // Pakai referensi lokal agar tidak race dengan stopServer().
-                    val active = statPool
-                    if (!active.isShutdown) runCatching { active.execute(cmd) }.onFailure { e ->
-                        runCatching { logError(e) }
-                    }
-                }
+            java.util.concurrent.RejectedExecutionHandler { _, _ ->
+                // Jangan execute ulang di sini: bila pool tetap shutdown,
+                // handler terpanggil rekursif sampai StackOverflow. Buang
+                // tugas + catat; request berikutnya memakai pool baru lewat
+                // liveStatPool() yang auto-heal.
+                runCatching { appendLog("stat task rejected (pool restarting/stopped)") }
             }
         return pool
     }
@@ -198,18 +193,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Kembalikan JSON snapshot cache untuk throttle request. */
     private fun snapshotPayloadCached(): String = lastSnapshotJson
 
-    /** Alamat IP client dari NanoHTTPD session (tanpa port). */
-    private fun clientAddress(session: IHTTPSession): String {
-        val remoteIp = session.remoteIpAddress.orEmpty()
-        // Hanya percaya X-Forwarded-For dari loopback. Klien LAN bisa memalsukan
-        // header ini untuk bypass rate-limit per-IP bila dipercaya.
-        val trustForwarded = remoteIp.startsWith("127.") || remoteIp == "::1"
-        return if (trustForwarded) {
-            session.headers["x-forwarded-for"]?.substringBefore(",")?.trim().orEmpty()
-                .ifEmpty { remoteIp }
-        } else remoteIp
-    }
-
     override fun serve(session: IHTTPSession): Response {
         // NanoHTTPD internal pool bisa terminated saat stop/start server;
         // tangkap RejectedExecutionException supaya tidak crash.
@@ -244,21 +227,32 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 appendRequestLog(session, un, System.currentTimeMillis() - startedAt)
                 return un
             }
-            val ip = clientAddress(session).ifEmpty { "unknown" }
+            // Kunci throttle = IP mentah (bukan X-Forwarded-For): header itu
+            // hanya dipercaya dari loopback sehingga app lokal bisa memutar
+            // nilainya untuk lolos rate-limit; konsisten dengan throttle login.
+            val ip = session.remoteIpAddress.ifEmpty { "unknown" }
             val now = System.currentTimeMillis()
-            val last = snapshotLastHit.getOrDefault(ip, 0L)
-            if (now - last < SNAPSHOT_RATE_MS) {
+            // getOrPut Kotlin tidak atomik di ConcurrentHashMap: dua request
+            // paralel dari IP sama bisa sama-sama lolos throttle. Kunci eksplisit.
+            val throttledPayload: String? = synchronized(snapshotLastHit) {
+                val last = snapshotLastHit.getOrDefault(ip, 0L)
+                if (now - last < SNAPSHOT_RATE_MS) snapshotPayloadCached()
+                else {
+                    snapshotLastHit[ip] = now
+                    null
+                }
+            }
+            if (throttledPayload != null) {
                 // Throttle: kembalikan snapshot cache terakhir tanpa rebuild.
                 val throttled = newFixedLengthResponse(
                     Response.Status.OK,
                     "application/json; charset=utf-8",
-                    snapshotPayloadCached()
+                    throttledPayload
                 )
                 secureHeaders(session.uri, throttled)
                 appendRequestLog(session, throttled, System.currentTimeMillis() - startedAt)
                 return throttled
             }
-            snapshotLastHit[ip] = now
         }
         val response = try {
             when {
@@ -352,9 +346,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             invalidateFsRootsCache()
             invalidateStatusCache()
             statPoolEnabled = true
-            // Bila statPool terminated (stopServer() sebelumnya), buat baru supaya
+            // Bila statPool shutdown (stopServer() sebelumnya), buat baru supaya
             // request pertama setelah restart tidak gagal dengan RejectedExecutionException.
-            if (statPool.isTerminated) statPool = newStatPool()
+            // Pakai isShutdown: pool yang sedang shutdown tapi belum terminated
+            // tetap menolak submit baru.
+            if (statPool.isShutdown) statPool = newStatPool()
         }
         var lastEx: IOException? = null
         for (attempt in 1..3) {
@@ -479,7 +475,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         synchronized(lifecycleLock) {
             periodicCleanupJob?.cancel()
             periodicCleanupJob = null
-            if (!isAlive && statPool.isTerminated) return
+            if (!isAlive && statPool.isShutdown) return
             statPoolEnabled = false
             sseJob?.cancel()
             sseJob = null
@@ -1078,7 +1074,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
             jsonResponse(JSONObject().put("ok", true).put("name", published.fileName ?: finalName)).closeConnection()
         }.getOrElse {
-            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "upload failed")).closeConnection()
+            // Pesan exception bisa memuat path absolut internal: catat penuh di
+            // log server, klien hanya dapat pesan generik.
+            appendLog("UPLOAD single-shot FAILED: ${it.javaClass.simpleName}: ${it.message}")
+            jsonResponse(JSONObject().put("ok", false).put("error", "upload failed")).closeConnection()
         }
     }
 
@@ -1103,7 +1102,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         finalizingUploads[id]?.let {
             return jsonResponse(JSONObject().put("ok", false).put("pending", true).put("name", it))
         }
-        return jsonResponse(JSONObject().put("ok", false))
+        // ID tak dikenal (server restart / entri kedaluwarsa): gagal cepat
+        // dengan pesan jelas, bukan polling buta 5 menit lalu timeout.
+        // Aman: entri hanya di-prune setelah 30 menit, klien poll maks 5 menit.
+        return jsonResponse(
+            JSONObject().put("ok", false)
+                .put("error", "Upload session expired (server restarted?). Please upload again.")
+        )
     }
 
     private fun pruneFsStats() {
@@ -1194,11 +1199,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val resp = jsonResponse(JSONObject().put("ok", true).put("pending", true).put("name", pendingName))
             return if (drained) resp else resp.closeConnection()
         }
-        if (length > MAX_UPLOAD_BYTES) {
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: chunk too large")
+        if (length <= 0 || length > MAX_UPLOAD_BYTES) {
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid chunk length $length")
+            drainBody(session)
             return jsonResponse(
                 JSONObject().put("ok", false)
-                    .put("error", "Chunk too large (max ${MAX_UPLOAD_MB} MB)")
+                    .put("error", "Invalid chunk length (max ${MAX_UPLOAD_MB} MB)")
             ).closeConnection()
         }
         synchronized(uploadBufferReservation) {
@@ -1227,12 +1233,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 chunkIdx, chunks, length
             )
         } finally {
-            // Byte sudah di disk tapi pemindaian cache bisa basi hingga 10 dtk:
-            // pindahkan ke hitungan cache agar tidak undercount (fail-open)
-            // sebelum refresh berikutnya (refresh memutakhirkan dari disk).
+            // Lepas reservasi dan tandai cache basi agar hitungan berikutnya
+            // dipindai ulang dari disk. Jangan tambah length secara buta:
+            // chunk gagal atau retry yang menimpa offset sama tidak menambah
+            // ukuran file di disk sehingga penambahan buta membuat overcount
+            // (upload berikutnya ditolak palsu sampai cache refresh).
             synchronized(uploadBufferReservation) {
                 reservedUploadBytes.addAndGet(-length)
-                cachedUploadBufferBytes += length
+                cachedUploadBufferAt = 0L
             }
         }
     }
@@ -1684,7 +1692,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val uri = item.contentUri.toUri()
             if (!isMediaUriAllowed(uri)) return notFound()
             val resolver = context.contentResolver
-            val rawStream = resolver.openInputStream(uri) ?: return notFound()
+            // URI MediaStore basi (file dihapus di luar app saat kolom DATA null
+            // sehingga lolos scan): openInputStream melempar, bukan null —
+            // jadikan 404 + invalidasi cache galeri agar entri basi hilang saat
+            // daftar dimuat ulang (tanpa probe per-baris saat scan).
+            val rawStream = runCatching { resolver.openInputStream(uri) }.getOrNull()
+                ?: run { invalidateGalleryCache(); return notFound() }
             var len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
             if (len < 0) {
                 len = runCatching {
@@ -1884,7 +1897,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     ?: return notFound()
                 total = descriptor.length
                 val range = parseRange(rangeHeader, total)
-                val stream = PositionedAssetInputStream(descriptor, range?.first ?: 0L)
+                // Konstruktor bisa melempar sebelum stream terpegang (fd tak
+                // valid): descriptor yang sudah terbuka wajib ditutup di sini.
+                val stream = try {
+                    PositionedAssetInputStream(descriptor, range?.first ?: 0L)
+                } catch (e: Exception) {
+                    runCatching { descriptor.close() }
+                    throw e
+                }
                 val meta = cachedMediaMeta(raw)
                 return try {
                     streamMedia(
@@ -1915,7 +1935,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             )
         }
         // Helper murni di ServerSecurity agar clamp/batas tak diduplikasi antar endpoint.
+        // Batas atas: page Int raksasa membuat page*SIZE overflow (negatif)
+        // sehingga halaman pertama terbalas dengan hasMore/total yang salah.
         val page = ServerSecurity.clampGalleryPage(session.param("page"))
+            .coerceAtMost(MediaLibrary.GALLERY_MAX_ENTRIES)
         val start = page * GALLERY_PAGE_SIZE
         val pageEnd = start + GALLERY_PAGE_SIZE
         // Scanner sudah video-only; type=video bukan filter tambahan. Pencarian
@@ -2382,6 +2405,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val destDir = File(dest.removePrefix(FS_PREFIX))
                 if (!destDir.isDirectory || !isFsPathAllowed(destDir.absolutePath)) return false
                 if (file.parentFile?.absolutePath == destDir.absolutePath) return true
+                // Folder tak boleh dipindah ke dalam dirinya sendiri:
+                // copyRecursively rekursi tanpa akhir + sampah dalam.
+                if (file.isDirectory) {
+                    val srcPath = file.absolutePath
+                    val dstPath = File(destDir, FileNames.safe(file.name)).absolutePath
+                    if (dstPath == srcPath || dstPath.startsWith(srcPath + File.separator)) return false
+                }
                 val target = File(destDir, FileNames.safe(file.name))
                 if (target.exists()) return false
                 if (file.renameTo(target)) {
@@ -2390,10 +2420,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     return true
                 }
-                if (!file.isFile) return false
+                // renameTo gagal lintas volume: salin dulu baru hapus sumber.
+                // Direktori disalin rekursif (sebelumnya langsung false).
                 runCatching {
-                    file.copyTo(target, overwrite = false)
-                    file.delete()
+                    try {
+                        if (file.isDirectory) {
+                            file.copyRecursively(target, overwrite = false)
+                            if (!file.deleteRecursively()) throw java.io.IOException("Failed to remove source")
+                        } else {
+                            file.copyTo(target, overwrite = false)
+                            if (!file.delete()) throw java.io.IOException("Failed to remove source")
+                        }
+                    } catch (e: Exception) {
+                        // Salin separuh jalan jangan tertinggal sebagai data ganda.
+                        runCatching { if (target.isDirectory) target.deleteRecursively() else target.delete() }
+                        throw e
+                    }
                     invalidateFsMediaCache()
                     invalidateGalleryCache()
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
@@ -2502,7 +2544,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val dir = File(dest)
         if (!dir.isDirectory && !dir.mkdirs()) return false
         val sourceName = mediaStoreName(uri) ?: return false
-        val target = FileNames.unique(File(dir, sourceName).name) { File(dir, it).exists() }
+        // DISPLAY_NAME dari provider tak boleh dipercaya mentah: separator
+        // di dalamnya membuat File(dir, name) lolos keluar folder tujuan.
+        val target = FileNames.unique(FileNames.safe(sourceName)) { File(dir, it).exists() }
             .let { File(dir, it) }
         val resolver = context.contentResolver
         val written = runCatching {
@@ -2510,7 +2554,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             input.use { src -> target.outputStream().use { dst -> src.copyTo(dst) } }
             true
         }.getOrDefault(false)
-        if (!written) return false
+        // Salin gagal: target kosong/setengah wajib dibuang (yatim di folder user).
+        if (!written) {
+            runCatching { target.delete() }
+            return false
+        }
         val gone = resolver.delete(uri, null, null) > 0
         if (!gone) {
             // Rollback: hapus file yang sudah dicopy supaya tidak ada duplikasi data

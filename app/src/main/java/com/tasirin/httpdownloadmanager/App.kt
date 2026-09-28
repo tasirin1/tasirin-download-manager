@@ -31,8 +31,12 @@ class App : Application() {
         if (lastThumbCleanup == 0L ||
             System.currentTimeMillis() - lastThumbCleanup >= THUMB_CLEANUP_INTERVAL_MS
         ) {
-            StoragePrefs.setThumbCleanupDone(this, System.currentTimeMillis())
-            Thread { MediaLibrary.cleanupOldThumbs(this) }.start()
+            // Cap waktu ditulis SETELAH bersih-bersih selesai: bila proses
+            // mati di tengah, start berikutnya mengulang, bukan menunggu 7 hari.
+            Thread {
+                runCatching { MediaLibrary.cleanupOldThumbs(this) }
+                StoragePrefs.setThumbCleanupDone(this, System.currentTimeMillis())
+            }.start()
         }
         // Server dinyalakan langsung dari Application supaya tetap jalan
         // walau halaman utama gagal terbuka (mis. crash di Activity).

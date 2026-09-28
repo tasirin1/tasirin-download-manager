@@ -2,7 +2,7 @@
 remote-web:
   - any:
       - remote.src.html
-      - assets/remote.html
+      - app/src/main/assets/remote.html
       - scripts/prepare_remote.py
       - app/src/main/java/com/tasirin/httpdownloadmanager/remote/**
 

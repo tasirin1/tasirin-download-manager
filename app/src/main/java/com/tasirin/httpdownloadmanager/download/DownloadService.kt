@@ -113,9 +113,11 @@ class DownloadService : Service() {
         super.onDestroy()
     }
 
-    private var lastWakeAcquireAt = 0L
-    /** PARTIAL_WAKE_LOCK selama ada item aktif; diperbarui tiap 10 menit agar
-     *  unduhan macet tanpa tick progres tak kehilangan lock saat timeout habis. */
+    /** PARTIAL_WAKE_LOCK tanpa timeout selama ada item aktif: refresh lock
+     *  hanya terjadi saat flow items meng-emit, sehingga timeout 15 menit bisa
+     *  kedaluwarsa diam-diam saat koneksi stall tanpa tick progres. Lock tanpa
+     *  timeout tetap aman: ikut lepas saat proses mati dan dilepas eksplisit
+     *  saat antrean idle (cabang else di bawah). */
     private fun updateWakeLock(active: Boolean) {
         if (active) {
             if (wakeLock == null) {
@@ -124,12 +126,8 @@ class DownloadService : Service() {
                     .apply { setReferenceCounted(false) }
             }
             val lock = wakeLock
-            // Jam monotonik: jam dinding yang mundur/maju (NTP/zona) tidak
-            // boleh memicu acquire berulang atau membiarkan lock kedaluwarsa.
-            val now = android.os.SystemClock.elapsedRealtime()
-            if (lock != null && (!lock.isHeld || now - lastWakeAcquireAt > 10 * 60 * 1000L)) {
-                runCatching { lock.acquire(15 * 60 * 1000L) }
-                lastWakeAcquireAt = now
+            if (lock != null && runCatching { !lock.isHeld }.getOrDefault(true)) {
+                runCatching { lock.acquire() }
             }
         } else {
             val lock = wakeLock

@@ -39,6 +39,7 @@ import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.Formats
+import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
@@ -49,6 +50,7 @@ import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.tasirin.httpdownloadmanager.util.whiteNavigationIcon
@@ -828,11 +830,12 @@ class SettingsActivity : AppCompatActivity() {
             }.getOrDefault(0)
             if (info.versionCode <= current) {
                 binding.updateStatus.text = getString(R.string.update_latest)
-            } else {
-                binding.updateStatus.text = getString(
-                    R.string.update_available, info.versionName, info.versionCode
-                )
+                // Sudah terbaru: jangan unduh ulang APK yang sama (buang kuota).
+                return@launch
             }
+            binding.updateStatus.text = getString(
+                R.string.update_available, info.versionName, info.versionCode
+            )
             // Tombol Check Update = cek + unduh APK terbaru (bukan cuma cek).
             // APK disimpan ke folder Download; instalasi tetap manual supaya
             // Play Protect tidak curiga (keputusan historis repo).
@@ -845,13 +848,15 @@ class SettingsActivity : AppCompatActivity() {
         val view = layoutInflater.inflate(R.layout.dialog_update_progress, null)
         val bar = view.findViewById<ProgressBar>(R.id.update_progress_bar)
         val txt = view.findViewById<TextView>(R.id.update_progress_text)
+        var downloadJob: Job? = null
         val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.update_title)
             .setView(view)
-            .setNegativeButton(R.string.cancel, null)
+            .setNegativeButton(R.string.cancel) { _, _ -> downloadJob?.cancel() }
+            .setOnDismissListener { downloadJob?.cancel() }
             .show()
         var lastProgressUi = 0L
-        lifecycleScope.launch {
+        downloadJob = lifecycleScope.launch {
             val status = try {
                 val file = withContext(Dispatchers.IO) {
                     Updater.download(this@SettingsActivity, info) { done, total ->
@@ -892,7 +897,7 @@ class SettingsActivity : AppCompatActivity() {
             file.delete()
             return getString(R.string.update_signature_failed)
         }
-        val displayName = "tasirin-download-manager-${info.versionName}-${info.versionCode}.apk"
+        val displayName = FileNames.safe("tasirin-download-manager-${info.versionName}-${info.versionCode}.apk")
         val saved = FileSaver(this).saveStream(displayName, "download", "") { out ->
             file.inputStream().use { it.copyTo(out) }
         }

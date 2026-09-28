@@ -60,7 +60,12 @@ private fun thumbLockFor(key: String): ThumbLock {
             thumbLocks.entries.removeIf { it.value.lastUse.get() <= evictBefore && it.key != key }
         }
     }
-    return thumbLocks.getOrPut(key) { ThumbLock() }.also { it.lastUse.set(now) }
+    // getOrPut tidak atomik: dua thread bisa memegang lock berbeda untuk key
+    // sama lalu decode paralel dan menulis cache JPEG yang sama secara
+    // interleave (thumbnail korup tersaji permanen). Kunci eksplisit.
+    return synchronized(thumbLocks) {
+        thumbLocks.getOrPut(key) { ThumbLock() }
+    }.also { it.lastUse.set(now) }
 }
 
 internal fun getOrCreateThumb(
@@ -90,6 +95,13 @@ internal fun getOrCreateThumb(
                     if (thumbFailures.size > 512) {
                         val cutoff = System.currentTimeMillis() - THUMB_FAILURE_TTL_MS
                         thumbFailures.entries.removeAll { it.value < cutoff }
+                        // Bila semua masih fresh (mis. 1000 video korup
+                        // sekaligus), pangkas tertua sampai batas agar map
+                        // tidak tumbuh tanpa batas.
+                        while (thumbFailures.size > 1024) {
+                            val oldest = thumbFailures.entries.minByOrNull { it.value } ?: break
+                            if (!thumbFailures.remove(oldest.key, oldest.value)) break
+                        }
                     }
                     return@synchronized null
                 }

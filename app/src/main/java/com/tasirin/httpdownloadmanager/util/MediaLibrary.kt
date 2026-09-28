@@ -192,7 +192,10 @@ object MediaLibrary {
         contentUri: String?,
         fileExists: (String) -> Boolean = { path -> File(path).isFile }
     ): Boolean = when {
-        filePath.isNullOrBlank() -> !contentUri.isNullOrBlank()
+        // DATA null (umum di Android 11+) bukan bukti file ada: wajib skema
+        // content:// yang valid; keberadaan penuh divalidasi malas saat
+        // serve/thumbnail (openInputStream gagal -> notFound), bukan saat scan.
+        filePath.isNullOrBlank() -> contentUri?.startsWith("content://") == true
         else -> fileExists(filePath)
     }
 
@@ -319,7 +322,10 @@ object MediaLibrary {
         if (observerRegistered) return
         synchronized(this) {
             if (observerRegistered) return
-            observerRegistered = true
+            // Flag HANYA setelah sukses: gagal di tengah (mis. registrasi
+            // kedua melempar) lalu retry membuat observer ganda yang
+            // menumpuk selamanya (invalidate duplikat tiap perubahan media).
+            var ok = false
             runCatching {
                 val appContext = context.applicationContext
                 val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -341,9 +347,12 @@ object MediaLibrary {
                         MediaStore.Downloads.EXTERNAL_CONTENT_URI, true, observer
                     )
                 }
+            }.onSuccess {
+                ok = true
             }.onFailure {
-                observerRegistered = false
+                ok = false
             }
+            observerRegistered = ok
         }
     }
 

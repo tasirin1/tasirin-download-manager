@@ -161,14 +161,27 @@ class LogActivity : AppCompatActivity() {
                             return@runCatching false
                         }
                         val done = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
-                        resolver.update(uri, done, null, null) > 0
+                        if (resolver.update(uri, done, null, null) <= 0) {
+                            // IS_PENDING tak bisa dibuka: file terkunci tak kasatmata
+                            // selamanya — hapus entri yatim dan laporkan gagal.
+                            resolver.delete(uri, null, null)
+                            return@runCatching false
+                        }
+                        true
                     } else {
                         val dir = Environment.getExternalStoragePublicDirectory(
                             Environment.DIRECTORY_DOWNLOADS
                         )
                         if (!dir.isDirectory && !dir.mkdirs()) return@runCatching false
-                        File(dir, "httpdm-serverlog-$stamp.txt").writeText(header)
-                        true
+                        val target = File(dir, "httpdm-serverlog-$stamp.txt")
+                        runCatching {
+                            target.writeText(header)
+                            true
+                        }.getOrElse {
+                            // Tulis gagal di tengah: buang file setengah jadi.
+                            runCatching { target.delete() }
+                            false
+                        }
                     }
                 }.getOrDefault(false)
             }

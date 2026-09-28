@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.util
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FileNamesTest {
@@ -12,6 +13,17 @@ class FileNamesTest {
     }
 
     @Test
+    fun `safe - nama CJK panjang dipangkas per byte bukan char`() {
+        // Batas filesystem 255 byte: 154 char tapi 304 byte (>240) wajib
+        // dipangkas per byte (tanpa belah UTF-8) dengan ekstensi utuh.
+        val long = "é".repeat(150) + ".mp4"
+        val clean = FileNames.safe(long)
+        assertTrue(clean.toByteArray(Charsets.UTF_8).size <= 240)
+        assertTrue(clean.endsWith(".mp4"))
+        // Nama ASCII pendek tidak berubah.
+        assertEquals("video.mp4", FileNames.safe("video.mp4"))
+    }
+
     fun `unique - nama bebas tidak diubah`() {
         val result = FileNames.unique("video.mp4") { false }
         assertEquals("video.mp4", result)

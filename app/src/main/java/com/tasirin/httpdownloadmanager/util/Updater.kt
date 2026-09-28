@@ -65,6 +65,9 @@ object Updater {
             if (isSignatureValid(context, target)) return target
             runCatching { target.delete() }
         }
+        // Sisa parsial dari percobaan gagal sebelumnya: mulai bersih agar
+        // kegagalan jaringan tak menumpuk file setengah jadi di cache.
+        if (target.exists()) runCatching { target.delete() }
 
         if (!info.apkUrl.startsWith("https://", ignoreCase = true)) return null
         var url = info.apkUrl
@@ -81,8 +84,12 @@ object Updater {
             if (code in 300..399) {
                 val loc = conn.getHeaderField("Location") ?: return null
                 conn.disconnect()
-                if (!loc.startsWith("https://", ignoreCase = true)) return null
-                url = loc
+                // Location boleh relatif (RFC 7231): resolve ke absolut dulu,
+                // tapi tujuan akhir tetap wajib https (tutup downgrade/http).
+                val next = runCatching { java.net.URL(java.net.URL(url), loc).toString() }.getOrNull()
+                    ?: return null
+                if (!next.startsWith("https://", ignoreCase = true)) return null
+                url = next
                 redirects++
                 continue
             }
@@ -110,9 +117,10 @@ object Updater {
                             }
                         }
                     }
-                } catch (e: SecurityException) {
-                    // Respons melebihi batas: buang file setengah jadi supaya
-                    // percobaan berikut tidak membaca sisa overshoot dari disk.
+                } catch (e: Exception) {
+                    // Respons melebihi batas maupun gagal jaringan/IO di tengah
+                    // unduh: buang file setengah jadi supaya cache tak membengkak
+                    // dan percobaan berikut mulai bersih.
                     runCatching { target.delete() }
                     throw e
                 }

@@ -12,6 +12,17 @@ private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024
  * terbaca sebagai request HTTP berikutnya pada keep-alive. */
 internal class BodyTooLargeException : IOException("Request body too large")
 
+/** Body chunked tanpa Content-Length terpakai: panjang tak bisa dihitung di
+ *  muka, jadi pemanggil tak boleh mengasumsikan body sudah habis (desync
+ *  keep-alive) atau mengabaikannya diam-diam (form terpotong). Murni agar
+ *  bisa di-unit-test tanpa sesi HTTP. */
+internal fun isChunkedBody(headers: Map<String, String>): Boolean {
+    val encoding = headers.entries
+        .firstOrNull { it.key.equals("transfer-encoding", ignoreCase = true) }
+        ?.value.orEmpty()
+    return encoding.contains("chunked", ignoreCase = true)
+}
+
 /** Baca form POST (x-www-form-urlencoded) dari body sesi NanoHTTPD,
  *  gabung dengan parameter query. Dibatasi 4 MB. */
 internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
@@ -21,22 +32,48 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
     }
     val contentType = session.headers["content-type"].orEmpty()
     if (contentType.startsWith("multipart/form-data", ignoreCase = true)) {
-        runCatching {
-            val files = mutableMapOf<String, String>()
+        // parseBody NanoHTTPD menulis file tmp tanpa batas internal — tolak
+        // sejak awal bila Content-Length deklarasi melebihi batas form.
+        val declared = session.headers["content-length"]?.toLongOrNull() ?: 0L
+        if (declared > MAX_BODY_SIZE) throw BodyTooLargeException()
+        // parseBody melempar saat body rusak/terpotong: teruskan sebagai
+        // IOException agar pemanggil menutup koneksi, bukan diam-diam memakai
+        // parameter query saja sebagai form valid (fail-open).
+        val files = mutableMapOf<String, String>()
+        try {
             session.parseBody(files)
             session.getParameters().forEach { (k, v) -> v.firstOrNull()?.let { map[k] = it } }
+            // parseBody menulis tmp tanpa batas bila Content-Length tak ada
+            // (chunked): tolak bila jumbo agar disk tak penuh diam-diam.
+            val oversized = files.values.any { tmp ->
+                runCatching { java.io.File(tmp).length() }.getOrDefault(0L) > MAX_BODY_SIZE
+            }
+            if (oversized) throw BodyTooLargeException()
+        } catch (e: BodyTooLargeException) {
             files.values.forEach { tmp -> runCatching { java.io.File(tmp).delete() } }
+            throw e
+        } catch (e: Exception) {
+            files.values.forEach { tmp -> runCatching { java.io.File(tmp).delete() } }
+            throw IOException("Malformed multipart body")
         }
+        files.values.forEach { tmp -> runCatching { java.io.File(tmp).delete() } }
         return map
     }
     val rawLength = session.headers["content-length"]?.toLongOrNull() ?: 0L
+    if (rawLength < 0) throw IOException("Invalid content length")
     if (rawLength > MAX_BODY_SIZE) throw BodyTooLargeException()
+    if (rawLength == 0L && isChunkedBody(session.headers)) {
+        // Body chunked tak bisa dibaca terbatas di sini: tolak eksplisit
+        // (413 + tutup koneksi) agar form tak diparse diam-diam dari query saja.
+        throw BodyTooLargeException()
+    }
     val length = rawLength.toInt()
     if (length > 0) {
-        // Baca per-baris tanpa alokasi ByteArray(length) penuh — hemats memori
-        // untuk form kecil (100 byte) yang sebelumnya alokasi 4MB.
+        // Kumpulkan byte dulu, decode UTF-8 sekali di akhir: decode per chunk
+        // membelah karakter multi-byte di batas 8KB menjadi mojibake
+        // (mis. postBody/URL beraksen rusak diam-diam).
         val buf = ByteArray(8192)
-        val sb = StringBuilder(length.coerceAtMost(65536))
+        val collected = java.io.ByteArrayOutputStream(length.coerceAtMost(65536))
         var remaining = length
         while (remaining > 0) {
             val toRead = minOf(buf.size, remaining)
@@ -44,11 +81,11 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
             // Stream putus sebelum Content-Length terpenuhi: jangan parse
             // parsial sebagai form valid (bisa jadi login/pin terpotong).
             if (read == -1) throw IOException("Request body truncated")
-            sb.append(String(buf, 0, read, Charsets.UTF_8))
+            collected.write(buf, 0, read)
             remaining -= read
         }
         // Loop tanpa split("&") — hindari alokasi List<String> per request POST.
-        val body = sb.toString()
+        val body = String(collected.toByteArray(), Charsets.UTF_8)
         var start = 0
         while (start <= body.length) {
             val amp = body.indexOf('&', start)
@@ -80,7 +117,15 @@ internal fun NanoHTTPD.IHTTPSession.param(key: String): String? =
  *  (closeConnection) agar sisa byte tidak dibaca sebagai request berikutnya. */
 internal fun drainBody(session: NanoHTTPD.IHTTPSession): Boolean {
     val declared = session.headers["content-length"]?.toLongOrNull() ?: 0L
-    if (declared <= 0) return true
+    if (declared <= 0) {
+        // Tanpa Content-Length (mis. chunked) sisa body tak bisa dihitung:
+        // paksa tutup koneksi agar byte body tak terbaca sebagai request berikutnya.
+        if (isChunkedBody(session.headers)) return false
+        return true
+    }
+    // Content-Length + chunked sekaligus = request ambigu (smuggling);
+    // klien normal tak pernah mengirim keduanya: tutup koneksi.
+    if (isChunkedBody(session.headers)) return false
     if (declared > MAX_UPLOAD_BYTES) return false
     val buffer = ByteArray(64 * 1024)
     var remaining = declared

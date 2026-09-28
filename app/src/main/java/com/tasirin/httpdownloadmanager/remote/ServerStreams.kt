@@ -29,6 +29,9 @@ internal class ChainInputStream(private val files: List<File>) : InputStream() {
             val cur = current ?: next() ?: return -1
             val b = cur.read()
             if (b != -1) return b
+            // Stream habis wajib ditutup di sini: next() hanya menutup current
+            // yang non-null sehingga fd segmen lama bocor per request.
+            runCatching { cur.close() }
             current = null
         }
     }
@@ -41,6 +44,7 @@ internal class ChainInputStream(private val files: List<File>) : InputStream() {
             val cur = current ?: next() ?: return -1
             val n = cur.read(b, off, len)
             if (n != -1) return n
+            runCatching { cur.close() }
             current = null
         }
     }

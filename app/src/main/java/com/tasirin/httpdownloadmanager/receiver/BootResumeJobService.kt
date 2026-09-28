@@ -56,7 +56,10 @@ class BootResumeJobService : JobService() {
                 .setPersisted(true) // bertahan lintas reboot
                 .setMinimumLatency(15_000L) // biarkan sistem settle setelah boot
                 .setOverrideDeadline(30_000L)
-            scheduler.schedule(builder.build())
+            val result = scheduler.schedule(builder.build())
+            if (result <= 0) {
+                android.util.Log.w("BootResume", "JobScheduler.schedule failed (result=$result)")
+            }
         }
     }
 }

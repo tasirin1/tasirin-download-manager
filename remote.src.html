@@ -4583,6 +4583,12 @@ function uploadFiles(files, path, statusEl, progressBox, progressText, progressP
     function retryChunk() {
       chunkFails++;
       if (chunkFails < 3) {
+        // Baseline attempt gagal wajib di-nol-kan: tanpa ini, event progres
+        // attempt baru (< baseline lama) diabaikan sehingga bar beku, dan
+        // bestDone overclaim dari byte attempt yang gagal.
+        chunkBest = 0;
+        lastBytes = 0;
+        lastTime = 0;
         setTimeout(nextChunk, 600);
         return;
       }
@@ -5319,7 +5325,7 @@ function fmtSpeed(bps) {
 }
 
 function fmtEta(seconds) {
-  seconds = Number(seconds);
+  seconds = Math.floor(Number(seconds));
   if (!isFinite(seconds) || seconds <= 0) return '0s';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -5673,7 +5679,9 @@ function getLockedTotal(it) {
   if ((it.progressPercentOverride || -1) >= 0) return it.bytesDownloaded;
   if (it.totalBytes > 0) {
     var prev = lockedTotalBytes.get(it.id);
-    if (!prev || it.totalBytes > prev) lockedTotalBytes.set(it.id, it.totalBytes);
+    if (!prev) lockedTotalBytes.set(it.id, it.totalBytes);
+    else if (it.totalBytes > prev) lockedTotalBytes.set(it.id, it.totalBytes);
+    else if (it.totalBytes < prev && it.bytesDownloaded <= it.totalBytes) lockedTotalBytes.set(it.id, it.totalBytes);
     return lockedTotalBytes.get(it.id);
   }
   return it.bytesDownloaded;
@@ -6340,6 +6348,7 @@ function connectEvents() {
   sse.onopen = function () { sseFailCount = 0; hideConnBanner(); };
   sse.onmessage = function (ev) {
     sseFailCount = 0;
+    sseSilentReconnects = 0;
     lastSseAt = Date.now();
     hasLoadedItems = true;
     try {
@@ -6368,8 +6377,9 @@ function connectEvents() {
 // transfer yang berjalan (realtime), sisanya 10 detik.
 // WebView/browser tua kadang membiarkan EventSource "terbuka" tapi tidak
 // pernah memicu onmessage: setelah satu percobaan reconnect masih diam,
-// SSE dimatikan permanen untuk sesi ini dan polling adaptif mengambil alih
-// (mencegah reconnect storm yang terlihat di log server perangkat TV).
+// SSE dimatikan sementara dan polling adaptif mengambil alih (mencegah
+// reconnect storm di log server perangkat TV). Hitungan direset setiap
+// pesan sukses sehingga putus jaringan berulang tetap bisa pulih.
 let lastItems = [];
 let pollTimer = null;
 const POLL_FAST_MS = 1000;
@@ -6413,6 +6423,14 @@ async function pollSnapshot() {
     hasLoadedItems = true;
     statusLine.textContent = '';
     hideConnBanner();
+    // Snapshot sukses = server terjangkau: hidupkan lagi SSE yang sempat
+    // give-up (putus lama). Aman dari storm: reconnect hanya saat server
+    // terbukti hidup, bukan saat gagal.
+    if ((sseGaveUp || !sse) && typeof EventSource !== 'undefined') {
+      sseGaveUp = false;
+      sseSilentReconnects = 0;
+      connectEvents();
+    }
     if (data.status) applyServerStatus(data.status);
     const items = data.items || [];
     lastItems = items;

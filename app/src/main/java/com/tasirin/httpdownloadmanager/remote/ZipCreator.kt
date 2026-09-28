@@ -97,7 +97,7 @@ object ZipCreator {
                         val children = runCatching { f.listFiles() }.getOrNull() ?: return@runCatching
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-                        ).forEach { child -> zipFile(zos, child, root, isFileAllowed = isFileAllowed) }
+                        ).forEach { child -> zipFile(zos, child, root, depth = 1, seen = mutableSetOf(), isFileAllowed = isFileAllowed) }
                         return@runCatching
                     }
                     name = f.name

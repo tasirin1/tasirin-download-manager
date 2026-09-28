@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Base64
 import androidx.core.content.edit
 import androidx.core.net.toUri
@@ -102,6 +103,14 @@ class DownloadEngine(appContext: Context) {
     private val pendingRetries = ConcurrentHashMap.newKeySet<String>()
     /** URL HLS yang sudah gagal (media playlist 403/404) — jangan retry; re-extract dari YouTube URL. */
     private val failedHlsUrls = ConcurrentHashMap.newKeySet<String>()
+    private val FAILED_HLS_URLS_MAX = 256
+
+    /** Negative-cache sesi: aman dihapus total bila penuh (hanya memicu
+     *  satu percobaan ulang HLS, bukan korupsi). */
+    private fun rememberFailedHlsUrl(url: String) {
+        if (failedHlsUrls.size >= FAILED_HLS_URLS_MAX) failedHlsUrls.clear()
+        failedHlsUrls.add(url)
+    }
     /** URL sosial media original per item (YouTube/TikTok/etc) — disimpan saat ekstraksi
      *  menghasilkan URL HLS yang berbeda; dipakai untuk re-extract saat HLS gagal. */
     private val originalSocialUrls = ConcurrentHashMap<String, String>()
@@ -180,21 +189,34 @@ class DownloadEngine(appContext: Context) {
         scope.launch { monitorLoop() }
     }
 
-    private val cancelledConns = ConcurrentHashMap.newKeySet<String>()
+    private val cancelledConns = ConcurrentHashMap<String, Long>()
     private fun disconnectActive(id: String) {
-        cancelledConns.add(id)
+        cancelledConns[id] = System.currentTimeMillis()
+        // Map tak terbatas bila item dihapus tanpa pernah start lagi; eviksi
+        // entri tertua (bukan acak) agar cancel yang masih aktif tak hidup lagi.
+        if (cancelledConns.size > 512) {
+            runCatching {
+                val oldest = cancelledConns.entries.minByOrNull { it.value }?.key
+                if (oldest != null) cancelledConns.remove(oldest)
+            }
+        }
         activeConns.remove(id)?.forEach { connection ->
             runCatching { connection.disconnect() }
         }
     }
 
     private fun trackConnection(id: String, connection: HttpURLConnection): HttpURLConnection {
-        if (cancelledConns.contains(id)) {
+        if (cancelledConns.containsKey(id)) {
             runCatching { connection.disconnect() }
             return connection
         }
-        activeConns.getOrPut(id) { Collections.newSetFromMap(ConcurrentHashMap()) }.add(connection)
-        if (cancelledConns.contains(id)) {
+        // getOrPut Kotlin tidak atomik di ConcurrentHashMap: dua segmen yang
+        // mulai bersamaan bisa membuat dua set dan satu set hilang (koneksi
+        // bocor saat pause/cancel). Kunci eksplisit (aman minSdk 21).
+        synchronized(activeConns) {
+            activeConns.getOrPut(id) { Collections.newSetFromMap(ConcurrentHashMap()) }.add(connection)
+        }
+        if (cancelledConns.containsKey(id)) {
             untrackConnection(id, connection)
         }
         return connection
@@ -203,7 +225,9 @@ class DownloadEngine(appContext: Context) {
     private fun untrackConnection(id: String, connection: HttpURLConnection) {
         activeConns[id]?.remove(connection)
         activeConns.remove(id, emptySet())
-        runCatching { connection.disconnect() }
+        // Sukses jangan disconnect: biarkan socket keep-alive dipakai ulang.
+        // Cancel/pause tetap diputus via disconnectActive().
+        if (cancelledConns.containsKey(id)) runCatching { connection.disconnect() }
     }
 
     fun addDownload(
@@ -274,7 +298,11 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun pause(id: String) {
-        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD PAUSED: ${it.fileName}") }
+        val target = _items.value.find { it.id == id } ?: return
+        // Hanya antrean aktif yang bisa dijeda: tanpa guard, item COMPLETED/
+        // FAILED yang ter-pause (mis. via /api/action) kehilangan statusnya.
+        if (target.state != DownloadState.DOWNLOADING && target.state != DownloadState.PENDING) return
+        App.logEvent("DOWNLOAD PAUSED: ${target.fileName}")
         retryAttempts.remove(id)
         pendingRetries.remove(id)
         speedTracker.reset(id)
@@ -312,7 +340,11 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun cancel(id: String) {
-        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD CANCELLED: ${it.fileName}") }
+        val target = _items.value.find { it.id == id } ?: return
+        // COMPLETED tidak bisa di-cancel: status selesai bukan sesuatu yang
+        // bisa dibatalkan (hapus memakai remove/delete).
+        if (target.state == DownloadState.COMPLETED) return
+        App.logEvent("DOWNLOAD CANCELLED: ${target.fileName}")
         retryAttempts.remove(id)
         pendingRetries.remove(id)
         originalSocialUrls.remove(id)
@@ -341,6 +373,7 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
+        cancelledConns.remove(id)
         update(_items.value.filterNot { it.id == id })
         item?.let { fileSaver.deleteFiles(it) }
         scheduleSave()
@@ -349,7 +382,10 @@ class DownloadEngine(appContext: Context) {
     fun clearCompleted() {
         // Hanya membersihkan daftar; file hasil download TIDAK dihapus.
         val removed = _items.value.filter { it.state == DownloadState.COMPLETED }
-        removed.forEach { speedTracker.reset(it.id) }
+        removed.forEach {
+            speedTracker.reset(it.id)
+            cancelledConns.remove(it.id)
+        }
         update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
         scheduleSave()
     }
@@ -365,6 +401,7 @@ class DownloadEngine(appContext: Context) {
             clearSegProgress(item.id)
             jobs.remove(item.id)?.cancel()
             disconnectActive(item.id)
+            cancelledConns.remove(item.id)
             App.logEvent("DOWNLOAD DELETED: ${item.fileName}")
         }
         // Batch delete: satu loop, bukan N kali filter list
@@ -504,6 +541,7 @@ class DownloadEngine(appContext: Context) {
         username: String,
         password: String,
         headers: String,
+        presetRange: Long? = null,
         configure: (HttpURLConnection, String) -> Unit = { _, _ -> }
     ): HttpURLConnection {
         var current = url
@@ -532,6 +570,12 @@ class DownloadEngine(appContext: Context) {
             }
             if (current == url || isSameOrigin(url, current)) {
                 applyAuthHeaders(conn, username, password, headers)
+            }
+            // Header Range resume wajib di-set SEBELUM connect/responseCode:
+            // setRequestProperty setelah konek melempar IllegalStateException
+            // di HttpURLConnection (Android maupun JDK).
+            if (presetRange != null && presetRange > 0) {
+                conn.setRequestProperty("Range", "bytes=$presetRange-")
             }
             configure(conn, current)
             val code = conn.responseCode
@@ -563,6 +607,7 @@ class DownloadEngine(appContext: Context) {
             speedTracker.reset(item.id)
             jobs.remove(item.id)?.cancel()
             disconnectActive(item.id)
+            clearSegProgress(item.id)
         }
         val ids = targets.map { it.id }.toSet()
         update(_items.value.map { item ->
@@ -583,7 +628,8 @@ class DownloadEngine(appContext: Context) {
     fun resumeAll() {
         // Batch: satu filter + satu update, bukan N kali find() di resume()
         val targets = _items.value.filter {
-            it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED
+            it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED ||
+                it.state == DownloadState.CANCELLED
         }
         if (targets.isEmpty()) return
         val ids = targets.map { it.id }.toSet()
@@ -681,7 +727,13 @@ class DownloadEngine(appContext: Context) {
         if (clean.isBlank() || clean == item.fileName) return
         val newPath = fileSaver.rename(item, clean)
         if (newPath != null) {
-            updateItem(id) { it.copy(fileName = clean, filePath = newPath) }
+            // FileSaver.rename mengembalikan URI untuk item MediaStore/SAF dan
+            // path untuk file: salah kolom membuat serveFile gagal (File("content://…")
+            // tak ada -> notFound tanpa mencoba contentUri).
+            updateItem(id) {
+                if (!it.contentUri.isNullOrEmpty()) it.copy(fileName = clean, contentUri = newPath)
+                else it.copy(fileName = clean, filePath = newPath)
+            }
         }
     }
 
@@ -698,6 +750,33 @@ class DownloadEngine(appContext: Context) {
     private fun shouldInvalidateResume(item: DownloadItem, currentEtag: String?): Boolean {
         return item.bytesDownloaded > 0 && item.etag.isNotBlank() &&
             !currentEtag.isNullOrBlank() && currentEtag != item.etag
+    }
+
+    /** Hitung offset resume + selaraskan file parsial dengan catatan bytes.
+     *  Idempoten: aman dipanggil dua kali untuk item yang sama (panggilan
+     *  kedua selalu KEEP). Dipanggil SEBELUM membuka koneksi agar header
+     *  Range bisa di-preset (lihat presetRange). */
+    private fun prepareResumeOffset(item: DownloadItem, saver: FileSaver): Long {
+        var downloaded = item.bytesDownloaded
+        val partialFile = saver.partialFile(item.fileName)
+        when (resumeAction(downloaded, partialFile.length())) {
+            ResumeAction.TRUNCATE_TO_RECORD -> {
+                val truncated = runCatching {
+                    RandomAccessFile(partialFile, "rw").use { it.setLength(downloaded) }
+                    true
+                }.getOrDefault(false)
+                if (!truncated) {
+                    downloaded = 0
+                    partialFile.delete()
+                }
+            }
+            ResumeAction.RESTART -> {
+                downloaded = 0
+                partialFile.delete()
+            }
+            ResumeAction.KEEP -> Unit
+        }
+        return downloaded
     }
 
     private suspend fun invalidateChangedResume(item: DownloadItem, etag: String?) {
@@ -1126,7 +1205,11 @@ class DownloadEngine(appContext: Context) {
                 if (result.isHls) originalSocialUrls[item.id] = item.url
                 // YouTube via HLS: segmen .ts digabung jadi satu file.
                 if (result.isHls) {
-                    val hlsName = result.fileName ?: item.fileName
+                    // Nama dari API pihak ketiga wajib disanitasi (separator di
+                    // dalamnya membuat dua item berbagi file .part yang sama di
+                    // disk). Nama kustom user selalu menang bila ada.
+                    val hlsName = if (!item.nameIsCustom) sanitizeFileName(result.fileName ?: item.fileName)
+                    else item.fileName
                     val hlsHeaders = if (result.cookies.isNotEmpty()) {
                         val existing = item.headers.trim()
                         if (existing.isNotEmpty()) "${existing}\nCookie: ${result.cookies}" else "Cookie: ${result.cookies}"
@@ -1145,13 +1228,14 @@ class DownloadEngine(appContext: Context) {
                         // HLS gagal (mis. media playlist butuh pot token / 403).
                         // Tandai URL HLS sebagai gagal supaya resume/retry tidak
                         // mengulang HLS yang sama — re-extract dari YouTube URL.
-                        failedHlsUrls.add(result.directUrl)
+                        rememberFailedHlsUrl(result.directUrl)
                         // Fallback: coba ekstrak non-HLS (page/Piped/Invidious).
                         App.logEvent("HLS: download failed (${e.message?.take(50)}), trying non-HLS fallback")
                         val fallback = SocialMediaExtractor.extractNonHlsYouTube(item.url)
                         if (fallback != null && fallback.directUrl != item.url && !fallback.isHls) {
                             App.logEvent("SOCIAL: non-HLS fallback: ${fallback.directUrl.take(80)}")
-                            val fbName = fallback.fileName ?: item.fileName
+                            val fbName = if (!item.nameIsCustom) sanitizeFileName(fallback.fileName ?: item.fileName)
+                            else item.fileName
                             val fbHeaders = if (fallback.cookies.isNotEmpty()) {
                                 val existing = item.headers.trim()
                                 if (existing.isNotEmpty()) "${existing}\nCookie: ${fallback.cookies}" else "Cookie: ${fallback.cookies}"
@@ -1172,7 +1256,7 @@ class DownloadEngine(appContext: Context) {
                     }
                 }
                 // Non-HLS extraction path (bukan HLS)
-                val newName = result.fileName ?: item.fileName
+                val newName = sanitizeFileName(result.fileName ?: item.fileName)
                 // Gabung cookies dari extraction ke headers untuk CDN download
                 val mergedHeaders = if (result.cookies.isNotEmpty()) {
                     val existing = item.headers.trim()
@@ -1183,10 +1267,14 @@ class DownloadEngine(appContext: Context) {
                     fileName = if (!item.nameIsCustom) newName else item.fileName,
                     headers = mergedHeaders
                 ) }
-                val resultItem = item.copy(url = result.directUrl, fileName = newName, headers = mergedHeaders)
+                // resultItem wajib memakai nama yang sama dengan updateItem di
+                // atas (kustom user menang) — sebelumnya file terpublish memakai
+                // nama ekstraksi walau user mengetik nama sendiri.
+                val effectiveName = if (!item.nameIsCustom) newName else item.fileName
+                val resultItem = item.copy(url = result.directUrl, fileName = effectiveName, headers = mergedHeaders)
                 if (result.audioUrl.isNotEmpty()) {
                     App.logEvent("SOCIAL: adaptive pair → merging video+audio into MP4")
-                    downloadAdaptiveMuxed(resultItem, result.videoUrl, result.audioUrl, newName)
+                    downloadAdaptiveMuxed(resultItem, result.videoUrl, result.audioUrl, effectiveName)
                     return
                 }
                 return runDownload(resultItem, skipSocial = true)
@@ -1259,11 +1347,15 @@ class DownloadEngine(appContext: Context) {
             return
         }
 
+        // Offset resume dihitung dulu (sekaligus truncate/selaraskan file
+        // parsial): header Range harus sudah terpasang saat koneksi dibuka.
+        val resumeFrom = prepareResumeOffset(item, saver)
         val conn = openAuthenticatedConnection(
             item.url, method = if (item.method == "POST") "POST" else "GET",
             username = item.username,
             password = item.password,
-            headers = item.headers
+            headers = item.headers,
+            presetRange = resumeFrom.takeIf { it > 0 }
         ) { connection, _ ->
             if (item.method == "POST" && item.postBody.isNotEmpty()) {
                 connection.doOutput = true
@@ -1324,6 +1416,17 @@ class DownloadEngine(appContext: Context) {
         }
         val buffer = ByteArray(BUFFER_SIZE)
         coroutineContext.ensureActive()
+
+        // Estimasi dari BANDWIDTH x durasi tersedia sebelum segmen diunduh:
+        // tolak awal bila jelas tak muat, bukan ENOSPC di tengah jalan.
+        if (plan.estimateTotalBytes > 0 &&
+            saver.freeBytes() < plan.estimateTotalBytes + MIN_FREE_BYTES
+        ) {
+            throw IOException(
+                "Not enough storage for HLS: need ~${Formats.bytes(plan.estimateTotalBytes)}, " +
+                    "available ${Formats.bytes(saver.freeBytes())}"
+            )
+        }
 
         try {
             // 1) Unduh segmen video (MPEG-TS) ke file temp.
@@ -1599,7 +1702,7 @@ class DownloadEngine(appContext: Context) {
         total: Long = 0
     ) {
         val totalNow = progress.downloaded + segNow
-        val now = System.currentTimeMillis()
+        val now = monotonicNow()
         if (now - progress.lastNotify >= 1000) {
             progress.lastNotify = now
             // Total HLS asli tidak diketahui (segmen tidak punya Content-Length
@@ -1765,6 +1868,11 @@ class DownloadEngine(appContext: Context) {
 
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
     private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = ""): HlsPlan? {
+        // Segmen terenkripsi yang diunduh mentah = file sampah berstatus
+        // COMPLETED: gagal cepat dengan pesan jelas, bukan unduh sia-sia.
+        if (isEncryptedHlsPlaylist(body)) {
+            throw IOException("HLS terenkripsi (EXT-X-KEY) tidak didukung")
+        }
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
             // Hanya baris URI segmen (bukan tag #... / baris kosong) yang sah:
@@ -1776,6 +1884,12 @@ class DownloadEngine(appContext: Context) {
                 .filter { it.startsWith("http") }
             App.logEvent("HLS: direct media playlist, ${segments.size} segments")
             if (segments.isEmpty()) return null
+            if (!body.contains("#EXT-X-ENDLIST")) {
+                throw IOException("Live HLS tidak didukung (playlist tanpa EXT-X-ENDLIST)")
+            }
+            if (isEncryptedHlsPlaylist(body)) {
+                throw IOException("HLS terenkripsi (EXT-X-KEY) tidak didukung")
+            }
             val durations = mediaDurations(body)
             return HlsPlan(segments, videoSegmentDurationsUs = durations, estimateTotalBytes = estimateBytes(durations, 0L))
         }
@@ -1916,6 +2030,15 @@ class DownloadEngine(appContext: Context) {
             } finally { conn.disconnect() }
         } catch (_: Exception) { null }
         if (body == null) return null
+        // Playlist live (event/DVR sliding window) tidak punya EXT-X-ENDLIST:
+        // gagal cepat dengan pesan jelas, bukan mengunduh snapshot window
+        // yang tak berujung (dan mengulang dari nol tiap retry HLS).
+        if (!body.contains("#EXT-X-ENDLIST")) {
+            throw IOException("Live HLS tidak didukung (playlist tanpa EXT-X-ENDLIST)")
+        }
+        if (isEncryptedHlsPlaylist(body)) {
+            throw IOException("HLS terenkripsi (EXT-X-KEY) tidak didukung")
+        }
         val result = mutableListOf<Pair<String, Long>>()
         val lines = body.lines()
         var i = 0
@@ -1993,41 +2116,22 @@ class DownloadEngine(appContext: Context) {
         saver: FileSaver,
         throttle: SpeedThrottle
     ) {
-        var downloaded = item.bytesDownloaded
         var fileName = item.fileName
         var partialFile = saver.partialFile(fileName)
         val health = DownloadHealthWatchdog(
             if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
         )
-        // Resume anti-korup: catatan bytes harus sinkron dengan ukuran file
-        // parsial. Bila file sedikit LEBIH PANJANG dari catatan (catatan
-        // tertinggal <1 dtk dari tick progres terakhir — sangat umum saat
-        // koneksi putus di tengah interval), cukup pangkas ke posisi catatan
-        // lalu lanjut: sebelumnya tiap putus jaringan mengulang unduhan dari
-        // nol karena file selalu tampak "lebih maju". Mulai dari nol hanya
-        // bila data benar-benar hilang (file lebih pendek dari catatan / sisa
-        // .part tanpa catatan sama sekali).
-        when (resumeAction(downloaded, partialFile.length())) {
-            ResumeAction.TRUNCATE_TO_RECORD -> {
-                val truncated = runCatching {
-                    RandomAccessFile(partialFile, "rw").use { it.setLength(downloaded) }
-                    true
-                }.getOrDefault(false)
-                if (!truncated) {
-                    downloaded = 0
-                    partialFile.delete()
-                }
-            }
-            ResumeAction.RESTART -> {
-                downloaded = 0
-                partialFile.delete()
-            }
-            ResumeAction.KEEP -> Unit
-        }
+        // Resume anti-korup: selaraskan file parsial dengan catatan bytes
+        // (pangkas bila file lebih maju, buang bila data hilang). Idempoten:
+        // pemanggil runDownload sudah memanggilnya dulu untuk preset Range.
+        var downloaded = prepareResumeOffset(item, saver)
         coroutineContext.ensureActive()
         trackConnection(item.id, conn)
         try {
-        if (downloaded > 0) conn.setRequestProperty("Range", "bytes=$downloaded-")
+        // JANGAN setRequestProperty di sini: koneksi dari
+        // openAuthenticatedConnection sudah connected (responseCode dibaca
+        // untuk deteksi redirect) dan itu melempar IllegalStateException.
+        // Header Range resume sudah di-preset sebelum connect.
         conn.connect()
 
         val code = conn.responseCode
@@ -2067,10 +2171,15 @@ class DownloadEngine(appContext: Context) {
             // Server tidak mendukung resume; mulai dari awal.
             downloaded = 0
             partialFile.writeBytes(ByteArray(0))
+            // throttle.reset(downloaded) di bawah memakai nilai 0 ini,
+            // jadi baseline batas kecepatan ikut benar setelah fallback.
         }
-        if (total > 0 && saver.freeBytes() < total) {
+        // Resume 206: byte terunduh sudah di disk, jadi yang dibutuhkan hanya
+        // sisanya (total penuh menolak resume besar yang sebenarnya muat).
+        val needBytes = if (code == 206) (total - downloaded).coerceAtLeast(0) else total
+        if (needBytes > 0 && saver.freeBytes() < needBytes) {
             throw IOException(
-                "Not enough storage: need ${Formats.bytes(total)}, " +
+                "Not enough storage: need ${Formats.bytes(needBytes)}, " +
                     "available ${Formats.bytes(saver.freeBytes())}"
             )
         }
@@ -2088,9 +2197,9 @@ class DownloadEngine(appContext: Context) {
                 output.write(buffer, 0, read)
                 downloaded += read
                 throttle.sleepIfNeeded { downloaded }
-                // Cek jam tiap 8 chunk (512KB): currentTimeMillis per iterasi boros.
+                // Cek jam tiap 8 chunk (512KB): baca jam per iterasi boros.
                 if ((iters++ and 7) != 0) continue
-                val now = System.currentTimeMillis()
+                val now = monotonicNow()
                 // Progres di-throttle 1x/detik: salinan daftar + emisi StateFlow
                 // (ke UI, notifikasi, SSE) tidak perlu 2x/detik — hemat CPU/GC
                 // saat banyak download paralel, UI tetap terasa halus.
@@ -2238,22 +2347,12 @@ class DownloadEngine(appContext: Context) {
                     username = item.username, password = item.password, headers = item.headers
                 )
                 try {
-                    fallbackConn.connectTimeout = connectTimeoutMs
-                    fallbackConn.readTimeout = readTimeoutMs
-                    // Terapkan cookie dari CookieManager (situs yang butuh session)
-                    try {
-                        val cookieHeader = cookieManager.cookieStore.cookies
-                            .filter { c ->
-                                c.domain?.let { d ->
-                                    item.url.contains(d.removePrefix("."), ignoreCase = true)
-                                } ?: false
-                            }
-                            .joinToString("; ") { "${it.name}=${it.value}" }
-                        if (cookieHeader.isNotEmpty()) {
-                            fallbackConn.setRequestProperty("Cookie", cookieHeader)
-                        }
-                    } catch (_: Exception) { /* Cookie opsional */ }
-                    applyAuthHeaders(fallbackConn, item)
+                    // JANGAN set header/timeout di sini: koneksi sudah connected
+                    // (setRequestProperty melempar IllegalStateException). Auth,
+                    // cookie (via CookieHandler global), timeout, dan UA sudah
+                    // dipasang di dalam openAuthenticatedConnection; kredensial
+                    // juga sengaja TIDAK dipaksa ulang agar tidak bocor ke host
+                    // redirect beda-origin.
                     runSingle(item, fallbackConn, saver, throttle)
                 } finally {
                     fallbackConn.disconnect()
@@ -2311,7 +2410,7 @@ class DownloadEngine(appContext: Context) {
         )
         var downloaded = segment.downloaded
         var lastSegBytes = downloaded
-        var lastSegAt = System.currentTimeMillis()
+        var lastSegAt = monotonicNow()
         // Resume anti-korup per segmen: ukuran file parsial harus sinkron.
         // File sedikit lebih panjang dari catatan (flush progres tiap 500 ms)
         // hanya dipangkas, bukan dibuang — tanpa ini, tiap putus jaringan
@@ -2377,7 +2476,7 @@ class DownloadEngine(appContext: Context) {
                     val sharedTotal = addThrottleTotal(id, read.toLong())
                     throttle.sleepIfNeeded { sharedTotal }
                     if ((segIters++ and 7) != 0) continue
-                    val now = System.currentTimeMillis()
+                    val now = monotonicNow()
                     if (now - lastNotify >= 1000) {
                         lastNotify = now
                         coroutineContext.ensureActive()
@@ -2417,7 +2516,7 @@ class DownloadEngine(appContext: Context) {
             val totalDone = segs.sumOf { it.downloaded }
             // Sampel kecepatan/ETA maks 1x/detik (EMA + format ETA mahal bila
             // N item aktif x flush 500ms); byte/segmen tetap update tiap flush.
-            val nowMs = System.currentTimeMillis()
+            val nowMs = monotonicNow()
             val lastAt = lastSpeedSampleAt[id] ?: 0L
             val cached = lastSpeedSample[id]
             val (speed, eta) = if (cached != null && nowMs - lastAt < 1000) {
@@ -2444,7 +2543,12 @@ class DownloadEngine(appContext: Context) {
     // _items O(n) hanya untuk tahu ukuran array.
     private fun recordSegmentProgress(id: String, index: Int, downloaded: Long, segCount: Int) {
         if (segCount <= 0 || index < 0 || index >= segCount) return
-        val arr = segProgress.getOrPut(id) { LongArray(segCount) { -1L } }
+        // Pembuatan array wajib atomik (dua segmen paralel bisa membuat dua
+        // array dan progres salah satu hilang). Tulis per-indeks tetap aman
+        // tanpa kunci karena tiap indeks hanya ditulis segmen yang sama.
+        val arr = synchronized(segProgress) {
+            segProgress.getOrPut(id) { LongArray(segCount) { -1L } }
+        }
         // Segmen tetap (tidak berubah mid-download); abaikan bila ukuran geser.
         if (index >= arr.size) return
         arr[index] = downloaded
@@ -2488,7 +2592,7 @@ class DownloadEngine(appContext: Context) {
             }
             // Sampel kecepatan/ETA maks 1x/detik (EMA + format ETA mahal bila
             // N item aktif x flush 500ms); byte/segmen tetap update tiap flush.
-            val nowMs = System.currentTimeMillis()
+            val nowMs = monotonicNow()
             val lastAt = lastSpeedSampleAt[id] ?: 0L
             val cached = lastSpeedSample[id]
             val (speed, eta) = if (cached != null && nowMs - lastAt < 1000) {
@@ -2516,10 +2620,14 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun addThrottleTotal(id: String, delta: Long): Long =
-        throttleTotals.getOrPut(id) {
-            val current = _items.value.find { it.id == id }?.bytesDownloaded ?: 0L
-            AtomicLong(current)
-        }.addAndGet(delta)
+        // getOrPut tidak atomik: pembuatan counter + addAndGet wajib satu lock
+        // agar reset paralel tidak membuang hitungan (bypass/over-throttle).
+        synchronized(throttleTotals) {
+            throttleTotals.getOrPut(id) {
+                val current = _items.value.find { it.id == id }?.bytesDownloaded ?: 0L
+                AtomicLong(current)
+            }.addAndGet(delta)
+        }
 
     private fun clearSegProgress(id: String) {
         segProgress.remove(id)
@@ -2530,23 +2638,11 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun verifySize(downloaded: Long, total: Long) {
-        // total = klaim Content-Length. CDN kadang tidak konsisten:
-        // - underrun kecil (<=5%) sah — stream terpotong di akhir segmen
-        // - overrun (byte diterima > klaim) selalu sah — file menerima semua
-        //   byte klaim plus lebih; memakai abs() di sini membuat overrun
-        //   dianggap korup padahal justru bukti file utuh.
+        // total = klaim Content-Length. Overrun (byte > klaim) selalu sah,
+        // tapi underrun sekecil apa pun berarti file terpotong dan tidak
+        // boleh dilaporkan COMPLETED (toleransi lama menutupi video korup).
         if (total > 0 && downloaded < total) {
-            val shortage = total - downloaded
-            val tolerance = total / 20  // 5%
-            if (shortage > tolerance) {
-                throw IOException("Size mismatch: expected $total (Content-Length), received $downloaded")
-            }
-            if (shortage > 0) {
-                App.logEvent(
-                    "DOWNLOAD WARNING: received $downloaded of $total bytes " +
-                        "(short ${Formats.bytes(shortage)} within 5% tolerance)"
-                )
-            }
+            throw IOException("Size mismatch: expected $total (Content-Length), received $downloaded")
         }
     }
 
@@ -2785,7 +2881,7 @@ class DownloadEngine(appContext: Context) {
      *  detail segmen, disimpan paling cepat tiap 2 detik selama download aktif. */
     @Synchronized
     private fun scheduleProgressSave() {
-        val now = System.currentTimeMillis()
+        val now = monotonicNow()
         if (now - lastProgressSaveAt < PROGRESS_SAVE_INTERVAL_MS) return
         lastProgressSaveAt = now
         progressSaveJob?.cancel()
@@ -2908,6 +3004,12 @@ class DownloadEngine(appContext: Context) {
     }
 }
 
+/** Jam monotonik untuk interval (throttle/watchdog/progres): jam dinding bisa
+ *  melompat (NTP/ubah jam manual) dan membuat throttle macet berjam-jam atau
+ *  watchdog salah vonis stall. Fallback ke currentTimeMillis di JVM unit test. */
+internal fun monotonicNow(): Long =
+    runCatching { SystemClock.elapsedRealtime() }.getOrDefault(System.currentTimeMillis())
+
 internal fun redirectTarget(base: String, location: String?): String? {
     if (location.isNullOrBlank()) return null
     return runCatching {
@@ -2932,15 +3034,45 @@ internal fun isBlockedRedirectHost(host: String): Boolean {
     // Bentuk numerik IPv4 (desimal penuh/okt/heks, mis. 2130706433 = 127.0.0.1):
     // tolak bila oktet pertama 127 atau link-local 169.254.x.x.
     val numeric = h.removePrefix("[").removeSuffix("]")
+    // Unspecified IPv6 panjang (0:0:...:0) dan mapped-IPv4 wildcard
+    // (::ffff:0.0.0.0): setara 0.0.0.0 — tolak seperti bentuk ringkas "::".
+    if (numeric == "0:0:0:0:0:0:0:0" || numeric == "::ffff:0.0.0.0") return true
+    // Mapped-IPv4 loopback tanpa kurung (mis. dari URL yang tak dinormalisasi).
+    if (numeric.startsWith("::ffff:127.")) return true
     val parts = numeric.split('.')
     if (parts.size == 4) {
         val first = parseIpv4Part(parts[0])
         val second = parseIpv4Part(parts[1])
         if (first == 127) return true
         if (first == 169 && second == 254) return true
+        // 0.0.0.0 tersamar (0x0.0.0.0, 00.0.0.0): wildcard = localhost,
+        // tanpa ini hanya string persis "0.0.0.0" yang tertolak.
+        if (first == 0 && second == 0 &&
+            parseIpv4Part(parts[2]) == 0 && parseIpv4Part(parts[3]) == 0
+        ) return true
+    } else if (parts.size == 3) {
+        // Bentuk ringkas a.b.c (c 16-bit, mis. 127.0.1 = 127.0.0.1):
+        // tanpa ini, redirect ke 127.0.0.1 lolos sebagai "127.0.1".
+        val first = parseIpv4Part(parts[0])
+        val second = parseIpv4Part(parts[1])
+        if (first == 127) return true
+        if (first == 169 && second == 254) return true
+        if (first == 0 && second == 0 && parseIpv4Part(parts[2]) == 0) return true
+    } else if (parts.size == 2) {
+        // Bentuk ringkas a.b (b 24-bit, mis. 127.1 = 127.0.0.1).
+        val first = parseIpv4Part(parts[0])
+        if (first == 127) return true
+        if (first == 0 && parseIpv4Part(parts[1]) == 0) return true
+        if (first == 169) {
+            // 169.254.0.0/16 sebagai satu angka 24-bit di bagian kedua.
+            val second = parseIpv4Part(parts[1])
+            if (second != null && second in (254 shl 16)..((254 shl 16) or 0xFFFF)) return true
+        }
     } else if (parts.size == 1) {
         val long = parseIpv4Part(numeric)
         if (long != null) {
+            // Angka tunggal 0 ("http://0/") = 0.0.0.0.
+            if (long == 0) return true
             if ((long ushr 24) == 127) return true
             if ((long ushr 16) == ((169 shl 8) or 254)) return true
         }
@@ -2959,6 +3091,19 @@ internal fun parseIpv4Part(part: String): Int? {
             else -> return null
         }.takeIf { it in 0..4294967295L }?.toInt()
     }.getOrNull()
+}
+
+private val HLS_KEY_METHOD_RE = Regex("METHOD=([^,\\s\"]+)", RegexOption.IGNORE_CASE)
+
+/** Playlist HLS terenkripsi bila ada #EXT-X-KEY dengan METHOD selain NONE.
+ *  Murni agar bisa di-unit-test. */
+internal fun isEncryptedHlsPlaylist(body: String): Boolean {
+    if (!body.contains("#EXT-X-KEY")) return false
+    val methods = HLS_KEY_METHOD_RE.findAll(body).map { it.groupValues[1].uppercase() }.toList()
+    // Tanpa METHOD eksplisit: anggap terenkripsi (fail-closed) daripada
+    // mengunduh ciphertext yang dilaporkan sukses.
+    if (methods.isEmpty()) return true
+    return methods.any { it != "NONE" }
 }
 
 internal fun isSameOrigin(first: String, second: String): Boolean = runCatching {
@@ -3011,13 +3156,13 @@ private class SpeedThrottle(
     private val shared: GlobalRateLimiter?
 ) {
     private val lock = Any()
-    private var startTime = System.currentTimeMillis()
+    private var startTime = monotonicNow()
     private var startBytes = 0L
     private var lastSeen = 0L
 
     fun reset(start: Long) {
         synchronized(lock) {
-            startTime = System.currentTimeMillis()
+            startTime = monotonicNow()
             startBytes = start
             lastSeen = start
         }
@@ -3036,7 +3181,7 @@ private class SpeedThrottle(
                 if (delta <= 0) 0L else g.waitFor(delta)
             } else {
                 val limit = limitKbps * 1024L
-                val elapsed = System.currentTimeMillis() - startTime
+                val elapsed = monotonicNow() - startTime
                 val expected = startBytes + (elapsed * limit) / 1000L
                 if (total > expected) ((total - expected) * 1000L) / limit else 0L
             }
@@ -3052,7 +3197,7 @@ private class SpeedThrottle(
 private class DownloadHealthWatchdog(limitKbps: Int) {
     private val limitedLow = limitKbps > 0 && limitKbps * 1024L <= MIN_GOOD_SPEED_BPS
     private var lastBytes = 0L
-    private var lastAt = System.currentTimeMillis()
+    private var lastAt = monotonicNow()
     private var slowSince = 0L
 
     fun check(now: Long, downloaded: Long, total: Long, speed: Long) {
@@ -3089,12 +3234,12 @@ private class DownloadHealthWatchdog(limitKbps: Int) {
  *  throttle (akumulasi sejak dibuat membuat throttle mati setelah jeda lama). */
 private class GlobalRateLimiter(private val limitKbps: Int) {
     private val lock = Any()
-    private var windowStart = System.currentTimeMillis()
+    private var windowStart = monotonicNow()
     private var windowBytes = 0L
 
     fun waitFor(bytes: Long): Long {
         synchronized(lock) {
-            val now = System.currentTimeMillis()
+            val now = monotonicNow()
             if (now - windowStart > GLOBAL_WINDOW_MS) {
                 windowStart = now
                 windowBytes = 0

@@ -32,6 +32,20 @@ class RedirectSafetyTest {
     }
 
     @Test
+    fun `blocked redirect host covers short ipv4 forms`() {
+        // Bentuk ringkas inet_aton: 127.1 dan 127.0.1 = 127.0.0.1.
+        assertTrue(isBlockedRedirectHost("127.1"))
+        assertTrue(isBlockedRedirectHost("127.0.1"))
+        assertTrue(isBlockedRedirectHost("0x7f.1"))
+        assertTrue(isBlockedRedirectHost("0x7f.0.1"))
+        assertNull(redirectTarget("https://example.com/a", "http://127.1/x"))
+        assertNull(redirectTarget("https://example.com/a", "http://127.0.1/x"))
+        // Bukan loopback: 2/3 bagian biasa tetap lolos.
+        assertFalse(isBlockedRedirectHost("126.1"))
+        assertFalse(isBlockedRedirectHost("example.com"))
+    }
+
+    @Test
     fun `blocked redirect host covers numeric and local variants`() {
         assertTrue(isBlockedRedirectHost("127.0.0.1"))
         assertTrue(isBlockedRedirectHost("localhost"))
@@ -39,6 +53,26 @@ class RedirectSafetyTest {
         assertTrue(isBlockedRedirectHost("169.254.169.254"))
         assertFalse(isBlockedRedirectHost("192.168.1.10"))
         assertFalse(isBlockedRedirectHost("example.com"))
+    }
+
+    @Test
+    fun `blocked redirect host covers unspecified wildcard variants`() {
+        // 0.0.0.0 tersamar desimal/oktal/heks = wildcard, wajib ditolak.
+        assertTrue(isBlockedRedirectHost("0"))
+        assertTrue(isBlockedRedirectHost("0x0"))
+        assertTrue(isBlockedRedirectHost("0x0.0.0.0"))
+        assertTrue(isBlockedRedirectHost("00.0.0.0"))
+        assertTrue(isBlockedRedirectHost("0.0.0"))
+        assertTrue(isBlockedRedirectHost("0.0"))
+        assertNull(redirectTarget("https://example.com/a", "http://0/x"))
+        assertNull(redirectTarget("https://example.com/a", "http://0x0.0.0.0/x"))
+        // IPv6 unspecified panjang & mapped wildcard.
+        assertTrue(isBlockedRedirectHost("[0:0:0:0:0:0:0:0]"))
+        assertTrue(isBlockedRedirectHost("[::ffff:0.0.0.0]"))
+        assertTrue(isBlockedRedirectHost("::ffff:127.0.0.1"))
+        // Bukan wildcard: tetap lolos.
+        assertFalse(isBlockedRedirectHost("0.0.0.1"))
+        assertFalse(isBlockedRedirectHost("10.0.0.1"))
     }
 
     @Test

@@ -49,9 +49,17 @@ object CrashLog {
                         val buf = ByteArray(MAX_BYTES)
                         raf.seek(len - MAX_BYTES)
                         raf.readFully(buf)
-                        raf.setLength(MAX_BYTES.toLong())
+                        // Mulai dari newline pertama: titik potong byte mentah
+                        // bisa membelah karakter UTF-8 multi-byte dan baris.
+                        // Batas newline (0x0A ASCII) selalu aman untuk UTF-8.
+                        var start = 0
+                        while (start < buf.size && buf[start] != '
+'.code.toByte()) start++
+                        if (start < buf.size) start++
+                        val keep = buf.size - start
+                        raf.setLength(keep.toLong())
                         raf.seek(0)
-                        raf.write(buf)
+                        raf.write(buf, start, keep)
                     }
                 }
             }

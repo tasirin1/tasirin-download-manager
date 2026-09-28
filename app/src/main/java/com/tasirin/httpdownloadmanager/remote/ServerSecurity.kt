@@ -215,9 +215,12 @@ object ServerSecurity {
     }
 
     /** Validasi nama file dari remote/native: tidak kosong, tanpa separator
-     *  path, dan bukan traversal (".." / "../" / "..\\"). Satu definisi di sini
-     *  agar endpoint tidak memakai aturan inline yang berbeda-beda. */
+     *  path, bukan traversal (".." / "../" / "..\\"), dan tanpa titik/spasi
+     *  di akhir (filesystem FAT/SD memangkasnya sehingga "a. " bertabrakan
+     *  dengan "a" dan menimpa file lain). Satu definisi di sini agar endpoint
+     *  tidak memakai aturan inline yang berbeda-beda. */
     fun isFileNameValid(name: String): Boolean =
         name.isNotBlank() && '/' !in name && '\\' !in name &&
-        name != "." && name != ".." && !name.startsWith("../") && !name.startsWith("..\\")
+        name != "." && name != ".." && !name.startsWith("../") && !name.startsWith("..\\") &&
+        !name.endsWith(" ") && !name.endsWith(".")
 }

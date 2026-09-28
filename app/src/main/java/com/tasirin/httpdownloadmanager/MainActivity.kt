@@ -1305,7 +1305,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         for (item in items) {
             if (item.state == DownloadState.COMPLETED &&
                 item.id !in autoOpenedIds &&
-                item.filePath != null &&
+                (item.filePath != null || item.contentUri != null) &&
                 prev[item.id] != null && prev[item.id] != DownloadState.COMPLETED
             ) {
                 autoOpenedIds.add(item.id)

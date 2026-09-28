@@ -46,6 +46,10 @@ class FileSaver(context: Context) {
         return item.segments.map { partialFile(item.fileName, it.index) }
     }
 
+    // Dua merge dengan fileName sama yang jalan paralel akan saling menimpa
+    // target rename yang sama. Serialisasi per proses (merge jarang: sekali
+    // per download selesai) — murah dan menutup hasil merge tercampur.
+    @Synchronized
     fun mergeSegments(fileName: String, segmentCount: Int): File {
         val target = partialFile(fileName)
         // Staging unik per proses agar dua item bernama sama yang merge
@@ -82,7 +86,14 @@ class FileSaver(context: Context) {
         if (!dir.isDirectory) return null
         return runCatching {
             val target = uniqueTargetFile(File(dir, fileName))
-            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+            try {
+                target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+            } catch (e: Exception) {
+                // Gagal di tengah salin: buang target setengah jadi agar tidak
+                // tertinggal sebagai file korup di folder tujuan.
+                runCatching { target.delete() }
+                throw e
+            }
             partial.delete()
             MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
             PublishResult(filePath = target.absolutePath, fileName = target.name)
@@ -288,7 +299,14 @@ class FileSaver(context: Context) {
         val dir = File(folder)
         if (!dir.isDirectory && !dir.mkdirs()) return null
         val target = uniqueTargetFile(File(dir, fileName))
-        target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+        try {
+            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+        } catch (e: Exception) {
+            // Gagal di tengah salin: buang target setengah jadi agar tidak
+            // tertinggal sebagai file korup di folder teks (seperti publishToPath).
+            runCatching { target.delete() }
+            throw e
+        }
         partial.delete()
         MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
         PublishResult(filePath = target.absolutePath, fileName = target.name)
@@ -296,7 +314,7 @@ class FileSaver(context: Context) {
 
     fun freeBytes(): Long = runCatching {
         StatFs(downloadDir.absolutePath).availableBytes
-    }.getOrDefault(Long.MAX_VALUE)
+    }.getOrDefault(0L)
 
     fun destinationFreeBytes(): Long {
         // Partial download ditulis di downloadDir internal dan tmp upload di
@@ -307,7 +325,7 @@ class FileSaver(context: Context) {
         free = minOf(
             free,
             runCatching { StatFs(appContext.cacheDir.absolutePath).availableBytes }
-                .getOrDefault(Long.MAX_VALUE)
+                .getOrDefault(0L)
         )
         val textFolder = StoragePrefs.getTextFolder(appContext)
         if (textFolder != null) {
@@ -316,7 +334,7 @@ class FileSaver(context: Context) {
                 free = minOf(
                     free,
                     runCatching { StatFs(dir.absolutePath).availableBytes }
-                        .getOrDefault(Long.MAX_VALUE)
+                        .getOrDefault(0L)
                 )
             }
         }
@@ -401,6 +419,9 @@ class FileSaver(context: Context) {
                     MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
                     return PublishResult(filePath = target.absolutePath, fileName = target.name)
                 } catch (_: Exception) {
+                    // Gagal di tengah salin: buang target setengah jadi agar
+                    // tidak tertinggal sebagai file korup di folder publik.
+                    runCatching { target.delete() }
                     // fallback ke penyimpanan internal
                 }
             }
@@ -410,7 +431,14 @@ class FileSaver(context: Context) {
 
     private fun publishToInternal(partial: File, fileName: String): PublishResult {
         val target = uniqueTargetFile(File(downloadDir, fileName))
-        target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+        try {
+            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+        } catch (e: Exception) {
+            // Target setengah jadi tidak disapu pemindaian orphan (.part saja):
+            // hapus di sini agar tidak yatim selamanya.
+            runCatching { target.delete() }
+            throw e
+        }
         partial.delete()
         MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
         return PublishResult(filePath = target.absolutePath, fileName = target.name)
@@ -464,7 +492,12 @@ class FileSaver(context: Context) {
                     if (file.exists() && file.renameTo(target)) {
                         MediaLibrary.notifyMediaChanged(appContext, file.absolutePath, target.absolutePath)
                         target.absolutePath
-                    } else null
+                    } else {
+                        // Klaim kosong dari uniqueTargetFile tertinggal bila
+                        // rename gagal (mis. beda volume): hapus bila masih kosong.
+                        runCatching { if (target.isFile && target.length() == 0L) target.delete() }
+                        null
+                    }
                 }
                 else -> null
             }
@@ -477,13 +510,17 @@ class FileSaver(context: Context) {
             val unique = uniqueDocumentName(tree, item.fileName)
             val target = tree.createFile(MimeTypes.forFile(unique), unique)
                 ?: return null
-            val input = when {
-                !item.contentUri.isNullOrEmpty() ->
-                    appContext.contentResolver.openInputStream(item.contentUri.toUri())
-                !item.filePath.isNullOrEmpty() -> File(item.filePath).inputStream()
-                else -> null
-            } ?: return null
             try {
+                // Sumber dibaca di dalam try: bila tak bisa dibuka (URI basi /
+                // file hilang / null), target kosong yang terlanjur dibuat
+                // wajib dibuang agar tak jadi yatim di folder tujuan.
+                val input = when {
+                    !item.contentUri.isNullOrEmpty() ->
+                        appContext.contentResolver.openInputStream(item.contentUri.toUri())
+                    !item.filePath.isNullOrEmpty() ->
+                        runCatching { File(item.filePath).inputStream() }.getOrNull()
+                    else -> null
+                } ?: throw java.io.IOException("Failed to open move source")
                 input.use { src ->
                     val out = appContext.contentResolver.openOutputStream(target.uri, "wt")
                         ?: throw java.io.IOException("Failed to open move destination")
@@ -512,12 +549,21 @@ class FileSaver(context: Context) {
                 if (runCatching { candidate.createNewFile() }.getOrDefault(false)) {
                     return candidate
                 }
-                if (!candidate.exists()) return candidate
+                if (!candidate.exists()) {
+                    // Klaim gagal tapi path tetap tak ada = direktori tak bisa
+                    // ditulisi; sufiks lain tak akan membantu — gagal cepat agar
+                    // pemanggil (runCatching) batal bersih, bukan pakai path buntu.
+                    throw IOException("Cannot create file in ${parent?.absolutePath}")
+                }
+                // Klaim kalah race (file muncul di sela exists/create):
+                // jatuh ke sufiks unik berikutnya.
             }
             val next = FileNames.unique(candidate.name) { File(parent, it).exists() }
             candidate = if (parent != null) File(parent, next) else File(next)
         }
-        return candidate
+        // 1000 tabrakan nama (praktis tak terjadi): jangan kembalikan file
+        // tak-terklaim yang akan di-truncate pemanggil — gagal eksplisit.
+        throw IOException("Cannot allocate unique file in ${parent?.absolutePath}")
     }
 
     private fun uniqueDocumentName(tree: DocumentFile, fileName: String): String {
@@ -586,11 +632,21 @@ class FileSaver(context: Context) {
                         val target = subDir.findFile(fileName)
                             ?: subDir.createFile(MimeTypes.forFile(fileName), fileName)
                             ?: return result
-                        val input = appContext.contentResolver.openInputStream(uri) ?: return result
-                        input.use { src ->
-                            val out = appContext.contentResolver.openOutputStream(target.uri, "wt")
-                                ?: return result
-                            out.use { dst -> src.copyTo(dst) }
+                        val input = appContext.contentResolver.openInputStream(uri)
+                            ?: run {
+                                // Target kosong sudah terlanjur dibuat di atas.
+                                runCatching { appContext.contentResolver.delete(target.uri, null, null) }
+                                return result
+                            }
+                        try {
+                            input.use { src ->
+                                val out = appContext.contentResolver.openOutputStream(target.uri, "wt")
+                                    ?: throw java.io.IOException("Failed to open organize destination")
+                                out.use { dst -> src.copyTo(dst) }
+                            }
+                        } catch (e: Exception) {
+                            runCatching { appContext.contentResolver.delete(target.uri, null, null) }
+                            throw e
                         }
                         appContext.contentResolver.delete(uri, null, null)
                         PublishResult(contentUri = target.uri.toString())

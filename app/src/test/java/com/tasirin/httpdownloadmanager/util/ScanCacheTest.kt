@@ -37,7 +37,8 @@ class ScanCacheTest {
     fun `entry media store basi - tidak ditampilkan`() {
         assertFalse(MediaLibrary.isMediaEntryReadable("/sdcard/gone.mp4", "u:stale", { false }))
         assertTrue(MediaLibrary.isMediaEntryReadable("/sdcard/live.mp4", "u:live", { true }))
-        assertTrue(MediaLibrary.isMediaEntryReadable(null, "u:saf-only", { false }))
+        assertTrue(MediaLibrary.isMediaEntryReadable(null, "content://media/external/video/media/1", { false }))
+        assertFalse(MediaLibrary.isMediaEntryReadable(null, "u:saf-only", { false }))
         assertFalse(MediaLibrary.isMediaEntryReadable(null, null, { true }))
     }
 }

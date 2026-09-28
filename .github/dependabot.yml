@@ -24,7 +24,6 @@ updates:
           - "org.nanohttpd:*"
           - "junit:*"
           - "org.json:*"
-          - "com.google.zxing:*"
     ignore:
       # Major AGP/Kotlin perlu upgrade Gradle dulu; tangani manual bertahap,
       # bukan PR otomatis yang gagal CI (AGENTS.md aturan #12).

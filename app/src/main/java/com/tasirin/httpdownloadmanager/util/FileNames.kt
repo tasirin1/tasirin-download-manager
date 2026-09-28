@@ -37,6 +37,20 @@ object FileNames {
             clean = if (dot in 1..190) clean.substring(0, 190) + clean.substring(dot)
             else clean.substring(0, 200)
         }
+        // Batas filesystem dalam byte (255): 200 char CJK = 600 byte sehingga
+        // gagal ENAMETOOLONG. Pangkas per karakter (tak belah UTF-8) sambil
+        // mempertahankan ekstensi.
+        if (clean.toByteArray(Charsets.UTF_8).size > 240) {
+            val dot = clean.lastIndexOf('.')
+            val ext = if (dot in 1..239) clean.substring(dot) else ""
+            var base = if (dot in 1..239) clean.substring(0, dot) else clean
+            val budget = 240 - ext.toByteArray(Charsets.UTF_8).size
+            while (base.isNotEmpty() && base.toByteArray(Charsets.UTF_8).size > budget) {
+                base = base.dropLast(1)
+            }
+            clean = (base + ext).trimEnd('.', ' ')
+            if (clean.isEmpty()) clean = "download"
+        }
         return clean
     }
 
