@@ -294,7 +294,7 @@ class DownloadEngine(appContext: Context) {
             preferredHeight = preferredHeight,
             preferredAudioLang = preferredAudioLang
         )
-        update(ArrayList(_items.value.size + 1).apply { add(item); addAll(_items.value) })
+        update(ArrayList<DownloadItem>(_items.value.size + 1).apply { add(item); addAll(_items.value) })
         flushSave()
         val host = runCatching { URL(cleanUrl).host }.getOrDefault("")
         App.logEvent("DOWNLOAD ADDED: $name (${host.ifEmpty { "custom URL" }})")
@@ -448,7 +448,7 @@ class DownloadEngine(appContext: Context) {
             autoResume = false,
             finishedAt = System.currentTimeMillis()
         )
-        update(ArrayList(_items.value.size + 1).apply { add(item); addAll(_items.value) })
+        update(ArrayList<DownloadItem>(_items.value.size + 1).apply { add(item); addAll(_items.value) })
         flushSave()
         return published
     }
