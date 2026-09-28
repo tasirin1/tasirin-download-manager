@@ -41,7 +41,8 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
 │   ├── assets/
-│   │   └── remote.html               # Remote web minified (digenapi dari remote.src.html)
+│   │   ├── remote.html               # Remote web minified (digenapi dari remote.src.html)
+│   │   └── extract.js                # Skrip grab WebExtractActivity (readable, JANGAN minify satu baris: pemicu Wacatac)
 │   ├── res/raw/                      # trust anchor TLS (digicert_global_root_g2.pem, isrg_root_x1.pem)
 │   └── java/com/tasirin/httpdownloadmanager/
 │       ├── App.kt                    # Application — inisialisasi engine download
