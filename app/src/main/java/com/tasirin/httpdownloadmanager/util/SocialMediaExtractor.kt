@@ -1071,6 +1071,32 @@ object SocialMediaExtractor {
         return url
     }
 
+    /** Batas daftar episode per halaman agar intent hasil tetap ringan. */
+    private const val HH_MAX_EPISODES = 50
+
+    /** Tautan episode HentaiHaven dari WebView (JSON `[{url,title}]`). */
+    data class EpisodeLink(val url: String, val title: String)
+
+    /** Parse daftar episode titipan WebView: hanya http(s) ber-path `/watch/`,
+     *  buang halaman aktif & duplikat (tanpa I/O sehingga bisa di-unit-test). */
+    internal fun parseEpisodeLinks(json: String, excludeUrl: String = ""): List<EpisodeLink> {
+        val arr = runCatching { JSONArray(json) }.getOrNull() ?: return emptyList()
+        val seen = LinkedHashSet<String>()
+        val out = mutableListOf<EpisodeLink>()
+        for (i in 0 until arr.length()) {
+            if (out.size >= HH_MAX_EPISODES) break
+            val obj = arr.optJSONObject(i) ?: continue
+            var url = obj.optString("url").trim()
+            if (url.startsWith("//")) url = "https:$url"
+            if (!url.startsWith("http://") && !url.startsWith("https://")) continue
+            if (!url.contains("/watch/")) continue
+            if (url == excludeUrl) continue
+            if (!seen.add(url)) continue
+            out.add(EpisodeLink(url, obj.optString("title").trim().take(80)))
+        }
+        return out
+    }
+
     // ── Twitter/X ────────────────────────────────────────────────────────
 
     private fun extractTwitter(url: String): Result? {

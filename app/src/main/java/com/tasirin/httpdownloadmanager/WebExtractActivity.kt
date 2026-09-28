@@ -16,6 +16,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** Browser ekstraksi video dalam aplikasi (WebView sistem, tanpa dependensi).
@@ -31,8 +32,10 @@ class WebExtractActivity : AppCompatActivity() {
         const val EXTRA_COOKIES = "extra_cookies"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_WATCH_URL = "extra_watch_url"
+        const val EXTRA_EPISODES_JSON = "extra_episodes_json"
         private const val GRAB_INTERVAL_MS = 1500L
         private const val MAX_GRAB_TRIES = 40
+        private const val MAX_EPISODES = 50
     }
 
     private lateinit var webView: WebView
@@ -44,6 +47,8 @@ class WebExtractActivity : AppCompatActivity() {
     private var grabTries = 0
     private var finished = false
     private var loopStarted = false
+    private var manualGrab = false
+    private var lastEpisodesJson = ""
     private val handler = Handler(Looper.getMainLooper())
 
     private val grabLoop = object : Runnable {
@@ -51,8 +56,12 @@ class WebExtractActivity : AppCompatActivity() {
             if (finished) return
             loopStarted = true
             if (grabTries >= MAX_GRAB_TRIES) {
-                statusText.text = getString(R.string.web_extract_failed)
-                progress.isVisible = false
+                if (lastEpisodesJson.isNotBlank() && lastEpisodesJson != "[]") {
+                    onEpisodesOnly(lastEpisodesJson, webView.title.orEmpty())
+                } else {
+                    statusText.text = getString(R.string.web_extract_failed)
+                    progress.isVisible = false
+                }
                 return
             }
             grabTries++
@@ -107,7 +116,7 @@ class WebExtractActivity : AppCompatActivity() {
                 }
             }
         }
-        grabButton.setOnClickListener { runGrabScript() }
+        grabButton.setOnClickListener { manualGrab = true; runGrabScript() }
         closeButton.setOnClickListener {
             setResult(RESULT_CANCELED)
             finish()
@@ -177,38 +186,92 @@ class WebExtractActivity : AppCompatActivity() {
             "for(var q=0;q<b.length;q++)bucket2(b[q]);" +
             "mp4=mp4.concat(mp42);hls=hls.concat(hls2);" +
             "var src=mp4.length>0?mp4[0]:(hls.length>0?hls[0]:'');" +
+            "var eps=[],seenEps={};" +
+            "docs.forEach(function(doc){try{" +
+            "var links=doc.getElementsByTagName('a');" +
+            "for(var n=0;n<links.length&&eps.length<50;n++){" +
+            "var a=links[n];var href=a.getAttribute('href')||'';if(!href)continue;" +
+            "var u=abs(href.trim());if(u.indexOf('http')!==0)continue;" +
+            "var host='';try{host=new URL(u).hostname;}catch(e){continue;}" +
+            "if(host!==location.hostname)continue;" +
+            "if(u===location.href)continue;" +
+            "if(u.indexOf('/watch/')<0)continue;" +
+            "if(seenEps[u])continue;seenEps[u]=1;" +
+            "var t=((a.textContent||'').trim().replace(/\\s+/g,' ').slice(0,80))||u.split('/').filter(Boolean).pop();" +
+            "eps.push({url:u,title:t});}" +
+            "}catch(e){}});" +
             "return JSON.stringify({src:src,title:document.title||''," +
-            "hasVideo:(hasVideo||window.__hhBlob===true),hasBlob:(window.__hhBlob===true)});" +
-            "}catch(e){return JSON.stringify({src:'',title:'',hasVideo:false,hasBlob:false});}})()"
+            "hasVideo:(hasVideo||window.__hhBlob===true),hasBlob:(window.__hhBlob===true),episodes:eps});" +
+            "}catch(e){return JSON.stringify({src:'',title:'',hasVideo:false,hasBlob:false,episodes:[]});}})()"
         webView.evaluateJavascript(js) { raw ->
             if (finished) return@evaluateJavascript
             val payload = raw?.trim('"')?.replace("\\\"", "\"")?.replace("\\\\", "\\").orEmpty()
             val obj = runCatching { JSONObject(payload) }.getOrNull() ?: return@evaluateJavascript
+            val episodesJson = trimEpisodes(obj.optJSONArray("episodes")?.toString().orEmpty())
+            if (episodesJson.isNotBlank() && episodesJson != "[]") lastEpisodesJson = episodesJson
             val src = obj.optString("src").replace("\\/", "/")
             if (src.startsWith("http")) {
-                onVideoFound(src, obj.optString("title"))
+                onVideoFound(src, obj.optString("title"), episodesJson)
+            } else if (manualGrab) {
+                manualGrab = false
+                if (episodesJson.isNotBlank() && episodesJson != "[]") {
+                    onEpisodesOnly(episodesJson, obj.optString("title"))
+                } else {
+                    statusText.text = getString(R.string.web_extract_failed)
+                }
             } else if (obj.optBoolean("hasVideo") || obj.optBoolean("hasBlob")) {
                 statusText.text = getString(R.string.web_extract_ready)
             }
         }
     }
 
-    private fun onVideoFound(videoUrl: String, title: String) {
+    private fun onVideoFound(videoUrl: String, title: String, episodesJson: String) {
         finished = true
         handler.removeCallbacks(grabLoop)
         statusText.text = getString(R.string.web_extract_found)
-        val cookies = runCatching {
-            CookieManager.getInstance().getCookie(watchUrl)
-        }.getOrNull().orEmpty()
         setResult(
             RESULT_OK,
             Intent()
                 .putExtra(EXTRA_VIDEO_URL, videoUrl)
-                .putExtra(EXTRA_COOKIES, cookies)
+                .putExtra(EXTRA_COOKIES, extractCookies())
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_WATCH_URL, watchUrl)
+                .putExtra(EXTRA_EPISODES_JSON, episodesJson)
         )
         finish()
+    }
+
+    /** Halaman tanpa video tapi berisi daftar episode (mis. halaman seri):
+     *  kembalikan daftarnya agar pemanggil bisa menawarkan unduh batch. */
+    private fun onEpisodesOnly(episodesJson: String, title: String) {
+        finished = true
+        handler.removeCallbacks(grabLoop)
+        statusText.text = getString(R.string.web_extract_found)
+        setResult(
+            RESULT_OK,
+            Intent()
+                .putExtra(EXTRA_VIDEO_URL, "")
+                .putExtra(EXTRA_COOKIES, extractCookies())
+                .putExtra(EXTRA_TITLE, title)
+                .putExtra(EXTRA_WATCH_URL, watchUrl)
+                .putExtra(EXTRA_EPISODES_JSON, episodesJson)
+        )
+        finish()
+    }
+
+    /** Cookie WebView halaman aktif (diteruskan sebagai header `Cookie`). */
+    private fun extractCookies(): String = runCatching {
+        CookieManager.getInstance().getCookie(watchUrl)
+    }.getOrNull().orEmpty()
+
+    /** Batasi daftar episode titipan JS agar intent hasil tetap ringan. */
+    private fun trimEpisodes(json: String): String {
+        if (json.isBlank()) return ""
+        val arr = runCatching { JSONArray(json) }.getOrNull() ?: return ""
+        if (arr.length() <= MAX_EPISODES) return arr.toString()
+        val out = JSONArray()
+        for (i in 0 until MAX_EPISODES) out.put(arr.optJSONObject(i) ?: continue)
+        return out.toString()
     }
 
     override fun onDestroy() {

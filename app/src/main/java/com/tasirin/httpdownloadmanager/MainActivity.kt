@@ -667,46 +667,121 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
 
+        // Unduh banyak episode HentaiHaven sekaligus: tiap episode diekstrak
+        // berurutan lewat browser dalam aplikasi, lalu langsung diantrekan.
+        fun runEpisodeBatch(
+            remaining: ArrayDeque<SocialMediaExtractor.EpisodeLink>,
+            total: Int,
+            added: Int
+        ) {
+            val next = remaining.removeFirstOrNull()
+            if (next == null) {
+                Toast.makeText(
+                    this,
+                    getString(R.string.batch_episodes_added, added, total),
+                    Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+            Toast.makeText(
+                this,
+                getString(R.string.batch_episodes_progress, total - remaining.size, total),
+                Toast.LENGTH_SHORT
+            ).show()
+            onWebExtractResult = { data ->
+                val video = data?.getStringExtra(WebExtractActivity.EXTRA_VIDEO_URL).orEmpty()
+                var count = added
+                if (video.startsWith("http")) {
+                    val cookies = data?.getStringExtra(WebExtractActivity.EXTRA_COOKIES).orEmpty()
+                    val referer = data?.getStringExtra(WebExtractActivity.EXTRA_WATCH_URL).orEmpty()
+                    val headers = buildString {
+                        if (cookies.isNotBlank()) append("Cookie: ").append(cookies)
+                        if (referer.isNotBlank()) {
+                            if (isNotEmpty()) append("\n")
+                            append("Referer: ").append(referer)
+                        }
+                    }
+                    val epTitle = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
+                        ?.substringBefore(" - ").orEmpty().trim().take(80)
+                    val fileName: String? =
+                        epTitle.takeIf { it.isNotBlank() } ?: next.title.takeIf { it.isNotBlank() }
+                    App.engine.addDownload(url = video, fileName = fileName, headers = headers)
+                    count++
+                } else {
+                    Toast.makeText(this, R.string.batch_episodes_skipped, Toast.LENGTH_SHORT).show()
+                }
+                runEpisodeBatch(remaining, total, count)
+            }
+            webExtractLauncher.launch(
+                Intent(this, WebExtractActivity::class.java)
+                    .putExtra(WebExtractActivity.EXTRA_URL, next.url)
+            )
+        }
+        fun offerEpisodeBatch(
+            episodes: List<SocialMediaExtractor.EpisodeLink>,
+            allowSingle: Boolean
+        ) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.batch_episodes_title)
+                .setMessage(getString(R.string.batch_episodes_message, episodes.size))
+                .setPositiveButton(R.string.batch_episodes_all) { _, _ ->
+                    runEpisodeBatch(ArrayDeque(episodes), episodes.size, 0)
+                }
+                .setNegativeButton(
+                    if (allowSingle) R.string.batch_episodes_single else android.R.string.cancel,
+                    null
+                )
+                .show()
+        }
         // Situs anti-bot (HentaiHaven): ambil video lewat browser dalam
         // aplikasi, lalu isi URL + cookie ke form agar engine unduh langsung.
         onWebExtractResult = { data ->
             val videoUrl = data?.getStringExtra(WebExtractActivity.EXTRA_VIDEO_URL).orEmpty()
-            if (videoUrl.isBlank()) {
+            val watch = data?.getStringExtra(WebExtractActivity.EXTRA_WATCH_URL).orEmpty()
+            val episodes = SocialMediaExtractor.parseEpisodeLinks(
+                data?.getStringExtra(WebExtractActivity.EXTRA_EPISODES_JSON).orEmpty(),
+                watch
+            )
+            if (videoUrl.isBlank() && episodes.isEmpty()) {
                 Toast.makeText(this, R.string.web_extract_failed, Toast.LENGTH_LONG).show()
             } else {
-                urlInput.setText(videoUrl)
-                urlInput.setSelection(videoUrl.length)
-                val cookies = data?.getStringExtra(WebExtractActivity.EXTRA_COOKIES).orEmpty()
-                val watch = data?.getStringExtra(WebExtractActivity.EXTRA_WATCH_URL).orEmpty()
-                val extra = buildString {
-                    if (cookies.isNotBlank()) append("Cookie: ").append(cookies)
-                    if (watch.isNotBlank()) {
-                        if (isNotEmpty()) append("\n")
-                        append("Referer: ").append(watch)
+                if (videoUrl.isNotBlank()) {
+                    urlInput.setText(videoUrl)
+                    urlInput.setSelection(videoUrl.length)
+                    val cookies = data?.getStringExtra(WebExtractActivity.EXTRA_COOKIES).orEmpty()
+                    val extra = buildString {
+                        if (cookies.isNotBlank()) append("Cookie: ").append(cookies)
+                        if (watch.isNotBlank()) {
+                            if (isNotEmpty()) append("\n")
+                            append("Referer: ").append(watch)
+                        }
                     }
+                    if (extra.isNotBlank()) {
+                        val cur = headersInput.text?.toString().orEmpty()
+                        headersInput.setText(if (cur.isBlank()) extra else cur + "\n" + extra)
+                    }
+                    val title = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
+                        ?.substringBefore(" - ").orEmpty().trim().take(80)
+                    if (nameInput.text?.toString().isNullOrBlank() && title.isNotBlank()) {
+                        nameInput.setText(title)
+                    }
+                    Toast.makeText(this, R.string.web_extract_done, Toast.LENGTH_LONG).show()
+                    // URL hasil ekstraksi adalah CDN langsung (bukan sosial):
+                    // samakan tampilan seperti cabang non-sosial probeSocialNow.
+                    socialOptions = emptyList()
+                    socialVideoOptions = emptyList()
+                    socialPhotoOptions = emptyList()
+                    socialYoutubeHeights = intArrayOf()
+                    socialAudioLanguages = emptyList()
+                    socialAudioSection.isVisible = false
+                    socialQualitySection.isVisible = false
+                    socialCarouselSection.isVisible = false
+                    platformBadge.isVisible = false
+                    btnWebExtract.isVisible = false
                 }
-                if (extra.isNotBlank()) {
-                    val cur = headersInput.text?.toString().orEmpty()
-                    headersInput.setText(if (cur.isBlank()) extra else cur + "\n" + extra)
+                if (episodes.isNotEmpty()) {
+                    offerEpisodeBatch(episodes, videoUrl.isNotBlank())
                 }
-                val title = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
-                    ?.substringBefore(" - ").orEmpty().trim().take(80)
-                if (nameInput.text?.toString().isNullOrBlank() && title.isNotBlank()) {
-                    nameInput.setText(title)
-                }
-                Toast.makeText(this, R.string.web_extract_done, Toast.LENGTH_LONG).show()
-                // URL hasil ekstraksi adalah CDN langsung (bukan sosial):
-                // samakan tampilan seperti cabang non-sosial probeSocialNow.
-                socialOptions = emptyList()
-                socialVideoOptions = emptyList()
-                socialPhotoOptions = emptyList()
-                socialYoutubeHeights = intArrayOf()
-                socialAudioLanguages = emptyList()
-                socialAudioSection.isVisible = false
-                socialQualitySection.isVisible = false
-                socialCarouselSection.isVisible = false
-                platformBadge.isVisible = false
-                btnWebExtract.isVisible = false
             }
         }
         btnWebExtract.setOnClickListener {

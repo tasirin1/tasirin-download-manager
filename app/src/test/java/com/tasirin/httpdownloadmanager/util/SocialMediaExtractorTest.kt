@@ -202,6 +202,29 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parseEpisodeLinks - saring watch, buang duplikat dan halaman aktif`() {
+        val json = "[{\"url\":\"https://$hhDomain/watch/ep-2/\",\"title\":\"Ep 2\"}," +
+            "{\"url\":\"https://$hhDomain/watch/ep-1/\",\"title\":\"Ep 1\"}," +
+            "{\"url\":\"https://$hhDomain/watch/ep-2/\",\"title\":\"Ep 2 dup\"}," +
+            "{\"url\":\"https://$hhDomain/about/\",\"title\":\"About\"}," +
+            "{\"url\":\"not a url\",\"title\":\"Bad\"}]"
+        val eps = SocialMediaExtractor.parseEpisodeLinks(json, "https://$hhDomain/watch/ep-1/")
+        assertEquals(1, eps.size)
+        assertEquals("https://$hhDomain/watch/ep-2/", eps[0].url)
+        assertEquals("Ep 2", eps[0].title)
+    }
+
+    @Test
+    fun `parseEpisodeLinks - json rusak dan batas 50`() {
+        assertTrue(SocialMediaExtractor.parseEpisodeLinks("bukan json").isEmpty())
+        assertTrue(SocialMediaExtractor.parseEpisodeLinks("[]").isEmpty())
+        val big = (1..60).joinToString(",", "[", "]") {
+            "{\"url\":\"https://$hhDomain/watch/ep-$it/\",\"title\":\"Ep $it\"}"
+        }
+        assertEquals(50, SocialMediaExtractor.parseEpisodeLinks(big).size)
+    }
+
+    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))
