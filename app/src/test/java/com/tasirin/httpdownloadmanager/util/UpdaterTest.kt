@@ -45,9 +45,19 @@ class UpdaterTest {
     }
 
     @Test
+    fun `nama apk generik ikut kode tag yang valid`() {
+        // Nama asset hanya dipakai untuk format lawas; pemanggil memfilter
+        // `.apk` dulu sehingga asset generik sah memakai kode dari tag.
+        assertEquals(
+            101191,
+            Updater.codeFromRelease("v1.0.1191", "aplikasi.apk")
+        )
+    }
+
+    @Test
     fun `tag rusak dan nama tanpa kode menghasilkan null`() {
         assertNull(Updater.codeFromRelease("release-foo", "tasirin-download-manager-v1.0.1191.apk"))
-        assertNull(Updater.codeFromRelease("v1.0.1191", "aplikasi.apk"))
+        assertNull(Updater.codeFromRelease("release-foo", "mapping.txt"))
         assertNull(Updater.codeFromRelease("", ""))
     }
 }
