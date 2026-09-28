@@ -212,6 +212,7 @@ object StoragePrefs {
         val expected = normalizePinHash(stored) ?: return false
         if (!constantEquals(sha256Hex(pin), expected)) return false
         prefs(context).edit { putString(KEY_SERVER_PIN, PinHash.hash(pin)) }
+        rotateServerSessionSecret(context)
         return true
     }
 

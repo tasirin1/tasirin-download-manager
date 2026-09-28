@@ -41,6 +41,7 @@ object SocialMediaExtractor {
     private val IG_BROAD_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/|(?:https?://)instagr\.am/""")
     private val XV_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xvideos\.com/""")
     private val XN_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xnxx\.com/|(?:https?://)(?:www\.)?xnxxvideos\.me/""")
+    private val PH_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?pornhub\.com/|(?:https?://)(?:www\.)?pornhubpremium\.com/""")
     /** HentaiHaven: halaman watch (`/watch/<slug>/`) dilindungi challenge
      *  Cloudflare sehingga fetch server pasti 403; ekstraksi memakai WebView
      *  (`WebExtractActivity`) + parser murni di bawah sebagai fallback. */
@@ -74,6 +75,9 @@ object SocialMediaExtractor {
     private val HP_OG_VIDEO_RE = Regex("""<meta[^>]+property\s*=\s*["']og:video["'][^>]+content\s*=\s*["'](https?://[^"']+)["']""")
     private val HP_OG_TITLE_RE = Regex("""<meta[^>]+property\s*=\s*["']og:title["'][^>]+content\s*=\s*["'](.+?)["']""")
     private val HP_TITLE_TAG_RE = Regex("""<title>(.+?)</title>""")
+    private val PH_MEDIA_DEF_RE = Regex("\"videoUrl\"\\s*:\\s*\"(https?:[^\"]+)\"[^}]*?\"quality\"\\s*:\\s*\"(\\d+)\"")
+    private val PH_FLASHVARS_Q_RE = Regex("\"quality_(\\d+)p\"\\s*:\\s*\"(https?:[^\"]+)\"")
+    private val PH_VIDEO_URL_RE = Regex("\"video_url\"\\s*:\\s*\"(https?:[^\"]+)\"")
     private val HH_VIDEO_TAG_RE = Regex("""<video[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
     private val HH_SOURCE_TAG_RE = Regex("""<source[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
     private val HH_DATA_SRC_RE = Regex("""<(?:video|source)[^>]+data-(?:src|video|source)\s*=\s*["'](https?://[^"']+)["']""")
@@ -104,6 +108,7 @@ object SocialMediaExtractor {
             !lower.contains("youtube.com") && !lower.contains("youtu.be") &&
             !lower.contains("instagr.am") && !lower.contains("xvideos.com") &&
             !lower.contains("xnxx.com") && !lower.contains("xnxxvideos.me") &&
+            !lower.contains("pornhub.com") && !lower.contains("pornhubpremium.com") &&
             !lower.contains("hentaihaven")
         ) return false
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
@@ -115,6 +120,7 @@ object SocialMediaExtractor {
                 YT_HOST_RE.containsMatchIn(lower) ||
                 XV_HOST_RE.containsMatchIn(lower) ||
                 XN_HOST_RE.containsMatchIn(lower) ||
+                PH_HOST_RE.containsMatchIn(lower) ||
                 HH_HOST_RE.containsMatchIn(lower)
     }
 
@@ -134,10 +140,11 @@ object SocialMediaExtractor {
                 YT_HOST_RE.containsMatchIn(lower) -> extractYouTube(url)
                 XV_HOST_RE.containsMatchIn(lower) -> extractXVideos(url)
                 XN_HOST_RE.containsMatchIn(lower) -> extractXnxx(url)
+                PH_HOST_RE.containsMatchIn(lower) -> extractPornhub(url)
                 HH_HOST_RE.containsMatchIn(lower) -> extractHentaiHaven(url)
                 else -> null
             }
-        } catch (_: Exception) { null }
+        } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
     }
 
     /** Ekstrak semua opsi resolusi yang tersedia. */
@@ -156,10 +163,11 @@ object SocialMediaExtractor {
                     YT_HOST_RE.containsMatchIn(lower) -> extractAllYouTube(url)
                     XV_HOST_RE.containsMatchIn(lower) -> extractAllXVideos(url)
                     XN_HOST_RE.containsMatchIn(lower) -> extractAllXnxx(url)
+                    PH_HOST_RE.containsMatchIn(lower) -> extractAllPornhub(url)
                     HH_HOST_RE.containsMatchIn(lower) -> extractAllHentaiHaven(url)
                     else -> emptyList()
                 }
-            } catch (_: Exception) { emptyList() }
+            } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; emptyList() }
         } ?: emptyList()
     }
 
@@ -463,7 +471,7 @@ object SocialMediaExtractor {
             // Strategi 1: halaman WEB + Piped/Invidious/Cobalt
             val results = extractYouTubeFromPage(url, videoId)
             results.firstOrNull { it.directUrl.startsWith("http") }
-        } catch (_: Exception) { null }
+        } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
     }
 
     private fun extractYouTubeFromPage(url: String, videoId: String): List<Result> {
@@ -994,6 +1002,74 @@ object SocialMediaExtractor {
             .replace("\\u002F", "/")
             .replace("\\u0026", "&")
             .replace("&amp;", "&")
+    }
+
+    // ── Pornhub ─────────────────────────────────────────────────────
+    // Halaman watch (`/view_video.php?viewkey=...`) memuat varian di JSON
+    // `mediaDefinitions` (`"videoUrl"` + `"quality"`) dan fallback `flashvars`
+    // (`"quality_720p"`, `"video_url"`). Unduhan langsung yang sebelumnya hanya
+    // menyimpan halaman HTML kini diekstrak jadi MP4/HLS seperti XNXX/XVideos.
+
+    private val PH_HEADERS = mapOf(
+        "User-Agent" to DEFAULT_UA,
+        "Accept" to "text/html,application/xhtml+xml",
+        "Referer" to "https://www.pornhub.com/"
+    )
+
+    private fun extractPornhub(url: String): Result? = extractBestPlayerOption(extractAllPornhub(url))
+
+    private fun extractAllPornhub(url: String): List<Result> {
+        val html = fetchWatchHtml(url, PH_HEADERS) ?: return emptyList()
+        return parsePornhubPage(html)
+    }
+
+    /** Parser murni halaman watch Pornhub (tanpa I/O) agar bisa di-unit-test. */
+    internal fun parsePornhubPage(html: String): List<Result> {
+        var title = HP_OG_TITLE_RE.find(html)?.groupValues?.get(1)
+            ?: HP_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(" - Pornhub")
+            ?: "Pornhub_video"
+        title = unescapePlayer(title.trim()).take(120)
+        if (title.isBlank()) title = "Pornhub_video"
+        val safeName = sanitizeFileName(title)
+        val found = LinkedHashMap<String, Int>()
+        fun addCandidate(raw: String?, quality: Int) {
+            if (raw.isNullOrBlank()) return
+            val url = unescapePlayer(raw.trim())
+            if (!url.startsWith("http")) return
+            val prev = found[url]
+            if (prev == null || quality > prev) found[url] = quality
+        }
+        PH_MEDIA_DEF_RE.findAll(html).forEach {
+            addCandidate(it.groupValues.getOrNull(1), it.groupValues.getOrNull(2)?.toIntOrNull() ?: 0)
+        }
+        PH_FLASHVARS_Q_RE.findAll(html).forEach {
+            addCandidate(it.groupValues.getOrNull(2), it.groupValues.getOrNull(1)?.toIntOrNull() ?: 0)
+        }
+        if (found.isEmpty()) {
+            addCandidate(PH_VIDEO_URL_RE.find(html)?.groupValues?.getOrNull(1), 0)
+        }
+        if (found.isEmpty()) {
+            addCandidate(HP_OG_VIDEO_RE.find(html)?.groupValues?.getOrNull(1), 0)
+        }
+        if (found.isEmpty()) {
+            addCandidate(HH_TWITTER_STREAM_RE.find(html)?.groupValues?.getOrNull(1), 0)
+        }
+        if (found.isEmpty()) {
+            HH_GENERIC_MEDIA_RE.findAll(html).forEach { addCandidate(it.value, 0) }
+        }
+        return found.entries.sortedByDescending { it.value }.map { (url, quality) ->
+            val isHls = url.contains(".m3u8")
+            if (isHls) {
+                Result(url, "Pornhub_${safeName}.ts", title, if (quality > 0) "${quality}p" else "HLS", "application/x-mpegURL", isHls = true)
+            } else {
+                val label = when {
+                    quality >= 720 -> "HD"
+                    quality > 0 -> "${quality}p"
+                    else -> "Video"
+                }
+                Result(url, "Pornhub_${safeName}_${label}.mp4", title, label, MIME_MP4)
+            }
+        }
     }
 
     // ── HentaiHaven ─────────────────────────────────────────────────────

@@ -412,20 +412,24 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialDebounce: Job? = null
         fun platformLabelFrom(url: String): String {
             val host = runCatching { url.toUri().host.orEmpty() }.getOrDefault("").lowercase()
+            fun matches(vararg domains: String): Boolean =
+                domains.any { d -> host == d || host.endsWith(".$d") }
             return when {
-                host.contains("youtube.com") || host.contains("youtu.be") ->
+                matches("youtube.com", "youtu.be") ->
                     getString(R.string.platform_youtube)
-                host.contains("tiktok.com") || host.contains("douyin.com") ->
+                matches("tiktok.com", "douyin.com") ->
                     getString(R.string.platform_tiktok)
-                host.contains("instagram.com") || host.contains("instagr.am") ->
+                matches("instagram.com", "instagr.am") ->
                     getString(R.string.platform_instagram)
-                host.contains("twitter.com") || host.contains("x.com") ->
+                matches("twitter.com", "x.com") ->
                     getString(R.string.platform_x)
-                host.contains("xvideos.com") ->
+                matches("xvideos.com") ->
                     getString(R.string.platform_xvideos)
-                host.contains("xnxx.com") || host.contains("xnxxvideos.me") ->
+                matches("pornhub.com", "pornhubpremium.com") ->
+                    getString(R.string.platform_pornhub)
+                matches("xnxx.com", "xnxxvideos.me") ->
                     getString(R.string.platform_xnxx)
-                host.contains("hentaihaven") ->
+                matches("hentaihaven.xxx") -> // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
                     getString(R.string.platform_hentaihaven)
                 else -> getString(R.string.platform_social)
             }
@@ -1648,7 +1652,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         private val URL_PATTERN = Regex("https?://[^\\s\"'<>]+")
         private fun extractUrls(text: String): List<String> =
             URL_PATTERN.findAll(text)
-                .map { it.value.trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}', '"', '\'', '>', '\u2019', '\u201d', '\u2026') }
+                .map { it.value.trimEnd(',', ';', ':', ')', ']', '}', '"', '\'', '>', '\u2019', '\u201d', '\u2026') }
                 .filter { it.startsWith("http://") || it.startsWith("https://") }
                 .distinct()
                 .toList()

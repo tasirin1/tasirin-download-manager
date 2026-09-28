@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 
 class DownloadService : Service() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var lastUiUpdate = 0L
     // ID item yang terakhir terlihat aktif — dipakai mendeteksi item selesai/
     // mulai agar refresh notifikasi tidak ter-skip throttle (anti progress nyangkut).

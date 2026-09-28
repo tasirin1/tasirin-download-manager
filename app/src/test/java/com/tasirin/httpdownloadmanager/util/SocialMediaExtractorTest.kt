@@ -225,6 +225,47 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `isSocialMediaUrl - pornhub terdeteksi`() {
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.pornhub.com/view_video.php?viewkey=abc123"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://m.pornhub.com/view_video.php?viewkey=abc123"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.pornhubpremium.com/view_video.php?viewkey=abc123"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://notpornhub.com/view_video.php?viewkey=abc"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://pornhub.com"))
+    }
+
+    @Test
+    fun `parsePornhubPage - mediaDefinitions urut kualitas`() {
+        val html = "<html><head><title>Hot video - Pornhub.com</title></head><body><script>" +
+            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/low.mp4\",\"quality\":\"480\"},{\"videoUrl\":\"https://cdn.ph.com/high.mp4\",\"quality\":\"720\"}]}" +
+            "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(2, opts.size)
+        assertEquals("Hot video", opts[0].title)
+        assertTrue(opts[0].fileName!!.startsWith("Pornhub_"))
+        assertEquals("HD", opts[0].quality)
+        assertTrue(opts[0].directUrl.endsWith("high.mp4"))
+        assertEquals("480p", opts[1].quality)
+    }
+
+    @Test
+    fun `parsePornhubPage - flashvars dan fallback og`() {
+        val html = "<html><head>" +
+            "<meta property=\"og:title\" content=\"OG Title\"/>" +
+            "<meta property=\"og:video\" content=\"https://cdn.ph.com/og.mp4\"/>" +
+            "</head><body><script>var flashvars={\"quality_480p\":\"https://cdn.ph.com/fv480.mp4\"};</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(1, opts.size)
+        assertTrue(opts[0].directUrl.endsWith("fv480.mp4"))
+        val ogOnly = SocialMediaExtractor.parsePornhubPage("<html><head>" +
+            "<meta property=\"og:title\" content=\"OG Title\"/>" +
+            "<meta property=\"og:video\" content=\"https://cdn.ph.com/og.mp4\"/>" +
+            "</head><body>watch</body></html>")
+        assertEquals(1, ogOnly.size)
+        assertTrue(ogOnly[0].directUrl.endsWith("og.mp4"))
+        assertTrue(SocialMediaExtractor.parsePornhubPage("<html><body>hello</body></html>").isEmpty())
+    }
+
+    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))

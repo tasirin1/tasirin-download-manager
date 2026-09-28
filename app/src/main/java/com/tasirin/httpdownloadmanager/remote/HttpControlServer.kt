@@ -510,19 +510,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun storedPinHash(): String? = StoragePrefs.storedPinHash(context)
 
     /** Cache secret cookie sesi agar prefs tidak dibaca pada tiap request. */
-    @Volatile private var cachedSessionSecret: String? = null
-    @Volatile private var cachedSessionSecretBytes: ByteArray? = null
+    private val sessionSecretLock = Any()
+    @Volatile private var cachedSessionSecret: Pair<String, ByteArray>? = null
 
     private fun pinOk(session: IHTTPSession): Boolean {
         if (storedPinHash() == null) return true
         val expected = StoragePrefs.serverSessionSecret(context)
-        val cachedSessionBytes = cachedSessionSecretBytes
-        val expectedBytes = if (cachedSessionSecret == expected && cachedSessionBytes != null) {
-            cachedSessionBytes
+        val cached = cachedSessionSecret
+        val expectedBytes = if (cached != null && cached.first == expected) {
+            cached.second
         } else {
             expected.toByteArray(Charsets.UTF_8).also {
-                cachedSessionSecret = expected
-                cachedSessionSecretBytes = it
+                synchronized(sessionSecretLock) {
+                    cachedSessionSecret = expected to it
+                }
             }
         }
         // Parse per nama cookie (bukan indexOf mentah) agar tidak cocok
@@ -611,8 +612,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun logout(): Response {
         appendLog("LOGOUT")
         StoragePrefs.rotateServerSessionSecret(context)
-        cachedSessionSecret = null
-        cachedSessionSecretBytes = null
+        synchronized(sessionSecretLock) { cachedSessionSecret = null }
         val r = newFixedLengthResponse(
             Response.Status.REDIRECT,
             "text/html",

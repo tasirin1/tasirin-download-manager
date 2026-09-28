@@ -229,6 +229,7 @@ class DownloadEngine(appContext: Context) {
     private fun untrackConnection(id: String, connection: HttpURLConnection) {
         activeConns[id]?.remove(connection)
         activeConns.remove(id, emptySet())
+        if (activeConns[id] == null && _items.value.none { it.id == id }) cancelledConns.remove(id)
         // Sukses jangan disconnect: biarkan socket keep-alive dipakai ulang.
         // Cancel/pause tetap diputus via disconnectActive().
         if (cancelledConns.containsKey(id)) runCatching { connection.disconnect() }
@@ -360,9 +361,8 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
-        cancelledConns.remove(id)
         update(_items.value.filterNot { it.id == id })
-        runCatching { fileSaver.deleteFiles(target) }
+        if (activeConns[id] == null) cancelledConns.remove(id)
         scheduleSave()
     }
 
@@ -376,8 +376,8 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
-        cancelledConns.remove(id)
         update(_items.value.filterNot { it.id == id })
+        if (activeConns[id] == null) cancelledConns.remove(id)
         item?.let { fileSaver.deleteFiles(it) }
         scheduleSave()
     }
@@ -404,7 +404,7 @@ class DownloadEngine(appContext: Context) {
             clearSegProgress(item.id)
             jobs.remove(item.id)?.cancel()
             disconnectActive(item.id)
-            cancelledConns.remove(item.id)
+            if (activeConns[item.id] == null) cancelledConns.remove(item.id)
             App.logEvent("DOWNLOAD DELETED: ${item.fileName}")
         }
         // Batch delete: satu loop, bukan N kali filter list
