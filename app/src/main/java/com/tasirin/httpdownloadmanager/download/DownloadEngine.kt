@@ -363,6 +363,11 @@ class DownloadEngine(appContext: Context) {
         disconnectActive(id)
         update(_items.value.filterNot { it.id == id })
         if (activeConns[id] == null) cancelledConns.remove(id)
+        // Opsi "Delete partial file when cancelled": tanpa ini toggle
+        // Pengaturan tidak berpengaruh (partial menumpuk sampai cleanup).
+        if (StoragePrefs.isDeletePartialOnCancel(context)) {
+            runCatching { fileSaver.deleteFiles(target) }
+        }
         scheduleSave()
     }
 
@@ -730,6 +735,12 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun cleanupOrphans() {
+        // Load terdegradasi (blob antrean corrupt): daftar kosong bukan
+        // berarti tak ada partial aktif — lewati agar file user tak terhapus.
+        if (shouldSkipOrphanCleanup(_items.value.size, repository.hadStoredItems())) {
+            App.logEvent("ORPHAN CLEANUP SKIPPED: stored queue unreadable, keeping partial files")
+            return
+        }
         fileSaver.cleanupOrphanPartials(_items.value)
     }
 
@@ -3166,6 +3177,11 @@ class DownloadEngine(appContext: Context) {
         private const val COOKIE_WRITE_DEBOUNCE_MS = 2_000L
         /** Umur fallback cookie format lama (tanpa maxAge tersimpan). */
         private const val COOKIE_LEGACY_MAX_AGE_SEC = 7L * 24 * 60 * 60
+        /** Lewati cleanup yatim bila antrean kosong tapi prefs menyimpan
+         *  blob (tanda load terdegradasi, bukan fresh install). */
+        internal fun shouldSkipOrphanCleanup(itemCount: Int, hadStored: Boolean): Boolean =
+            itemCount == 0 && hadStored
+
         private const val MONITOR_INTERVAL_MS = 30 * 60 * 1000L
         // User-Agent realistis agar situs download tidak memblokir koneksi.
         private const val DEFAULT_USER_AGENT =
