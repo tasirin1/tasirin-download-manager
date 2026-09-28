@@ -978,7 +978,11 @@ class DownloadEngine(appContext: Context) {
             }
             jobs[item.id] = job
             job.invokeOnCompletion {
-                jobs.remove(item.id)
+                // Hapus hanya bila masih job ini: pause/cancel menghapus job
+                // lama dari map lalu resume bisa meluncurkan job pengganti
+                // sebelum handler ini jalan; remove() buta akan menendang job
+                // baru yang hidup (tak terhentikan + tak terhitung konkuren).
+                jobs.remove(item.id, job)
                 startQueued()
             }
             return true
@@ -1268,7 +1272,7 @@ class DownloadEngine(appContext: Context) {
                         rememberFailedHlsUrl(result.directUrl)
                         // Fallback: coba ekstrak non-HLS (page/Piped/Invidious).
                         App.logEvent("HLS: download failed (${e.message?.take(50)}), trying non-HLS fallback")
-                        val fallback = SocialMediaExtractor.extractNonHlsYouTube(item.url)
+                        val fallback = SocialMediaExtractor.extractNonHlsYouTube(item.url, item.headers)
                         if (fallback != null && fallback.directUrl != item.url && !fallback.isHls) {
                             App.logEvent("SOCIAL: non-HLS fallback: ${fallback.directUrl.take(80)}")
                             val fbName = if (!item.nameIsCustom) sanitizeFileName(fallback.fileName ?: item.fileName)
@@ -1525,9 +1529,11 @@ class DownloadEngine(appContext: Context) {
                 videoTs.delete()
                 audioAdts.delete()
                 adaptiveAudioFile?.delete()
+                ensureItemPresent(item.id, mp4)
                 val published0 = publishItem(saver, mp4, fileName, item)
                 val finalName = published0.fileName ?: fileName
                 val published = organizeIfEnabled(saver, published0, finalName)
+                ensurePublishedKept(item.id, published0, published)
                 finishHls(item, progress.downloaded, published, finalName)
                 return
             }
@@ -1537,9 +1543,11 @@ class DownloadEngine(appContext: Context) {
             runCatching { mp4.delete() }
             runCatching { audioAdts.delete() }
             val fileName = "$baseName.ts"
+            ensureItemPresent(item.id, videoTs)
             val published0 = publishItem(saver, videoTs, fileName, item)
             val finalName = published0.fileName ?: fileName
             val published = organizeIfEnabled(saver, published0, finalName)
+            ensurePublishedKept(item.id, published0, published)
             finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
             runCatching { videoTs.delete() }
@@ -1732,9 +1740,11 @@ class DownloadEngine(appContext: Context) {
             val fileName = "$baseName.mp4"
             videoMp4.delete()
             audioM4a.delete()
+            ensureItemPresent(item.id, mp4)
             val published0 = publishItem(saver, mp4, fileName, item)
             val finalName = published0.fileName ?: fileName
             val published = organizeIfEnabled(saver, published0, finalName)
+            ensurePublishedKept(item.id, published0, published)
             finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
             runCatching { videoMp4.delete() }
@@ -2196,6 +2206,31 @@ class DownloadEngine(appContext: Context) {
         }.getOrNull()
     }
 
+    /** Batalkan finalize bila item sudah hilang dari antrean (cancel/remove/
+     *  clear tepat di tengah merge/remux/publish yang blocking sehingga tak
+     *  bisa diinterupsi): tanpa ini file tetap terbit yatim — ada di folder
+     *  tujuan tapi tanpa entri daftar, tanpa notifikasi, dan tak terkelola.
+     *  Scrap ikut dibuang langsung agar tak jadi yatim di downloadDir. */
+    private suspend fun ensureItemPresent(id: String, vararg scrap: File) {
+        coroutineContext.ensureActive()
+        if (_items.value.none { it.id == id }) {
+            scrap.forEach { runCatching { it.delete() } }
+            throw CancellationException("item $id removed during finalize")
+        }
+    }
+
+    /** Buang hasil publish yang yatim bila item hilang tepat di jendela
+     *  publish/organize yang blocking (cancel/remove sudah lewat sehingga
+     *  deleteFiles tak melihat file final): tanpa ini file tetap mendarat di
+     *  folder tujuan tanpa entri daftar dan tak terkelola. */
+    private suspend fun ensurePublishedKept(id: String, vararg published: FileSaver.PublishResult) {
+        coroutineContext.ensureActive()
+        if (_items.value.none { it.id == id }) {
+            published.forEach { deletePublished(it) }
+            throw CancellationException("item $id removed after publish")
+        }
+    }
+
     private suspend fun runSingle(
         item: DownloadItem,
         conn: HttpURLConnection,
@@ -2326,6 +2361,7 @@ class DownloadEngine(appContext: Context) {
             runCatching { output.close() }
         }
 
+        ensureItemPresent(item.id, partialFile)
         verifySize(downloaded, total)
 
         val published0 = publishItem(saver, partialFile, fileName, item)
@@ -2335,6 +2371,7 @@ class DownloadEngine(appContext: Context) {
             throw IOException(it)
         }
         val published = organizeIfEnabled(saver, published0, finalName)
+        ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
         val serverEtag = conn.getHeaderField("ETag").orEmpty()
         updateItem(item.id) {
@@ -2488,10 +2525,12 @@ class DownloadEngine(appContext: Context) {
             throw e
         }
 
+        ensureItemPresent(item.id)
         val current = _items.value.find { it.id == item.id } ?: return
         verifySize(current.bytesDownloaded, current.totalBytes)
 
         val merged = saver.mergeSegments(fileName, segments.size)
+        ensureItemPresent(item.id, merged)
         val published0 = publishItem(saver, merged, fileName, item)
         val finalName = published0.fileName ?: fileName
         verifyChecksum(item.id, published0, saver)?.let {
@@ -2499,6 +2538,7 @@ class DownloadEngine(appContext: Context) {
             throw IOException(it)
         }
         val published = organizeIfEnabled(saver, published0, finalName)
+        ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
         updateItem(item.id) {
             it.copy(
@@ -3246,6 +3286,17 @@ internal fun isBlockedRedirectHost(host: String): Boolean {
     if (numeric == "0:0:0:0:0:0:0:0" || numeric == "::ffff:0.0.0.0") return true
     // Mapped-IPv4 loopback tanpa kurung (mis. dari URL yang tak dinormalisasi).
     if (numeric.startsWith("::ffff:127.")) return true
+    // IPv6 literal bentuk penuh (mis. 0:0:0:0:0:0:0:1 = ::1): host URL bisa
+    // tak ternormalisasi sehingga lolos semua cabang string di atas yang
+    // hanya kenal bentuk ringkas. getByName pada literal tak memicu DNS;
+    // guard regex memastikan hanya literal valid yang diparse (tanpa ini
+    // string sampah memicu lookup DNS tanpa timeout di thread worker).
+    // Link-local (fe80::/10) SENGAJA lolos seperti LAN IPv4 — hanya loopback
+    // dan unspecified yang ditolak.
+    if (numeric.contains(':') && IPV6_LITERAL_RE.matches(numeric)) {
+        val addr = runCatching { java.net.InetAddress.getByName(numeric) }.getOrNull()
+        if (addr != null && (addr.isLoopbackAddress || addr.isAnyLocalAddress)) return true
+    }
     val parts = numeric.split('.')
     if (parts.size == 4) {
         val first = parseIpv4Part(parts[0])
@@ -3301,6 +3352,13 @@ internal fun parseIpv4Part(part: String): Int? {
 }
 
 private val HLS_KEY_METHOD_RE = Regex("METHOD=([^,\\s\"]+)", RegexOption.IGNORE_CASE)
+
+/** Literal IPv6 valid (grup heks dipisah ':', satu '::' kompresi diizinkan,
+ *  IPv4-embedded bertitik diizinkan): guard sebelum InetAddress.getByName
+ *  agar hostname/sampah tak memicu lookup DNS. */
+internal val IPV6_LITERAL_RE = Regex(
+    "^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F:.]{0,45}$|^::[0-9a-fA-F:.]{0,45}$"
+)
 
 /** Playlist HLS terenkripsi bila ada #EXT-X-KEY dengan METHOD selain NONE.
  *  Murni agar bisa di-unit-test. */

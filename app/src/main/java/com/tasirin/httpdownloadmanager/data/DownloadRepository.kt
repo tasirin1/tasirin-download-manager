@@ -23,6 +23,10 @@ class DownloadRepository(context: Context) {
     /** Apakah prefs menyimpan blob antrean (bedakan fresh install vs corrupt). */
     fun hadStoredItems(): Boolean = prefs.contains(KEY_ITEMS)
 
+    // Sinkron dengan persistItems: save dari thread UI (flush) dan IO (job)
+    // bisa tumpang tindih dan merusak storedCreds (HashMap polos) sehingga
+    // kredensial pulihan-decrypt tertimpa/nol permanen.
+    @Synchronized
     fun load(): List<DownloadItem> {
         val raw = prefs.getString(KEY_ITEMS, null) ?: return emptyList()
         val arrLen = runCatching { org.json.JSONArray(raw).length() }.getOrDefault(-1)
@@ -82,6 +86,7 @@ class DownloadRepository(context: Context) {
         persistItems(items, blocking = true)
     }
 
+    @Synchronized
     private fun persistItems(items: List<DownloadItem>, blocking: Boolean) {
         // Load terdegradasi + daftar kosong = blob corrupt, bukan antrean
         // kosong sungguhan: jangan timpa blob mentah (forensik + pemulihan).

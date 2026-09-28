@@ -173,17 +173,23 @@ object SocialMediaExtractor {
     /** Ekstrak URL terbaik (satu opsi). */
     suspend fun extract(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
         try {
+            // Header user (Cookie/Referer dari WebExtract) wajib ikut saat
+            // fetch halaman first-party; tanpa ini re-extract situs ber-cookie
+            // tak pernah mereproduksi hasil pertama. TikTok/Twitter hanya
+            // memakai API pihak ketiga sehingga tak menerima header user
+            // (cookie tak boleh bocor ke host lain).
+            val user = parseUserHeaders(headers)
             val lower = url.lowercase()
             when {
                 TT_HOST_RE.containsMatchIn(lower) -> extractTikTok(url)
-                IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractInstagram(url)
+                IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractInstagram(url, user)
                 TW_HOST_RE.containsMatchIn(lower) || X_URL_RE.containsMatchIn(lower) ->
                     extractTwitter(url)
-                YT_HOST_RE.containsMatchIn(lower) -> extractYouTube(url)
-                XV_HOST_RE.containsMatchIn(lower) -> extractXVideos(url)
-                XN_HOST_RE.containsMatchIn(lower) -> extractXnxx(url)
-                PH_HOST_RE.containsMatchIn(lower) -> extractPornhub(url)
-                HH_HOST_RE.containsMatchIn(lower) -> extractHentaiHaven(url)
+                YT_HOST_RE.containsMatchIn(lower) -> extractYouTube(url, user)
+                XV_HOST_RE.containsMatchIn(lower) -> extractXVideos(url, user)
+                XN_HOST_RE.containsMatchIn(lower) -> extractXnxx(url, user)
+                PH_HOST_RE.containsMatchIn(lower) -> extractPornhub(url, user)
+                HH_HOST_RE.containsMatchIn(lower) -> extractHentaiHaven(url, user)
                 else -> null
             }
         } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
@@ -196,17 +202,18 @@ object SocialMediaExtractor {
         // dialog probe terlalu lama bila semua mirror lambat/gagal.
         withTimeoutOrNull(EXTRACT_TOTAL_TIMEOUT_MS) {
             try {
+                val user = parseUserHeaders(headers)
                 val lower = url.lowercase()
                 when {
                     TT_HOST_RE.containsMatchIn(lower) -> extractAllTikTok(url)
-                    IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractAllInstagram(url)
+                    IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractAllInstagram(url, user)
                     TW_HOST_RE.containsMatchIn(lower) || X_URL_RE.containsMatchIn(lower) ->
                         extractAllTwitter(url)
-                    YT_HOST_RE.containsMatchIn(lower) -> extractAllYouTube(url)
-                    XV_HOST_RE.containsMatchIn(lower) -> extractAllXVideos(url)
-                    XN_HOST_RE.containsMatchIn(lower) -> extractAllXnxx(url)
-                    PH_HOST_RE.containsMatchIn(lower) -> extractAllPornhub(url)
-                    HH_HOST_RE.containsMatchIn(lower) -> extractAllHentaiHaven(url)
+                    YT_HOST_RE.containsMatchIn(lower) -> extractAllYouTube(url, user)
+                    XV_HOST_RE.containsMatchIn(lower) -> extractAllXVideos(url, user)
+                    XN_HOST_RE.containsMatchIn(lower) -> extractAllXnxx(url, user)
+                    PH_HOST_RE.containsMatchIn(lower) -> extractAllPornhub(url, user)
+                    HH_HOST_RE.containsMatchIn(lower) -> extractAllHentaiHaven(url, user)
                     else -> emptyList()
                 }
             } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; emptyList() }
@@ -266,12 +273,12 @@ object SocialMediaExtractor {
         "Accept" to "text/html"
     )
 
-    private fun extractInstagram(url: String): Result? {
-        val options = extractAllInstagram(url)
+    private fun extractInstagram(url: String, user: Map<String, String> = emptyMap()): Result? {
+        val options = extractAllInstagram(url, user)
         return options.firstOrNull()
     }
 
-    private fun extractAllInstagram(url: String): List<Result> {
+    private fun extractAllInstagram(url: String, user: Map<String, String> = emptyMap()): List<Result> {
         val shortcode = IG_SHORTCODE_RE.find(url)
             ?.groupValues?.get(1) ?: return emptyList()
         val options = mutableListOf<Result>()
@@ -279,7 +286,7 @@ object SocialMediaExtractor {
         // Strategi 1: embed page — data carousel presisi (hanya foto/video milik post ini)
         // Format contextJSON":"{...}" berisi edge_sidecar_to_children lengkap.
         val embedResult = httpGetWithCookies(
-            "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS
+            "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS + user
         )
         val embedHtml = embedResult?.body
         val igCookies = embedResult?.cookies.orEmpty()
@@ -295,7 +302,7 @@ object SocialMediaExtractor {
 
         // Strategi 2: halaman utama via Googlebot — hanya bila embed gagal
         if (options.isEmpty()) {
-            val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", IG_HEADERS)
+            val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", IG_HEADERS + user)
             val pageCookies = httpResult?.cookies.orEmpty()
             val pageHtml = httpResult?.body
             if (pageHtml != null && pageHtml.length > 1000) {
@@ -483,46 +490,51 @@ object SocialMediaExtractor {
 
     // ── YouTube ────────────────────────────────────────────────────────
 
-    private fun extractYouTube(url: String): Result? {
-        val options = extractAllYouTube(url)
+    private fun extractYouTube(url: String, user: Map<String, String> = emptyMap()): Result? {
+        val options = extractAllYouTube(url, user)
         return options.firstOrNull()
     }
 
-    private fun extractAllYouTube(url: String): List<Result> {
+    private fun extractAllYouTube(url: String, user: Map<String, String> = emptyMap()): List<Result> {
         val videoId = extractYouTubeId(url) ?: return emptyList()
 
         // Strategi 1: VISIONOS player API — URL stream tanpa n-signature.
         // URL adaptif/HLS dari client ini bisa langsung di-download (tidak 403).
-        val vision = extractYouTubeViaVisionos(videoId)
+        val vision = extractYouTubeViaVisionos(videoId, user)
         if (vision != null) {
             return listOf(vision)
         }
 
         // Strategi 2: halaman WEB (ytInitialPlayerResponse) + fallback Piped/Invidious.
-        return extractYouTubeFromPage(url, videoId)
+        return extractYouTubeFromPage(url, videoId, user)
     }
 
     /** Ekstrak URL non-HLS dari YouTube: halaman WEB langsung + fallback Piped/Invidious.
      *  Dipanggil bila VISIONOS HLS gagal (media playlist butuh pot token). */
-    suspend fun extractNonHlsYouTube(url: String): Result? = withContext(Dispatchers.IO) {
+    suspend fun extractNonHlsYouTube(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
         try {
             val videoId = extractYouTubeId(url) ?: return@withContext null
+            val user = parseUserHeaders(headers)
             // Strategi 0: coba adaptiveFormats dari VISIONOS (URL langsung tanpa HLS)
-            val visionAdaptive = extractYouTubeViaVisionosAdaptive(videoId)
+            val visionAdaptive = extractYouTubeViaVisionosAdaptive(videoId, user)
             if (visionAdaptive != null) return@withContext visionAdaptive
             // Strategi 1: halaman WEB + Piped/Invidious/Cobalt
-            val results = extractYouTubeFromPage(url, videoId)
+            val results = extractYouTubeFromPage(url, videoId, user)
             results.firstOrNull { it.directUrl.startsWith("http") }
         } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
     }
 
-    private fun extractYouTubeFromPage(url: String, videoId: String): List<Result> {
+    private fun extractYouTubeFromPage(
+        url: String,
+        videoId: String,
+        user: Map<String, String> = emptyMap()
+    ): List<Result> {
         val httpResult = httpGetWithCookies(
             "https://www.youtube.com/watch?v=$videoId",
             mapOf(
                 "User-Agent" to YT_PAGE_UA,
                 "Accept-Language" to YT_LANG
-            ),
+            ) + user,
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return emptyList()
         val pageHtml = httpResult.body
@@ -583,14 +595,17 @@ object SocialMediaExtractor {
 
     /** Strategi VISIONOS: player API mengembalikan URL HLS/adaptif tanpa
      *  n-signature, sehingga bisa langsung di-download (tidak HTTP 403). */
-    private fun extractYouTubeViaVisionos(videoId: String): Result? {
+    private fun extractYouTubeViaVisionos(
+        videoId: String,
+        user: Map<String, String> = emptyMap()
+    ): Result? {
         // Butuh visitorData + cookies dari halaman agar API tidak LOGIN_REQUIRED.
         val page = httpGetWithCookies(
             "https://www.youtube.com/shorts/$videoId",
             mapOf(
                 "User-Agent" to YT_UA,
                 "Accept-Language" to YT_LANG
-            ),
+            ) + user,
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
         val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
@@ -613,14 +628,14 @@ object SocialMediaExtractor {
         val json = httpPostJson(
             "https://www.youtube.com/youtubei/v1/player",
             body,
-            mapOf(
+            (mapOf(
                 "User-Agent" to YT_UA,
                 "Origin" to "https://www.youtube.com",
                 "Referer" to "https://www.youtube.com/",
                 "X-Goog-Visitor-Id" to visitor,
                 "X-YouTube-Client-Name" to "101",
                 "X-YouTube-Client-Version" to "1.02"
-            ),
+            ) + user,
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
 
@@ -670,7 +685,10 @@ object SocialMediaExtractor {
 
     /** Strategi VISIONOS adaptive: ambil URL langsung dari adaptiveFormats
      *  tanpa lewat HLS (menghindari media playlist 404). */
-    private fun extractYouTubeViaVisionosAdaptive(videoId: String): Result? {
+    private fun extractYouTubeViaVisionosAdaptive(
+        videoId: String,
+        user: Map<String, String> = emptyMap()
+    ): Result? {
         val page = httpGetWithCookies(
             "https://www.youtube.com/watch?v=$videoId",
             mapOf(
@@ -698,14 +716,14 @@ object SocialMediaExtractor {
         val json = httpPostJson(
             "https://www.youtube.com/youtubei/v1/player",
             body,
-            mapOf(
+            (mapOf(
                 "User-Agent" to YT_UA,
                 "Origin" to "https://www.youtube.com",
                 "Referer" to "https://www.youtube.com/",
                 "X-Goog-Visitor-Id" to visitor,
                 "X-YouTube-Client-Name" to "101",
                 "X-YouTube-Client-Version" to "1.02"
-            ),
+            ) + user,
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
         return runCatching {
@@ -793,6 +811,9 @@ object SocialMediaExtractor {
                 conn.requestMethod = "HEAD"
                 conn.connectTimeout = 6000
                 conn.readTimeout = 6000
+                // Jangan ikuti redirect otomatis: Cookie hanya untuk host asal,
+                // redirect manual di sini tidak diteruskan agar tak bocor lintas origin.
+                conn.instanceFollowRedirects = false
                 conn.setRequestProperty("User-Agent",
                     YT_UA)
                 conn.setRequestProperty("Referer", "https://www.youtube.com/")
@@ -981,17 +1002,19 @@ object SocialMediaExtractor {
         return html
     }
 
-    private fun extractXVideos(url: String): Result? = extractBestPlayerOption(extractAllXVideos(url))
+    private fun extractXVideos(url: String, user: Map<String, String> = emptyMap()): Result? =
+        extractBestPlayerOption(extractAllXVideos(url, user))
 
-    private fun extractAllXVideos(url: String): List<Result> {
-        val html = fetchWatchHtml(url, XV_HEADERS) ?: return emptyList()
+    private fun extractAllXVideos(url: String, user: Map<String, String> = emptyMap()): List<Result> {
+        val html = fetchWatchHtml(url, XV_HEADERS + user) ?: return emptyList()
         return parseXVideosPage(html)
     }
 
-    private fun extractXnxx(url: String): Result? = extractBestPlayerOption(extractAllXnxx(url))
+    private fun extractXnxx(url: String, user: Map<String, String> = emptyMap()): Result? =
+        extractBestPlayerOption(extractAllXnxx(url, user))
 
-    private fun extractAllXnxx(url: String): List<Result> {
-        val html = fetchWatchHtml(url, XN_HEADERS) ?: return emptyList()
+    private fun extractAllXnxx(url: String, user: Map<String, String> = emptyMap()): List<Result> {
+        val html = fetchWatchHtml(url, XN_HEADERS + user) ?: return emptyList()
         return parseXnxxPage(html)
     }
 
@@ -1058,8 +1081,8 @@ object SocialMediaExtractor {
         "Referer" to "https://www.pornhub.com/"
     )
 
-    private fun extractPornhub(url: String): Result? =
-        preferProgressiveMp4(extractAllPornhub(url))
+    private fun extractPornhub(url: String, user: Map<String, String> = emptyMap()): Result? =
+        preferProgressiveMp4(extractAllPornhub(url, user))
 
     /** MP4 progresif diutamakan: single-stream (Range/resume) jauh lebih
      *  andal daripada HLS phncdn yang segmennya rawan HTTP 404. Opsi sudah
@@ -1068,8 +1091,8 @@ object SocialMediaExtractor {
         return options.firstOrNull { !it.isHls } ?: options.firstOrNull()
     }
 
-    private fun extractAllPornhub(url: String): List<Result> {
-        val result = httpGetWithCookies(url, PH_HEADERS, PAGE_TIMEOUT_MS) ?: return emptyList()
+    private fun extractAllPornhub(url: String, user: Map<String, String> = emptyMap()): List<Result> {
+        val result = httpGetWithCookies(url, PH_HEADERS + user, PAGE_TIMEOUT_MS) ?: return emptyList()
         if (result.body.length < 1000) return emptyList()
         return parsePornhubPage(result.body, result.cookies)
     }
@@ -1136,13 +1159,13 @@ object SocialMediaExtractor {
         "Referer" to "https://hentaihaven.xxx/"
     )
 
-    private fun extractHentaiHaven(url: String): Result? {
-        val options = extractAllHentaiHaven(url)
+    private fun extractHentaiHaven(url: String, user: Map<String, String> = emptyMap()): Result? {
+        val options = extractAllHentaiHaven(url, user)
         return options.firstOrNull { !it.isHls } ?: options.firstOrNull()
     }
 
-    private fun extractAllHentaiHaven(url: String): List<Result> {
-        val html = fetchWatchHtml(url, HH_HEADERS) ?: return emptyList()
+    private fun extractAllHentaiHaven(url: String, user: Map<String, String> = emptyMap()): List<Result> {
+        val html = fetchWatchHtml(url, HH_HEADERS + user) ?: return emptyList()
         return parseHentaiHavenPage(html)
     }
 
@@ -1262,6 +1285,31 @@ object SocialMediaExtractor {
         return options
     }
 
+    /** Parse header user format "Key: value" per baris (sama seperti
+     *  applyAuthHeaders engine): baris kosong/tanpa ':' dibuang, user menang
+     *  atas default platform. Murni agar bisa di-unit-test. */
+    internal fun parseUserHeaders(headers: String): Map<String, String> {
+        if (headers.isBlank()) return emptyMap()
+        val out = LinkedHashMap<String, String>()
+        var start = 0
+        while (start <= headers.length) {
+            val nl = headers.indexOf('\n', start)
+            val end = if (nl >= 0) nl else headers.length
+            if (end > start) {
+                val line = headers.substring(start, end)
+                val idx = line.indexOf(':')
+                if (idx > 0) {
+                    val key = line.substring(0, idx).trim()
+                    val value = line.substring(idx + 1).trim()
+                    if (key.isNotEmpty() && value.isNotEmpty()) out[key] = value
+                }
+            }
+            if (nl < 0) break
+            start = nl + 1
+        }
+        return out
+    }
+
     // ── HTTP ─────────────────────────────────────────────────────────────
 
     data class HttpResult(val body: String, val cookies: String = "")
@@ -1274,28 +1322,63 @@ object SocialMediaExtractor {
         return readBounded(input, MAX_RESPONSE_BYTES.toInt())
     }
 
+    /** Redirect manual ekstraktor: HttpURLConnection mengirim ulang header Cookie/
+     *  Authorization ke host redirect bila instanceFollowRedirects=true, jadi
+     *  cookie user bisa bocor lintas origin. Ikuti pola jalur unduh utama
+     *  (openAuthenticatedConnection): redirect manual + buang kredensial saat
+     *  host berubah. */
+    private fun isExtractSameHost(from: String, to: String): Boolean {
+        return try {
+            URL(from).host.equals(URL(to).host, ignoreCase = true)
+        } catch (_: Exception) { false }
+    }
+
+    private fun stripExtractCredentials(headers: Map<String, String>): Map<String, String> {
+        return headers.filterKeys { k ->
+            !k.equals("Cookie", ignoreCase = true) &&
+                !k.equals("Authorization", ignoreCase = true) &&
+                !k.equals("Proxy-Authorization", ignoreCase = true)
+        }
+    }
+
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
-        val conn = URL(urlStr).openConnection() as HttpURLConnection
-        try {
-            conn.connectTimeout = timeoutMs
-            conn.readTimeout = timeoutMs
-            conn.instanceFollowRedirects = true
-            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-            if (!headers.containsKey("User-Agent")) {
-                conn.setRequestProperty("User-Agent",
-                    DEFAULT_UA)
-            }
-            val code = conn.responseCode
-            if (code !in 200..299) return null
-            val cookies = conn.headerFields.entries
-                .filter { it.key.equals("set-cookie", ignoreCase = true) }
-                .flatMap { it.value }
-                .map { it.substringBefore(';') }
-                .joinToString("; ")
-            // Baca terbatas: hindari OOM dari body redirect/HTML raksasa.
-            val body = readBodyLimited(conn.inputStream)
-            return HttpResult(body, cookies)
-        } catch (_: Exception) { return null } finally { conn.disconnect() }
+        var current = urlStr
+        var activeHeaders = headers
+        repeat(6) {
+            val conn = URL(current).openConnection() as HttpURLConnection
+            try {
+                conn.connectTimeout = timeoutMs
+                conn.readTimeout = timeoutMs
+                conn.instanceFollowRedirects = false
+                activeHeaders.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+                if (!activeHeaders.containsKey("User-Agent")) {
+                    conn.setRequestProperty("User-Agent",
+                        DEFAULT_UA)
+                }
+                val code = conn.responseCode
+                if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                    val loc = conn.getHeaderField("Location") ?: return null
+                    val next = try {
+                        java.net.URI(current).resolve(loc).toString()
+                    } catch (_: Exception) { return null }
+                    if (!isExtractSameHost(current, next)) {
+                        activeHeaders = stripExtractCredentials(activeHeaders)
+                    }
+                    current = next
+                    return@repeat
+                }
+                if (code !in 200..299) return null
+                val cookies = conn.headerFields.entries
+                    .filter { it.key.equals("set-cookie", ignoreCase = true) }
+                    .flatMap { it.value }
+                    .map { it.substringBefore(';') }
+                    .joinToString("; ")
+                // Baca terbatas: hindari OOM dari body redirect/HTML raksasa.
+                val body = readBodyLimited(conn.inputStream)
+                return HttpResult(body, cookies)
+            } catch (_: Exception) { return null } finally { conn.disconnect() }
+        }
+        return null
     }
 
     private fun httpGet(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): String? {
@@ -1308,19 +1391,47 @@ object SocialMediaExtractor {
         headers: Map<String, String> = emptyMap(),
         timeoutMs: Int = 15000
     ): String? {
-        val conn = URL(urlStr).openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = "POST"
-            conn.connectTimeout = timeoutMs
-            conn.readTimeout = timeoutMs
-            conn.setRequestProperty("Content-Type", "application/json")
-            conn.setRequestProperty("Accept", "application/json")
-            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-            conn.doOutput = true
-            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            val code = conn.responseCode
-            if (code !in 200..299) return null
-            return readBodyLimited(conn.inputStream)
-        } catch (_: Exception) { return null } finally { conn.disconnect() }
+        var current = urlStr
+        var method = "POST"
+        var payload: ByteArray? = body.toByteArray(Charsets.UTF_8)
+        var activeHeaders = headers
+        repeat(6) {
+            val conn = URL(current).openConnection() as HttpURLConnection
+            try {
+                conn.requestMethod = method
+                conn.connectTimeout = timeoutMs
+                conn.readTimeout = timeoutMs
+                conn.instanceFollowRedirects = false
+                if (method == "POST") {
+                    conn.setRequestProperty("Content-Type", "application/json")
+                }
+                conn.setRequestProperty("Accept", "application/json")
+                activeHeaders.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+                val body = payload
+                if (body != null) {
+                    conn.doOutput = true
+                    conn.outputStream.use { it.write(body) }
+                }
+                val code = conn.responseCode
+                if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                    val loc = conn.getHeaderField("Location") ?: return null
+                    val next = try {
+                        java.net.URI(current).resolve(loc).toString()
+                    } catch (_: Exception) { return null }
+                    if (!isExtractSameHost(current, next)) {
+                        activeHeaders = stripExtractCredentials(activeHeaders)
+                    }
+                    current = next
+                    if (code == 301 || code == 302 || code == 303) {
+                        method = "GET"
+                        payload = null
+                    }
+                    return@repeat
+                }
+                if (code !in 200..299) return null
+                return readBodyLimited(conn.inputStream)
+            } catch (_: Exception) { return null } finally { conn.disconnect() }
+        }
+        return null
     }
 }

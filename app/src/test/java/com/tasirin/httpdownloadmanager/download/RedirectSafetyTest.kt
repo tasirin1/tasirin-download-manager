@@ -76,6 +76,24 @@ class RedirectSafetyTest {
     }
 
     @Test
+    fun `blocked redirect host covers full-form ipv6 loopback`() {
+        // Bentuk penuh tak ternormalisasi (0:0:0:0:0:0:0:1 = ::1) wajib
+        // ditolak seperti bentuk ringkasnya.
+        assertTrue(isBlockedRedirectHost("[0:0:0:0:0:0:0:1]"))
+        assertTrue(isBlockedRedirectHost("0:0:0:0:0:0:0:1"))
+        assertTrue(isBlockedRedirectHost("0000:0000:0000:0000:0000:0000:0000:0001"))
+        assertTrue(isBlockedRedirectHost("[0:0:0:0:0:0:0:0]"))
+        assertNull(redirectTarget("https://example.com/a", "http://[0:0:0:0:0:0:0:1]/x"))
+        assertNull(redirectTarget("https://example.com/a", "http://[0:0:0:0:0:0:0:0]/x"))
+        // Bukan loopback/unspecified: global unicast dan link-local (LAN)
+        // tetap lolos seperti kebijakan LAN IPv4.
+        assertFalse(isBlockedRedirectHost("[2001:db8::1]"))
+        assertFalse(isBlockedRedirectHost("2001:db8::1"))
+        assertFalse(isBlockedRedirectHost("[fe80::1]"))
+        assertFalse(isBlockedRedirectHost("::ffff:192.168.1.1"))
+    }
+
+    @Test
     fun `same origin ignores default ports but rejects cross origin`() {
         assertTrue(isSameOrigin("https://example.com/a", "https://EXAMPLE.com/b"))
         assertTrue(isSameOrigin("http://example.com/a", "http://example.com:80/b"))

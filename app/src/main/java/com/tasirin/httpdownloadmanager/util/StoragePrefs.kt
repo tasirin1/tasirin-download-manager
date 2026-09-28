@@ -190,7 +190,15 @@ object StoragePrefs {
 
     /** Simpan PIN sebagai PBKDF2-SHA256; nilai kosong menghapus PIN. */
     fun setServerPin(context: Context, pin: String?) {
-        val hash = pin?.trim()?.takeIf { it.isNotEmpty() }?.let { PinHash.hash(it) }
+        val clean = pin?.trim()?.takeIf { it.isNotEmpty() }
+        val old = getServerPin(context)
+        // PIN tak berubah (termasuk kosong->kosong): jangan rotate secret sesi —
+        // tanpanya tiap simpan Pengaturan menendang semua sesi remote dan
+        // memaksa login ulang padahal PIN sama.
+        val unchanged = (clean == null && old == null) ||
+            (clean != null && old != null && pinMatches(context, clean))
+        if (unchanged) return
+        val hash = clean?.let { PinHash.hash(it) }
         rotateServerSessionSecret(context)
         prefs(context).edit {
             putString(KEY_SERVER_PIN, hash)

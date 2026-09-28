@@ -11,6 +11,23 @@ class SocialMediaExtractorTest {
     private val hhDomain = "hentaihaven.xxx"
 
     @Test
+    fun `parseUserHeaders memparse format Key-value per baris`() {
+        val parsed = SocialMediaExtractor.parseUserHeaders(
+            "Cookie: session=abc; theme=dark\nReferer: https://example.com/watch\n"
+        )
+        assertEquals("session=abc; theme=dark", parsed["Cookie"])
+        assertEquals("https://example.com/watch", parsed["Referer"])
+        // Baris sampah dibuang, user boleh menimpa default platform.
+        val dirty = SocialMediaExtractor.parseUserHeaders("\n\nTanpaColon\n: tanpaKey\nKeyTanpaValue:\nCookie: x=1\nCookie: y=2\n")
+        assertEquals(mapOf("Cookie" to "y=2"), dirty)
+        assertTrue(SocialMediaExtractor.parseUserHeaders("").isEmpty())
+        assertTrue(SocialMediaExtractor.parseUserHeaders("   ").isEmpty())
+        // Nilai boleh mengandung ':' (URL, waktu).
+        val colon = SocialMediaExtractor.parseUserHeaders("Referer: https://example.com:8080/a?x=1:2")
+        assertEquals("https://example.com:8080/a?x=1:2", colon["Referer"])
+    }
+
+    @Test
     fun `isSocialMediaUrl - deteksi URL beranda sosial`() {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.youtube.com/watch?v=abc"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://youtu.be/abc"))
