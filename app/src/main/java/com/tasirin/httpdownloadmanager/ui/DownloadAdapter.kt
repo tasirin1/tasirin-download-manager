@@ -1,7 +1,6 @@
 package com.tasirin.httpdownloadmanager.ui
 
 import android.content.res.ColorStateList
-import android.animation.ObjectAnimator
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,7 +17,6 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.databinding.ItemDownloadBinding
 import com.tasirin.httpdownloadmanager.databinding.ItemSectionHeaderBinding
 import java.io.File
-import java.util.Locale
 
 /** Baris daftar: header grup status atau item download. */
 sealed class DownloadRow {
@@ -93,7 +91,7 @@ class DownloadAdapter(private val listener: Listener) :
     private fun bindHeader(holder: HeaderHolder, row: DownloadRow.Header) {
         val b = holder.binding
         b.textSectionTitle.text = row.title
-        b.textSectionCount.text = String.format(Locale.US, "%d", row.count)
+        b.textSectionCount.text = row.count.toString()
         val chevron = if (row.collapsed) R.drawable.ic_chevron else R.drawable.ic_chevron_up
         b.sectionChevron.setImageResource(chevron)
         b.sectionChevron.visibility = if (row.count > 0) View.VISIBLE else View.INVISIBLE
@@ -149,7 +147,7 @@ class DownloadAdapter(private val listener: Listener) :
             // totalBytes server lebih besar dari byte yang diterima (CDN
             // Instagram kerap melaporkan Content-Length berlebih).
             val size = if (item.totalBytes > 0) item.totalBytes else item.bytesDownloaded
-            String.format(Locale.US, "100%%  %s", Formats.bytes(size))
+            "100%  " + Formats.bytes(size)
         } else if (item.totalBytes > 0) {
             // HLS: totalBytes bisa berupa estimasi (BANDWIDTH x durasi) —
             // tandai dengan "~" supaya jelas bukan angka pasti.
@@ -158,19 +156,12 @@ class DownloadAdapter(private val listener: Listener) :
             } else {
                 Formats.bytes(item.totalBytes)
             }
-            String.format(
-                Locale.US, "%d%%  %s / %s",
-                item.progressPercent,
-                Formats.bytes(item.bytesDownloaded),
-                totalTxt
-            )
+            item.progressPercent.toString() + "%  " +
+                Formats.bytes(item.bytesDownloaded) + " / " + totalTxt
         } else if (item.progressPercentOverride >= 0) {
             // HLS: total asli tidak diketahui — persen + byte riil tanpa denominator palsu.
-            String.format(
-                Locale.US, "%d%%  %s",
-                item.progressPercent,
+            item.progressPercent.toString() + "%  " +
                 Formats.bytes(item.bytesDownloaded)
-            )
         } else {
             Formats.bytes(item.bytesDownloaded)
         }
@@ -286,19 +277,10 @@ class DownloadAdapter(private val listener: Listener) :
         else -> R.color.white
     }
 
-    /** Animasi hanya untuk lompatan berarti; tick kecil 1-3% di-set langsung
-     *  agar tidak membuat ObjectAnimator tiap detik per item aktif. */
+    /** Tick progres 400ms: set langsung tanpa ObjectAnimator agar tak ada
+     *  alokasi animator + cancel per item aktif per tick. */
     private fun smoothProgress(bar: android.widget.ProgressBar, from: Int, to: Int) {
-        (bar.getTag(R.id.progress_animator) as? ObjectAnimator)?.cancel()
-        if (from >= 0 && to > from && to - from > 3 && to - from <= 25) {
-            val anim = ObjectAnimator.ofInt(bar, "progress", from, to)
-                .setDuration(350)
-            bar.setTag(R.id.progress_animator, anim)
-            anim.start()
-        } else {
-            bar.progress = to
-            bar.setTag(R.id.progress_animator, null)
-        }
+        if (bar.progress != to) bar.progress = to
     }
 
     /** Warna lingkaran ikon per tipe file (lembut, kontras dengan ikon gelap). */
@@ -340,9 +322,10 @@ class DownloadAdapter(private val listener: Listener) :
          *  header dan menyembunyikan item-nya. */
         fun buildSections(context: android.content.Context, items: List<DownloadItem>): List<DownloadRow> {
             val rows = mutableListOf<DownloadRow>()
-            fun addGroup(labelRes: Int, group: List<DownloadItem>) {
+            // Kunci literal = hasil getResourceEntryName(section_*): hindari
+            // lookup resource 4x per tick 400ms saat download aktif.
+            fun addGroup(labelRes: Int, key: String, group: List<DownloadItem>) {
                 if (group.isEmpty()) return
-                val key = context.resources.getResourceEntryName(labelRes)
                 val collapsed = StoragePrefs.isSectionCollapsed(context, key)
                 rows.add(DownloadRow.Header(context.getString(labelRes), group.size, collapsed, key))
                 if (!collapsed) group.forEach { rows.add(DownloadRow.Item(it)) }
@@ -361,10 +344,10 @@ class DownloadAdapter(private val listener: Listener) :
                     DownloadState.FAILED, DownloadState.CANCELLED -> failed.add(item)
                 }
             }
-            addGroup(R.string.section_active, active)
-            addGroup(R.string.section_paused, paused)
-            addGroup(R.string.section_completed, completed)
-            addGroup(R.string.section_failed, failed)
+            addGroup(R.string.section_active, "section_active", active)
+            addGroup(R.string.section_paused, "section_paused", paused)
+            addGroup(R.string.section_completed, "section_completed", completed)
+            addGroup(R.string.section_failed, "section_failed", failed)
             return rows
         }
 
@@ -386,24 +369,25 @@ class DownloadAdapter(private val listener: Listener) :
                 if (oldItem is DownloadRow.Item && newItem is DownloadRow.Item) {
                     val a = oldItem.item
                     val b = newItem.item
-                    // Samakan semua kecuali field yang berubah tiap tick.
-                    val aBase = a.copy(
-                        bytesDownloaded = 0L,
-                        totalBytes = 0L,
-                        speedBps = 0L,
-                        etaSeconds = 0L,
-                        segments = emptyList(),
-                        progressPercentOverride = -1
-                    )
-                    val bBase = b.copy(
-                        bytesDownloaded = 0L,
-                        totalBytes = 0L,
-                        speedBps = 0L,
-                        etaSeconds = 0L,
-                        segments = emptyList(),
-                        progressPercentOverride = -1
-                    )
-                    if (aBase == bBase) return PAYLOAD_PROGRESS
+                    // Bandingkan field-by-field tanpa copy(): copy() mengalokasi
+                    // 2 DownloadItem + 2 list segmen per baris per tick 400ms.
+                    if (a.id == b.id && a.url == b.url && a.fileName == b.fileName &&
+                        a.state == b.state && a.error == b.error &&
+                        a.contentUri == b.contentUri && a.filePath == b.filePath &&
+                        a.addedAt == b.addedAt && a.finishedAt == b.finishedAt &&
+                        a.nameIsCustom == b.nameIsCustom && a.autoResume == b.autoResume &&
+                        a.username == b.username && a.password == b.password &&
+                        a.headers == b.headers && a.destination == b.destination &&
+                        a.folderPath == b.folderPath && a.speedLimitKbps == b.speedLimitKbps &&
+                        a.priority == b.priority && a.checksum == b.checksum &&
+                        a.checksumVerified == b.checksumVerified && a.mirrors == b.mirrors &&
+                        a.monitor == b.monitor && a.etag == b.etag &&
+                        a.method == b.method && a.postBody == b.postBody &&
+                        a.preferredHeight == b.preferredHeight &&
+                        a.preferredAudioLang == b.preferredAudioLang &&
+                        a.retryCount == b.retryCount &&
+                        a.totalBytesEstimated == b.totalBytesEstimated
+                    ) return PAYLOAD_PROGRESS
                 }
                 return null
             }

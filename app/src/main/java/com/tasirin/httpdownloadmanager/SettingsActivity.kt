@@ -288,8 +288,9 @@ class SettingsActivity : AppCompatActivity() {
         val itemNames = App.engine.items.value.map { it.fileName }.toSet()
         runCatching {
             File(filesDir, "downloads").listFiles()?.forEach { f ->
-                val base = f.name.replace(PART_PATTERN, "")
-                if (PART_PATTERN.containsMatchIn(f.name) && base !in itemNames) {
+                // Satu find() saja: replace + containsMatchIn memindai nama 2x.
+                val m = PART_PATTERN.find(f.name) ?: return@forEach
+                if (f.name.substring(0, m.range.first) !in itemNames) {
                     deleteIf(f)
                 }
             }

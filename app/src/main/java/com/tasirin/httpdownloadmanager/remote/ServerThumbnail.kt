@@ -45,19 +45,17 @@ private val thumbLocks = ConcurrentHashMap<String, ThumbLock>()
 private fun thumbLockFor(key: String): ThumbLock {
     val now = System.currentTimeMillis()
     if (thumbLocks.size > 512) {
-        // Satu pass O(n) di atas snapshot iterator: values.elementAt(i) per
-        // indeks di ConcurrentHashMap adalah O(n) per panggilan sehingga
-        // eviksi lama berbiaya kuadratik saat browsing ribuan media.
-        var cutoff = now
-        var seen = 0
-        for (lock in thumbLocks.values) {
-            val last = lock.lastUse.get()
-            if (last < cutoff) cutoff = last
-            seen++
-        }
-        if (seen > 0) {
-            val evictBefore = cutoff
-            thumbLocks.entries.removeIf { it.value.lastUse.get() <= evictBefore && it.key != key }
+        // Satu removeIf: buang lock menganggur >10 menit; bila masih penuh
+        // (browsing ribuan media sekaligus), buang kelebihan tertua sekaligus
+        // agar tak ada scan dua pass per request galeri.
+        thumbLocks.entries.removeIf { it.key != key && now - it.value.lastUse.get() > 600_000L }
+        if (thumbLocks.size > 768) {
+            val sorted = thumbLocks.entries.sortedBy { it.value.lastUse.get() }
+            val drop = thumbLocks.size - 512
+            for (i in 0 until drop) {
+                val k = sorted.getOrNull(i)?.key ?: break
+                if (k != key) thumbLocks.remove(k)
+            }
         }
     }
     // getOrPut tidak atomik: dua thread bisa memegang lock berbeda untuk key

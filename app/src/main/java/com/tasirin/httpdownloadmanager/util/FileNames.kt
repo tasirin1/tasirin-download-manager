@@ -43,12 +43,26 @@ object FileNames {
         if (clean.toByteArray(Charsets.UTF_8).size > 240) {
             val dot = clean.lastIndexOf('.')
             val ext = if (dot in 1..239) clean.substring(dot) else ""
-            var base = if (dot in 1..239) clean.substring(0, dot) else clean
+            val base = if (dot in 1..239) clean.substring(0, dot) else clean
             val budget = 240 - ext.toByteArray(Charsets.UTF_8).size
-            while (base.isNotEmpty() && base.toByteArray(Charsets.UTF_8).size > budget) {
-                base = base.dropLast(1)
+            // Hitung per karakter sekali jalan (surrogate pair = 4 byte):
+            // loop lama meng-encode ulang seluruh base tiap dropLast (O(n^2)).
+            var used = 0
+            var cut = 0
+            while (cut < base.length) {
+                val c = base[cut]
+                val w = if (Character.isHighSurrogate(c) && cut + 1 < base.length &&
+                    Character.isLowSurrogate(base[cut + 1])) 4
+                else when {
+                    c <= '\u007F' -> 1
+                    c <= '\u07FF' -> 2
+                    else -> 3
+                }
+                if (used + w > budget) break
+                used += w
+                cut += if (w == 4) 2 else 1
             }
-            clean = (base + ext).trimEnd('.', ' ')
+            clean = (base.substring(0, cut) + ext).trimEnd('.', ' ')
             if (clean.isEmpty()) clean = "download"
         }
         return clean

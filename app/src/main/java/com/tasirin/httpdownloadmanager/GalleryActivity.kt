@@ -325,6 +325,8 @@ private class GalleryAdapter(
 
     private val items = mutableListOf<MediaLibrary.MediaEntry>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    // Cache string badge: getString() tiap bind partial = lookup resource berulang.
+    private var partialBadge: String? = null
 
     fun release() { scope.cancel() }
 
@@ -394,13 +396,14 @@ private class GalleryAdapter(
         val e = items[position]
         val b = holder.binding
         b.textName.text = e.name
-        b.textExt.text = e.name.substringAfterLast('.', "").uppercase()
+        val dot = e.name.lastIndexOf('.')
+        b.textExt.text = if (dot < 0) "" else e.name.substring(dot + 1).uppercase()
         val ctx = holder.itemView.context
         // 3. Tampilkan play overlay saat tidak ada thumbnail supaya cell tidak kosong
         b.playOverlay.visibility = if (e.isVideo) View.VISIBLE else View.GONE
         b.textInfo.text = if (e.isPartial) {
             val pct = if (e.progressPercent in 0..100) " · ${e.progressPercent}%" else ""
-            ctx.getString(R.string.gallery_partial_badge) + pct + " · " + Formats.bytes(e.size)
+            (partialBadge ?: ctx.getString(R.string.gallery_partial_badge).also { partialBadge = it }) + pct + " · " + Formats.bytes(e.size)
         } else if (e.isVideo && e.durationMs > 0) {
             Formats.duration(e.durationMs) + " · " + Formats.bytes(e.size)
         } else {

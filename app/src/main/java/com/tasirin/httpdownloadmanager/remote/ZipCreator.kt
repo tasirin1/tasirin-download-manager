@@ -16,17 +16,48 @@ object ZipCreator {
     /** Kedalaman maksimum rekursi ZIP (anti symlink-cycle). */
     private const val MAX_ZIP_DEPTH = 64
 
-    /** Kontrol karakter C0 (U+0000-U+001F) yang bisa dipakai exploit nama entri. */
-    private val CONTROL_CHARS_RE = Regex("[\\u0000-\\u001f]")
+    /** Batas total entri per arsip: folder raksasa di TV box bisa memblokir
+     *  thread HTTP ber menit-menit / OOM bila tak dibatasi. */
+    const val MAX_ZIP_ENTRIES = 5000
+
+    /** Akumulator jumlah entri yang sudah ditulis (diteruskan saat rekursi). */
+    class ZipBudget(var count: Int = 0) {
+        fun tryTake(): Boolean {
+            if (count >= MAX_ZIP_ENTRIES) return false
+            count++
+            return true
+        }
+    }
 
     /** Nama dari filesystem/MediaStore tidak boleh dipakai mentah sebagai
      *  path ZIP; normalisasi mencegah Zip Slip di extractor pihak ketiga. */
-    internal fun safeEntryPath(path: String): String =
-        path.replace('\\', '/')
-            .split('/')
-            .map { part -> part.replace(CONTROL_CHARS_RE, "_") }
-            .filter { it.isNotEmpty() && it != "." && it != ".." }
-            .joinToString("/")
+    internal fun safeEntryPath(path: String): String {
+        // Satu pass StringBuilder: tanpa replace/split/map/join antara
+        // (4 koleksi per file x 5000 entri). Hasil identik: '\\' -> '/',
+        // segmen kosong/./.. dibuang, kontrol C0 -> '_'.
+        val out = StringBuilder(path.length)
+        val n = path.length
+        var i = 0
+        while (i < n) {
+            while (i < n && (path[i] == '/' || path[i] == '\\')) i++
+            if (i >= n) break
+            var j = i
+            while (j < n && path[j] != '/' && path[j] != '\\') j++
+            val isDot = j - i == 1 && path[i] == '.'
+            val isDotDot = j - i == 2 && path[i] == '.' && path[i + 1] == '.'
+            if (!isDot && !isDotDot) {
+                if (out.isNotEmpty()) out.append('/')
+                var k = i
+                while (k < j) {
+                    val c = path[k]
+                    out.append(if (c.code in 0x00..0x1F) '_' else c)
+                    k++
+                }
+            }
+            i = j
+        }
+        return out.toString()
+    }
 
     fun zipFile(
         zos: ZipOutputStream,
@@ -34,7 +65,8 @@ object ZipCreator {
         prefix: String,
         depth: Int = 0,
         seen: MutableSet<String> = mutableSetOf(),
-        isFileAllowed: (String) -> Boolean
+        isFileAllowed: (String) -> Boolean,
+        budget: ZipBudget = ZipBudget()
     ) {
         // Izin dicek terhadap canonical path: symlink file di dalam root
         // yang menunjuk ke luar root lolos bila hanya absolutePath (lokasi
@@ -49,6 +81,7 @@ object ZipCreator {
             if (!seen.add(canonical)) return
         }
         val entryPath = safeEntryPath(if (prefix.isEmpty()) file.name else "$prefix/${file.name}")
+        if (!budget.tryTake()) return
         if (file.isDirectory) {
             val children = runCatching { file.listFiles() }.getOrNull()
             if (children.isNullOrEmpty()) {
@@ -59,7 +92,8 @@ object ZipCreator {
             children.sortedWith(
                 Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
             ).forEach { child ->
-                zipFile(zos, child, entryPath, depth + 1, seen, isFileAllowed)
+                if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
+                zipFile(zos, child, entryPath, depth + 1, seen, isFileAllowed, budget)
             }
         } else if (file.isFile) {
             runCatching {
@@ -83,7 +117,9 @@ object ZipCreator {
         isUriAllowed: (android.net.Uri) -> Boolean = { false }
     ) {
         val used = mutableMapOf<String, Int>()
+        val budget = ZipBudget()
         tokens.forEach { token ->
+            if (budget.count >= MAX_ZIP_ENTRIES) return
             val raw = MediaLibrary.decodeToken(token) ?: return@forEach
             runCatching {
                 val name: String
@@ -97,7 +133,8 @@ object ZipCreator {
                         val children = runCatching { f.listFiles() }.getOrNull() ?: return@runCatching
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-                        ).forEach { child -> zipFile(zos, child, root, depth = 1, seen = mutableSetOf(), isFileAllowed = isFileAllowed) }
+                        ).forEach { child -> if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
+                            zipFile(zos, child, root, depth = 1, seen = mutableSetOf(), isFileAllowed = isFileAllowed, budget = budget) }
                         return@runCatching
                     }
                     name = f.name

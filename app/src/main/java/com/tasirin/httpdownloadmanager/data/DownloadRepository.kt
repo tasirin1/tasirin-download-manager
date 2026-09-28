@@ -3,7 +3,6 @@ package com.tasirin.httpdownloadmanager.data
 import android.content.Context
 import androidx.core.content.edit
 import com.tasirin.httpdownloadmanager.util.Crypto
-import java.security.MessageDigest
 import java.util.Collections
 
 class DownloadRepository(context: Context) {
@@ -93,12 +92,10 @@ class DownloadRepository(context: Context) {
     }
 
     private fun cacheKeyOf(vararg parts: String): String {
-        val md = MessageDigest.getInstance("SHA-256")
-        parts.forEachIndexed { i, s ->
-            if (i > 0) md.update(0)
-            md.update(s.toByteArray(Charsets.UTF_8))
-        }
-        return md.digest().joinToString("") { "%02x".format(java.util.Locale.US, it) }
+        // Tanpa Formatter per byte + tanpa list/array antara: hash string langsung.
+        return com.tasirin.httpdownloadmanager.util.Hex.encode(
+            com.tasirin.httpdownloadmanager.util.sha256Strings(*parts)
+        )
     }
 
     // Nilai terenkripsi empat field sensitif; dipakai sebagai value cache.

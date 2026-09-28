@@ -55,8 +55,13 @@ class ServerVideoDurations(
 
     private fun cacheLocked(): JSONObject {
         cache?.let { return it }
-        // audit-ignore: unbounded_read_text (cache JSON internal kecil ditulis app sendiri)
-        val loaded = runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject())
+        // Batas 512KB: file ditulis app sendiri, bila korup membengkak jangan
+        // baca utuh ke memori — mulai dari cache kosong.
+        // audit-ignore: unbounded_read_text (dibatasi file.length di atas)
+        val loaded = runCatching {
+            if (file.length() > 524_288L) JSONObject()
+            else JSONObject(file.readText())
+        }.getOrDefault(JSONObject())
         cache = loaded
         return loaded
     }

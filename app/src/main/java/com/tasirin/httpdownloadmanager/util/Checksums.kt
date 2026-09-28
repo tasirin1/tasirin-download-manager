@@ -6,24 +6,20 @@ package com.tasirin.httpdownloadmanager.util
  *  yang sama dengan input manual di MainActivity/remote web. */
 object Checksums {
 
-    /** Cari nilai header dengan nama case-insensitive. */
-    fun header(headers: Map<String, String>, name: String): String? {
-        val wanted = name.lowercase()
-        for ((k, v) in headers) if (k.lowercase() == wanted) return v
-        return null
-    }
-
     /** Ekstrak checksum dari header respons; null bila tidak ada yang dikenali. */
     fun fromHeaders(headers: Map<String, String>): String? {
-        val digest = header(headers, "Digest")?.let { parseDigestHeader(it) }
+        // Normalisasi kunci sekali: 5x header() berarti 5x lowercase per kunci.
+        val lower = HashMap<String, String>(headers.size + 1)
+        for ((k, v) in headers) lower[k.lowercase()] = v
+        val digest = lower["digest"]?.let { parseDigestHeader(it) }
         if (digest != null) return digest
-        val xSha256 = header(headers, "X-Checksum-Sha256")?.let { toHex(it, "SHA-256") }
+        val xSha256 = lower["x-checksum-sha256"]?.let { toHex(it, "SHA-256") }
         if (xSha256 != null) return "sha256:$xSha256"
-        val xSha1 = header(headers, "X-Checksum-Sha1")?.let { toHex(it, "SHA-1") }
+        val xSha1 = lower["x-checksum-sha1"]?.let { toHex(it, "SHA-1") }
         if (xSha1 != null) return "sha1:$xSha1"
-        val xMd5 = header(headers, "X-Checksum-MD5")?.let { toHex(it, "MD5") }
+        val xMd5 = lower["x-checksum-md5"]?.let { toHex(it, "MD5") }
         if (xMd5 != null) return "md5:$xMd5"
-        val contentMd5 = header(headers, "Content-MD5")?.let { toHex(it, "MD5") }
+        val contentMd5 = lower["content-md5"]?.let { toHex(it, "MD5") }
         if (contentMd5 != null) return "md5:$contentMd5"
         return null
     }
@@ -65,14 +61,20 @@ object Checksums {
 
     /** Decode base64 standar maupun URL-safe (alphabet A-Za-z0-9+/ dan -_), padding opsional. */
     fun base64Decode(input: String): ByteArray? {
-        val clean = input.filter { !it.isWhitespace() }.map { if (it == '-') '+' else if (it == '_') '/' else it }.joinToString("")
-        if (clean.isEmpty() || clean.length % 4 == 1) return null
-        val firstPad = clean.indexOf('=')
-        if (firstPad >= 0 && firstPad < clean.length - 2) return null
-        if (clean.count { it == '=' } > 2) return null
-        if (clean.length >= 2 && clean[clean.length - 2] == '=' && clean[clean.length - 1] != '=') return null
-        var s = clean
-        while (s.length % 4 != 0) s += "="
+        // Satu pass StringBuilder: tanpa list + string antara dari filter/map/join.
+        val s = StringBuilder(input.length)
+        for (c in input) {
+            if (c.isWhitespace()) continue
+            s.append(if (c == '-') '+' else if (c == '_') '/' else c)
+        }
+        if (s.isEmpty() || s.length % 4 == 1) return null
+        val firstPad = s.indexOf("=")
+        if (firstPad >= 0 && firstPad < s.length - 2) return null
+        var pads = 0
+        for (i in 0 until s.length) if (s[i] == '=') pads++
+        if (pads > 2) return null
+        if (s.length >= 2 && s[s.length - 2] == '=' && s[s.length - 1] != '=') return null
+        while (s.length % 4 != 0) s.append('=')
         // Ukuran pasti: setiap 4 char base64 = 3 byte output (tanpa padding).
         val buf = ByteArray(s.length * 3 / 4)
         var pos = 0

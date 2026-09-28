@@ -294,7 +294,7 @@ class DownloadEngine(appContext: Context) {
             preferredHeight = preferredHeight,
             preferredAudioLang = preferredAudioLang
         )
-        update(listOf(item) + _items.value)
+        update(ArrayList(_items.value.size + 1).apply { add(item); addAll(_items.value) })
         flushSave()
         val host = runCatching { URL(cleanUrl).host }.getOrDefault("")
         App.logEvent("DOWNLOAD ADDED: $name (${host.ifEmpty { "custom URL" }})")
@@ -448,7 +448,7 @@ class DownloadEngine(appContext: Context) {
             autoResume = false,
             finishedAt = System.currentTimeMillis()
         )
-        update(listOf(item) + _items.value)
+        update(ArrayList(_items.value.size + 1).apply { add(item); addAll(_items.value) })
         flushSave()
         return published
     }
@@ -487,7 +487,7 @@ class DownloadEngine(appContext: Context) {
                 if (code !in 200..299) return emptyList()
                 val body = conn.inputStream.use { readBounded(it, HLS_PROBE_MAX_BYTES) }
                 val renditions = HlsParser.parseAudioRenditions(body, conn.url.toString())
-                renditions.distinctBy { it.language.lowercase() + "|" + it.name.lowercase() }
+                renditions.distinctBy { it.language.lowercase() to it.name.lowercase() }
             } finally {
                 conn.disconnect()
             }
@@ -1141,19 +1141,20 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun isSlowError(message: String?): Boolean {
-        val m = message?.lowercase() ?: return false
-        return m.contains("speed too low") || m.contains("connection stalled")
+        if (message.isNullOrEmpty()) return false
+        return message.contains("speed too low", ignoreCase = true) ||
+            message.contains("connection stalled", ignoreCase = true)
     }
 
     private fun isConnectError(message: String?): Boolean {
-        val m = message?.lowercase() ?: return false
-        return m.contains("failed to connect") ||
-            m.contains("unable to resolve host") ||
-            m.contains("unknownhost") ||
-            m.contains("connect timed out") ||
-            m.contains("connection refused") ||
-            m.contains("network is unreachable") ||
-            m.contains("timeout")
+        if (message.isNullOrEmpty()) return false
+        return message.contains("failed to connect", ignoreCase = true) ||
+            message.contains("unable to resolve host", ignoreCase = true) ||
+            message.contains("unknownhost", ignoreCase = true) ||
+            message.contains("connect timed out", ignoreCase = true) ||
+            message.contains("connection refused", ignoreCase = true) ||
+            message.contains("network is unreachable", ignoreCase = true) ||
+            message.contains("timeout", ignoreCase = true)
     }
 
     private fun isGitHubUrl(url: String): Boolean =
@@ -1185,13 +1186,12 @@ class DownloadEngine(appContext: Context) {
 
     private fun isNetworkError(message: String?): Boolean {
         if (message.isNullOrBlank()) return false
-        val m = message.lowercase()
-        return m.contains("unknownhost") ||
-            m.contains("timeout") ||
-            m.contains("failed to connect") ||
-            m.contains("connect exception") ||
-            m.contains("network") ||
-            m.contains("socket")
+        return message.contains("unknownhost", ignoreCase = true) ||
+            message.contains("timeout", ignoreCase = true) ||
+            message.contains("failed to connect", ignoreCase = true) ||
+            message.contains("connect exception", ignoreCase = true) ||
+            message.contains("network", ignoreCase = true) ||
+            message.contains("socket", ignoreCase = true)
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
@@ -1405,7 +1405,7 @@ class DownloadEngine(appContext: Context) {
     private fun isHlsManifestUrl(url: String): Boolean {
         return url.contains("manifest.googlevideo.com") ||
             url.contains("/api/manifest/hls") ||
-            url.lowercase().contains(".m3u8")
+            url.contains(".m3u8", ignoreCase = true)
     }
 
     /** Unduh HLS (m3u8): pilih varian terbaik, unduh semua segmen .ts lalu
@@ -2909,7 +2909,12 @@ class DownloadEngine(appContext: Context) {
             else -> null
         } ?: return null
         input.use { stream ->
-            val md = MessageDigest.getInstance(algo)
+            // SHA-256 streaming via digest per-thread (sekali per file selesai).
+            val md = if (algo.equals("SHA-256", ignoreCase = true)) {
+                com.tasirin.httpdownloadmanager.util.sha256Digest()
+            } else {
+                MessageDigest.getInstance(algo)
+            }
             val buf = ByteArray(BUFFER_SIZE)
             while (true) {
                 val read = stream.read(buf)

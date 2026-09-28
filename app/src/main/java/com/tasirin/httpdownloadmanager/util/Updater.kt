@@ -96,7 +96,7 @@ object Updater {
                     // Cap waktu ikut disimpan: fallback oversize tak boleh memakai
                     // body berumur berminggu-minggu (cache parsed dibatasi 24 jam).
                     context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit()
-                        .putString("raw", raw.takeLast(524_288))
+                        .putString("raw", raw)
                         .putLong("raw_at", System.currentTimeMillis())
                         .apply()
                 }

@@ -410,12 +410,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val now = System.currentTimeMillis()
             val thumbs = File(context.cacheDir, "thumbs")
             if (thumbs.isDirectory) {
-                val files = thumbs.listFiles()?.filter { it.isFile }
-                    ?.sortedByDescending { it.lastModified() } ?: return
+                // Satu stat per file: sortedByDescending memanggil lastModified()
+                // di tiap perbandingan (O(n log n) stat). Petakan dulu ke Pair.
+                val files = thumbs.listFiles()?.mapNotNull { f ->
+                    if (!f.isFile) null else f to f.lastModified()
+                }?.sortedByDescending { it.second } ?: return
                 val keep = 300
                 val maxAge = 7L * 24 * 60 * 60 * 1000
-                files.forEachIndexed { i, f ->
-                    if (i >= keep || now - f.lastModified() > maxAge) f.delete()
+                files.forEachIndexed { i, (f, modified) ->
+                    if (i >= keep || now - modified > maxAge) f.delete()
                 }
             }
             val tmpMaxAge = 24L * 60 * 60 * 1000
@@ -869,21 +872,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         items.forEachIndexed { idx, item ->
             val cachedObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
             if (cachedObj != null && cachedObj.optString("id") == item.id) {
-                // Salin dulu sebelum update: array cache lama masih diserialisasi
-                // thread request lain di luar lock — mutasi in-place merusak JSON
-                // mereka (race polling 1-2x/detik + SSE 2x/detik). Shallow copy
-                // aman karena nilainya immutable (String/Long/Boolean).
+                // Bangun objek baru tanpa iterasi keys(): semua field dinamis
+                // ditulis ulang, hanya addedAt yang dipertahankan dari cache.
+                // Hemat iterator + get(k) per key pada poll 1-2x/detik; aman
+                // dari race karena cache lama tak pernah dimutasi in-place.
                 val oldObj = JSONObject()
-                val keys = cachedObj.keys()
-                while (keys.hasNext()) {
-                    val k = keys.next()
-                    oldObj.put(k, cachedObj.get(k))
-                }
-                // Update hanya field yang berubah — hemat ~40% GC alloc.
-                // fileName/url ikut disegarkan: item bisa di-rename saat download
-                // mulai (Content-Disposition) atau lewat aksi Rename/mirror.
-                if (oldObj.optString("fileName") != item.fileName) oldObj.put("fileName", item.fileName)
-                if (oldObj.optString("url") != item.url) oldObj.put("url", item.url)
+                oldObj.put("id", item.id)
+                oldObj.put("fileName", item.fileName)
+                oldObj.put("url", item.url)
+                oldObj.put("addedAt", cachedObj.optLong("addedAt", item.addedAt))
                 oldObj.put("state", item.state.name)
                 oldObj.put("bytesDownloaded", item.bytesDownloaded)
                 oldObj.put("totalBytes", item.totalBytes)

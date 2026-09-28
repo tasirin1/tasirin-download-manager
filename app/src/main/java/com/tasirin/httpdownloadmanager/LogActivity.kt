@@ -81,11 +81,17 @@ class LogActivity : AppCompatActivity() {
         refreshLog()
     }
 
+    // Backoff saat log sepi: refreshLog() early-return bila versi sama,
+    // tapi polling 1 dtk terus membangunkan CPU. Idle -> mundur sampai 5 dtk.
+    private var logIdleTicks = 0
     private val pollLog = object : Runnable {
         override fun run() {
             if (isDestroyed || isFinishing) return
+            val before = lastLogVersion
             refreshLog()
-            binding.log.postDelayed(this, 1000)
+            logIdleTicks = if (lastLogVersion == before) logIdleTicks + 1 else 0
+            val delay = (1000L + logIdleTicks * 1000L).coerceAtMost(5000L)
+            binding.log.postDelayed(this, delay)
         }
     }
 

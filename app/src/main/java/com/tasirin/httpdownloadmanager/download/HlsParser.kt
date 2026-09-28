@@ -54,16 +54,18 @@ object HlsParser {
             if (line.startsWith("#EXT-X-STREAM-INF")) {
                 val next = lines.getOrNull(i + 1)?.trim().orEmpty()
                 if (next.isNotEmpty() && !next.startsWith("#")) {
-                    val bandwidth = BANDWIDTH_RE
-                        .find(line)?.groupValues?.get(1)?.toLongOrNull()
-                    val res = RESOLUTION_RE
-                        .find(line)?.groupValues?.get(1)
-                    val name = NAME_RE
-                        .find(line)?.groupValues?.get(1)
-                    val audioGroup = AUDIO_RE
-                        .find(line)?.groupValues?.get(1)
-                    val frameRate = FRAME_RATE_RE
-                        .find(line)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
+                    // Guard contains dulu: regex find 6x per baris varian boros
+                    // bila atributnya tidak ada di baris tersebut.
+                    val bandwidth = if (line.contains("BANDWIDTH")) BANDWIDTH_RE
+                        .find(line)?.groupValues?.get(1)?.toLongOrNull() else null
+                    val res = if (line.contains("RESOLUTION")) RESOLUTION_RE
+                        .find(line)?.groupValues?.get(1) else null
+                    val name = if (line.contains("NAME=")) NAME_RE
+                        .find(line)?.groupValues?.get(1) else null
+                    val audioGroup = if (line.contains("AUDIO")) AUDIO_RE
+                        .find(line)?.groupValues?.get(1) else null
+                    val frameRate = if (line.contains("FRAME-RATE")) FRAME_RATE_RE
+                        .find(line)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0 else 0
                     val height = RESOLUTION_HEIGHT_RE
                         .find(line)?.groupValues?.let { g ->
                             // Label kualitas = dimensi terkecil: video portrait

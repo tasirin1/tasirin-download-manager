@@ -2718,6 +2718,18 @@ function renderGalleryReset(items, total, hasMore) {
   loadMoreGallery();
 }
 
+// Fetch dengan batas waktu agar spinner tak gantung selamanya saat koneksi
+// putus di tengah. Tanpa AbortController (WebView tua) fallback fetch biasa.
+function fetchTimeout(url, opts, ms) {
+  if (typeof AbortController === 'undefined') return fetch(url, opts);
+  const ac = new AbortController();
+  const timer = setTimeout(function () { try { ac.abort(); } catch (e) {} }, ms || 20000);
+  const o = opts || {};
+  o.signal = ac.signal;
+  return fetch(url, o).then(function (res) { clearTimeout(timer); return res; },
+    function (e) { clearTimeout(timer); throw e; });
+}
+
 async function loadGalleryRequest(reset) {
   const seq = ++gallerySeq;
   if (reset) showGallerySkeleton();
@@ -2725,7 +2737,7 @@ async function loadGalleryRequest(reset) {
     const params = new URLSearchParams();
     params.set('page', reset ? 0 : galleryPage);
     params.set('type', 'video');
-    const res = await fetch(API + '/api/gallery?' + params.toString());
+    const res = await fetchTimeout(API + '/api/gallery?' + params.toString(), undefined, 25000);
     if (seq !== gallerySeq) return;
     if (res.status === 401) {
       galleryStatus.textContent = 'PIN required. Reload the page to log in.';
@@ -3218,7 +3230,7 @@ async function loadFsLocations() {
   if (fsLocationsLoaded || fsLocationsLoading) return;
   fsLocationsLoading = true;
   try {
-    const res = await fetch(API + '/api/fs?path=');
+    const res = await fetchTimeout(API + '/api/fs?path=', undefined, 20000);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     fsLocations = data.items || [];
@@ -3314,8 +3326,8 @@ async function loadFs() {
   fsOffset = 0;
   fsTotal = 0;
   try {
-    const res = await fetch(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
-      '&offset=0&limit=' + FS_PAGE);
+    const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
+      '&offset=0&limit=' + FS_PAGE, undefined, 20000);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (seq !== fsLoadSeq) return;
@@ -3515,8 +3527,8 @@ async function fsLoadMore() {
     btn.textContent = 'Loading\u2026';
   }
   try {
-    const res = await fetch(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
-      '&offset=' + fsOffset + '&limit=' + FS_PAGE);
+    const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
+      '&offset=' + fsOffset + '&limit=' + FS_PAGE, undefined, 20000);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (seq !== fsLoadSeq) return;
@@ -4173,7 +4185,7 @@ async function movePickOpen(path) {
   list.innerHTML = '<div class="move-empty">Loading\u2026</div>';
   renderMoveCrumbs(movePath, pathEl);
   try {
-    const res = await fetch(API + '/api/fs?path=' + encodeURIComponent(movePath) + '&offset=0&limit=250');
+    const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(movePath) + '&offset=0&limit=250', undefined, 20000);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (seq !== movePickSeq) return;
@@ -6475,7 +6487,7 @@ function schedulePoll() {
 
 async function pollSnapshot() {
   try {
-    const res = await fetch(API + '/api/snapshot');
+    const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
     if (!res.ok) {
       if (res.status === 401) return;
       throw new Error('HTTP ' + res.status);

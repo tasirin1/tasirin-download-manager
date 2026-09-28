@@ -85,6 +85,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     // bila struktur daftar sama; toolbar teks hanya update saat hitungan berubah.
     private var lastUiSubmitMs = 0L
     private var lastToolbarSig = Int.MIN_VALUE
+    // Signature progres terlihat: emisi tanpa perubahan tampil (tick stagnan)
+    // tak perlu submitList + DiffUtil sama sekali.
+    private var lastProgressSig = 0
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -199,10 +202,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     runCatching { autoOpenCompleted(items) }
                 }
                 runCatching {
-                    // Rebuild daftar dibatasi 400ms sekali kecuali jumlah item berubah.
+                    // Rebuild daftar dibatasi 400ms sekali kecuali jumlah item berubah;
+                    // lewati bila tak ada field tampil yang berubah (termasuk lipatan section).
                     val now = android.os.SystemClock.uptimeMillis()
-                    if (sizeChanged || now - lastUiSubmitMs >= 400L) {
+                    val sig = progressSig(items)
+                    if (sizeChanged || (sig != lastProgressSig && now - lastUiSubmitMs >= 400L)) {
                         lastUiSubmitMs = now
+                        lastProgressSig = sig
                         adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
                     }
                     updateStickyHeader()
@@ -1404,6 +1410,28 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     /** Ringkasan ringkas: "3 active · 5 done · 1 failed", dihitung dalam SATU
      *  iterasi daftar (bukan beberapa pass terpisah). */
+    /** Hash murah field yang tampil di daftar + status lipatan section. */
+    private fun progressSig(items: List<com.tasirin.httpdownloadmanager.data.DownloadItem>): Int {
+        var h = items.size * 31 +
+            (if (StoragePrefs.isSectionCollapsed(this, "section_active")) 1 else 0) * 7 +
+            (if (StoragePrefs.isSectionCollapsed(this, "section_paused")) 1 else 0) * 13 +
+            (if (StoragePrefs.isSectionCollapsed(this, "section_completed")) 1 else 0) * 17 +
+            (if (StoragePrefs.isSectionCollapsed(this, "section_failed")) 1 else 0) * 19
+        for (it in items) {
+            h = h * 31 + it.id.hashCode()
+            h = h * 31 + it.state.hashCode()
+            h = h * 31 + it.progressPercent
+            h = h * 31 + (it.speedBps % Int.MAX_VALUE).toInt()
+            h = h * 31 + it.etaSeconds.toInt()
+            h = h * 31 + (it.bytesDownloaded % Int.MAX_VALUE).toInt()
+            h = h * 31 + (it.totalBytes % Int.MAX_VALUE).toInt()
+            h = h * 31 + it.fileName.hashCode()
+            h = h * 31 + (it.error?.hashCode() ?: 0)
+            h = h * 31 + (it.finishedAt % Int.MAX_VALUE).toInt()
+        }
+        return h
+    }
+
     private fun updateToolbar(items: List<DownloadItem>) {
         var active = 0
         var paused = 0

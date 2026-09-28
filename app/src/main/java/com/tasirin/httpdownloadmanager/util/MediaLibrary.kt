@@ -58,10 +58,24 @@ object MediaLibrary {
         return sb.toString()
     }
 
+    // Samakan segmen pertama path tanpa alokasi trim/substring/lowercase.
+    private fun firstSegmentEquals(path: String, vararg names: String): Boolean {
+        var s = 0
+        val n = path.length
+        while (s < n && path[s] == '/') s++
+        var e = s
+        while (e < n && path[e] != '/') e++
+        for (name in names) {
+            if (e - s != name.length) continue
+            if (path.regionMatches(s, name, 0, name.length, ignoreCase = true)) return true
+        }
+        return false
+    }
+
     fun mediaCollectionForRoot(root: String): Uri {
-        return when (root.trim('/').substringBefore('/').lowercase()) {
-            "pictures", "dcim" -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            "movies" -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        return when {
+            firstSegmentEquals(root, "pictures", "dcim") -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            firstSegmentEquals(root, "movies") -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
             else -> downloadsCollection()
         }
     }
@@ -69,12 +83,12 @@ object MediaLibrary {
     /** Koleksi MediaStore untuk menyimpan file; fallback ke Downloads bila
      *  MIME tidak cocok dengan koleksi media (mis. APK ke Pictures). */
     fun mediaCollectionFor(relativePath: String?, mime: String): Uri {
-        val root = relativePath?.trim('/')?.substringBefore('/').orEmpty().lowercase()
+        val root = relativePath.orEmpty()
         return when {
-            root == "pictures" || root == "dcim" ->
+            firstSegmentEquals(root, "pictures", "dcim") ->
                 if (mime.startsWith("image/")) MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                 else downloadsCollection()
-            root == "movies" ->
+            firstSegmentEquals(root, "movies") ->
                 if (mime.startsWith("video/")) MediaStore.Video.Media.EXTERNAL_CONTENT_URI
                 else downloadsCollection()
             else -> downloadsCollection()
@@ -104,23 +118,47 @@ object MediaLibrary {
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
     private val VIDEO_EXTS = setOf("mp4", "mkv", "webm", "avi", "mov", "3gp", "m4v", "mpg", "mpeg", "ts", "m2ts")
 
-    private fun isGalleryVideo(name: String): Boolean =
-        VIDEO_EXTS.contains(name.substringAfterLast('.', "").lowercase())
+    // Cek akhiran tanpa alokasi substring+lowercase per file saat scan ribuan file.
+    private fun hasExt(name: String, ext: String): Boolean {
+        if (name.length <= ext.length + 1) return false
+        if (name[name.length - ext.length - 1] != '.') return false
+        return name.endsWith(ext, ignoreCase = true)
+    }
+
+    private fun hasAnyExt(name: String, exts: Set<String>): Boolean {
+        for (e in exts) if (hasExt(name, e)) return true
+        return false
+    }
+
+    private fun isGalleryVideo(name: String): Boolean = hasAnyExt(name, VIDEO_EXTS)
 
     fun mediaKind(name: String): String? {
-        val ext = name.substringAfterLast('.', "").lowercase()
         return when {
-            IMAGE_EXTS.contains(ext) -> "image"
-            VIDEO_EXTS.contains(ext) -> "video"
+            hasAnyExt(name, IMAGE_EXTS) -> "image"
+            hasAnyExt(name, VIDEO_EXTS) -> "video"
             else -> null
         }
     }
 
-    fun tokenForPath(path: String): String =
-        Base64.encodeToString("f:$path".toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE)
+    // Memo token: scan ulang tiap 30 dtk meng-encode path yang sama berulang-ulang.
+    private val tokenCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private fun cachedToken(raw: String): String {
+        tokenCache[raw]?.let { return it }
+        val v = Base64.encodeToString(raw.toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE)
+        // Buang separuh tertua, bukan clear() total: clear memicu re-encode
+        // massal 4000 path pada scan berikutnya (thundering herd).
+        if (tokenCache.size > 4000) {
+            val it = tokenCache.keys.iterator()
+            var n = 2000
+            while (it.hasNext() && n-- > 0) { it.next(); it.remove() }
+        }
+        tokenCache[raw] = v
+        return v
+    }
 
-    fun tokenForUri(uri: String): String =
-        Base64.encodeToString("u:$uri".toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE)
+    fun tokenForPath(path: String): String = cachedToken("f:$path")
+
+    fun tokenForUri(uri: String): String = cachedToken("u:$uri")
 
     fun decodeToken(token: String): String? = runCatching {
         String(

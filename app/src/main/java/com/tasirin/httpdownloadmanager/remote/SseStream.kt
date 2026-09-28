@@ -16,6 +16,9 @@ internal class SseStream : InputStream() {
     // Pil tutup: membangunkan queue.poll yang sedang menunggu 25 dtk
     // supaya koneksi mati tidak menggantung; diabaikan oleh read normal.
     private val POISON = ByteArray(0)
+    // Heartbeat statis: array read-only, aman dipakai ulang tiap timeout
+    // (read hanya menyalin keluar, tak pernah menulis).
+    private val PING = ": ping\n\n".toByteArray(Charsets.UTF_8)
 
     @Volatile
     var isClosed = false
@@ -89,7 +92,7 @@ internal class SseStream : InputStream() {
                 if (isClosed) return -1
                 // Tidak ada data selama timeout: kirim komentar heartbeat
                 // supaya koneksi tidak diputus proxy/timeout.
-                current = ": ping\n\n".toByteArray(Charsets.UTF_8)
+                current = PING
                 pos = 0
             }
         }
