@@ -13,8 +13,19 @@ class DownloadRepository(context: Context) {
     // synchronizedMap: save bisa dipanggil dari thread UI (flush) dan IO (job).
     private val credCache = Collections.synchronizedMap(HashMap<String, Quad>())
 
+    // True bila load terakhir terdegradasi (blob ada tapi tak terbaca):
+    // save kosong diblokir agar tak menimpa blob mentah secara permanen.
+    @Volatile private var degradedLoad = false
+    // Kredensial terenkripsi apa adanya per id, untuk memulihkan field yang
+    // gagal di-decrypt (keystore invalid) agar save tak menimpa permanen "".
+    private val storedCreds = HashMap<String, Quad>()
+
+    /** Apakah prefs menyimpan blob antrean (bedakan fresh install vs corrupt). */
+    fun hadStoredItems(): Boolean = prefs.contains(KEY_ITEMS)
+
     fun load(): List<DownloadItem> {
         val raw = prefs.getString(KEY_ITEMS, null) ?: return emptyList()
+        val arrLen = runCatching { org.json.JSONArray(raw).length() }.getOrDefault(-1)
         val items = DownloadItemCodec.decode(raw).map { item ->
             // Kredensial dan secret header/body disimpan terenkripsi (API 23+);
             // Android 5.0-5.1 menyimpan plaintext (Keystore AES belum tersedia)
@@ -26,7 +37,28 @@ class DownloadRepository(context: Context) {
                 postBody = Crypto.decrypt(item.postBody)
             )
         }
+        degradedLoad = items.isEmpty() && (arrLen != 0)
+        storedCreds.clear()
+        storedCreds.putAll(readStoredCreds(raw))
         return DownloadItemCodec.overlayProgress(items, prefs.getString(KEY_PROGRESS, null))
+    }
+
+    /** Baca kredensial tersimpan (masih terenkripsi) per id dari blob mentah. */
+    private fun readStoredCreds(raw: String): Map<String, Quad> {
+        val out = HashMap<String, Quad>()
+        val arr = runCatching { org.json.JSONArray(raw) }.getOrNull() ?: return out
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val id = o.optString("id")
+            if (id.isBlank()) continue
+            out[id] = Quad(
+                o.optString("username", ""),
+                o.optString("password", ""),
+                o.optString("headers", ""),
+                o.optString("postBody", "")
+            )
+        }
+        return out
     }
 
     /** Simpan progres kompak (id -> bytes/total) tanpa enkripsi & tanpa detail
@@ -51,10 +83,36 @@ class DownloadRepository(context: Context) {
     }
 
     private fun persistItems(items: List<DownloadItem>, blocking: Boolean) {
+        // Load terdegradasi + daftar kosong = blob corrupt, bukan antrean
+        // kosong sungguhan: jangan timpa blob mentah (forensik + pemulihan).
+        if (items.isEmpty() && degradedLoad) return
         val encItems = items.map { item ->
-            val (encUser, encPass, encHeaders, encBody) = encryptedCreds(item)
-            item.copy(username = encUser, password = encPass, headers = encHeaders, postBody = encBody)
+            val stored = storedCreds[item.id]
+            if (stored != null && (shouldRestoreStored(item.username, stored.first) ||
+                        shouldRestoreStored(item.password, stored.second) ||
+                        shouldRestoreStored(item.headers, stored.third) ||
+                        shouldRestoreStored(item.postBody, stored.fourth))
+            ) {
+                // Sebagian field gagal di-decrypt: enkripsi ulang per field
+                // yang sehat, pertahankan blob asli untuk yang gagal.
+                item.copy(
+                    username = if (shouldRestoreStored(item.username, stored.first)) stored.first
+                    else Crypto.encrypt(item.username),
+                    password = if (shouldRestoreStored(item.password, stored.second)) stored.second
+                    else Crypto.encrypt(item.password),
+                    headers = if (shouldRestoreStored(item.headers, stored.third)) stored.third
+                    else Crypto.encrypt(item.headers),
+                    postBody = if (shouldRestoreStored(item.postBody, stored.fourth)) stored.fourth
+                    else Crypto.encrypt(item.postBody)
+                )
+            } else {
+                val (encUser, encPass, encHeaders, encBody) = encryptedCreds(item)
+                item.copy(username = encUser, password = encPass, headers = encHeaders, postBody = encBody)
+            }
         }
+        storedCreds.clear()
+        encItems.forEach { storedCreds[it.id] = Quad(it.username, it.password, it.headers, it.postBody) }
+        if (items.isNotEmpty()) degradedLoad = false
         // Snapshot penuh sudah memuat progres terbaru -> hapus progres ringan
         // supaya tidak menimpa data yang lebih lama saat load berikutnya.
         prefs.edit(commit = blocking) {
@@ -101,9 +159,19 @@ class DownloadRepository(context: Context) {
     // Nilai terenkripsi empat field sensitif; dipakai sebagai value cache.
     private data class Quad(val first: String, val second: String, val third: String, val fourth: String)
 
+
     companion object {
         private const val KEY_ITEMS = "items"
         private const val KEY_PROGRESS = "progress"
         private const val MAX_CRED_CACHE = 128
     }
 }
+
+/** Pulihkan nilai tersimpan bila field polos kosong tapi simpanan tak kosong:
+ *  decrypt yang gagal tak pernah menghasilkan "" dari simpanan tak kosong
+ *  (plaintext lama lolos apa adanya, prefix "plain:" kembali "" hanya bila
+ *  aslinya memang kosong), dan engine tak pernah mengosongkan kredensial
+ *  item yang sudah ada — jadi ini selalu berarti kegagalan decrypt, bukan
+ *  pengosongan oleh user. */
+internal fun shouldRestoreStored(currentPlain: String, storedEnc: String?): Boolean =
+    currentPlain.isEmpty() && !storedEnc.isNullOrEmpty()
