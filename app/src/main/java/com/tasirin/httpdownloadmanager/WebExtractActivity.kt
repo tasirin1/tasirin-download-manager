@@ -31,6 +31,8 @@ class WebExtractActivity : AppCompatActivity() {
         const val EXTRA_COOKIES = "extra_cookies"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_WATCH_URL = "extra_watch_url"
+        private const val GRAB_INTERVAL_MS = 1500L
+        private const val MAX_GRAB_TRIES = 40
     }
 
     private lateinit var webView: WebView
@@ -165,9 +167,9 @@ class WebExtractActivity : AppCompatActivity() {
             "function bucket2(u){u=abs((u||'').trim());if(u.indexOf('http')!==0)return;" +
             "if(/\\.m3u8/i.test(u)){if(hls2.indexOf(u)<0)hls2.push(u);}else{if(mp42.indexOf(u)<0)mp42.push(u);}}" +
             "var h='';" +
-            "try{h=document.documentElement.innerHTML.slice(0,1000000).replace(/\\\\\//g,'/');}catch(e){}" +
-            "var fm=h.match(/(?:file|src|source)\s*:\s*[\"'](https?:[^\"']+?\\.(?:mp4|m3u8)[^\"']*)[\"']/gi)||[];" +
-            "for(var f=0;f<fm.length;f++){var fu=fm[f].replace(/^[^\"']*[\"']/, '').replace(/[\"'].*$/,'');" +
+            "try{h=document.documentElement.innerHTML.slice(0,1000000).replace(/\\\\\\//g,'/');}catch(e){}" +
+            "var fm=h.match(/(?:file|src|source)\\s*:\\s*[\"'](https?:[^\"']+?\\.(?:mp4|m3u8)[^\"']*)[\"']/gi)||[];" +
+            "for(var f=0;f<fm.length;f++){var fu=fm[f].replace(/^[^\"']*[\"']/, '').replace(/[\"'].*\$/, '');" +
             "bucket2(fu);}" +
             "var a=h.match(/https?:\\/\\/[^\\s\"'<>]+\\.mp4[^\\s\"'<>]*/gi)||[];" +
             "for(var p=0;p<a.length;p++)bucket2(a[p]);" +
@@ -219,8 +221,4 @@ class WebExtractActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    companion object {
-        private const val GRAB_INTERVAL_MS = 1500L
-        private const val MAX_GRAB_TRIES = 40
-    }
 }
