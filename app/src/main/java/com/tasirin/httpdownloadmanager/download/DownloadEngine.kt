@@ -102,18 +102,17 @@ class DownloadEngine(appContext: Context) {
     private val retryAttempts = ConcurrentHashMap<String, Int>()
     private val pendingRetries = ConcurrentHashMap.newKeySet<String>()
     /** URL HLS yang sudah gagal (media playlist 403/404) — jangan retry; re-extract dari YouTube URL. */
-    private val failedHlsUrls = ConcurrentHashMap.newKeySet<String>()
+    // Set concurrent via newSetFromMap (bukan ConcurrentHashMap.newKeySet):
+    // KeySetView.size/clear butuh API 24 (lint NewApi, minSdk 21),
+    // sedangkan Set polos aman di semua API.
+    private val failedHlsUrls: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val FAILED_HLS_URLS_MAX = 256
 
     /** Negative-cache sesi: aman dihapus total bila penuh (hanya memicu
      *  satu percobaan ulang HLS, bukan korupsi). */
     private fun rememberFailedHlsUrl(url: String) {
-        // KeySetView.clear() butuh API 24 (lint NewApi, minSdk 21): hapus
-        // via iterator yang aman di semua API.
-        if (failedHlsUrls.size >= FAILED_HLS_URLS_MAX) {
-            val it = failedHlsUrls.iterator()
-            while (it.hasNext()) { it.next(); it.remove() }
-        }
+        if (failedHlsUrls.size >= FAILED_HLS_URLS_MAX) failedHlsUrls.clear()
         failedHlsUrls.add(url)
     }
     /** URL sosial media original per item (YouTube/TikTok/etc) — disimpan saat ekstraksi
