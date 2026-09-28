@@ -428,21 +428,27 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun renderToggle(btn: Button, on: Boolean, label: String) {
-        btn.text = label
-        // Teks selalu gelap (text_primary): abu/hijau di atas tonal biru muda
-        // kontrasnya rendah (<4.5:1) sehingga tampak tenggelam; status ON/OFF
-        // cukup lewat ikon ujung (check hijau / close abu).
-        btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
-        val color = ContextCompat.getColor(
-            this, if (on) R.color.status_on else R.color.text_secondary
-        )
-        val icon = ContextCompat.getDrawable(
-            this, if (on) R.drawable.ic_check else R.drawable.ic_close
-        )
-        if (icon != null) {
-            icon.mutate().setTint(color)
-            btn.setCompoundDrawablesRelative(null, null, icon, null)
-            btn.compoundDrawablePadding = 12
+        // Status harus kentara tanpa mengandalkan warna saja: ON = tombol terisi
+        // + label "ON", OFF = tombol tonal + label "OFF", plus ikon ujung.
+        val state = getString(if (on) R.string.settings_badge_on else R.string.settings_badge_off)
+        btn.text = "$label \u2014 $state"
+        btn.contentDescription = "$label: $state"
+        if (on) {
+            btn.setBackgroundResource(R.drawable.bg_btn_filled)
+            btn.setTextColor(ContextCompat.getColor(this, R.color.white))
+            ContextCompat.getDrawable(this, R.drawable.ic_check)?.let { icon ->
+                icon.mutate().setTint(ContextCompat.getColor(this, R.color.white))
+                btn.setCompoundDrawablesRelative(null, null, icon, null)
+                btn.compoundDrawablePadding = 12
+            }
+        } else {
+            btn.setBackgroundResource(R.drawable.bg_btn_tv)
+            btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+            ContextCompat.getDrawable(this, R.drawable.ic_close)?.let { icon ->
+                icon.mutate().setTint(ContextCompat.getColor(this, R.color.text_secondary))
+                btn.setCompoundDrawablesRelative(null, null, icon, null)
+                btn.compoundDrawablePadding = 12
+            }
         }
     }
 
