@@ -4,25 +4,47 @@
 # CI/CD — workflow & dependabot
 .github/ @tasirin1
 
-# Remote web
-remote.src.html @tasirin1
-assets/remote.html @tasirin1
+# Remote web (sumber + hasil minify + generator)
+# Catatan: hasil minify ada di app/src/main/assets/ (bukan /assets).
+/remote.src.html @tasirin1
+app/src/main/assets/remote.html @tasirin1
 scripts/prepare_remote.py @tasirin1
 
 # Download engine — inti unduhan
 app/src/main/java/com/tasirin/httpdownloadmanager/download/ @tasirin1
+app/src/main/java/com/tasirin/httpdownloadmanager/data/ @tasirin1
 
-# Keamanan server
+# Keamanan + server remote
 app/src/main/java/com/tasirin/httpdownloadmanager/remote/ @tasirin1
+
+# UI aplikasi (aktivitas, adapter, galeri, ekstraksi situs)
+app/src/main/java/com/tasirin/httpdownloadmanager/MainActivity.kt @tasirin1
+app/src/main/java/com/tasirin/httpdownloadmanager/WebExtractActivity.kt @tasirin1
+app/src/main/java/com/tasirin/httpdownloadmanager/GalleryActivity.kt @tasirin1
+app/src/main/java/com/tasirin/httpdownloadmanager/SettingsActivity.kt @tasirin1
+app/src/main/java/com/tasirin/httpdownloadmanager/LogActivity.kt @tasirin1
+app/src/main/java/com/tasirin/httpdownloadmanager/ui/ @tasirin1
+app/src/main/java/com/tasirin/httpdownloadmanager/util/ @tasirin1
+app/src/main/java/com/tasirin/httpdownloadmanager/receiver/ @tasirin1
+
+# Manifest, resources, dan konfigurasi build
+app/src/main/AndroidManifest.xml @tasirin1
+app/src/main/res/ @tasirin1
+app/build.gradle.kts @tasirin1
+build.gradle.kts @tasirin1
+settings.gradle.kts @tasirin1
+gradle.properties @tasirin1
+gradle/ @tasirin1
 
 # Scripts — guard, audit, smoke test
 scripts/ @tasirin1
 
-# Dokumentasi
+# Dokumentasi & website
 AGENTS.md @tasirin1
 README.md @tasirin1
 README.en.md @tasirin1
 CHANGELOG.md @tasirin1
+CHANGELOG.archive.md @tasirin1
 SECURITY.md @tasirin1
 CONTRIBUTING.md @tasirin1
 docs/ @tasirin1

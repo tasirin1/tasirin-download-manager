@@ -20,11 +20,11 @@ jobs:
           days-before-pr-stale: 21
           days-before-issue-close: 14
           days-before-pr-close: 14
-          stale-issue-message: "Issue ini tidak ada aktivitas 60 hari. Beri tahu kalau masih relevan, kalau tidak akan ditutup 14 hari lagi."
-          stale-pr-message: "PR ini tidak ada aktivitas 30 hari. Lanjutkan atau akan ditutup 14 hari lagi."
-          close-issue-message: "Issue ditutup karena tidak ada aktivitas."
-          close-pr-message: "PR ditutup karena tidak ada aktivitas."
-          exempt-issue-labels: "help wanted,good first issue,enhancement"
+          stale-issue-message: "Issue ini tidak ada aktivitas 45 hari dan ditandai stale. Balas di sini kalau masih relevan — bila 14 hari tidak ada respons, issue akan ditutup otomatis."
+          stale-pr-message: "PR ini tidak ada aktivitas 21 hari dan ditandai stale. Push commit baru atau balas di sini kalau masih dikerjakan — bila 14 hari tidak ada respons, PR akan ditutup otomatis."
+          close-issue-message: "Issue ditutup otomatis karena tidak ada aktivitas. Kalau masalahnya masih terjadi di rilis terbaru, silakan buka issue baru dengan menyertakan versi APK dan langkah reproduksi."
+          close-pr-message: "PR ditutup otomatis karena tidak ada aktivitas. Silakan buka ulang bila masih relevan (rebase ke main terbaru dan pastikan CI hijau)."
+          exempt-issue-labels: "help wanted,good first issue,enhancement,security"
           exempt-pr-labels: "dependencies"
           stale-issue-label: "stale"
           stale-pr-label: "stale"

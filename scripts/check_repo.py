@@ -125,10 +125,102 @@ def agents_md_completeness() -> Result:
         )
     return Result("AGENTS.md completeness", True, 0.0, "OK")
 
+
+
+def admin_consistency() -> Result:
+    """Penjaga relevansi administrasi: pesan stale, path CODEOWNERS/labeler,
+    dan angka toolchain di AGENTS.md harus sinkron dengan sumber aslinya."""
+    problems: list[str] = []
+    try:
+        stale = (ROOT / ".github/workflows/stale.yml").read_text(encoding="utf-8")
+        issue_days = pr_days = ""
+        for line in stale.splitlines():
+            s = line.strip()
+            if s.startswith("days-before-issue-stale:"):
+                issue_days = s.split(":", 1)[1].strip()
+            elif s.startswith("days-before-pr-stale:"):
+                pr_days = s.split(":", 1)[1].strip()
+        if issue_days and f"{issue_days} hari" not in stale:
+            problems.append(f"pesan stale issue tidak menyebut {issue_days} hari")
+        if pr_days and f"{pr_days} hari" not in stale:
+            problems.append(f"pesan stale PR tidak menyebut {pr_days} hari")
+    except OSError as exc:
+        problems.append(f"stale.yml tak terbaca: {exc}")
+    try:
+        owners = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
+        if "assets/remote.html" in owners and "app/src/main/assets/remote.html" not in owners:
+            problems.append("CODEOWNERS masih memakai path usang assets/remote.html")
+        for lineno, line in enumerate(owners.splitlines(), start=1):
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            path = s.split()[0].lstrip("/")
+            if path in ("*", "*.jks", "keystore.b64"):
+                continue
+            if any(ch in path for ch in ("*", "?", "[")):
+                prefix = path.split("*")[0].split("?")[0].split("[")[0].rstrip("/")
+                if prefix and not (ROOT / prefix).exists():
+                    problems.append(f"CODEOWNERS:{lineno} awalan tak ada: {prefix}")
+            elif not (ROOT / path).exists():
+                problems.append(f"CODEOWNERS:{lineno} path tak ada: {path}")
+    except OSError as exc:
+        problems.append(f"CODEOWNERS tak terbaca: {exc}")
+    try:
+        import yaml as _yaml
+        labeler = _yaml.safe_load((ROOT / ".github/labeler.yml").read_text(encoding="utf-8")) or {}
+
+        def _paths(node):
+            if isinstance(node, str):
+                yield node
+            elif isinstance(node, list):
+                for item in node:
+                    yield from _paths(item)
+            elif isinstance(node, dict):
+                for key, val in node.items():
+                    if key in ("any", "all") and isinstance(val, list):
+                        yield from _paths(val)
+
+        for path in _paths(labeler):
+            clean = str(path).split("*")[0].rstrip("/")
+            if not clean or clean.startswith("#"):
+                continue
+            if not (ROOT / clean).exists():
+                problems.append(f"labeler path tak ada: {path}")
+    except OSError as exc:
+        problems.append(f"labeler.yml tak terbaca: {exc}")
+    except ImportError:
+        problems.append("modul yaml tak tersedia untuk validasi labeler")
+    try:
+        import re as _re
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")
+        catalog = (ROOT / "gradle/libs.versions.toml").read_text(encoding="utf-8")
+        app_build = (ROOT / "app/build.gradle.kts").read_text(encoding="utf-8")
+        gradle_ver = _re.search(r"gradle-(\d+\.\d+\.\d+)-bin\.zip", wrapper)
+        agp_ver = _re.search(r'^agp\s*=\s*"([^"]+)"', catalog, _re.M)
+        if gradle_ver and gradle_ver.group(1) not in agents:
+            problems.append(f"AGENTS.md tak menyebut Gradle {gradle_ver.group(1)}")
+        if agp_ver and agp_ver.group(1) not in agents:
+            problems.append(f"AGENTS.md tak menyebut AGP {agp_ver.group(1)}")
+        jacoco = _re.search(r'minimum\s*=\s*"0\.(\d+)"', app_build)
+        if jacoco:
+            pct = f"8,{jacoco.group(1)[1:]}" if jacoco.group(1).startswith("0") else jacoco.group(1)
+            # Bentuk umum: "0.085" -> "8,5" di dokumen Indonesia.
+            expect = "8,5" if jacoco.group(0).endswith('"0.085"') else None
+            if expect and expect not in agents:
+                problems.append("AGENTS.md ambang JaCoCo tak sinkron dengan app/build.gradle.kts")
+    except OSError as exc:
+        problems.append(f"cek toolchain tak terbaca: {exc}")
+    if problems:
+        return Result("admin konsisten", False, 0.0, "; ".join(problems))
+    return Result("admin konsisten", True, 0.0, "stale/CODEOWNERS/labeler/toolchain sinkron.")
+
+
 def fast_checks() -> list[Result]:
     results = [no_local_sdk()]
     results += list(static_checks())
     results.append(agents_md_completeness())
+    results.append(admin_consistency())
     results.extend(
         [
             python_tool("remote web", "scripts/prepare_remote.py", ["--check"]),

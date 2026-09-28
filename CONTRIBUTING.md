@@ -60,10 +60,15 @@ unit test bila Java/Gradle tersedia.
 
 ## Label otomatis & issue/PR lama
 
-- Workflow `Labeler` memberi label otomatis per path (remote-web, gallery,
-  download-engine, settings, ci, docs).
-- Workflow `Stale` menandai issue/PR tidak aktif 45/21 hari dan menutupnya
-  bila 14 hari tidak ada respons (label `dependencies` dikecualikan).
+- Workflow `Labeler` memberi label otomatis per path (`remote-web`, `gallery`,
+  `download-engine`, `settings`, `ci`, `docs` — lihat `.github/labeler.yml`
+  untuk peta path lengkap). Label `dependencies` dibuat otomatis oleh
+  Dependabot; label `security`, `help wanted`, `good first issue`, dan `stale`
+  dikelola manual/otomatis dan bukan dari labeler path.
+- Workflow `Stale` menandai issue/PR tidak aktif (issue 45 hari, PR 21 hari)
+  dan menutupnya bila 14 hari tidak ada respons. Label `dependencies`,
+  `security`, `help wanted`, `good first issue`, dan `enhancement` (issue)
+  dikecualikan dari penutupan otomatis — lihat `.github/workflows/stale.yml`.
 
 ## Menjalankan guard lokal
 

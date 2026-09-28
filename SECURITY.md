@@ -1,10 +1,20 @@
 # Kebijakan Keamanan
 
+## Versi yang didukung
+
+Hanya rilis terbaru dari branch `main` yang menerima perbaikan keamanan.
+Rilis lama dipertahankan sebagai riwayat, tetapi tidak di-patch.
+
+| Versi | Didukung |
+|---|---|
+| Rilis terbaru (`releases/latest`) | Ya |
+| Rilis lama | Tidak (perbarui dulu, lalu uji ulang) |
+
 ## Melaporkan kerentanan
 
 Jangan buat issue publik untuk kerentanan keamanan. Gunakan fitur
-**Private vulnerability reporting** di tab Security repository GitHub ini.
-Sertakan:
+**Private vulnerability reporting** di tab Security repository GitHub ini
+(atau tautan di template issue bila tab tidak terlihat). Sertakan:
 
 - versi APK atau commit yang diuji;
 - langkah reproduksi singkat;
@@ -25,6 +35,8 @@ Termasuk namun tidak terbatas pada:
 Di luar cakupan:
 
 - serangan fisik setelah perangkat sudah root/tidak terkunci;
+- peringatan Play Protect generik terhadap APK sideload tanpa bukti bypass
+  (aplikasi memang memakai `MANAGE_EXTERNAL_STORAGE`; verifikasi lewat build CI);
 - laporan tanpa dampak nyata terhadap aplikasi atau datanya;
 - hasil pemindaian otomatis tanpa analisis dan langkah reproduksi.
 

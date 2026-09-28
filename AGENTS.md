@@ -33,7 +33,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── docs/icons/                       # Ikon PWA (192/512 PNG)
 ├── docs/screenshots/                 # Screenshot README (remote-web.png, gallery.png, downloads.png)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
-├── scripts/prepare_remote.py         # Minify remote.src.html → assets/remote.html + guard CI
+├── scripts/prepare_remote.py         # Minify remote.src.html → app/src/main/assets/remote.html + guard CI
 ├── scripts/check_readme_sync.py      # Guard CI: struktur heading README.md vs README.en.md sinkron
 ├── scripts/security_audit.py        # Audit statis bug/error/keamanan + self-test
 ├── scripts/upload_smoke_test.js      # Smoke test alur upload (stub DOM/XHR, tanpa dependensi)
@@ -90,12 +90,14 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
 - **DownloadEngine** (inti): tiap item = state (antre/menunggu/aktif/jeda/gagal/
   selesai) + monitor kecepatan & ETA; multi-segmen via HTTP Range; fallback
   single-stream saat Range ditolak; HLS/m3u8 probe; mirror & blacklist URL.
-- **Ekstraksi situs anti-bot** (HentaiHaven/Cloudflare): fetch server pasti 403,
-  jadi `WebExtractActivity` (WebView sistem) membuka halaman watch, auto-grab
-  URL video + cookie, lalu `MainActivity` mengisi form (URL + header
-  `Cookie`/`Referer`) agar engine unduh langsung. Parser murni
-  `parseHentaiHavenPage` + `extractAllHentaiHaven` tetap ada sebagai fallback
-  bila challenge longgar; probe server di-skip untuk URL HH di dialog tambah.
+- **Ekstraksi situs/media sosial** (HentaiHaven/Cloudflare, Pornhub best-effort):
+  fetch server bisa 403/404 (proteksi hotlink/sesi), jadi `WebExtractActivity`
+  (WebView sistem) membuka halaman watch, auto-grab URL video + cookie, lalu
+  `MainActivity` mengisi form (URL + header `Cookie`/`Referer`) agar engine
+  unduh langsung. Parser murni (`parseHentaiHavenPage`/`extractAllHentaiHaven`,
+  `parsePornhubPage` via `SocialMediaExtractor`) tetap ada sebagai fallback
+  bila challenge longgar; probe server di-skip untuk URL HH di dialog tambah,
+  dan unduhan Pornhub mengutamakan MP4 progresif (HLS hanya fallback).
 - **DownloadService** menjalankan engine di *foreground service*; `NetworkCallback`
   (Android 7+) / broadcast (5–6) untuk melanjutkan download saat koneksi pulih.
 - **HttpControlServer** (nanohttpd, port default `8080`): endpoint JSON + SSE
@@ -253,8 +255,8 @@ kuat dan tanpa diskusi:
     aktif) mengawal API >21 jangan sampai lolos, `testDebugUnitTest` menjaga
     logika murni (`Formats`, `FileNames`, `MimeTypes`, `DownloadItem`,
     `ServerSecurity`). Cakupan unit test (JaCoCo) di CI: `jacocoTestReport` +
-    `jacocoTestCoverageVerification` (ambang LINE 8%, lihat
-    `app/build.gradle.kts` — naikkan seiring bertambahnya test); ringkasan
+    `jacocoTestCoverageVerification` (ambang LINE 8,5%, lihat
+    `app/build.gradle.kts` — naikkan seiring bertambahnya test; dijaga `check_repo.py` supaya angka sinkron); ringkasan
     cakupan dicetak di job summary.
 13. **Website (`docs/index.html`)**: situs GitHub Pages dari folder `/docs`
     (deploy otomatis oleh `pages-build-deployment` saat push ke `main`).
@@ -293,7 +295,7 @@ kuat dan tanpa diskusi:
   `tasirin-download-manager-v<versi>.apk` (`versi = 1.0.<run_number>`,
   `code = 100000 + run_number`; rilis lama dipertahankan sebagai riwayat).
 - **Dependabot** → update dikelompokkan (`androidx`, `kotlinx`,
-  `gradle-tools`, `actions`). PR yang TIDAK menyentuh dependensi Gradle
+  `jvm-libs`, `gradle-tools`, `actions`). PR yang TIDAK menyentuh dependensi Gradle
   (mis. update GitHub Actions) di-**auto-merge** setelah CI hijau (workflow
   `auto-merge.yml`). PR dependensi Gradle tetap manual karena wajib
   regenerasi metadata verifikasi. Yang di-ignore (perlu upgrade toolchain
@@ -417,9 +419,11 @@ server remote, galeri). Keputusan naik ke `targetSdk 37` masih **opsional** —
 jangan digabung dengan PR fitur lain.
 
 - **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
-  di-update bertahap via CI, toolchain Gradle 9.6.1 + AGP 9.0.1 (built-in
+  di-update bertahap via CI, toolchain Gradle 9.8.0 + AGP 9.4.1 (built-in
   Kotlin, KGP dibundel AGP), core library desugaring aktif.
-  `versionName`/`versionCode` tetap diatur CI.
+  `versionName`/`versionCode` tetap diatur CI. Bila toolchain naik lagi,
+  update angka di sini supaya sama dengan `gradle-wrapper.properties`
+  dan `gradle/libs.versions.toml` (dijaga `check_repo.py`).
 - **Fase 2a — selesai**: `compileSdk 36`.
 - **Fase 2b — selesai**: `targetSdk 35`.
   - **FGS dari `BOOT_COMPLETED`**: `dataSync` FGS dilarang start langsung dari
@@ -503,9 +507,10 @@ jangan digabung dengan PR fitur lain.
 
 ### Verifikasi perubahan
 
-18. **`python3 scripts/check_repo.py`** — jalankan sebelum commit. Cek 8
-    guard: SDK lokal, struktur repo, remote web sync, upload smoke, README
-    sync, audit self-test, security audit, whitespace.
+18. **`python3 scripts/check_repo.py`** — jalankan sebelum commit. Cek 9
+    guard: SDK lokal, struktur repo, kelengkapan AGENTS.md, admin konsisten
+    (stale/CODEOWNERS/labeler/toolchain), remote web sync, upload smoke,
+    README sync, audit self-test, security audit, whitespace.
 19. **`python3 scripts/prepare_remote.py --check`** — wajib setelah mengubah
     `remote.src.html`. Cek sinkron, node --check, larangan kata Indonesia.
 20. **`python3 scripts/security_audit.py`** — audit statis otomatis di CI.

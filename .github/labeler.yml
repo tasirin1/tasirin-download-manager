@@ -1,31 +1,51 @@
-# Format actions/labeler v5: tiap label = daftar aturan any/all.
+# Mapping path -> label otomatis (workflow .github/workflows/labeler.yml).
+# Label di bawah harus sudah ada di repository (Issues -> Labels),
+# kecuali `dependencies` yang dibuat otomatis oleh Dependabot.
 remote-web:
   - any:
       - remote.src.html
       - app/src/main/assets/remote.html
       - scripts/prepare_remote.py
+      - scripts/upload_smoke_test.js
       - app/src/main/java/com/tasirin/httpdownloadmanager/remote/**
+      - app/src/main/java/com/tasirin/httpdownloadmanager/WebExtractActivity.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/util/SocialMediaExtractor.kt
 
 gallery:
   - any:
       - app/src/main/java/com/tasirin/httpdownloadmanager/GalleryActivity.kt
       - app/src/main/java/com/tasirin/httpdownloadmanager/util/MediaLibrary.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/util/BitmapUtil.kt
 
 download-engine:
   - any:
       - app/src/main/java/com/tasirin/httpdownloadmanager/download/**
       - app/src/main/java/com/tasirin/httpdownloadmanager/data/**
+      - app/src/main/java/com/tasirin/httpdownloadmanager/App.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/MainActivity.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/ui/**
+      - app/src/main/java/com/tasirin/httpdownloadmanager/receiver/**
 
 settings:
   - any:
       - app/src/main/java/com/tasirin/httpdownloadmanager/SettingsActivity.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/LogActivity.kt
       - app/src/main/java/com/tasirin/httpdownloadmanager/util/StoragePrefs.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/util/StorageCleanup.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/util/Updater.kt
+      - app/src/main/java/com/tasirin/httpdownloadmanager/util/FileSaver.kt
 
 ci:
   - any:
       - .github/workflows/**
       - .github/dependabot.yml
       - .github/labeler.yml
+      - .github/CODEOWNERS
+      - gradle/**
+      - build.gradle.kts
+      - settings.gradle.kts
+      - gradle.properties
+      - app/build.gradle.kts
 
 docs:
   - any:
@@ -37,3 +57,5 @@ docs:
       - CONTRIBUTING.md
       - SECURITY.md
       - docs/**
+      - .editorconfig
+      - .githooks/**

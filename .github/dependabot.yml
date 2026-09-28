@@ -1,5 +1,5 @@
-# Update dependensi bertahap (aturan pengembangan #12): tiap PR Dependabot
-# melewati build + lint + unit test di CI seperti PR biasa, tanpa release.
+# Update dependensi bertahap (aturan pengembangan #14 di AGENTS.md): tiap PR
+# Dependabot melewati build + lint + unit test di CI seperti PR biasa, tanpa release.
 version: 2
 updates:
   - package-ecosystem: "gradle"
@@ -14,24 +14,27 @@ updates:
     groups:
       androidx:
         patterns:
-          - "androidx.*"
+          - "androidx*"
       kotlinx:
         patterns:
-          - "org.jetbrains.kotlinx:*"
+          - "org.jetbrains.kotlinx*"
+      jvm-libs:
+        patterns:
+          - "org.nanohttpd*"
+          - "junit*"
+          - "org.json*"
       gradle-tools:
         patterns:
-          - "com.android.tools:*"
-          - "org.nanohttpd:*"
-          - "junit:*"
-          - "org.json:*"
+          - "com.android.tools*"
     ignore:
       # Major AGP/Kotlin perlu upgrade Gradle dulu; tangani manual bertahap,
-      # bukan PR otomatis yang gagal CI (AGENTS.md aturan #12).
+      # bukan PR otomatis yang gagal CI (AGENTS.md aturan #14).
       - dependency-name: "com.android.application"
         update-types: ["version-update:semver-major"]
       - dependency-name: "org.jetbrains.kotlin.android"
         update-types: ["version-update:semver-major"]
       # Semua material > 1.12 menuntut minSdk 23; proyek wajib minSdk 21 (Android 5+).
+      # Di-ignore total sampai ada strategi storage/fallback pengganti.
       - dependency-name: "com.google.android.material:material"
       # androidx.core 1.17+ menuntut compileSdk 37; proyek di compileSdk 36.
       # Buka lagi manual setelah upgrade AGP + compileSdk siap.
