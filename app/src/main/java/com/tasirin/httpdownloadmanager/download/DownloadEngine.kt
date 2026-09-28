@@ -386,6 +386,9 @@ class DownloadEngine(appContext: Context) {
         if (activeConns[id] == null) cancelledConns.remove(id)
         item?.let { fileSaver.deleteFiles(it) }
         scheduleSave()
+        // Hapus eksplisit item terakhir: niat antrean kosong jelas — tulis
+        // blob kosong agar sisa blob korup (degraded) tak menetap selamanya.
+        if (_items.value.isEmpty()) repository.clearAll()
     }
 
     fun clearCompleted() {
@@ -407,6 +410,7 @@ class DownloadEngine(appContext: Context) {
         }
         update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
         scheduleSave()
+        if (_items.value.isEmpty()) repository.clearAll()
     }
 
     fun clearFailed() {
@@ -427,6 +431,7 @@ class DownloadEngine(appContext: Context) {
         failed.forEach { fileSaver.deleteFiles(it) }
         update(_items.value.filterNot { it.state == DownloadState.FAILED })
         scheduleSave()
+        if (_items.value.isEmpty()) repository.clearAll()
     }
 
     fun importStream(

@@ -86,8 +86,11 @@ internal fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
     return when {
         start != null -> {
             if (start < 0 || start >= total) return null
-            val e = (endRaw ?: (total - 1)).coerceIn(start, total - 1)
-            start to e
+            val end = endRaw ?: (total - 1)
+            // Akhir sebelum awal (mis. bytes=5-3) tidak terpenuhi -> 416,
+            // bukan rentang 1-byte semu seperti sebelumnya (coerceIn).
+            if (end < start) return null
+            start to end.coerceAtMost(total - 1)
         }
         endRaw != null -> {
             if (endRaw <= 0) return null

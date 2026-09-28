@@ -86,11 +86,20 @@ class DownloadRepository(context: Context) {
         persistItems(items, blocking = true)
     }
 
+    /** Penghapusan eksplisit pengguna saat antrean kosong: tulis blob kosong
+     *  dan lepas flag degraded agar sisa blob korup tak menetap selamanya.
+     *  Hanya untuk aksi clear/hapus eksplisit, bukan save rutin. */
+    fun clearAll() {
+        persistItems(emptyList(), blocking = true, userCleared = true)
+    }
+
     @Synchronized
-    private fun persistItems(items: List<DownloadItem>, blocking: Boolean) {
+    private fun persistItems(items: List<DownloadItem>, blocking: Boolean, userCleared: Boolean = false) {
         // Load terdegradasi + daftar kosong = blob corrupt, bukan antrean
         // kosong sungguhan: jangan timpa blob mentah (forensik + pemulihan).
-        if (items.isEmpty() && degradedLoad) return
+        // Pengecualian: penghapusan eksplisit pengguna (niat jelas) agar
+        // blob korup tak menetap selamanya dan tak bisa pulih via clear.
+        if (shouldBlockEmptySave(items.isEmpty(), degradedLoad, userCleared)) return
         val encItems = items.map { item ->
             val stored = storedCreds[item.id]
             if (stored != null && (shouldRestoreStored(item.username, stored.first) ||
@@ -117,7 +126,7 @@ class DownloadRepository(context: Context) {
         }
         storedCreds.clear()
         encItems.forEach { storedCreds[it.id] = Quad(it.username, it.password, it.headers, it.postBody) }
-        if (items.isNotEmpty()) degradedLoad = false
+        if (items.isNotEmpty() || userCleared) degradedLoad = false
         // Snapshot penuh sudah memuat progres terbaru -> hapus progres ringan
         // supaya tidak menimpa data yang lebih lama saat load berikutnya.
         prefs.edit(commit = blocking) {
@@ -180,3 +189,8 @@ class DownloadRepository(context: Context) {
  *  pengosongan oleh user. */
 internal fun shouldRestoreStored(currentPlain: String, storedEnc: String?): Boolean =
     currentPlain.isEmpty() && !storedEnc.isNullOrEmpty()
+
+/** Tulis daftar kosong diblokir bila load terakhir terdegradasi (blob
+ *  korup), kecuali penghapusan eksplisit pengguna. Murni agar bisa diuji. */
+internal fun shouldBlockEmptySave(itemsEmpty: Boolean, degraded: Boolean, userCleared: Boolean): Boolean =
+    itemsEmpty && degraded && !userCleared

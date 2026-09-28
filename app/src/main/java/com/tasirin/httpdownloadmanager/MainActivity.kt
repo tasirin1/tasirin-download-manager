@@ -841,8 +841,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 audioSel in 1..socialAudioLanguages.size
             ) socialAudioLanguages[audioSel - 1].language else ""
             val carouselSel = socialCarouselSpinner.selectedItemPosition
+            // Pilihan video eksplisit menang atas default "All": tanpa ini,
+            // konten campuran (video + foto) selalu mengunduh foto saja dan
+            // kualitas video yang dipilih user diabaikan diam-diam.
             val carouselAll = socialCarouselSection.isVisible &&
-                socialPhotoOptions.size > 1 && carouselSel == 0
+                socialPhotoOptions.size > 1 && carouselSel == 0 &&
+                selectedVideoOption == null
             val selectedPhotoOption = if (
                 socialCarouselSection.isVisible &&
                 socialPhotoOptions.isNotEmpty() &&

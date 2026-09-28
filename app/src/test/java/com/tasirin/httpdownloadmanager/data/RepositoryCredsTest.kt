@@ -14,6 +14,23 @@ class RepositoryCredsTest {
     }
 
     @Test
+    fun `kosong terdegradasi tanpa clear - blokir tulis`() {
+        assertTrue(shouldBlockEmptySave(true, true, false))
+    }
+
+    @Test
+    fun `kosong terdegradasi via clear eksplisit - tulis`() {
+        assertFalse(shouldBlockEmptySave(true, true, true))
+    }
+
+    @Test
+    fun `kosong sehat atau isi - tulis`() {
+        assertFalse(shouldBlockEmptySave(true, false, false))
+        assertFalse(shouldBlockEmptySave(false, true, false))
+        assertFalse(shouldBlockEmptySave(false, false, false))
+    }
+
+    @Test
     fun `field sehat - jangan timpa simpanan`() {
         assertFalse(shouldRestoreStored("user", "v1:abc"))
         assertFalse(shouldRestoreStored("", ""))

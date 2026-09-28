@@ -44,4 +44,15 @@ class MediaStreamTest {
         assertNull(parseRange("bytes=0-99,200-299", 1000))
         assertNull(parseRange("bytes=0-99", 0))
     }
+
+    @Test
+    fun parseRange_akhirSebelumAwal_null() {
+        assertNull(parseRange("bytes=5-3", 1000))
+        assertNull(parseRange("bytes=999-100", 1000))
+    }
+
+    @Test
+    fun parseRange_akhirLewatTotal_dipotong() {
+        assertEquals(900L to 999L, parseRange("bytes=900-1500", 1000))
+    }
 }

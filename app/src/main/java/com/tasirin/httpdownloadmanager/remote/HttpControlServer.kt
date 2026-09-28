@@ -53,6 +53,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipOutputStream
 import java.net.NetworkInterface
 import java.security.MessageDigest
@@ -153,7 +154,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // dibuat supaya request berikutnya tidak selalu gagal dengan
         // RejectedExecutionException.
         pool.rejectedExecutionHandler =
-            java.util.concurrent.RejectedExecutionHandler { _, _ ->
+            java.util.concurrent.RejectedExecutionHandler { task, _ ->
+                // Tugas dari submit() adalah FutureTask: batalkan agar .get()
+                // pemanggil langsung gagal (fallback statistik nol), bukan
+                // menggantung selamanya dan membocorkan thread NanoHTTPD
+                // saat stop-server beradu dengan listing file manager.
+                runCatching { (task as? java.util.concurrent.Future<*>)?.cancel(false) }
                 // Jangan execute ulang di sini: bila pool tetap shutdown,
                 // handler terpanggil rekursif sampai StackOverflow. Buang
                 // tugas + catat; request berikutnya memakai pool baru lewat
@@ -2293,7 +2299,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 o.put("modified", f.lastModified())
                 if (f.isDirectory) {
                     val (itemCount, totalSize) = if (allowed) {
-                        runCatching { statFutures[f]?.get() }.getOrNull() ?: (0 to 0L)
+                        runCatching { statFutures[f]?.get(STAT_FUTURE_TIMEOUT_SEC, TimeUnit.SECONDS) }.getOrNull() ?: (0 to 0L)
                     } else {
                         0 to 0L
                     }
@@ -3149,6 +3155,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val SNAPSHOT_RATE_MS = 1_000L
         private const val SERVER_RETRY_DELAY_MS = 200L
         private const val SERVER_STOP_GRACE_MS = 200L
+        private const val STAT_FUTURE_TIMEOUT_SEC = 15L
         private const val GALLERY_SCAN_TTL_MS = 30_000L
         private const val GALLERY_PAGE_SIZE = 100
         private const val FS_LISTING_TTL_MS = 3_000L
