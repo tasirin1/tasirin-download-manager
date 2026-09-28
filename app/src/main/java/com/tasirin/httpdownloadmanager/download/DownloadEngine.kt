@@ -108,7 +108,12 @@ class DownloadEngine(appContext: Context) {
     /** Negative-cache sesi: aman dihapus total bila penuh (hanya memicu
      *  satu percobaan ulang HLS, bukan korupsi). */
     private fun rememberFailedHlsUrl(url: String) {
-        if (failedHlsUrls.size >= FAILED_HLS_URLS_MAX) failedHlsUrls.clear()
+        // KeySetView.clear() butuh API 24 (lint NewApi, minSdk 21): hapus
+        // via iterator yang aman di semua API.
+        if (failedHlsUrls.size >= FAILED_HLS_URLS_MAX) {
+            val it = failedHlsUrls.iterator()
+            while (it.hasNext()) { it.next(); it.remove() }
+        }
         failedHlsUrls.add(url)
     }
     /** URL sosial media original per item (YouTube/TikTok/etc) — disimpan saat ekstraksi
