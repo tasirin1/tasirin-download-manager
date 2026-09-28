@@ -75,7 +75,7 @@ object SocialMediaExtractor {
     private val HP_OG_VIDEO_RE = Regex("""<meta[^>]+property\s*=\s*["']og:video["'][^>]+content\s*=\s*["'](https?://[^"']+)["']""")
     private val HP_OG_TITLE_RE = Regex("""<meta[^>]+property\s*=\s*["']og:title["'][^>]+content\s*=\s*["'](.+?)["']""")
     private val HP_TITLE_TAG_RE = Regex("""<title>(.+?)</title>""")
-    private val PH_MEDIA_DEF_RE = Regex("\"videoUrl\"\\s*:\\s*\"(https?:[^\"]+)\"[^}]*?\"quality\"\\s*:\\s*\"(\\d+)\"")
+    private val PH_MEDIA_DEF_RE = Regex("\"videoUrl\"\\s*:\\s*\"(https?:[^\"]+)\"[^}]*?\"quality\"\\s*:\\s*\"?(\\d+)p?\"")
     private val PH_FLASHVARS_Q_RE = Regex("\"quality_(\\d+)p\"\\s*:\\s*\"(https?:[^\"]+)\"")
     private val PH_VIDEO_URL_RE = Regex("\"video_url\"\\s*:\\s*\"(https?:[^\"]+)\"")
     private val HH_VIDEO_TAG_RE = Regex("""<video[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
@@ -1016,15 +1016,24 @@ object SocialMediaExtractor {
         "Referer" to "https://www.pornhub.com/"
     )
 
-    private fun extractPornhub(url: String): Result? = extractBestPlayerOption(extractAllPornhub(url))
+    private fun extractPornhub(url: String): Result? =
+        preferProgressiveMp4(extractAllPornhub(url))
+
+    /** MP4 progresif diutamakan: single-stream (Range/resume) jauh lebih
+     *  andal daripada HLS phncdn yang segmennya rawan HTTP 404. Opsi sudah
+     *  urut kualitas menurun sehingga MP4 pertama = MP4 terbaik. */
+    internal fun preferProgressiveMp4(options: List<Result>): Result? {
+        return options.firstOrNull { !it.isHls } ?: options.firstOrNull()
+    }
 
     private fun extractAllPornhub(url: String): List<Result> {
-        val html = fetchWatchHtml(url, PH_HEADERS) ?: return emptyList()
-        return parsePornhubPage(html)
+        val result = httpGetWithCookies(url, PH_HEADERS, PAGE_TIMEOUT_MS) ?: return emptyList()
+        if (result.body.length < 1000) return emptyList()
+        return parsePornhubPage(result.body, result.cookies)
     }
 
     /** Parser murni halaman watch Pornhub (tanpa I/O) agar bisa di-unit-test. */
-    internal fun parsePornhubPage(html: String): List<Result> {
+    internal fun parsePornhubPage(html: String, cookies: String = ""): List<Result> {
         var title = HP_OG_TITLE_RE.find(html)?.groupValues?.get(1)
             ?: HP_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(" - Pornhub")
             ?: "Pornhub_video"
@@ -1060,14 +1069,14 @@ object SocialMediaExtractor {
         return found.entries.sortedByDescending { it.value }.map { (url, quality) ->
             val isHls = url.contains(".m3u8")
             if (isHls) {
-                Result(url, "Pornhub_${safeName}.ts", title, if (quality > 0) "${quality}p" else "HLS", "application/x-mpegURL", isHls = true)
+                Result(url, "Pornhub_${safeName}.ts", title, if (quality > 0) "${quality}p" else "HLS", "application/x-mpegURL", cookies = cookies, isHls = true)
             } else {
                 val label = when {
                     quality >= 720 -> "HD"
                     quality > 0 -> "${quality}p"
                     else -> "Video"
                 }
-                Result(url, "Pornhub_${safeName}_${label}.mp4", title, label, MIME_MP4)
+                Result(url, "Pornhub_${safeName}_${label}.mp4", title, label, MIME_MP4, cookies = cookies)
             }
         }
     }

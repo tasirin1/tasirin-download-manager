@@ -266,6 +266,46 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parsePornhubPage - quality tanpa kutip dan ber-akhiran p`() {
+        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
+            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":480}," +
+            "{\"videoUrl\":\"https://cdn.ph.com/b.mp4\",\"quality\":\"720p\"}]}" +
+            "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(2, opts.size)
+        assertTrue(opts[0].directUrl.endsWith("b.mp4"))
+        assertEquals("HD", opts[0].quality)
+        assertTrue(opts[1].directUrl.endsWith("a.mp4"))
+        assertEquals("480p", opts[1].quality)
+    }
+
+    @Test
+    fun `parsePornhubPage - cookie diteruskan ke hasil`() {
+        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
+            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":\"480\"}]}" +
+            "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html, "ph=abc123")
+        assertEquals(1, opts.size)
+        assertEquals("ph=abc123", opts[0].cookies)
+        assertEquals("", SocialMediaExtractor.parsePornhubPage(html)[0].cookies)
+    }
+
+    @Test
+    fun `preferProgressiveMp4 - MP4 terbaik dipilih walau HLS lebih tinggi`() {
+        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
+            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":\"480\"}," +
+            "{\"videoUrl\":\"https://cdn.ph.com/master.m3u8\",\"quality\":\"1080\"}]}" +
+            "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(2, opts.size)
+        val best = SocialMediaExtractor.preferProgressiveMp4(opts)
+        assertTrue(best!!.directUrl.endsWith("a.mp4"))
+        val hlsOnly = SocialMediaExtractor.preferProgressiveMp4(opts.filter { it.isHls })
+        assertTrue(hlsOnly!!.isHls)
+        assertEquals(null, SocialMediaExtractor.preferProgressiveMp4(emptyList()))
+    }
+
+    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))

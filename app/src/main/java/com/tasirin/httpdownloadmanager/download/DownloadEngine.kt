@@ -570,6 +570,9 @@ class DownloadEngine(appContext: Context) {
             } else if (current.contains("cdninstagram.com") || current.contains("scontent")) {
                 conn.setRequestProperty("Referer", "https://www.instagram.com/")
                 conn.setRequestProperty("Origin", "https://www.instagram.com")
+            } else if (current.contains("phncdn.com") || current.contains("pornhub.com")) {
+                conn.setRequestProperty("Referer", "https://www.pornhub.com/")
+                conn.setRequestProperty("Origin", "https://www.pornhub.com")
             }
             if (current == url || isSameOrigin(url, current)) {
                 applyAuthHeaders(conn, username, password, headers)
@@ -1441,7 +1444,10 @@ class DownloadEngine(appContext: Context) {
         try {
             // 1) Unduh segmen video (MPEG-TS) ke file temp.
             progress.totalSegments = plan.videoSegments.size + (plan.audioSegments?.size ?: 0)
-            downloadSegmentsToFile(item, plan.videoSegments, videoTs, buffer, throttle, progress)
+            downloadSegmentsToFile(
+                item, plan.videoSegments, videoTs, buffer, throttle, progress,
+                fallbackQuery = plan.segmentQueryFallback
+            )
 
             // 2) Unduh segmen audio (ADTS AAC) ke file temp bila terpisah.
             var audioStream: AdtsAac.Stream? = null
@@ -1538,13 +1544,15 @@ class DownloadEngine(appContext: Context) {
         buffer: ByteArray,
         throttle: SpeedThrottle,
         progress: HlsProgress,
-        transform: (ByteArray) -> ByteArray = { it }
+        transform: (ByteArray) -> ByteArray = { it },
+        fallbackQuery: String = ""
     ) {
         BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
             for (url in urls) {
                 coroutineContext.ensureActive()
                 val segBytes = fetchHlsSegmentWithRetry(
                     item, url, buffer, throttle, progress.downloaded,
+                    fallbackQuery = fallbackQuery,
                     notify = { segNow -> reportHlsProgress(item, progress, segNow) },
                     onLength = { declared ->
                         // Segmen referensi dari header Content-Length (ukuran
@@ -1800,7 +1808,8 @@ class DownloadEngine(appContext: Context) {
         throttle: SpeedThrottle,
         committed: Long,
         notify: (Long) -> Unit,
-        onLength: (Long) -> Unit = {}
+        onLength: (Long) -> Unit = {},
+        fallbackQuery: String = ""
     ): ByteArray {
         var attempts = 0
         while (true) {
@@ -1812,6 +1821,17 @@ class DownloadEngine(appContext: Context) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                val msg = e.message.orEmpty()
+                val denied = msg.contains("404") || msg.contains("403")
+                if (denied && fallbackQuery.isNotEmpty() && !url.contains("?")) {
+                    // CDN signed-URL: segmen relatif tanpa token ditolak —
+                    // coba sekali lagi dengan query token playlist varian.
+                    App.logEvent("HLS: segment 404/403, retrying with playlist query")
+                    return fetchHlsSegment(
+                        item, url + fallbackQuery, buffer, throttle,
+                        committed, notify, onLength
+                    )
+                }
                 attempts++
                 if (attempts >= 2 || !isNetworkError(e.message)) throw e
             }
@@ -1873,8 +1893,18 @@ class DownloadEngine(appContext: Context) {
         /** Estimasi total byte dari BANDWIDTH master x total durasi #EXTINF.
          *  Dihitung sekali di awal supaya denominator "/≈MB" stabil sejak
          *  detik pertama (tidak menunggu segmen pertama selesai). */
-        val estimateTotalBytes: Long = 0L
+        val estimateTotalBytes: Long = 0L,
+        /** Query "?..." playlist varian untuk retry segmen 403/404: CDN
+         *  signed-URL (mis. phncdn) menaruh token di query playlist,
+         *  sedangkan segmen relatif tidak membawanya. */
+        val segmentQueryFallback: String = ""
     )
+
+    /** Query "?..." dari URL playlist untuk fallback segmen 404/403. */
+    private fun playlistQuery(url: String): String {
+        val q = url.substringAfter('?', "").substringBefore('#')
+        return if (q.isNotEmpty()) "?$q" else ""
+    }
 
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
     private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = ""): HlsPlan? {
@@ -1901,7 +1931,11 @@ class DownloadEngine(appContext: Context) {
                 throw IOException("HLS terenkripsi (EXT-X-KEY) tidak didukung")
             }
             val durations = mediaDurations(body)
-            return HlsPlan(segments, videoSegmentDurationsUs = durations, estimateTotalBytes = estimateBytes(durations, 0L))
+            return HlsPlan(
+                segments, videoSegmentDurationsUs = durations,
+                estimateTotalBytes = estimateBytes(durations, 0L),
+                segmentQueryFallback = playlistQuery(baseUrl)
+            )
         }
         var variants = HlsParser.parseMaster(body, baseUrl)
         // Fallback: bila parseMaster gagal (mis. format YouTube 2026 yang
@@ -2017,7 +2051,8 @@ class DownloadEngine(appContext: Context) {
             } else 0L
             return HlsPlan(
                 videoSegments, videoDurations, audioSegments,
-                estimateTotalBytes = estimateBytes(videoDurations, candidate.bandwidth) + audioBytes
+                estimateTotalBytes = estimateBytes(videoDurations, candidate.bandwidth) + audioBytes,
+                segmentQueryFallback = playlistQuery(candidate.url)
             )
         }
         return null
