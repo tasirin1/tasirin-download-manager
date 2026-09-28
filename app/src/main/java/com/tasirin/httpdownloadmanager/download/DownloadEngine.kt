@@ -1223,9 +1223,12 @@ class DownloadEngine(appContext: Context) {
             if (result != null && result.directUrl != item.url) {
                 App.logEvent("SOCIAL: extracted direct URL from $host → ${result.directUrl.take(80)}...")
                 App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.length} chars")
-                // Simpan URL sosial media original supaya saat HLS gagal kita
-                // bisa re-extract dari URL asli (bukan dari URL manifest HLS yang stale).
-                if (result.isHls) originalSocialUrls[item.id] = item.url
+                // Simpan URL sosial media original untuk SEMUA hasil ekstraksi
+                // (bukan cuma HLS): URL CDN langsung bertanda-tangan (mis.
+                // xvideos-cdn) bisa kedaluwarsa di tengah unduhan — retry butuh
+                // re-extract URL segar dari halaman asli agar progres puluhan
+                // MB tidak dibuang (lihat refreshExpiredCdnUrl).
+                originalSocialUrls[item.id] = item.url
                 // YouTube via HLS: segmen .ts digabung jadi satu file.
                 if (result.isHls) {
                     // Nama dari API pihak ketiga wajib disanitasi (separator di
@@ -2244,7 +2247,14 @@ class DownloadEngine(appContext: Context) {
             val crTotal = cr?.substringAfter('/')?.trim()?.toLongOrNull()?.takeIf { it > 0 }
             total = crTotal ?: (total + downloaded)
         } else if (downloaded > 0) {
-            // Server tidak mendukung resume; mulai dari awal.
+            // Server tidak mendukung resume (minta lanjut, dikirim dari awal):
+            // progres terpaksa dibuang — catat eksplisit agar tidak terlihat
+            // seperti "download ulang misterius" di log.
+            App.logEvent(
+                "DOWNLOAD ${item.fileName}: server does not support resume " +
+                    "(HTTP $code, ignoring Range) — restarting from zero, " +
+                    "${Formats.bytes(downloaded)} discarded"
+            )
             downloaded = 0
             partialFile.writeBytes(ByteArray(0))
             // throttle.reset(downloaded) di bawah memakai nilai 0 ini,
@@ -2395,9 +2405,38 @@ class DownloadEngine(appContext: Context) {
         } catch (e: IOException) {
             val current = _items.value.find { it.id == item.id }
             if (e.message?.contains("does not support Range") == true) {
-                // Server/proxy menolak Range (mis. proxy transparan ISP): semua
-                // percobaan Range akan gagal selamanya, jadi buang segmen lalu
-                // unduh sekali jalan tanpa Range (partial lama ikut dibuang).
+                val keptBytes = (current?.segments ?: item.segments).sumOf { it.downloaded }
+                if (shouldKeepPartialOnRangeReject(keptBytes)) {
+                    // URL ini sebelumnya MELAYANI Range (progres sudah masuk)
+                    // lalu tiba-tiba menolak — ciri khas signed CDN URL yang
+                    // kedaluwarsa di tengah jalan (kasus nyata: xvideos-cdn77,
+                    // 60,8/61,1 MB masuk lalu size-mismatch → retry 6 detik
+                    // kemudian kena HTTP 200). Partial JANGAN dihapus: coba
+                    // re-extract URL segar lalu resume dari progres yang ada.
+                    rememberFailedUrl(item.url)
+                    val fresh = refreshExpiredCdnUrl(item.id)
+                    if (fresh != null) {
+                        App.logEvent(
+                            "DOWNLOAD ${item.fileName}: link expired, refreshed URL — " +
+                                "resuming from ${Formats.bytes(keptBytes)}"
+                        )
+                        updateItem(item.id) { it.copy(url = fresh) }
+                    } else {
+                        App.logEvent(
+                            "DOWNLOAD ${item.fileName}: Range rejected after " +
+                                "${Formats.bytes(keptBytes)} (${e.message}) — " +
+                                "keeping partial data for resume"
+                        )
+                    }
+                    throw IOException(
+                        "Server stopped supporting Range (link may have expired) — " +
+                            "retrying resume from ${Formats.bytes(keptBytes)}"
+                    )
+                }
+                // Tanpa progres sama sekali = server memang tak dukung Range
+                // (mis. proxy transparan ISP): semua percobaan Range akan gagal
+                // selamanya, jadi buang segmen lalu unduh sekali jalan tanpa
+                // Range (partial lama ikut dibuang).
                 rememberFailedUrl(item.url)
                 App.logEvent(
                     "DOWNLOAD ${item.fileName}: Range rejected (${e.message}), " +
@@ -2470,6 +2509,34 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(item.id)
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
         NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == item.id } ?: item)
+    }
+
+    /** Minta URL CDN segar saat link kedaluwarsa di tengah unduhan:
+     *  re-extract dari halaman sosial asli (disimpan saat ekstraksi pertama),
+     *  lalu validasi ukuran via HEAD supaya resume segmen tidak menggabung
+     *  file beda. Kembalikan URL baru bila layak resume, else null. */
+    private suspend fun refreshExpiredCdnUrl(id: String): String? {
+        val item = _items.value.find { it.id == id } ?: return null
+        val original = originalSocialUrls[id] ?: return null
+        coroutineContext.ensureActive()
+        val result = runCatching { SocialMediaExtractor.extract(original, item.headers) }.getOrNull()
+            ?: return null
+        if (result.directUrl == item.url || result.isHls) return null
+        if (item.totalBytes > 0) {
+            val probe = openAuthenticatedConnection(
+                result.directUrl, method = "HEAD",
+                username = item.username, password = item.password, headers = item.headers
+            )
+            try {
+                if (probe.responseCode !in 200..299) return null
+                if (!isFreshResumeSizeValid(item.totalBytes, contentLength(probe))) return null
+            } catch (_: Exception) {
+                return null
+            } finally {
+                probe.disconnect()
+            }
+        }
+        return result.directUrl
     }
 
     private suspend fun downloadSegment(
@@ -3115,6 +3182,17 @@ internal fun isSegmentEndAllowed(returnedEnd: Long?, requestedEnd: Long): Boolea
 internal fun cappedSegmentWrite(read: Int, budgetLeft: Long): Int =
     minOf(read.toLong(), budgetLeft.coerceAtLeast(0)).toInt()
 
+/** Partial dipertahankan bila Range ditolak SETELAH ada progres: penolakan di
+ *  tengah jalan = link kedaluwarsa/transien, bukan server tanpa-Range.
+ *  Murni agar bisa di-unit-test. */
+internal fun shouldKeepPartialOnRangeReject(keptBytes: Long): Boolean = keptBytes > 0
+
+/** Ukuran file hasil re-extract wajib sama dengan file lama agar resume segmen
+ *  tidak korup; freshTotal <= 0 = server tak memberi tahu (izinkan resume
+ *  best-effort). Murni agar bisa di-unit-test. */
+internal fun isFreshResumeSizeValid(storedTotal: Long, freshTotal: Long): Boolean =
+    freshTotal <= 0 || storedTotal <= 0 || freshTotal == storedTotal
+
 internal fun monotonicNow(): Long =
     runCatching { SystemClock.elapsedRealtime() }.getOrDefault(System.currentTimeMillis())
 
@@ -3302,7 +3380,8 @@ private class SpeedThrottle(
  *  kecepatan anjlok (di bawah ambang minimum terus-menerus), lalu melempar
  *  IOException supaya handleFailure bisa pindah mirror / retry. Otomatis
  *  nonaktif bila pengguna memasang batas kecepatan di bawah ambang. */
-private class DownloadHealthWatchdog(limitKbps: Int) {
+// Internal (bukan private) agar bisa di-unit-test langsung (lihat WatchdogTest).
+internal class DownloadHealthWatchdog(limitKbps: Int) {
     private val limitedLow = limitKbps > 0 && limitKbps * 1024L <= MIN_GOOD_SPEED_BPS
     private var lastBytes = 0L
     private var lastAt = monotonicNow()
@@ -3313,6 +3392,11 @@ private class DownloadHealthWatchdog(limitKbps: Int) {
         if (downloaded != lastBytes) {
             lastBytes = downloaded
             lastAt = now
+            // Byte bergerak = koneksi hidup: maafkan lambat. Tanpa ini,
+            // unduhan di jaringan lemah (mis. 2G, <2 KB/s tapi stabil)
+            // divonis mati tiap 20 detik lalu retry gagal terus — padahal
+            // yang boleh divonis hanya byte yang macet total.
+            slowSince = 0L
         }
         if (speed > 0 && !limitedLow && speed < MIN_GOOD_SPEED_BPS) {
             if (slowSince == 0L) slowSince = now

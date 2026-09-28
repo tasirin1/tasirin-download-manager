@@ -200,6 +200,8 @@ kuat dan tanpa diskusi:
 | `Accept-Ranges` header case-sensitive | `getHeaderField("Accept-Ranges") == "bytes"` tidak menangani server yang mengembalikan `Bytes`/`BYTES` → multi-segmen dilewati walau server mendukung Range | gunakan `.equals("bytes", ignoreCase = true)` di `DownloadEngine` |
 | Gallery select mode rebuild DOM | `galSetSelectMode()` memanggil `reRenderGalleryLoaded()` yang menghapus semua cell lalu rebuild dari awal (flash & alokasi DOM berulang pada galeri besar) | in-place toggle: tambah/hapus `.gal-check` per cell tanpa membongkar grid; `reRenderGalleryLoaded()` sudah dihapus |
 | Nama item remote tidak pernah update setelah rename/resolve nama | cache JSON remote meng-reuse JSONObject statis tanpa menyegarkan `fileName`/`url`, dan `itemsSignature()` tidak memuat `fileName` | `itemsSignature()` wajib memasukkan `fileName`/`url`/`totalBytes`; reuse path di `itemsJson()` wajib refresh `fileName`/`url` |
+| Unduhan lambat tapi sehat divonis mati tiap 20 detik lalu retry gagal terus | `slowSince` tak pernah direset saat byte bergerak | reset `slowSince` tiap ada progres di `DownloadHealthWatchdog` — hanya byte macet total yang divonis; guard `WatchdogTest` |
+| Range 200 setelah progres besar → puluhan MB partial dihapus + unduh ulang dari nol | signed CDN URL kedaluwarsa (token menit) dianggap server tanpa-Range | `shouldKeepPartialOnRangeReject` pertahankan partial + `refreshExpiredCdnUrl` re-extract URL segar lalu resume; hapus+single-pass hanya bila progres nol |
 | SSE reconnect diam bisa gagal masuk state "give up" | flag diberi nilai `true` sebelum reconnect manual | pakai counter percobaan sekali + grace window sebelum menutup EventSource |
 
 ## Aturan pengembangan
