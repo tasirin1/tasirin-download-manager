@@ -41,8 +41,10 @@ class WatchdogTest {
             t += 1000
             w.check(t, 5000L, 1_000_000L, 0L)
         }
+        // Panggilan pertama (t=1000) tercatat sebagai progres sehingga
+        // lastAt mulai di t=1000 -> vonis stall jatuh di t=31000.
         try {
-            w.check(30_000L, 5000L, 1_000_000L, 0L)
+            w.check(31_000L, 5000L, 1_000_000L, 0L)
             fail("harus melempar IOException saat stall 30 detik")
         } catch (_: IOException) {
         }
