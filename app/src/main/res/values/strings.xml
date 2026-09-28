@@ -107,12 +107,12 @@
     <string name="storage_picker_error">Failed to use folder: %1$s</string>
     <string name="storage_picker_unavailable">No app available to pick a folder</string>
     <string name="storage_download_folder">Download folder</string>
-    <string name="storage_hint_scoped">Remote File Manager can only browse the app folder, MediaStore, and the folders listed here.</string>
     <string name="storage_extra_folders">Extra folders</string>
     <string name="storage_add_folder">+ Add folder</string>
     <string name="storage_extra_folder_hint">Folder path, e.g. /sdcard/movie</string>
     <string name="storage_remove_folder">&#10005;</string>
     <string name="storage_text_folder_hint">Folder path (e.g. /sdcard/Download)</string>
+    <string name="storage_hint_all_files">&quot;All files access&quot; is only needed for the remote File Manager. Downloads &amp; gallery work without it.</string>
     <string name="storage_text_folder_invalid">Path is not valid or not a folder</string>
     <string name="storage_text_folder_saved">Folder saved: %1$s</string>
 
@@ -284,6 +284,7 @@
     <string name="gallery_play_desc">Play video</string>
 
     <string name="settings_pin_enforced">Require PIN when server runs</string>
+    <string name="settings_fs_full_access">Full access to main storage (file manager)</string>
     <string name="settings_server_read_only">Read-only server</string>
     <string name="remote_storage_btn">Enable file access</string>
     <string name="remote_pin_required">Set a PIN first before starting the server</string>
