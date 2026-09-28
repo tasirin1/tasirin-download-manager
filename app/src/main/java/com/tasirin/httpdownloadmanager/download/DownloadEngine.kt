@@ -384,9 +384,17 @@ class DownloadEngine(appContext: Context) {
 
     fun clearCompleted() {
         // Hanya membersihkan daftar; file hasil download TIDAK dihapus.
+        // State per-ID ikut dibersihkan seperti clearFailed agar tak ada
+        // sisa retry/progres/url-sosial dari item yang sudah dibuang.
         val removed = _items.value.filter { it.state == DownloadState.COMPLETED }
         removed.forEach {
+            retryAttempts.remove(it.id)
+            pendingRetries.remove(it.id)
+            originalSocialUrls.remove(it.id)
             speedTracker.reset(it.id)
+            clearSegProgress(it.id)
+            jobs.remove(it.id)?.cancel()
+            disconnectActive(it.id)
             cancelledConns.remove(it.id)
         }
         update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
@@ -2005,8 +2013,17 @@ class DownloadEngine(appContext: Context) {
             variants.sortedByDescending { it.bandwidth }
         }
         val audioRenditions = HlsParser.parseAudioRenditions(body, baseUrl)
+        // Alasan fatal (live/terenkripsi) dicatat tapi tak menghentikan loop:
+        // varian berikut masih dicoba; bila semua gagal, alasan jelas
+        // dilempar ulang (bukan "No HLS segments found" yang samar).
+        var fatalError: IOException? = null
         for (candidate in candidates) {
-            val videoSegs = mediaSegmentsWithDurations(candidate.url, headers)
+            val videoSegs = try {
+                mediaSegmentsWithDurations(candidate.url, headers)
+            } catch (e: IOException) {
+                if (fatalError == null) fatalError = e
+                null
+            }
             if (videoSegs == null) {
                 continue
             }
@@ -2055,6 +2072,7 @@ class DownloadEngine(appContext: Context) {
                 segmentQueryFallback = playlistQuery(candidate.url)
             )
         }
+        fatalError?.let { throw it }
         return null
     }
 
