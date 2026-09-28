@@ -635,7 +635,7 @@ object SocialMediaExtractor {
                 "X-Goog-Visitor-Id" to visitor,
                 "X-YouTube-Client-Name" to "101",
                 "X-YouTube-Client-Version" to "1.02"
-            ) + user,
+            ) + user),
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
 
@@ -723,7 +723,7 @@ object SocialMediaExtractor {
                 "X-Goog-Visitor-Id" to visitor,
                 "X-YouTube-Client-Name" to "101",
                 "X-YouTube-Client-Version" to "1.02"
-            ) + user,
+            ) + user),
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
         return runCatching {
