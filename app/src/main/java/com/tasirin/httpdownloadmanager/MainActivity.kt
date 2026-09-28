@@ -412,6 +412,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     getString(R.string.platform_instagram)
                 host.contains("twitter.com") || host.contains("x.com") ->
                     getString(R.string.platform_x)
+                host.contains("xvideos.com") ->
+                    getString(R.string.platform_xvideos)
                 else -> getString(R.string.platform_social)
             }
         }
@@ -509,7 +511,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 ) return@launch
                 socialOptions = options
                 // Pisahkan opsi video dan foto
-                socialVideoOptions = options.filter { it.mimeType.startsWith("video") }
+                socialVideoOptions = options.filter { it.mimeType.startsWith("video") || it.isHls }
                 socialPhotoOptions = options.filter { it.mimeType.startsWith("image") }
                 val hasVideo = socialVideoOptions.isNotEmpty()
                 val hasPhotos = socialPhotoOptions.isNotEmpty()

@@ -52,6 +52,7 @@
     <string name="platform_tiktok">TikTok</string>
     <string name="platform_instagram">Instagram</string>
     <string name="platform_x">X</string>
+    <string name="platform_xvideos">XVideos</string>
     <string name="platform_social">Social media</string>
     <string name="platform_detected">Detected: %1$s</string>
     <string name="confirm_cancel">Cancel this download?</string>

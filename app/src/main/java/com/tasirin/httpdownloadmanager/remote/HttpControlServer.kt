@@ -990,7 +990,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val photos = JSONArray()
         val videos = JSONArray()
         for (r in results) {
-            val isVideo = r.mimeType.startsWith("video")
+            val isVideo = r.isHls || r.mimeType.startsWith("video")
             val label = r.quality.takeIf { it.isNotBlank() }
                 ?: r.mimeType.takeIf { it.isNotBlank() }
                 ?: if (isVideo) "Video" else "Photo"

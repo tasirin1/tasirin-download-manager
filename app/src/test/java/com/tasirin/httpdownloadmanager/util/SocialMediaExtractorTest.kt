@@ -2,6 +2,7 @@ package com.tasirin.httpdownloadmanager.util
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SocialMediaExtractorTest {
@@ -68,6 +69,48 @@ class SocialMediaExtractorTest {
     fun `isSocialMediaUrl - HTTP juga terdeteksi`() {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://youtube.com/watch?v=abc"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://tiktok.com/@user/video/123"))
+    }
+
+    @Test
+    fun `isSocialMediaUrl - xvideos terdeteksi`() {
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.xvideos.com/video.12345/judul-video"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("http://m.xvideos.com/video.123/judul"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://mobile.xvideos.com/video.123/judul"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://notxvideos.com/video/123"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://xvideos.com"))
+    }
+
+    @Test
+    fun `parseXVideosPage - high low hls`() {
+        val html = "<html><head><title>Cool video - XVIDEOS.COM</title></head><body>" +
+            "<script>html5player.setVideoTitle('Cool video');" +
+            "html5player.setVideoUrlHigh('https://cdn77-vid.xvideos-cdn.com/abc-high.mp4');" +
+            "html5player.setVideoUrlLow('https://cdn77-vid.xvideos-cdn.com/abc-low.mp4');" +
+            "html5player.setVideoHLS('https://cdn77-vid.xvideos-cdn.com/hls/abc.m3u8');</script></body></html>"
+        val opts = SocialMediaExtractor.parseXVideosPage(html)
+        assertEquals(3, opts.size)
+        assertEquals("HD", opts[0].quality)
+        assertTrue(opts[0].directUrl.endsWith("-high.mp4"))
+        assertEquals("SD", opts[1].quality)
+        assertTrue(opts[2].isHls)
+        assertTrue(opts[2].directUrl.endsWith(".m3u8"))
+    }
+
+    @Test
+    fun `parseXVideosPage - fallback og video`() {
+        val html = "<html><head>" +
+            "<meta property=\"og:title\" content=\"OG Title\"/>" +
+            "<meta property=\"og:video\" content=\"https://cdn.xvideos-cdn.com/og.mp4\"/>" +
+            "</head><body>watch</body></html>"
+        val opts = SocialMediaExtractor.parseXVideosPage(html)
+        assertEquals(1, opts.size)
+        assertEquals("OG Title", opts[0].title)
+        assertTrue(opts[0].directUrl.endsWith("og.mp4"))
+    }
+
+    @Test
+    fun `parseXVideosPage - kosong bila tak ada video`() {
+        assertTrue(SocialMediaExtractor.parseXVideosPage("<html><body>hello</body></html>").isEmpty())
     }
 
     @Test

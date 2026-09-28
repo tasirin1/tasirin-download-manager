@@ -39,6 +39,7 @@ object SocialMediaExtractor {
     private val IG_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/(?:p|reel|tv)/|(?:https?://)instagr\.am/(?:p|reel)/""")
     private val TW_HOST_RE = Regex("""(?:https?://)(?:www\.)?twitter\.com/""")
     private val IG_BROAD_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/|(?:https?://)instagr\.am/""")
+    private val XV_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xvideos\.com/""")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
      * (Instagram & YouTube) yang dipanggil berulang saat unduh. */
@@ -60,6 +61,13 @@ object SocialMediaExtractor {
     private val YT_ID_SHORTS_RE = Regex("/shorts/([A-Za-z0-9_-]{11})")
     private val YT_ID_V_RE = Regex("[?&]v=([A-Za-z0-9_-]{11})")
     private val YT_ID_YOUTU_RE = Regex("youtu\\.be/([A-Za-z0-9_-]{11})")
+    private val XV_URL_HIGH_RE = Regex("""setVideoUrlHigh\s*\(\s*['"](https?://[^'"]+)['"]""")
+    private val XV_URL_LOW_RE = Regex("""setVideoUrlLow\s*\(\s*['"](https?://[^'"]+)['"]""")
+    private val XV_HLS_RE = Regex("""setVideoHLS\s*\(\s*['"](https?://[^'"]+?\.m3u8[^'"]*)['"]""")
+    private val XV_TITLE_RE = Regex("""setVideoTitle\s*\(\s*['"](.+?)['"]\s*\)""")
+    private val XV_OG_VIDEO_RE = Regex("""<meta[^>]+property\s*=\s*["']og:video["'][^>]+content\s*=\s*["'](https?://[^"']+)["']""")
+    private val XV_OG_TITLE_RE = Regex("""<meta[^>]+property\s*=\s*["']og:title["'][^>]+content\s*=\s*["'](.+?)["']""")
+    private val XV_TITLE_TAG_RE = Regex("""<title>(.+?)</title>""")
     private val SANITIZE_BAD_CHARS_RE = Regex("[^A-Za-z0-9_\\-. ]")
     private val SANITIZE_WS_RE = Regex("\\s+")
 
@@ -81,7 +89,7 @@ object SocialMediaExtractor {
         if (!lower.contains("tiktok.com") && !lower.contains("instagram.com") &&
             !lower.contains("twitter.com") && !lower.contains("x.com/") &&
             !lower.contains("youtube.com") && !lower.contains("youtu.be") &&
-            !lower.contains("instagr.am")
+            !lower.contains("instagr.am") && !lower.contains("xvideos.com")
         ) return false
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
@@ -89,7 +97,8 @@ object SocialMediaExtractor {
                 IG_HOST_RE.containsMatchIn(lower) ||
                 TW_HOST_RE.containsMatchIn(lower) ||
                 X_URL_RE.containsMatchIn(lower) ||
-                YT_HOST_RE.containsMatchIn(lower)
+                YT_HOST_RE.containsMatchIn(lower) ||
+                XV_HOST_RE.containsMatchIn(lower)
     }
 
     /** Ekstrak URL terbaik (satu opsi). */
@@ -102,6 +111,7 @@ object SocialMediaExtractor {
                 TW_HOST_RE.containsMatchIn(lower) || X_URL_RE.containsMatchIn(lower) ->
                     extractTwitter(url)
                 YT_HOST_RE.containsMatchIn(lower) -> extractYouTube(url)
+                XV_HOST_RE.containsMatchIn(lower) -> extractXVideos(url)
                 else -> null
             }
         } catch (_: Exception) { null }
@@ -121,6 +131,7 @@ object SocialMediaExtractor {
                     TW_HOST_RE.containsMatchIn(lower) || X_URL_RE.containsMatchIn(lower) ->
                         extractAllTwitter(url)
                     YT_HOST_RE.containsMatchIn(lower) -> extractAllYouTube(url)
+                    XV_HOST_RE.containsMatchIn(lower) -> extractAllXVideos(url)
                     else -> emptyList()
                 }
             } catch (_: Exception) { emptyList() }
@@ -863,6 +874,70 @@ object SocialMediaExtractor {
         return FileNames.safe(name).replace(SANITIZE_BAD_CHARS_RE, "_")
             .replace(SANITIZE_WS_RE, "_")
             .take(80)
+    }
+
+    // ── XVideos ─────────────────────────────────────────────────────────
+
+    private val XV_HEADERS = mapOf(
+        "User-Agent" to DEFAULT_UA,
+        "Accept" to "text/html,application/xhtml+xml",
+        "Referer" to "https://www.xvideos.com/"
+    )
+
+    private fun extractXVideos(url: String): Result? {
+        val options = extractAllXVideos(url)
+        return options.firstOrNull { it.quality == "HD" }
+            ?: options.firstOrNull { !it.isHls }
+            ?: options.firstOrNull()
+    }
+
+    private fun extractAllXVideos(url: String): List<Result> {
+        val html = httpGet(url, XV_HEADERS, timeoutMs = PAGE_TIMEOUT_MS) ?: return emptyList()
+        if (html.length < 1000) return emptyList()
+        return parseXVideosPage(html)
+    }
+
+    /** Parser murni halaman watch XVideos (tanpa I/O) agar bisa di-unit-test. */
+    internal fun parseXVideosPage(html: String): List<Result> {
+        var title = XV_TITLE_RE.find(html)?.groupValues?.get(1)
+            ?: XV_OG_TITLE_RE.find(html)?.groupValues?.get(1)
+            ?: XV_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(" - XVIDEOS")
+            ?: "XVideos_video"
+        title = unescapeXv(title.trim()).take(120)
+        if (title.isBlank()) title = "XVideos_video"
+        val safeName = sanitizeFileName(title)
+        val options = mutableListOf<Result>()
+        val high = XV_URL_HIGH_RE.find(html)?.groupValues?.get(1)?.let(::unescapeXv)
+        if (!high.isNullOrEmpty() && high.startsWith("http")) {
+            options.add(Result(high, "XVideos_${safeName}_HD.mp4", title, "HD", MIME_MP4))
+        }
+        val low = XV_URL_LOW_RE.find(html)?.groupValues?.get(1)?.let(::unescapeXv)
+        if (!low.isNullOrEmpty() && low.startsWith("http") && low != high) {
+            options.add(Result(low, "XVideos_${safeName}_SD.mp4", title, "SD", MIME_MP4))
+        }
+        val hls = XV_HLS_RE.find(html)?.groupValues?.get(1)?.let(::unescapeXv)
+        if (!hls.isNullOrEmpty() && hls.startsWith("http")) {
+            options.add(Result(hls, "XVideos_${safeName}.ts", title, "HLS", "application/x-mpegURL", isHls = true))
+        }
+        if (options.isEmpty()) {
+            val ogVideo = XV_OG_VIDEO_RE.find(html)?.groupValues?.get(1)?.let(::unescapeXv)
+            if (!ogVideo.isNullOrEmpty() && ogVideo.startsWith("http")) {
+                if (ogVideo.contains(".m3u8")) {
+                    options.add(Result(ogVideo, "XVideos_${safeName}.ts", title, "HLS", "application/x-mpegURL", isHls = true))
+                } else {
+                    options.add(Result(ogVideo, "XVideos_${safeName}.mp4", title, "Video", MIME_MP4))
+                }
+            }
+        }
+        return options
+    }
+
+    /** Unescape URL/judul dari JS/HTML (`\/`, `\u0026`, `&amp;`). */
+    private fun unescapeXv(raw: String): String {
+        return raw.replace("\\/", "/")
+            .replace("\\u002F", "/")
+            .replace("\\u0026", "&")
+            .replace("&amp;", "&")
     }
 
     // ── Twitter/X ────────────────────────────────────────────────────────
