@@ -514,6 +514,9 @@ class SettingsActivity : AppCompatActivity() {
         }
         binding.checkServerReadOnly.setOnClickListener {
             StoragePrefs.setServerReadOnly(this, !StoragePrefs.isServerReadOnly(this))
+            // Status readOnly di-cache server: invalidasi agar remote web
+            // langsung menampilkan status baru (tanpa ini basi sampai restart).
+            App.httpServer.invalidateStatusCache()
             renderChecks()
         }
         // PIN disimpan sebagai hash — field dikosongkan, hint menjelaskan

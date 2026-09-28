@@ -849,8 +849,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             val password = passwordInput.text?.toString()?.trim().orEmpty()
             val headers = headersInput.text?.toString()?.trim().orEmpty()
             val checksum = checksumInput.text?.toString()?.trim().orEmpty()
-            val perSpeed = speedKbps[spinnerSpeedPer.selectedItemPosition]
-            val priority = priorityValues[spinnerPriority.selectedItemPosition]
+            // Guard indeks: jumlah opsi spinner berasal dari resources yang bisa
+            // berubah tanpa ikut mengubah konstanta (pola showLimitPriorityDialog).
+            val speedPos = spinnerSpeedPer.selectedItemPosition
+            val perSpeed = if (speedPos in speedKbps.indices) speedKbps[speedPos] else 0
+            val prioPos = spinnerPriority.selectedItemPosition
+            val priority = if (prioPos in priorityValues.indices) priorityValues[prioPos] else 0
             if (selectedYtHeight > 0) {
                 addYoutubeWithHeight(
                     urls = urls,

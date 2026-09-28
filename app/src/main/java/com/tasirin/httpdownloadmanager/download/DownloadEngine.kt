@@ -395,7 +395,9 @@ class DownloadEngine(appContext: Context) {
             clearSegProgress(it.id)
             jobs.remove(it.id)?.cancel()
             disconnectActive(it.id)
-            cancelledConns.remove(it.id)
+            // Seperti clearFailed: flag koneksi dipertahankan bila masih ada
+            // koneksi aktif (segmen yang datang terlambat tetap diputus).
+            if (activeConns[it.id] == null) cancelledConns.remove(it.id)
         }
         update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
         scheduleSave()
