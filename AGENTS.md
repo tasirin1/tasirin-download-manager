@@ -290,7 +290,7 @@ kuat dan tanpa diskusi:
   tapi workflow tetap wajib dipantau sampai sukses dan release baru terbit.
 - **Push sukses ke `main`** → workflow `build.yml` menjalankan guard, test,
   build/release, lalu membuat release baru `v<versi>` dengan APK
-  `tasirin-download-manager-v<versi>-<code>.apk` (`versi = 1.0.<run_number>`,
+  `tasirin-download-manager-v<versi>.apk` (`versi = 1.0.<run_number>`,
   `code = 100000 + run_number`; rilis lama dipertahankan sebagai riwayat).
 - **Dependabot** → update dikelompokkan (`androidx`, `kotlinx`,
   `gradle-tools`, `actions`). PR yang TIDAK menyentuh dependensi Gradle
@@ -384,7 +384,7 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
 - **Pengaturan baru** → `SettingsActivity.kt` + `StoragePrefs.kt`
   (simpan kunci baru di sana) + `remote.html` bila perlu ditampilkan remote.
 - **Self-update APK** → `Updater.kt` — **cek-saja** (format nama asset
-  `-<code>.apk` wajib dipertahankan agar versi terbaca). Jangan kembalikan
+  kode versi dibaca `Updater` dari tag rilis (`v1.0.<n>` → `100000+n`); nama file lawas `…-<code>.apk` tetap diterima sebagai fallback). Jangan kembalikan
   unduh-APK-dalam-aplikasi; jangan deklarasikan `REQUEST_INSTALL_PACKAGES`
   (dihapus anti-Play-Protect). Ketuk item APK hanya membuka panduan manual
   (`showApkInstallGuide`) + tombol folder.
@@ -394,7 +394,7 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
 ## Cara cek rilis terbaru & verifikasi build
 
 - Tiap push ke `main` membuat release baru `v<versi>`; asset APK selalu
-  `tasirin-download-manager-v<versi>-<code>.apk` dengan `versi = 1.0.<run_number>`,
+  `tasirin-download-manager-v<versi>.apk` dengan `versi = 1.0.<run_number>`,
   `code = 100000 + run_number`.
 - Jangan ubah `versionName`/`versionCode` manual (keduanya di-bump CI).
 

@@ -252,13 +252,20 @@ jobs:
         run: |
           VER=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           CODE=$(grep -oP 'versionCode = \K[0-9]+' app/build.gradle.kts)
-          OUT="tasirin-download-manager-v${VER}-${CODE}.apk"
+          OUT="tasirin-download-manager-v${VER}.apk"
           if [ -n "$KEYSTORE_BASE64" ]; then
             cp app/build/outputs/apk/release/app-release.apk "$OUT"
           else
             cp app/build/outputs/apk/debug/app-debug.apk "$OUT"
           fi
-          NOTES=$(python3 -c "import re; s=open('CHANGELOG.md', encoding='utf-8').read(); m=re.search(r'^## .*?(?=\n## |\Z)', s, re.M | re.S); print(m.group(0).strip() if m else '')")
+          NOTES=""
+          # Catatan rilis = entri CHANGELOG yang ditambah push ini saja (maks 15
+          # baris), bukan seluruh seksi [Unreleased] yang menumpuk. Push tanpa
+          # entri baru (mis. chore metadata) memakai teks generik.
+          BASE="${{ github.event.before }}"
+          if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            NOTES=$(git diff "$BASE" HEAD -- CHANGELOG.md 2>/dev/null | grep -E '^\+- ' | sed 's/^+//' | head -n 15)
+          fi
           if [ -z "$NOTES" ]; then
             NOTES="APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box."
           fi
@@ -349,7 +356,7 @@ jobs:
         run: |
           VER=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           CODE=$((100000 + ${{ github.run_number }}))
-          EXPECTED_APK="tasirin-download-manager-v${VER}-${CODE}.apk"
+          EXPECTED_APK="tasirin-download-manager-v${VER}.apk"
           LATEST_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name')
           RELEASE=$(gh release view "v${VER}" --json name,assets)
 
@@ -358,7 +365,7 @@ jobs:
 
           if [ "${{ github.event_name }}" = "schedule" ]; then
             echo "$RELEASE" | jq -e \
-              '[.assets[] | select(.name | test("^tasirin-download-manager-v[0-9.]+-[0-9]+\\.apk$"))] |
+              '[.assets[] | select(.name | test("^tasirin-download-manager-v[0-9.]+\\.apk$"))] |
                length >= 1 and all(.[]; .size > 0 and .size <= 3670016)' >/dev/null \
               || { echo "::error::Tidak ada APK rilis yang sehat pada release v${VER}"; exit 1; }
           else
