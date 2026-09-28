@@ -2148,8 +2148,12 @@ class DownloadEngine(appContext: Context) {
         if (resolvedName != fileName) {
             val newPartial = saver.partialFile(resolvedName)
             val keepOld = downloaded > 0 && partialFile.exists()
-            val renamed = keepOld && partialFile.renameTo(newPartial)
-            if (renamed || !keepOld) {
+            // Rename gagal sementara byte lama ada: pertahankan nama lama agar
+            // byte tetap nyambung ke file yang benar (tanpa ini: file lama
+            // yatim + retry mengunduh ulang penuh dari nol).
+            if (keepOld && !partialFile.renameTo(newPartial)) {
+                App.logEvent("DOWNLOAD ${item.fileName}: keeping partial name (rename failed)")
+            } else {
                 if (!keepOld) partialFile.delete()
                 partialFile = newPartial
                 fileName = resolvedName

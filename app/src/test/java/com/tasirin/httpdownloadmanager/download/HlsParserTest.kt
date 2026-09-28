@@ -46,6 +46,19 @@ class HlsParserTest {
     }
 
     @Test
+    fun `tag STREAM-INF tanpa URI tidak menelan varian berikut`() {
+        val malformed = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=1280000,NAME="720p"
+            #EXT-X-STREAM-INF:BANDWIDTH=2800000,NAME="1080p"
+            https://cdn.example.com/videos/1080.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(malformed, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals("1080p", variants[0].name)
+    }
+
+    @Test
     fun `bukan master playlist - mengembalikan null`() {
         val media = """
             #EXTM3U

@@ -75,9 +75,9 @@ object HlsParser {
                             bandwidth ?: 0L, codecs, audioGroup, frameRate, height
                         )
                     )
+                    i += 2
+                    continue
                 }
-                i += 2
-                continue
             }
             i++
         }

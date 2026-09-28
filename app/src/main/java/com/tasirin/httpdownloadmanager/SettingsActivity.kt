@@ -890,7 +890,8 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /** Simpan APK hasil unduhan ke folder Downloads publik (tanpa pasang
-     *  otomatis — aplikasi tidak lagi meminta REQUEST_INSTALL_PACKAGES). */
+     *  otomatis — izin REQUEST_INSTALL_PACKAGES di manifest hanya untuk buka
+     *  installer manual dari daftar download, bukan auto-install). */
     private fun saveDownloadedUpdate(file: File?, info: UpdateInfo): String {
         if (file == null) return getString(R.string.update_download_failed)
         if (!Updater.isSignatureValid(this, file)) {
