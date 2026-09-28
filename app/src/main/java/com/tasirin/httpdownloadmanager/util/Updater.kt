@@ -1,43 +1,34 @@
 package com.tasirin.httpdownloadmanager.util
 
-import android.content.pm.PackageInfo
-import android.content.pm.PackageManager
-import android.os.Build
 import android.content.Context
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 
 data class UpdateInfo(
     val versionCode: Int,
     val versionName: String,
     val apkUrl: String,
-    val apkSize: Long
+    val apkSize: Long,
+    val pageUrl: String = ""
 )
 
-/** Cek & unduh APK rilis terbaru dari GitHub (download-only + verifikasi
- *  tanda tangan). Instalasi tetap manual oleh pengguna: izin
- *  REQUEST_INSTALL_PACKAGES di manifest hanya dipakai MainActivity untuk
- *  membuka installer saat pengguna mengetuk item APK, bukan auto-install. */
+/** Cek rilis terbaru dari GitHub (cek-saja, tanpa mengunduh APK).
+ *  Aplikasi tidak pernah memegang byte APK update sendiri (pola dropper yang
+ *  dicurigai Play Protect): pengguna mengambil versi baru lewat browser dari
+ *  halaman rilis resmi, lalu memasang manual. */
 object Updater {
     private val APK_NAME_RE = Regex("-(\\d+)\\.apk$")
     private const val LATEST_API =
         "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest"
-    private const val MAX_REDIRECTS = 5
-    private const val MAX_UPDATE_BYTES = 100L * 1024 * 1024
     private const val UA = "TasirinDownloadManager"
-    /** SHA-256 fingerprint sertifikat release resmi (alias `tasirin`), huruf kecil tanpa titik dua.
-     *  Didapat dari `keytool -list -v` keystore rilis; APK dengan tanda tangan lain ditolak. */
-    private const val RELEASE_CERT_SHA256 =
-        "c2785a618082683755eeae867e0a2e01f450b1fd448859d1ec21cf854c5713d1"
 
     fun checkLatest(context: Context): UpdateInfo? = runCatching {
         val body = get(context, LATEST_API) ?: return null
         val json = JSONObject(body)
         val tag = json.optString("tag_name")
+        val page = json.optString("html_url")
         val assets = json.optJSONArray("assets") ?: return null
         var best: UpdateInfo? = null
         for (i in 0 until assets.length()) {
@@ -47,145 +38,11 @@ object Updater {
                 ?: continue
             val url = a.optString("browser_download_url", "")
             if (url.isEmpty() || !url.startsWith("https://", ignoreCase = true)) continue
-            val info = UpdateInfo(code, tag, url, a.optLong("size"))
+            val info = UpdateInfo(code, tag, url, a.optLong("size"), page)
             if (best == null || code > best.versionCode) best = info
         }
         best
     }.getOrNull()
-
-    fun download(
-        context: Context,
-        info: UpdateInfo,
-        onProgress: (done: Long, total: Long) -> Unit
-    ): File? = runCatching {
-        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-        val target = File(dir, "update-${info.versionCode}.apk")
-        if (info.apkSize > MAX_UPDATE_BYTES) return null
-        if (target.exists() && info.apkSize > 0 && target.length() == info.apkSize) {
-            if (isSignatureValid(context, target)) return target
-            runCatching { target.delete() }
-        }
-        // Sisa parsial dari percobaan gagal sebelumnya: mulai bersih agar
-        // kegagalan jaringan tak menumpuk file setengah jadi di cache.
-        if (target.exists()) runCatching { target.delete() }
-
-        if (!info.apkUrl.startsWith("https://", ignoreCase = true)) return null
-        var url = info.apkUrl
-        var redirects = 0
-        var downloaded = false
-        while (redirects < MAX_REDIRECTS) {
-            val conn = URL(url).openConnection() as HttpURLConnection
-            if (conn is HttpsURLConnection) TlsCompat.apply(conn, context)
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 30_000
-            conn.setRequestProperty("User-Agent", UA)
-            conn.instanceFollowRedirects = false
-            val code = conn.responseCode
-            if (code in 300..399) {
-                val loc = conn.getHeaderField("Location") ?: return null
-                conn.disconnect()
-                // Location boleh relatif (RFC 7231): resolve ke absolut dulu,
-                // tapi tujuan akhir tetap wajib https (tutup downgrade/http).
-                val next = runCatching { java.net.URL(java.net.URL(url), loc).toString() }.getOrNull()
-                    ?: return null
-                if (!next.startsWith("https://", ignoreCase = true)) return null
-                url = next
-                redirects++
-                continue
-            }
-            if (code !in 200..299) {
-                conn.disconnect()
-                return null
-            }
-            val total = conn.contentLength.toLong().coerceAtLeast(0L)
-            // Batas tulis selalu ada: bila ukuran dari API tak diketahui (0),
-            // pakai MAX_UPDATE_BYTES agar respons jahat tak memenuhi disk.
-            val writeCap = if (info.apkSize > 0) info.apkSize else MAX_UPDATE_BYTES
-            try {
-                try {
-                    conn.inputStream.use { input ->
-                        java.io.BufferedOutputStream(target.outputStream(), 64 * 1024).use { out ->
-                            val buf = ByteArray(64 * 1024)
-                            var done = 0L
-                            while (true) {
-                                val n = input.read(buf)
-                                if (n < 0) break
-                                out.write(buf, 0, n)
-                                done += n
-                                if (done > writeCap) throw SecurityException("Update size mismatch")
-                                onProgress(done, total)
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Respons melebihi batas maupun gagal jaringan/IO di tengah
-                    // unduh: buang file setengah jadi supaya cache tak membengkak
-                    // dan percobaan berikut mulai bersih.
-                    runCatching { target.delete() }
-                    throw e
-                }
-            } finally {
-                conn.disconnect()
-            }
-            downloaded = true
-            break
-        }
-        // Redirect habis tanpa pernah mengunduh: jangan kembalikan file target
-        // yang tidak ada (terjadi bila ukuran APK tak diketahui).
-        if (!downloaded) return null
-        if (info.apkSize > 0 && target.length() != info.apkSize) {
-            target.delete()
-            null
-        } else if (!isSignatureValid(context, target)) {
-            // Pertahanan berlapis: caller juga memverifikasi, tapi file yang
-            // lolos dari sini harus selalu bertanda tangan resmi (aman bila
-            // fungsi dipakai ulang di tempat lain).
-            runCatching { target.delete() }
-            null
-        } else {
-            target
-        }
-    }.getOrNull()
-
-    /** Pastikan APK ditandatangani sertifikat release resmi sebelum dipasang.
-     *  API 28+ memakai GET_SIGNING_CERTIFICATES (v2/v3), Android 5-8 memakai
-     *  GET_SIGNATURES — dua-duanya mengembalikan byte DER sertifikat. */
-    // GET_SIGNATURES/signatures sengaja dipakai karena dibutuhkan Android 5-8
-    // (minSdk 21) untuk verifikasi tanda tangan sumber APK v1; API 28+ sudah
-    // memakai GET_SIGNING_CERTIFICATES. Deprecation di-suppress bukan bug.
-    @Suppress("DEPRECATION")
-    fun isSignatureValid(context: Context, file: File): Boolean = runCatching {
-        val flags = if (Build.VERSION.SDK_INT >= 28) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            PackageManager.GET_SIGNATURES
-        }
-        var info = context.packageManager.getPackageArchiveInfo(file.absolutePath, flags)
-        var certs = signingCerts(info)
-        if (certs.isEmpty() && Build.VERSION.SDK_INT >= 28) {
-            // Fallback: APK bertanda tangan v1 saja tidak selalu mengisi signingInfo.
-            info = context.packageManager.getPackageArchiveInfo(
-                file.absolutePath, PackageManager.GET_SIGNATURES
-            )
-            certs = signingCerts(info)
-        }
-        certs.any { cert ->
-            val digest = MessageDigest.getInstance("SHA-256").digest(cert)
-            Hex.encode(digest).equals(RELEASE_CERT_SHA256, ignoreCase = true)
-        }
-    }.getOrDefault(false)
-
-    @Suppress("DEPRECATION")
-    private fun signingCerts(info: PackageInfo?): List<ByteArray> {
-        if (info == null) return emptyList()
-        if (Build.VERSION.SDK_INT >= 28) {
-            info.signingInfo?.let { si ->
-                val signers = si.apkContentsSigners
-                if (!signers.isNullOrEmpty()) return signers.map { it.toByteArray() }
-            }
-        }
-        return info.signatures?.map { it.toByteArray() } ?: emptyList()
-    }
 
     private fun get(context: Context, url: String): String? = runCatching {
         val conn = URL(url).openConnection() as HttpURLConnection

@@ -22,7 +22,6 @@ import android.widget.AdapterView
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.ImageView
 import android.widget.TextView
@@ -39,18 +38,14 @@ import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.Formats
-import com.tasirin.httpdownloadmanager.util.FileNames
-import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
-import com.tasirin.httpdownloadmanager.util.UpdateInfo
 import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import java.io.File
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.tasirin.httpdownloadmanager.util.whiteNavigationIcon
@@ -836,76 +831,26 @@ class SettingsActivity : AppCompatActivity() {
             binding.updateStatus.text = getString(
                 R.string.update_available, info.versionName, info.versionCode
             )
-            // Tombol Check Update = cek + unduh APK terbaru (bukan cuma cek).
-            // APK disimpan ke folder Download; instalasi tetap manual supaya
-            // Play Protect tidak curiga (keputusan historis repo).
-            downloadUpdate(info)
-        }
-    }
-
-    @SuppressLint("InflateParams") // Inflate dialog progres dengan root null adalah pola standar.
-    private fun downloadUpdate(info: UpdateInfo) {
-        val view = layoutInflater.inflate(R.layout.dialog_update_progress, null)
-        val bar = view.findViewById<ProgressBar>(R.id.update_progress_bar)
-        val txt = view.findViewById<TextView>(R.id.update_progress_text)
-        var downloadJob: Job? = null
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.update_title)
-            .setView(view)
-            .setNegativeButton(R.string.cancel) { _, _ -> downloadJob?.cancel() }
-            .setOnDismissListener { downloadJob?.cancel() }
-            .show()
-        var lastProgressUi = 0L
-        downloadJob = lifecycleScope.launch {
-            val status = try {
-                val file = withContext(Dispatchers.IO) {
-                    Updater.download(this@SettingsActivity, info) { done, total ->
-                        val now = System.currentTimeMillis()
-                        if (now - lastProgressUi < 100) return@download
-                        lastProgressUi = now
-                        runOnUiThread {
-                            if (total > 0) {
-                                bar.progress = (done * 100 / total).toInt()
-                                txt.text = getString(
-                                    R.string.update_progress_detail,
-                                    Formats.bytes(done),
-                                    Formats.bytes(total)
-                                )
-                            } else {
-                                txt.text = getString(
-                                    R.string.update_progress_unknown, Formats.bytes(done)
-                                )
-                            }
-                        }
+            // Aplikasi tidak pernah mengunduh APK sendiri (pola dropper yang
+            // dicurigai Play Protect): pengguna mengambil versi baru lewat
+            // browser dari halaman rilis resmi.
+            AlertDialog.Builder(this@SettingsActivity)
+                .setTitle(R.string.update_title)
+                .setMessage(
+                    getString(
+                        R.string.update_available, info.versionName, info.versionCode
+                    ) + "\n\n" + getString(R.string.update_browser_note)
+                )
+                .setNegativeButton(R.string.update_later, null)
+                .setPositiveButton(R.string.update_open_release) { _, _ ->
+                    runCatching {
+                        startActivity(Intent(Intent.ACTION_VIEW, info.pageUrl.toUri()))
                     }
                 }
-                withContext(Dispatchers.IO) { saveDownloadedUpdate(file, info) }
-            } catch (e: Exception) {
-                App.logEvent("UPDATE download error: ${e.javaClass.simpleName} ${e.message}")
-                getString(R.string.update_download_failed)
-            }
-            runCatching { if (dialog.isShowing) dialog.dismiss() }
-            binding.updateStatus.text = status
+                .show()
         }
     }
 
-    /** Simpan APK hasil unduhan ke folder Downloads publik (tanpa pasang
-     *  otomatis — izin REQUEST_INSTALL_PACKAGES di manifest hanya untuk buka
-     *  installer manual dari daftar download, bukan auto-install). */
-    private fun saveDownloadedUpdate(file: File?, info: UpdateInfo): String {
-        if (file == null) return getString(R.string.update_download_failed)
-        if (!Updater.isSignatureValid(this, file)) {
-            file.delete()
-            return getString(R.string.update_signature_failed)
-        }
-        val displayName = FileNames.safe("tasirin-download-manager-${info.versionName}-${info.versionCode}.apk")
-        val saved = FileSaver(this).saveStream(displayName, "download", "") { out ->
-            file.inputStream().use { it.copyTo(out) }
-        }
-        file.delete()
-        val location = saved?.filePath ?: saved?.contentUri ?: saved?.fileName ?: displayName
-        return getString(R.string.update_downloaded_path, location)
-    }
 
     private fun refreshActiveStorageUi() {
         val input = activeStorageInput

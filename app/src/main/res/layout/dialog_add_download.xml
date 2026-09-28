@@ -89,6 +89,21 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <!-- Ekstraksi via browser dalam aplikasi (situs anti-bot seperti HentaiHaven) -->
+    <Button
+        android:id="@+id/btn_web_extract"
+        style="@style/TvOutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginTop="6dp"
+        android:text="@string/web_extract_open"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <!-- Quality card (social media) -->
     <LinearLayout
         android:id="@+id/social_quality_section"

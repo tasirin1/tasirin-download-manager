@@ -7,6 +7,9 @@ import org.junit.Test
 
 class SocialMediaExtractorTest {
 
+    // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
+    private val hhDomain = "hentaihaven.xxx"
+
     @Test
     fun `isSocialMediaUrl - deteksi URL beranda sosial`() {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.youtube.com/watch?v=abc"))
@@ -134,6 +137,68 @@ class SocialMediaExtractorTest {
     @Test
     fun `parseXVideosPage - kosong bila tak ada video`() {
         assertTrue(SocialMediaExtractor.parseXVideosPage("<html><body>hello</body></html>").isEmpty())
+    }
+
+    @Test
+    fun `isSocialMediaUrl - hentaihaven terdeteksi`() {
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://$hhDomain/watch/muchuu-no-tou/"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.$hhDomain/watch/some-episode-1/"))
+        assertTrue(SocialMediaExtractor.isHentaiHavenUrl("https://$hhDomain/watch/abc/"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://not$hhDomain/watch/abc/"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://$hhDomain"))
+        // Host media situs yang sama bukan halaman watch tapi tetap satu domain;
+        // tidak boleh salah deteksi sebagai CDN generik pihak ketiga.
+        assertFalse(SocialMediaExtractor.isHentaiHavenUrl("https://img.$hhDomain/images/a.jpg"))
+    }
+
+    @Test
+    fun `parseHentaiHavenPage - tag video dan judul`() {
+        val html = "<html><head><title>Muchuu no Tou Episode 1 - Hentai Haven</title></head><body>" +
+            "<video src=\"https://cdn.example.com/vid123.mp4\"></video></body></html>"
+        val opts = SocialMediaExtractor.parseHentaiHavenPage(html)
+        assertEquals(1, opts.size)
+        assertEquals("Muchuu no Tou Episode 1", opts[0].title)
+        assertTrue(opts[0].fileName!!.startsWith("HentaiHaven_"))
+        assertTrue(opts[0].fileName!!.endsWith(".mp4"))
+        assertEquals("Video", opts[0].quality)
+        assertEquals("https://cdn.example.com/vid123.mp4", opts[0].directUrl)
+    }
+
+    @Test
+    fun `parseHentaiHavenPage - data-src dan twitter stream`() {
+        val html = "<html><head><title>Data Test - Hentai Haven</title>" +
+            "<meta name=\"twitter:player:stream\" content=\"https://cdn.example.com/tw.mp4\"/>" +
+            "</head><body>" +
+            "<video><source data-src=\"https://cdn.example.com/lazy.mp4\"/></video>" +
+            "</body></html>"
+        val opts = SocialMediaExtractor.parseHentaiHavenPage(html)
+        assertTrue(opts.isNotEmpty())
+        // Lazy-load data-src diutamakan sebelum meta twitter stream.
+        assertEquals("https://cdn.example.com/lazy.mp4", opts[0].directUrl)
+        assertTrue(opts.any { it.directUrl.endsWith("tw.mp4") } || opts.size == 1)
+    }
+
+    @Test
+    fun `parseHentaiHavenPage - mp4 diutamakan dari m3u8`() {
+        val html = "<html><head><title>Both - Hentai Haven</title></head><body>" +
+            "<script>var p={file:'https://cdn.example.com/a.m3u8'};</script>" +
+            "<video src=\"https://cdn.example.com/b.mp4\"></video></body></html>"
+        val opts = SocialMediaExtractor.parseHentaiHavenPage(html)
+        assertTrue(opts.size >= 2)
+        assertTrue(opts[0].directUrl.endsWith(".mp4"))
+    }
+
+    @Test
+    fun `parseHentaiHavenPage - hls dan og fallback`() {
+        val html = "<html><head>" +
+            "<meta property=\"og:title\" content=\"OG Title\"/>" +
+            "<meta property=\"og:video\" content=\"https://cdn.example.com/og.m3u8\"/>" +
+            "</head><body>watch</body></html>"
+        val opts = SocialMediaExtractor.parseHentaiHavenPage(html)
+        assertEquals(1, opts.size)
+        assertTrue(opts[0].isHls)
+        assertTrue(opts[0].directUrl.endsWith(".m3u8"))
+        assertTrue(SocialMediaExtractor.parseHentaiHavenPage("<html><body>hello</body></html>").isEmpty())
     }
 
     @Test

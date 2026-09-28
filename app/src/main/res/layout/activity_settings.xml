@@ -222,6 +222,14 @@
                             android:textSize="13sp" />
 
                         <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/server_network_warning"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <TextView
                             android:id="@+id/urls"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"

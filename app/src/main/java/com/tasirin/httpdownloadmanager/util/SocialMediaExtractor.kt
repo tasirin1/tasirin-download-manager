@@ -41,6 +41,11 @@ object SocialMediaExtractor {
     private val IG_BROAD_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/|(?:https?://)instagr\.am/""")
     private val XV_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xvideos\.com/""")
     private val XN_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xnxx\.com/|(?:https?://)(?:www\.)?xnxxvideos\.me/""")
+    /** HentaiHaven: halaman watch (`/watch/<slug>/`) dilindungi challenge
+     *  Cloudflare sehingga fetch server pasti 403; ekstraksi memakai WebView
+     *  (`WebExtractActivity`) + parser murni di bawah sebagai fallback. */
+    // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
+    private val HH_HOST_RE = Regex("""(?:https?://)(?:www\.)?hentaihaven\.xxx/""")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
      * (Instagram & YouTube) yang dipanggil berulang saat unduh. */
@@ -69,6 +74,13 @@ object SocialMediaExtractor {
     private val HP_OG_VIDEO_RE = Regex("""<meta[^>]+property\s*=\s*["']og:video["'][^>]+content\s*=\s*["'](https?://[^"']+)["']""")
     private val HP_OG_TITLE_RE = Regex("""<meta[^>]+property\s*=\s*["']og:title["'][^>]+content\s*=\s*["'](.+?)["']""")
     private val HP_TITLE_TAG_RE = Regex("""<title>(.+?)</title>""")
+    private val HH_VIDEO_TAG_RE = Regex("""<video[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
+    private val HH_SOURCE_TAG_RE = Regex("""<source[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
+    private val HH_DATA_SRC_RE = Regex("""<(?:video|source)[^>]+data-(?:src|video|source)\s*=\s*["'](https?://[^"']+)["']""")
+    private val HH_JWPLAYER_RE = Regex("""(?:file|src|source)\s*:\s*["'](https?://[^"']+\.(?:mp4|m3u8)[^"']*)["']""")
+    private val HH_TWITTER_STREAM_RE = Regex("""<meta[^>]+(?:name|property)\s*=\s*["']twitter:player:stream["'][^>]+content\s*=\s*["'](https?://[^"']+)["']""")
+    private val HH_PRELOAD_RE = Regex("""<link[^>]+href\s*=\s*["'](https?://[^"']+\.(?:mp4|m3u8)[^"']*)["']""")
+    private val HH_GENERIC_MEDIA_RE = Regex("""https?://[^\s"'<>]+\.(?:mp4|m3u8)[^\s"'<>]*""")
     private val SANITIZE_BAD_CHARS_RE = Regex("[^A-Za-z0-9_\\-. ]")
     private val SANITIZE_WS_RE = Regex("\\s+")
 
@@ -91,7 +103,8 @@ object SocialMediaExtractor {
             !lower.contains("twitter.com") && !lower.contains("x.com/") &&
             !lower.contains("youtube.com") && !lower.contains("youtu.be") &&
             !lower.contains("instagr.am") && !lower.contains("xvideos.com") &&
-            !lower.contains("xnxx.com") && !lower.contains("xnxxvideos.me")
+            !lower.contains("xnxx.com") && !lower.contains("xnxxvideos.me") &&
+            !lower.contains("hentaihaven")
         ) return false
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
@@ -101,8 +114,13 @@ object SocialMediaExtractor {
                 X_URL_RE.containsMatchIn(lower) ||
                 YT_HOST_RE.containsMatchIn(lower) ||
                 XV_HOST_RE.containsMatchIn(lower) ||
-                XN_HOST_RE.containsMatchIn(lower)
+                XN_HOST_RE.containsMatchIn(lower) ||
+                HH_HOST_RE.containsMatchIn(lower)
     }
+
+    /** True bila URL adalah halaman HentaiHaven (butuh ekstraksi WebView). */
+    fun isHentaiHavenUrl(url: String): Boolean =
+        HH_HOST_RE.containsMatchIn(url.lowercase())
 
     /** Ekstrak URL terbaik (satu opsi). */
     suspend fun extract(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
@@ -116,6 +134,7 @@ object SocialMediaExtractor {
                 YT_HOST_RE.containsMatchIn(lower) -> extractYouTube(url)
                 XV_HOST_RE.containsMatchIn(lower) -> extractXVideos(url)
                 XN_HOST_RE.containsMatchIn(lower) -> extractXnxx(url)
+                HH_HOST_RE.containsMatchIn(lower) -> extractHentaiHaven(url)
                 else -> null
             }
         } catch (_: Exception) { null }
@@ -137,6 +156,7 @@ object SocialMediaExtractor {
                     YT_HOST_RE.containsMatchIn(lower) -> extractAllYouTube(url)
                     XV_HOST_RE.containsMatchIn(lower) -> extractAllXVideos(url)
                     XN_HOST_RE.containsMatchIn(lower) -> extractAllXnxx(url)
+                    HH_HOST_RE.containsMatchIn(lower) -> extractAllHentaiHaven(url)
                     else -> emptyList()
                 }
             } catch (_: Exception) { emptyList() }
@@ -974,6 +994,81 @@ object SocialMediaExtractor {
             .replace("\\u002F", "/")
             .replace("\\u0026", "&")
             .replace("&amp;", "&")
+    }
+
+    // ── HentaiHaven ─────────────────────────────────────────────────────
+    // Halaman watch di balik challenge Cloudflare: fetch server langsung
+    // hampir selalu 403. Alur utama adalah WebView (`WebExtractActivity`)
+    // yang mewarisi challenge + cookie browser asli; fungsi di sini mencoba
+    // fetch biasa dulu (berhasil bila challenge longgar) lewat parser murni.
+
+    private val HH_HEADERS = mapOf(
+        "User-Agent" to DEFAULT_UA,
+        "Accept" to "text/html,application/xhtml+xml",
+        // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
+        "Referer" to "https://hentaihaven.xxx/"
+    )
+
+    private fun extractHentaiHaven(url: String): Result? {
+        val options = extractAllHentaiHaven(url)
+        return options.firstOrNull { !it.isHls } ?: options.firstOrNull()
+    }
+
+    private fun extractAllHentaiHaven(url: String): List<Result> {
+        val html = fetchWatchHtml(url, HH_HEADERS) ?: return emptyList()
+        return parseHentaiHavenPage(html)
+    }
+
+    /** Parser murni halaman watch HentaiHaven (tanpa I/O) agar bisa di-unit-test. */
+    internal fun parseHentaiHavenPage(html: String): List<Result> {
+        var title = HP_OG_TITLE_RE.find(html)?.groupValues?.get(1)
+            ?: HP_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(" - ")
+            ?: "HentaiHaven_video"
+        title = unescapePlayer(title.trim()).take(120)
+        if (title.isBlank()) title = "HentaiHaven_video"
+        val safeName = sanitizeFileName(title)
+        val candidates = mutableListOf<Pair<String, Boolean>>()
+        fun addCandidate(raw: String?) {
+            val url = cleanHentaiHavenUrl(raw) ?: return
+            candidates.add(url to url.contains(".m3u8"))
+        }
+        HH_VIDEO_TAG_RE.findAll(html).forEach { addCandidate(it.groupValues.getOrNull(1)) }
+        HH_SOURCE_TAG_RE.findAll(html).forEach { addCandidate(it.groupValues.getOrNull(1)) }
+        HH_DATA_SRC_RE.findAll(html).forEach { addCandidate(it.groupValues.getOrNull(1)) }
+        HH_JWPLAYER_RE.findAll(html).forEach { addCandidate(it.groupValues.getOrNull(1)) }
+        if (candidates.isEmpty()) {
+            addCandidate(HP_OG_VIDEO_RE.find(html)?.groupValues?.getOrNull(1))
+        }
+        if (candidates.isEmpty()) {
+            addCandidate(HH_TWITTER_STREAM_RE.find(html)?.groupValues?.getOrNull(1))
+        }
+        if (candidates.isEmpty()) {
+            HH_PRELOAD_RE.findAll(html).forEach { addCandidate(it.groupValues.getOrNull(1)) }
+        }
+        if (candidates.isEmpty()) {
+            HH_GENERIC_MEDIA_RE.findAll(html).forEach { addCandidate(it.value) }
+        }
+        val seen = mutableSetOf<String>()
+        val distinct = candidates
+            .filter { (url, _) -> url.startsWith("http") && seen.add(url) }
+        // MP4 langsung diutamakan (lebih kompatibel di engine); HLS sesudahnya.
+        val ordered = distinct.filter { !it.second } + distinct.filter { it.second }
+        return ordered.map { (url, hls) ->
+            if (hls) {
+                Result(url, "HentaiHaven_${safeName}.ts", title, "HLS", "application/x-mpegURL", isHls = true)
+            } else {
+                Result(url, "HentaiHaven_${safeName}.mp4", title, "Video", MIME_MP4)
+            }
+        }
+    }
+
+    /** Bersihkan URL media HH: unescape JS/HTML + pangkas buntut sintaks. */
+    private fun cleanHentaiHavenUrl(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        var url = unescapePlayer(raw.trim())
+        url = url.trimEnd('.', ',', ';', ')', ']', '}', '!', '"', '\'')
+        if (!url.startsWith("http")) return null
+        return url
     }
 
     // ── Twitter/X ────────────────────────────────────────────────────────

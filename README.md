@@ -26,7 +26,7 @@ Aplikasi unduhan untuk Android dengan kontrol web realtime, file manager jarak j
 2. Unduh APK `tasirin-download-manager-v<versi>-<code>.apk` (versi naik tiap rilis, mis. `v1.0.123`).
 3. Instal aplikasi dan berikan izin penyimpanan yang diminta.
 
-APK dirilis lewat GitHub Actions dan ditandatangani dengan kunci rilis resmi. Pembaruan dalam aplikasi hanya mengunduh APK; instalasi tetap dilakukan pengguna.
+APK dirilis lewat GitHub Actions dan ditandatangani dengan kunci rilis resmi. Pembaruan dalam aplikasi hanya memberi tahu versi baru; unduh dan instalasi dilakukan pengguna dari halaman rilis (aplikasi tidak mengunduh APK sendiri dan tidak meminta izin instal paket).
 
 ## Remote Web
 
@@ -93,7 +93,7 @@ node scripts/upload_smoke_test.js             # smoke test alur upload remote
 - Sesi remote dilindungi cookie acak; PIN disimpan sebagai hash PBKDF2.
 - Path server dibatasi pada root yang sah, upload memiliki batas ukuran, dan token stream ditandatangani serta kedaluwarsa.
 - CI menjalankan unit test, lint, CodeQL, Gitleaks, pemindaian internal, dan verifikasi tanda tangan APK.
-- Play Protect dapat menampilkan peringatan pada aplikasi sideload dengan akses semua file karena model risikonya konservatif. Periksa build CI sebelum memasang APK.
+- Play Protect dapat menampilkan peringatan pada aplikasi sideload dengan akses semua file karena model risikonya konservatif. Periksa build CI sebelum memasang APK. Untuk mengurangi peringatan: aplikasi tidak meminta izin instal paket, tidak mengunduh APK sendiri, tidak membuka installer otomatis, tidak auto-start saat boot secara default, dan server remote mati secara default.
 
 Kerentanan keamanan dilaporkan privat — lihat [SECURITY.md](SECURITY.md).
 

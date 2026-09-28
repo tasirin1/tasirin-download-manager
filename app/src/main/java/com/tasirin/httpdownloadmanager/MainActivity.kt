@@ -89,6 +89,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
 
+    /** Hasil browser ekstraksi WebView: diterapkan ke dialog tambah yang terbuka. */
+    private var onWebExtractResult: ((Intent?) -> Unit)? = null
+    private val webExtractLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { res ->
+        if (res.resultCode == RESULT_OK) onWebExtractResult?.invoke(res.data)
+        onWebExtractResult = null
+    }
     private val movePicker = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
@@ -186,7 +194,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             App.engine.items.collect { items ->
                 val sizeChanged = items.size != lastItems.size
                 lastItems = items
-                // Auto-open file yang baru selesai (video → player, APK → installer)
+                // Auto-open file yang baru selesai (video → player; APK tidak dibuka otomatis)
                 if (StoragePrefs.isAutoOpenComplete(this@MainActivity)) {
                     runCatching { autoOpenCompleted(items) }
                 }
@@ -344,6 +352,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val checksumInput = view.findViewById<EditText>(R.id.input_checksum)
         val mirrorInput = view.findViewById<EditText>(R.id.input_mirrors)
         val btnPasteUrl = view.findViewById<Button>(R.id.btn_paste_url)
+        val btnWebExtract = view.findViewById<Button>(R.id.btn_web_extract)
         val platformBadge = view.findViewById<TextView>(R.id.text_social_platform)
         val socialQualitySection = view.findViewById<View>(R.id.social_quality_section)
         val socialQualitySpinner = view.findViewById<Spinner>(R.id.spinner_social_quality)
@@ -416,6 +425,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     getString(R.string.platform_xvideos)
                 host.contains("xnxx.com") || host.contains("xnxxvideos.me") ->
                     getString(R.string.platform_xnxx)
+                host.contains("hentaihaven") ->
+                    getString(R.string.platform_hentaihaven)
                 else -> getString(R.string.platform_social)
             }
         }
@@ -444,9 +455,25 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialQualitySection.isVisible = false
                 socialCarouselSection.isVisible = false
                 platformBadge.isVisible = false
+                btnWebExtract.isVisible = false
                 return
             }
             setPlatformBadge(target)
+            btnWebExtract.isVisible = SocialMediaExtractor.isHentaiHavenUrl(target)
+            if (SocialMediaExtractor.isHentaiHavenUrl(target)) {
+                // Fetch server pasti 403 (Cloudflare): jangan buang waktu probe,
+                // pengguna mengekstrak lewat tombol browser di atas.
+                socialJob = null
+                socialOptions = emptyList()
+                socialVideoOptions = emptyList()
+                socialPhotoOptions = emptyList()
+                socialYoutubeHeights = intArrayOf()
+                socialAudioLanguages = emptyList()
+                socialAudioSection.isVisible = false
+                socialQualitySection.isVisible = false
+                socialCarouselSection.isVisible = false
+                return
+            }
             val isYoutube = target.contains("youtube.com/") || target.contains("youtu.be/")
             if (isYoutube) {
                 socialOptions = emptyList()
@@ -640,6 +667,59 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
 
+        // Situs anti-bot (HentaiHaven): ambil video lewat browser dalam
+        // aplikasi, lalu isi URL + cookie ke form agar engine unduh langsung.
+        onWebExtractResult = { data ->
+            val videoUrl = data?.getStringExtra(WebExtractActivity.EXTRA_VIDEO_URL).orEmpty()
+            if (videoUrl.isBlank()) {
+                Toast.makeText(this, R.string.web_extract_failed, Toast.LENGTH_LONG).show()
+            } else {
+                urlInput.setText(videoUrl)
+                urlInput.setSelection(videoUrl.length)
+                val cookies = data?.getStringExtra(WebExtractActivity.EXTRA_COOKIES).orEmpty()
+                val watch = data?.getStringExtra(WebExtractActivity.EXTRA_WATCH_URL).orEmpty()
+                val extra = buildString {
+                    if (cookies.isNotBlank()) append("Cookie: ").append(cookies)
+                    if (watch.isNotBlank()) {
+                        if (isNotEmpty()) append("\n")
+                        append("Referer: ").append(watch)
+                    }
+                }
+                if (extra.isNotBlank()) {
+                    val cur = headersInput.text?.toString().orEmpty()
+                    headersInput.setText(if (cur.isBlank()) extra else cur + "\n" + extra)
+                }
+                val title = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
+                    ?.substringBefore(" - ").orEmpty().trim().take(80)
+                if (nameInput.text?.toString().isNullOrBlank() && title.isNotBlank()) {
+                    nameInput.setText(title)
+                }
+                Toast.makeText(this, R.string.web_extract_done, Toast.LENGTH_LONG).show()
+                // URL hasil ekstraksi adalah CDN langsung (bukan sosial):
+                // samakan tampilan seperti cabang non-sosial probeSocialNow.
+                socialOptions = emptyList()
+                socialVideoOptions = emptyList()
+                socialPhotoOptions = emptyList()
+                socialYoutubeHeights = intArrayOf()
+                socialAudioLanguages = emptyList()
+                socialAudioSection.isVisible = false
+                socialQualitySection.isVisible = false
+                socialCarouselSection.isVisible = false
+                platformBadge.isVisible = false
+                btnWebExtract.isVisible = false
+            }
+        }
+        btnWebExtract.setOnClickListener {
+            val target = extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull().orEmpty()
+            if (target.isBlank()) {
+                Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_SHORT).show()
+            } else {
+                webExtractLauncher.launch(
+                    Intent(this, WebExtractActivity::class.java)
+                        .putExtra(WebExtractActivity.EXTRA_URL, target)
+                )
+            }
+        }
         // Dialog bottom-sheet: tanpa title bar AlertDialog, tombol ada di layout.
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -771,6 +851,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
             dialog.dismiss()
         }
+        dialog.setOnDismissListener { onWebExtractResult = null }
         // Tombol Cancel
         view.findViewById<Button>(R.id.btn_cancel).setOnClickListener {
             dialog.dismiss()
@@ -960,23 +1041,43 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    /** Cek versi terbaru dari GitHub (tanpa unduh/pasang — itu ada di Pengaturan). */
+    /** Cek versi terbaru dari GitHub (cek-saja: aplikasi tidak mengunduh
+     *  APK sendiri agar tidak dicurigai Play Protect sebagai dropper). */
     private fun checkUpdateFromAbout() {
         lifecycleScope.launch {
             val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@MainActivity) }
             val current = runCatching {
                 packageManager.getPackageInfo(packageName, 0).versionCodeCompat().toInt()
             }.getOrDefault(0)
-            val msg = when {
-                info == null -> getString(R.string.update_failed)
-                info.versionCode > current ->
-                    getString(R.string.update_available, info.versionName, info.versionCode)
-                else -> getString(R.string.update_latest)
+            if (info == null) {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(R.string.update_check)
+                    .setMessage(getString(R.string.update_failed))
+                    .setPositiveButton(R.string.ok, null)
+                    .show()
+                return@launch
+            }
+            if (info.versionCode <= current) {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(R.string.update_check)
+                    .setMessage(getString(R.string.update_latest))
+                    .setPositiveButton(R.string.ok, null)
+                    .show()
+                return@launch
             }
             AlertDialog.Builder(this@MainActivity)
                 .setTitle(R.string.update_check)
-                .setMessage(msg)
-                .setPositiveButton(R.string.ok, null)
+                .setMessage(
+                    getString(
+                        R.string.update_available, info.versionName, info.versionCode
+                    ) + "\n\n" + getString(R.string.update_browser_note)
+                )
+                .setNegativeButton(R.string.update_later, null)
+                .setPositiveButton(R.string.update_open_release) { _, _ ->
+                    runCatching {
+                        startActivity(Intent(Intent.ACTION_VIEW, info.pageUrl.toUri()))
+                    }
+                }
                 .show()
         }
     }
@@ -1327,19 +1428,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val ext = item.fileName.substringAfterLast('.', "").lowercase()
         val mime = MimeTypes.forFile(item.fileName)
         when {
-            // APK → installer
-            ext == "apk" -> {
-                val uri = if (item.contentUri != null) {
-                    item.contentUri.toUri()
-                } else {
-                    runCatching { fileUriForOpen(File(item.filePath)) }.getOrNull()
-                        ?: return
-                }
-                val intent = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                runCatching { startActivity(intent) }
-            }
+            // APK sengaja tidak dibuka otomatis: pola unduh-selesai-langsung-
+            // pasang dicurigai Play Protect; pengguna memasang manual dari
+            // file manager (tanpa izin REQUEST_INSTALL_PACKAGES).
+            ext == "apk" -> return
             // Video → pemutar video
             mime.startsWith("video/") || ext in AUTO_OPEN_VIDEO_EXTS -> {
                 val uri = if (item.contentUri != null) {
@@ -1384,7 +1476,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             return
         }
         if (isApk) {
-            openApk(uri)
+            showApkInstallGuide(item)
             return
         }
         // Non-APK: ACTION_VIEW
@@ -1398,32 +1490,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
-    /** Buka APK dengan beberapa fallback intent. */
-    private fun openApk(uri: Uri) {
-        // 1) ACTION_VIEW + MIME khusus APK (paling kompatibel lintas versi)
-        try {
-            val i = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(i)
-            return
-        } catch (e: Exception) { App.logEvent("APK VIEW failed: ${e.message}") }
-        // 2) ACTION_INSTALL_PACKAGE (Android 7+)
-        try {
-            val i = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(i)
-            return
-        } catch (e: Exception) { App.logEvent("APK INSTALL failed: ${e.message}") }
-        // 3) Generic viewer
-        try {
-            val i = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, MimeTypes.forFile("x.apk"))
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            startActivity(i)
-            return
-        } catch (e: Exception) { App.logEvent("APK GENERIC failed: ${e.message}") }
-        Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
+    /** Panduan pasang APK manual: tanpa izin REQUEST_INSTALL_PACKAGES
+     *  (dihapus agar tidak dicurigai Play Protect), aplikasi tidak boleh
+     *  menembak installer; pengguna membuka berkas dari file manager. */
+    private fun showApkInstallGuide(item: DownloadItem) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.apk_install_title)
+            .setMessage(R.string.apk_install_manual)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.open_folder) { _, _ -> openFolder(item) }
+            .show()
     }
 
     private fun openFolder(item: DownloadItem) {

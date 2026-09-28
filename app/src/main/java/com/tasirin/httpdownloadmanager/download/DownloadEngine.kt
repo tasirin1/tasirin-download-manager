@@ -348,6 +348,10 @@ class DownloadEngine(appContext: Context) {
         // COMPLETED tidak bisa di-cancel: status selesai bukan sesuatu yang
         // bisa dibatalkan (hapus memakai remove/delete).
         if (target.state == DownloadState.COMPLETED) return
+        // Cancel langsung menghapus progres + item dari daftar (tidak lagi
+        // menyisakan status CANCELLED): tombol Cancel terasa instan walau
+        // coroutine segmen masih menyelesaikan pembatalan di background.
+        // State CANCELLED dipertahankan di enum untuk item lama yang tersimpan.
         App.logEvent("DOWNLOAD CANCELLED: ${target.fileName}")
         retryAttempts.remove(id)
         pendingRetries.remove(id)
@@ -356,14 +360,9 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
-        if (StoragePrefs.isDeletePartialOnCancel(context)) {
-            _items.value.find { it.id == id }?.let { item ->
-                fileSaver.partialFiles(item).forEach { runCatching { it.delete() } }
-            }
-        }
-        updateItem(id) {
-            it.copy(state = DownloadState.CANCELLED, speedBps = 0, etaSeconds = 0)
-        }
+        cancelledConns.remove(id)
+        update(_items.value.filterNot { it.id == id })
+        runCatching { fileSaver.deleteFiles(target) }
         scheduleSave()
     }
 
@@ -1283,11 +1282,18 @@ class DownloadEngine(appContext: Context) {
                 }
                 return runDownload(resultItem, skipSocial = true)
             }
-            // Ekstraksi gagal — post mungkin private/deleted atau platform memblokir
+            // Ekstraksi gagal — post mungkin private/deleted atau platform memblokir.
+            // HentaiHaven memakai challenge Cloudflare: arahkan ke browser
+            // ekstraksi dalam aplikasi (tombol di dialog tambah URL).
             throw IOException(
-                "Cannot download from $host. " +
-                "This post may be private, deleted, or temporarily unavailable. " +
-                "Try opening the post in your browser first."
+                if (SocialMediaExtractor.isHentaiHavenUrl(item.url)) {
+                    "Cannot download from $host (Cloudflare protection). " +
+                    "Use 'Open in app browser' in the add-download dialog to extract the video first."
+                } else {
+                    "Cannot download from $host. " +
+                    "This post may be private, deleted, or temporarily unavailable. " +
+                    "Try opening the post in your browser first."
+                }
             )
         }
         val saver = fileSaver

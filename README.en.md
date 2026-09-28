@@ -26,7 +26,7 @@ A download manager for Android with realtime web control, a remote file manager,
 2. Download the `tasirin-download-manager-v<version>-<code>.apk` asset (version rises each release, e.g. `v1.0.123`).
 3. Install the app and grant the requested storage permissions.
 
-Releases are built by GitHub Actions and signed with the official release key. In-app updates only download the APK; installation remains manual.
+Releases are built by GitHub Actions and signed with the official release key. In-app updates only notify about new versions; downloading and installation are done manually from the release page (the app never downloads APK files itself and requests no install-packages permission).
 
 ## Remote Web
 
@@ -93,7 +93,7 @@ node scripts/upload_smoke_test.js             # remote upload flow smoke test
 - Remote sessions use a random cookie; the PIN is stored as a PBKDF2 hash.
 - Server paths are confined to approved roots, uploads have size limits, and stream tokens are signed and expiring.
 - CI runs unit tests, lint, CodeQL, Gitleaks, internal static analysis, and APK signature verification.
-- Play Protect may warn about sideloaded apps that request all-files access because its risk model is conservative. Review CI builds before installing an APK.
+- Play Protect may warn about sideloaded apps that request all-files access because its risk model is conservative. Review CI builds before installing an APK. To reduce warnings: the app requests no install-packages permission, never downloads APKs itself, never fires the installer automatically, does not auto-start on boot by default, and the remote server is off by default.
 
 Report security vulnerabilities privately — see [SECURITY.md](SECURITY.md).
 

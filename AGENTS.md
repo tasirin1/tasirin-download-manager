@@ -46,6 +46,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │   └── java/com/tasirin/httpdownloadmanager/
 │       ├── App.kt                    # Application — inisialisasi engine download
 │       ├── MainActivity.kt           # UI utama: daftar download, dialog tambah URL, About
+│       ├── WebExtractActivity.kt     # Browser WebView ekstraksi video situs anti-bot (HentaiHaven)
 │       ├── GalleryActivity.kt        # Galeri video perangkat (video-only)
 │       ├── SettingsActivity.kt       # Pengaturan lengkap + self-update APK
 │       ├── LogActivity.kt            # Log server realtime + ekspor TXT
@@ -63,7 +64,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │       ├── remote/ShareToken.kt      # Token berbagi file sementara
 │       ├── ui/DownloadAdapter.kt     # RecyclerView adapter daftar download
 │       └── util/
-│           ├── Updater.kt            # Cek & unduh APK update (tanpa auto-install) + verifikasi tanda tangan
+│           ├── Updater.kt            # Cek rilis terbaru (cek-saja; tanpa unduh/pasang APK)
 │           ├── FileSaver.kt          # Simpan file (MediaStore / folder, auto-sort)
 │           ├── MediaLibrary.kt       # Scan video + thumbnail (kondisional API 29+)
 │           ├── StoragePrefs.kt       # Semua kunci SharedPreferences ("storage_settings")
@@ -89,6 +90,12 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
 - **DownloadEngine** (inti): tiap item = state (antre/menunggu/aktif/jeda/gagal/
   selesai) + monitor kecepatan & ETA; multi-segmen via HTTP Range; fallback
   single-stream saat Range ditolak; HLS/m3u8 probe; mirror & blacklist URL.
+- **Ekstraksi situs anti-bot** (HentaiHaven/Cloudflare): fetch server pasti 403,
+  jadi `WebExtractActivity` (WebView sistem) membuka halaman watch, auto-grab
+  URL video + cookie, lalu `MainActivity` mengisi form (URL + header
+  `Cookie`/`Referer`) agar engine unduh langsung. Parser murni
+  `parseHentaiHavenPage` + `extractAllHentaiHaven` tetap ada sebagai fallback
+  bila challenge longgar; probe server di-skip untuk URL HH di dialog tambah.
 - **DownloadService** menjalankan engine di *foreground service*; `NetworkCallback`
   (Android 7+) / broadcast (5–6) untuk melanjutkan download saat koneksi pulih.
 - **HttpControlServer** (nanohttpd, port default `8080`): endpoint JSON + SSE
@@ -98,8 +105,9 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
 - **MediaLibrary** memindai **video saja** dari MediaStore/file (kolom `DURATION`
   bila tersedia; `RELATIVE_PATH` hanya API ≥ 29), TTL 30 detik, thumbnail 16:9
   di-cache, dan akses cache scan dilindungi lock agar tidak scan paralel duplikat.
-- **Updater** membaca release GitHub, memilih asset APK dengan kode tertinggi,
-  memverifikasi SHA-256 sertifikat release, lalu **hanya mengunduh APK**. Instalasi
+- **Updater** membaca release GitHub dan memilih asset APK dengan kode tertinggi
+  (**cek-saja**: aplikasi tidak pernah mengunduh/memegang byte APK update —
+  pengguna mengambil versi baru lewat browser dari halaman rilis). Instalasi
   tetap manual oleh pengguna.
 - **Kunci SharedPreferences aktif** (`storage_settings`): `folder_uri`, `folder_name`,
   `text_folder_path`, `extra_folders`, `background_download`, `auto_start_boot`,
@@ -119,11 +127,12 @@ kuat dan tanpa diskusi:
 - **Android SDK lokal** — DILARANG meng-install SDK (sdkmanager/platform/
   build-tools) di mesin kerja: boros RAM/disk; build/lint/test resmi via CI.
   `scripts/check_repo.py` memblokir bila penanda SDK lokal terdeteksi (non-CI).
-- **Auto-install APK via Updater** — dihapus; `Updater.kt` download-only +
-  verifikasi tanda tangan (kurangi sinyal berbahaya Play Protect). Izin
-  `REQUEST_INSTALL_PACKAGES` tetap ADA di manifest: dipakai untuk membuka
-  installer saat user mengetuk item APK di daftar download (manual), bukan
-  auto-install. Jangan hapus izin ini.
+- **Unduh & pasang APK oleh aplikasi** — dihapus total (anti-sinyal Play Protect):
+  `Updater.kt` cek-saja tanpa mengunduh APK, dan izin `REQUEST_INSTALL_PACKAGES`
+  DILARANG di manifest (dihapus 2026-09-28 atas permintaan owner). Ketuk item APK
+  hanya menampilkan panduan pasang manual via file manager (`showApkInstallGuide`);
+  auto-open APK setelah download selesai dimatikan. JANGAN kembalikan alur
+  unduh-APK-dalam-aplikasi atau tembakan installer tanpa diskusi.
 - **Tema gelap native** (`values-night`) — dihapus; app selalu tema terang.
 - **Bilah status remote web** (`#deviceStatus`, `renderStatus`,
   `refreshStatus`, `renderSpeedTotal`) — dihapus 2026-08-13; info redundan
@@ -349,7 +358,7 @@ satu salinan aman (jangan di commit, jangan hanya di satu perangkat).
 ### Verifikasi keystore mana yang dipakai
 
 Fingerprint SHA-256 sertifikat signing release (alias `tasirin`) — BUKAN
-rahasia, sudah tertanam di `Updater.kt` sebagai `RELEASE_CERT_SHA256`:
+rahasia; dipakai CI untuk verifikasi tanda tangan APK release:
 
 ```
 c2785a618082683755eeae867e0a2e01f450b1fd448859d1ec21cf854c5713d1
@@ -374,11 +383,11 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
 - **Galeri / thumbnail** → `MediaLibrary.kt` + `GalleryActivity.kt`.
 - **Pengaturan baru** → `SettingsActivity.kt` + `StoragePrefs.kt`
   (simpan kunci baru di sana) + `remote.html` bila perlu ditampilkan remote.
-- **Self-update APK** → `Updater.kt` — **download-only** (format nama asset
+- **Self-update APK** → `Updater.kt` — **cek-saja** (format nama asset
   `-<code>.apk` wajib dipertahankan agar versi terbaca). Jangan kembalikan
-  auto-install di Updater; izin `REQUEST_INSTALL_PACKAGES` di manifest HANYA
-  untuk membuka installer manual saat user mengetuk item APK (MainActivity),
-  dan tidak dipakai oleh Updater.
+  unduh-APK-dalam-aplikasi; jangan deklarasikan `REQUEST_INSTALL_PACKAGES`
+  (dihapus anti-Play-Protect). Ketuk item APK hanya membuka panduan manual
+  (`showApkInstallGuide`) + tombol folder.
 - **Log server** → `LogActivity.kt` + buffer log (lihat `App.kt`/engine).
 - **Versi app** → jangan manual; CI yang mengatur (lihat aturan di atas).
 

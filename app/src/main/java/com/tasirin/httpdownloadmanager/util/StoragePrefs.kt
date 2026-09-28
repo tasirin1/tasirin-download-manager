@@ -113,9 +113,11 @@ object StoragePrefs {
         }
     }
 
+    // Default mati: aplikasi tidak bangun sendiri saat boot sebelum pengguna
+    // mengaktifkan (kurangi sinyal persistence ala malware bagi Play Protect).
     fun isAutoStartEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_AUTOSTART, true)
+            .getBoolean(KEY_AUTOSTART, false)
 
     fun setAutoStartEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
