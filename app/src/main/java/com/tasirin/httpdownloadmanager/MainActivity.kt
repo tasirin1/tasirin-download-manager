@@ -1525,10 +1525,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val ext = item.fileName.substringAfterLast('.', "").lowercase()
         val mime = MimeTypes.forFile(item.fileName)
         when {
-            // APK sengaja tidak dibuka otomatis: pola unduh-selesai-langsung-
-            // pasang dicurigai Play Protect; pengguna memasang manual dari
-            // file manager (tanpa izin REQUEST_INSTALL_PACKAGES).
-            ext == "apk" -> return
+            // APK -> installer (dikembalikan atas permintaan owner).
+            ext == "apk" -> {
+                val uri = if (item.contentUri != null) {
+                    item.contentUri.toUri()
+                } else {
+                    runCatching { fileUriForOpen(File(item.filePath)) }.getOrNull()
+                        ?: return
+                }
+                val intent = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                runCatching { startActivity(intent) }
+            }
             // Video → pemutar video
             mime.startsWith("video/") || ext in AUTO_OPEN_VIDEO_EXTS -> {
                 val uri = if (item.contentUri != null) {
@@ -1573,7 +1582,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             return
         }
         if (isApk) {
-            showApkInstallGuide(item)
+            openApk(uri)
             return
         }
         // Non-APK: ACTION_VIEW
@@ -1587,16 +1596,32 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
-    /** Panduan pasang APK manual: tanpa izin REQUEST_INSTALL_PACKAGES
-     *  (dihapus agar tidak dicurigai Play Protect), aplikasi tidak boleh
-     *  menembak installer; pengguna membuka berkas dari file manager. */
-    private fun showApkInstallGuide(item: DownloadItem) {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.apk_install_title)
-            .setMessage(R.string.apk_install_manual)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.open_folder) { _, _ -> openFolder(item) }
-            .show()
+    /** Buka APK dengan beberapa fallback intent. */
+    private fun openApk(uri: Uri) {
+        // 1) ACTION_VIEW + MIME khusus APK (paling kompatibel lintas versi)
+        try {
+            val i = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(i)
+            return
+        } catch (e: Exception) { App.logEvent("APK VIEW failed: ${e.message}") }
+        // 2) ACTION_INSTALL_PACKAGE (Android 7+)
+        try {
+            val i = Intent(Intent.ACTION_INSTALL_PACKAGE, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(i)
+            return
+        } catch (e: Exception) { App.logEvent("APK INSTALL failed: ${e.message}") }
+        // 3) Generic viewer
+        try {
+            val i = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, MimeTypes.forFile("x.apk"))
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(i)
+            return
+        } catch (e: Exception) { App.logEvent("APK GENERIC failed: ${e.message}") }
+        Toast.makeText(this, R.string.no_app_to_open, Toast.LENGTH_SHORT).show()
     }
 
     private fun openFolder(item: DownloadItem) {

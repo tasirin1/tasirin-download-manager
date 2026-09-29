@@ -93,7 +93,7 @@ node scripts/upload_smoke_test.js             # remote upload flow smoke test
 - Remote sessions use a random cookie; the PIN is stored as a PBKDF2 hash.
 - Server paths are confined to approved roots, uploads have size limits, and stream tokens are signed and expiring.
 - CI runs unit tests, lint, CodeQL, Gitleaks, internal static analysis, and APK signature verification.
-- Play Protect may warn about sideloaded apps that request all-files access because its risk model is conservative. Review CI builds before installing an APK. To reduce warnings: the app requests no install-packages permission, never downloads APKs itself, never fires the installer automatically, does not auto-start on boot by default, and the remote server is off by default.
+- Play Protect may warn about sideloaded apps that request all-files access because its risk model is conservative. Review CI builds before installing an APK. To reduce warnings: the app never downloads APKs itself, does not auto-start on boot by default, and the remote server is off by default. The install-packages permission is only used when the user taps an APK in the download list.
 
 Report security vulnerabilities privately — see [SECURITY.md](SECURITY.md).
 

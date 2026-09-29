@@ -93,7 +93,7 @@ node scripts/upload_smoke_test.js             # smoke test alur upload remote
 - Sesi remote dilindungi cookie acak; PIN disimpan sebagai hash PBKDF2.
 - Path server dibatasi pada root yang sah, upload memiliki batas ukuran, dan token stream ditandatangani serta kedaluwarsa.
 - CI menjalankan unit test, lint, CodeQL, Gitleaks, pemindaian internal, dan verifikasi tanda tangan APK.
-- Play Protect dapat menampilkan peringatan pada aplikasi sideload dengan akses semua file karena model risikonya konservatif. Periksa build CI sebelum memasang APK. Untuk mengurangi peringatan: aplikasi tidak meminta izin instal paket, tidak mengunduh APK sendiri, tidak membuka installer otomatis, tidak auto-start saat boot secara default, dan server remote mati secara default.
+- Play Protect dapat menampilkan peringatan pada aplikasi sideload dengan akses semua file karena model risikonya konservatif. Periksa build CI sebelum memasang APK. Untuk mengurangi peringatan: aplikasi tidak mengunduh APK sendiri, tidak auto-start saat boot secara default, dan server remote mati secara default. Izin instal paket dipakai hanya saat pengguna mengetuk file APK di daftar unduhan.
 
 Kerentanan keamanan dilaporkan privat — lihat [SECURITY.md](SECURITY.md).
 

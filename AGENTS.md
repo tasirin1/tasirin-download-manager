@@ -130,12 +130,11 @@ kuat dan tanpa diskusi:
 - **Android SDK lokal** — DILARANG meng-install SDK (sdkmanager/platform/
   build-tools) di mesin kerja: boros RAM/disk; build/lint/test resmi via CI.
   `scripts/check_repo.py` memblokir bila penanda SDK lokal terdeteksi (non-CI).
-- **Unduh & pasang APK oleh aplikasi** — dihapus total (anti-sinyal Play Protect):
-  `Updater.kt` cek-saja tanpa mengunduh APK, dan izin `REQUEST_INSTALL_PACKAGES`
-  DILARANG di manifest (dihapus 2026-09-28 atas permintaan owner). Ketuk item APK
-  hanya menampilkan panduan pasang manual via file manager (`showApkInstallGuide`);
-  auto-open APK setelah download selesai dimatikan. JANGAN kembalikan alur
-  unduh-APK-dalam-aplikasi atau tembakan installer tanpa diskusi.
+- **Unduh & pasang APK oleh aplikasi** — `Updater.kt` tetap cek-saja tanpa mengunduh APK
+  (anti-sinyal Play Protect), tapi installer dari daftar unduhan DIKEMBALIKAN atas
+  permintaan owner (2026-09-29): izin `REQUEST_INSTALL_PACKAGES` ada lagi di manifest,
+  ketuk item APK menembak installer via `openApk()` (3 fallback intent) dan auto-open APK
+  aktif lagi. JANGAN kembalikan alur unduh-APK-dalam-aplikasi tanpa diskusi.
 - **Tema gelap native** (`values-night`) — dihapus; app selalu tema terang.
 - **Bilah status remote web** (`#deviceStatus`, `renderStatus`,
   `refreshStatus`, `renderSpeedTotal`) — dihapus 2026-08-13; info redundan
@@ -390,9 +389,8 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
   (simpan kunci baru di sana) + `remote.html` bila perlu ditampilkan remote.
 - **Self-update APK** → `Updater.kt` — **cek-saja** (format nama asset
   kode versi dibaca `Updater` dari tag rilis (`v1.0.<n>` → `100000+n`); nama file lawas `…-<code>.apk` tetap diterima sebagai fallback). Jangan kembalikan
-  unduh-APK-dalam-aplikasi; jangan deklarasikan `REQUEST_INSTALL_PACKAGES`
-  (dihapus anti-Play-Protect). Ketuk item APK hanya membuka panduan manual
-  (`showApkInstallGuide`) + tombol folder.
+  unduh-APK-dalam-aplikasi. Izin `REQUEST_INSTALL_PACKAGES` dipakai hanya untuk installer
+  dari daftar unduhan (`openApk()`), bukan untuk unduh-pasangan otomatis.
 - **Log server** → `LogActivity.kt` + buffer log (lihat `App.kt`/engine).
 - **Versi app** → jangan manual; CI yang mengatur (lihat aturan di atas).
 
