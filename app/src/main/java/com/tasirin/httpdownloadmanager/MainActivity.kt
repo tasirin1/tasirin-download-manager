@@ -92,11 +92,20 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     /** Hasil browser ekstraksi WebView: diterapkan ke dialog tambah yang terbuka. */
     private var onWebExtractResult: ((Intent?) -> Unit)? = null
+    /** Handler default dialog tambah aktif: launcher kembali ke sini setelah
+     *  batch episode selesai atau pengguna batal di tengah, supaya tombol
+     *  ekstrak tak mati diam-diam (handler lama di-null tanpa pengganti). */
+    private var fallbackWebExtractHandler: ((Intent?) -> Unit)? = null
     private val webExtractLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
-        if (res.resultCode == RESULT_OK) onWebExtractResult?.invoke(res.data)
-        onWebExtractResult = null
+        if (res.resultCode == RESULT_OK) {
+            onWebExtractResult?.invoke(res.data)
+        } else {
+            // Batal di tengah batch = batch gugur: jangan biarkan handler
+            // episode basi tetap terpasang untuk ketukan berikutnya.
+            onWebExtractResult = fallbackWebExtractHandler
+        }
     }
     private val movePicker = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -690,6 +699,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     resources.getQuantityString(R.plurals.batch_episodes_added, added, added, total),
                     Toast.LENGTH_LONG
                 ).show()
+                // Batch selesai: kembalikan handler default agar ketukan tombol
+                // ekstrak berikutnya tetap mengisi form, bukan handler basi.
+                onWebExtractResult = fallbackWebExtractHandler
                 return
             }
             Toast.makeText(
@@ -793,6 +805,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
         }
+        fallbackWebExtractHandler = onWebExtractResult
         btnWebExtract.setOnClickListener {
             val target = extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull().orEmpty()
             if (target.isBlank()) {
@@ -943,7 +956,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
             dialog.dismiss()
         }
-        dialog.setOnDismissListener { onWebExtractResult = null }
+        dialog.setOnDismissListener {
+            onWebExtractResult = null
+            fallbackWebExtractHandler = null
+        }
         // Tombol Cancel
         view.findViewById<Button>(R.id.btn_cancel).setOnClickListener {
             dialog.dismiss()

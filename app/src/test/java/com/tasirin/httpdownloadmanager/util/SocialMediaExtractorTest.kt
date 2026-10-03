@@ -345,6 +345,16 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `isExtractRedirectAllowed - hanya http dan bukan loopback`() {
+        assertTrue(SocialMediaExtractor.isExtractRedirectAllowed("https://cdn.example.com/v.mp4"))
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("http://127.0.0.1:8080/api/snapshot"))
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("http://localhost/x"))
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("ftp://cdn.example.com/v.mp4"))
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("file:///etc/passwd"))
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("bukan url"))
+    }
+
+    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))

@@ -1351,6 +1351,19 @@ object SocialMediaExtractor {
      *  cookie user bisa bocor lintas origin. Ikuti pola jalur unduh utama
      *  (openAuthenticatedConnection): redirect manual + buang kredensial saat
      *  host berubah. */
+    /** Redirect ekstraktor hanya boleh ke http(s) dan bukan host literal
+     *  berbahaya (loopback/metadata), selaras `redirectTarget` jalur unduh
+     *  utama. Tanpa ini fetch halaman bisa dibelokkan ke server lokal sendiri
+     *  atau skema aneh. Murni agar bisa di-unit-test. */
+    internal fun isExtractRedirectAllowed(target: String): Boolean {
+        return try {
+            val u = URL(target)
+            val scheme = u.protocol.lowercase()
+            if (scheme != "http" && scheme != "https") return false
+            !com.tasirin.httpdownloadmanager.download.isBlockedRedirectHost(u.host.orEmpty())
+        } catch (_: Exception) { false }
+    }
+
     private fun isExtractSameHost(from: String, to: String): Boolean {
         return try {
             URL(from).host.equals(URL(to).host, ignoreCase = true)
@@ -1385,6 +1398,7 @@ object SocialMediaExtractor {
                     val next = try {
                         java.net.URI(current).resolve(loc).toString()
                     } catch (_: Exception) { return null }
+                    if (!isExtractRedirectAllowed(next)) return null
                     if (!isExtractSameHost(current, next)) {
                         activeHeaders = stripExtractCredentials(activeHeaders)
                     }
@@ -1442,6 +1456,7 @@ object SocialMediaExtractor {
                     val next = try {
                         java.net.URI(current).resolve(loc).toString()
                     } catch (_: Exception) { return null }
+                    if (!isExtractRedirectAllowed(next)) return null
                     if (!isExtractSameHost(current, next)) {
                         activeHeaders = stripExtractCredentials(activeHeaders)
                     }
