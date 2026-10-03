@@ -141,17 +141,14 @@ object MediaLibrary {
     }
 
     // Memo token: scan ulang tiap 30 dtk meng-encode path yang sama berulang-ulang.
-    private val tokenCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val tokenCache: MutableMap<String, String> =
+        java.util.Collections.synchronizedMap(object : LinkedHashMap<String, String>(4096, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>): Boolean = size > 4000
+        })
+
     private fun cachedToken(raw: String): String {
         tokenCache[raw]?.let { return it }
         val v = Base64.encodeToString(raw.toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE)
-        // Buang separuh tertua, bukan clear() total: clear memicu re-encode
-        // massal 4000 path pada scan berikutnya (thundering herd).
-        if (tokenCache.size > 4000) {
-            val it = tokenCache.keys.iterator()
-            var n = 2000
-            while (it.hasNext() && n-- > 0) { it.next(); it.remove() }
-        }
         tokenCache[raw] = v
         return v
     }

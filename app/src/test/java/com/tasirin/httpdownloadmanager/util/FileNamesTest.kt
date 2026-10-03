@@ -24,6 +24,7 @@ class FileNamesTest {
         assertEquals("video.mp4", FileNames.safe("video.mp4"))
     }
 
+    @Test
     fun `unique - nama bebas tidak diubah`() {
         val result = FileNames.unique("video.mp4") { false }
         assertEquals("video.mp4", result)
@@ -46,6 +47,13 @@ class FileNamesTest {
     fun `unique - ekstensi bertitik banyak tetap dipertahankan`() {
         val result = FileNames.unique("arsip.tar.gz") { it == "arsip.tar.gz" }
         assertEquals("arsip.tar (1).gz", result)
+    }
+
+    @Test
+    fun `unique - tabrakan masif tetap selesai dengan fallback`() {
+        val result = FileNames.unique("f.txt") { true }
+        assertTrue(result.startsWith("f"))
+        assertTrue(result.endsWith(".txt"))
     }
 
     @Test

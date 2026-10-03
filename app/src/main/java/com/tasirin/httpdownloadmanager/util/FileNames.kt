@@ -4,14 +4,19 @@ import java.util.Locale
 
 object FileNames {
 
+    private const val UNIQUE_MAX_SUFFIX = 999
+
     fun unique(fileName: String, taken: (String) -> Boolean): String {
         if (!taken(fileName)) return fileName
         val dot = fileName.lastIndexOf('.')
         val base = if (dot > 0) fileName.substring(0, dot) else fileName
         val ext = if (dot > 0) fileName.substring(dot) else ""
         var i = 1
-        while (taken("$base ($i)$ext")) i++
-        return "$base ($i)$ext"
+        while (i <= UNIQUE_MAX_SUFFIX && taken("$base ($i)$ext")) i++
+        if (i <= UNIQUE_MAX_SUFFIX) return "$base ($i)$ext"
+        val fallback = "$base (${java.util.UUID.randomUUID().toString().take(8)})$ext"
+        if (!taken(fallback)) return fallback
+        return "$base (${System.nanoTime()})$ext"
     }
 
     // Sanitasi nama file: buang separator, karakter kontrol, karakter

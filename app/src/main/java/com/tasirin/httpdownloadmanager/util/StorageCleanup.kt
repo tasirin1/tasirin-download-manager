@@ -25,13 +25,13 @@ object StorageCleanup {
 
     /** Jalankan bila free space di bawah ambang; kembalikan byte yang dibebaskan. */
     fun runIfLow(context: Context, items: List<DownloadItem>): Long {
+        val saver = FileSaver(context)
+        val free = saver.destinationFreeBytes()
+        if (free > LOW_THRESHOLD_BYTES) return 0L
         synchronized(throttleLock) {
             if (android.os.SystemClock.elapsedRealtime() - lastRunElapsed < MIN_INTERVAL_MS) return 0L
             lastRunElapsed = android.os.SystemClock.elapsedRealtime()
         }
-        val saver = FileSaver(context)
-        val free = saver.destinationFreeBytes()
-        if (free > LOW_THRESHOLD_BYTES) return 0L
         var freed = 0L
         freed += saver.cleanupOrphanPartials(items)
         freed += MediaLibrary.cleanupOldThumbs(context)

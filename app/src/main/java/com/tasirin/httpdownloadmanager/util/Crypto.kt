@@ -39,6 +39,13 @@ object Crypto {
         }
     }
 
+    /** True bila payload tersimpan lemah (plaintext eksplisit atau legacy tanpa prefix). */
+    fun isWeakStorage(payload: String?): Boolean {
+        if (payload.isNullOrEmpty()) return false
+        if (payload.startsWith(PLAIN_PREFIX)) return true
+        return !payload.startsWith(PREFIX)
+    }
+
     /** Dekripsi; nilai lama tanpa prefix dianggap plaintext (data lama). */
     fun decrypt(payload: String?): String {
         if (payload.isNullOrEmpty()) return ""

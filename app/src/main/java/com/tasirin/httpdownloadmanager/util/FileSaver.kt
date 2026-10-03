@@ -48,11 +48,11 @@ class FileSaver(context: Context) {
         return files
     }
 
-    // Dua merge dengan fileName sama yang jalan paralel akan saling menimpa
-    // target rename yang sama. Serialisasi per proses (merge jarang: sekali
-    // per download selesai) — murah dan menutup hasil merge tercampur.
-    @Synchronized
-    fun mergeSegments(fileName: String, segmentCount: Int): File {
+    companion object {
+        private val MERGE_LOCK = Any()
+    }
+
+    fun mergeSegments(fileName: String, segmentCount: Int): File = synchronized(MERGE_LOCK) {
         val target = partialFile(fileName)
         // Staging unik per proses agar dua item bernama sama yang merge
         // paralel tidak saling menimpa file staging yang sama.

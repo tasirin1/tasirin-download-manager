@@ -114,7 +114,7 @@ class WebExtractActivity : AppCompatActivity() {
             // true = host tujuan sama dengan halaman awal ( challenge
             // Cloudflare/redirect login selalu satu host, jadi ini cukup).
             fun isAllowedTarget(url: String): Boolean =
-                runCatching { url.toUri() }.getOrNull()?.host == allowedHost
+                runCatching { url.toUri() }.getOrNull()?.host?.equals(allowedHost, ignoreCase = true) == true
 
             // Signature lama melayani API 21-23; versi request melayani 24+.
             // Blokir navigasi keluar host (iklan/redirect): ekstraksi cukup

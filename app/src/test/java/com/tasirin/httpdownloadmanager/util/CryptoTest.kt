@@ -12,6 +12,15 @@ class CryptoTest {
     }
 
     @Test
+    fun `isWeakStorage menandai plaintext dan legacy`() {
+        assertTrue(Crypto.isWeakStorage("plain:secret"))
+        assertTrue(Crypto.isWeakStorage("legacy-token"))
+        assertTrue(!Crypto.isWeakStorage("v1:abc:def"))
+        assertTrue(!Crypto.isWeakStorage(""))
+        assertTrue(!Crypto.isWeakStorage(null))
+    }
+
+    @Test
     fun `decrypt legacy tanpa prefix tetap plaintext`() {
         assertEquals("legacy-token", Crypto.decrypt("legacy-token"))
     }
