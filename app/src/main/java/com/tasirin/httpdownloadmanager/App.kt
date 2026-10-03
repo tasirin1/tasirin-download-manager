@@ -33,11 +33,12 @@ class App : Application() {
         if (lastThumbCleanup == 0L ||
             System.currentTimeMillis() - lastThumbCleanup >= THUMB_CLEANUP_INTERVAL_MS
         ) {
-            // Cap waktu ditulis SETELAH bersih-bersih selesai: bila proses
-            // mati di tengah, start berikutnya mengulang, bukan menunggu 7 hari.
+            // Cap waktu ditulis SETELAH bersih-bersih sukses: bila proses
+            // mati di tengah atau bersih-bersih gagal, start berikutnya
+            // mengulang, bukan menunggu 7 hari dengan cache gagal tak dicoba lagi.
             Thread {
-                runCatching { MediaLibrary.cleanupOldThumbs(this) }
-                StoragePrefs.setThumbCleanupDone(this, System.currentTimeMillis())
+                val ok = runCatching { MediaLibrary.cleanupOldThumbs(this) }.isSuccess
+                if (ok) StoragePrefs.setThumbCleanupDone(this, System.currentTimeMillis())
             }.start()
         }
         // Server dinyalakan langsung dari Application supaya tetap jalan
