@@ -58,7 +58,7 @@ object ServerSecurity {
      *  mentah tidak boleh masuk buffer log / ekspor TXT. ID item biasa
      *  (`/file/<id>`) bukan rahasia dan tetap tampil untuk korelasi debug. */
     private val LOG_PATH_TOKEN_RE =
-        Regex("(^|/)(share|stream_part)/[^/?#\s]+", RegexOption.IGNORE_CASE)
+        Regex("(^|/)(share|stream_part)/[^/?#\\s]+", RegexOption.IGNORE_CASE)
 
     fun redactUriForLog(uri: String): String {
         if (uri.isEmpty()) return uri
