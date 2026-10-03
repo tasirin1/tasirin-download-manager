@@ -377,19 +377,11 @@ class FileSaver(context: Context) {
         var freed = 0L
         runCatching {
             val expected = buildSet {
-                items.forEach { item ->
-                    if (item.segments.isEmpty()) {
-                        add(partialFile(item.fileName).name)
-                    } else {
-                        item.segments.forEach { seg ->
-                            add(partialFile(item.fileName, seg.index).name)
-                        }
-                    }
-                }
+                items.forEach { item -> addAll(protectedPartialNames(item)) }
             }
             downloadDir.listFiles()?.forEach { f ->
                 val name = f.name
-                if ((name.endsWith(".part") || name.contains(".part.")) && name !in expected) {
+                if (isSweepablePartial(name) && name !in expected) {
                     // Hapus file .part yang sudah tua (>2jam) supaya tidak menghapus
                     // file .part yang sedang aktif di-download.
                     val age = System.currentTimeMillis() - f.lastModified()
@@ -725,3 +717,22 @@ internal fun statFsDirForFolderPath(folderPath: String): java.io.File? {
     while (cur != null && !cur.exists()) cur = cur.parentFile
     return cur?.takeIf { it.isDirectory }
 }
+
+/** Nama partial milik satu item yang wajib dilindungi sweeper yatim: basis
+ *  `.part` SELALU ikut — item bersegmen yang jatuh ke single-stream (fallback
+ *  saat Range ditolak) menulis ke basis tanpa sufiks, dan tanpa ini progres
+ *  unduhan jeda-lama (>2 jam) terhapus sebagai yatim lalu mengulang dari nol.
+ *  Murni agar bisa di-unit-test. */
+internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.DownloadItem): Set<String> {
+    val base = FileNames.safe(item.fileName)
+    return buildSet {
+        add("$base.part")
+        item.segments.forEach { add("$base.part.${it.index}") }
+    }
+}
+
+/** File internal yang boleh disapu bila yatim: partial segmen/basis plus
+ *  staging merge (`.merge.`) yang tertinggal bila proses mati di tengah merge.
+ *  Murni agar bisa di-unit-test. */
+internal fun isSweepablePartial(name: String): Boolean =
+    name.endsWith(".part") || ".part." in name || ".merge." in name

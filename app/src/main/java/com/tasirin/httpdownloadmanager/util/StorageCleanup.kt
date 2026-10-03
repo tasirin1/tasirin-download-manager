@@ -24,11 +24,7 @@ object StorageCleanup {
     @Volatile private var lastRunElapsed = 0L
 
     /** Jalankan bila free space di bawah ambang; kembalikan byte yang dibebaskan. */
-    fun runIfLow(
-        context: Context,
-        items: List<DownloadItem>,
-        now: Long = System.currentTimeMillis()
-    ): Long {
+    fun runIfLow(context: Context, items: List<DownloadItem>): Long {
         synchronized(throttleLock) {
             if (android.os.SystemClock.elapsedRealtime() - lastRunElapsed < MIN_INTERVAL_MS) return 0L
             lastRunElapsed = android.os.SystemClock.elapsedRealtime()
