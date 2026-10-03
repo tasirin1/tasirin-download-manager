@@ -173,6 +173,7 @@ class GalleryActivity : AppCompatActivity() {
             e.isPartial -> partialPlayIntent(e, mime)
             !e.contentUri.isNullOrEmpty() ->
                 Intent(Intent.ACTION_VIEW).setDataAndType(e.contentUri.toUri(), mime)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             !e.filePath.isNullOrEmpty() -> {
                 val uri = FileProvider.getUriForFile(
                     this, "$packageName.fileprovider", File(e.filePath)
