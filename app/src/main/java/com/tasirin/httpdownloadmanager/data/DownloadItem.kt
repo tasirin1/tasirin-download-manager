@@ -65,3 +65,24 @@ data class DownloadItem(
             0
         }
 }
+
+/** Progres gabungan notifikasi: hanya item yang totalnya diketahui yang
+ *  dihitung; null = semua tak diketahui sehingga tampil indeterminate.
+ *  Byte per item dijepit ke totalnya agar over-report satu CDN tak
+ *  mendongkrak persen gabungan di atas 100. Murni agar bisa di-unit-test. */
+internal fun aggregateDownloadProgress(items: List<DownloadItem>): Int? {
+    val known = items.filter { it.totalBytes > 0 }
+    if (known.isEmpty()) return null
+    val total = known.sumOf { it.totalBytes }
+    if (total <= 0) return null
+    val done = known.sumOf { it.bytesDownloaded.coerceIn(0L, it.totalBytes) }
+    return ((done * 100) / total).toInt().coerceIn(0, 100)
+}
+
+/** Progres galeri per nama file: nama sama (duplikat sebelum unik-final atau
+ *  hasil rename) memakai progres tertinggi agar sel tak tertukar angka basi.
+ *  Item selesai dikecualikan — galeri memakai entry file asli, bukan parsial. */
+internal fun fileProgressByName(items: List<DownloadItem>): Map<String, Int> =
+    items.filter { it.state != DownloadState.COMPLETED }
+        .groupBy { it.fileName }
+        .mapValues { (_, group) -> group.maxOf { it.progressPercent } }

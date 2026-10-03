@@ -115,9 +115,8 @@ class GalleryActivity : AppCompatActivity() {
 
     private fun activeDownloadProgress(
         items: List<DownloadItem> = App.engine.items.value
-    ): Map<String, Int> = items
-        .filter { it.state != DownloadState.COMPLETED }
-        .associate { it.fileName to it.progressPercent }
+    ): Map<String, Int> =
+        com.tasirin.httpdownloadmanager.data.fileProgressByName(items)
 
     private fun mergedProgress(
         items: List<MediaLibrary.MediaEntry>
@@ -194,7 +193,12 @@ class GalleryActivity : AppCompatActivity() {
     /** File belum selesai: putar progresif via server lokal (mendukung Range/seek)
      *  agar bisa diputar dan bertambah terus; fallback FileProvider offline. */
     private fun partialPlayIntent(e: MediaLibrary.MediaEntry, mime: String): Intent? {
-        val item = App.engine.items.value.find { it.fileName == e.name }
+        // Nama bisa ganda sesaat: pilih yang masih aktif dulu agar URL stream
+        // parsial memakai token item yang benar, bukan item jeda/gagal senama.
+        val candidates = App.engine.items.value.filter { it.fileName == e.name }
+        val item = candidates.firstOrNull {
+            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
+        } ?: candidates.firstOrNull()
         if (item != null && App.httpServer.isAlive) {
             val url = "http://127.0.0.1:${App.httpServer.listeningPort}${App.httpServer.createPartialStreamUrl(item.id)}"
             return Intent(Intent.ACTION_VIEW).setDataAndType(url.toUri(), mime)

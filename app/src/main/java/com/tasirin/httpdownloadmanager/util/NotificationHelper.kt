@@ -113,15 +113,16 @@ object NotificationHelper {
         }
 
         if (active.isNotEmpty()) {
-            val totalBytes = active.sumOf { it.totalBytes }
-            val downloadedBytes = active.sumOf { it.bytesDownloaded }
             builder.setContentText(
                 context.resources.getQuantityString(
                     R.plurals.notification_active_files, active.size, active.size
                 )
             )
-            if (totalBytes > 0) {
-                builder.setProgress(100, (downloadedBytes * 100 / totalBytes).toInt(), false)
+            // Hanya total diketahui yang dihitung: item pending tanpa total
+            // tak boleh mengencerkan denominator sehingga persen macet.
+            val progress = com.tasirin.httpdownloadmanager.data.aggregateDownloadProgress(active)
+            if (progress != null) {
+                builder.setProgress(100, progress, false)
             } else {
                 builder.setProgress(0, 0, true)
             }

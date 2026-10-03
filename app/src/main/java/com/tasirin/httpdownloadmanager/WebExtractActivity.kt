@@ -240,9 +240,16 @@ class WebExtractActivity : AppCompatActivity() {
         finish()
     }
 
-    /** Cookie WebView halaman aktif (diteruskan sebagai header `Cookie`). */
+    /** Cookie WebView halaman aktif (diteruskan sebagai header `Cookie`).
+     *  Pakai URL aktif WebView dulu: setelah redirect Cloudflare/login, cookie
+     *  menempel di host final, bukan URL awal sehingga unduhan tak lagi 403. */
     private fun extractCookies(): String = runCatching {
-        CookieManager.getInstance().getCookie(watchUrl)
+        val cm = CookieManager.getInstance()
+        val current = if (::webView.isInitialized) {
+            runCatching { webView.url }.getOrNull().orEmpty()
+        } else ""
+        current.takeIf { it.startsWith("http") }?.let { cm.getCookie(it) }?.takeIf { it.isNotEmpty() }
+            ?: cm.getCookie(watchUrl)
     }.getOrNull().orEmpty()
 
     /** Batasi daftar episode titipan JS agar intent hasil tetap ringan. */

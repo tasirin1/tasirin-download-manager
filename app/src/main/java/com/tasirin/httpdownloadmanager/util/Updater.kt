@@ -84,24 +84,15 @@ object Updater {
                     if (n < 0) break
                     total += n
                     // Respons > 512 KB ditolak agar JSON setengah jadi tak salah
-                    // pilih asset; tapi jangan gagal senyap: catat + fallback cache
-                    // agar pengguna tak tertahan di versi lama tanpa jejak.
+                    // pilih asset: kembalikan null supaya pemanggil memakai cache
+                    // parsed tervalidasi 24 jam, bukan body mentah setengah jadi.
                     if (total > 524_288) {
                         android.util.Log.w(UA, "GitHub releases response > 512KB, using cache")
-                        return loadCachedBody(context)
+                        return null
                     }
                     sb.append(buf, 0, n)
                 }
-                val raw = sb.toString()
-                runCatching {
-                    // Cap waktu ikut disimpan: fallback oversize tak boleh memakai
-                    // body berumur berminggu-minggu (cache parsed dibatasi 24 jam).
-                    context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit {
-                        putString("raw", raw)
-                        putLong("raw_at", System.currentTimeMillis())
-                    }
-                }
-                raw
+                sb.toString()
             }
         } finally {
             conn.disconnect()
@@ -140,12 +131,4 @@ object Updater {
         )
     }.getOrNull()
 
-    /** Body mentah terakhir untuk dipakai ulang saat respons baru kebesaran.
-     *  Dibatasi umur yang sama dengan cache parsed agar tak memakai JSON basi. */
-    private fun loadCachedBody(context: Context): String? = runCatching {
-        val p = context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
-        val at = p.getLong("raw_at", 0L)
-        if (at <= 0L || System.currentTimeMillis() - at > CACHE_MAX_AGE_MS) return null
-        p.getString("raw", null)
-    }.getOrNull()
 }

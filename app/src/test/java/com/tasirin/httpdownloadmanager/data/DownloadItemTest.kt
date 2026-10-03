@@ -88,6 +88,30 @@ class DownloadItemTest {
     }
 
     @Test
+    fun `aggregateDownloadProgress - hanya total diketahui yang dihitung`() {
+        val known = item(bytesDownloaded = 500, totalBytes = 1000)
+        val unknown = item(bytesDownloaded = 900, totalBytes = 0)
+        assertEquals(50, aggregateDownloadProgress(listOf(known, unknown)))
+        assertNull(aggregateDownloadProgress(listOf(unknown)))
+        assertNull(aggregateDownloadProgress(emptyList()))
+    }
+
+    @Test
+    fun `aggregateDownloadProgress - byte dijepit ke total per item`() {
+        val over = item(bytesDownloaded = 5000, totalBytes = 1000)
+        assertEquals(100, aggregateDownloadProgress(listOf(over)))
+    }
+
+    @Test
+    fun `fileProgressByName - nama ganda pakai progres tertinggi`() {
+        val a = item(bytesDownloaded = 200, totalBytes = 1000).copy(fileName = "video.mp4")
+        val b = item(bytesDownloaded = 800, totalBytes = 1000).copy(fileName = "video.mp4")
+        assertEquals(80, fileProgressByName(listOf(a, b))["video.mp4"])
+        val done = b.copy(state = DownloadState.COMPLETED)
+        assertEquals(20, fileProgressByName(listOf(a, done))["video.mp4"])
+    }
+
+    @Test
     fun `progressPercentOverride - zero pakai totalBytes`() {
         // override=0 aktif (>=0), returns 0 (bukan 50 dari totalBytes)
         val overridden = item(bytesDownloaded = 500, totalBytes = 1000).copy(progressPercentOverride = 0)

@@ -2164,7 +2164,7 @@ class DownloadEngine(appContext: Context) {
                     .toDoubleOrNull() ?: 0.0
                 val url = HlsParser.resolveUrl(playlistUrl, lines.getOrNull(i + 1)?.trim().orEmpty())
                 if (url.startsWith("http")) {
-                    result.add(url to (dur * 1_000_000).toLong())
+                    result.add(url to hlsSegmentDurationUs(dur))
                 }
                 i += 2; continue
             }
@@ -2184,7 +2184,7 @@ class DownloadEngine(appContext: Context) {
             val t = line.trim()
             if (t.startsWith("#EXTINF:")) {
                 val dur = t.substringAfter(":").substringBefore(",").trim().toDoubleOrNull() ?: 0.0
-                out.add((dur * 1_000_000).toLong())
+                out.add(hlsSegmentDurationUs(dur))
             }
         }
         return out
@@ -3308,6 +3308,14 @@ internal fun isFreshResumeSizeValid(storedTotal: Long, freshTotal: Long): Boolea
 
 internal fun monotonicNow(): Long =
     runCatching { SystemClock.elapsedRealtime() }.getOrDefault(System.currentTimeMillis())
+
+/** Durasi segmen HLS (mikrodetik) dari detik EXTINF: dijepit 0 dtk–24 jam
+ *  agar playlist rusak/jahat tak membuat overflow Long negatif yang merusak
+ *  estimasi ukuran dan muxer. Murni agar bisa di-unit-test. */
+internal fun hlsSegmentDurationUs(durSec: Double): Long {
+    if (!durSec.isFinite()) return 0L
+    return ((durSec.coerceIn(0.0, 86_400.0)) * 1_000_000).toLong()
+}
 
 internal fun redirectTarget(base: String, location: String?): String? {
     if (location.isNullOrBlank()) return null
