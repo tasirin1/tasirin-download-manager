@@ -177,7 +177,7 @@ class DownloadEngine(appContext: Context) {
     // tiap detik TANPA emisi StateFlow; flush berkala menggabungkannya menjadi
     // SATU updateItem per item (sebelumnya 1 salinan daftar + 1 emisi per
     // segmen per detik) — hemat CPU/GC saat banyak segmen paralel.
-    private val segProgress = ConcurrentHashMap<String, LongArray>()
+    private val segProgress = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicLongArray>()
     private val segFlushJobs = ConcurrentHashMap<String, Job>()
     /** Sampel kecepatan/ETA terakhir per item (throttle 1 dtk saat flush 500ms). */
     private val lastSpeedSampleAt = ConcurrentHashMap<String, Long>()
@@ -2783,15 +2783,24 @@ class DownloadEngine(appContext: Context) {
     // _items O(n) hanya untuk tahu ukuran array.
     private fun recordSegmentProgress(id: String, index: Int, downloaded: Long, segCount: Int) {
         if (segCount <= 0 || index < 0 || index >= segCount) return
-        // Pembuatan array wajib atomik (dua segmen paralel bisa membuat dua
-        // array dan progres salah satu hilang). Tulis per-indeks tetap aman
-        // tanpa kunci karena tiap indeks hanya ditulis segmen yang sama.
+        // Pembuatan/penggantian array wajib atomik di bawah satu lock yang sama
+        // dengan clearSegProgress/flush: tanpa ini remove paralel bisa yatim
+        // (tulis ke array yang sudah dibuang) dan baca flush bisa basi
+        // (elemen LongArray bukan volatile). Ukuran beda = percobaan baru,
+        // ganti array agar indeks tak terbuang diam-diam.
         val arr = synchronized(segProgress) {
-            segProgress.getOrPut(id) { LongArray(segCount) { -1L } }
+            val existing = segProgress[id]
+            if (existing == null || existing.length() != segCount) {
+                val fresh = java.util.concurrent.atomic.AtomicLongArray(segCount)
+                for (i in 0 until segCount) fresh.set(i, -1L)
+                segProgress[id] = fresh
+                fresh
+            } else {
+                existing
+            }
         }
-        // Segmen tetap (tidak berubah mid-download); abaikan bila ukuran geser.
-        if (index >= arr.size) return
-        arr[index] = downloaded
+        if (index >= arr.length()) return
+        arr.set(index, downloaded)
         scheduleSegFlush(id)
     }
 
@@ -2813,7 +2822,10 @@ class DownloadEngine(appContext: Context) {
      *  salinan daftar + satu emisi StateFlow per interval per item). */
     @Synchronized
     private fun flushSegmentProgress(id: String) {
-        val pending = segProgress[id] ?: return
+        // Snapshot di bawah lock agar baca tak balapan dengan tulis segmen/clear.
+        val pending = synchronized(segProgress) {
+            segProgress[id]?.let { arr -> LongArray(arr.length()) { i -> arr.get(i) } }
+        } ?: return
         val current = _items.value.find { it.id == id } ?: return
         // Jangan menimpa item yang sudah pause/gagal/selesai.
         if (current.state != DownloadState.DOWNLOADING) return
@@ -2870,7 +2882,7 @@ class DownloadEngine(appContext: Context) {
         }
 
     private fun clearSegProgress(id: String) {
-        segProgress.remove(id)
+        synchronized(segProgress) { segProgress.remove(id) }
         throttleTotals.remove(id)
         lastSpeedSampleAt.remove(id)
         lastSpeedSample.remove(id)
@@ -3506,10 +3518,11 @@ private class SpeedThrottle(
 
     suspend fun sleepIfNeeded(totalDownloaded: () -> Long) {
         if (limitKbps <= 0) return
+        // Total dihitung SEBELUM lock: pemindaian daftar item di dalam lock
+        // menahan segmen lain dan memperlebar window kontensi tiap chunk.
+        // Early-return di atas menjaga download tanpa batas tetap tanpa biaya scan.
+        val total = totalDownloaded()
         val delayMs = synchronized(lock) {
-            // Total dihitung di sini (bukan saat pemanggilan) supaya download
-            // tanpa batas kecepatan tidak membayar biaya scan daftar item.
-            val total = totalDownloaded()
             val delta = (total - lastSeen).coerceAtLeast(0L)
             lastSeen = total
             val g = shared

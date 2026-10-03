@@ -87,7 +87,8 @@ class WebExtractActivity : AppCompatActivity() {
         // (intent:, file:, javascript:) yang bisa disalahgunakan pemanggil.
         allowedHost = runCatching { watchUrl.toUri() }.getOrNull()?.host.orEmpty()
         if (watchUrl.isBlank() ||
-            !(watchUrl.startsWith("http://") || watchUrl.startsWith("https://")) ||
+            !(watchUrl.startsWith("http://", ignoreCase = true) ||
+                watchUrl.startsWith("https://", ignoreCase = true)) ||
             allowedHost.isEmpty()
         ) {
             setResult(RESULT_CANCELED)
@@ -112,10 +113,14 @@ class WebExtractActivity : AppCompatActivity() {
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false)
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
-            // true = host tujuan sama dengan halaman awal ( challenge
-            // Cloudflare/redirect login selalu satu host, jadi ini cukup).
-            fun isAllowedTarget(url: String): Boolean =
-                runCatching { url.toUri() }.getOrNull()?.host?.equals(allowedHost, ignoreCase = true) == true
+            // true = host sama atau subdomain host awal (challenge Cloudflare
+            // sering pindah subdomain; iklan/host asing tetap diblokir).
+            fun isAllowedTarget(url: String): Boolean {
+                val host = runCatching { url.toUri() }.getOrNull()?.host.orEmpty()
+                if (host.isEmpty() || allowedHost.isEmpty()) return false
+                if (host.equals(allowedHost, ignoreCase = true)) return true
+                return host.lowercase().endsWith("." + allowedHost.lowercase())
+            }
 
             // Signature lama melayani API 21-23; versi request melayani 24+.
             // Blokir navigasi keluar host (iklan/redirect): ekstraksi cukup

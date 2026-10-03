@@ -28,14 +28,48 @@ object Updater {
     private val TAG_RUN_RE = Regex("^v?1\\.0\\.(\\d+)$")
     private const val LATEST_API =
         "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest"
+    private const val LIST_API =
+        "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases?per_page=20"
     private const val UA = "TasirinDownloadManager"
 
     fun checkLatest(context: Context): UpdateInfo? = runCatching {
+        // Daftar dulu: rilis latest kadang mapping-only tanpa APK sehingga
+        // cache basi tersaji sebagai update. Daftar 20 rilis menemukan APK
+        // terbaru yang sebenarnya; gagal jaringan baru pakai cache.
+        get(context, LIST_API)?.let { body ->
+            val best = runCatching { bestFromReleasesList(org.json.JSONArray(body)) }.getOrNull()
+            if (best != null) {
+                saveCached(context, best)
+                return best
+            }
+            // Daftar sukses tapi tanpa APK = fakta baru, bukan gagal jaringan:
+            // jangan sajikan cache basi sebagai update.
+            if (isReleasesList(body)) return null
+            return loadCached(context)
+        }
         val body = get(context, LATEST_API) ?: return loadCached(context)
-        val json = JSONObject(body)
-        val tag = json.optString("tag_name")
-        val page = json.optString("html_url")
-        val assets = json.optJSONArray("assets") ?: return loadCached(context)
+        val best = runCatching { bestFromRelease(JSONObject(body)) }.getOrNull()
+        if (best != null) {
+            saveCached(context, best)
+            return best
+        }
+        // Rilis sukses dibaca tapi tanpa APK valid = tak ada update, bukan
+        // alasan menyajikan cache basi. getOrElse (bukan getOrNull ?: ) agar
+        // null sukses tak diubah jadi cache basi; cache hanya untuk exception.
+        return null
+    }.getOrElse { loadCached(context) }
+
+    /** true bila body adalah daftar rilis (array JSON), bukan objek error. */
+    internal fun isReleasesList(body: String): Boolean = runCatching {
+        org.json.JSONArray(body)
+        true
+    }.getOrDefault(false)
+
+    /** APK terbaik dalam satu objek rilis (tag + assets). Murni agar bisa di-unit-test. */
+    internal fun bestFromRelease(release: JSONObject): UpdateInfo? {
+        val tag = release.optString("tag_name")
+        val page = release.optString("html_url")
+        val assets = release.optJSONArray("assets") ?: return null
         var best: UpdateInfo? = null
         for (i in 0 until assets.length()) {
             val a = assets.optJSONObject(i) ?: continue
@@ -47,9 +81,20 @@ object Updater {
             val info = UpdateInfo(code, tag, url, a.optLong("size"), page)
             if (best == null || code > best.versionCode) best = info
         }
-        if (best != null) saveCached(context, best)
-        best ?: loadCached(context)
-    }.getOrNull() ?: loadCached(context)
+        return best
+    }
+
+    /** APK terbaik lintas daftar rilis (terbaru menang bila kode sama tak mungkin).
+     *  Murni agar bisa di-unit-test. */
+    internal fun bestFromReleasesList(releases: org.json.JSONArray): UpdateInfo? {
+        var best: UpdateInfo? = null
+        for (i in 0 until releases.length()) {
+            val r = releases.optJSONObject(i) ?: continue
+            val cur = bestFromRelease(r) ?: continue
+            if (best == null || cur.versionCode > best.versionCode) best = cur
+        }
+        return best
+    }
 
     /** Kode versi dari nama asset lawas atau tag rilis.
      *  Murni (tanpa Android) agar bisa di-unit-test; pemanggil wajib

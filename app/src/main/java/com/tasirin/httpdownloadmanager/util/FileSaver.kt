@@ -49,10 +49,14 @@ class FileSaver(context: Context) {
     }
 
     companion object {
-        private val MERGE_LOCK = Any()
+        private val MERGE_LOCKS = Array(8) { Any() }
     }
 
-    fun mergeSegments(fileName: String, segmentCount: Int): File = synchronized(MERGE_LOCK) {
+    private fun mergeLockFor(key: String): Any =
+        MERGE_LOCKS[(key.hashCode() and Int.MAX_VALUE) % MERGE_LOCKS.size]
+
+    fun mergeSegments(fileName: String, segmentCount: Int): File =
+        synchronized(mergeLockFor(FileNames.safe(fileName))) {
         val target = partialFile(fileName)
         // Staging unik per proses agar dua item bernama sama yang merge
         // paralel tidak saling menimpa file staging yang sama.

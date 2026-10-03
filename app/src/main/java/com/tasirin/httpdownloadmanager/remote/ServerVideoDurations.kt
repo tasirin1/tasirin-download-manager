@@ -112,7 +112,25 @@ class ServerVideoDurations(
         synchronized(lock) {
             val c = cacheLocked()
             runCatching {
-                if (c.length() == 0) file.delete() else file.writeText(c.toString())
+                if (c.length() == 0) {
+                    file.delete()
+                    return@runCatching
+                }
+                // Tulis via staging lalu rename: crash di tengah tak boleh
+                // meninggalkan JSON setengah jadi yang merusak cache berikutnya.
+                val staging = File(file.parentFile, file.name + ".tmp")
+                try {
+                    staging.writeText(c.toString())
+                    if (!staging.renameTo(file)) {
+                        runCatching { file.delete() }
+                        if (!staging.renameTo(file) || !file.isFile) {
+                            runCatching { staging.delete() }
+                            runCatching { file.delete() }
+                        }
+                    }
+                } finally {
+                    if (staging.exists()) runCatching { staging.delete() }
+                }
             }
         }
     }

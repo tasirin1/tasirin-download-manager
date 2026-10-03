@@ -668,12 +668,14 @@ object MediaLibrary {
         // fallback scan filesystem mahal, jadi cache harus bisa melayani
         // load-more berikutnya tanpa scan ulang. Pemakaian aktual tetap
         // dipotong per halaman di scanCached/scan.
-        val deduped = list
+        // Total = distinct penuh SEBELUM take: total terpotong membuat
+        // hasMore selalu false dan load-more berhenti di 3000 walau masih ada sisa.
+        val allDistinct = list
             .distinctBy { it.filePath ?: it.contentUri ?: it.token }
             .sortedByDescending { it.modified }
-            .take(GALLERY_MAX_ENTRIES)
+        val deduped = allDistinct.take(GALLERY_MAX_ENTRIES)
         val usedFallback = !folderFilterActive && mediaStoreRows == 0
-        return MediaScanResult(deduped, deduped.size, usedFallback)
+        return MediaScanResult(deduped, allDistinct.size, usedFallback)
     }
 
     /** Hapus thumbnail disk yang sudah lama tak terpakai (> 7 hari). Dipanggil
