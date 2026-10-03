@@ -13,3 +13,6 @@ __pycache__/
 node_modules/
 package-lock.json
 package.json
+
+# lokal antar-sesi, jangan commit
+MEMORY.md
