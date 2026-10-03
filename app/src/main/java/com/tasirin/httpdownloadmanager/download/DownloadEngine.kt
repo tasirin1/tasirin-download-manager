@@ -1031,7 +1031,7 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(id)
         val maxRetries = StoragePrefs.maxRetries(context)
         val attempts = (retryAttempts[id] ?: 0) + 1
-        val rangeRejected = message?.contains("does not support Range") == true
+        val rangeRejected = isRangeRejectError(message)
         val slowRejected = isSlowError(message)
         rememberFailedUrl(item.url)
         // YouTube CDN (googlevideo.com) menolak URL yang butuh n-signature dengan
@@ -1129,9 +1129,10 @@ class DownloadEngine(appContext: Context) {
                     attemptStart(id)
                 }
             }
-        } else if (item.autoResume && isNetworkError(message)) {
-            // Gagal karena jaringan (mati/sinyal hilang): jangan tandai FAILED,
-            // biarkan PAUSED agar otomatis lanjut saat koneksi pulih.
+        } else if (item.autoResume && (isNetworkError(message) || isTailIncompleteError(message))) {
+            // Gagal karena jaringan/ekor terpotong (Size mismatch, segmen
+            // incomplete): partial tetap valid, jadi jangan FAILED — biarkan
+            // PAUSED agar otomatis lanjut saat koneksi pulih.
             retryAttempts.remove(id)
             App.logEvent("DOWNLOAD PAUSED (network): ${item.fileName} — ${message ?: "?"}")
             updateItem(id) {
@@ -2458,15 +2459,15 @@ class DownloadEngine(appContext: Context) {
             }
         } catch (e: IOException) {
             val current = _items.value.find { it.id == item.id }
-            if (e.message?.contains("does not support Range") == true) {
+            if (isRangeRejectError(e.message)) {
                 val keptBytes = (current?.segments ?: item.segments).sumOf { it.downloaded }
                 if (shouldKeepPartialOnRangeReject(keptBytes)) {
                     // URL ini sebelumnya MELAYANI Range (progres sudah masuk)
                     // lalu tiba-tiba menolak — ciri khas signed CDN URL yang
                     // kedaluwarsa di tengah jalan (kasus nyata: xvideos-cdn77,
                     // 60,8/61,1 MB masuk lalu size-mismatch → retry 6 detik
-                    // kemudian kena HTTP 200). Partial JANGAN dihapus: coba
-                    // re-extract URL segar lalu resume dari progres yang ada.
+                    // kemudian kena HTTP 200). Coba re-extract URL segar lalu
+                    // resume dari progres yang ada.
                     rememberFailedUrl(item.url)
                     val fresh = refreshExpiredCdnUrl(item.id)
                     if (fresh != null) {
@@ -2475,27 +2476,34 @@ class DownloadEngine(appContext: Context) {
                                 "resuming from ${Formats.bytes(keptBytes)}"
                         )
                         updateItem(item.id) { it.copy(url = fresh) }
-                    } else {
-                        App.logEvent(
-                            "DOWNLOAD ${item.fileName}: Range rejected after " +
-                                "${Formats.bytes(keptBytes)} (${e.message}) — " +
-                                "keeping partial data for resume"
+                        // Pesan ini SENGAJA tidak match isRangeRejectError agar
+                        // handleFailure memberi retry ke URL segar, bukan FAILED.
+                        throw IOException(
+                            "Server stopped supporting Range (link may have expired) — " +
+                                "retrying resume from ${Formats.bytes(keptBytes)}"
                         )
                     }
-                    throw IOException(
-                        "Server stopped supporting Range (link may have expired) — " +
-                            "retrying resume from ${Formats.bytes(keptBytes)}"
+                    // Tidak ada URL segar (bukan link kedaluwarsa atau re-extract
+                    // menghasilkan URL yang sama, mis. CDN transien HTTP 501):
+                    // mengulang Range hanya gagal lagi, jadi jatuh ke fallback
+                    // satu-alur di bawah sebagai upaya terakhir — ekor 99%
+                    // tetap selesai walau harus unduh ulang, bukan FAILED.
+                    App.logEvent(
+                        "DOWNLOAD ${item.fileName}: Range rejected after " +
+                            "${Formats.bytes(keptBytes)} (${e.message}) — " +
+                            "no fresh URL, re-downloading in one pass"
+                    )
+                } else {
+                    // Tanpa progres sama sekali = server memang tak dukung Range
+                    // (mis. proxy transparan ISP): semua percobaan Range akan gagal
+                    // selamanya, jadi buang segmen lalu unduh sekali jalan tanpa
+                    // Range (partial lama ikut dibuang).
+                    rememberFailedUrl(item.url)
+                    App.logEvent(
+                        "DOWNLOAD ${item.fileName}: Range rejected (${e.message}), " +
+                            "downloading again in one pass"
                     )
                 }
-                // Tanpa progres sama sekali = server memang tak dukung Range
-                // (mis. proxy transparan ISP): semua percobaan Range akan gagal
-                // selamanya, jadi buang segmen lalu unduh sekali jalan tanpa
-                // Range (partial lama ikut dibuang).
-                rememberFailedUrl(item.url)
-                App.logEvent(
-                    "DOWNLOAD ${item.fileName}: Range rejected (${e.message}), " +
-                        "downloading again in one pass"
-                )
                 saver.partialFiles(current ?: item).forEach { runCatching { it.delete() } }
                 updateItem(item.id) {
                     it.copy(
@@ -3253,6 +3261,28 @@ internal fun cappedSegmentWrite(read: Int, budgetLeft: Long): Int =
  *  tengah jalan = link kedaluwarsa/transien, bukan server tanpa-Range.
  *  Murni agar bisa di-unit-test. */
 internal fun shouldKeepPartialOnRangeReject(keptBytes: Long): Boolean = keptBytes > 0
+
+/** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
+ *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able
+ *  internal (URL segar sudah dipasang, tinggal coba lagi); bila ikut match,
+ *  handleFailure langsung FAILED tanpa memberi kesempatan pada URL segar.
+ *  Murni agar bisa di-unit-test. */
+internal fun isRangeRejectError(message: String?): Boolean {
+    if (message.isNullOrBlank()) return false
+    return message.contains("does not support Range", ignoreCase = true) ||
+        message.contains("HTTP 416", ignoreCase = true) ||
+        message.contains("refused resume", ignoreCase = true)
+}
+
+/** Ekor terpotong (server menutup koneksi sebelum Content-Length terpenuhi):
+ *  transient seperti putus jaringan — partial tetap valid, jadi setelah retry
+ *  habis jangan FAILED melainkan PAUSED agar auto-lanjut saat koneksi pulih.
+ *  Murni agar bisa di-unit-test. */
+internal fun isTailIncompleteError(message: String?): Boolean {
+    if (message.isNullOrBlank()) return false
+    return message.contains("Size mismatch", ignoreCase = true) ||
+        message.contains("incomplete", ignoreCase = true)
+}
 
 /** Ukuran file hasil re-extract wajib sama dengan file lama agar resume segmen
  *  tidak korup; freshTotal <= 0 = server tak memberi tahu (izinkan resume
