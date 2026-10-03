@@ -650,8 +650,8 @@ mmUnlockOrientation();
 }
 });
 async function loadGallery(reset) {
-const ticket = ++galleryLoadTicket;
 if (!reset && galleryLoading) return;
+const ticket = ++galleryLoadTicket;
 galleryLoading = true;
 try {
 await loadGalleryRequest(reset);

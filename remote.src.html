@@ -2655,8 +2655,12 @@ mmVideo.addEventListener('webkitpresentationmodechanged', function () {
 });
 
 async function loadGallery(reset) {
-  const ticket = ++galleryLoadTicket;
+  // Tiket HANYA setelah lolos guard: increment sebelum guard membuat panggilan
+  // yang di-drop ikut menaikkan tiket sehingga (1) flag loading dibersihkan
+  // prematur oleh panggilan yang tidak jalan, lalu (2) dua fetch halaman sama
+  // berjalan paralel dan hasil concat ganda (galeri duplikat).
   if (!reset && galleryLoading) return;
+  const ticket = ++galleryLoadTicket;
   galleryLoading = true;
   try {
     await loadGalleryRequest(reset);
