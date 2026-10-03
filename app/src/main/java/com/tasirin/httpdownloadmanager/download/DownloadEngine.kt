@@ -3507,10 +3507,6 @@ private class SpeedThrottle(
     }
 }
 
-/** Watchdog per-unduhan: mendeteksi koneksi macet (tanpa byte baru) atau
- *  kecepatan anjlok (di bawah ambang minimum terus-menerus), lalu melempar
- *  IOException supaya handleFailure bisa pindah mirror / retry. Otomatis
- *  nonaktif bila pengguna memasang batas kecepatan di bawah ambang. */
 /** True bila host URL adalah GitHub (termasuk subdomain/asset host): cek host
  *  persis, bukan substring full URL — `https://evil.com/?x=github.com` tidak
  *  boleh memicu mirror proxy pihak ketiga. Internal agar bisa di-unit-test. */
@@ -3523,6 +3519,10 @@ internal fun isGitHubUrl(url: String): Boolean {
 }
 
 // Internal (bukan private) agar bisa di-unit-test langsung (lihat WatchdogTest).
+/** Watchdog per-unduhan: mendeteksi koneksi macet (tanpa byte baru) atau
+ *  kecepatan anjlok (di bawah ambang minimum terus-menerus), lalu melempar
+ *  IOException supaya handleFailure bisa pindah mirror / retry. Otomatis
+ *  nonaktif bila pengguna memasang batas kecepatan di bawah ambang. */
 internal class DownloadHealthWatchdog(limitKbps: Int) {
     private val limitedLow = limitKbps > 0 && limitKbps * 1024L <= MIN_GOOD_SPEED_BPS
     private var lastBytes = 0L
