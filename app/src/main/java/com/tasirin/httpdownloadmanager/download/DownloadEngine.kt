@@ -3095,7 +3095,6 @@ class DownloadEngine(appContext: Context) {
     }
 
     @Synchronized
-    @Synchronized
     private fun updateItem(
         id: String,
         persist: Boolean = true,
