@@ -279,10 +279,12 @@ kuat dan tanpa diskusi:
     entri `CHANGELOG.md`. Untuk PR, sebut nomor PR di isi entri setelah dibuat.
     **Dijaga otomatis CI** berdasarkan diff push/PR. Satu commit/PR = satu tujuan;
     jangan campur fitur + refactor besar + docs.
-16. **Jangan berhenti di tengah alur rilis** — setiap push rilis ke `main` wajib
-    dipantau sampai workflow Build APK sukses dan asset APK terbaru ada di release
-    terbaru (lihat "Cara cek rilis terbaru"). Normal flow adalah PR; owner boleh push
-    hotfix/docs langsung hanya jika CI tetap dipantau penuh (kecuali aturan 19).
+16. **Jangan berhenti di tengah alur rilis** — setiap push kode ke `main`
+    memicu workflow Build APK + release; hasil ditentukan CI dan DILARANG
+    memantau workflow sampai selesai (model aturan 19). Normal flow adalah PR;
+    owner boleh push hotfix langsung bila memang disengaja. Push docs-only
+    (`.md`, `docs/`, `LICENSE`, `.gitignore`) tidak memicu build sama sekali
+    (lihat `paths-ignore` di `build.yml`).
 17. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
     .githooks` (memanggil `scripts/check_repo.py --pre-commit`; unit test
     otomatis hanya bila Java/Gradle tersedia). Hook tidak wajib; CI tetap penentu.
@@ -301,8 +303,7 @@ kuat dan tanpa diskusi:
 
 - **Normal flow**: PR → build verifikasi tanpa publish → merge ke `main`.
 - **Hotfix owner**: push langsung ke `main` diperbolehkan bila memang disengaja,
-  tapi workflow tetap wajib dipantau sampai sukses dan release baru terbit
-  (kecuali perbaikan/bugfix: ikut aturan 19, langsung push tanpa pantau).
+  tanpa perlu memantau workflow (ikut aturan 19); push docs-only tidak memicu build.
 - **Push sukses ke `main`** → workflow `build.yml` menjalankan guard, test,
   build/release, lalu membuat release baru `v<versi>` dengan APK
   `tasirin-download-manager-v<versi>.apk` (`versi = 1.0.<run_number>`,

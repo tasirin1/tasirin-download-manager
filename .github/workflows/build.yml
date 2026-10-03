@@ -3,7 +3,18 @@ name: Build APK
 on:
   push:
     branches: ["main"]
+    # Push docs-only tak menyentuh APK: hemat satu build + satu nomor rilis.
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "docs/**"
+      - ".gitignore"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "docs/**"
+      - ".gitignore"
   workflow_dispatch:
   # Build terjadwal (mingguan): pastikan repo tetap build dengan toolchain
   # terbaru walau tidak ada perubahan. Tidak mem-publish release.
