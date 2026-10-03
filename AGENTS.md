@@ -119,9 +119,10 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
   `server_background`, `server_autostart_boot`, `server_port`, `server_pin`,
   `pin_enforced`, `fs_full_access`, `server_read_only`, `max_concurrent`, `segments`,
   `speed_limit_kbps`, `max_retries`, `connect_timeout_sec`, `read_timeout_sec`,
-  `small_first`, `delete_partial_on_cancel`, `recent_urls`, `sort_mode`,
+  `small_first`, `delete_partial_on_cancel`,
   `auto_sort`, `battery_exempt`, `collapsed_sections`, `thumb_cleanup_last`, `partial_stream_secret`,
-  `server_session_secret`, `file_access_offered`, `fs_full_access_pending`.
+  `server_session_secret`, `file_access_offered`, `fs_full_access_pending`,
+  `auto_open_on_complete`, `user_agent`, `gallery_folders`.
   Kunci galeri foto/video terpisah sudah tidak dipakai; scanner galeri sekarang video-only.
 
 ## Keputusan & larangan historis
