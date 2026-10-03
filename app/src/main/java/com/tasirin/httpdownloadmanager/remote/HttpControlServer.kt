@@ -876,12 +876,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Signature ringkas daftar item: tanpa alokasi JSON, dipakai SSE untuk
      *  memutuskan apakah payload perlu di-build ulang (hemat GC di tick 2x/detik). */
-    @Volatile private var lastSigItems: List<DownloadItem>? = null
-    @Volatile private var lastSigResult = 0
+    // Satu holder Pair volatil (bukan dua field): dua tulis volatil terpisah
+    // bisa terjalin antar thread (A tulis items, B tulis items+hash, A tulis
+    // hash basi) sehingga pasangan sobek — request berikutnya memakai hash
+    // milik daftar lain dan snapshot/SSE basi sampai instance daftar berganti.
+    @Volatile private var lastSig: Pair<List<DownloadItem>, Int>? = null
 
     private fun itemsSignature(items: List<DownloadItem>): Int {
         // Baca cache tanpa menahan lock selama hash loop (request 1-2x/detik).
-        if (items === lastSigItems) return lastSigResult
+        lastSig?.let { (cached, h) -> if (cached === items) return h }
         var h = items.size
         items.forEach { item ->
             h = h * 31 + item.id.hashCode() * 7 + item.state.hashCode() * 13 +
@@ -897,10 +900,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 item.progressPercentOverride.hashCode() * 61 +
                 (item.error?.hashCode() ?: 0) * 47
         }
-        synchronized(itemsCacheLock) {
-            lastSigItems = items
-            lastSigResult = h
-        }
+        // Tulis tunggal objek immutable: publikasi atomik, tak pernah sobek.
+        lastSig = items to h
         return h
     }
 
