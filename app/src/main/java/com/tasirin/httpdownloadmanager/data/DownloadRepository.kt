@@ -70,6 +70,12 @@ class DownloadRepository(context: Context) {
      *  apply): apply async bisa mendarat SETELAH commit snapshot penuh
      *  (persistItems + remove KEY_PROGRESS) sehingga progres basi menimpa
      *  data segar saat load. Dipanggil dari thread IO engine, bukan main. */
+    // Sinkron dengan persistItems/load: tanpa lock, commit progres bisa
+    // mendarat SEBELUM commit snapshot penuh yang di-encode lebih dulu
+    // (persistItems + remove KEY_PROGRESS), sehingga progres segar terhapus
+    // dan load memakai byte satu tick lebih tua. Satu monitor mengurutkan
+    // commit sesuai urutan encode.
+    @Synchronized
     fun saveProgress(items: List<DownloadItem>) {
         prefs.edit(commit = true) {
             putString(KEY_PROGRESS, DownloadItemCodec.encodeProgress(items))
