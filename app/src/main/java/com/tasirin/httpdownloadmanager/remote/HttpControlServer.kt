@@ -611,14 +611,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun pruneLoginAttempts(now: Long) {
-        if (loginAttempts.isEmpty()) return
-        loginAttempts.entries.removeIf {
-            it.value.lockedUntil < now &&
-                now - it.value.updatedAt > LOGIN_LOCK_MS
-        }
-        while (loginAttempts.size > MAX_LOGIN_ATTEMPT_ENTRIES) {
-            val oldest = loginAttempts.entries.minByOrNull { it.value.updatedAt } ?: break
-            loginAttempts.remove(oldest.key)
+        // Satu lock dengan loginAttempt: minBy+remove di luar lock bisa
+        // membuang entry yang baru dibuat thread login paralel (throttle lolos).
+        synchronized(loginAttempts) {
+            if (loginAttempts.isEmpty()) return
+            loginAttempts.entries.removeIf {
+                it.value.lockedUntil < now &&
+                    now - it.value.updatedAt > LOGIN_LOCK_MS
+            }
+            while (loginAttempts.size > MAX_LOGIN_ATTEMPT_ENTRIES) {
+                val oldest = loginAttempts.entries.minByOrNull { it.value.updatedAt } ?: break
+                loginAttempts.remove(oldest.key)
+            }
         }
     }
 

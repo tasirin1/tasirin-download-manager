@@ -2806,12 +2806,19 @@ class DownloadEngine(appContext: Context) {
      *  (tick 1 dtk dari banyak segmen tidak menumpuk job). */
     private fun scheduleSegFlush(id: String) {
         if (segFlushJobs.containsKey(id)) return
-        synchronized(this) {
+        // Kunci sempit pada map (bukan synchronized(this)): lock engine global
+        // dipakai semua @Synchronized (updateItem/flush) sehingga tiap tick
+        // segmen memblokir seluruh engine dan bikin jank saat banyak unduhan.
+        synchronized(segFlushJobs) {
             if (segFlushJobs.containsKey(id)) return
             segFlushJobs[id] = scope.launch {
                 delay(SEG_FLUSH_INTERVAL_MS)
-                runCatching { flushSegmentProgress(id) }
+                // Hapus SEBELUM flush: record yang datang setelah snapshot tapi
+                // sebelum remove lama hilang tanpa flush susulan (progress basi
+                // sampai tick berikutnya). Hapus dulu agar record susulan
+                // menjadwalkan job baru; overlap flush aman (flush @Synchronized).
                 segFlushJobs.remove(id)
+                runCatching { flushSegmentProgress(id) }
             }
         }
     }
