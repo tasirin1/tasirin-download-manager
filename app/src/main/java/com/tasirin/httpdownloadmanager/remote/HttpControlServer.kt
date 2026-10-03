@@ -343,8 +343,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         val remote = session.remoteIpAddress.orEmpty()
         val query = ServerSecurity.redactQueryForLog(session.queryParameterString?.take(160))
+        // Path ikut disensor: /share/<token> setara password dan tak boleh
+        // masuk buffer log / ekspor TXT (query token= sudah disensor).
+        val safeUri = ServerSecurity.redactUriForLog(session.uri)
         appendLog(
-            "${session.method.name} ${session.uri}$query -> HTTP ${response.status.requestStatus} " +
+            "${session.method.name} $safeUri$query -> HTTP ${response.status.requestStatus} " +
                 "(${elapsedMs}ms) $remote"
         )
     }
@@ -1747,22 +1750,28 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun runAction(session: IHTTPSession): Response {
         val params = readForm(session)
         val id = params["id"].orEmpty()
+        // Aksi no-op (id tak dikenal / state tak cocok / rename gagal) dibalas
+        // ok:false supaya klien tahu tidak ada yang berubah — bukan sukses palsu.
         when (params["action"]) {
             "pause" -> {
-                if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))
-                App.engine.pause(id)
+                if (id.isEmpty() || !App.engine.pause(id)) {
+                    return jsonResponse(JSONObject().put("ok", false))
+                }
             }
             "resume" -> {
-                if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))
-                App.engine.resume(id)
+                if (id.isEmpty() || !App.engine.resume(id)) {
+                    return jsonResponse(JSONObject().put("ok", false))
+                }
             }
             "cancel" -> {
-                if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))
-                App.engine.cancel(id)
+                if (id.isEmpty() || !App.engine.cancel(id)) {
+                    return jsonResponse(JSONObject().put("ok", false))
+                }
             }
             "delete" -> {
-                if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))
-                App.engine.remove(id)
+                if (id.isEmpty() || !App.engine.remove(id)) {
+                    return jsonResponse(JSONObject().put("ok", false))
+                }
             }
             "rename" -> {
                 if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))
@@ -1770,7 +1779,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (!ServerSecurity.isFileNameValid(name)) {
                     return jsonResponse(JSONObject().put("ok", false).put("error", "invalid name"))
                 }
-                App.engine.rename(id, name)
+                if (!App.engine.rename(id, name)) {
+                    return jsonResponse(JSONObject().put("ok", false).put("error", "rename failed"))
+                }
             }
             "limit_priority" -> {
                 if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))

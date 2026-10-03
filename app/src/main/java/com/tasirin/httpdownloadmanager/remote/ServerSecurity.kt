@@ -53,6 +53,18 @@ object ServerSecurity {
         return "?" + LOG_SECRET_RE.replace(query.trimStart('?'), "$1$2<redacted>")
     }
 
+    /** Redaksi token pada path untuk log request: `/share/<token>` dan
+     *  `/stream_part/<token>` setara password (berlaku 24 jam) sehingga URI
+     *  mentah tidak boleh masuk buffer log / ekspor TXT. ID item biasa
+     *  (`/file/<id>`) bukan rahasia dan tetap tampil untuk korelasi debug. */
+    private val LOG_PATH_TOKEN_RE =
+        Regex("(^|/)(share|stream_part)/[^/?#\s]+", RegexOption.IGNORE_CASE)
+
+    fun redactUriForLog(uri: String): String {
+        if (uri.isEmpty()) return uri
+        return LOG_PATH_TOKEN_RE.replace(uri, "$1$2/<redacted>")
+    }
+
     /** True bila salah satu segmen path adalah ".." (traversal), tanpa menolak
      *  nama sah yang hanya mengandung titik ganda seperti "my..video". */
     fun containsTraversalSegment(path: String): Boolean =

@@ -303,11 +303,11 @@ class DownloadEngine(appContext: Context) {
         return item.id
     }
 
-    fun pause(id: String) {
-        val target = _items.value.find { it.id == id } ?: return
+    fun pause(id: String): Boolean {
+        val target = _items.value.find { it.id == id } ?: return false
         // Hanya antrean aktif yang bisa dijeda: tanpa guard, item COMPLETED/
         // FAILED yang ter-pause (mis. via /api/action) kehilangan statusnya.
-        if (target.state != DownloadState.DOWNLOADING && target.state != DownloadState.PENDING) return
+        if (target.state != DownloadState.DOWNLOADING && target.state != DownloadState.PENDING) return false
         App.logEvent("DOWNLOAD PAUSED: ${target.fileName}")
         retryAttempts.remove(id)
         pendingRetries.remove(id)
@@ -319,37 +319,49 @@ class DownloadEngine(appContext: Context) {
         }
         clearSegProgress(id)
         scheduleSave()
+        return true
     }
 
-    fun resume(id: String) {
-        val item = _items.value.find { it.id == id } ?: return
-        if (item.state != DownloadState.PAUSED && item.state != DownloadState.FAILED &&
+    fun resume(id: String): Boolean {
+        val item = _items.value.find { it.id == id } ?: return false
+        // Zombie DOWNLOADING (proses mati saat aktif, tanpa job berjalan):
+        // antrekan ulang supaya tidak macet selamanya dan tombol resume
+        // bisa dipakai lagi. DOWNLOADING dengan job aktif sudah berjalan —
+        // anggap sukses idempoten.
+        if (item.state == DownloadState.DOWNLOADING) {
+            if (jobs[item.id]?.isActive == true) return true
+        } else if (item.state != DownloadState.PAUSED && item.state != DownloadState.FAILED &&
             item.state != DownloadState.CANCELLED
-        ) return
+        ) return false
         App.logEvent("DOWNLOAD RESUMED: ${item.fileName}")
         retryAttempts.remove(id)
         pendingRetries.remove(id)
         clearSegProgress(id)
         updateItem(id) { it.copy(state = DownloadState.PENDING, autoResume = true) }
         attemptStart(id)
+        return true
     }
 
     fun resumeInterrupted() {
         if (interruptedResumed) return
         interruptedResumed = true
+        // DOWNLOADING ikut dipulihkan: state ini terpersist saat proses mati
+        // mendadak sehingga tanpa ini item zombie macet selamanya (tidak
+        // auto-lanjut dan tombol resume menolaknya).
         _items.value.filter {
-            it.autoResume && (it.state == DownloadState.PAUSED || it.state == DownloadState.PENDING)
+            it.autoResume && (it.state == DownloadState.PAUSED || it.state == DownloadState.PENDING ||
+                it.state == DownloadState.DOWNLOADING)
         }.forEach { item ->
             updateItem(item.id) { it.copy(state = DownloadState.PENDING, autoResume = true) }
         }
         startQueued()
     }
 
-    fun cancel(id: String) {
-        val target = _items.value.find { it.id == id } ?: return
+    fun cancel(id: String): Boolean {
+        val target = _items.value.find { it.id == id } ?: return false
         // COMPLETED tidak bisa di-cancel: status selesai bukan sesuatu yang
         // bisa dibatalkan (hapus memakai remove/delete).
-        if (target.state == DownloadState.COMPLETED) return
+        if (target.state == DownloadState.COMPLETED) return false
         // Cancel langsung menghapus progres + item dari daftar (tidak lagi
         // menyisakan status CANCELLED): tombol Cancel terasa instan walau
         // coroutine segmen masih menyelesaikan pembatalan di background.
@@ -370,11 +382,12 @@ class DownloadEngine(appContext: Context) {
             runCatching { fileSaver.deleteFiles(target) }
         }
         scheduleSave()
+        return true
     }
 
-    fun remove(id: String) {
-        _items.value.find { it.id == id }?.let { App.logEvent("DOWNLOAD DELETED: ${it.fileName}") }
-        val item = _items.value.find { it.id == id }
+    fun remove(id: String): Boolean {
+        val item = _items.value.find { it.id == id } ?: return false
+        App.logEvent("DOWNLOAD DELETED: ${item.fileName}")
         retryAttempts.remove(id)
         pendingRetries.remove(id)
         originalSocialUrls.remove(id)
@@ -384,11 +397,12 @@ class DownloadEngine(appContext: Context) {
         disconnectActive(id)
         update(_items.value.filterNot { it.id == id })
         if (activeConns[id] == null) cancelledConns.remove(id)
-        item?.let { fileSaver.deleteFiles(it) }
+        fileSaver.deleteFiles(item)
         scheduleSave()
         // Hapus eksplisit item terakhir: niat antrean kosong jelas — tulis
         // blob kosong agar sisa blob korup (degraded) tak menetap selamanya.
         if (_items.value.isEmpty()) repository.clearAll()
+        return true
     }
 
     fun clearCompleted() {
@@ -756,15 +770,15 @@ class DownloadEngine(appContext: Context) {
      *  folder custom `f:` bisa beda volume dengan penyimpanan internal). */
     fun freeSpaceBytesFor(folderPath: String): Long = fileSaver.destinationFreeBytes(folderPath)
 
-    fun rename(id: String, newName: String) {
-        val item = _items.value.find { it.id == id } ?: return
-        if (item.state != DownloadState.COMPLETED) return
+    fun rename(id: String, newName: String): Boolean {
+        val item = _items.value.find { it.id == id } ?: return false
+        if (item.state != DownloadState.COMPLETED) return false
         // Unikkan terhadap item lain agar file hasil rename tidak menimpa
         // milik item lain (renameTo Linux menggantikan target diam-diam).
         val clean = FileNames.unique(FileNames.safe(newName.trim())) { n ->
             n != item.fileName && _items.value.any { it.fileName == n }
         }
-        if (clean.isBlank() || clean == item.fileName) return
+        if (clean.isBlank() || clean == item.fileName) return false
         val newPath = fileSaver.rename(item, clean)
         if (newPath != null) {
             // FileSaver.rename mengembalikan URI untuk item MediaStore/SAF dan
@@ -774,7 +788,9 @@ class DownloadEngine(appContext: Context) {
                 if (!it.contentUri.isNullOrEmpty()) it.copy(fileName = clean, contentUri = newPath)
                 else it.copy(fileName = clean, filePath = newPath)
             }
+            return true
         }
+        return false
     }
 
     fun setLimitAndPriority(id: String, speedLimitKbps: Int, priority: Int) {

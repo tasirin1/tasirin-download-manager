@@ -29,6 +29,17 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun redactUri_tokenShareDanStreamPartDisamarkan_idBiasaTampil() {
+        // /share/<token> setara password: wajib disensor di log/ekspor TXT.
+        assertEquals("/share/<redacted>", ServerSecurity.redactUriForLog("/share/AbC123xYz"))
+        assertEquals("/stream_part/<redacted>", ServerSecurity.redactUriForLog("/stream_part/qwerty9"))
+        // ID item biasa bukan rahasia: tetap tampil untuk korelasi debug.
+        assertEquals("/file/abc123", ServerSecurity.redactUriForLog("/file/abc123"))
+        assertEquals("/api/downloads", ServerSecurity.redactUriForLog("/api/downloads"))
+        assertEquals("", ServerSecurity.redactUriForLog(""))
+    }
+
+    @Test
     fun redactQuery_tokenUnduhDisamarkan_substringAman() {
         // zt ikut disamarkan (token sekali-pakai tak boleh bocor di log).
         assertEquals("?a=1&zt=<redacted>", ServerSecurity.redactQueryForLog("?a=1&zt=abc123"))

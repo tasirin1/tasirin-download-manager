@@ -283,8 +283,13 @@ class SettingsActivity : AppCompatActivity() {
             val input = box.getChildAt(i).findViewById<EditText>(R.id.extra_folder_path)
             val path = input.text?.toString()?.trim().orEmpty()
             if (path.isEmpty()) continue
-            // Normalisasi path: hapus trailing slash, resolve relatif
-            val normalized = java.io.File(path).canonicalPath
+            // Normalisasi path: canonicalPath bisa melempar IOException untuk
+            // path aneh — jangan crash coroutine save Pengaturan karenanya.
+            val normalized = runCatching { java.io.File(path).canonicalPath }.getOrNull()
+            if (normalized.isNullOrEmpty()) {
+                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
+                return
+            }
             val dir = java.io.File(normalized)
             if (!dir.isDirectory) {
                 Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
@@ -769,7 +774,11 @@ class SettingsActivity : AppCompatActivity() {
             val input = box.getChildAt(i).findViewById<EditText>(R.id.extra_folder_path)
             val path = input.text?.toString()?.trim().orEmpty()
             if (path.isEmpty()) continue
-            val normalized = java.io.File(path).canonicalPath
+            val normalized = runCatching { java.io.File(path).canonicalPath }.getOrNull()
+            if (normalized.isNullOrEmpty()) {
+                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
+                return
+            }
             val dir = java.io.File(normalized)
             if (!dir.isDirectory && !dir.mkdirs()) {
                 Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()

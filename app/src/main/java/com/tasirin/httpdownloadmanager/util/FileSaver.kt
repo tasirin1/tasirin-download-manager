@@ -40,10 +40,12 @@ class FileSaver(context: Context) {
     }
 
     fun partialFiles(item: DownloadItem): List<File> {
-        if (item.segments.isEmpty()) {
-            return listOf(partialFile(item.fileName))
-        }
-        return item.segments.map { partialFile(item.fileName, it.index) }
+        // Basis .part selalu ikut: item segmen yang jatuh ke single-stream
+        // (fallback saat Range ditolak) menulis ke .part tanpa sufiks — tanpa
+        // ini deleteFiles menyisakan yatim sampai sapuan orphan 2 jam.
+        val files = mutableListOf(partialFile(item.fileName))
+        item.segments.forEach { files.add(partialFile(item.fileName, it.index)) }
+        return files
     }
 
     // Dua merge dengan fileName sama yang jalan paralel akan saling menimpa
@@ -137,7 +139,14 @@ class FileSaver(context: Context) {
         val cleanFolder = folderPath.trim().removePrefix("f:")
         if (cleanFolder.isNotBlank()) {
             if (cleanFolder.startsWith("m:")) {
-                return saveToMediaStore(fileName, cleanFolder.substring(2), writer)
+                // Kolom IS_PENDING/RELATIVE_PATH dan koleksi Downloads hanya
+                // ada di API 29+: di Android 5-9 insert MediaStore bisa gagal,
+                // jadi fallback ke dir publik/internal seperti tujuan download.
+                if (Build.VERSION.SDK_INT >= 29) {
+                    return saveToMediaStore(fileName, cleanFolder.substring(2), writer)
+                }
+                writePublicDir(fileName, writer)?.let { return it }
+                return writeInternal(fileName, writer)
             }
             val dir = File(cleanFolder)
             if (!dir.isDirectory && !dir.mkdirs()) {
@@ -621,6 +630,13 @@ class FileSaver(context: Context) {
                 !result.contentUri.isNullOrEmpty() -> {
                     val uri = result.contentUri.toUri()
                     if (Build.VERSION.SDK_INT >= 29 && uri.authority == MediaStore.AUTHORITY) {
+                        // Hormati tujuan m: kustom user: bila file sudah di
+                        // relative path non-default (mis. Movies/Koleksi),
+                        // jangan seret paksa ke Download/<Sub>/.
+                        val currentRel = mediaRelativePath(uri)?.trim('/')?.trim()
+                        if (!currentRel.isNullOrEmpty() &&
+                            !currentRel.startsWith("Download", ignoreCase = true)
+                        ) return result
                         val values = ContentValues().apply {
                             put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/$sub/")
                         }
