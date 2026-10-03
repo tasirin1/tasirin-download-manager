@@ -1607,7 +1607,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Simpan jejak biar bisa dicek lewat Ekspor Log Error.
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks FAILED: ${it.message}")
             (it as? Exception)?.let { e -> logError(e) }
+            // Body bisa baru terbaca setengah saat gagal (putus di tengah):
+            // tutup koneksi agar sisa byte tak dibaca sebagai request
+            // keep-alive berikutnya (semua jalur error lain drain/close).
             jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "upload failed"))
+                .closeConnection()
         }
     }
 
