@@ -286,8 +286,9 @@ kuat dan tanpa diskusi:
     fingerprint sertifikat signing dari `KEYSTORE_BASE64` dengan
     `c2785a61...`; mismatch = build gagal (keystore salah/korup terdeteksi
     lebih awal).
-19. **Perbaikan langsung push, jangan pantau** — setiap ada perbaikan langsung
-    commit + push ke `main` (atau PR bila perlu review); workflow Build APK TIDAK
+19. **Perbaikan langsung push (= build), jangan pantau** — setiap ada perbaikan
+    langsung commit + push ke `main` (atau PR bila perlu review); push ke `main`
+    otomatis memicu workflow Build APK + release, jadi push = build. Workflow TIDAK
     perlu dipantau sampai selesai — CI yang menentukan hasil. Cukup pastikan guard
     lokal (`python3 scripts/check_repo.py`) hijau sebelum push.
 
