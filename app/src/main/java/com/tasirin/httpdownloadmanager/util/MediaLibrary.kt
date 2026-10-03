@@ -33,6 +33,10 @@ object MediaLibrary {
     private var scanCacheFolderKey: List<String> = emptyList()
     private val scanLock = Any()
     @Volatile private var observerRegistered = false
+    // Tahan ContentObserver seumur proses: observer lokal yang tak direferensikan
+    // bisa dikumpulkan GC sehingga onChange berhenti dipanggil diam-diam dan
+    // cache galeri basi sampai TTL habis (pola sama seperti NetworkCallback di App).
+    @Volatile private var mediaObserver: ContentObserver? = null
 
     /** Hasil scan galeri: [items] = daftar lengkap hingga GALLERY_MAX_ENTRIES
      *  (cache; pemotongan per halaman dilakukan di scanCached/scan),
@@ -390,6 +394,7 @@ object MediaLibrary {
                         MediaStore.Downloads.EXTERNAL_CONTENT_URI, true, observer
                     )
                 }
+                mediaObserver = observer
             }.onSuccess {
                 ok = true
             }.onFailure {
