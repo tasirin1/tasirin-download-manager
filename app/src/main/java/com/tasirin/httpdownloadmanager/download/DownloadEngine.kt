@@ -180,8 +180,9 @@ class DownloadEngine(appContext: Context) {
     private val segProgress = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicLongArray>()
     private val segFlushJobs = ConcurrentHashMap<String, Job>()
     /** Sampel kecepatan/ETA terakhir per item (throttle 1 dtk saat flush 500ms). */
-    private val lastSpeedSampleAt = ConcurrentHashMap<String, Long>()
-    private val lastSpeedSample = ConcurrentHashMap<String, Pair<Long, Long>>()
+    // Satu holder (waktu, sampel) agar baca/tulis/replace atomik: dua map terpisah
+    // bisa sobek (waktu baru + sampel lama) saat flush dan clear balapan.
+    private val lastSpeedSample = ConcurrentHashMap<String, Pair<Long, Pair<Long, Long>>>()
     // Total byte bersama untuk speed limiter multi-segmen; menghindari pencarian
     // item + penjumlahan segmen di setiap chunk saat batas kecepatan aktif.
     private val throttleTotals = ConcurrentHashMap<String, AtomicLong>()
@@ -1044,7 +1045,6 @@ class DownloadEngine(appContext: Context) {
         speedTracker.reset(id)
         // Buang sampel speed/ETA + penyangga segmen agar retry tidak memakai
         // angka basi sesaat (≤1 dtk) dari attempt yang gagal.
-        lastSpeedSampleAt.remove(id)
         lastSpeedSample.remove(id)
         clearSegProgress(id)
         val maxRetries = StoragePrefs.maxRetries(context)
@@ -2757,14 +2757,12 @@ class DownloadEngine(appContext: Context) {
             // Sampel kecepatan/ETA maks 1x/detik (EMA + format ETA mahal bila
             // N item aktif x flush 500ms); byte/segmen tetap update tiap flush.
             val nowMs = monotonicNow()
-            val lastAt = lastSpeedSampleAt[id] ?: 0L
-            val cached = lastSpeedSample[id]
-            val (speed, eta) = if (cached != null && nowMs - lastAt < 1000) {
-                cached
+            val prev = lastSpeedSample[id]
+            val (speed, eta) = if (prev != null && nowMs - prev.first < 1000) {
+                prev.second
             } else {
                 val sampled = speedTracker.sample(id, totalDone, item.totalBytes)
-                lastSpeedSampleAt[id] = nowMs
-                lastSpeedSample[id] = sampled
+                lastSpeedSample[id] = nowMs to sampled
                 sampled
             }
             item.copy(
@@ -2845,14 +2843,12 @@ class DownloadEngine(appContext: Context) {
             // Sampel kecepatan/ETA maks 1x/detik (EMA + format ETA mahal bila
             // N item aktif x flush 500ms); byte/segmen tetap update tiap flush.
             val nowMs = monotonicNow()
-            val lastAt = lastSpeedSampleAt[id] ?: 0L
-            val cached = lastSpeedSample[id]
-            val (speed, eta) = if (cached != null && nowMs - lastAt < 1000) {
-                cached
+            val prev = lastSpeedSample[id]
+            val (speed, eta) = if (prev != null && nowMs - prev.first < 1000) {
+                prev.second
             } else {
                 val sampled = speedTracker.sample(id, totalDone, item.totalBytes)
-                lastSpeedSampleAt[id] = nowMs
-                lastSpeedSample[id] = sampled
+                lastSpeedSample[id] = nowMs to sampled
                 sampled
             }
             item.copy(
@@ -2868,7 +2864,10 @@ class DownloadEngine(appContext: Context) {
     /** Buang penyangga progres + batalkan flush job (download selesai/gagal/
      *  ulang dari awal). Nilai final tetap sudah ditulis via updateSegment. */
     private fun resetThrottleTotal(id: String, value: Long) {
-        throttleTotals[id] = AtomicLong(value)
+        // Satu lock dengan addThrottleTotal: put polos balapan dengan
+        // getOrPut+add paralel sehingga hitungan hilang (over-throttle)
+        // atau reset tertimpa counter basi (bypass throttle).
+        synchronized(throttleTotals) { throttleTotals[id] = AtomicLong(value) }
     }
 
     private fun addThrottleTotal(id: String, delta: Long): Long =
@@ -2883,8 +2882,9 @@ class DownloadEngine(appContext: Context) {
 
     private fun clearSegProgress(id: String) {
         synchronized(segProgress) { segProgress.remove(id) }
-        throttleTotals.remove(id)
-        lastSpeedSampleAt.remove(id)
+        // Lock sama dengan add/reset: remove polos bisa menghapus setelah
+        // add membuat ulang (counter yatim) atau sebelum reset (reset basi).
+        synchronized(throttleTotals) { throttleTotals.remove(id) }
         lastSpeedSample.remove(id)
         segFlushJobs.remove(id)?.cancel()
     }

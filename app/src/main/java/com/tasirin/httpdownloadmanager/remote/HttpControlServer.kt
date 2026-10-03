@@ -1422,7 +1422,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 .closeConnection()
         }
         appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks received: $name (${length}B offset=$offset)")
-        val lock = uploadLockFor(id)
+        // Klaim atomik: batas lock ditegakkan di dalam uploadLockFor agar dua
+        // ID baru paralel tak sama-sama lolos cek lalu melebihi MAX_UPLOAD_LOCKS.
+        val lock = uploadLockFor(id) ?: run {
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: too many active upload locks")
+            drainBody(session)
+            return jsonResponse(JSONObject().put("ok", false).put("error", "Too many uploads in progress"))
+        }
         synchronized(lock.lock) {
             return writeUploadChunk(
                 session, id, name, storage, folderPath,
@@ -1431,13 +1437,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     }
 
-    private fun uploadLockFor(id: String): UploadLock {
+    private fun uploadLockFor(id: String): UploadLock? {
         synchronized(uploadLockGate) {
+            uploadLocks[id]?.also { it.lastUse.set(System.currentTimeMillis()) }?.let { return it }
             val now = System.currentTimeMillis()
             if (uploadLocks.size > 256) {
                 uploadLocks.entries.removeIf {
                     now - it.value.lastUse.get() > 30 * 60 * 1000L
                 }
+            }
+            // Tegakkan batas di lock yang sama dengan pembuatan: cek-terpisah
+            // di canAcceptUploadLock bisa lolos ganda untuk dua ID baru paralel.
+            if (uploadLocks.size >= MAX_UPLOAD_LOCKS) {
+                uploadLocks.entries.removeIf { now - it.value.lastUse.get() > 30 * 60 * 1000L }
+                if (uploadLocks.size >= MAX_UPLOAD_LOCKS) return null
             }
             return uploadLocks.getOrPut(id) { UploadLock() }.also { it.lastUse.set(now) }
         }
