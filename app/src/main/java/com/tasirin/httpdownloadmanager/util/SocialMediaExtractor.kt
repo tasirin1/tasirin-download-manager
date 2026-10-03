@@ -196,6 +196,10 @@ object SocialMediaExtractor {
 
     /** Ekstrak URL terbaik (satu opsi). */
     suspend fun extract(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
+        // Batas keras total seperti extractAll: rantai fallback (page/API
+        // pihak ketiga) masing-masing punya timeout, tapi jumlahnya bisa
+        // menahan slot worker/retry puluhan detik tanpa cap ini.
+        withTimeoutOrNull(EXTRACT_TOTAL_TIMEOUT_MS) {
         try {
             // Header user (Cookie/Referer dari WebExtract) wajib ikut saat
             // fetch halaman first-party; tanpa ini re-extract situs ber-cookie
@@ -217,6 +221,7 @@ object SocialMediaExtractor {
                 else -> null
             }
         } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
+        }
     }
 
     /** Ekstrak semua opsi resolusi yang tersedia. */
