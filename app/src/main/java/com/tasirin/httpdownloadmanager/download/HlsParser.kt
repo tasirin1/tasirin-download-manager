@@ -116,6 +116,7 @@ object HlsParser {
      *  Tak pernah melempar: base malformed mengembalikan relative apa adanya
      *  agar parser murni tidak men-crash pemanggil engine. */
     fun resolveUrl(base: String, relative: String): String {
+        if (relative.isBlank()) return base
         if (relative.startsWith("http://", ignoreCase = true) ||
             relative.startsWith("https://", ignoreCase = true)
         ) return relative

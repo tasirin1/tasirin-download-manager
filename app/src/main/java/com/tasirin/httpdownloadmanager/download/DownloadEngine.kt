@@ -3476,6 +3476,8 @@ data class UrlProbe(
     val etag: String? = null
 )
 
+private const val MAX_THROTTLE_SLEEP_MS = 2_000L
+
 private class SpeedThrottle(
     private val limitKbps: Int,
     private val shared: GlobalRateLimiter?
@@ -3508,7 +3510,7 @@ private class SpeedThrottle(
                 val limit = limitKbps * 1024L
                 val elapsed = monotonicNow() - startTime
                 val expected = startBytes + (elapsed * limit) / 1000L
-                if (total > expected) ((total - expected) * 1000L) / limit else 0L
+                if (total > expected) (((total - expected) * 1000L) / limit).coerceAtMost(MAX_THROTTLE_SLEEP_MS) else 0L
             }
         }
         if (delayMs > 0) delay(delayMs)
@@ -3590,7 +3592,7 @@ private class GlobalRateLimiter(private val limitKbps: Int) {
             val limit = limitKbps * 1024L
             val elapsed = now - windowStart
             val targetMs = (windowBytes * 1000L) / limit
-            return if (targetMs > elapsed) (targetMs - elapsed) else 0L
+            return if (targetMs > elapsed) (targetMs - elapsed).coerceAtMost(MAX_THROTTLE_SLEEP_MS) else 0L
         }
     }
 

@@ -23,35 +23,30 @@ object CrashLog {
     }
 
     fun append(context: Context, tag: String, t: Throwable) {
-        runCatching {
-            // Simpan di folder data eksternal: /Android/data/<pkg>/crash.log
-            // (terlihat dari file manager tanpa root; otomatis dihapus saat uninstall).
-            val dir = context.getExternalFilesDir(null) ?: context.filesDir
-            val file = File(dir, FILE_NAME)
-            val stamp = (stampFormat.get()
-                ?: SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)).format(Date())
-            val text = buildString {
-                appendLine("=== $stamp [$tag] ===")
-                appendLine(Log.getStackTraceString(t))
-                appendLine()
-            }
-            // Append mode: tidak perlu readText() seluruh file.
-            BufferedWriter(
-                OutputStreamWriter(FileOutputStream(file, true), Charsets.UTF_8)
-            ).use { it.write(text) }
-            // Trim bila melebihi batas: baca dari akhir file (RandomAccessFile)
-            // supaya tidak perlu load seluruh file ke memori.
-            // synchronized: mencegah race condition saat dua thread crash bersamaan.
-            synchronized(trimLock) {
+        synchronized(trimLock) {
+            runCatching {
+                // Simpan di folder data eksternal: /Android/data/<pkg>/crash.log
+                // (terlihat dari file manager tanpa root; otomatis dihapus saat uninstall).
+                val dir = context.getExternalFilesDir(null) ?: context.filesDir
+                val file = File(dir, FILE_NAME)
+                val stamp = (stampFormat.get()
+                    ?: SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)).format(Date())
+                val text = buildString {
+                    appendLine("=== $stamp [$tag] ===")
+                    appendLine(Log.getStackTraceString(t))
+                    appendLine()
+                }
+                BufferedWriter(
+                    OutputStreamWriter(FileOutputStream(file, true), Charsets.UTF_8)
+                ).use { it.write(text) }
+                // Trim bila melebihi batas: baca dari akhir file (RandomAccessFile)
+                // supaya tidak perlu load seluruh file ke memori.
                 if (file.length() > MAX_BYTES * 1.5) {
                     java.io.RandomAccessFile(file, "rw").use { raf ->
                         val len = raf.length()
                         val buf = ByteArray(MAX_BYTES)
                         raf.seek(len - MAX_BYTES)
                         raf.readFully(buf)
-                        // Mulai dari newline pertama: titik potong byte mentah
-                        // bisa membelah karakter UTF-8 multi-byte dan baris.
-                        // Batas newline (0x0A ASCII) selalu aman untuk UTF-8.
                         var start = 0
                         while (start < buf.size && buf[start] != '\n'.code.toByte()) start++
                         if (start < buf.size) start++

@@ -1711,7 +1711,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         private val URL_PATTERN = Regex("https?://[^\\s\"'<>]+")
         private fun extractUrls(text: String): List<String> =
             URL_PATTERN.findAll(text)
-                .map { it.value.trimEnd(',', ';', ':', ')', ']', '}', '"', '\'', '>', '\u2019', '\u201d', '\u2026') }
+                .map { it.value.trimEnd(',', ';', ':', ')', ']', '}', '"', '\'', '>', '.', '\u2019', '\u201d', '\u2026') }
                 .filter { it.startsWith("http://") || it.startsWith("https://") }
                 .distinct()
                 .toList()
