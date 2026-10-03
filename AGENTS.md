@@ -286,17 +286,19 @@ kuat dan tanpa diskusi:
     fingerprint sertifikat signing dari `KEYSTORE_BASE64` dengan
     `c2785a61...`; mismatch = build gagal (keystore salah/korup terdeteksi
     lebih awal).
-19. **Perbaikan langsung push (= build), jangan pantau** — setiap ada perbaikan
-    langsung commit + push ke `main` (atau PR bila perlu review); push ke `main`
-    otomatis memicu workflow Build APK + release, jadi push = build. Workflow TIDAK
-    perlu dipantau sampai selesai — CI yang menentukan hasil. Cukup pastikan guard
+19. **Setelah perbaikan langsung push tanpa pantau** — setiap perbaikan/bugfix
+    yang selesai langsung commit + push ke `main` (atau PR bila perlu review);
+    push ke `main` otomatis memicu workflow Build APK + release, jadi push = build.
+    DILARANG memantau workflow sampai selesai (`gh run watch`, polling status,
+    menunggu release terbit) — CI yang menentukan hasil. Cukup pastikan guard
     lokal (`python3 scripts/check_repo.py`) hijau sebelum push.
 
 ## Cara memicu build & release
 
 - **Normal flow**: PR → build verifikasi tanpa publish → merge ke `main`.
 - **Hotfix owner**: push langsung ke `main` diperbolehkan bila memang disengaja,
-  tapi workflow tetap wajib dipantau sampai sukses dan release baru terbit.
+  tapi workflow tetap wajib dipantau sampai sukses dan release baru terbit
+  (kecuali perbaikan/bugfix: ikut aturan 19, langsung push tanpa pantau).
 - **Push sukses ke `main`** → workflow `build.yml` menjalankan guard, test,
   build/release, lalu membuat release baru `v<versi>` dengan APK
   `tasirin-download-manager-v<versi>.apk` (`versi = 1.0.<run_number>`,
