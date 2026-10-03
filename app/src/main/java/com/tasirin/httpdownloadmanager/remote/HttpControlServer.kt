@@ -1131,7 +1131,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val chunks = (session.param("chunks")?.toIntOrNull() ?: 1).coerceAtLeast(1)
         // Indeks di luar rentang tak pernah finalisasi namun tetap menulis tmp:
         // tolak sejak awal agar tak jadi tmp yatim penahan disk.
-        if (chunkIdx >= chunks) {
+        // Negatif selain -1 (mode single-shot) juga tak valid: tanpa ini
+        // chunk=-5 jatuh diam-diam ke single-shot dan mengabaikan chunks.
+        if (chunkIdx < -1 || chunkIdx >= chunks) {
             // Body gagal terdrain tuntas (terlalu besar/terputus): tutup koneksi
             // agar sisa byte tidak dibaca sebagai request keep-alive berikutnya.
             if (!drainBody(session)) {
