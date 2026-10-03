@@ -278,7 +278,7 @@ kuat dan tanpa diskusi:
 16. **Jangan berhenti di tengah alur rilis** — setiap push rilis ke `main` wajib
     dipantau sampai workflow Build APK sukses dan asset APK terbaru ada di release
     terbaru (lihat "Cara cek rilis terbaru"). Normal flow adalah PR; owner boleh push
-    hotfix/docs langsung hanya jika CI tetap dipantau penuh.
+    hotfix/docs langsung hanya jika CI tetap dipantau penuh (kecuali aturan 19).
 17. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
     .githooks` (memanggil `scripts/check_repo.py --pre-commit`; unit test
     otomatis hanya bila Java/Gradle tersedia). Hook tidak wajib; CI tetap penentu.
@@ -286,6 +286,10 @@ kuat dan tanpa diskusi:
     fingerprint sertifikat signing dari `KEYSTORE_BASE64` dengan
     `c2785a61...`; mismatch = build gagal (keystore salah/korup terdeteksi
     lebih awal).
+19. **Perbaikan langsung push, jangan pantau** — setiap ada perbaikan langsung
+    commit + push ke `main` (atau PR bila perlu review); workflow Build APK TIDAK
+    perlu dipantau sampai selesai — CI yang menentukan hasil. Cukup pastikan guard
+    lokal (`python3 scripts/check_repo.py`) hijau sebelum push.
 
 ## Cara memicu build & release
 
