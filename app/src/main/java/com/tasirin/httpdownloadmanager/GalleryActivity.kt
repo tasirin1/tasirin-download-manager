@@ -420,7 +420,13 @@ private class GalleryAdapter(
         holder.job?.cancel()
         holder.job = scope.launch {
             val bmp = loader(e)
-            if (bmp != null && holder.bindingAdapterPosition == pos) {
+            // Cek identitas token juga (bukan hanya posisi): job lama yang
+            // sudah lewat titik cancel (decode blocking) bisa selesai setelah
+            // holder di-bind ulang ke item lain di posisi SAMA (hasil diff),
+            // sehingga thumbnail salah terpasang sekilas (flash gambar tetangga).
+            if (bmp != null && holder.bindingAdapterPosition == pos &&
+                items.getOrNull(pos)?.token == e.token
+            ) {
                 b.imageThumb.setImageBitmap(bmp)
                 // Thumbnail ada: sembunyikan play overlay (gambar sudah cukup)
                 if (e.isVideo) b.playOverlay.visibility = View.GONE
