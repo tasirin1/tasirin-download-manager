@@ -63,6 +63,9 @@ class App : Application() {
     // Android 7+ tidak menerima broadcast CONNECTIVITY_CHANGE untuk receiver
     // statis di manifest, jadi pakai NetworkCallback untuk fitur lanjutkan
     // download otomatis saat koneksi pulih (Android 5-6 pakai varian lama).
+    // Callback DITAHAN di field statis: instance lokal yang tak direferensikan
+    // bisa dikumpulkan GC sehingga onAvailable berhenti dipanggil diam-diam
+    // dan download jeda-jaringan tak pernah lanjut otomatis.
     private fun registerNetworkCallback() {
         runCatching {
             val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -74,6 +77,7 @@ class App : Application() {
                     runCatching { engine.resumeAutoPaused() }
                 }
             }
+            networkCallback = callback
             if (Build.VERSION.SDK_INT >= 24) {
                 cm.registerDefaultNetworkCallback(callback)
             } else {
@@ -92,6 +96,9 @@ class App : Application() {
 
     @SuppressLint("StaticFieldLeak")
     companion object {
+        // Tahan NetworkCallback seumur proses (lihat registerNetworkCallback).
+        // NetworkCallback bukan Context/activity sehingga aman ditahan statis.
+        @Volatile private var networkCallback: ConnectivityManager.NetworkCallback? = null
         const val CRASH_LOG_FILE = "crash.log"
         private const val THUMB_CLEANUP_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
         // StaticFieldLeak: sengaja ditahan — kedua objek menyimpan Application
