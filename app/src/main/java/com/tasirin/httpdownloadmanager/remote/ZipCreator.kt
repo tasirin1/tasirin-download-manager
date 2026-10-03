@@ -178,7 +178,7 @@ object ZipCreator {
         ?: uri.lastPathSegment?.substringAfterLast('/')
         ?: "file"
 
-    private fun uniqueZipName(base: String, used: MutableMap<String, Int>): String {
+    internal fun uniqueZipName(base: String, used: MutableMap<String, Int>): String {
         val count = used.getOrDefault(base, 0)
         used[base] = count + 1
         if (count == 0) return base
@@ -204,6 +204,12 @@ object ZipCreator {
         // folder dari request: escape wildcard LIKE agar "%"/"_" di nama
         // folder tidak menjaring direktori lain di luar folder terpilih.
         val likeArg = ServerSecurity.escapeLike(folder) + "%"
+        // Batas entri + dedup nama seperti zipTokens/zipFile: folder media
+        // raksasa tanpa budget memblokir thread HTTP ber menit-menit, dan
+        // DISPLAY_NAME duplikat (diizinkan MediaStore) membuat ZipException
+        // duplikat sehingga file kedua hilang diam-diam.
+        val used = mutableMapOf<String, Int>()
+        val budget = ZipBudget()
         runCatching {
             resolver.query(
                 collection, projection,
@@ -214,11 +220,14 @@ object ZipCreator {
                 val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val iRel = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
                 while (c.moveToNext()) {
+                    if (!budget.tryTake()) break
                     val relPath = c.getString(iRel) ?: continue
                     val name = c.getString(iName) ?: continue
                     if (!relPath.startsWith(folder)) continue
                     val dirPart = relPath.removePrefix(folder).trimEnd('/')
-                    val entry = safeEntryPath(if (dirPart.isEmpty()) name else "$dirPart/$name")
+                    val rawEntry = safeEntryPath(if (dirPart.isEmpty()) name else "$dirPart/$name")
+                    if (rawEntry.isEmpty()) continue
+                    val entry = uniqueZipName(rawEntry, used)
                     resolver.openInputStream(
                         ContentUris.withAppendedId(collection, c.getLong(iId))
                     )?.use { input ->

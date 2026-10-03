@@ -85,6 +85,16 @@ class ZipCreatorTest {
     }
 
     @Test
+    fun `zip entry names are deduplicated`() {
+        val used = mutableMapOf<String, Int>()
+        assertEquals("a.mp4", ZipCreator.uniqueZipName("a.mp4", used))
+        assertEquals("a (1).mp4", ZipCreator.uniqueZipName("a.mp4", used))
+        assertEquals("a (2).mp4", ZipCreator.uniqueZipName("a.mp4", used))
+        assertEquals("file", ZipCreator.uniqueZipName("file", used))
+        assertEquals("file (1)", ZipCreator.uniqueZipName("file", used))
+    }
+
+    @Test
     fun `entry path blocks traversal separators and control chars`() {
         assertEquals("folder/file.txt", ZipCreator.safeEntryPath("../folder/..\\file.txt"))
         assertEquals("file.txt", ZipCreator.safeEntryPath("/../../file.txt"))
