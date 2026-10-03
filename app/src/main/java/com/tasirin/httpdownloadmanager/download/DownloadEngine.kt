@@ -236,6 +236,7 @@ class DownloadEngine(appContext: Context) {
         if (cancelledConns.containsKey(id)) runCatching { connection.disconnect() }
     }
 
+    @Synchronized
     fun addDownload(
         url: String,
         fileName: String?,
@@ -770,6 +771,7 @@ class DownloadEngine(appContext: Context) {
      *  folder custom `f:` bisa beda volume dengan penyimpanan internal). */
     fun freeSpaceBytesFor(folderPath: String): Long = fileSaver.destinationFreeBytes(folderPath)
 
+    @Synchronized
     fun rename(id: String, newName: String): Boolean {
         val item = _items.value.find { it.id == id } ?: return false
         if (item.state != DownloadState.COMPLETED) return false
@@ -3093,6 +3095,7 @@ class DownloadEngine(appContext: Context) {
     }
 
     @Synchronized
+    @Synchronized
     private fun updateItem(
         id: String,
         persist: Boolean = true,
@@ -3183,16 +3186,17 @@ class DownloadEngine(appContext: Context) {
     private fun persistCookiesImmediate() {
         try {
             val arr = JSONArray()
+            val now = System.currentTimeMillis()
             cookieManager.cookieStore.cookies.forEach { c ->
-                // Lewati yang sudah kedaluwarsa; simpan sisa umur agar cookie
-                // sesi situs tidak hidup selamanya di disk (basi -> 403 misterius).
                 if (c.hasExpired()) return@forEach
+                val ttlSec = if (c.maxAge > 0) c.maxAge else COOKIE_LEGACY_MAX_AGE_SEC
                 arr.put(JSONObject().apply {
                     put("name", c.name)
                     put("value", c.value)
                     put("domain", c.domain.orEmpty())
                     put("path", c.path.orEmpty())
                     put("maxAge", c.maxAge)
+                    put("expAt", now + ttlSec * 1000L)
                 })
             }
             cookiePrefs.edit { putString("cookies", arr.toString()) }
@@ -3204,18 +3208,24 @@ class DownloadEngine(appContext: Context) {
         try {
             val raw = cookiePrefs.getString("cookies", null) ?: return
             val arr = JSONArray(raw)
+            val now = System.currentTimeMillis()
             for (i in 0 until arr.length()) {
-                val obj = arr.getJSONObject(i)
-                val cookie = HttpCookie(obj.getString("name"), obj.getString("value"))
-                cookie.domain = obj.getString("domain")
-                cookie.path = obj.getString("path")
-                // Batas umur agar tidak abadi: format lama tanpa maxAge dan
-                // cookie sesi (maxAge < 0) diberi umur 7 hari; entri baru memakai
-                // maxAge asli server bila positif.
-                val storedAge = obj.optLong("maxAge", COOKIE_LEGACY_MAX_AGE_SEC)
-                cookie.maxAge = if (storedAge < 0) COOKIE_LEGACY_MAX_AGE_SEC else storedAge
-                if (cookie.hasExpired()) continue
-                cookieManager.cookieStore.add(null, cookie)
+                runCatching {
+                    val obj = arr.getJSONObject(i)
+                    val expAt = obj.optLong("expAt", 0L)
+                    if (expAt > 0 && expAt <= now) return@runCatching
+                    val cookie = HttpCookie(obj.getString("name"), obj.getString("value"))
+                    cookie.domain = obj.getString("domain")
+                    cookie.path = obj.getString("path")
+                    if (expAt > 0) {
+                        cookie.maxAge = ((expAt - now) / 1000L).coerceAtLeast(1L)
+                    } else {
+                        val storedAge = obj.optLong("maxAge", COOKIE_LEGACY_MAX_AGE_SEC)
+                        cookie.maxAge = if (storedAge < 0) COOKIE_LEGACY_MAX_AGE_SEC else storedAge
+                    }
+                    if (cookie.hasExpired()) return@runCatching
+                    cookieManager.cookieStore.add(null, cookie)
+                }
             }
         } catch (_: Exception) { /* cookie persist is best-effort */ }
     }

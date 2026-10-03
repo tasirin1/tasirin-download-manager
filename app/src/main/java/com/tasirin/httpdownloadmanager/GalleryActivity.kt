@@ -282,7 +282,7 @@ class GalleryActivity : AppCompatActivity() {
         suspend fun loadThumb(context: Context, e: MediaLibrary.MediaEntry, req: Int): Bitmap? =
             withContext(Dispatchers.IO) {
                 val cache = cacheFor(context)
-                cache.get(e.token)?.let { return@withContext it }
+                synchronized(cacheLock) { cache.get(e.token) }?.let { return@withContext it }
 
                 // Satu generator/cache disk dipakai remote web & galeri native;
                 // ini menghindari dua file thumbnail berbeda untuk video sama.
@@ -297,7 +297,7 @@ class GalleryActivity : AppCompatActivity() {
                     ensureActive()
                     val tiny = scaleDown(direct, req)
                     if (tiny !== direct) direct.recycle()
-                    cache.put(e.token, tiny)
+                    synchronized(cacheLock) { cache.put(e.token, tiny) }
                     return@withContext tiny
                 }
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -316,7 +316,7 @@ class GalleryActivity : AppCompatActivity() {
                 ensureActive()
                 val bitmap = scaleDown(decoded, req)
                 if (bitmap !== decoded) decoded.recycle()
-                cache.put(e.token, bitmap)
+                synchronized(cacheLock) { cache.put(e.token, bitmap) }
                 bitmap
             }
     }
