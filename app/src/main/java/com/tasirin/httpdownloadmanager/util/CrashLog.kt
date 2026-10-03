@@ -49,7 +49,9 @@ object CrashLog {
                         raf.readFully(buf)
                         var start = 0
                         while (start < buf.size && buf[start] != '\n'.code.toByte()) start++
-                        if (start < buf.size) start++
+                        // Tanpa newline di jendela 100KB: pertahankan seluruh
+                        // jendela, bukan memangkas log jadi kosong.
+                        if (start < buf.size) start++ else start = 0
                         val keep = buf.size - start
                         raf.setLength(keep.toLong())
                         raf.seek(0)

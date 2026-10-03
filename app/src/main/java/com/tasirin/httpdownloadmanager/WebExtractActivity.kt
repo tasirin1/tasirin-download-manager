@@ -8,6 +8,7 @@ import android.os.Looper
 import androidx.core.net.toUri
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -142,6 +143,20 @@ class WebExtractActivity : AppCompatActivity() {
                 failingUrl: String?
             ) {
                 if (failingUrl != null && failingUrl == view.url) {
+                    statusText.text = getString(R.string.web_extract_failed)
+                    progress.isVisible = false
+                }
+            }
+
+            // Callback API 23+: tanpa ini error main frame di perangkat modern
+            // tak pernah tampil dan status macet di "loading".
+            @SuppressLint("NewApi")
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceError
+            ) {
+                if (request.isForMainFrame) {
                     statusText.text = getString(R.string.web_extract_failed)
                     progress.isVisible = false
                 }

@@ -1614,6 +1614,20 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     /** Buka APK dengan beberapa fallback intent. */
     private fun openApk(uri: Uri) {
+        // Android 8+: installer diblokir diam-diam tanpa izin ini; arahkan
+        // user ke pengaturannya alih-alih gagal tanpa penjelasan.
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            runCatching {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName")
+                    )
+                )
+            }
+            Toast.makeText(this, R.string.apk_unknown_sources, Toast.LENGTH_LONG).show()
+            return
+        }
         // 1) ACTION_VIEW + MIME khusus APK (paling kompatibel lintas versi)
         try {
             val i = Intent(Intent.ACTION_VIEW)

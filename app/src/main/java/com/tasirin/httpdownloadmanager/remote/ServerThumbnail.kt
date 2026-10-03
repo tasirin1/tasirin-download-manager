@@ -11,6 +11,7 @@ import com.tasirin.httpdownloadmanager.util.sha256Hex
 import com.tasirin.httpdownloadmanager.util.scaleDown
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -105,15 +106,30 @@ internal fun getOrCreateThumb(
                 }
             thumbFailures.remove(key)
             runCatching {
-                val out = FileOutputStream(cached)
+                // Tulis via staging lalu rename: gagal di tengah tak boleh
+                // menyisakan file setengah jadi yang dikira cache valid.
+                val staging = File(dir, "$key.jpg.tmp")
                 try {
-                    bmp.compress(Bitmap.CompressFormat.JPEG, 72, out)
+                    FileOutputStream(staging).use { out ->
+                        if (!bmp.compress(Bitmap.CompressFormat.JPEG, 72, out)) {
+                            throw IOException("Thumbnail compress failed")
+                        }
+                    }
+                    if (!staging.renameTo(cached)) {
+                        runCatching { cached.delete() }
+                        if (!staging.renameTo(cached) || cached.length() <= 0) {
+                            throw IOException("Thumbnail finalize failed")
+                        }
+                    }
                 } finally {
-                    runCatching { out.close() }
                     runCatching { bmp.recycle() }
+                    if (staging.exists()) runCatching { staging.delete() }
                 }
                 cached
-            }.getOrNull()
+            }.getOrElse {
+                runCatching { cached.delete() }
+                null
+            }
         }
     }.also { lock.lastUse.set(System.currentTimeMillis()) }
 }

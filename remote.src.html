@@ -2091,7 +2091,7 @@ let currentItems = [];
 let webFilter = 'ALL';
 try { webFilter = localStorage.getItem('dl_filter') || 'ALL'; } catch (e) {}
 let dlPinned = new Set();
-try { const _pv = localStorage.getItem('dl_pinned'); if (_pv) dlPinned = new Set(JSON.parse(_pv)); } catch (_e) {}
+try { const _pv = localStorage.getItem('dl_pinned'); if (_pv) { const _arr = JSON.parse(_pv); dlPinned = new Set(Array.isArray(_arr) ? _arr.filter(function (x) { return typeof x === 'string'; }) : []); } } catch (_e) {}
 const WEB_FILTERS = {ALL:'webFilterAll', ACTIVE:'webFilterActive', COMPLETED:'webFilterCompleted', FAILED:'webFilterFailed', NEW:'webFilterNew'};
 if (!WEB_FILTERS[webFilter]) webFilter = 'ALL';
 Object.entries(WEB_FILTERS).forEach(function (e) {

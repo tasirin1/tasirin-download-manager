@@ -315,4 +315,5 @@
     <string name="gallery_thumb_desc">Media preview</string>
     <string name="label_user_agent">User-Agent</string>
     <string name="hint_custom_user_agent">Or type custom User-Agent</string>
+    <string name="apk_unknown_sources">Allow installs from this app in system settings, then tap the APK again.</string>
 </resources>
