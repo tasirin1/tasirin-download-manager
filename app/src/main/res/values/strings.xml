@@ -33,8 +33,6 @@
     <string name="update_open_release">Open release page</string>
     <string name="update_later">Later</string>
     <string name="update_browser_note">This app never downloads APK files itself. Get the new version in your browser and install it manually.</string>
-    <string name="apk_install_title">Install APK</string>
-    <string name="apk_install_manual">This app cannot start installations directly. Open the APK file from a file manager to install it.</string>
     <string name="server_network_warning">Warning: the remote server exposes your files to the local network. Keep PIN required on shared or untrusted Wi-Fi.</string>
     <string name="update_title">Update available</string>
     <string name="invalid_url">URL must not be empty</string>
