@@ -458,10 +458,22 @@ class DownloadEngine(appContext: Context) {
         writer: (OutputStream) -> Unit
     ): FileSaver.PublishResult {
         val name = sanitizeFileName(fileName)
-        val size = length
         val saver = fileSaver
         val published = saver.saveStream(name, destination, folderPath, writer)
         val finalName = published.fileName ?: name
+        // Ukuran riil hasil tulis, bukan angka deklarasi: upload chunked
+        // (length 0) atau Content-Length yang meleset membuat daftar tampil
+        // 0 byte / salah. Stat file dulu, fallback ke angka deklarasi.
+        val actualSize = published.filePath?.let { path ->
+            runCatching { File(path).length() }.getOrDefault(-1L)
+        }?.takeIf { it >= 0 }
+            ?: published.contentUri?.let { uri ->
+                runCatching {
+                    context.contentResolver.openAssetFileDescriptor(uri.toUri(), "r")
+                        ?.use { it.length } ?: -1L
+                }.getOrDefault(-1L)
+            }?.takeIf { it >= 0 }
+        val size = actualSize ?: length.coerceAtLeast(0L)
         val item = DownloadItem(
             id = UUID.randomUUID().toString(),
             url = "upload://$finalName",
