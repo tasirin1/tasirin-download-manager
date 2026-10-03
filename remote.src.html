@@ -4216,9 +4216,15 @@ async function moveHere() {
   }
   const yesBtn = document.getElementById('moveYes');
   yesBtn.disabled = true;
-  const res = await runFsActions('Moving', 'moved', moveItems, function (it) {
-    return {action: 'move', path: it.path, dest: dest};
-  });
+  let res;
+  try {
+    res = await runFsActions('Moving', 'moved', moveItems, function (it) {
+      return {action: 'move', path: it.path, dest: dest};
+    });
+  } finally {
+    // Tanpa ini tombol lumpuh selamanya setelah satu kali move (wajib reload halaman).
+    yesBtn.disabled = false;
+  }
   const count = res.done;
   closeMovePicker();
   if (res.failed) {

@@ -2098,9 +2098,14 @@ return;
 }
 const yesBtn = document.getElementById('moveYes');
 yesBtn.disabled = true;
-const res = await runFsActions('Moving', 'moved', moveItems, function (it) {
+let res;
+try {
+res = await runFsActions('Moving', 'moved', moveItems, function (it) {
 return {action: 'move', path: it.path, dest: dest};
 });
+} finally {
+yesBtn.disabled = false;
+}
 const count = res.done;
 closeMovePicker();
 if (res.failed) {
