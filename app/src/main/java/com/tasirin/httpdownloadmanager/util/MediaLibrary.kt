@@ -160,12 +160,20 @@ object MediaLibrary {
 
     fun tokenForUri(uri: String): String = cachedToken("u:$uri")
 
-    fun decodeToken(token: String): String? = runCatching {
-        String(
-            Base64.decode(token, Base64.URL_SAFE or Base64.NO_WRAP),
-            Charsets.UTF_8
-        )
-    }.getOrNull()
+    /** Token query terpanjang yang masih di-decode: token asli (base64
+     *  path/URI) selalu pendek; tanpa batas, token raksasa di query langsung
+     *  menjadi byte[] di RAM sebelum validasi apa pun. */
+    const val MAX_TOKEN_LENGTH = 4096
+
+    fun decodeToken(token: String): String? {
+        if (token.length > MAX_TOKEN_LENGTH) return null
+        return runCatching {
+            String(
+                Base64.decode(token, Base64.URL_SAFE or Base64.NO_WRAP),
+                Charsets.UTF_8
+            )
+        }.getOrNull()
+    }
 
     /** Scan dengan cache 30 detik + auto-invalidasi saat MediaStore berubah.
      *  [maxEntries] membatasi berapa entry di-hold di memori; galeri mulai dari

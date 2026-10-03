@@ -159,16 +159,23 @@ def scan_xml() -> list:
 
 def scan_kotlin() -> list:
     hits = []
+    # Tokenizer satu-pass: raw string, komentar blok, komentar baris, char
+    # literal ('"'), atau string biasa — hanya isi string biasa yang dipindai.
+    # `//` di dalam string (mis. "https://") ikut termakan token string
+    # sehingga tidak dianggap komentar dan tidak merusak pairing (false +/-).
+    token_re = re.compile(
+        r'"""[\s\S]*?"""|/\*.*?\*/|//[^\n]*|\'(?:[^\'\\\n]|\\.)*\''
+        r'|"((?:[^"\\]|\\.)*)"', re.S
+    )
     for path in sorted((ROOT / "app" / "src" / "main" / "java").rglob("*.kt")):
         src = path.read_text(encoding="utf-8")
-        src = re.sub(r"//[^\n]*", "", src)
-        src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
-        src = re.sub(r'"""', "", src)  # lewati raw string (HTML/CSS)
-        for m in re.finditer(r'"((?:[^"\\]|\\.)*)"', src):
-            for word, _ in banned_hits(m.group(1)):
+        for m in token_re.finditer(src):
+            lit = m.group(1)
+            if lit is None:
+                continue
+            for word, _ in banned_hits(lit):
                 hits.append(f"{path.name}:{word}")
     return hits
-
 
 def node_check() -> list:
     errors = []

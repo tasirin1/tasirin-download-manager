@@ -917,17 +917,25 @@ class SettingsActivity : AppCompatActivity() {
         if (!storagePathEdited) return
         val path = pathInput.text?.toString()?.trim().orEmpty()
         if (path.isEmpty()) return
-        val dir = java.io.File(path)
+        // Samakan dengan folder galeri/ekstra: simpan path kanonikal agar
+        // `..`/trailing slash tak tersimpan mentah dan lolos perbandingan
+        // string di tempat lain. canonicalPath bisa melempar IOException.
+        val normalized = runCatching { java.io.File(path).canonicalPath }.getOrNull()
+        if (normalized.isNullOrEmpty()) {
+            Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
+            return
+        }
+        val dir = java.io.File(normalized)
         if (!dir.isDirectory && !dir.mkdirs()) {
             Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
             return
         }
-        StoragePrefs.setTextFolder(this, path)
+        StoragePrefs.setTextFolder(this, normalized)
         StoragePrefs.saveFolder(this, null, null)
         refreshActiveStorageUi()
         Toast.makeText(
             this,
-            getString(R.string.storage_text_folder_saved, path),
+            getString(R.string.storage_text_folder_saved, normalized),
             Toast.LENGTH_SHORT
         ).show()
     }

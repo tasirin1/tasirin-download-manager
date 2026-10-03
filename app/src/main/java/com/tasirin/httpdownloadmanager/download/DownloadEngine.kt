@@ -1195,11 +1195,6 @@ class DownloadEngine(appContext: Context) {
             message.contains("timeout", ignoreCase = true)
     }
 
-    private fun isGitHubUrl(url: String): Boolean =
-        url.startsWith("https://") &&
-            (url.contains("github.com") ||
-                url.contains("githubusercontent.com") ||
-                url.contains("github.io"))
 
     private fun githubMirrors(url: String): List<String> {
         // URL signed release-asset (release-assets.githubusercontent.com) hanya
@@ -1975,7 +1970,7 @@ class DownloadEngine(appContext: Context) {
         // Segmen terenkripsi yang diunduh mentah = file sampah berstatus
         // COMPLETED: gagal cepat dengan pesan jelas, bukan unduh sia-sia.
         if (isEncryptedHlsPlaylist(body)) {
-            throw IOException("HLS terenkripsi (EXT-X-KEY) tidak didukung")
+            throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
         }
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
@@ -1989,10 +1984,10 @@ class DownloadEngine(appContext: Context) {
             App.logEvent("HLS: direct media playlist, ${segments.size} segments")
             if (segments.isEmpty()) return null
             if (!body.contains("#EXT-X-ENDLIST")) {
-                throw IOException("Live HLS tidak didukung (playlist tanpa EXT-X-ENDLIST)")
+                throw IOException("Live HLS not supported (playlist without EXT-X-ENDLIST)")
             }
             if (isEncryptedHlsPlaylist(body)) {
-                throw IOException("HLS terenkripsi (EXT-X-KEY) tidak didukung")
+                throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
             }
             val durations = mediaDurations(body)
             return HlsPlan(
@@ -2153,10 +2148,10 @@ class DownloadEngine(appContext: Context) {
         // gagal cepat dengan pesan jelas, bukan mengunduh snapshot window
         // yang tak berujung (dan mengulang dari nol tiap retry HLS).
         if (!body.contains("#EXT-X-ENDLIST")) {
-            throw IOException("Live HLS tidak didukung (playlist tanpa EXT-X-ENDLIST)")
+            throw IOException("Live HLS not supported (playlist without EXT-X-ENDLIST)")
         }
         if (isEncryptedHlsPlaylist(body)) {
-            throw IOException("HLS terenkripsi (EXT-X-KEY) tidak didukung")
+            throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
         }
         val result = mutableListOf<Pair<String, Long>>()
         val lines = body.lines()
@@ -2385,7 +2380,7 @@ class DownloadEngine(appContext: Context) {
         }
 
         ensureItemPresent(item.id, partialFile)
-        verifySize(downloaded, total)
+        verifySize(downloaded, total, fileName)
 
         val published0 = publishItem(saver, partialFile, fileName, item)
         val finalName = published0.fileName ?: fileName
@@ -2557,7 +2552,7 @@ class DownloadEngine(appContext: Context) {
 
         ensureItemPresent(item.id)
         val current = _items.value.find { it.id == item.id } ?: return
-        verifySize(current.bytesDownloaded, current.totalBytes)
+        verifySize(current.bytesDownloaded, current.totalBytes, current.fileName)
 
         val merged = saver.mergeSegments(fileName, segments.size)
         ensureItemPresent(item.id, merged)
@@ -2880,12 +2875,17 @@ class DownloadEngine(appContext: Context) {
         segFlushJobs.remove(id)?.cancel()
     }
 
-    private fun verifySize(downloaded: Long, total: Long) {
-        // total = klaim Content-Length. Overrun (byte > klaim) selalu sah,
-        // tapi underrun sekecil apa pun berarti file terpotong dan tidak
-        // boleh dilaporkan COMPLETED (toleransi lama menutupi video korup).
+    private fun verifySize(downloaded: Long, total: Long, label: String) {
+        // total = klaim Content-Length. Underrun sekecil apa pun berarti file
+        // terpotong dan tidak boleh dilaporkan COMPLETED (toleransi lama
+        // menutupi video korup). Overrun tetap diterima (klaim bisa basi,
+        // mis. gzip/proxy) tapi dicatat: tanpa checksum, kelebihan byte
+        // injeksi tak terdeteksi sehingga layak terlihat di log.
         if (total > 0 && downloaded < total) {
             throw IOException("Size mismatch: expected $total (Content-Length), received $downloaded")
+        }
+        if (total > 0 && downloaded > total) {
+            App.logEvent("SIZE OVERRUN: $label — received $downloaded > claimed $total (kept, no checksum)")
         }
     }
 
@@ -3511,6 +3511,17 @@ private class SpeedThrottle(
  *  kecepatan anjlok (di bawah ambang minimum terus-menerus), lalu melempar
  *  IOException supaya handleFailure bisa pindah mirror / retry. Otomatis
  *  nonaktif bila pengguna memasang batas kecepatan di bawah ambang. */
+/** True bila host URL adalah GitHub (termasuk subdomain/asset host): cek host
+ *  persis, bukan substring full URL — `https://evil.com/?x=github.com` tidak
+ *  boleh memicu mirror proxy pihak ketiga. Internal agar bisa di-unit-test. */
+internal fun isGitHubUrl(url: String): Boolean {
+    if (!url.startsWith("https://", ignoreCase = true)) return false
+    val host = runCatching { java.net.URL(url).host }.getOrDefault("").lowercase()
+    return host == "github.com" || host.endsWith(".github.com") ||
+        host == "githubusercontent.com" || host.endsWith(".githubusercontent.com") ||
+        host == "github.io" || host.endsWith(".github.io")
+}
+
 // Internal (bukan private) agar bisa di-unit-test langsung (lihat WatchdogTest).
 internal class DownloadHealthWatchdog(limitKbps: Int) {
     private val limitedLow = limitKbps > 0 && limitKbps * 1024L <= MIN_GOOD_SPEED_BPS

@@ -502,6 +502,41 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     }
 
+    /** Snapshot tautan share aktif untuk dibawa ke instance baru saat ganti
+     *  port (restartHttpServer): tanpa ini link `/share` 24 jam mati tiap
+     *  ganti port karena stopServer mengosongkan peta token. */
+    fun snapshotShares(): Map<String, ShareEntry> = synchronized(shareLock) {
+        pruneShares()
+        shareTokens.toMap()
+    }
+
+    fun restoreShares(entries: Map<String, ShareEntry>) {
+        if (entries.isEmpty()) return
+        synchronized(shareLock) {
+            pruneShares()
+            val now = System.currentTimeMillis()
+            entries.forEach { (token, entry) ->
+                if (!ServerSecurity.isShareExpired(entry.expiresAt, now)) {
+                    shareTokens.putIfAbsent(token, entry)
+                }
+            }
+        }
+    }
+
+    /** Snapshot upload selesai (<1 jam) agar jawaban cepat "already done"
+     *  tetap ada setelah ganti port. Upload yang masih berjalan sembuh
+     *  sendiri: tmp di cacheDir lestari dan klien retry dari chunk 0. */
+    fun snapshotCompletedUploads(): Map<String, Pair<String, Long>> =
+        completedUploads.toMap()
+
+    fun restoreCompletedUploads(entries: Map<String, Pair<String, Long>>) {
+        if (entries.isEmpty()) return
+        val now = System.currentTimeMillis()
+        entries.forEach { (id, done) ->
+            if (now - done.second <= 3_600_000L) completedUploads.putIfAbsent(id, done)
+        }
+    }
+
     fun stopServer() {
         synchronized(lifecycleLock) {
             periodicCleanupJob?.cancel()
