@@ -55,6 +55,16 @@ class UpdaterTest {
     }
 
     @Test
+    fun `kode lawas overflow ditolak bukan jatuh ke tag`() {
+        assertNull(
+            Updater.codeFromRelease(
+                "v1.0.5",
+                "tasirin-download-manager-v1.0.5-99999999999.apk"
+            )
+        )
+    }
+
+    @Test
     fun `tag rusak dan nama tanpa kode menghasilkan null`() {
         assertNull(Updater.codeFromRelease("release-foo", "tasirin-download-manager-v1.0.1191.apk"))
         assertNull(Updater.codeFromRelease("release-foo", "mapping.txt"))

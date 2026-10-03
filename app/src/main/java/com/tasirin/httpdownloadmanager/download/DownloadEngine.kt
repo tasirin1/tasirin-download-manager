@@ -3549,7 +3549,7 @@ internal class DownloadHealthWatchdog(limitKbps: Int) {
     private var slowSince = 0L
 
     fun check(now: Long, downloaded: Long, total: Long, speed: Long) {
-        if (total <= 0 || downloaded >= total) return
+        if (total > 0 && downloaded >= total) return
         if (downloaded != lastBytes) {
             lastBytes = downloaded
             lastAt = now
@@ -3558,6 +3558,17 @@ internal class DownloadHealthWatchdog(limitKbps: Int) {
             // divonis mati tiap 20 detik lalu retry gagal terus — padahal
             // yang boleh divonis hanya byte yang macet total.
             slowSince = 0L
+        }
+        if (total <= 0) {
+            // Total tak diketahui (HLS/unknown-length): hanya vonis macet
+            // total (speed nol), bukan vonis lambat — kecepatan segmen HLS
+            // memang burst sehingga ambang 2 KB/s memberi vonis palsu.
+            if (speed == 0L && now - lastAt >= STALL_TIMEOUT_MS) {
+                throw IOException(
+                    "Connection stalled: no data for ${STALL_TIMEOUT_MS / 1000} seconds — retrying"
+                )
+            }
+            return
         }
         if (speed > 0 && !limitedLow && speed < MIN_GOOD_SPEED_BPS) {
             if (slowSince == 0L) slowSince = now

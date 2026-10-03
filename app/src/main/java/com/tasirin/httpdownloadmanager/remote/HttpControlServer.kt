@@ -125,7 +125,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
     // Cache itemsJson berdasarkan signature; satu Pair agar sig & JSON tidak
     // pernah terbaca sebagai versi campuran saat request server paralel.
-    @Volatile private var cachedItems: Pair<Int, JSONArray>? = null
+    @Volatile private var cachedItems: Pair<Long, JSONArray>? = null
     // Fix #4: cache terpisah untuk bytes/speed yang berubah tiap detik
     // tanpa rebuild struktur JSON (hemat ~30% CPU saat polling aktif).
     @Volatile private var lastDynamicUpdate = 0L
@@ -880,25 +880,27 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // bisa terjalin antar thread (A tulis items, B tulis items+hash, A tulis
     // hash basi) sehingga pasangan sobek — request berikutnya memakai hash
     // milik daftar lain dan snapshot/SSE basi sampai instance daftar berganti.
-    @Volatile private var lastSig: Pair<List<DownloadItem>, Int>? = null
+    @Volatile private var lastSig: Pair<List<DownloadItem>, Long>? = null
 
-    private fun itemsSignature(items: List<DownloadItem>): Int {
+    private fun itemsSignature(items: List<DownloadItem>): Long {
         // Baca cache tanpa menahan lock selama hash loop (request 1-2x/detik).
         lastSig?.let { (cached, h) -> if (cached === items) return h }
-        var h = items.size
+        // Akumulator 64-bit: ruang Int 32-bit tabrakan jauh lebih mudah pada
+        // daftar besar sehingga request bisa memakai JSON basi satu siklus poll.
+        var h = items.size.toLong()
         items.forEach { item ->
-            h = h * 31 + item.id.hashCode() * 7 + item.state.hashCode() * 13 +
+            h = h * 31 + item.id.hashCode().toLong() * 7 + item.state.hashCode().toLong() * 13 +
                 // fileName/url/totalBytes ikut signature: rename atau ganti URL
                 // (mis. hasil resolveFinalName dari Content-Disposition) wajib
                 // memicu rebuild cache JSON remote, bukan menampilkan nama lama.
-                item.fileName.hashCode() * 17 + item.url.hashCode() * 23 +
-                item.totalBytes.hashCode() * 21 +
-                item.bytesDownloaded.hashCode() * 19 + item.speedBps.hashCode() * 29 +
-                item.etaSeconds.hashCode() * 31 + item.finishedAt.hashCode() * 41 +
-                item.priority.hashCode() * 43 + item.retryCount.hashCode() * 53 +
+                item.fileName.hashCode().toLong() * 17 + item.url.hashCode().toLong() * 23 +
+                item.totalBytes.hashCode().toLong() * 21 +
+                item.bytesDownloaded.hashCode().toLong() * 19 + item.speedBps.hashCode().toLong() * 29 +
+                item.etaSeconds.hashCode().toLong() * 31 + item.finishedAt.hashCode().toLong() * 41 +
+                item.priority.hashCode().toLong() * 43 + item.retryCount.hashCode().toLong() * 53 +
                 (if (item.checksumVerified) 1 else 0) * 59 +
-                item.progressPercentOverride.hashCode() * 61 +
-                (item.error?.hashCode() ?: 0) * 47
+                item.progressPercentOverride.hashCode().toLong() * 61 +
+                (item.error?.hashCode() ?: 0).toLong() * 47
         }
         // Tulis tunggal objek immutable: publikasi atomik, tak pernah sobek.
         lastSig = items to h
@@ -1350,7 +1352,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         synchronized(uploadBufferReservation) {
             val now = System.currentTimeMillis()
-            if (now - cachedUploadBufferAt > 10_000 || cachedUploadBufferBytes <= 0) {
+            // Murni berbasis waktu: buffer yang memang nol wajib di-cache 10 detik
+            // juga (sebelumnya `<= 0` memindai ulang disk tiap chunk). Invalidasi
+            // tetap jalan via finally yang menulis 0L ke penanda waktu.
+            if (cachedUploadBufferAt == 0L || now - cachedUploadBufferAt > 10_000) {
                 cachedUploadBufferBytes = context.cacheDir.listFiles()
                     ?.filter { it.isFile && it.name.startsWith("up_") }
                     ?.sumOf { it.length() } ?: 0L
@@ -2973,7 +2978,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // Ini menutup celah lama: perubahan yang tertahan throttle tidak
                     // perlu menunggu ticker status 10 dtk.
                     var tick = 0
-                    var lastBuiltSig = 0
+                    var lastBuiltSig = 0L
                     while (true) {
                         delay(1_000)
                         tick++

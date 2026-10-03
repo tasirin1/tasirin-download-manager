@@ -55,8 +55,11 @@ object Updater {
      *  Murni (tanpa Android) agar bisa di-unit-test; pemanggil wajib
      *  memfilter asset `.apk` dulu (mapping.txt tidak boleh lolos). */
     internal fun codeFromRelease(tag: String, assetName: String): Int? {
-        LEGACY_APK_CODE_RE.find(assetName)?.groupValues?.get(1)?.toIntOrNull()
-            ?.let { return it }
+        // Nama lawas yang cocok pola tapi kodenya overflow Int (digit raksasa)
+        // wajib ditolak, bukan jatuh ke kode tag (asset salah versi terpilih).
+        LEGACY_APK_CODE_RE.find(assetName)?.let { match ->
+            return match.groupValues.get(1).toIntOrNull() ?: return null
+        }
         val run = TAG_RUN_RE.find(tag.trim())?.groupValues?.get(1)?.toLongOrNull()
             ?.takeIf { it in 0..20_000_000 }
             ?: return null

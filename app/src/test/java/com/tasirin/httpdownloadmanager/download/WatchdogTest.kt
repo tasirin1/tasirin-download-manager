@@ -64,4 +64,27 @@ class WatchdogTest {
         w.check(100_000L, 1_000_000L, 1_000_000L, 0L)
         w.check(100_000L, 0L, 0L, 0L)
     }
+
+    @Test fun totalNolBergerak_tidakDivonisLambat() {
+        // HLS/unknown-length bersifat burst: byte bergerak tak boleh kena
+        // vonis lambat 20 detik seperti total diketahui.
+        val w = DownloadHealthWatchdog(0)
+        var downloaded = 0L
+        var t = 0L
+        repeat(60) {
+            t += 1000
+            downloaded += 1500
+            w.check(t, downloaded, 0L, 1500L)
+        }
+    }
+
+    @Test fun totalNolMacetTotal_divonisStall() {
+        val w = DownloadHealthWatchdog(0)
+        w.check(1_000L, 5000L, 0L, 0L)
+        try {
+            w.check(31_000L, 5000L, 0L, 0L)
+            fail("harus melempar IOException saat total tak diketahui tapi stall 30 detik")
+        } catch (_: IOException) {
+        }
+    }
 }
