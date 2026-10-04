@@ -51,6 +51,29 @@ var b=h.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/gi)||[];
 for(var q=0;q<b.length;q++)bucket2(b[q]);
 mp4=mp4.concat(mp42);hls=hls.concat(hls2);
 var src=mp4.length>0?mp4[0]:(hls.length>0?hls[0]:'');
+// Halaman dokumen Scribd: kumpulkan gambar dari CDN scribdassets yang
+// ter-render (pratinjau gratis sesi anonim). Abaikan chrome situs
+// (ikon/logo/avatar) dan non-gambar; urutkan menurut nomor halaman bila ada.
+var docPages=[],seenDocPages={};
+function docPageNum(u){var m=u.match(/pages?[_\/\-]?(\d{1,4})/i)||u.match(/[._-](\d{1,4})\.(?:jpe?g|png|webp|gif)(?:[?#]|$)/i);return m?parseInt(m[1],10):-1;}
+function collectDocPage(u){u=(u||'').trim();if(!u||u.indexOf('blob:')===0||u.indexOf('data:')===0)return;
+if(u.indexOf('//')===0)u=location.protocol+u;if(u.indexOf('http')!==0)return;u=abs(u);
+var host='';try{host=new URL(u).hostname.toLowerCase();}catch(e){return;}
+if(host.indexOf('scribdassets.com')<0||seenDocPages[u])return;
+var low=u.toLowerCase();
+if(/icon|logo|avatar|emoji|sprite|badge|button|spinner|placeholder|favicon|1x1|pixel|blank/.test(low))return;
+if(low.indexOf('page')<0&&!/[._-]\d{1,4}\.(?:jpe?g|png|webp|gif)(?:[?#]|$)/.test(low))return;
+seenDocPages[u]=1;docPages.push({u:u,n:docPageNum(u)});}
+docs.forEach(function(doc){try{
+var pimgs=doc.getElementsByTagName('img');
+for(var g=0;g<pimgs.length&&docPages.length<300;g++){var pim=pimgs[g];
+collectDocPage(pim.src);collectDocPage(pim.getAttribute('data-src'));
+collectDocPage(pim.getAttribute('data-original'));collectDocPage(pim.getAttribute('data-lazy-src'));
+var pset=pim.getAttribute('srcset');
+if(pset){var pparts=pset.split(',');for(var s2=0;s2<pparts.length;s2++){collectDocPage(pparts[s2].trim().split(' ')[0]);}}}
+}catch(e){}});
+docPages.sort(function(a,b){if(a.n>=0&&b.n>=0)return a.n-b.n;if(a.n>=0)return -1;if(b.n>=0)return 1;return 0;});
+var pageList=docPages.slice(0,300).map(function(dp,idx){return{url:dp.u,title:'Page '+(dp.n>=0?dp.n:(idx+1))};});
 var eps=[],seenEps={};
 docs.forEach(function(doc){try{
 var links=doc.getElementsByTagName('a');
@@ -66,5 +89,5 @@ var t=((a.textContent||'').trim().replace(/\s+/g,' ').slice(0,80))||u.split('/')
 eps.push({url:u,title:t});}
 }catch(e){}});
 return JSON.stringify({src:src,title:document.title||'',
-hasVideo:(hasVideo||window.__hhBlob===true),hasBlob:(window.__hhBlob===true),episodes:eps});
-}catch(e){return JSON.stringify({src:'',title:'',hasVideo:false,hasBlob:false,episodes:[]});}})()
+hasVideo:(hasVideo||window.__hhBlob===true),hasBlob:(window.__hhBlob===true),episodes:eps,pages:pageList});
+}catch(e){return JSON.stringify({src:'',title:'',hasVideo:false,hasBlob:false,episodes:[],pages:[]});}})()

@@ -37,9 +37,11 @@ class WebExtractActivity : AppCompatActivity() {
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_WATCH_URL = "extra_watch_url"
         const val EXTRA_EPISODES_JSON = "extra_episodes_json"
+        const val EXTRA_PAGES_JSON = "extra_pages_json"
         private const val GRAB_INTERVAL_MS = 1500L
         private const val MAX_GRAB_TRIES = 40
         private const val MAX_EPISODES = 50
+        private const val MAX_PAGES = 300
     }
 
     private lateinit var webView: WebView
@@ -53,6 +55,7 @@ class WebExtractActivity : AppCompatActivity() {
     private var loopStarted = false
     private var manualGrab = false
     private var lastEpisodesJson = ""
+    private var lastPagesJson = ""
     private var allowedHost = ""
     private var cachedGrabScript: String? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -64,6 +67,8 @@ class WebExtractActivity : AppCompatActivity() {
             if (grabTries >= MAX_GRAB_TRIES) {
                 if (lastEpisodesJson.isNotBlank() && lastEpisodesJson != "[]") {
                     onEpisodesOnly(lastEpisodesJson, webView.title.orEmpty())
+                } else if (lastPagesJson.isNotBlank() && lastPagesJson != "[]") {
+                    onPagesOnly(lastPagesJson, webView.title.orEmpty())
                 } else {
                     statusText.text = getString(R.string.web_extract_failed)
                     progress.isVisible = false
@@ -210,13 +215,17 @@ class WebExtractActivity : AppCompatActivity() {
             val obj = runCatching { JSONObject(payload) }.getOrNull() ?: return@evaluateJavascript
             val episodesJson = trimEpisodes(obj.optJSONArray("episodes")?.toString().orEmpty())
             if (episodesJson.isNotBlank() && episodesJson != "[]") lastEpisodesJson = episodesJson
+            val pagesJson = trimPages(obj.optJSONArray("pages")?.toString().orEmpty())
+            if (pagesJson.isNotBlank() && pagesJson != "[]") lastPagesJson = pagesJson
             val src = obj.optString("src").replace("\\/", "/")
             if (src.startsWith("http")) {
-                onVideoFound(src, obj.optString("title"), episodesJson)
+                onVideoFound(src, obj.optString("title"), episodesJson, pagesJson)
             } else if (manualGrab) {
                 manualGrab = false
                 if (episodesJson.isNotBlank() && episodesJson != "[]") {
                     onEpisodesOnly(episodesJson, obj.optString("title"))
+                } else if (pagesJson.isNotBlank() && pagesJson != "[]") {
+                    onPagesOnly(pagesJson, obj.optString("title"))
                 } else {
                     statusText.text = getString(R.string.web_extract_failed)
                 }
@@ -226,7 +235,7 @@ class WebExtractActivity : AppCompatActivity() {
         }
     }
 
-    private fun onVideoFound(videoUrl: String, title: String, episodesJson: String) {
+    private fun onVideoFound(videoUrl: String, title: String, episodesJson: String, pagesJson: String = "") {
         finished = true
         handler.removeCallbacks(grabLoop)
         statusText.text = getString(R.string.web_extract_found)
@@ -238,6 +247,26 @@ class WebExtractActivity : AppCompatActivity() {
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_WATCH_URL, watchUrl)
                 .putExtra(EXTRA_EPISODES_JSON, episodesJson)
+                .putExtra(EXTRA_PAGES_JSON, pagesJson)
+        )
+        finish()
+    }
+
+    /** Halaman dokumen tanpa video tapi berisi gambar halaman (mis. Scribd):
+     *  kembalikan daftarnya agar pemanggil bisa menawarkan unduh batch. */
+    private fun onPagesOnly(pagesJson: String, title: String) {
+        finished = true
+        handler.removeCallbacks(grabLoop)
+        statusText.text = getString(R.string.web_extract_found)
+        setResult(
+            RESULT_OK,
+            Intent()
+                .putExtra(EXTRA_VIDEO_URL, "")
+                .putExtra(EXTRA_COOKIES, extractCookies())
+                .putExtra(EXTRA_TITLE, title)
+                .putExtra(EXTRA_WATCH_URL, watchUrl)
+                .putExtra(EXTRA_EPISODES_JSON, "")
+                .putExtra(EXTRA_PAGES_JSON, pagesJson)
         )
         finish()
     }
@@ -271,6 +300,16 @@ class WebExtractActivity : AppCompatActivity() {
         current.takeIf { it.startsWith("http") }?.let { cm.getCookie(it) }?.takeIf { it.isNotEmpty() }
             ?: cm.getCookie(watchUrl)
     }.getOrNull().orEmpty()
+
+    /** Batasi daftar halaman dokumen titipan JS agar intent hasil tetap ringan. */
+    private fun trimPages(json: String): String {
+        if (json.isBlank()) return ""
+        val arr = runCatching { JSONArray(json) }.getOrNull() ?: return ""
+        if (arr.length() <= MAX_PAGES) return arr.toString()
+        val out = JSONArray()
+        for (i in 0 until MAX_PAGES) out.put(arr.optJSONObject(i) ?: continue)
+        return out.toString()
+    }
 
     /** Batasi daftar episode titipan JS agar intent hasil tetap ringan. */
     private fun trimEpisodes(json: String): String {

@@ -56,6 +56,7 @@
     <string name="platform_xnxx">XNXX</string>
     <string name="platform_pornhub">Pornhub</string>
     <string name="platform_hentaihaven">HentaiHaven</string>
+    <string name="platform_scribd">Scribd</string>
     <string name="web_extract_open">Open in app browser</string>
     <string name="web_extract_grab">Grab video</string>
     <string name="web_extract_close">Close</string>
@@ -77,6 +78,16 @@
     </plurals>
     <string name="batch_episodes_progress">Extracting episode %1$d of %2$d…</string>
     <string name="batch_episodes_skipped">An episode had no video — skipped.</string>
+    <string name="batch_pages_title">Document pages found</string>
+    <plurals name="batch_pages_message">
+        <item quantity="one">Found %1$d page in this document. Download it?</item>
+        <item quantity="other">Found %1$d pages in this document. Download them all?</item>
+    </plurals>
+    <string name="batch_pages_all">Download all</string>
+    <plurals name="batch_pages_added">
+        <item quantity="one">Added %1$d of %2$d page</item>
+        <item quantity="other">Added %1$d of %2$d pages</item>
+    </plurals>
     <string name="platform_social">Social media</string>
     <string name="platform_detected">Detected: %1$s</string>
     <string name="confirm_cancel">Cancel and delete this download?</string>

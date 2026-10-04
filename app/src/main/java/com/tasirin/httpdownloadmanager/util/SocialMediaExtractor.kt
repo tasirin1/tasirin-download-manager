@@ -71,6 +71,7 @@ object SocialMediaExtractor {
      *  (`WebExtractActivity`) + parser murni di bawah sebagai fallback. */
     // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
     private val HH_HOST_RE = Regex("""(?:https?://)(?:www\.)?hentaihaven\.xxx/""")
+    private val SCRIBD_HOST_RE = Regex("""(?:https?://)(?:www\.)?scribd\.com/""")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
      * (Instagram & YouTube) yang dipanggil berulang saat unduh. */
@@ -175,7 +176,7 @@ object SocialMediaExtractor {
             !lower.contains("instagr.am") && !lower.contains("xvideos.com") &&
             !lower.contains("xnxx.com") && !lower.contains("xnxxvideos.me") &&
             !lower.contains("pornhub.com") && !lower.contains("pornhubpremium.com") &&
-            !lower.contains("hentaihaven")
+            !lower.contains("hentaihaven") && !lower.contains("scribd.com")
         ) return false
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
@@ -187,12 +188,17 @@ object SocialMediaExtractor {
                 XV_HOST_RE.containsMatchIn(lower) ||
                 XN_HOST_RE.containsMatchIn(lower) ||
                 PH_HOST_RE.containsMatchIn(lower) ||
-                HH_HOST_RE.containsMatchIn(lower)
+                HH_HOST_RE.containsMatchIn(lower) ||
+                SCRIBD_HOST_RE.containsMatchIn(lower)
     }
 
     /** True bila URL adalah halaman HentaiHaven (butuh ekstraksi WebView). */
     fun isHentaiHavenUrl(url: String): Boolean =
         HH_HOST_RE.containsMatchIn(url.lowercase())
+
+    /** True bila URL adalah halaman dokumen Scribd (butuh ekstraksi WebView). */
+    fun isScribdUrl(url: String): Boolean =
+        SCRIBD_HOST_RE.containsMatchIn(url.lowercase())
 
     /** Ekstrak URL terbaik (satu opsi). */
     suspend fun extract(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
@@ -218,6 +224,7 @@ object SocialMediaExtractor {
                 XN_HOST_RE.containsMatchIn(lower) -> extractXnxx(url, user)
                 PH_HOST_RE.containsMatchIn(lower) -> extractPornhub(url, user)
                 HH_HOST_RE.containsMatchIn(lower) -> extractHentaiHaven(url, user)
+                SCRIBD_HOST_RE.containsMatchIn(lower) -> extractScribd(url, user)
                 else -> null
             }
         } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
@@ -243,6 +250,7 @@ object SocialMediaExtractor {
                     XN_HOST_RE.containsMatchIn(lower) -> extractAllXnxx(url, user)
                     PH_HOST_RE.containsMatchIn(lower) -> extractAllPornhub(url, user)
                     HH_HOST_RE.containsMatchIn(lower) -> extractAllHentaiHaven(url, user)
+                    SCRIBD_HOST_RE.containsMatchIn(lower) -> extractAllScribd(url, user)
                     else -> emptyList()
                 }
             } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; emptyList() }
@@ -1284,6 +1292,129 @@ object SocialMediaExtractor {
             if (url == excludeUrl) continue
             if (!seen.add(url)) continue
             out.add(EpisodeLink(url, obj.optString("title").trim().take(80)))
+        }
+        return out
+    }
+
+    // ── Scribd ───────────────────────────────────────────────────────────
+    // Dokumen di balik challenge JS ("Client Challenge"): fetch server
+    // langsung hampir selalu ditolak. Alur utama adalah WebView
+    // (`WebExtractActivity`) + `extract.js` yang mengumpulkan gambar halaman
+    // yang ter-render untuk sesi anonim (pratinjau gratis, tanpa langganan);
+    // halaman terkunci/tak ter-render tak punya URL gambar di DOM sehingga
+    // tak ikut terunduh. Fungsi di sini mencoba fetch biasa dulu (berhasil
+    // bila challenge longgar / cookie user ditempel) lewat parser murni.
+
+    private val SCRIBD_HEADERS = mapOf(
+        "User-Agent" to DEFAULT_UA,
+        "Accept" to "text/html,application/xhtml+xml",
+        "Referer" to "https://www.scribd.com/"
+    )
+
+    /** Batas halaman dokumen per unduh agar intent hasil tetap ringan. */
+    private const val SCRIBD_MAX_PAGES = 300
+
+    private val SCRIBD_OG_TITLE_RE =
+        Regex("""<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)""", RegexOption.IGNORE_CASE)
+    private val SCRIBD_TITLE_TAG_RE =
+        Regex("""<title>([^<]{1,160})</title>""", RegexOption.IGNORE_CASE)
+    private val SCRIBD_IMG_ATTR_RE = Regex(
+        """(?:src|data-src|data-original|data-lazy-src)\s*=\s*["']([^"']+)["']""",
+        RegexOption.IGNORE_CASE
+    )
+    private val SCRIBD_SRCSET_RE =
+        Regex("""srcset\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+    private val SCRIBD_PAGE_NUM_RE = Regex(
+        """pages?[_/-]?(\d{1,4})|[._-](\d{1,4})\.(?:jpe?g|png|webp|gif)(?:[?#]|$)""",
+        RegexOption.IGNORE_CASE
+    )
+    private val SCRIBD_NUMBERED_IMG_RE =
+        Regex("""[._-]\d{1,4}\.(?:jpe?g|png|webp|gif)(?:[?#]|$)""", RegexOption.IGNORE_CASE)
+    private val SCRIBD_CHROME_RE = Regex(
+        """icon|logo|avatar|emoji|sprite|badge|button|spinner|placeholder|favicon|1x1|pixel|blank""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private fun extractScribd(url: String, user: Map<String, String> = emptyMap()): Result? =
+        extractAllScribd(url, user).firstOrNull()
+
+    private fun extractAllScribd(url: String, user: Map<String, String> = emptyMap()): List<Result> {
+        val html = fetchWatchHtml(url, SCRIBD_HEADERS + user) ?: return emptyList()
+        return parseScribdPage(html)
+    }
+
+    /** Parser murni halaman dokumen Scribd (tanpa I/O) agar bisa di-unit-test:
+     *  judul dari og:title + gambar halaman dari CDN scribdassets. */
+    internal fun parseScribdPage(html: String): List<Result> {
+        var title = SCRIBD_OG_TITLE_RE.find(html)?.groupValues?.getOrNull(1)
+            ?: SCRIBD_TITLE_TAG_RE.find(html)?.groupValues?.getOrNull(1)
+            ?: "Scribd_doc"
+        title = unescapePlayer(title.trim()).substringBefore(" | ").substringBefore(" - ").trim().take(80)
+        if (title.isBlank()) title = "Scribd_doc"
+        val safeName = sanitizeFileName(title)
+        val seen = LinkedHashSet<String>()
+        val numbered = mutableListOf<Pair<String, Int>>()
+        fun addCandidate(raw: String?) {
+            var url = raw?.trim().orEmpty()
+            if (url.isEmpty() || url.startsWith("blob:") || url.startsWith("data:")) return
+            if (url.startsWith("//")) url = "https:$url"
+            if (!url.startsWith("http://") && !url.startsWith("https://")) return
+            val clean = unescapePlayer(url).substringBefore(' ').trim()
+            val host = runCatching { URL(clean).host }.getOrNull()?.lowercase().orEmpty()
+            if (!host.endsWith("scribdassets.com")) return
+            val low = clean.lowercase()
+            if (SCRIBD_CHROME_RE.containsMatchIn(low)) return
+            val looksPage = low.contains("page") || SCRIBD_NUMBERED_IMG_RE.containsMatchIn(low)
+            if (!looksPage) return
+            if (!seen.add(clean)) return
+            val m = SCRIBD_PAGE_NUM_RE.find(low)
+            val num = m?.groupValues?.drop(1)?.firstOrNull { it.isNotEmpty() }?.toIntOrNull() ?: -1
+            numbered.add(clean to num)
+        }
+        SCRIBD_IMG_ATTR_RE.findAll(html).forEach { addCandidate(it.groupValues.getOrNull(1)) }
+        SCRIBD_SRCSET_RE.findAll(html).forEach { set ->
+            set.groupValues.getOrNull(1)?.split(',')?.forEach { part ->
+                addCandidate(part.trim().substringBefore(' '))
+            }
+        }
+        // Halaman bernomor urut dulu (stabil untuk yang tak bernomor).
+        val ordered = (numbered.filter { it.second >= 0 }.sortedBy { it.second } +
+            numbered.filter { it.second < 0 }).take(SCRIBD_MAX_PAGES)
+        return ordered.mapIndexed { index, (url, num) ->
+            val label = num.takeIf { it >= 0 } ?: (index + 1)
+            val ext = url.substringBefore('?').substringAfterLast('.', "jpg").lowercase()
+                .takeIf { it in setOf("jpg", "jpeg", "png", "webp", "gif") } ?: "jpg"
+            val mime = when (ext) {
+                "png" -> "image/png"
+                "webp" -> "image/webp"
+                "gif" -> "image/gif"
+                else -> "image/jpeg"
+            }
+            Result(url, "Scribd_${safeName}_p${(index + 1).toString().padStart(3, '0')}.$ext",
+                title, "Page $label", mime)
+        }
+    }
+
+    /** Satu halaman dokumen Scribd dari WebView (JSON `[{url,title}]`). */
+    data class DocPage(val url: String, val title: String)
+
+    /** Parse daftar halaman titipan WebView: hanya http(s) dari CDN Scribd,
+     *  buang duplikat (tanpa I/O sehingga bisa di-unit-test). Batas host
+     *  penting: JS tak boleh mengarahkan engine (beserta cookie) ke host asing. */
+    internal fun parseDocPages(json: String, max: Int = SCRIBD_MAX_PAGES): List<DocPage> {
+        val arr = runCatching { JSONArray(json) }.getOrNull() ?: return emptyList()
+        val seen = LinkedHashSet<String>()
+        val out = mutableListOf<DocPage>()
+        for (i in 0 until arr.length()) {
+            if (out.size >= max) break
+            val obj = arr.optJSONObject(i) ?: continue
+            var url = obj.optString("url").trim()
+            if (url.startsWith("//")) url = "https:$url"
+            if (!url.startsWith("http://") && !url.startsWith("https://")) continue
+            val host = runCatching { URL(url).host }.getOrNull()?.lowercase().orEmpty()
+            if (!host.endsWith("scribdassets.com")) continue
+            if (!seen.add(url)) continue
+            out.add(DocPage(url, obj.optString("title").trim().take(80)))
         }
         return out
     }
