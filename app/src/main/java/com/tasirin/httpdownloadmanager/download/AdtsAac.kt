@@ -44,6 +44,11 @@ object AdtsAac {
      *  memori dengan alokasi raksasa. */
     private const val MAX_FRAME_BYTES = 1 shl 16
 
+    /** Batas baca 0-byte beruntun: kontrak InputStream membolehkan read() = 0
+     *  (bukan EOF); tanpa guard stream macet membuat readExact loop selamanya
+     *  menahan thread muxing — pola sama seperti HttpBody dan readBounded. */
+    private const val MAX_ZERO_READS = 32
+
     /** Ukuran tag ID3v2 di posisi offset (0 bila tidak ada). Video/audio segmen
      *  HLS YouTube sering diawali tag ID3 berisi timestamp transport stream. */
     // Batas wajar tag ID3 di segmen HLS (biasanya < 1 KB timestamp);
@@ -269,9 +274,16 @@ object AdtsAac {
 
     private fun readExact(input: InputStream, out: ByteArray, off: Int, len: Int): Boolean {
         var pos = off
+        var zeroStreak = 0
         while (pos < off + len) {
             val n = input.read(out, pos, off + len - pos)
             if (n < 0) return false
+            if (n == 0) {
+                // Stream macet: gagal cepat sebagai frame rusak, bukan gantung.
+                if (++zeroStreak >= MAX_ZERO_READS) return false
+                continue
+            }
+            zeroStreak = 0
             pos += n
         }
         return true
