@@ -229,7 +229,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             )
             secureHeaders(session.uri, denied)
             appendRequestLog(session, denied, System.currentTimeMillis() - startedAt)
-            return denied
+            // Body POST tak dibaca di jalur tolak ini: tutup koneksi agar sisa
+            // body tak terbaca sebagai request berikutnya (desync keep-alive).
+            return denied.closeConnection()
         }
         // Rate-limit per-IP untuk endpoint polling/cache yang sering: mencegah
         // klien/script hammering menguras CPU server saat banyak device meloop.
@@ -636,7 +638,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val attempt = loginAttempt(ip)
         if (ServerSecurity.isPinLocked(now, attempt.lockedUntil)) {
             val waitSec = ((attempt.lockedUntil - now) / 1000) + 1
-            return loginPage("Too many attempts. Try again in $waitSec seconds.")
+            // Body POST tak dibaca saat terkunci: tutup koneksi agar tak desync.
+            return loginPage("Too many attempts. Try again in $waitSec seconds.").closeConnection()
         }
         val params = readForm(session)
         val pin = params["pin"].orEmpty()
@@ -846,11 +849,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
+    // Koneksi ditutup: 401 bisa menjawab POST tanpa membaca body-nya,
+    // dan sisa body meracuni request berikutnya di koneksi yang sama.
     private fun unauthorized(): Response = newFixedLengthResponse(
         Response.Status.UNAUTHORIZED,
         "application/json; charset=utf-8",
         JSONObject().put("ok", false).put("error", "PIN required").toString()
-    )
+    ).closeConnection()
 
     // Catatan ukuran: nanohttpd 2.3.1 otomatis gzip untuk mime text/* dan
     // application/json (useGzipWhenAccepted) selama client kirim Accept-Encoding: gzip —
