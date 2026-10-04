@@ -7,6 +7,11 @@ import java.net.URLDecoder
 
 private const val MAX_BODY_SIZE = 4L * 1024 * 1024
 private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024
+/** Batas baca 0-byte beruntun: kontrak InputStream membolehkan read() = 0
+ *  (bukan EOF), dan loop tanpa penanganan ini busy-loop selamanya menahan
+ *  thread HTTP. Socket blocking praktis tak pernah 0; puluhan kali
+ *  beruntun = stream macet, wajib gagal cepat. */
+private const val MAX_ZERO_READS = 32
 
 /** Body POST melebihi batas; koneksi harus ditutup agar sisa body tidak
  * terbaca sebagai request HTTP berikutnya pada keep-alive. */
@@ -90,12 +95,19 @@ internal fun readForm(session: NanoHTTPD.IHTTPSession): Map<String, String> {
         val buf = ByteArray(8192)
         val collected = java.io.ByteArrayOutputStream(length.coerceAtMost(65536))
         var remaining = length
+        var zeroStreak = 0
         while (remaining > 0) {
             val toRead = minOf(buf.size, remaining)
             val read = session.inputStream.read(buf, 0, toRead)
             // Stream putus sebelum Content-Length terpenuhi: jangan parse
             // parsial sebagai form valid (bisa jadi login/pin terpotong).
             if (read == -1) throw IOException("Request body truncated")
+            // Baca 0 bukan EOF: tanpa guard loop busy-loop selamanya.
+            if (read == 0) {
+                if (++zeroStreak >= MAX_ZERO_READS) throw IOException("Request body stalled")
+                continue
+            }
+            zeroStreak = 0
             collected.write(buf, 0, read)
             remaining -= read
         }
@@ -144,10 +156,18 @@ internal fun drainBody(session: NanoHTTPD.IHTTPSession): Boolean {
     if (declared > MAX_UPLOAD_BYTES) return false
     val buffer = ByteArray(64 * 1024)
     var remaining = declared
+    var zeroStreak = 0
     while (remaining > 0) {
         val chunk = minOf(buffer.size.toLong(), remaining).toInt()
         val read = session.inputStream.read(buffer, 0, chunk)
         if (read == -1) return false
+        // Baca 0 bukan EOF: tanpa guard loop busy-loop selamanya; false =
+        // pemanggil menutup koneksi seperti stream terputus.
+        if (read == 0) {
+            if (++zeroStreak >= MAX_ZERO_READS) return false
+            continue
+        }
+        zeroStreak = 0
         remaining -= read
     }
     return true
@@ -162,9 +182,16 @@ internal fun copyUploadBody(session: NanoHTTPD.IHTTPSession, length: Long, out: 
     val buffer = ByteArray(64 * 1024)
     if (length <= 0) {
         var total = 0L
+        var zeroStreak = 0
         while (true) {
             val read = input.read(buffer)
             if (read == -1) break
+            // Baca 0 bukan EOF: tanpa guard loop busy-loop selamanya.
+            if (read == 0) {
+                if (++zeroStreak >= MAX_ZERO_READS) throw IOException("Upload body stalled")
+                continue
+            }
+            zeroStreak = 0
             total += read
             if (total > MAX_UPLOAD_BYTES) throw BodyTooLargeException()
             out.write(buffer, 0, read)
@@ -172,10 +199,17 @@ internal fun copyUploadBody(session: NanoHTTPD.IHTTPSession, length: Long, out: 
         return
     }
     var remaining = length
+    var zeroStreak = 0
     while (remaining > 0) {
         val chunk = minOf(buffer.size.toLong(), remaining).toInt()
         val read = input.read(buffer, 0, chunk)
         if (read == -1) break
+        // Baca 0 bukan EOF: tanpa guard loop busy-loop selamanya.
+        if (read == 0) {
+            if (++zeroStreak >= MAX_ZERO_READS) throw IOException("Upload body stalled")
+            continue
+        }
+        zeroStreak = 0
         out.write(buffer, 0, read)
         remaining -= read
     }

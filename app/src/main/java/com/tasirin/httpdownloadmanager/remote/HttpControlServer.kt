@@ -543,8 +543,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             periodicCleanupJob = null
             if (!isAlive && statPool.isShutdown) return
             statPoolEnabled = false
-            sseJob?.cancel()
-            sseJob = null
+            // Batal + null di kunci yang sama dengan ensureSsePump dan
+            // jalur keluar pump: tanpa ini stop bisa meng-null-kan job pump
+            // baru yang lahir di tengah shutdown (pump yatim / ganda).
+            val pump = synchronized(ssePumpLock) { sseJob.also { sseJob = null } }
+            runCatching { pump?.cancel() }
             runCatching { statPool.shutdownNow() }
         }
         appendLog("SERVER STOPPED (port $listeningPort)")
@@ -2216,7 +2219,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun scannedGallery(maxEntries: Int): MediaLibrary.MediaScanResult {
-        val now = System.currentTimeMillis()
+        // Jam monotonik seperti MediaLibrary: lompatan jam dinding (NTP/zona)
+        // tak boleh membuat cache 15 dtk basi lama atau refresh prematur.
+        val now = android.os.SystemClock.elapsedRealtime()
         val folders = StoragePrefs.getGalleryFolders(context)
         val cached = galleryCache
         if (cached != null && cached.second == folders &&
@@ -3013,7 +3018,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         if (sseClients.isEmpty()) {
                             delay(1_000)
                             if (sseClients.isEmpty()) {
-                                if (sseJob === me) sseJob = null
+                                // Keluar di dalam lock dengan cek identitas: null
+                                // polos di luar lock bisa menghapus job pump BARU
+                                // yang baru ditugaskan thread lain (pump yatim
+                                // jalan tanpa terlacak + pump ganda saat
+                                // ensureSsePump dipanggil lagi).
+                                synchronized(ssePumpLock) {
+                                    if (sseJob === me) sseJob = null
+                                }
                                 return@launch
                             }
                         }
@@ -3102,8 +3114,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun serveShare(session: IHTTPSession): Response {
         val token = session.uri.removePrefix("/share/").trim()
         if (token.isEmpty()) return notFound()
-        pruneShares()
-        val entry = shareTokens[token] ?: return notFound()
+        // Satu lock dengan createShare/snapshotShares: prune + baca di luar
+        // lock bisa beradu dengan eviksi tertua paralel (entri baru terbuang).
+        val entry = synchronized(shareLock) {
+            pruneShares()
+            shareTokens[token]
+        } ?: return notFound()
         val item = App.engine.items.value.find {
             it.id == entry.itemId && it.state == DownloadState.COMPLETED
         } ?: return notFound()

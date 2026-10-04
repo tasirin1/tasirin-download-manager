@@ -28,16 +28,27 @@ internal class SseStream : InputStream() {
     private var pos = 0
 
     fun push(text: String) {
-        if (!isClosed && !queue.offer(text.toByteArray(Charsets.UTF_8))) {
+        if (isClosed) return
+        if (!queue.offer(text.toByteArray(Charsets.UTF_8))) {
             // Antrean penuh berarti klien tidak lagi membaca (koneksi putus).
             isClosed = true
+            wakeBlockedReader()
+        }
+    }
+
+    /** Bangunkan poll(25 dtk) yang sedang menunggu: flag saja tak cukup.
+     *  offer dulu agar frame basi tak terbuang sia-sia; hanya bila penuh
+     *  (offer gagal) buang satu lalu selipkan pil tutup. Non-blokir. */
+    private fun wakeBlockedReader() {
+        if (!queue.offer(POISON)) {
+            queue.poll()
+            queue.offer(POISON)
         }
     }
 
     fun closeStream() {
         isClosed = true
-        // offer (bukan put): jangan blokir thread pemanggil saat antrean penuh.
-        queue.offer(POISON)
+        wakeBlockedReader()
     }
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
@@ -67,7 +78,7 @@ internal class SseStream : InputStream() {
 
     override fun close() {
         isClosed = true
-        queue.offer(POISON)
+        wakeBlockedReader()
         super.close()
     }
 
