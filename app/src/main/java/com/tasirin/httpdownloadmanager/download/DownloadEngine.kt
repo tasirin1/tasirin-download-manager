@@ -758,13 +758,22 @@ class DownloadEngine(appContext: Context) {
             it.autoResume && it.state == DownloadState.PAUSED
         }.map { it.id }
         if (ids.isEmpty()) return
+        // Batch: satu salinan list + satu emisi StateFlow, bukan N kali
+        // updateItem saat NetworkCallback.onAvailable menembak berulang
+        // (sama seperti pauseAll/resumeAll/retryFailed).
+        val idSet = ids.toSet()
         ids.forEach { id ->
             retryAttempts.remove(id)
             pendingRetries.remove(id)
-            updateItem(id) {
-                it.copy(state = DownloadState.PENDING, autoResume = true, error = null)
-            }
+            clearSegProgress(id)
         }
+        update(_items.value.map { item ->
+            if (item.id in idSet) {
+                item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
+            } else {
+                item
+            }
+        })
         startQueued()
     }
 
