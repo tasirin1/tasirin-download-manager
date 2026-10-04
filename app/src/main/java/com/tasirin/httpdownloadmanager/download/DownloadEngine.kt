@@ -350,11 +350,21 @@ class DownloadEngine(appContext: Context) {
         // DOWNLOADING ikut dipulihkan: state ini terpersist saat proses mati
         // mendadak sehingga tanpa ini item zombie macet selamanya (tidak
         // auto-lanjut dan tombol resume menolaknya).
-        _items.value.filter {
+        // Batch: satu salinan list + satu emisi StateFlow, bukan N kali
+        // updateItem (pola sama seperti resumeAutoPaused/pauseAll).
+        val ids = _items.value.filter {
             it.autoResume && (it.state == DownloadState.PAUSED || it.state == DownloadState.PENDING ||
                 it.state == DownloadState.DOWNLOADING)
-        }.forEach { item ->
-            updateItem(item.id) { it.copy(state = DownloadState.PENDING, autoResume = true) }
+        }.map { it.id }
+        if (ids.isNotEmpty()) {
+            val idSet = ids.toSet()
+            update(_items.value.map { item ->
+                if (item.id in idSet) {
+                    item.copy(state = DownloadState.PENDING, autoResume = true)
+                } else {
+                    item
+                }
+            })
         }
         startQueued()
     }

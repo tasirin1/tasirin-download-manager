@@ -2352,6 +2352,10 @@ let galleryCache = null; // {items, total, hasMore, at}
     if (active < MAX_CONCURRENT) { active++; img.onload = img.onerror = function() { active--; next(); }; img.src = src; }
     else { queue.push({img: img, src: src}); }
   };
+  // Buang antrean thumbnail yang belum jalan (cell-nya sudah hancur saat
+  // galeri reset/ganti filter): entri antrean belum set src sehingga aman
+  // dibuang tanpa load sia-sia; yang sedang jalan dibiarkan selesai.
+  window._thumbQueueClear = function() { queue.length = 0; };
 })();
 // Nomor urut request galeri: respons lama (mis. ganti filter/ketik
 // pencarian saat request sebelumnya belum selesai) diabaikan supaya tidak
@@ -2676,6 +2680,7 @@ function galleryCacheFresh() {
 // Render ulang seluruh galeri dari data (hasil fetch atau cache memori).
 function renderGalleryReset(items, total, hasMore) {
   galleryItems = items;
+  if (window._thumbQueueClear) window._thumbQueueClear();
   galleryVideoPos = {};
   for (const v of items) {
     if (v.isVideo) galleryVideoPos[v.token] = loadVideoPos(v.token);
@@ -5655,6 +5660,13 @@ function render(items) {
     const alive = new Set(items.map(function (it) { return it.id; }));
     lockedTotalBytes.forEach(function (_, id) { if (!alive.has(id)) lockedTotalBytes.delete(id); });
   }
+  // Batasi pertumbuhan dlPinned (pin tersimpan di localStorage): id
+  // unduhan yang sudah dihapus dibuang seperti lockedTotalBytes di atas.
+  if (dlPinned.size > items.length + 32) {
+    const alivePin = new Set(items.map(function (it) { return it.id; }));
+    dlPinned.forEach(function (id) { if (!alivePin.has(id)) dlPinned.delete(id); });
+    try { localStorage.setItem('dl_pinned', JSON.stringify(Array.from(dlPinned))); } catch (_e) {}
+  }
   const struct = (webFilter || '') + '::' + (dlSearchQuery || '') + '::' + structSig(items);
   if (struct !== lastStructSig) {
     lastStructSig = struct;
@@ -5829,23 +5841,27 @@ function updateRows(items) {
     rebuildList(items);
     return;
   }
-  items.forEach(function (it) {
+  // For + break (bukan forEach): rebuild di tengah harus menghentikan
+  // loop — return di forEach hanya lanjut ke item berikut sehingga sisa
+  // baris di-patch ulang tepat setelah rebuild penuh (render ganda).
+  for (let k = 0; k < items.length; k++) {
+    const it = items[k];
     const li = rowNodes.get(it.id);
-    if (!li || !li.isConnected) return;
+    if (!li || !li.isConnected) continue;
     var needRetry = it.state === 'FAILED';
     var hasRetry = !!li.querySelector('.item-retry');
     var needErr = !!it.error;
     var hasErr = !!li.querySelector('.err');
     if (needRetry !== hasRetry || needErr !== hasErr) {
       rebuildList(items);
-      return;
+      break;
     }
     const sig = it.state + '|' + it.bytesDownloaded + '|' + it.totalBytes + '|' + it.progress + '|' + it.speedBps + '|' +
       it.etaSeconds + '|' + (it.error || '') + '|' + (it.retryCount || 0) + '|' + (it.checksumVerified ? 1 : 0) + '|' + it.fileName + '|' + it.url;
-    if (lastRowSig[it.id] === sig) return;
+    if (lastRowSig[it.id] === sig) continue;
     lastRowSig[it.id] = sig;
     patchRowSub(li, it);
-  });
+  }
   updateToolbar(items);
 }
 
