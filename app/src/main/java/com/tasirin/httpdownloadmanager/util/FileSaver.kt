@@ -238,7 +238,7 @@ class FileSaver(context: Context) {
         // membuat dua publish paralel bernama sama mendapat DISPLAY_NAME kembar
         // (MediaStore tak menolak nama duplikat). Pola sama seperti klaim
         // createNewFile di uniqueTargetFile untuk path filesystem.
-        val (uri, unique) = synchronized(mergeLockFor(FileNames.safe(fileName))) {
+        val (uri, unique, values) = synchronized(mergeLockFor(FileNames.safe(fileName))) {
             val unique = uniqueMediaStoreName(fileName, relativePath, collection)
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, unique)
@@ -250,7 +250,7 @@ class FileSaver(context: Context) {
             }
             val uri = resolver.insert(collection, values)
                 ?: throw IOException("Failed to create file in MediaStore")
-            uri to unique
+            Triple(uri, unique, values)
         }
         try {
             resolver.openOutputStream(uri)?.use { out -> writer(out) }
