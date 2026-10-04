@@ -188,7 +188,7 @@ object StoragePrefs {
         prefs(context)
             .getString(KEY_SERVER_PIN, null)?.takeIf { it.isNotBlank() }
 
-    /** Simpan PIN sebagai PBKDF2-SHA256; nilai kosong menghapus PIN. */
+    /** Simpan PIN sebagai PBKDF2-HMAC-SHA1 (lihat PinHash); nilai kosong menghapus PIN. */
     fun setServerPin(context: Context, pin: String?) {
         val clean = pin?.trim()?.takeIf { it.isNotEmpty() }
         val old = getServerPin(context)
