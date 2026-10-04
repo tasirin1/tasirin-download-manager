@@ -947,12 +947,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 oldObj.put("retryCount", item.retryCount)
                 oldObj.put("checksumVerified", item.checksumVerified)
                 oldObj.put("progressPercentOverride", item.progressPercentOverride)
+                // Objek baru tiap bangun ulang: tak ada error basi dari cache
+                // yang perlu dihapus — cukup tulis error bila masih ada.
                 if (item.error != null) {
                     oldObj.put("error", item.error)
-                } else if (oldObj.has("error")) {
-                    // Error pulih (retry sukses): hapus agar UI remote tidak
-                    // menampilkan error lama setelah item selesai.
-                    oldObj.remove("error")
                 }
                 arr.put(oldObj)
             } else {
@@ -1422,13 +1420,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
         if (!ServerSecurity.isChunkOffsetAllowed(offset, MAX_UPLOAD_BYTES)) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid offset")
+            // Kuras body dulu seperti jalur tetangga: tanpa ini koneksi keep-alive
+            // langsung ditutup (reconnect sia-sia) dan klien berisiko tak membaca
+            // JSON error dengan bersih.
+            if (!drainBody(session)) {
+                return jsonResponse(JSONObject().put("ok", false).put("error", "invalid offset"))
+                    .closeConnection()
+            }
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid offset"))
-                .closeConnection()
         }
         if (length > 0 && offset > MAX_UPLOAD_BYTES - length) {
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: invalid upload range")
+            // Kuras body dulu seperti jalur tetangga (lihat alasan di atas).
+            if (!drainBody(session)) {
+                return jsonResponse(JSONObject().put("ok", false).put("error", "invalid upload range"))
+                    .closeConnection()
+            }
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid upload range"))
-                .closeConnection()
         }
         appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks received: $name (${length}B offset=$offset)")
         // Klaim atomik: batas lock ditegakkan di dalam uploadLockFor agar dua
@@ -2181,10 +2189,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             matched++
         }
         if (extracted > 0) videoDurations.save()
+        // Filter nama (param legacy q): matched = hitungan yang cocok, bukan
+        // hitungan scan — bandingkan dengan pageEnd agar halaman terakhir hasil
+        // filter tak mengklaim hasMore lalu memicu fetch halaman kosong sia-sia.
+        val hasMore = pageCount >= GALLERY_PAGE_SIZE &&
+            (if (q.isNotEmpty()) matched > pageEnd
+             else matched < scan.total || scan.items.size < scan.total)
         return jsonResponse(
             JSONObject()
                 .put("items", arr)
-                .put("hasMore", pageCount >= GALLERY_PAGE_SIZE && (matched < scan.total || scan.items.size < scan.total))
+                .put("hasMore", hasMore)
                 .put("total", if (q.isNotEmpty()) matched else scan.total)
         )
     }

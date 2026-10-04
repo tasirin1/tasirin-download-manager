@@ -1,10 +1,8 @@
 package com.tasirin.httpdownloadmanager.util
 
-import android.annotation.SuppressLint
 import android.content.Context
 import com.tasirin.httpdownloadmanager.R
 import java.security.KeyStore
-import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import javax.net.ssl.HttpsURLConnection
@@ -47,7 +45,10 @@ object TlsCompat {
         }
     }
 
-    @SuppressLint("CustomX509TrustManager") // Sengaja: gabung trust anchor sistem + root lama (Android 6-7).
+    // Sengaja: gabung trust anchor sistem + root lama (Android 6-7) dalam SATU
+    // store sehingga rantai cross-signed yang butuh kedua sisi tetap lolos.
+    // (Sebelumnya: coba-sistem-lalu-ekstra; rantai gabungan selalu gagal dan
+    // exception asli sistem tertutup exception ekstra.)
     private fun build(context: Context): SSLContext? = runCatching {
         val systemTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         systemTmf.init(null as KeyStore?)
@@ -56,6 +57,9 @@ object TlsCompat {
 
         val cf = CertificateFactory.getInstance("X.509")
         val ks = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
+        systemTm.acceptedIssuers.forEachIndexed { i, cert ->
+            runCatching { ks.setCertificateEntry("sys-$i", cert) }
+        }
         var loaded = 0
         for (resId in EXTRA_ROOTS) {
             runCatching {
@@ -68,27 +72,12 @@ object TlsCompat {
         }
         if (loaded == 0) return@runCatching null
 
-        val extraTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        extraTmf.init(ks)
-        val extraTm = extraTmf.trustManagers.filterIsInstance<X509TrustManager>()
+        val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+        tmf.init(ks)
+        val tm = tmf.trustManagers.filterIsInstance<X509TrustManager>()
             .firstOrNull() ?: return@runCatching null
-
-        val combined = object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
-                systemTm.checkClientTrusted(chain, authType)
-            }
-            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
-                try {
-                    systemTm.checkServerTrusted(chain, authType)
-                } catch (e: CertificateException) {
-                    extraTm.checkServerTrusted(chain, authType)
-                }
-            }
-            override fun getAcceptedIssuers(): Array<X509Certificate> =
-                systemTm.acceptedIssuers + extraTm.acceptedIssuers
-        }
         val ctx = SSLContext.getInstance("TLS")
-        ctx.init(null, arrayOf<X509TrustManager>(combined), null)
+        ctx.init(null, arrayOf<X509TrustManager>(tm), null)
         ctx
     }.getOrNull()
 }
