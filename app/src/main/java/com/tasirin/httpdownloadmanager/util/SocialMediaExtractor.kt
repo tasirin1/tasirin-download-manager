@@ -934,7 +934,10 @@ object SocialMediaExtractor {
             if (resp == null) {
                 continue
             }
-            return runCatching {
+            // Pola seperti Piped di atas: null = lanjut ke instance berikut.
+            // (Sebelumnya `return ...?.let { return it }` membuat parse tanpa URL
+            // langsung me-return null dari fungsi sehingga loop tak pernah lanjut.)
+            val result = runCatching {
                 val obj = JSONObject(resp)
                 val status = obj.optString("status", "")
                 val url = obj.optString("url", "")
@@ -944,7 +947,8 @@ object SocialMediaExtractor {
                 } else {
                     null
                 }
-            }.getOrNull()?.let { return it }
+            }.getOrNull()
+            if (result != null) return result
         }
         return null
     }
@@ -967,10 +971,18 @@ object SocialMediaExtractor {
                         YT_UA)
                     conn.setRequestProperty("Accept", "$MIME_MP4,*/*")
                     val code = conn.responseCode
-                    if (code in 301..308) {
+                    // Hanya redirect sungguhan (304/305/306 bukan redirect bertarget):
+                    // samakan daftar dengan httpGetWithCookies/httpPostJson.
+                    if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
                         val loc = conn.getHeaderField("Location")
                         if (loc.isNullOrBlank()) return null
-                        current = java.net.URI(current).resolve(loc).toString()
+                        val next = try {
+                            java.net.URI(current).resolve(loc).toString()
+                        } catch (_: Exception) { return null }
+                        // Instance pihak ketiga tak boleh mengarahkan ke host
+                        // terlarang (loopback/metadata) seperti helper HTTP lain.
+                        if (!isExtractRedirectAllowed(next)) return null
+                        current = next
                         return@runCatching null
                     }
                     val type = conn.contentType ?: ""
@@ -979,7 +991,7 @@ object SocialMediaExtractor {
                     }
                     return null
                 } finally { runCatching { conn.disconnect() } }
-            }.getOrNull()?.let { return it }
+            }.getOrNull()
         }
         return null
     }

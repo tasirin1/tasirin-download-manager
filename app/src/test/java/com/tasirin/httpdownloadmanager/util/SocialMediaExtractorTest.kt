@@ -355,6 +355,19 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `isExtractRedirectAllowed - tolak metadata dan samaran loopback`() {
+        // Guard validasi redirect resolveInvidiousLatest: instance pihak ketiga
+        // tak boleh mengarahkan ke metadata cloud / wildcard / loopback samaran.
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("http://169.254.169.254/latest/meta-data/"))
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("http://0.0.0.0/x"))
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("http://2130706433/x"))
+        assertFalse(SocialMediaExtractor.isExtractRedirectAllowed("http://127.1/x"))
+        // CDN video sah tetap lolos.
+        assertTrue(SocialMediaExtractor.isExtractRedirectAllowed("https://rr1---sn.googlevideo.com/videoplayback?x=1"))
+        assertTrue(SocialMediaExtractor.isExtractRedirectAllowed("http://192.168.1.10/nas/film.mp4"))
+    }
+
+    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))
