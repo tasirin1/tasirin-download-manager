@@ -1466,13 +1466,15 @@ more.forEach(function (it) { fsAppendRow(fsList, it); });
 fsUpdateLoadMore();
 } catch (e) {
 fsMsg('Failed to load more: ' + e, true);
+} finally {
+fsLoadingMore = false;
 if (btn) {
+btn.style.pointerEvents = '';
+if (btn.isConnected) {
 btn.disabled = false;
 btn.textContent = 'Load more';
 }
-} finally {
-fsLoadingMore = false;
-if (btn) { btn.style.pointerEvents = ''; }
+}
 }
 }
 const fsSearchBtn = document.getElementById('fsSearchBtn');

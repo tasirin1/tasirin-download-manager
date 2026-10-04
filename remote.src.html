@@ -3545,13 +3545,18 @@ async function fsLoadMore() {
     fsUpdateLoadMore();
   } catch (e) {
     fsMsg('Failed to load more: ' + e, true);
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = 'Load more';
-    }
   } finally {
     fsLoadingMore = false;
-    if (btn) { btn.style.pointerEvents = ''; }
+    if (btn) {
+      btn.style.pointerEvents = '';
+      // Tombol harus aktif lagi selama masih menempel di DOM: jalur sukses
+      // tak pernah mengaktifkannya, dan respons basi (return dini) juga
+      // lewat sini. Tombol yang sudah di-remove (tak ada sisa) dilewati.
+      if (btn.isConnected) {
+        btn.disabled = false;
+        btn.textContent = 'Load more';
+      }
+    }
   }
 }
 
