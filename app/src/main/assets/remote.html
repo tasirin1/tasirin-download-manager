@@ -2263,7 +2263,7 @@ return j;
 });
 const total = jobs.length;
 if (!total) return;
-let verifyToken = '';
+jobs.forEach(function (j) { j.verifyToken = ''; });
 fsUploading = true;
 const failed = [];
 const ulRows = {};
@@ -2394,7 +2394,7 @@ try {
 const d = JSON.parse(xhr.responseText);
 ok = !!d.ok;
 pending = !!d.pending;
-if (d.verify) verifyToken = d.verify;
+if (d.verify) job.verifyToken = d.verify;
 } catch (e) {}
 }
 if (pending) {
@@ -2430,7 +2430,7 @@ let tries = 0;
 (function tick() {
 const v = new XMLHttpRequest();
 v.open('GET', API + '/api/upload_verify?id=' + encodeURIComponent(id) +
-'&verify=' + encodeURIComponent(verifyToken));
+'&verify=' + encodeURIComponent(job.verifyToken));
 v.timeout = 6000;
 v.onload = function () {
 let done = false;
@@ -2492,7 +2492,7 @@ return;
 }
 const verify = new XMLHttpRequest();
 verify.open('GET', API + '/api/upload_verify?id=' + encodeURIComponent(id) +
-'&verify=' + encodeURIComponent(verifyToken));
+'&verify=' + encodeURIComponent(job.verifyToken));
 verify.timeout = 5000;
 verify.onload = function () {
 let done = false;

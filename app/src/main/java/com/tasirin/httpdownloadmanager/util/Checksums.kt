@@ -6,6 +6,10 @@ package com.tasirin.httpdownloadmanager.util
  *  yang sama dengan input manual di MainActivity/remote web. */
 object Checksums {
 
+    /** Batas panjang nilai checksum header: nilai valid selalu <1KB (hex 64 / base64 44);
+     *  header raksasa dari server jahat ditolak sebelum alokasi decode agar tak OOM. */
+    private const val MAX_HEADER_VALUE_LEN = 4096
+
     /** Ekstrak checksum dari header respons; null bila tidak ada yang dikenali. */
     fun fromHeaders(headers: Map<String, String>): String? {
         // Normalisasi kunci sekali: 5x header() berarti 5x lowercase per kunci.
@@ -26,6 +30,7 @@ object Checksums {
 
     /** RFC 3230: `Digest: sha-256=<nilai>, sha-1=<nilai>` — pilih sha-256 dulu. */
     fun parseDigestHeader(value: String): String? {
+        if (value.length > MAX_HEADER_VALUE_LEN * 2) return null
         val parts = value.split(',').map { it.trim() }
         val preferred = listOf("sha-256" to "SHA-256", "sha-1" to "SHA-1", "md5" to "MD5")
         for ((token, algo) in preferred) {
@@ -39,6 +44,7 @@ object Checksums {
     /** Terima hex polos (32/40/64 karakter) atau base64 (dengan/tanpa padding);
      *  hasil selalu hex huruf kecil. */
     fun toHex(value: String, algo: String): String? {
+        if (value.length > MAX_HEADER_VALUE_LEN) return null
         val v = value.trim()
         if (v.isEmpty()) return null
         val hexLen = when (algo) {
@@ -61,6 +67,7 @@ object Checksums {
 
     /** Decode base64 standar maupun URL-safe (alphabet A-Za-z0-9+/ dan -_), padding opsional. */
     fun base64Decode(input: String): ByteArray? {
+        if (input.length > MAX_HEADER_VALUE_LEN * 2) return null
         // Satu pass StringBuilder: tanpa list + string antara dari filter/map/join.
         val s = StringBuilder(input.length)
         for (c in input) {

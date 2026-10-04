@@ -65,4 +65,14 @@ class ChecksumsTest {
         assertNull(Checksums.fromHeaders(mapOf("ETag" to "\"x\"")))
         assertNull(Checksums.fromHeaders(mapOf("Digest" to "garbage")))
     }
+
+    @Test
+    fun `header raksasa ditolak tanpa OOM`() {
+        val huge = "A".repeat(9000)
+        assertNull(Checksums.toHex(huge, "SHA-256"))
+        assertNull(Checksums.base64Decode(huge))
+        assertNull(Checksums.parseDigestHeader("sha-256=$huge,$huge"))
+        assertNull(Checksums.fromHeaders(mapOf("Digest" to "sha-256=$huge")))
+        assertNull(Checksums.fromHeaders(mapOf("X-Checksum-Sha256" to huge)))
+    }
 }

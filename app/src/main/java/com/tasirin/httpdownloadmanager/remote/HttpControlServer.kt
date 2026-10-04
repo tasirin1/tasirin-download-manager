@@ -902,14 +902,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         var h = items.size.toLong()
         items.forEach { item ->
             h = h * 31 + item.id.hashCode().toLong() * 7 + item.state.hashCode().toLong() * 13 +
-                // fileName/url/totalBytes ikut signature: rename atau ganti URL
-                // (mis. hasil resolveFinalName dari Content-Disposition) wajib
-                // memicu rebuild cache JSON remote, bukan menampilkan nama lama.
+                // fileName/url/totalBytes/speedLimit ikut signature: rename, ganti URL
+                // (mis. hasil resolveFinalName dari Content-Disposition), atau ubah
+                // batas kecepatan wajib memicu rebuild cache JSON remote.
                 item.fileName.hashCode().toLong() * 17 + item.url.hashCode().toLong() * 23 +
                 item.totalBytes.hashCode().toLong() * 21 +
                 item.bytesDownloaded.hashCode().toLong() * 19 + item.speedBps.hashCode().toLong() * 29 +
                 item.etaSeconds.hashCode().toLong() * 31 + item.finishedAt.hashCode().toLong() * 41 +
                 item.priority.hashCode().toLong() * 43 + item.retryCount.hashCode().toLong() * 53 +
+                item.speedLimitKbps.hashCode().toLong() * 67 +
                 (if (item.checksumVerified) 1 else 0) * 59 +
                 item.progressPercentOverride.hashCode().toLong() * 61 +
                 (item.error?.hashCode() ?: 0).toLong() * 47
