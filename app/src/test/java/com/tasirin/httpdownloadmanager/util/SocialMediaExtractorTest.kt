@@ -368,62 +368,6 @@ class SocialMediaExtractorTest {
     }
 
     @Test
-    fun `isScribdUrl - deteksi halaman dokumen`() {
-        assertTrue(SocialMediaExtractor.isScribdUrl("https://www.scribd.com/document/687185479/21221"))
-        assertTrue(SocialMediaExtractor.isScribdUrl("https://scribd.com/document/123/slug"))
-        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.scribd.com/document/687185479/21221"))
-        // CDN halaman bukan URL sosial (sudah hasil ekstraksi).
-        assertFalse(SocialMediaExtractor.isScribdUrl("https://html.scribdassets.com/abc/pages/1-x.jsonp"))
-        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://imgv2-1-f.scribdassets.com/img/document/1/2.jpg"))
-        assertFalse(SocialMediaExtractor.isScribdUrl("https://www.youtube.com/watch?v=abc"))
-    }
-
-    @Test
-    fun `parseScribdPage - judul dan gambar halaman terurut`() {
-        val html = "<html><head>" +
-            "<meta property=\"og:title\" content=\"Belajar Python | Scribd\">" +
-            "<title>Belajar Python | Scribd</title></head><body>" +
-            "<img src=\"https://imgv2-1-f.scribdassets.com/img/document/1/pages/3-a.jpg\">" +
-            "<img data-src=\"https://imgv2-1-f.scribdassets.com/img/document/1/pages/1-a.jpg\">" +
-            "<img src=\"https://imgv2-1-f.scribdassets.com/img/document/1/pages/2-a.jpg\">" +
-            "<img src=\"https://imgv2-1-f.scribdassets.com/img/document/1/pages/1-a.jpg\">" +
-            "<img src=\"https://www.scribd.com/assets/icon-book.png\">" +
-            "<img src=\"https://example.com/evil/page-1.jpg\">" +
-            "</body></html>"
-        val opts = SocialMediaExtractor.parseScribdPage(html)
-        assertEquals(3, opts.size)
-        assertTrue(opts[0].directUrl.endsWith("pages/1-a.jpg"))
-        assertTrue(opts[1].directUrl.endsWith("pages/2-a.jpg"))
-        assertTrue(opts[2].directUrl.endsWith("pages/3-a.jpg"))
-        assertEquals("Scribd_Belajar_Python_p001.jpg", opts[0].fileName)
-        assertEquals("Page 1", opts[0].quality)
-        assertEquals("image/jpeg", opts[0].mimeType)
-    }
-
-    @Test
-    fun `parseScribdPage - tanpa konten valid kosong`() {
-        assertTrue(SocialMediaExtractor.parseScribdPage("<html><body>challenge</body></html>").isEmpty())
-        assertTrue(SocialMediaExtractor.parseScribdPage("").isEmpty())
-    }
-
-    @Test
-    fun `parseDocPages - hanya CDN Scribd tanpa duplikat`() {
-        val json = "[" +
-            "{\"url\":\"https://imgv2-1-f.scribdassets.com/img/document/1/pages/1-a.jpg\",\"title\":\"Page 1\"}," +
-            "{\"url\":\"//html.scribdassets.com/x/pages/2-y.png\",\"title\":\"Page 2\"}," +
-            "{\"url\":\"https://imgv2-1-f.scribdassets.com/img/document/1/pages/1-a.jpg\",\"title\":\"Page 1\"}," +
-            "{\"url\":\"https://evil.com/page-3.jpg\",\"title\":\"Page 3\"}," +
-            "{\"url\":\"bukan-url\",\"title\":\"x\"}" +
-            "]"
-        val pages = SocialMediaExtractor.parseDocPages(json)
-        assertEquals(2, pages.size)
-        assertTrue(pages[0].url.startsWith("https://imgv2-1-f"))
-        assertEquals("https://html.scribdassets.com/x/pages/2-y.png", pages[1].url)
-        assertTrue(SocialMediaExtractor.parseDocPages("bukan json").isEmpty())
-        assertTrue(SocialMediaExtractor.parseDocPages("[]").isEmpty())
-    }
-
-    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))

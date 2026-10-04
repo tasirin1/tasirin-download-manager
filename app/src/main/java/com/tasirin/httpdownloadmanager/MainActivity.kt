@@ -427,8 +427,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     getString(R.string.platform_xnxx)
                 matches("hentaihaven.xxx") -> // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
                     getString(R.string.platform_hentaihaven)
-                matches("scribd.com") ->
-                    getString(R.string.platform_scribd)
                 else -> getString(R.string.platform_social)
             }
         }
@@ -479,14 +477,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 return
             }
             setPlatformBadge(target)
-            btnWebExtract.isVisible = SocialMediaExtractor.isHentaiHavenUrl(target) ||
-                SocialMediaExtractor.isScribdUrl(target)
-            if (SocialMediaExtractor.isHentaiHavenUrl(target) ||
-                SocialMediaExtractor.isScribdUrl(target)
-            ) {
-                // Fetch server pasti ditolak (challenge Cloudflare/JS): jangan
-                // buang waktu probe, pengguna mengekstrak lewat tombol browser
-                // di atas (Scribd: gambar halaman pratinjau, tanpa langganan).
+            btnWebExtract.isVisible = SocialMediaExtractor.isHentaiHavenUrl(target)
+            if (SocialMediaExtractor.isHentaiHavenUrl(target)) {
+                // Fetch server pasti 403 (Cloudflare): jangan buang waktu probe,
+                // pengguna mengekstrak lewat tombol browser di atas.
                 socialJob = null
                 socialOptions = emptyList()
                 socialVideoOptions = emptyList()
@@ -760,47 +754,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 )
                 .show()
         }
-        // Dokumen multi-halaman (Scribd): tiap gambar halaman langsung
-        // diantrekan sebagai unduhan (URL CDN langsung + cookie/Referer sesi
-        // anonim, tanpa perlu buka browser per halaman seperti episode).
-        fun offerPagesBatch(
-            pages: List<SocialMediaExtractor.DocPage>,
-            data: Intent?
-        ) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.batch_pages_title)
-                .setMessage(resources.getQuantityString(R.plurals.batch_pages_message, pages.size, pages.size))
-                .setPositiveButton(R.string.batch_pages_all) { _, _ ->
-                    val cookies = data?.getStringExtra(WebExtractActivity.EXTRA_COOKIES).orEmpty()
-                    val referer = data?.getStringExtra(WebExtractActivity.EXTRA_WATCH_URL).orEmpty()
-                    val headers = buildString {
-                        if (cookies.isNotBlank()) append("Cookie: ").append(cookies)
-                        if (referer.isNotBlank()) {
-                            if (isNotEmpty()) append("\n")
-                            append("Referer: ").append(referer)
-                        }
-                    }
-                    val rawTitle = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
-                        ?.substringBefore(" | ")?.substringBefore(" - ").orEmpty().trim().take(60)
-                    val docTitle = rawTitle.ifBlank { "Scribd_doc" }
-                    var count = 0
-                    pages.forEachIndexed { index, page ->
-                        val ext = page.url.substringBefore('?').substringAfterLast('.', "jpg")
-                            .lowercase().takeIf { it in setOf("jpg", "jpeg", "png", "webp", "gif") }
-                            ?: "jpg"
-                        val fileName = "${docTitle}_p${(index + 1).toString().padStart(3, '0')}.$ext"
-                        App.engine.addDownload(url = page.url, fileName = fileName, headers = headers)
-                        count++
-                    }
-                    Toast.makeText(
-                        this,
-                        resources.getQuantityString(R.plurals.batch_pages_added, count, count, pages.size),
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
-        }
         // Situs anti-bot (HentaiHaven): ambil video lewat browser dalam
         // aplikasi, lalu isi URL + cookie ke form agar engine unduh langsung.
         onWebExtractResult = { data ->
@@ -810,10 +763,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 data?.getStringExtra(WebExtractActivity.EXTRA_EPISODES_JSON).orEmpty(),
                 watch
             )
-            val pages = SocialMediaExtractor.parseDocPages(
-                data?.getStringExtra(WebExtractActivity.EXTRA_PAGES_JSON).orEmpty()
-            )
-            if (videoUrl.isBlank() && episodes.isEmpty() && pages.isEmpty()) {
+            if (videoUrl.isBlank() && episodes.isEmpty()) {
                 Toast.makeText(this, R.string.web_extract_failed, Toast.LENGTH_LONG).show()
             } else {
                 if (videoUrl.isNotBlank()) {
@@ -852,9 +802,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
                 if (episodes.isNotEmpty()) {
                     offerEpisodeBatch(episodes, videoUrl.isNotBlank())
-                }
-                if (pages.isNotEmpty()) {
-                    offerPagesBatch(pages, data)
                 }
             }
         }
