@@ -234,17 +234,24 @@ class FileSaver(context: Context) {
         val resolver = appContext.contentResolver
         val mime = MimeTypes.forFile(fileName)
         val collection = MediaLibrary.mediaCollectionFor(relativePath, mime)
-        val unique = uniqueMediaStoreName(fileName, relativePath, collection)
-        val values = ContentValues().apply {
-            put(MediaStore.Downloads.DISPLAY_NAME, unique)
-            put(MediaStore.Downloads.MIME_TYPE, mime)
-            relativePath?.let { rel ->
-                put(MediaStore.Downloads.RELATIVE_PATH, rel.trim('/').trimEnd('/') + "/")
+        // Klaim nama atomik dalam proses: cek-duplikat + insert tanpa lock
+        // membuat dua publish paralel bernama sama mendapat DISPLAY_NAME kembar
+        // (MediaStore tak menolak nama duplikat). Pola sama seperti klaim
+        // createNewFile di uniqueTargetFile untuk path filesystem.
+        val (uri, unique) = synchronized(mergeLockFor(FileNames.safe(fileName))) {
+            val unique = uniqueMediaStoreName(fileName, relativePath, collection)
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, unique)
+                put(MediaStore.Downloads.MIME_TYPE, mime)
+                relativePath?.let { rel ->
+                    put(MediaStore.Downloads.RELATIVE_PATH, rel.trim('/').trimEnd('/') + "/")
+                }
+                put(MediaStore.Downloads.IS_PENDING, 1)
             }
-            put(MediaStore.Downloads.IS_PENDING, 1)
+            val uri = resolver.insert(collection, values)
+                ?: throw IOException("Failed to create file in MediaStore")
+            uri to unique
         }
-        val uri = resolver.insert(collection, values)
-            ?: throw IOException("Failed to create file in MediaStore")
         try {
             resolver.openOutputStream(uri)?.use { out -> writer(out) }
                 ?: throw IOException("Failed to open MediaStore output")

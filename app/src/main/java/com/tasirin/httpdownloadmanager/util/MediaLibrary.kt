@@ -195,7 +195,9 @@ object MediaLibrary {
                 entry
             }
         }
-        return MediaScanResult(items, base.total)
+        // Teruskan flag fallback: scanCached memilih TTL dari flag ini dan
+        // konsumen masa depan tak boleh mengira hasil fallback itu MediaStore.
+        return MediaScanResult(items, base.total, base.usedFallback)
     }
 
     /** Isi cache scan galeri di background (dipanggil server saat start) supaya
