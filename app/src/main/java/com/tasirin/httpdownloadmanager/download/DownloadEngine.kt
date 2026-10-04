@@ -2133,7 +2133,7 @@ class DownloadEngine(appContext: Context) {
             } else 0L
             return HlsPlan(
                 videoSegments, videoDurations, audioSegments,
-                estimateTotalBytes = estimateBytes(videoDurations, candidate.bandwidth) + audioBytes,
+                estimateTotalBytes = saturatingAdd(estimateBytes(videoDurations, candidate.bandwidth), audioBytes),
                 segmentQueryFallback = playlistQuery(candidate.url)
             )
         }
@@ -2209,7 +2209,10 @@ class DownloadEngine(appContext: Context) {
     private fun estimateBytes(durationsUs: List<Long>, bandwidth: Long): Long {
         val totalUs = durationsUs.sum()
         if (totalUs <= 0 || bandwidth <= 0) return 0L
-        return (bandwidth * totalUs) / 8_000_000L
+        // Kali-dulu-bagi-kemudian meluap bila BANDWIDTH raksasa (nilai
+        // playlist tak-terpercaya) atau video sangat panjang: estimasi negatif
+        // meracuni total + cek storage pra-unduh lolos palsu.
+        return safeMulDiv(totalUs, bandwidth, 8_000_000L)
     }
 
     /** Estimasi audio rendition terpisah (YouTube HLS): ukuran pastinya baru
@@ -2219,8 +2222,9 @@ class DownloadEngine(appContext: Context) {
     private fun estimateAudioBytes(audioSegmentCount: Int, videoDurationsUs: List<Long>): Long {
         val totalUs = videoDurationsUs.sum()
         if (totalUs <= 0 || audioSegmentCount <= 0) return 0L
-        // 128 kbps AAC, bit -> byte (÷8)
-        return (128_000L * totalUs) / 8_000_000L
+        // 128 kbps AAC, bit -> byte (÷8); bagi-dulu agar video
+        // >~20 jam tak meluap seperti estimateBytes.
+        return safeMulDiv(totalUs, 128_000L, 8_000_000L)
     }
 
     private fun fetchText(url: String, headers: String, maxBytes: Int): String? {
@@ -3356,6 +3360,24 @@ internal fun hlsSegmentDurationUs(durSec: Double): Long {
     if (!durSec.isFinite()) return 0L
     return ((durSec.coerceIn(0.0, 86_400.0)) * 1_000_000).toLong()
 }
+
+/** (a*b)/div tanpa overflow Long: bagi dulu baru kali, sisa dihitung
+ *  terpisah. Jenuh di Long.MAX bila operan raksasa (BANDWIDTH playlist
+ *  jahat). Murni agar bisa di-unit-test. */
+internal fun safeMulDiv(a: Long, b: Long, div: Long): Long {
+    if (a <= 0 || b <= 0 || div <= 0) return 0L
+    val q = a / div
+    val r = a % div
+    // q*b / r*b masih bisa meluap bila b raksasa: jenuh, jangan bungkus negatif.
+    val hi = if (q > 0 && b > Long.MAX_VALUE / q) return Long.MAX_VALUE else q * b
+    val lo = if (r > 0 && b > Long.MAX_VALUE / r) return Long.MAX_VALUE else (r * b) / div
+    return if (hi > Long.MAX_VALUE - lo) Long.MAX_VALUE else hi + lo
+}
+
+/** Jumlah jenuh: dua estimasi yang sudah dijepit MAX tak boleh bungkus
+ *  negatif saat dijumlah. Murni agar bisa di-unit-test. */
+internal fun saturatingAdd(a: Long, b: Long): Long =
+    if (b > 0 && a > Long.MAX_VALUE - b) Long.MAX_VALUE else (a + b).coerceAtLeast(0L)
 
 internal fun redirectTarget(base: String, location: String?): String? {
     if (location.isNullOrBlank()) return null
