@@ -2355,7 +2355,7 @@ let galleryCache = null; // {items, total, hasMore, at}
     else { queue.push({img: img, src: src}); }
   };
   let thumbObserver = null;
-  const thumbPending = [];
+  const thumbPending = new Set();
   function ensureThumbObserver() {
     if (thumbObserver || typeof IntersectionObserver === 'undefined') return thumbObserver;
     thumbObserver = new IntersectionObserver(function (entries) {
@@ -2363,8 +2363,7 @@ let galleryCache = null; // {items, total, hasMore, at}
         if (!en.isIntersecting) continue;
         const img = en.target;
         try { thumbObserver.unobserve(img); } catch (e) {}
-        const i = thumbPending.indexOf(img);
-        if (i >= 0) thumbPending.splice(i, 1);
+        thumbPending.delete(img);
         if (img.isConnected) window._thumbQueue(img, img.dataset.thumb);
       }
     }, {rootMargin: '300px'});
@@ -2373,7 +2372,7 @@ let galleryCache = null; // {items, total, hasMore, at}
   window._thumbObserve = function(img) {
     const ob = ensureThumbObserver();
     if (!ob) { window._thumbQueue(img, img.dataset.thumb); return; }
-    thumbPending.push(img);
+    thumbPending.add(img);
     try { ob.observe(img); } catch (e) { window._thumbQueue(img, img.dataset.thumb); }
   };
   // Buang antrean thumbnail yang belum jalan (cell-nya sudah hancur saat
@@ -2383,7 +2382,7 @@ let galleryCache = null; // {items, total, hasMore, at}
     queue.length = 0;
     if (thumbObserver) {
       for (const img of thumbPending) { try { thumbObserver.unobserve(img); } catch (e) {} }
-      thumbPending.length = 0;
+      thumbPending.clear();
     }
   };
 })();
@@ -2859,8 +2858,12 @@ function trimGalleryTop() {
   if (cells.length <= GAL_MAX_CELLS) return;
   let h = 0;
   const drop = cells.length - GAL_MAX_CELLS;
+  // Baca dulu semuanya, hapus belakangan: baca-tulis selang-seling memaksa
+  // reflow sinkron per cell (layout thrash) sehingga scroll jank di WebView tua.
   for (let i = 0; i < drop; i++) {
     h += cells[i].offsetHeight + GAL_ROW_GAP;
+  }
+  for (let i = 0; i < drop; i++) {
     cells[i].remove();
   }
   galTopHidden += drop;

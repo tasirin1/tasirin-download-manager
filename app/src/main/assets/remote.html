@@ -374,7 +374,7 @@ if (active < MAX_CONCURRENT) { active++; img.onload = img.onerror = function() {
 else { queue.push({img: img, src: src}); }
 };
 let thumbObserver = null;
-const thumbPending = [];
+const thumbPending = new Set();
 function ensureThumbObserver() {
 if (thumbObserver || typeof IntersectionObserver === 'undefined') return thumbObserver;
 thumbObserver = new IntersectionObserver(function (entries) {
@@ -382,8 +382,7 @@ for (const en of entries) {
 if (!en.isIntersecting) continue;
 const img = en.target;
 try { thumbObserver.unobserve(img); } catch (e) {}
-const i = thumbPending.indexOf(img);
-if (i >= 0) thumbPending.splice(i, 1);
+thumbPending.delete(img);
 if (img.isConnected) window._thumbQueue(img, img.dataset.thumb);
 }
 }, {rootMargin: '300px'});
@@ -392,14 +391,14 @@ return thumbObserver;
 window._thumbObserve = function(img) {
 const ob = ensureThumbObserver();
 if (!ob) { window._thumbQueue(img, img.dataset.thumb); return; }
-thumbPending.push(img);
+thumbPending.add(img);
 try { ob.observe(img); } catch (e) { window._thumbQueue(img, img.dataset.thumb); }
 };
 window._thumbQueueClear = function() {
 queue.length = 0;
 if (thumbObserver) {
 for (const img of thumbPending) { try { thumbObserver.unobserve(img); } catch (e) {} }
-thumbPending.length = 0;
+thumbPending.clear();
 }
 };
 })();
@@ -830,6 +829,8 @@ let h = 0;
 const drop = cells.length - GAL_MAX_CELLS;
 for (let i = 0; i < drop; i++) {
 h += cells[i].offsetHeight + GAL_ROW_GAP;
+}
+for (let i = 0; i < drop; i++) {
 cells[i].remove();
 }
 galTopHidden += drop;
