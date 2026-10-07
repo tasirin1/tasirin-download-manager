@@ -125,14 +125,19 @@ class DownloadService : Service() {
         super.onDestroy()
     }
 
-    /** PARTIAL_WAKE_LOCK tanpa timeout selama ada item aktif: refresh lock
-     *  hanya terjadi saat flow items meng-emit, sehingga timeout 15 menit bisa
-     *  kedaluwarsa diam-diam saat koneksi stall tanpa tick progres. Lock tanpa
-     *  timeout tetap aman: ikut lepas saat proses mati dan dilepas eksplisit
-     *  saat antrean idle (cabang else di bawah) serta saat service destroy. */
-    // Acquire/release lintas callback lifecycle (bukan try/finally satu
-    // metode) dan tanpa timeout adalah desain sengaja — bukan kebocoran.
-    @SuppressLint("Wakelock", "WakelockTimeout")
+    // Sabuk-pengaman: bila jalur release terlewat (bug masa depan), lock tak
+    // dipegang selamanya. Refresh otomatis: tiap emisi flow memanggil
+    // updateWakeLock(true) yang re-acquire saat isHeld false, sehingga unduhan
+    // sehat (emisi tiap tick progres) tak pernah kehilangan lock; stall total
+    // >1 jam melepas CPU (hemat baterai) dan dipegang lagi saat pulih via
+    // NetworkCallback/retry -> emisi -> re-acquire di bawah.
+    private companion object {
+        const val WAKELOCK_TIMEOUT_MS = 60 * 60 * 1000L
+    }
+
+    // Acquire/release lintas callback lifecycle (bukan try/finally satu metode)
+    // adalah desain sengaja — bukan kebocoran.
+    @SuppressLint("Wakelock")
     private fun updateWakeLock(active: Boolean) {
         if (active) {
             if (wakeLock == null) {
@@ -142,7 +147,7 @@ class DownloadService : Service() {
             }
             val lock = wakeLock
             if (lock != null && runCatching { !lock.isHeld }.getOrDefault(true)) {
-                runCatching { lock.acquire() }
+                runCatching { lock.acquire(WAKELOCK_TIMEOUT_MS) }
             }
         } else {
             val lock = wakeLock
