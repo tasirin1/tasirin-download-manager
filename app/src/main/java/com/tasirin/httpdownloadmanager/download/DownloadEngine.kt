@@ -2636,10 +2636,17 @@ class DownloadEngine(appContext: Context) {
             ?: return null
         if (result.directUrl == item.url || result.isHls) return null
         if (item.totalBytes > 0) {
-            val probe = openAuthenticatedConnection(
-                result.directUrl, method = "HEAD",
-                username = item.username, password = item.password, headers = item.headers
-            )
+            // Validasi HEAD tak boleh melempar: openAuthenticatedConnection
+            // ikut menyambung + membaca responseCode saat redirect, sehingga
+            // blip jaringan di sini harus berarti "tak ada URL segar" (jatuh
+            // ke fallback satu-alur di pemanggil), bukan meledak keluar dan
+            // melewatkan fallback lalu retry-Range berulang sampai FAILED.
+            val probe = runCatching {
+                openAuthenticatedConnection(
+                    result.directUrl, method = "HEAD",
+                    username = item.username, password = item.password, headers = item.headers
+                )
+            }.getOrNull() ?: return null
             try {
                 if (probe.responseCode !in 200..299) return null
                 if (!isFreshResumeSizeValid(item.totalBytes, contentLength(probe))) return null
