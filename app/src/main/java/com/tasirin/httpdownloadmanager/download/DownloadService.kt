@@ -86,11 +86,20 @@ class DownloadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        val action = intent?.action
+        when (action) {
             NotificationHelper.ACTION_PAUSE_ALL -> App.engine.pauseAll()
             NotificationHelper.ACTION_RESUME_ALL -> App.engine.resumeAll()
         }
-        return START_STICKY
+        // Baru diminta jalan = ada kerja (jangan NOT_STICKY: restart-mode ikut
+        // return terakhir sehingga unduhan aktif kehilangan perlindungan).
+        if (action == NotificationHelper.ACTION_RESUME_ALL) return START_STICKY
+        // STICKY hanya bila masih ada kerja: restart service kosong oleh sistem
+        // hanya mem-flash notifikasi sesaat sebelum stopSelf di emisi pertama.
+        val keepAlive = App.engine.items.value.any {
+            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
+        } || (StoragePrefs.isServerBackgroundEnabled(this) && App.httpServer.isAlive)
+        return if (keepAlive) START_STICKY else START_NOT_STICKY
     }
 
     private fun startForegroundCompat() {
