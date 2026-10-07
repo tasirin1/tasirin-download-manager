@@ -169,25 +169,32 @@ class GalleryActivity : AppCompatActivity() {
 
     private fun openEntry(e: MediaLibrary.MediaEntry) {
         val mime = MimeTypes.forFile(e.name)
-        val intent = when {
-            e.isPartial -> partialPlayIntent(e, mime)
-            !e.contentUri.isNullOrEmpty() ->
-                Intent(Intent.ACTION_VIEW).setDataAndType(e.contentUri.toUri(), mime)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            !e.filePath.isNullOrEmpty() -> {
-                val uri = FileProvider.getUriForFile(
-                    this, "$packageName.fileprovider", File(e.filePath)
-                )
-                Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, mime)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Konstruksi intent bisa melempar (FileProvider menolak path di luar
+        // roots untuk folder kustom/SD): bungkus seperti MainActivity agar
+        // ketuk tak crash, melainkan toast seperti startActivity gagal.
+        val intent = runCatching {
+            when {
+                e.isPartial -> partialPlayIntent(e, mime)
+                !e.contentUri.isNullOrEmpty() ->
+                    Intent(Intent.ACTION_VIEW).setDataAndType(e.contentUri.toUri(), mime)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                !e.filePath.isNullOrEmpty() -> {
+                    val uri = FileProvider.getUriForFile(
+                        this, "$packageName.fileprovider", File(e.filePath)
+                    )
+                    Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(uri, mime)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                else -> null
             }
-            else -> null
-        }
+        }.getOrNull()
         if (intent != null) {
             runCatching { startActivity(intent) }.onFailure {
                 Toast.makeText(this, R.string.gallery_open_error, Toast.LENGTH_SHORT).show()
             }
+        } else {
+            Toast.makeText(this, R.string.gallery_open_error, Toast.LENGTH_SHORT).show()
         }
     }
 

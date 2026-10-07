@@ -95,6 +95,36 @@ class ZipCreatorTest {
     }
 
     @Test
+    fun `recursive zip deduplicates normalized entry names`() {
+        val root = temp.newFolder("dup")
+        // Dua nama berbeda yang ternormalisasi sama (kontrol C0 -> '_'):
+        // tanpa dedupe, ZipException duplikat menggugurkan seluruh arsip.
+        java.io.File(root, "bad\u0001name.txt").writeText("one")
+        java.io.File(root, "bad\u0002name.txt").writeText("two")
+        val allowedPath = root.absolutePath
+        val bytes = ByteArrayOutputStream().use { raw ->
+            ZipOutputStream(raw).use { zip ->
+                ZipCreator.zipFile(zip, root, "") { path ->
+                    path == allowedPath || path.startsWith("$allowedPath/")
+                }
+            }
+            raw.toByteArray()
+        }
+        val names = mutableListOf<String>()
+        ByteArrayInputStream(bytes).use { input ->
+            ZipInputStream(input).use { zip ->
+                while (true) {
+                    val entry: ZipEntry = zip.nextEntry ?: break
+                    names.add(entry.name)
+                    zip.closeEntry()
+                }
+            }
+        }
+        assertTrue(names.contains("dup/bad_name.txt"))
+        assertTrue(names.contains("dup/bad_name (1).txt"))
+    }
+
+    @Test
     fun `entry path blocks traversal separators and control chars`() {
         assertEquals("folder/file.txt", ZipCreator.safeEntryPath("../folder/..\\file.txt"))
         assertEquals("file.txt", ZipCreator.safeEntryPath("/../../file.txt"))

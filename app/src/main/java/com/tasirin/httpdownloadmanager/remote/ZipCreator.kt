@@ -67,6 +67,7 @@ object ZipCreator {
         depth: Int = 0,
         seen: MutableSet<String> = mutableSetOf(),
         budget: ZipBudget = ZipBudget(),
+        usedNames: MutableMap<String, Int> = mutableMapOf(),
         isFileAllowed: (String) -> Boolean
     ) {
         // Izin dicek terhadap canonical path: symlink file di dalam root
@@ -81,7 +82,14 @@ object ZipCreator {
             val canonical = runCatching { file.canonicalPath }.getOrNull() ?: return
             if (!seen.add(canonical)) return
         }
-        val entryPath = safeEntryPath(if (prefix.isEmpty()) file.name else "$prefix/${file.name}")
+        // Dedupe seperti zipTokens/zipMedia: dua nama yang ternormalisasi
+        // sama (kontrol C0 -> '_') membuat ZipException duplikat — cabang
+        // file menelan diam-diam, cabang direktori menggugurkan seluruh ZIP.
+        val entryPath = uniqueZipName(
+            safeEntryPath(if (prefix.isEmpty()) file.name else "$prefix/${file.name}")
+                .ifEmpty { return },
+            usedNames
+        )
         if (!budget.tryTake()) return
         if (file.isDirectory) {
             val children = runCatching { file.listFiles() }.getOrNull()
@@ -94,7 +102,7 @@ object ZipCreator {
                 Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
             ).forEach { child ->
                 if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
-                zipFile(zos, child, entryPath, depth + 1, seen, budget, isFileAllowed)
+                zipFile(zos, child, entryPath, depth + 1, seen, budget, usedNames, isFileAllowed)
             }
         } else if (file.isFile) {
             runCatching {

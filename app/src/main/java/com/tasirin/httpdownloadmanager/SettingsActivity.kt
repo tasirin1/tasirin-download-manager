@@ -38,6 +38,7 @@ import com.tasirin.httpdownloadmanager.databinding.ActivitySettingsBinding
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.Formats
+import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.Updater
@@ -308,7 +309,10 @@ class SettingsActivity : AppCompatActivity() {
             bytes += f.length()
             if (f.delete()) files++
         }
-        val itemNames = App.engine.items.value.map { it.fileName }.toSet()
+        // File di disk memakai FileNames.safe(): bandingkan nama safe agar
+        // .part AKTIF yang namanya disanitasi (|?:*, >200 char, reserved)
+        // tidak dianggap sampah lalu dihapus saat download berjalan.
+        val itemNames = App.engine.items.value.map { FileNames.safe(it.fileName) }.toSet()
         runCatching {
             File(filesDir, "downloads").listFiles()?.forEach { f ->
                 // Satu find() saja: replace + containsMatchIn memindai nama 2x.
