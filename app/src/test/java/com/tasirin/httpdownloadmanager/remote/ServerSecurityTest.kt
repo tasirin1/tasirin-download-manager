@@ -268,6 +268,20 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun tokenAntarJalur_tidakLolos() {
+        // Secret + format kawat sama: tanpa domain HMAC, token partial
+        // untuk ID yang sama lolos sebagai token verify-upload dan sebaliknya.
+        val partial = ServerSecurity.createPartialToken("sama", 2000L, "secret")
+        assertFalse(
+            ServerSecurity.isUploadVerifyTokenValid(partial, "sama", 1999L, "secret")
+        )
+        val verify = ServerSecurity.createUploadVerifyToken("sama", 2000L, "secret")
+        assertFalse(
+            ServerSecurity.isPartialTokenValid(verify, "sama", 1999L, "secret")
+        )
+    }
+
+    @Test
     fun isRemoteDestinationAllowed_traversal_atau_luarRoot_false() {
         val r = root()
         val luar = tmp.newFolder("luar")

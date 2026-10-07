@@ -139,7 +139,10 @@ object ServerSecurity {
      *  HMAC (bukan SHA-256 polos) agar tak rentan length-extension. */
     fun createPartialToken(itemId: String, expiresAt: Long, secret: String): String {
         val payload = "$itemId.$expiresAt"
-        return "$payload.${hmacSha256Hex(secret, payload)}"
+        // Domain "partial:" memisahkan HMAC dari token verify-upload yang
+        // berbagi secret + format kawat sama; tanpa ini token satu jalur
+        // lolos validasi jalur lain bila ID tabrakan.
+        return "$payload.${hmacSha256Hex(secret, "partial:$payload")}"
     }
 
     // Batas panjang token: HMAC dihitung setelah validasi bentuk agar
@@ -152,14 +155,14 @@ object ServerSecurity {
         if (parts.size != 3 || parts[0] != itemId) return false
         val expiresAt = parts[1].toLongOrNull() ?: return false
         if (expiresAt < now) return false
-        val expected = hmacSha256Hex(secret, "${parts[0]}.${parts[1]}")
+        val expected = hmacSha256Hex(secret, "partial:${parts[0]}.${parts[1]}")
         return StoragePrefs.constantEquals(parts[2], expected)
     }
 
     /** Token status upload mencegah enumerasi ID oleh klien lain di LAN. */
     fun createUploadVerifyToken(uploadId: String, expiresAt: Long, secret: String): String {
         val payload = "$uploadId.$expiresAt"
-        return "$payload.${hmacSha256Hex(secret, payload)}"
+        return "$payload.${hmacSha256Hex(secret, "upload:$payload")}"
     }
 
     fun isUploadVerifyTokenValid(
@@ -174,7 +177,7 @@ object ServerSecurity {
         if (parts.size != 3 || parts[0] != uploadId) return false
         val expiresAt = parts[1].toLongOrNull() ?: return false
         if (expiresAt < now) return false
-        val expected = hmacSha256Hex(secret, "${parts[0]}.${parts[1]}")
+        val expected = hmacSha256Hex(secret, "upload:${parts[0]}.${parts[1]}")
         return StoragePrefs.constantEquals(parts[2], expected)
     }
 

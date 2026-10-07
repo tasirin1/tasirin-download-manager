@@ -963,6 +963,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         dialog.setOnDismissListener {
             onWebExtractResult = null
             fallbackWebExtractHandler = null
+            // Probe yang masih jalan menahan seluruh view dialog + bakar
+            // ekstraksi jaringan sia-sia pasca-tutup: batalkan di sini.
+            socialDebounce?.cancel()
+            socialJob?.cancel()
+            socialDebounce = null
+            socialJob = null
         }
         // Tombol Cancel
         view.findViewById<Button>(R.id.btn_cancel).setOnClickListener {

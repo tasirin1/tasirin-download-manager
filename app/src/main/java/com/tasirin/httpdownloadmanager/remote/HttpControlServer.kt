@@ -251,7 +251,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // paralel dari IP sama bisa sama-sama lolos throttle. Kunci eksplisit.
             val throttledPayload: String? = synchronized(snapshotLastHit) {
                 val last = snapshotLastHit.getOrDefault(ip, 0L)
-                if (now - last < SNAPSHOT_RATE_MS) snapshotPayloadCached()
+                // Cache awal "{}" belum pernah dibangun (start/restart + request
+                // paralel): sajikan fresh agar klien tak dapat daftar kosong sekedip.
+                if (now - last < SNAPSHOT_RATE_MS && lastSnapshotJson != "{}") snapshotPayloadCached()
                 else {
                     snapshotLastHit[ip] = now
                     null
