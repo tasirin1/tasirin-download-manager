@@ -152,8 +152,12 @@ object NotificationHelper {
         val title = if (success) item.fileName else "Failed: ${item.fileName}"
         val text = if (success) Formats.bytes(item.bytesDownloaded) else (item.error ?: "Unknown error")
         val intent = Intent(context, MainActivity::class.java).setPackage(context.packageName)
+        // requestCode stabil (bukan id unik): intent selalu sama (buka MainActivity
+        // tanpa extra) sehingga satu PendingIntent dipakai ulang; requestCode unik
+        // per unduhan selesai justru menumpuk objek PendingIntent di sistem
+        // seumur proses. Id unik hanya untuk baris notifikasi di bawah.
         val pending = PendingIntent.getActivity(
-            context, id, intent,
+            context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notif = NotificationCompat.Builder(context, CHANNEL_ID)
