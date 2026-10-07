@@ -2057,11 +2057,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             else -> MediaMeta("media", null)
         }
         if (mediaMetaCache.size > MEDIA_META_CACHE_MAX) {
+            // Iterator ConcurrentHashMap tak dukung remove (UnsupportedOperationException):
+            // hapus lewat snapshot kunci agar eviksi tak melempar 500.
             val toRemove = mediaMetaCache.size / 2
             var removed = 0
-            val iter = mediaMetaCache.entries.iterator()
-            while (iter.hasNext() && removed < toRemove) {
-                iter.next(); iter.remove(); removed++
+            for (key in mediaMetaCache.keys.toList()) {
+                if (removed >= toRemove) break
+                if (mediaMetaCache.remove(key) != null) removed++
             }
         }
         mediaMetaCache[raw] = now to meta
@@ -3165,8 +3167,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val uri = item.contentUri.toUri()
             if (!isMediaUriAllowed(uri)) return notFound()
             val resolver = context.contentResolver
-            val stream = resolver.openInputStream(uri) ?: return notFound()
-            var shareLen = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+            // Pola sama seperti serveFile: AFD bisa melempar setelah stream terbuka
+            // (URI basi) — tanpa ini descriptor bocor + respons jadi 500, bukan 404.
+            val rawStream = runCatching { resolver.openInputStream(uri) }.getOrNull()
+                ?: run { invalidateGalleryCache(); return notFound() }
+            var shareLen = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L }.getOrElse {
+                runCatching { rawStream.close() }
+                invalidateGalleryCache()
+                return notFound()
+            }
             if (shareLen < 0) {
                 shareLen = runCatching {
                     resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
@@ -3175,18 +3184,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }.getOrNull() ?: -1L
             }
             total = shareLen
-            input = stream
+            input = rawStream
         } else {
             return notFound()
         }
-        return streamMedia(
-            name = item.fileName,
-            mime = MimeTypes.forFile(item.fileName),
-            input = input,
-            total = total,
-            rangeHeader = session.headers["range"] ?: session.headers["Range"],
-            download = true
-        )
+        return try {
+            streamMedia(
+                name = item.fileName,
+                mime = MimeTypes.forFile(item.fileName),
+                input = input,
+                total = total,
+                rangeHeader = session.headers["range"] ?: session.headers["Range"],
+                download = true
+            )
+        } catch (e: Exception) {
+            runCatching { input.close() }
+            throw e
+        }
     }
 
     /** Jalur thumbnail bersama untuk remote dan galeri native agar decode,

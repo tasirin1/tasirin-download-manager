@@ -90,6 +90,12 @@ class ServerVideoDurations(
             if (probeFailAt.size > MAX_ENTRIES) {
                 val cutoff = System.currentTimeMillis() - PROBE_FAILURE_TTL_MS
                 probeFailAt.entries.removeAll { it.value < cutoff }
+                // Hanya hapus kedaluwarsa tak cukup bila gagal massal dalam TTL:
+                // paksa buang setengah tertua agar map tak tumbuh tanpa batas.
+                if (probeFailAt.size > MAX_ENTRIES) {
+                    val drop = probeFailAt.size / 2
+                    probeFailAt.entries.sortedBy { it.value }.take(drop).forEach { probeFailAt.remove(it.key) }
+                }
             }
             probeFailAt[token] = System.currentTimeMillis()
         }
