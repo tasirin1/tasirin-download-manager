@@ -138,12 +138,23 @@ object ZipCreator {
                     val canon = runCatching { f.canonicalPath }.getOrNull()
                     if (canon == null || !isFileAllowed(canon)) return@forEach
                     if (f.isDirectory) {
-                        val root = uniqueZipName(f.name, used)
+                        // Nama folder mentah tak boleh jadi prefix entri: folder
+                        // bernama ".."/backslash/karakter kontrol lolos sebagai
+                        // path traversal di extractor pihak ketiga (cabang file
+                        // tunggal di bawah sudah lewat safeEntryPath).
+                        val root = tokenDirRootName(f.name, used)
                         val children = runCatching { f.listFiles() }.getOrNull() ?: return@runCatching
+                        // seen + usedNames dipakai bersama seluruh sibling: map
+                        // fresh per child membuat nama ternormalisasi kembar
+                        // (kontrol C0 -> '_') menimpa entri duplikat sehingga
+                        // ZipException lalu file hilang diam-diam, dan symlink
+                        // ke target sama di-zip berulang sia-sia.
+                        val dirSeen = mutableSetOf<String>()
+                        val dirUsed = mutableMapOf<String, Int>()
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
                         ).forEach { child -> if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
-                            zipFile(zos, child, root, depth = 1, seen = mutableSetOf(), isFileAllowed = isFileAllowed, budget = budget) }
+                            zipFile(zos, child, root, depth = 1, seen = dirSeen, isFileAllowed = isFileAllowed, budget = budget, usedNames = dirUsed) }
                         return@runCatching
                     }
                     name = f.name
@@ -159,6 +170,10 @@ object ZipCreator {
                 if (input == null) {
                     return@runCatching
                 }
+                // Konsumsi budget juga di jalur file tunggal: tanpa ini guard
+                // MAX_ZIP_ENTRIES mati untuk daftar token flat (hanya rekursi
+                // direktori via zipFile yang memanggil tryTake).
+                if (!budget.tryTake()) return@forEach
                 val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
                 runCatching {
                     zos.putNextEntry(ZipEntry(entry))
@@ -185,6 +200,11 @@ object ZipCreator {
     }.getOrNull()?.takeIf { it.isNotBlank() }
         ?: uri.lastPathSegment?.substringAfterLast('/')
         ?: "file"
+
+    /** Nama root arsip untuk token direktori: disanitasi seperti entri
+     *  lain agar tak menjadi vektor traversal. Murni agar bisa di-unit-test. */
+    internal fun tokenDirRootName(dirName: String, used: MutableMap<String, Int>): String =
+        uniqueZipName(safeEntryPath(dirName).ifEmpty { "folder" }, used)
 
     internal fun uniqueZipName(base: String, used: MutableMap<String, Int>): String {
         val count = used.getOrDefault(base, 0)

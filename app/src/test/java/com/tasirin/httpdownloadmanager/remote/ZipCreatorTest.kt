@@ -125,6 +125,24 @@ class ZipCreatorTest {
     }
 
     @Test
+    fun `token dir root name is sanitized like other entries`() {
+        val used = mutableMapOf<String, Int>()
+        assertEquals("folder", ZipCreator.tokenDirRootName("..", used))
+        assertEquals("file.txt", ZipCreator.tokenDirRootName("..\\file.txt", used))
+        assertEquals("bad_name", ZipCreator.tokenDirRootName("bad\u0001name", used))
+        assertEquals("folder (1)", ZipCreator.tokenDirRootName("..", used))
+    }
+
+    @Test
+    fun `zip budget caps entries at max`() {
+        val budget = ZipCreator.ZipBudget()
+        var taken = 0
+        while (budget.tryTake()) taken++
+        assertEquals(ZipCreator.MAX_ZIP_ENTRIES, taken)
+        assertFalse(budget.tryTake())
+    }
+
+    @Test
     fun `entry path blocks traversal separators and control chars`() {
         assertEquals("folder/file.txt", ZipCreator.safeEntryPath("../folder/..\\file.txt"))
         assertEquals("file.txt", ZipCreator.safeEntryPath("/../../file.txt"))
