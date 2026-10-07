@@ -5,6 +5,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import java.io.File
+import java.io.IOException
 import java.nio.ByteBuffer
 
 /** Remux video + audio terpisah menjadi satu file MP4 memakai
@@ -161,6 +162,10 @@ object HlsMp4Muxer {
     }
 
     /** Ukuran buffer video dari format track (satu tempat, tiga remux memakai sama). */
+    /** Batas frame tunggal saat buffer tumbuh: klaim ukuran bohong di atas
+     *  ini digagalkan aman (outer catch menghapus partial), bukan OOM. */
+    private const val MAX_MUX_FRAME_BYTES = 64 shl 20
+
     private fun videoBufferSize(vFormat: MediaFormat): Int {
         return runCatching {
             vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
@@ -197,7 +202,7 @@ object HlsMp4Muxer {
         segmentDurationsUs: List<Long>,
         videoFrameCount: Int
     ) {
-        val buffer = ByteBuffer.allocate(bufferSize)
+        var buffer = ByteBuffer.allocate(bufferSize)
         val info = MediaCodec.BufferInfo()
         if (segmentDurationsUs.isEmpty() || videoFrameCount <= 1) {
             // Playlist tanpa EXTINF atau frame tidak terhitung (jarang):
@@ -217,8 +222,19 @@ object HlsMp4Muxer {
         var frameIndex = 0L
         while (true) {
             buffer.clear()
-            val size = ext.readSampleData(buffer, 0)
+            var size = ext.readSampleData(buffer, 0)
             if (size < 0) break
+            // KEY_MAX_INPUT_SIZE bisa diklaim kekecilan oleh track nakal:
+            // baca ulang dengan buffer lebih besar (tanpa advance, sampel
+            // sama). Dibatasi agar ukuran bohong tak meledakkan RAM.
+            if (size > buffer.capacity()) {
+                if (size > MAX_MUX_FRAME_BYTES) {
+                    throw IOException("oversized video frame $size bytes, MAX_INPUT_SIZE under-claimed")
+                }
+                buffer = ByteBuffer.allocate(size)
+                size = ext.readSampleData(buffer, 0)
+                if (size < 0) break
+            }
             buffer.position(0)
             buffer.limit(size)
             val pts = frameIndex * stepUs
