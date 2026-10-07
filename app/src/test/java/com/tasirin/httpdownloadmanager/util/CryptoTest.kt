@@ -34,4 +34,15 @@ class CryptoTest {
         assertEquals("plain:x", Crypto.encrypt("x"))
         assertTrue(!Crypto.encryptFallbackUsed)
     }
+
+    @Test
+    fun `isKeyInvalidated hanya true untuk rantai kunci invalid`() {
+        assertTrue(!Crypto.isKeyInvalidated(null))
+        assertTrue(!Crypto.isKeyInvalidated(RuntimeException("cipher hiccup")))
+        assertTrue(
+            !Crypto.isKeyInvalidated(
+                RuntimeException("bungkus", IllegalStateException("dalam"))
+            )
+        )
+    }
 }

@@ -35,10 +35,21 @@ object Crypto {
     fun encrypt(plain: String): String {
         if (plain.isEmpty()) return ""
         if (Build.VERSION.SDK_INT < 23) return PLAIN_PREFIX + plain
-        encryptOnce(plain)?.let { return it }
-        // Penyebab umum: kunci invalid (ganti/hapus lockscreen) — buang entri
-        // rusak, bangkitkan kunci baru, coba sekali lagi sebelum menyerah.
-        if (invalidateKey()) encryptOnce(plain)?.let { return it }
+        encryptOnce(plain).onSuccess { return it }
+            .onFailure { e ->
+                // Hanya kunci invalid yang boleh dibuang: gagal sesaat dengan
+                // kunci sehat (Cipher hiccup/OOM) lalu kunci dibuang justru
+                // menyatimkan SEMUA kredensial tersimpan (kunci baru tak bisa
+                // membuka blob lama) — lebih parah dari satu fallback.
+                if (!isKeyInvalidated(e)) return fallbackPlain(plain)
+            }
+        // Kunci invalid (ganti/hapus lockscreen): buang entri rusak,
+        // bangkitkan kunci baru, coba sekali lagi sebelum menyerah.
+        if (invalidateKey()) encryptOnce(plain).getOrNull()?.let { return it }
+        return fallbackPlain(plain)
+    }
+
+    private fun fallbackPlain(plain: String): String {
         encryptFallbackUsed = true
         runCatching {
             android.util.Log.e("Crypto", "encrypt failed twice, storing plaintext temporarily")
@@ -46,11 +57,23 @@ object Crypto {
         return PLAIN_PREFIX + plain
     }
 
-    private fun encryptOnce(plain: String): String? = runCatching {
+    private fun encryptOnce(plain: String): Result<String> = runCatching {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())
         PREFIX + b64(cipher.iv) + ":" + b64(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)))
-    }.getOrNull()
+    }
+
+    /** True bila rantai penyebab memuat kunci-invalid permanen. Internal agar
+     *  bisa di-unit-test. */
+    internal fun isKeyInvalidated(e: Throwable?): Boolean {
+        var cur = e
+        while (cur != null) {
+            if (cur is android.security.keystore.KeyPermanentlyInvalidatedException) return true
+            if (cur === cur.cause) break
+            cur = cur.cause
+        }
+        return false
+    }
 
     /** Buang entri kunci rusak + cache agar `key()` membangkitkan yang baru.
      *  True bila reset jalan (percobaan ulang layak), false bila reset
