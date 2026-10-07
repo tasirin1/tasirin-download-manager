@@ -256,6 +256,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
         handleIncomingIntent(intent)
         } catch (t: Throwable) {
+            // Error level-VM (memori habis, linkage rusak) jangan ditelan:
+            // biarkan crash agar laporan sistem jujur; Exception biasa tetap
+            // tampil ramah via showFatalError.
+            if (t is VirtualMachineError || t is ThreadDeath || t is LinkageError) throw t
             showFatalError(t)
         }
     }
