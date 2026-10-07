@@ -94,6 +94,28 @@ class RedirectSafetyTest {
     }
 
     @Test
+    fun `ip literal helper membedakan nama vs literal`() {
+        assertTrue(isIpLiteral("127.0.0.1"))
+        assertTrue(isIpLiteral("127.1"))
+        assertTrue(isIpLiteral("0x7f.0.0.1"))
+        assertTrue(isIpLiteral("2130706433"))
+        assertTrue(isIpLiteral("::1"))
+        assertTrue(isIpLiteral("192.168.1.10"))
+        assertTrue(!isIpLiteral("example.com"))
+        assertTrue(!isIpLiteral("localhost"))
+        assertTrue(!isIpLiteral(""))
+    }
+
+    @Test
+    fun `hostname guard hanya menerima nama valid`() {
+        assertTrue(HOSTNAME_RE.matches("example.com"))
+        assertTrue(HOSTNAME_RE.matches("cdn-01.example.co.id"))
+        assertTrue(!HOSTNAME_RE.matches(""))
+        assertTrue(!HOSTNAME_RE.matches("exa mple.com"))
+        assertTrue(!HOSTNAME_RE.matches("a_b.com"))
+    }
+
+    @Test
     fun `same origin ignores default ports but rejects cross origin`() {
         assertTrue(isSameOrigin("https://example.com/a", "https://EXAMPLE.com/b"))
         assertTrue(isSameOrigin("http://example.com/a", "http://example.com:80/b"))

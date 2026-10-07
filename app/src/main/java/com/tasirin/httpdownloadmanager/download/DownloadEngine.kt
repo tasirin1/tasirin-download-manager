@@ -3483,8 +3483,36 @@ internal fun isBlockedRedirectHost(host: String): Boolean {
             if ((long ushr 16) == ((169 shl 8) or 254)) return true
         }
     }
+    // Hostname yang lolos semua cek literal: resolve DNS dan tolak bila
+    // menunjuk loopback/unspecified (DNS-rebinding: evil.com -> 127.0.0.1).
+    // LAN privat (192.168.x/10.x) SENGAJA lolos agar unduhan NAS tetap jalan.
+    // Literal IP tak perlu resolve (sudah diputus di atas); DNS gagal =
+    // lolos (fail-open: konek pun akan gagal sendiri, dan guard ini tak boleh
+    // memblokir redirect sah saat DNS tersendat).
+    if (!isIpLiteral(numeric) && HOSTNAME_RE.matches(h)) {
+        val addrs = runCatching { java.net.InetAddress.getAllByName(h) }.getOrNull()
+            ?: return false
+        if (addrs.any { it.isLoopbackAddress || it.isAnyLocalAddress }) return true
+    }
     return false
 }
+
+/** True bila host adalah literal IP (bukan nama yang butuh resolve DNS).
+ *  Murni agar bisa di-unit-test. */
+internal fun isIpLiteral(host: String): Boolean {
+    val s = host.trim().trimEnd('.').lowercase().removePrefix("[").removeSuffix("]")
+    if (s.contains(':')) return IPV6_LITERAL_RE.matches(s)
+    val parts = s.split('.')
+    if (parts.size == 1) return parseIpv4Part(s) != null
+    return parts.size in 2..4 && parts.all { parseIpv4Part(it) != null }
+}
+
+/** Hostname valid (label alfanumerik + strip, tanpa spasi/garis bawah):
+ *  guard sebelum resolve agar sampah tak memicu lookup DNS. */
+internal val HOSTNAME_RE = Regex(
+    "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$",
+    RegexOption.IGNORE_CASE
+)
 
 internal fun parseIpv4Part(part: String): Int? {
     val p = part.trim().lowercase()
