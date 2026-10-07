@@ -1913,7 +1913,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // daftar dimuat ulang (tanpa probe per-baris saat scan).
             val rawStream = runCatching { resolver.openInputStream(uri) }.getOrNull()
                 ?: run { invalidateGalleryCache(); return notFound() }
-            var len = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+            // AFD bisa melempar setelah stream terbuka (URI basi): tanpa ini
+            // descriptor input bocor + respons jadi 500, bukan 404.
+            var len = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L }.getOrElse {
+                runCatching { rawStream.close() }
+                invalidateGalleryCache()
+                return notFound()
+            }
             if (len < 0) {
                 len = runCatching {
                     resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->

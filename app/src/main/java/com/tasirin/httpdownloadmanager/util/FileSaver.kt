@@ -683,6 +683,9 @@ class FileSaver(context: Context) {
                     if (file.renameTo(target)) {
                         PublishResult(filePath = target.absolutePath)
                     } else {
+                        // Klaim kosong uniqueTargetFile tertinggal bila rename
+                        // gagal: hapus bila masih kosong seperti rename().
+                        runCatching { if (target.isFile && target.length() == 0L) target.delete() }
                         result
                     }
                 }

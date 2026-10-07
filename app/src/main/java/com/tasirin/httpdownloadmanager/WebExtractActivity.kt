@@ -286,6 +286,7 @@ class WebExtractActivity : AppCompatActivity() {
         finished = true
         handler.removeCallbacks(grabLoop)
         if (::webView.isInitialized) {
+            runCatching { webView.stopLoading() }
             (webView.parent as? android.view.ViewGroup)?.removeView(webView)
             webView.destroy()
         }
