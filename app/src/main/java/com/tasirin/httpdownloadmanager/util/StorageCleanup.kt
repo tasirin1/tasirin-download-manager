@@ -21,7 +21,14 @@ object StorageCleanup {
     // tidak merusak interval; dipasang di bawah lock agar dua pemanggil
     // paralel tidak lolos dan membersihkan ganda.
     private val throttleLock = Any()
-    @Volatile private var lastRunElapsed = 0L
+    // Nilai awal = "sudah lama berjalan": 0 berarti "baru jalan saat boot"
+    // sehingga 5 menit pertama setelah reboot pembersihan selalu ter-throttle
+    // padahal belum pernah jalan — tepat saat autostart-boot paling butuh.
+    @Volatile private var lastRunElapsed = -MIN_INTERVAL_MS
+
+    /** Murni agar bisa diuji unit: true bila jarak sejak run terakhir cukup. */
+    internal fun isThrottleOpen(nowElapsed: Long, lastRun: Long): Boolean =
+        nowElapsed - lastRun >= MIN_INTERVAL_MS
 
     /** Jalankan bila free space di bawah ambang; kembalikan byte yang dibebaskan. */
     fun runIfLow(context: Context, items: List<DownloadItem>): Long {
@@ -29,8 +36,9 @@ object StorageCleanup {
         val free = saver.destinationFreeBytes()
         if (free > LOW_THRESHOLD_BYTES) return 0L
         synchronized(throttleLock) {
-            if (android.os.SystemClock.elapsedRealtime() - lastRunElapsed < MIN_INTERVAL_MS) return 0L
-            lastRunElapsed = android.os.SystemClock.elapsedRealtime()
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (!isThrottleOpen(now, lastRunElapsed)) return 0L
+            lastRunElapsed = now
         }
         var freed = 0L
         freed += saver.cleanupOrphanPartials(items)
