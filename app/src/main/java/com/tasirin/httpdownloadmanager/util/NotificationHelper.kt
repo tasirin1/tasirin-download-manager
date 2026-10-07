@@ -22,7 +22,16 @@ import java.util.concurrent.atomic.AtomicInteger
 object NotificationHelper {
     // Basis ID notifikasi per-item di luar ID foreground service (1001):
     // counter dari 0 akan menabrak notifikasi ongoing setelah ~1001 item selesai.
-    private val nextNotifId = AtomicInteger(10000)
+    // Batas atas + bungkus: Int meluap jadi negatif (~2M selesai) dan ID
+    // negatif berperilaku aneh di NotificationManager.
+    internal const val NOTIF_ID_BASE = 10000
+    internal const val NOTIF_ID_MAX = 900_000
+    private val nextNotifId = AtomicInteger(NOTIF_ID_BASE)
+
+    /** ID berikutnya dengan bungkus ke basis saat mencapai batas. Murni agar
+     *  bisa di-unit-test. */
+    internal fun wrapNotifId(current: Int): Int =
+        if (current >= NOTIF_ID_MAX) NOTIF_ID_BASE else current + 1
 
     const val CHANNEL_ID = "downloads"
     const val NOTIFICATION_ID = 1001
@@ -148,7 +157,7 @@ object NotificationHelper {
             PackageManager.PERMISSION_GRANTED
         ) return
         val success = item.state == DownloadState.COMPLETED
-        val id = nextNotifId.getAndIncrement()
+        val id = nextNotifId.getAndUpdate(::wrapNotifId)
         val title = if (success) item.fileName else "Failed: ${item.fileName}"
         val text = if (success) Formats.bytes(item.bytesDownloaded) else (item.error ?: "Unknown error")
         val intent = Intent(context, MainActivity::class.java).setPackage(context.packageName)
