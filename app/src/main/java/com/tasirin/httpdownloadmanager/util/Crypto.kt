@@ -23,21 +23,46 @@ object Crypto {
     private val KEY_LOCK = Any()
     @Volatile private var cachedKey: SecretKey? = null
 
+    /** True bila enkripsi terakhir jatuh ke plaintext (hanya API 23+; di
+     *  API 21-22 plaintext memang by-design). Pemanggil bisa memutar ulang
+     *  enkripsi setelah kunci pulih agar kredensial tak plaintext selamanya. */
+    @Volatile var encryptFallbackUsed: Boolean = false
+        private set
+
     /** Enkripsi nilai dengan kunci Android Keystore (AES-GCM, API 23+).
      *  Di Android 5.0-5.1 (API 21-22) Keystore AES belum tersedia,
      *  jadi nilai disimpan apa adanya. */
     fun encrypt(plain: String): String {
         if (plain.isEmpty()) return ""
         if (Build.VERSION.SDK_INT < 23) return PLAIN_PREFIX + plain
-        return runCatching {
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, key())
-            PREFIX + b64(cipher.iv) + ":" + b64(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)))
-        }.getOrElse { e ->
-            runCatching { android.util.Log.w("Crypto", "encrypt fallback to plaintext", e) }
-            PLAIN_PREFIX + plain
+        encryptOnce(plain)?.let { return it }
+        // Penyebab umum: kunci invalid (ganti/hapus lockscreen) — buang entri
+        // rusak, bangkitkan kunci baru, coba sekali lagi sebelum menyerah.
+        if (invalidateKey()) encryptOnce(plain)?.let { return it }
+        encryptFallbackUsed = true
+        runCatching {
+            android.util.Log.e("Crypto", "encrypt failed twice, storing plaintext temporarily")
         }
+        return PLAIN_PREFIX + plain
     }
+
+    private fun encryptOnce(plain: String): String? = runCatching {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        PREFIX + b64(cipher.iv) + ":" + b64(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)))
+    }.getOrNull()
+
+    /** Buang entri kunci rusak + cache agar `key()` membangkitkan yang baru.
+     *  True bila reset jalan (percobaan ulang layak), false bila reset
+     *  sendiri gagal. */
+    private fun invalidateKey(): Boolean = runCatching {
+        synchronized(KEY_LOCK) {
+            cachedKey = null
+            val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            if (ks.containsAlias(ALIAS)) ks.deleteEntry(ALIAS)
+        }
+        true
+    }.getOrDefault(false)
 
     /** True bila payload tersimpan lemah (plaintext eksplisit atau legacy tanpa prefix). */
     fun isWeakStorage(payload: String?): Boolean {

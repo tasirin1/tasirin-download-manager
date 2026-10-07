@@ -25,4 +25,13 @@ class CryptoTest {
     fun `decrypt legacy tanpa prefix tetap plaintext`() {
         assertEquals("legacy-token", Crypto.decrypt("legacy-token"))
     }
+
+    @Test
+    fun `encrypt kosong tetap kosong dan JVM tanpa keystore jatuh ke plain`() {
+        assertEquals("", Crypto.encrypt(""))
+        // Unit JVM: SDK_INT=0 sehingga jalur API 21-22 (plain by-design),
+        // bukan jalur gagal yang menaikkan flag.
+        assertEquals("plain:x", Crypto.encrypt("x"))
+        assertTrue(!Crypto.encryptFallbackUsed)
+    }
 }
