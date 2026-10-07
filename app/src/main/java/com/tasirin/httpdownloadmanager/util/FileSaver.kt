@@ -651,8 +651,12 @@ class FileSaver(context: Context) {
                         val subDir = parent.findFile(sub)
                             ?: parent.createDirectory(sub)
                             ?: return result
-                        val target = subDir.findFile(fileName)
-                            ?: subDir.createFile(MimeTypes.forFile(fileName), fileName)
+                        // Nama unik seperti cabang filesystem (uniqueTargetFile):
+                        // findFile/createFile nama asli menimpa file senama
+                        // di subfolder (truncate via "wt") lalu sumber dihapus.
+                        val unique = uniqueDocumentName(subDir, fileName)
+                        val target = subDir.findFile(unique)
+                            ?: subDir.createFile(MimeTypes.forFile(unique), unique)
                             ?: return result
                         val input = appContext.contentResolver.openInputStream(uri)
                             ?: run {

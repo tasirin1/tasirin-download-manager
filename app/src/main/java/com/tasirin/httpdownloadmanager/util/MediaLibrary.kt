@@ -27,9 +27,16 @@ object MediaLibrary {
     const val GALLERY_MAX_ENTRIES = 3000
     private const val THUMB_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
+    // TTL disimpan per-cache: cache fallback (600 dtk) yang masih valid
+    // tak boleh memakai TTL 600 dtk bila MediaStore sudah pulih (30 dtk).
+    private data class ScanCache(
+        val ts: Long,
+        val items: List<MediaEntry>,
+        val total: Int,
+        val ttlMs: Long
+    )
     @Volatile
-    private var scanCache: Triple<Long, List<MediaEntry>, Int>? = null
-    @Volatile private var scanCacheTtlMs = SCAN_TTL_MS
+    private var scanCache: ScanCache? = null
     private var scanCacheFolderKey: List<String> = emptyList()
     private val scanLock = Any()
     @Volatile private var observerRegistered = false
@@ -352,15 +359,17 @@ object MediaLibrary {
             val now = android.os.SystemClock.elapsedRealtime()
             val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
             // Cache hanya valid bila folder selection sama (kosong = semua)
-            scanCache?.let { (ts, items, total) ->
+            scanCache?.let { cached ->
                 if (scanCacheFolderKey == selectedFolders &&
-                    scanCacheUsable(now - ts, scanCacheTtlMs, items.size, total, limit)) {
-                    return MediaScanResult(items.take(limit), total)
+                    scanCacheUsable(now - cached.ts, cached.ttlMs, cached.items.size, cached.total, limit)) {
+                    return MediaScanResult(cached.items.take(limit), cached.total)
                 }
             }
             val result = scanUncached(context, selectedFolders)
-            scanCache = Triple(now, result.items, result.total)
-            scanCacheTtlMs = if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS
+            scanCache = ScanCache(
+                now, result.items, result.total,
+                if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS
+            )
             scanCacheFolderKey = selectedFolders
             return MediaScanResult(result.items.take(limit), result.total, result.usedFallback)
         }

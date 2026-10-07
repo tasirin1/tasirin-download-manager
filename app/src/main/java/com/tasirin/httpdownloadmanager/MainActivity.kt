@@ -222,15 +222,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     val showEmpty = items.isEmpty()
                     binding.emptyView.visibility =
                         if (showEmpty) View.VISIBLE else View.GONE
-                    if (showEmpty && binding.emptyView.animation == null) {
+                    // Animasi jalan di anak (getChildAt(0)): guard wajib baca
+                    // animation anak yang sama — animation parent selalu null
+                    // sehingga pulse di-reload+restart tiap tick progres.
+                    val emptyChild = binding.emptyView.getChildAt(0)
+                    if (showEmpty && emptyChild?.animation == null) {
                         runCatching {
                             val pulse = AnimationUtils.loadAnimation(
                                 this@MainActivity, R.anim.pulse
                             )
-                            binding.emptyView.getChildAt(0).startAnimation(pulse)
+                            emptyChild?.startAnimation(pulse)
                         }
                     } else if (!showEmpty) {
-                        binding.emptyView.getChildAt(0).clearAnimation()
+                        emptyChild?.clearAnimation()
                     }
                     updateToolbar(items)
                 }
