@@ -1653,11 +1653,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             startActivity(i)
             return
         } catch (e: Exception) { App.logEvent("APK INSTALL failed: ${e.message}") }
-        // 3) Generic viewer
+        // 3) Generic viewer (flag sama seperti fallback 1-2)
         try {
             val i = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, MimeTypes.forFile("x.apk"))
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(i)
             return
         } catch (e: Exception) { App.logEvent("APK GENERIC failed: ${e.message}") }
