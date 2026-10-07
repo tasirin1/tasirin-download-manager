@@ -1722,7 +1722,7 @@ setTimeout(function () { a.remove(); }, 1000);
 }
 let fsDlActive = false;
 let fsDlAbort = null;
-const ZIP_MEMORY_LIMIT = 400 * 1024 * 1024;
+const ZIP_MEMORY_LIMIT = 96 * 1024 * 1024;
 async function downloadZipWithProgress(url, label) {
 if (fsTaskBusy || fsDlActive) {
 mmShowToast('Another operation is already running', 2500);
@@ -2178,8 +2178,8 @@ const total = items.length;
 const t0 = Date.now();
 const out = {done: 0, cancelled: false, failed: false};
 showFsTask(title);
-try {
 let done = 0;
+try {
 for (const it of items) {
 if (fsTaskCancelFlag) break;
 const label = it.name || it.path || '';
@@ -2191,6 +2191,7 @@ updateFsTask(done + ' of ' + total, total > 1 ? (done / total) * 100 : 15);
 out.done = done;
 out.cancelled = done < total;
 } catch (e) {
+out.done = done;
 out.failed = true;
 mmShowToast('Failed: ' + e.message, 3000);
 }
@@ -2551,6 +2552,14 @@ let lastMove = 0;
 function arm() {
 clearTimeout(timer);
 timer = setTimeout(function () {
+var busy = false;
+try {
+busy = (typeof mmVideo !== 'undefined' && mmVideo && mmVideo.src && !mmVideo.paused && !mmVideo.ended) ||
+((typeof fsUploading !== 'undefined') && fsUploading) ||
+((typeof fsDlActive !== 'undefined') && fsDlActive) ||
+((typeof anyActiveTransfer === 'function') && anyActiveTransfer());
+} catch (e) { busy = false; }
+if (busy) { arm(); return; }
 fetch(API + '/api/logout', {
 method: 'POST',
 headers: {'X-Requested-With': 'XMLHttpRequest'}

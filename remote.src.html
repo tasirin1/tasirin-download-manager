@@ -3832,7 +3832,11 @@ async function fsDownloadUrl(url) {
 // browser tidak mendukung streaming, fallback ke unduhan anchor biasa.
 let fsDlActive = false;
 let fsDlAbort = null;
-const ZIP_MEMORY_LIMIT = 400 * 1024 * 1024;
+// Batas RAM unduhan ZIP via fetch+Blob (chunks + salinan Blob ~= 2x di memori):
+// 400MB membuat tab crash OOM di TV/box RAM kecil padahal fallback anchor
+// streaming tersedia; 96MB tetap mulus untuk ZIP kecil dan hemat kuota sia-sia
+// saat ukuran tak diketahui (batal + anchor setelah batas, bukan 400MB).
+const ZIP_MEMORY_LIMIT = 96 * 1024 * 1024;
 async function downloadZipWithProgress(url, label) {
   if (fsTaskBusy || fsDlActive) {
     mmShowToast('Another operation is already running', 2500);
@@ -4317,8 +4321,8 @@ async function runFsActions(title, verbDone, items, makeParams) {
   const t0 = Date.now();
   const out = {done: 0, cancelled: false, failed: false};
   showFsTask(title);
+  let done = 0;
   try {
-    let done = 0;
     for (const it of items) {
       if (fsTaskCancelFlag) break;
       const label = it.name || it.path || '';
@@ -4330,6 +4334,9 @@ async function runFsActions(title, verbDone, items, makeParams) {
     out.done = done;
     out.cancelled = done < total;
   } catch (e) {
+    // done ditulis juga di jalur gagal: tanpa ini batch yang gagal di tengah
+    // melapor 0 ("nothing moved") padahal sebagian item sudah berhasil.
+    out.done = done;
     out.failed = true;
     mmShowToast('Failed: ' + e.message, 3000);
   }
@@ -4720,6 +4727,17 @@ window.addEventListener('beforeunload', function (e) {
   function arm() {
     clearTimeout(timer);
     timer = setTimeout(function () {
+      // Logout saat video diputar / upload / unduh / ZIP berjalan akan
+      // memutar secret sesi sehingga /api/media 401 dan tontonan macet di
+      // tengah: tunda logout dan hitung ulang masa idle bila masih sibuk.
+      var busy = false;
+      try {
+        busy = (typeof mmVideo !== 'undefined' && mmVideo && mmVideo.src && !mmVideo.paused && !mmVideo.ended) ||
+          ((typeof fsUploading !== 'undefined') && fsUploading) ||
+          ((typeof fsDlActive !== 'undefined') && fsDlActive) ||
+          ((typeof anyActiveTransfer === 'function') && anyActiveTransfer());
+      } catch (e) { busy = false; }
+      if (busy) { arm(); return; }
       fetch(API + '/api/logout', {
         method: 'POST',
         headers: {'X-Requested-With': 'XMLHttpRequest'}
