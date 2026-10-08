@@ -58,6 +58,9 @@ object Crypto {
     }
 
     private fun encryptOnce(plain: String): Result<String> = runCatching {
+        // Guard dalam-metode (bukan hanya di encrypt): lint NewApi menuntut
+        // bukti API-23 di tiap fungsi yang menyentuh key().
+        if (Build.VERSION.SDK_INT < 23) throw IllegalStateException("keystore unavailable")
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())
         PREFIX + b64(cipher.iv) + ":" + b64(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)))
@@ -66,6 +69,8 @@ object Crypto {
     /** True bila rantai penyebab memuat kunci-invalid permanen. Internal agar
      *  bisa di-unit-test. */
     internal fun isKeyInvalidated(e: Throwable?): Boolean {
+        // Kelas pengecualian hanya ada di API 23+ (guard lint + runtime).
+        if (Build.VERSION.SDK_INT < 23) return false
         var cur = e
         while (cur != null) {
             if (cur is android.security.keystore.KeyPermanentlyInvalidatedException) return true
