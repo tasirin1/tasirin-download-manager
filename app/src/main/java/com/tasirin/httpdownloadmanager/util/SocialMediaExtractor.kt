@@ -1413,7 +1413,6 @@ object SocialMediaExtractor {
         val port = if (u.port > 0 && u.port != u.defaultPort) ":${u.port}" else ""
         "${u.protocol}://${u.host}$port"
     }.getOrNull()
-    }
 
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
         var current = urlStr
