@@ -368,6 +368,23 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `refererOrigin - turun ke origin saja`() {
+        assertEquals(
+            "https://www.youtube.com",
+            SocialMediaExtractor.refererOrigin("https://www.youtube.com/watch?v=abc123")
+        )
+        assertEquals(
+            "http://example.com:8080",
+            SocialMediaExtractor.refererOrigin("http://example.com:8080/a?x=1")
+        )
+        // Port default tak ditulis ulang; skema aneh/sampah = null (Referer dibuang).
+        assertEquals("https://example.com", SocialMediaExtractor.refererOrigin("https://example.com:443/x"))
+        assertEquals(null, SocialMediaExtractor.refererOrigin("ftp://example.com/x"))
+        assertEquals(null, SocialMediaExtractor.refererOrigin("bukan url"))
+        assertEquals(null, SocialMediaExtractor.refererOrigin(""))
+    }
+
+    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))

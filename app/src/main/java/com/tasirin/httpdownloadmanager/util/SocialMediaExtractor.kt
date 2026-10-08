@@ -1388,11 +1388,31 @@ object SocialMediaExtractor {
     }
 
     private fun stripExtractCredentials(headers: Map<String, String>): Map<String, String> {
-        return headers.filterKeys { k ->
+        var out = headers.filterKeys { k ->
             !k.equals("Cookie", ignoreCase = true) &&
                 !k.equals("Authorization", ignoreCase = true) &&
                 !k.equals("Proxy-Authorization", ignoreCase = true)
         }
+        // Referer lintas-host: turunkan ke origin saja (seperti browser
+        // strict-origin-when-cross-origin) — URL watch penuh tak bocor ke
+        // pihak ketiga, tapi cek hotlink berbasis origin/host tetap lolos.
+        val refKey = out.keys.firstOrNull { it.equals("Referer", ignoreCase = true) }
+        if (refKey != null) {
+            val origin = refKey.let { out[it] }?.let { refererOrigin(it) }
+            out = out.filterKeys { !it.equals("Referer", ignoreCase = true) }
+            if (origin != null) out = out + (refKey to "$origin/")
+        }
+        return out
+    }
+
+    /** Origin (skema://host[:port]) dari nilai Referer; null bila bukan
+     *  http(s) valid. Murni agar bisa di-unit-test. */
+    internal fun refererOrigin(ref: String): String? = runCatching {
+        val u = URL(ref.trim())
+        if (u.protocol != "http" && u.protocol != "https") return null
+        val port = if (u.port > 0 && u.port != u.defaultPort) ":${u.port}" else ""
+        "${u.protocol}://${u.host}$port"
+    }.getOrNull()
     }
 
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
