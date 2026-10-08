@@ -3510,7 +3510,7 @@ internal fun isIpLiteral(host: String): Boolean {
 /** Hostname valid (label alfanumerik + strip, tanpa spasi/garis bawah):
  *  guard sebelum resolve agar sampah tak memicu lookup DNS. */
 internal val HOSTNAME_RE = Regex(
-    "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$",
+    "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$",
     RegexOption.IGNORE_CASE
 )
 
