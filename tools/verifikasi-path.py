@@ -460,6 +460,8 @@ def cek_aturan_repo(gagal, berubah):
         gagal.append("minSdk %s != 21 (aturan: tetap Android 5+)" % cocok.group(1))
     for path in berubah:
         rendah = path.lower()
+        if "values-night" in rendah:
+            gagal.append("Larangan historis: values-night (%s) — app selalu terang" % path)
         if rendah.endswith((".apk", ".aab", ".dex", ".jks", ".keystore")):
             gagal.append("Berkas terlarang masuk repo: " + path)
         elif rendah.endswith((".env",)):
@@ -484,10 +486,6 @@ def cek_larangan_hidup_lagi(gagal, diff):
                 gagal.append("Larangan historis dilanggar di %s (%s): %s — %s"
                              % (path, kunci, isi.strip()[:70], alasan))
                 break
-    for baris in diff.splitlines():
-        if baris.startswith("+") and "values-night" in baris:
-            gagal.append("Larangan historis: values-night — app selalu terang")
-            break
 
 
 def nama_fun_hilang(diff, lewati_berkas=()):
