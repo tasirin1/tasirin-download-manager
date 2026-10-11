@@ -3097,12 +3097,8 @@ class DownloadEngine(appContext: Context) {
     /** Header yang bisa membawa checksum file — dipakai untuk deteksi otomatis
      *  (server mengirim Digest/Content-MD5/X-Checksum-*). */
     private fun checksumHeadersOf(conn: HttpURLConnection): Map<String, String> {
-        val names = listOf(
-            "Digest", "X-Checksum-Sha256", "X-Checksum-Sha1",
-            "X-Checksum-MD5", "Content-MD5"
-        )
-        val map = HashMap<String, String>(names.size)
-        for (n in names) {
+        val map = HashMap<String, String>(CHECKSUM_HEADER_NAMES.size)
+        for (n in CHECKSUM_HEADER_NAMES) {
             conn.getHeaderField(n)?.let { map[n] = it }
         }
         return map
@@ -3335,6 +3331,10 @@ class DownloadEngine(appContext: Context) {
         private const val MIN_FREE_BYTES = 2L * 1024 * 1024
         private const val SAVE_DEBOUNCE_MS = 400L
         private const val PROGRESS_SAVE_INTERVAL_MS = 2_000L
+        private val CHECKSUM_HEADER_NAMES = listOf(
+            "Digest", "X-Checksum-Sha256", "X-Checksum-Sha1",
+            "X-Checksum-MD5", "Content-MD5"
+        )
         private const val SEG_FLUSH_INTERVAL_MS = 500L
         private const val COOKIE_WRITE_DEBOUNCE_MS = 2_000L
         /** Umur fallback cookie format lama (tanpa maxAge tersimpan). */

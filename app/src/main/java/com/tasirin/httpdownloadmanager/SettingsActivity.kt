@@ -648,7 +648,7 @@ class SettingsActivity : AppCompatActivity() {
         // aturannya (kosongkan = nonaktif).
         binding.inputPin.setText("")
         binding.inputPort.setText(
-            String.format(java.util.Locale.US, "%d", StoragePrefs.serverPort(this))
+            StoragePrefs.serverPort(this).toString()
         )
         renderChecks()
     }

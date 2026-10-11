@@ -98,7 +98,9 @@ class GalleryActivity : AppCompatActivity() {
                 val newPartial = activeDownloadProgress(items)
                 val filesChanged = newPartial.keys != partialProgress.keys
                 partialProgress = newPartial
-                val now = System.currentTimeMillis()
+                // Jam monotonik (bukan wall-clock): lompatan jam sistem maju/mundur
+                // tak boleh membuat throttle macet lama atau spam refresh.
+                val now = android.os.SystemClock.uptimeMillis()
                 if (!filesChanged && now - lastUiAt < 800L) return@collect
                 lastUiAt = now
                 if (filesChanged) {

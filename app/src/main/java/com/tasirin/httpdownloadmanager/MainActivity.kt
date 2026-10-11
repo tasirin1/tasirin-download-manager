@@ -1526,7 +1526,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     /** State tiap item pada emisi sebelumnya: hanya transisi menuju COMPLETED
      *  selama sesi berjalan yang auto-open. Item yang sudah selesai sebelum
      *  app dibuka tidak boleh membuka player/installer sendiri. */
-    private var lastItemStates = mapOf<String, DownloadState>()
+    private var lastItemStates = mutableMapOf<String, DownloadState>()
 
     private fun autoOpenCompleted(items: List<DownloadItem>) {
         // autoOpenedIds tumbuh sepanjang sesi; buang id yang sudah tidak ada di
@@ -1535,20 +1535,27 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             val keep = items.asSequence().map { it.id }.toSet()
             autoOpenedIds.retainAll(keep)
         }
-        val prev = lastItemStates
+        // Peta state di-update in-place (bukan associate per emisi): emisi
+        // StateFlow tiap tick tak perlu membangun HashMap N-entry baru.
         for (item in items) {
+            val prev = lastItemStates[item.id]
             if (item.state == DownloadState.COMPLETED &&
                 item.id !in autoOpenedIds &&
                 (item.filePath != null || item.contentUri != null) &&
-                prev[item.id] != null && prev[item.id] != DownloadState.COMPLETED
+                prev != null && prev != DownloadState.COMPLETED
             ) {
                 autoOpenedIds.add(item.id)
                 runCatching {
                     autoOpenSingle(item)
                 }
             }
+            if (prev != item.state) lastItemStates[item.id] = item.state
         }
-        lastItemStates = items.associate { it.id to it.state }
+        // Id yang hilang dari daftar dibuang hanya bila peta membengkak.
+        if (lastItemStates.size > items.size * 2 + 16) {
+            val keep = items.asSequence().map { it.id }.toSet()
+            lastItemStates.keys.retainAll(keep)
+        }
     }
 
     /** Buka satu file selesai (dipisah agar path eksotis yang gagal tidak
