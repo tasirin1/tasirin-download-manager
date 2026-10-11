@@ -364,9 +364,9 @@ kuat dan tanpa diskusi:
    warning < 180 hari) → Android SDK → Gradle (cache + verifikasi wrapper +
    **verifikasi dependensi strict** lewat `gradle/verification-metadata.xml`).
 2. **Bump versi**: `versionName = "1.0.<run_number>"` + `versionCode = 100000 + run_number` ditulis ke `app/build.gradle.kts` (nilai dasar hanya fallback lokal).
-3. `assembleDebug` (artifact `app-debug`).
-4. **Lint + unit test**: `lintDebug` (abortOnError) + `testDebugUnitTest`.
-5. `assembleRelease` **hanya bila `KEYSTORE_BASE64` terisi** (artifact `app-release`).
+3. `assembleDebug` (artifact `app-debug`) — **hanya di PR** (verifikasi compile; push `main`/schedule/manual langsung release agar hemat 1x compile).
+4. **Lint (hanya PR)** `lintDebug` (abortOnError) + **unit test (selalu)** `testDebugUnitTest`.
+5. `assembleRelease` **bila `KEYSTORE_BASE64` terisi dan bukan PR** (artifact `app-release`; dilewati di PR karena debug sudah verifikasi compile).
 6. **Verifikasi tanda tangan APK release** (`keytool -printcert -jarfile`
    dibandingkan `c2785a61...`) — membuktikan APK benar ditandatangani kunci resmi.
 7. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).

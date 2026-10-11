@@ -148,14 +148,22 @@ jobs:
           sed -i "s/versionName = \"[0-9.]*\"/versionName = \"${VER}\"/" app/build.gradle.kts
           echo "Versi baru: ${VER} (code ${CODE})"
 
-      - name: Build debug APK
+      - name: Build debug APK (verifikasi PR saja)
+        # Push main/schedule/manual langsung build release (hemat 1x compile
+        # penuh); debug hanya untuk verifikasi compile di PR.
+        if: github.event_name == 'pull_request'
         run: ./gradlew assembleDebug
 
-      - name: Lint & unit test
-        run: ./gradlew lintDebug testDebugUnitTest
+      - name: Lint (hanya PR)
+        # lintDebug lambat (1-3 mnt); kode main normalnya sudah lolos saat PR.
+        if: github.event_name == 'pull_request'
+        run: ./gradlew lintDebug
+
+      - name: Unit test
+        run: ./gradlew testDebugUnitTest
 
       - name: Tampilkan laporan lint di log
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         run: cat app/build/reports/lint-results-debug.txt || true
 
       - name: Coverage JaCoCo (laporan + ambang batas)
@@ -189,7 +197,8 @@ jobs:
           PY
 
       - name: Build release APK (jika secret signing tersedia)
-        if: env.KEYSTORE_BASE64 != ''
+        # Dilewati di PR: debug sudah verifikasi compile (hemat 1x build R8).
+        if: env.KEYSTORE_BASE64 != '' && github.event_name != 'pull_request'
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -203,7 +212,7 @@ jobs:
             -PkeyPassword="$KEY_PASSWORD"
 
       - name: Verifikasi tanda tangan APK release (kunci resmi)
-        if: env.KEYSTORE_BASE64 != ''
+        if: env.KEYSTORE_BASE64 != '' && github.event_name != 'pull_request'
         run: |
           APK="app/build/outputs/apk/release/app-release.apk"
           EXPECT="c2785a618082683755eeae867e0a2e01f450b1fd448859d1ec21cf854c5713d1"
@@ -248,13 +257,14 @@ jobs:
           fi
 
       - name: Upload debug APK
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload release APK
-        if: env.KEYSTORE_BASE64 != ''
+        if: env.KEYSTORE_BASE64 != '' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: app-release
