@@ -38,6 +38,8 @@ settings:
 ci:
   - any:
       - .github/workflows/**
+      - tools/**
+      - scripts/cek-cepat.sh
       - .github/dependabot.yml
       - .github/labeler.yml
       - .github/CODEOWNERS

@@ -1,0 +1,13 @@
+# Metode/simbol yang sengaja dihapus total dari repo (contek vaultwarden-host).
+# Bila baris baru Kotlin memanggil salah satunya sebagai fun (nama + "(")
+# = regresi hapusan (GAGAL). Tambahkan nama ke sini tiap menghapus metode:
+# cek_metode_hilang hanya melihat diff saat itu, daftar inilah yang menjaga
+# push-push berikut. (JANGAN masukkan nama yang masih didefinisikan di berkas
+# lain atau masih dipakai — mis. applyServerStatus, fmtDate, tabGallery.)
+renderStatus
+refreshStatus
+renderSpeedTotal
+QrCode
+QrEncoder
+SpeedChartView
+reRenderGalleryLoaded

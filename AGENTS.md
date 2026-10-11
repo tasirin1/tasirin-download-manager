@@ -1,5 +1,20 @@
 # Panduan pengelolaan repo (untuk AI)
 
+> ⚠ **ATURAN NO. 1 — DILARANG KERAS BUILD DI LOKAL.**
+> AI yang mengelola repo ini **tidak boleh** menjalankan `./gradlew`,
+> `gradle`, `apktool`, `javac`/`kotlinc`, emulator, `adb install`, atau
+> perintah build/test/lint Android apa pun di mesin lokal — tanpa kecuali,
+> bahkan "cuma cek sebentar" atau "cuma unit test". Build lokal butuh
+> SDK/toolchain khusus dan hasilnya **tidak mewakili release**.
+> Satu-satunya cara build, test, lint, dan rilis: **push ke `main`/PR**,
+> lalu workflow GitHub Actions yang mengerjakan semuanya.
+> Verifikasi lokal yang diizinkan hanya yang tanpa toolchain Android:
+> membaca kode, `grep`, `git diff`/`git log`, parse XML polos,
+> `python3 scripts/check_repo.py` (tanpa `--android`),
+> `python3 tools/verifikasi-path.py`, dan `bash scripts/cek-cepat.sh`.
+> Pelanggaran aturan ini = pengerjaan dianggap gagal.
+> (Contek sistem tasirin-vaultwarden-host.)
+
 Baca file ini SEBELUM mengubah, memperbaiki, atau mengelola repository ini.
 Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 `README.md` (Indonesia) dan `README.en.md` (Inggris) — jaga keduanya sinkron.
@@ -17,6 +32,7 @@ Kontinuitas antar-sesi: di awal sesi jalankan `git -C /root/memori-agents-ai pul
 ├── .github/workflows/gitleaks.yml     # Deteksi secret ter-commit (push & PR)
 ├── .github/workflows/stale.yml       # Tutup PR/issue tidak aktif (mingguan)
 ├── .github/workflows/labeler.yml     # Label otomatis per path (config: .github/labeler.yml)
+├── .github/workflows/verifikasi-path.yml  # CI cepat tanpa SDK: verifikasi-path --rentang + cek-cepat.sh
 ├── .github/dependabot.yml            # Update dependensi terjadwal (grouped, auto-merge aman)
 ├── .github/labeler.yml               # Mapping path → label untuk labeler.yml
 ├── .github/CODEOWNERS               # Pemilik review default repository
@@ -39,7 +55,11 @@ Kontinuitas antar-sesi: di awal sesi jalankan `git -C /root/memori-agents-ai pul
 ├── scripts/check_readme_sync.py      # Guard CI: struktur heading README.md vs README.en.md sinkron
 ├── scripts/security_audit.py        # Audit statis bug/error/keamanan + self-test
 ├── scripts/upload_smoke_test.js      # Smoke test alur upload (stub DOM/XHR, tanpa dependensi)
-├── scripts/check_repo.py             # Satu pintu guard cepat repo (opsional Android)
+├── scripts/check_repo.py             # Satu pintu guard cepat repo (tanpa --android untuk AI)
+├── scripts/cek-cepat.sh              # Cek cepat pra-push tanpa SDK (vektor 0.x, README, secret, remote)
+├── tools/verifikasi-path.py          # Verifikasi path tanpa SDK (acuan yatim, manifest, import mati, hapusan)
+├── tools/bekas-hapusan.txt           # Daftar fun yang sengaja dihapus (regresi hapusan = GAGAL)
+├── tools/pasang-hook.sh              # Pasang pre-push hook (verifikasi-path + cek-cepat, gagal = push batal)
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
 │   ├── assets/
@@ -206,17 +226,22 @@ kuat dan tanpa diskusi:
 | Unduhan lambat tapi sehat divonis mati tiap 20 detik lalu retry gagal terus | `slowSince` tak pernah direset saat byte bergerak | reset `slowSince` tiap ada progres di `DownloadHealthWatchdog` — hanya byte macet total yang divonis; guard `WatchdogTest` |
 | Range 200 setelah progres besar → puluhan MB partial dihapus + unduh ulang dari nol | signed CDN URL kedaluwarsa (token menit) dianggap server tanpa-Range | `shouldKeepPartialOnRangeReject` pertahankan partial + `refreshExpiredCdnUrl` re-extract URL segar lalu resume; hapus+single-pass hanya bila progres nol |
 | SSE reconnect diam bisa gagal masuk state "give up" | flag diberi nilai `true` sebelum reconnect manual | pakai counter percobaan sekali + grace window sebelum menutup EventSource |
+| Import mati lolos (`TextView` di Settings, `assertTrue` di test) | `lint` UnusedImports tak menangkap semua kasus | `cek_import_mati` di `tools/verifikasi-path.py` (GAGAL) — jangan tambah import tanpa pakai |
+| Path vektor tanpa nol depan (`.9`) | crash/lint `InvalidVectorPath` di sebagian HP | `scripts/cek-cepat.sh` + `verifikasi-path.yml` — tulis `0.9`/`-0.9` |
+| Fun dihapus tapi pemanggil sisa / dipanggil lagi | hapus tidak bersih, regresi diam-diam | `cek_fun_hilang` + `tools/bekas-hapusan.txt` (tambah nama tiap hapus fun) |
 
 ## Aturan pengembangan
 
-1. **Build resmi HANYA via GitHub Actions** — jangan build lokal untuk rilis.
-   Build lokal (`./gradlew assembleDebug`) hanya untuk debugging cepat dan tidak
-   pernah menggantikan CI.
+1. **DILARANG build/test/lint di lokal — SELALU via GitHub Actions.**
+   Larangan mencakup `./gradlew` (perintah apa pun: `assemble*`, `lint*`,
+   `test*`), `apktool`, `adb`, emulator, `javac`/`kotlinc` manual, dan instalasi
+   SDK/NDK di mesin kerja — tanpa kecuali (lihat ATURAN NO. 1 di atas).
    **DILARANG meng-install Android SDK lokal** (sdkmanager, platform, build-tools)
    di mesin ini: ini memboroskan RAM/disk dan bukan alur resmi. Semua build,
    lint, dan unit test berjalan di CI. Bila butuh verifikasi cepat, gunakan
-   guard lintas-platform (`scripts/check_repo.py`) yang tidak butuh SDK, dan
-   serahkan verifikasi compile penuh ke PR/CI.
+   guard lintas-platform (`scripts/check_repo.py` tanpa `--android`,
+   `tools/verifikasi-path.py`, `scripts/cek-cepat.sh`), dan serahkan
+   verifikasi compile penuh ke PR/CI.
 2. **Bahasa**:
    - **UI aplikasi memakai Bahasa Inggris** (default `values/strings.xml`, tanpa
      `values-en` lagi — terjemahan default = Inggris; `remote.html` juga Inggris).
@@ -242,8 +267,12 @@ kuat dan tanpa diskusi:
    KEDUA file (CI memverifikasi sinkron lewat `--check`; jangan edit
    `assets/remote.html` manual).
 8. **Guard terpusat**: jalankan `python3 scripts/check_repo.py` sebagai satu
-   pintu pemeriksaan struktur repo, remote web, smoke upload, README, audit
-   keamanan, dan whitespace. Step CI `scripts/prepare_remote.py --check`
+   pintu pemeriksaan struktur repo, verifikasi path, cek cepat, remote web,
+   smoke upload, README, audit keamanan, dan whitespace. Jalankan juga
+   `python3 tools/verifikasi-path.py` + `bash scripts/cek-cepat.sh` sebelum
+   push (atau pasang sekali per clone: `sh tools/pasang-hook.sh` agar tiap
+   push otomatis terverifikasi dan batal bila GAGAL). CI `verifikasi-path.yml`
+   mengulang keduanya per push/PR sebagai gerbang cepat sebelum build APK. Step CI `scripts/prepare_remote.py --check`
    memverifikasi
    sinkron `remote.src.html` ↔ `remote.html`, `node --check` pada semua `<script>`,
    larangan kata Indonesia di string UI (remote.html, values/*.xml, Kotlin), dan

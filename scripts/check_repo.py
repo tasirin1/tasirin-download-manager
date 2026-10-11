@@ -224,6 +224,8 @@ def fast_checks() -> list[Result]:
     results.extend(
         [
             python_tool("remote web", "scripts/prepare_remote.py", ["--check"]),
+            python_tool("verifikasi path", "tools/verifikasi-path.py"),
+            run("cek cepat", ["bash", str(ROOT / "scripts/cek-cepat.sh")]),
             run("upload smoke", ["node", str(ROOT / "scripts/upload_smoke_test.js")]),
             python_tool("readme sync", "scripts/check_readme_sync.py"),
             python_tool("audit self-test", "scripts/security_audit.py", ["--self-test"]),
