@@ -57,6 +57,7 @@ import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
+import com.tasirin.httpdownloadmanager.util.packageInfoCompat
 import com.tasirin.httpdownloadmanager.util.SpeedOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -136,7 +137,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
             ?.apply { setTint(overflowColor) }
         // Subtitle toolbar: versi app (contoh "v1.0 · build 100995").
-        val pkgInfo = runCatching { packageManager.getPackageInfo(packageName, 0) }.getOrNull()
+        val pkgInfo = runCatching { packageManager.packageInfoCompat(packageName) }.getOrNull()
         binding.toolbar.subtitle = getString(
             R.string.app_version_subtitle,
             (pkgInfo?.versionName ?: "1.0") + " · build " + (pkgInfo?.versionCodeCompat() ?: 0L)
@@ -1092,7 +1093,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     @SuppressLint("InflateParams")
     private fun showAboutDialog() {
         val info = runCatching {
-            packageManager.getPackageInfo(packageName, 0)
+            packageManager.packageInfoCompat(packageName)
         }.getOrNull()
         val version = info?.versionName ?: "1.0"
         val build = info?.versionCodeCompat()?.toInt() ?: 0
@@ -1169,7 +1170,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         lifecycleScope.launch {
             val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@MainActivity) }
             val current = runCatching {
-                packageManager.getPackageInfo(packageName, 0).versionCodeCompat().toInt()
+                packageManager.packageInfoCompat(packageName).versionCodeCompat().toInt()
             }.getOrDefault(0)
             if (info == null) {
                 AlertDialog.Builder(this@MainActivity)

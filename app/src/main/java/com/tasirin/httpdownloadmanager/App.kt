@@ -13,6 +13,7 @@ import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.CrashLog
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
+import com.tasirin.httpdownloadmanager.util.packageInfoCompat
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 
@@ -53,7 +54,7 @@ class App : Application() {
         registerNetworkCallback()
         logEvent(
             "APP STARTED v" + runCatching {
-                val info = packageManager.getPackageInfo(packageName, 0)
+                val info = packageManager.packageInfoCompat(packageName)
                 info.versionName + " (build " + info.versionCodeCompat() + ")"
             }.getOrDefault("?") + " (Android " + Build.VERSION.RELEASE +
                 " API " + Build.VERSION.SDK_INT + ", " + Build.MANUFACTURER +

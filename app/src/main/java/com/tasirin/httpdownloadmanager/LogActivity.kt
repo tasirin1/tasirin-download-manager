@@ -21,6 +21,7 @@ import androidx.lifecycle.lifecycleScope
 import com.tasirin.httpdownloadmanager.databinding.ActivityLogBinding
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
+import com.tasirin.httpdownloadmanager.util.packageInfoCompat
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -116,7 +117,7 @@ class LogActivity : AppCompatActivity() {
                     appendLine("Time: ${SimpleDateFormat(EXPORT_TIME_PATTERN, Locale.US).format(Date())}")
                     appendLine(
                         "App version: " + runCatching {
-                            val info = packageManager.getPackageInfo(packageName, 0)
+                            val info = packageManager.packageInfoCompat(packageName)
                             info.versionName + " (build " + info.versionCodeCompat() + ")"
                         }.getOrDefault("?")
                     )

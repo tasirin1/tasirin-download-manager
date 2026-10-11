@@ -12,7 +12,10 @@ import androidx.core.net.toUri
 
 /** Daftar izin runtime yang perlu diminta (duplikat lama ada di MainActivity
  *  dan SettingsActivity). Android 5-12 tidak memakai notifikasi runtime,
- *  Android 5-9 tidak butuh WRITE_EXTERNAL_STORAGE diminta di runtime. */
+ *  Android 5-9 tidak butuh WRITE_EXTERNAL_STORAGE diminta di runtime.
+ *  Android 10+ (API 29+) memakai scoped storage / All-files-access:
+ *  izin ini tak ada di manifest (maxSdkVersion 28) sehingga memintanya
+ *  hanya dialog sampah — dibatasi ke API 23..28. */
 object Permissions {
 
     fun missingRuntime(context: Context): Array<String> {
@@ -23,7 +26,7 @@ object Permissions {
         ) {
             needed.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        if (Build.VERSION.SDK_INT >= 23 &&
+        if (Build.VERSION.SDK_INT in 23..28 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
             PackageManager.PERMISSION_GRANTED
         ) {
@@ -59,16 +62,24 @@ object Permissions {
         // Tandai niat: auto-aktifkan "Full access to main storage" begitu izin
         // sistem "All files access" benar-benar diberikan (lihat onResume sinkron).
         StoragePrefs.setFullAccessPending(context, true)
+        // NEW_TASK hanya bila bukan Activity: startActivity dari app context
+        // tanpa flag melempar AndroidRuntimeException di Android 6+; dari
+        // Activity justru jangan pakai flag agar tombol back kembali ke app.
+        val newTask = context !is android.app.Activity
+        fun Intent.withTask(): Intent =
+            if (newTask) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) else this
         val launched = runCatching {
             context.startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                     "package:${context.packageName}".toUri()
-                )
+                ).withTask()
             )
             true
         }.getOrDefault(false) || runCatching {
-            context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            context.startActivity(
+                Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).withTask()
+            )
             true
         }.getOrDefault(false)
         if (!launched) StoragePrefs.setFullAccessPending(context, false)

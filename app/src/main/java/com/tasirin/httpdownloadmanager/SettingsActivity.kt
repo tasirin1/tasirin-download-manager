@@ -44,6 +44,7 @@ import com.tasirin.httpdownloadmanager.util.Updater
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
+import com.tasirin.httpdownloadmanager.util.packageInfoCompat
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -952,7 +953,7 @@ class SettingsActivity : AppCompatActivity() {
                 return@launch
             }
             val current = runCatching {
-                packageManager.getPackageInfo(packageName, 0).versionCodeCompat().toInt()
+                packageManager.packageInfoCompat(packageName).versionCodeCompat().toInt()
             }.getOrDefault(0)
             if (info.versionCode <= current) {
                 binding.updateStatus.text = getString(R.string.update_latest)

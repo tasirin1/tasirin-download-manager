@@ -26,6 +26,7 @@ import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
+import com.tasirin.httpdownloadmanager.util.packageInfoCompat
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -180,12 +181,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val appVersion: String by lazy {
         // SDK 35 menandai versionName nullable — paksa non-null supaya by lazy aman.
         runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+            context.packageManager.packageInfoCompat(context.packageName).versionName
         }.getOrNull() ?: "?"
     }
     private val appBuild: Int by lazy {
         runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionCodeCompat().toInt()
+            context.packageManager.packageInfoCompat(context.packageName).versionCodeCompat().toInt()
         }.getOrDefault(0)
     }
     private val serverLog = ServerLog()
