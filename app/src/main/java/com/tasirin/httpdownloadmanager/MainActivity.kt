@@ -286,29 +286,30 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     /** Buka halaman remote web di browser. */
+    // Enumerasi NetworkInterface di IO: di main thread men-jank 10-100ms+
+    // di TV box Android 6 (pola sama seperti refreshLanIpsAsync Settings).
     private fun openRemote() {
         if (!App.httpServer.isAlive) {
             Toast.makeText(this, R.string.server_not_running_hint, Toast.LENGTH_SHORT).show()
             return
         }
-        val url = remoteUrl()
-        if (url == null) {
-            Toast.makeText(this, R.string.remote_no_url, Toast.LENGTH_SHORT).show()
-            return
-        }
-        runCatching {
-            startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-        }.onFailure {
-            Toast.makeText(this, R.string.open_remote_failed, Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            val ip = withContext(Dispatchers.IO) {
+                HttpControlServer.ipv4Addresses().firstOrNull()
+            }
+            if (ip == null) {
+                Toast.makeText(this@MainActivity, R.string.remote_no_url, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val url = "http://$ip:${App.httpServer.listeningPort}/"
+            runCatching {
+                startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+            }.onFailure {
+                Toast.makeText(this@MainActivity, R.string.open_remote_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    /** Alamat remote pertama (http://ip:port/), null bila tidak ada IP. */
-    private fun remoteUrl(): String? {
-        if (!App.httpServer.isAlive) return null
-        return HttpControlServer.ipv4Addresses().firstOrNull()
-            ?.let { "http://$it:${App.httpServer.listeningPort}/" }
-    }
 
     override fun onResume() {
         super.onResume()
@@ -1463,9 +1464,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val attention = failed + paused
         val anyVisible = active > 0 || done > 0 || attention > 0
         binding.summaryCard.visibility = if (anyVisible) View.VISIBLE else View.GONE
-        binding.textSummaryActive.text = String.format(Locale.US, "%d", active)
-        binding.textSummaryDone.text = String.format(Locale.US, "%d", done)
-        binding.textSummaryAttention.text = String.format(Locale.US, "%d", attention)
+        binding.textSummaryActive.text = active.toString()
+        binding.textSummaryDone.text = done.toString()
+        binding.textSummaryAttention.text = attention.toString()
         binding.textSummaryAttentionLabel.text = when {
             failed > 0 && paused > 0 -> getString(R.string.summary_attention)
             failed > 0 -> getString(R.string.summary_failed_label)

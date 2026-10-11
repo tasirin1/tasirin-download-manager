@@ -11,3 +11,4 @@ QrCode
 QrEncoder
 SpeedChartView
 reRenderGalleryLoaded
+remoteUrl
