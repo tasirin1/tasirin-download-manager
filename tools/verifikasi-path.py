@@ -356,6 +356,26 @@ def kupas_komentar(isi):
                 i += 1
             keluar.append('"""')
             i += 3
+        elif dua[0] == '"' or dua[0] == "'":
+            # String/char literal disalin utuh: `//` di dalam string
+            # (mis. "://") bukan komentar (tanpa ini sisa baris ikut
+            # terhapus dan cek import salah vonis "import mati", mis.
+            # Locale di HlsParser.kt yang dipakai sebaris string "://").
+            kutip = dua[0]
+            keluar.append(isi[i])
+            i += 1
+            while i < n:
+                if kutip == '"' and isi[i] == '\n':
+                    break
+                keluar.append(isi[i])
+                if isi[i] == '\\':
+                    i += 1
+                    if i < n:
+                        keluar.append(isi[i])
+                elif isi[i] == kutip:
+                    i += 1
+                    break
+                i += 1
         elif dua == '//':
             while i < n and isi[i] != '\n':
                 i += 1

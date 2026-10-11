@@ -60,14 +60,19 @@ jobs:
     needs: verify
     env:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      VER_CODE: ${{ 100000 + github.run_number }}
-      VER_NAME: 1.0.${{ github.run_number }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           # Catatan rilis memakai git diff CHANGELOG — history penuh.
           fetch-depth: 0
+
+      - name: Siapkan nomor versi (env VER_CODE/VER_NAME)
+        # Ekspresi GitHub tak mendukung aritmetika `+` di sini (run gagal
+        # startup 0-job) — hitung di shell, teruskan via GITHUB_ENV.
+        run: |
+          echo "VER_CODE=$((100000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
+          echo "VER_NAME=1.0.${{ github.run_number }}" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
