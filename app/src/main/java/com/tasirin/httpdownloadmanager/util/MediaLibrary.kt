@@ -365,7 +365,12 @@ object MediaLibrary {
         val relLc = folder.relLc ?: return false
         if (folder.isWholeRoot) return true // seluruh root dipilih
         for (alias in PRIMARY_STORAGE_ALIASES) {
-            if (fp.startsWith("$alias/")) {
+            // Prefix alias wajib case-insensitive seperti kode lama (DATA Android 5-6
+            // kadang "/SDCARD/..."): regionMatches tanpa alokasi "$alias/" per entry.
+            if (fp.length > alias.length &&
+                fp.regionMatches(0, alias, 0, alias.length, ignoreCase = true) &&
+                fp[alias.length] == '/'
+            ) {
                 val rel = fp.substring(alias.length + 1)
                 if (rel.length < relLc.length) return false
                 return rel.regionMatches(0, relLc, 0, relLc.length, ignoreCase = true) &&
