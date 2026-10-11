@@ -87,8 +87,8 @@ class GalleryFolderFilterTest {
     fun `prefix mirip tapi beda folder - ditolak (batas slash)`() {
         // /DCIM/Camera2 bukan subfolder /DCIM/Camera; tanpa cek batas,
         // startsWith polos ikut mencocokkan.
-        assertFalse(MediaLibrary.isInGalleryFolders("$folder/2/VID.mp4", null, root, listOf(folder)))
-        assertFalse(MediaLibrary.isInGalleryFolders("$folderX/VID.mp4", null, root, listOf(folder)))
+        assertFalse(MediaLibrary.isInGalleryFolders("${folder}2/VID.mp4", null, root, listOf(folder)))
+        assertFalse(MediaLibrary.isInGalleryFolders("${folder}X/VID.mp4", null, root, listOf(folder)))
         assertFalse(MediaLibrary.isInGalleryFolders(null, "DCIM/Camera2/VID.mp4", root, listOf(folder)))
     }
 
