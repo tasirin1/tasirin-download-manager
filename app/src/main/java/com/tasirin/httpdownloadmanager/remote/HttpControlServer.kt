@@ -1506,7 +1506,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         offset: Long
     ): Response {
         val tmp = File(context.cacheDir, "up_$id.tmp")
-        var resultName = name
         return runCatching {
             when {
                 chunkIdx == 0 && !tmp.isFile -> {
@@ -1612,11 +1611,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         .put("verify", verifyToken)
                 )
             }
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks OK ($resultName)")
+            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks OK ($name)")
             jsonResponse(
                 JSONObject()
                     .put("ok", true)
-                    .put("name", resultName)
+                    .put("name", name)
                     .put(
                         "verify",
                         ServerSecurity.createUploadVerifyToken(
@@ -1795,19 +1794,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             .split(",").filter { it.isNotBlank() }.distinct()
         val paths = session.param("paths").orEmpty().split(",").filter { it.isNotBlank() }
         if (requestedTokens.size + paths.size > MAX_MEDIA_ZIP_TOKENS) return notFound()
-        val tokens = requestedTokens.filter(::isMediaTokenAllowed).toMutableList()
-        if (tokens.isEmpty() && paths.isEmpty()) return notFound()
-        paths.forEach { p ->
-            if (p.startsWith(FS_PREFIX)) {
-                val f = File(p.removePrefix(FS_PREFIX))
-                if (f.exists() && isFsPathAllowed(f.absolutePath)) {
-                    tokens.add(MediaLibrary.tokenForPath(f.absolutePath))
-                }
-            }
+        // Satu distinct di akhir (bukan distinct-clear-addAll): requestedTokens
+        // sudah distinct, path sah ditambah lalu didedup sekali jalan.
+        val pathTokens = paths.mapNotNull { p ->
+            if (!p.startsWith(FS_PREFIX)) return@mapNotNull null
+            val f = File(p.removePrefix(FS_PREFIX))
+            if (f.exists() && isFsPathAllowed(f.absolutePath)) {
+                MediaLibrary.tokenForPath(f.absolutePath)
+            } else null
         }
-        val uniqueTokens = tokens.distinct()
-        tokens.clear()
-        tokens.addAll(uniqueTokens)
+        val tokens = (requestedTokens.filter(::isMediaTokenAllowed) + pathTokens).distinct()
         if (tokens.isEmpty()) return notFound()
         val key = "tokens:" + tokens.sorted().joinToString(",")
         val tmp = zipCached(key) {
