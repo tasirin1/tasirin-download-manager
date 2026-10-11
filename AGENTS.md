@@ -32,7 +32,6 @@ Kontinuitas antar-sesi: di awal sesi jalankan `git -C /root/memori-agents-ai pul
 ├── .github/workflows/gitleaks.yml     # Deteksi secret ter-commit (push & PR)
 ├── .github/workflows/stale.yml       # Tutup PR/issue tidak aktif (mingguan)
 ├── .github/workflows/labeler.yml     # Label otomatis per path (config: .github/labeler.yml)
-├── .github/workflows/verifikasi-path.yml  # CI cepat tanpa SDK: verifikasi-path --rentang + cek-cepat.sh
 ├── .github/dependabot.yml            # Update dependensi terjadwal (grouped, auto-merge aman)
 ├── .github/labeler.yml               # Mapping path → label untuk labeler.yml
 ├── .github/CODEOWNERS               # Pemilik review default repository
@@ -229,7 +228,7 @@ kuat dan tanpa diskusi:
 | Range 200 setelah progres besar → puluhan MB partial dihapus + unduh ulang dari nol | signed CDN URL kedaluwarsa (token menit) dianggap server tanpa-Range | `shouldKeepPartialOnRangeReject` pertahankan partial + `refreshExpiredCdnUrl` re-extract URL segar lalu resume; hapus+single-pass hanya bila progres nol |
 | SSE reconnect diam bisa gagal masuk state "give up" | flag diberi nilai `true` sebelum reconnect manual | pakai counter percobaan sekali + grace window sebelum menutup EventSource |
 | Import mati lolos (`TextView` di Settings, `assertTrue` di test) | `lint` UnusedImports tak menangkap semua kasus | `cek_import_mati` di `tools/verifikasi-path.py` (GAGAL) — jangan tambah import tanpa pakai |
-| Path vektor tanpa nol depan (`.9`) | crash/lint `InvalidVectorPath` di sebagian HP | `scripts/cek-cepat.sh` + `verifikasi-path.yml` — tulis `0.9`/`-0.9` |
+| Path vektor tanpa nol depan (`.9`) | crash/lint `InvalidVectorPath` di sebagian HP | `scripts/cek-cepat.sh` + job `verify` — tulis `0.9`/`-0.9` |
 | Fun dihapus tapi pemanggil sisa / dipanggil lagi | hapus tidak bersih, regresi diam-diam | `cek_fun_hilang` + `tools/bekas-hapusan.txt` (tambah nama tiap hapus fun) |
 
 ## Aturan pengembangan
@@ -273,8 +272,10 @@ kuat dan tanpa diskusi:
    smoke upload, README, audit keamanan, dan whitespace. Jalankan juga
    `python3 tools/verifikasi-path.py` + `bash scripts/cek-cepat.sh` sebelum
    push (atau pasang sekali per clone: `sh tools/pasang-hook.sh` agar tiap
-   push otomatis terverifikasi dan batal bila GAGAL). CI `verifikasi-path.yml`
-   mengulang keduanya per push/PR sebagai gerbang cepat sebelum build APK. Step CI `scripts/prepare_remote.py --check`
+   push otomatis terverifikasi dan batal bila GAGAL). Job `verify` di CI
+   mengulang keduanya per push/PR sebagai satu-satunya gerbang sebelum job
+   `build` (dulu workflow `verifikasi-path.yml` tersendiri — kini diserap
+   agar satu status dan satu runner). Step CI `scripts/prepare_remote.py --check`
    memverifikasi
    sinkron `remote.src.html` ↔ `remote.html`, `node --check` pada semua `<script>`,
    larangan kata Indonesia di string UI (remote.html, values/*.xml, Kotlin), dan
@@ -362,7 +363,8 @@ Dua job: **`verify`** (cepat, tanpa SDK — gagal-cepat sebelum Gradle) lalu
 dikecualikan untuk PR Dependabot) → **`scripts/prepare_remote.py --check`**
 (sinkron remote.html, node --check, guard i18n) + **cek sinkron
 README/README.en** → **audit statis bug/error/keamanan
-(`security_audit.py --self-test`)**.
+(`security_audit.py --self-test`)** → **`tools/verifikasi-path.py`** (penuh,
+tanpa `--rentang`) + **`scripts/cek-cepat.sh`**.
 
 **Job `build`**: checkout → JDK 17 → Android SDK → **cek kesehatan
 keystore** (fingerprint `c2785a61...` + **masa berlaku**: error < 90 hari,
@@ -373,11 +375,13 @@ strict** lewat `gradle/verification-metadata.xml`) →
 **lint (hanya PR)** `lintDebug` (laporan di-upload sebagai artifact bila
 gagal) + **unit test (selalu)** `testDebugUnitTest` (+ JaCoCo via
 `scripts/jacoco_summary.py`) → `assembleRelease` **bila `KEYSTORE_BASE64`
-terisi dan bukan PR** (versi dari `-P`, tanpa `sed`; artifact `app-release`) →
-**verifikasi tanda tangan APK** (`keytool -printcert -jarfile` vs
-`c2785a61...`) → **cek batas ukuran** (APK maks 3,5 MB + `remote.html`) →
-**publish & audit rilis** (APK signed + **`mapping.txt`**; audit memvalidasi
-judul/status latest, versionCode, dan asset). Rilis lama tidak dihapus.
+terisi dan bukan PR** (versi dari `-P`, tanpa `sed`) → **verifikasi tanda
+tangan APK** (`keytool -printcert -jarfile` vs `c2785a61...`) → **cek batas
+ukuran** (APK maks 3,5 MB + `remote.html`) → **publish & audit rilis** (APK
+signed + **`mapping.txt`**; audit memvalidasi judul/status latest,
+versionCode, dan asset; publish gagal-cepat bila keystore kosong). Artifact
+`app-release` tidak lagi di-upload (duplikat asset rilis); hanya `app-debug`
+(PR) dan `lint-report` (saat lint gagal). Rilis lama tidak dihapus.
 
 Catatan: workflow memakai `concurrency` (run lama di ref sama dibatalkan).
 Build hanya berjalan saat ada perubahan (push/PR) atau dipicu manual —

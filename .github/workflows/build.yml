@@ -54,6 +54,14 @@ jobs:
           python3 scripts/security_audit.py --self-test
           python3 scripts/security_audit.py
 
+      - name: Verifikasi path (tanpa SDK Android)
+        # Dulu workflow verifikasi-path.yml tersendiri; kini satu gerbang di
+        # sini agar satu status, satu runner, tanpa duplikasi checkout.
+        run: python3 tools/verifikasi-path.py
+
+      - name: Cek cepat (vektor 0.x, README, secret, remote)
+        run: bash scripts/cek-cepat.sh
+
   build:
     name: Build APK
     runs-on: ubuntu-24.04
@@ -216,13 +224,6 @@ jobs:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload release APK
-        if: env.KEYSTORE_BASE64 != '' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
-        with:
-          name: app-release
-          path: app/build/outputs/apk/release/app-release.apk
-
       - name: Publish & audit rilis
         # Hanya PR yang tidak publish (push main + manual publish lalu audit).
         if: github.event_name != 'pull_request'
@@ -232,11 +233,11 @@ jobs:
           VER="$VER_NAME"
           CODE="$VER_CODE"
           OUT="tasirin-download-manager-v${VER}.apk"
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            cp app/build/outputs/apk/release/app-release.apk "$OUT"
-          else
-            cp app/build/outputs/apk/debug/app-debug.apk "$OUT"
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 kosong — tak ada APK release untuk dipublish (debug hanya dibangun di PR)."
+            exit 1
           fi
+          cp app/build/outputs/apk/release/app-release.apk "$OUT"
           NOTES=""
           # Catatan rilis = entri CHANGELOG yang ditambah push ini saja (maks 15
           # baris), bukan seluruh seksi [Unreleased] yang menumpuk. Push tanpa
