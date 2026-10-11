@@ -66,9 +66,25 @@ object ServerSecurity {
     }
 
     /** True bila salah satu segmen path adalah ".." (traversal), tanpa menolak
-     *  nama sah yang hanya mengandung titik ganda seperti "my..video". */
-    fun containsTraversalSegment(path: String): Boolean =
-        path.split('/').any { it.trim() == ".." }
+     *  nama sah yang hanya mengandung titik ganda seperti "my..video".
+     *  Pindai manual tanpa split/trim: dipanggil di jalur request upload
+     *  sehingga alokasi daftar + string trim per panggilan hanya membebani GC. */
+    fun containsTraversalSegment(path: String): Boolean {
+        var i = 0
+        val n = path.length
+        while (i <= n) {
+            var j = i
+            while (j < n && path[j] != '/') j++
+            // Samakan trim(): abaikan whitespace tepi (char <= spasi).
+            var s = i
+            var e = j
+            while (s < e && path[s] <= ' ') s++
+            while (e > s && path[e - 1] <= ' ') e--
+            if (e - s == 2 && path[s] == '.' && path[s + 1] == '.') return true
+            i = j + 1
+        }
+        return false
+    }
 
     /** ID internal upload hanya boleh token aman; larang separator dan traversal. */
     fun isUploadIdAllowed(id: String): Boolean = UPLOAD_ID_RE.matches(id)

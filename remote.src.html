@@ -3702,17 +3702,27 @@ let fsNewBadges = {};
 const FS_MAX_NEW_BADGES = 128;
 function fsMarkNew(path, name) {
   if (!path) return;
-  fsNewBadges[path] = fsNewBadges[path] || [];
-  if (fsNewBadges[path].indexOf(name) < 0) fsNewBadges[path].push(name);
-  while (Object.keys(fsNewBadges).length > FS_MAX_NEW_BADGES) {
-    const oldest = Object.keys(fsNewBadges).find(function (key) { return key !== path; });
-    if (!oldest) break;
-    delete fsNewBadges[oldest];
+  let set = fsNewBadges[path];
+  if (!set) {
+    set = new Set();
+    fsNewBadges[path] = set;
+  }
+  set.add(name);
+  // Satu pass Object.keys (bukan dua per iterasi while): badge hanya tumbuh
+  // satu path per panggilan sehingga buang satu korban tertua sudah cukup.
+  const keys = Object.keys(fsNewBadges);
+  if (keys.length > FS_MAX_NEW_BADGES) {
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i] !== path) {
+        delete fsNewBadges[keys[i]];
+        break;
+      }
+    }
   }
 }
 function fsIsNew(name) {
-  const arr = fsNewBadges[fsPath];
-  return !!(arr && arr.indexOf(name) >= 0);
+  const set = fsNewBadges[fsPath];
+  return !!(set && set.has(name));
 }
 let fsRowCache = {};
 function fsFindFsRow(name) {
@@ -5854,11 +5864,11 @@ function setItemStateCls(li, state) {
   if (target) cls.add(target);
 }
 
+function pad2(n) { return String(n).padStart(2, '0'); }
 function fmtDate(ms) {
   const d = new Date(Number(ms));
   if (!isFinite(d.getTime()) || d.getTime() <= 0) return '';
-  const p = function (n) { return String(n).padStart(2, '0'); };
-  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
 }
 
 const lockedTotalBytes = new Map();
@@ -5977,9 +5987,11 @@ function updateRows(items) {
     const li = rowNodes.get(it.id);
     if (!li || !li.isConnected) continue;
     var needRetry = it.state === 'FAILED';
-    var hasRetry = !!li.querySelector('.item-retry');
+    var hasRetry = li._hasRetry;
+    if (hasRetry === undefined) hasRetry = li._hasRetry = !!li.querySelector('.item-retry');
     var needErr = !!it.error;
-    var hasErr = !!li.querySelector('.err');
+    var hasErr = li._hasErr;
+    if (hasErr === undefined) hasErr = li._hasErr = !!li.querySelector('.err');
     if (needRetry !== hasRetry || needErr !== hasErr) {
       rebuildList(items);
       break;
@@ -6093,6 +6105,10 @@ function rebuildList(items) {
       '</div>' +
       rowSubHtml(it);
     li._sub = li.querySelector('.item-sub');
+    // Flag kehadiran node aksi/error: updateRows tiap tick 1 dtk tak perlu
+    // querySelector per baris lagi (hadirnya hanya berubah saat rebuild).
+    li._hasRetry = it.state === 'FAILED';
+    li._hasErr = !!it.error;
     const menuBtn = li.querySelector('.item-menu-btn');
     if (menuBtn) {
       menuBtn.addEventListener('click', function (e) {
