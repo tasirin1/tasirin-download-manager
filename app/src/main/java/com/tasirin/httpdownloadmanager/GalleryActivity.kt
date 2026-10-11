@@ -409,7 +409,7 @@ private class GalleryAdapter(
         val b = holder.binding
         b.textName.text = e.name
         val dot = e.name.lastIndexOf('.')
-        b.textExt.text = if (dot < 0) "" else e.name.substring(dot + 1).uppercase()
+        b.textExt.text = if (dot < 0) "" else e.name.substring(dot + 1).uppercase(java.util.Locale.ROOT)
         val ctx = holder.itemView.context
         // 3. Tampilkan play overlay saat tidak ada thumbnail supaya cell tidak kosong
         b.playOverlay.visibility = if (e.isVideo) View.VISIBLE else View.GONE

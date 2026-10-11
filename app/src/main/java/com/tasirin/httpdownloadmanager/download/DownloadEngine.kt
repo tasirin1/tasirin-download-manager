@@ -2377,10 +2377,19 @@ class DownloadEngine(appContext: Context) {
         val buffer = ByteArray(BUFFER_SIZE)
         var lastNotify = 0L
         var iters = 0
+        var zeroStreak = 0
         try {
             while (true) {
                 val read = input.read(buffer)
                 if (read == -1) break
+                // Guard zero-read seperti downloadSegment di atas.
+                if (read == 0) {
+                    if (++zeroStreak >= MAX_ZERO_READS) {
+                        throw IOException("Connection stalled (zero reads) — retrying")
+                    }
+                    continue
+                }
+                zeroStreak = 0
                 output.write(buffer, 0, read)
                 downloaded += read
                 throttle.sleepIfNeeded { downloaded }
@@ -2740,6 +2749,7 @@ class DownloadEngine(appContext: Context) {
             val buffer = ByteArray(BUFFER_SIZE)
             var lastNotify = 0L
             var segIters = 0
+            var zeroStreak = 0
             // Sisa byte yang boleh ditulis untuk segmen ini; server nakal yang
             // mengabaikan batas akhir Range tak boleh menumpuk byte ekstra ke
             // file parsial (merge korup lolos verifySize yang membolehkan overrun).
@@ -2748,6 +2758,17 @@ class DownloadEngine(appContext: Context) {
                 while (true) {
                     val read = input.read(buffer)
                     if (read == -1) break
+                    // Kontrak InputStream membolehkan read() = 0 (bukan EOF):
+                    // tanpa guard, socket macet membuat loop busy-spin CPU
+                    // sampai watchdog 30 dtk. Gagal cepat agar retry/mirror
+                    // segera jalan (pola MAX_ZERO_READS di Streams/HttpBody).
+                    if (read == 0) {
+                        if (++zeroStreak >= MAX_ZERO_READS) {
+                            throw IOException("Segment ${segment.index} connection stalled (zero reads)")
+                        }
+                        continue
+                    }
+                    zeroStreak = 0
                     val capped = cappedSegmentWrite(read, budget)
                     if (capped < read) {
                         throw IOException("Segment ${segment.index} exceeded requested range")
@@ -3302,6 +3323,7 @@ class DownloadEngine(appContext: Context) {
         }
         private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")
         private const val BUFFER_SIZE = 64 * 1024
+        private const val MAX_ZERO_READS = 64
         private const val MAX_REDIRECTS = 5
         private const val HLS_PROBE_MAX_BYTES = 1_000_000
         private const val HLS_SEGMENT_MAX_BYTES = 64L * 1024 * 1024

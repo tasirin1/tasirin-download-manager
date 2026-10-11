@@ -11,9 +11,9 @@ import com.tasirin.httpdownloadmanager.App
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 
-/** Jembatan boot -> DownloadService untuk targetSdk 35.
+/** Jembatan boot -> DownloadService untuk targetSdk 36.
  *
- *  Sejak Android 15 (targetSdk 35), FGS tipe `dataSync` TIDAK boleh di-start
+ *  Sejak Android 15 (targetSdk 36), FGS tipe `dataSync` TIDAK boleh di-start
  *  langsung dari receiver BOOT_COMPLETED. Solusi: receiver hanya menjadwalkan
  *  JobScheduler (tersedia sejak API 21 = minSdk); eksekusi job berhak
  *  men-start foreground service (pola yang sama dipakai WorkManager).

@@ -14,7 +14,7 @@ class BootReceiver : BroadcastReceiver() {
         val serverAutostart = StoragePrefs.isServerAutoStartEnabled(context) &&
             StoragePrefs.isServerStartAllowed(context)
         if (!downloadAutostart && !serverAutostart) return
-        // targetSdk 35: dataSync FGS tidak boleh start langsung dari boot;
+        // targetSdk 36: dataSync FGS tidak boleh start langsung dari boot;
         // jadwalkan JobScheduler yang meneruskan ke DownloadService.
         BootResumeJobService.schedule(context)
     }

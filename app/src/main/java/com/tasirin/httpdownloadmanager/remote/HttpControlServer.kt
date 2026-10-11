@@ -3300,10 +3300,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val FS_PAGE_SIZE = 300
         private const val FS_PAGE_MAX = 5000
         private const val FS_MEDIA_CACHE_TTL_MS = 15_000L
-        /** Executor khusus probe sosmed (statis per proses): ekstraksi 60 detik
-         *  di worker HTTP akan menghabiskan pool NanoHTTPD saat request paralel;
-         *  batasi 20 dtk. Statis agar ganti port (instance baru) tak membocorkan
-         *  satu thread per ganti port. */
+        /** Executor khusus probe sosmed (statis per proses): ekstraksi di
+         *  worker HTTP dibatasi 20 dtk (lihat future.get di bawah) agar request
+         *  paralel tak menghabiskan pool NanoHTTPD. Statis agar ganti port
+         *  (instance baru) tak membocorkan satu thread per ganti port. */
         private val probeExecutor: java.util.concurrent.ExecutorService by lazy {
             java.util.concurrent.Executors.newSingleThreadExecutor { r ->
                 Thread(r, "probe-social").apply { isDaemon = true }

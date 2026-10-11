@@ -298,6 +298,22 @@ object MediaLibrary {
         "/storage/emulated/0", "/storage/emulated/legacy", "/sdcard", "/mnt/sdcard"
     )
 
+    /** Folder izin dengan bentuk turunan yang dihitung SEKALI per scan:
+     *  loop per-entry (ribuan baris MediaStore) sebelumnya mengalokasi
+     *  `lowercase()` untuk tiap folder di tiap baris — boros GC di HP kentang.
+     *  Perbandingan case-insensitive memakai regionMatches agar tanpa alokasi. */
+    private class AllowedFolder(val raw: String, root: String) {
+        val cleanRoot: String = root.trim().trimEnd('/')
+        val prefix: String = "$raw/"
+        val relLc: String? =
+            if (raw.startsWith(cleanRoot)) raw.removePrefix(cleanRoot).trim('/').lowercase() else null
+        val isWholeRoot: Boolean = raw == cleanRoot || relLc?.isEmpty() == true
+    }
+
+    private fun allowedFoldersFor(selectedFolders: List<String>, externalRoot: String): List<AllowedFolder> =
+        selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
+            .map { AllowedFolder(it, externalRoot) }
+
     /** Bagian murni filter folder galeri; [allowed] sudah ternormalisasi
      *  (trim + tanpa trailing slash). Dipakai scanUncached per-entry tanpa
      *  menormalisasi ulang daftar folder untuk ribuan baris MediaStore. */
@@ -306,20 +322,27 @@ object MediaLibrary {
         relativePath: String?,
         externalRoot: String,
         allowed: List<String>
+    ): Boolean = inSelectedFoldersPrecomputed(
+        dataPath, relativePath, allowedFoldersFor(allowed, externalRoot)
+    )
+
+    private fun inSelectedFoldersPrecomputed(
+        dataPath: String?,
+        relativePath: String?,
+        allowed: List<AllowedFolder>
     ): Boolean {
         val fp = dataPath?.trim()?.trimEnd('/').orEmpty()
         if (fp.isNotEmpty()) {
-            return allowed.any { pathMatchesFolder(fp, it, externalRoot) }
+            return allowed.any { pathMatchesFolder(fp, it) }
         }
         val rel = relativePath?.trim('/')?.trimEnd('/').orEmpty()
         if (rel.isNotEmpty()) {
-            val root = externalRoot.trim().trimEnd('/')
-            val relLc = rel.lowercase()
             return allowed.any { folder ->
-                if (folder == root) return@any true
-                val relFolder = folder.removePrefix(root).trim('/')
-                val relFolderLc = relFolder.lowercase()
-                relFolderLc.isEmpty() || relLc == relFolderLc || relLc.startsWith("$relFolderLc/")
+                if (folder.isWholeRoot) return@any true
+                val relFolderLc = folder.relLc ?: return@any false
+                relFolderLc.isEmpty() || rel.equals(relFolderLc, ignoreCase = true) ||
+                    rel.regionMatches(0, relFolderLc, 0, relFolderLc.length, ignoreCase = true) &&
+                    rel.length > relFolderLc.length && rel[relFolderLc.length] == '/'
             }
         }
         return false
@@ -332,21 +355,21 @@ object MediaLibrary {
      *  3) bila path memakai alias root primer (/sdcard, /mnt/sdcard, ...),
      *     bandingkan bagian relatifnya terhadap folder — menutup DATA Android
      *     5-6 yang memakai symlink lama. */
-    private fun pathMatchesFolder(fp: String, folder: String, externalRoot: String): Boolean {
-        if (fp == folder || fp.startsWith("$folder/")) return true
-        val folderLc = folder.lowercase()
-        val fpLc = fp.lowercase()
-        if (fpLc == folderLc || fpLc.startsWith("$folderLc/")) return true
-        val root = externalRoot.trim().trimEnd('/')
-        if (folder.startsWith(root)) {
-            val folderRel = folder.removePrefix(root).trim('/')
-            if (folderRel.isEmpty()) return true // seluruh root dipilih
-            val folderRelLc = folderRel.lowercase()
-            for (alias in PRIMARY_STORAGE_ALIASES) {
-                if (fp.startsWith("$alias/")) {
-                    val rel = fp.substring(alias.length + 1).lowercase()
-                    return rel == folderRelLc || rel.startsWith("$folderRelLc/")
-                }
+    private fun pathMatchesFolder(fp: String, folder: AllowedFolder): Boolean {
+        if (fp == folder.raw || fp.startsWith(folder.prefix)) return true
+        // Awalan case-insensitive tanpa alokasi lowercase (panas: per baris scan).
+        if (fp.length >= folder.raw.length &&
+            fp.regionMatches(0, folder.raw, 0, folder.raw.length, ignoreCase = true) &&
+            (fp.length == folder.raw.length || fp[folder.raw.length] == '/')
+        ) return true
+        val relLc = folder.relLc ?: return false
+        if (folder.isWholeRoot) return true // seluruh root dipilih
+        for (alias in PRIMARY_STORAGE_ALIASES) {
+            if (fp.startsWith("$alias/")) {
+                val rel = fp.substring(alias.length + 1)
+                if (rel.length < relLc.length) return false
+                return rel.regionMatches(0, relLc, 0, relLc.length, ignoreCase = true) &&
+                    (rel.length == relLc.length || rel[relLc.length] == '/')
             }
         }
         return false
@@ -498,7 +521,7 @@ object MediaLibrary {
         val galleryRoot = externalRootPath()
         val folderFilterActive = selectedFolders.isNotEmpty()
         val allowedFolders = if (folderFilterActive) {
-            selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
+            allowedFoldersFor(selectedFolders, galleryRoot)
         } else {
             emptyList()
         }
@@ -584,7 +607,7 @@ object MediaLibrary {
                     }
                     val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
                     if (!isMediaEntryReadable(filePath, uri)) continue
-                    if (folderFilterActive && !inSelectedFolders(filePath, relativePath, galleryRoot, allowedFolders)) continue
+                    if (folderFilterActive && !inSelectedFoldersPrecomputed(filePath, relativePath, allowedFolders)) continue
                     list.add(
                         MediaEntry(
                             name = name,
@@ -647,7 +670,7 @@ object MediaLibrary {
         //    berhenti lebih awal pada folder raksasa.
         if (folderFilterActive) {
             for (folder in allowedFolders) {
-                val dir = File(folder)
+                val dir = File(folder.raw)
                 if (!dir.isDirectory) continue
                 runCatching {
                     val seenDirs = mutableSetOf<String>()
@@ -672,7 +695,7 @@ object MediaLibrary {
         // dilewatkan seperti bug lama).
         if (folderFilterActive) {
             list.retainAll { entry ->
-                inSelectedFolders(entry.filePath, entry.relativePath, galleryRoot, allowedFolders)
+                inSelectedFoldersPrecomputed(entry.filePath, entry.relativePath, allowedFolders)
             }
         }
         // Simpan sampai GALLERY_MAX_ENTRIES (bukan hanya maxEntries halaman):
