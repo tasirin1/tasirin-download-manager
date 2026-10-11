@@ -14,7 +14,7 @@ object Checksums {
     fun fromHeaders(headers: Map<String, String>): String? {
         // Normalisasi kunci sekali: 5x header() berarti 5x lowercase per kunci.
         val lower = HashMap<String, String>(headers.size + 1)
-        for ((k, v) in headers) lower[k.lowercase()] = v
+        for ((k, v) in headers) lower[k.lowercase(java.util.Locale.ROOT)] = v
         val digest = lower["digest"]?.let { parseDigestHeader(it) }
         if (digest != null) return digest
         val xSha256 = lower["x-checksum-sha256"]?.let { toHex(it, "SHA-256") }
@@ -53,7 +53,7 @@ object Checksums {
             else -> 64
         }
         if (v.length == hexLen && v.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) {
-            return v.lowercase()
+            return v.lowercase(java.util.Locale.ROOT)
         }
         val decoded = base64Decode(v) ?: return null
         val expectLen = when (algo) {

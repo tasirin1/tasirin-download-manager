@@ -60,6 +60,13 @@ class SettingsActivity : AppCompatActivity() {
     private var storagePathEdited = false
     private var updatingStorageInput = false
 
+    // Cache IP LAN agar enumerasi NetworkInterface tak jalan di main thread
+    // tiap renderServer/onResume (10-100ms+ jank di HP lama, parah di Android 6
+    // dengan banyak interface). TTL 10 detik, refresh async dengan guard gen.
+    private var cachedLanIps: List<String> = emptyList()
+    private var cachedLanIpsAt: Long = 0
+    private var lanIpGen = 0
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -225,18 +232,63 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun remoteUrl(): String? =
+    // Refresh IP LAN di IO tanpa menahan main thread; guard gen memastikan
+    // hasil basi (mis. server sudah stop / activity recreate) tak menimpa UI.
+    private fun refreshLanIpsAsync(port: Int) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - cachedLanIpsAt < 10_000 && cachedLanIps.isNotEmpty()) return
+        val gen = ++lanIpGen
+        lifecycleScope.launch {
+            val ips = withContext(Dispatchers.IO) {
+                HttpControlServer.ipv4Addresses()
+            }
+            if (gen != lanIpGen || isFinishing || isDestroyed) return@launch
+            if (!App.httpServer.isAlive || App.httpServer.listeningPort != port) return@launch
+            cachedLanIps = ips
+            cachedLanIpsAt = android.os.SystemClock.elapsedRealtime()
+            binding.urls.text = ips
+                .map { "http://$it:$port/" }
+                .joinToString("\n").ifEmpty {
+                    getString(R.string.remote_no_url)
+                }
+        }
+    }
+
+    private fun cachedRemoteUrl(): String? =
         if (App.httpServer.isAlive) {
-            HttpControlServer.ipv4Addresses().firstOrNull()
+            cachedLanIps.firstOrNull()
                 ?.let { "http://$it:${App.httpServer.listeningPort}/" }
         } else null
 
     private fun openRemoteNow() {
-        val url = remoteUrl()
-        if (url == null) {
+        val fast = cachedRemoteUrl()
+        if (fast != null) {
+            openRemoteUrl(fast)
+            return
+        }
+        if (!App.httpServer.isAlive) {
             Toast.makeText(this, R.string.server_not_running_hint, Toast.LENGTH_SHORT).show()
             return
         }
+        lifecycleScope.launch {
+            val ip = withContext(Dispatchers.IO) {
+                HttpControlServer.ipv4Addresses().firstOrNull()
+            }
+            if (ip != null) {
+                cachedLanIps = listOf(ip)
+                cachedLanIpsAt = android.os.SystemClock.elapsedRealtime()
+                openRemoteUrl("http://$ip:${App.httpServer.listeningPort}/")
+            } else {
+                Toast.makeText(
+                    this@SettingsActivity,
+                    R.string.server_not_running_hint,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun openRemoteUrl(url: String) {
         runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         }.onFailure {
@@ -245,11 +297,34 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun copyRemoteUrl() {
-        val url = remoteUrl()
-        if (url == null) {
+        val fast = cachedRemoteUrl()
+        if (fast != null) {
+            copyRemoteText(fast)
+            return
+        }
+        if (!App.httpServer.isAlive) {
             Toast.makeText(this, R.string.server_not_running_hint, Toast.LENGTH_SHORT).show()
             return
         }
+        lifecycleScope.launch {
+            val ip = withContext(Dispatchers.IO) {
+                HttpControlServer.ipv4Addresses().firstOrNull()
+            }
+            if (ip != null) {
+                cachedLanIps = listOf(ip)
+                cachedLanIpsAt = android.os.SystemClock.elapsedRealtime()
+                copyRemoteText("http://$ip:${App.httpServer.listeningPort}/")
+            } else {
+                Toast.makeText(
+                    this@SettingsActivity,
+                    R.string.server_not_running_hint,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun copyRemoteText(url: String) {
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("remote", url))
         Toast.makeText(this, R.string.address_copied, Toast.LENGTH_SHORT).show()
@@ -360,11 +435,13 @@ class SettingsActivity : AppCompatActivity() {
             badge.setBackgroundResource(R.drawable.bg_badge_on)
 
             binding.serverStatus.setText(R.string.remote_running)
-            val urls = HttpControlServer.ipv4Addresses()
-                .map { "http://$it:${server.listeningPort}/" }
-            binding.urls.text = urls.joinToString("\n").ifEmpty {
-                getString(R.string.remote_no_url)
-            }
+            val port = server.listeningPort
+            binding.urls.text = cachedLanIps
+                .map { "http://$it:$port/" }
+                .joinToString("\n").ifEmpty {
+                    getString(R.string.remote_no_url)
+                }
+            refreshLanIpsAsync(port)
         } else {
             badge.isVisible = true
             badge.setText(R.string.settings_badge_off)
@@ -373,6 +450,7 @@ class SettingsActivity : AppCompatActivity() {
 
             binding.serverStatus.setText(R.string.remote_stopped)
             binding.urls.text = getString(R.string.remote_no_url)
+            lanIpGen++
         }
     }
 
