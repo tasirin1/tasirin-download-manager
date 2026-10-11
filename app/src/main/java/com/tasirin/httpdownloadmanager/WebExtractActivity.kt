@@ -22,6 +22,7 @@ import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
 import com.tasirin.httpdownloadmanager.util.readBounded
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 /** Browser ekstraksi video dalam aplikasi (WebView sistem, tanpa dependensi).
  *  Dipakai untuk situs yang memblokir fetch server langsung (challenge
@@ -119,7 +120,7 @@ class WebExtractActivity : AppCompatActivity() {
                 val host = runCatching { url.toUri() }.getOrNull()?.host.orEmpty()
                 if (host.isEmpty() || allowedHost.isEmpty()) return false
                 if (host.equals(allowedHost, ignoreCase = true)) return true
-                return host.lowercase().endsWith("." + allowedHost.lowercase())
+                return host.lowercase(Locale.ROOT).endsWith("." + allowedHost.lowercase(Locale.ROOT))
             }
 
             // Signature lama melayani API 21-23; versi request melayani 24+.

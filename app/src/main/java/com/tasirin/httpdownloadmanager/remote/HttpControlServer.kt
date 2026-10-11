@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.ZipOutputStream
 import java.net.NetworkInterface
 import java.security.MessageDigest
+import java.util.Locale
 
 class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort(appContext)) {
     // Object ini hidup seumur proses (disimpan statis di App.httpServer):
@@ -1007,7 +1008,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val checksum = params["checksum"]?.trim().orEmpty()
         val storage = params["storage"]?.trim().orEmpty()
         val folderPath = params["path"]?.trim().orEmpty()
-        val method = params["method"]?.trim()?.uppercase().orEmpty()
+        val method = params["method"]?.trim()?.uppercase(Locale.ROOT).orEmpty()
             .let { if (it == "POST") "POST" else "GET" }
         val postBody = params["postBody"]?.trim().orEmpty()
         val headers = params["headers"]?.trim().orEmpty()
@@ -1125,7 +1126,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             ?: "upload_${System.currentTimeMillis()}"
         val name = if (ServerSecurity.isFileNameValid(rawName)) rawName else {
             val ext = rawName.substringAfterLast('.', "").take(5)
-                .filter { it.isLetterOrDigit() }.lowercase()
+                .filter { it.isLetterOrDigit() }.lowercase(java.util.Locale.ROOT)
                 .takeIf { it.isNotEmpty() }?.let { ".$it" } ?: ""
             "upload_${System.currentTimeMillis()}$ext"
         }
@@ -1582,7 +1583,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         val published = App.engine.importStream(
                             finalName, storage, folderPath, tmp.length()
                         ) { out ->
-                            tmp.inputStream().use { it.copyTo(out) }
+                            tmp.inputStream().use { it.copyTo(out, SERVER_IO_BUF) }
                         }
                         published.filePath?.let {
                             fsMediaCache.clear()
@@ -2151,7 +2152,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun galleryJson(session: IHTTPSession): Response {
-        val q = session.param("q")?.trim()?.lowercase().orEmpty()
+        val q = session.param("q")?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
         val type = session.param("type")?.trim().orEmpty()
         // Penampil foto sudah dihapus; permintaan foto tidak perlu menyentuh disk.
         if (type == "image") {
@@ -2595,7 +2596,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             else -> fsActionFiles(action, path.removePrefix(FS_PREFIX), name, dest)
         }
         if (ok) invalidateFsListingCache()
-        appendLog("FS ${action.uppercase()}: $path -> ${if (ok) "OK" else "FAILED"}")
+        appendLog("FS ${action.uppercase(java.util.Locale.ROOT)}: $path -> ${if (ok) "OK" else "FAILED"}")
         return jsonResponse(JSONObject().put("ok", ok))
     }
 
@@ -2773,7 +2774,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val uri = resolver.insert(collection, values) ?: return false
         val written = runCatching {
             val out = resolver.openOutputStream(uri) ?: return false
-            out.use { dst -> file.inputStream().use { src -> src.copyTo(dst) } }
+            out.use { dst -> file.inputStream().use { src -> src.copyTo(dst, SERVER_IO_BUF) } }
             true
         }.getOrDefault(false)
         if (!written) {
@@ -2806,7 +2807,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val resolver = context.contentResolver
         val written = runCatching {
             val input = resolver.openInputStream(uri) ?: return false
-            input.use { src -> target.outputStream().use { dst -> src.copyTo(dst) } }
+            input.use { src -> target.outputStream().use { dst -> src.copyTo(dst, SERVER_IO_BUF) } }
             true
         }.getOrDefault(false)
         // Salin gagal: target kosong/setengah wajib dibuang (yatim di folder user).
@@ -3267,6 +3268,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     companion object {
         /** Regex sanitasi log — dihoist agar tidak dikompilasi ulang per panggilan log. */
+        private const val SERVER_IO_BUF = 64 * 1024
         private val LOG_SANITIZE_RE = Regex("[\r\n\t]+")
         private const val SERVER_SOCKET_TIMEOUT_MS = 60_000
         private const val FS_PREFIX = "f:"

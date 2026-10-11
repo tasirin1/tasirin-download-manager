@@ -18,8 +18,6 @@ import java.io.BufferedOutputStream
 import java.io.OutputStream
 
 class FileSaver(context: Context) {
-    private val WHITESPACE_RE = Regex("\\s+")
-
     private val appContext = context.applicationContext
     private val downloadDir = File(appContext.filesDir, "downloads").apply { mkdirs() }
 
@@ -50,6 +48,9 @@ class FileSaver(context: Context) {
 
     companion object {
         private val MERGE_LOCKS = Array(8) { Any() }
+        private val WHITESPACE_RE = Regex("\\s+")
+        /** Buffer salin 64KB: default copyTo 8KB lambat ~8x syscall untuk file GB. */
+        private const val IO_BUF = 64 * 1024
     }
 
     private fun mergeLockFor(key: String): Any =
@@ -93,7 +94,7 @@ class FileSaver(context: Context) {
         return runCatching {
             val target = uniqueTargetFile(File(dir, fileName))
             try {
-                target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+                target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
             } catch (e: Exception) {
                 // Gagal di tengah salin: buang target setengah jadi agar tidak
                 // tertinggal sebagai file korup di folder tujuan.
@@ -299,7 +300,7 @@ class FileSaver(context: Context) {
             ?: return null
         try {
             output.use { out ->
-                partial.inputStream().use { input -> input.copyTo(out) }
+                partial.inputStream().use { input -> input.copyTo(out, IO_BUF) }
             }
         } catch (e: Exception) {
             // Salinan gagal di tengah jalan: buang target setengah-tulis agar
@@ -320,7 +321,7 @@ class FileSaver(context: Context) {
         if (!dir.isDirectory && !dir.mkdirs()) return null
         val target = uniqueTargetFile(File(dir, fileName))
         try {
-            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
         } catch (e: Exception) {
             // Gagal di tengah salin: buang target setengah jadi agar tidak
             // tertinggal sebagai file korup di folder teks (seperti publishToPath).
@@ -378,7 +379,7 @@ class FileSaver(context: Context) {
                 val first = runCatching {
                     side.readText().trim().split(WHITESPACE_RE).firstOrNull().orEmpty() // audit-ignore: unbounded_read_text (dibatasi length>8192 di atas)
                 }.getOrDefault("")
-                if (first.length >= 32) return algo to first.lowercase()
+                if (first.length >= 32) return algo to first.lowercase(java.util.Locale.ROOT)
             }
         }
         return null
@@ -411,7 +412,7 @@ class FileSaver(context: Context) {
     private fun publishToMediaStore(partial: File, fileName: String): PublishResult {
         val result = runCatching {
             saveToMediaStore(fileName, null) { out ->
-                partial.inputStream().use { it.copyTo(out) }
+                partial.inputStream().use { it.copyTo(out, IO_BUF) }
             }
         }.getOrNull()
         if (result != null) {
@@ -429,7 +430,7 @@ class FileSaver(context: Context) {
             if (publicDir.isDirectory && publicDir.canWrite()) {
                 val target = uniqueTargetFile(File(publicDir, fileName))
                 try {
-                    target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+                    target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
                     partial.delete()
                     MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
                     return PublishResult(filePath = target.absolutePath, fileName = target.name)
@@ -447,7 +448,7 @@ class FileSaver(context: Context) {
     private fun publishToInternal(partial: File, fileName: String): PublishResult {
         val target = uniqueTargetFile(File(downloadDir, fileName))
         try {
-            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out) } }
+            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
         } catch (e: Exception) {
             // Target setengah jadi tidak disapu pemindaian orphan (.part saja):
             // hapus di sini agar tidak yatim selamanya.
@@ -539,7 +540,7 @@ class FileSaver(context: Context) {
                 input.use { src ->
                     val out = appContext.contentResolver.openOutputStream(target.uri, "wt")
                         ?: throw java.io.IOException("Failed to open move destination")
-                    out.use { dst -> src.copyTo(dst) }
+                    out.use { dst -> src.copyTo(dst, IO_BUF) }
                 }
             } catch (e: Exception) {
                 runCatching { target.delete() }
@@ -668,7 +669,7 @@ class FileSaver(context: Context) {
                             input.use { src ->
                                 val out = appContext.contentResolver.openOutputStream(target.uri, "wt")
                                     ?: throw java.io.IOException("Failed to open organize destination")
-                                out.use { dst -> src.copyTo(dst) }
+                                out.use { dst -> src.copyTo(dst, IO_BUF) }
                             }
                         } catch (e: Exception) {
                             runCatching { appContext.contentResolver.delete(target.uri, null, null) }
@@ -707,7 +708,7 @@ class FileSaver(context: Context) {
     )
 
     private fun subfolderFor(fileName: String): String? {
-        val ext = fileName.substringAfterLast('.', "").lowercase()
+        val ext = fileName.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT)
         val kind = MediaLibrary.mediaKind(fileName)
         return when {
             kind == "video" -> "Videos"

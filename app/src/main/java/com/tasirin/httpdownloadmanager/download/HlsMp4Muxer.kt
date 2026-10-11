@@ -32,11 +32,9 @@ object HlsMp4Muxer {
             muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
             // --- Track video (MPEG-TS AVC) via MediaExtractor ---
-            videoExt = MediaExtractor()
-            videoExt.setDataSource(videoTs.absolutePath)
-            val vIndex = selectVideoTrack(videoExt) ?: run { runCatching { outMp4.delete() }; return false }
-            val vFormat = videoExt.getTrackFormat(vIndex)
-            videoExt.selectTrack(vIndex)
+            val opened = openTrack(videoTs, true) ?: run { runCatching { outMp4.delete() }; return false }
+            videoExt = opened.first
+            val vFormat = opened.third
             val videoTrack = muxer.addTrack(vFormat)
 
             // --- Track audio (AAC murni) dibangun manual dari ADTS parse ---
@@ -87,20 +85,15 @@ object HlsMp4Muxer {
             muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
             // --- Track video (MPEG-TS AVC) via MediaExtractor ---
-            videoExt = MediaExtractor()
-            videoExt.setDataSource(videoTs.absolutePath)
-            val vIndex = selectVideoTrack(videoExt) ?: run { runCatching { outMp4.delete() }; return false }
-            val vFormat = videoExt.getTrackFormat(vIndex)
-            videoExt.selectTrack(vIndex)
+            val openedVideo = openTrack(videoTs, true) ?: run { runCatching { outMp4.delete() }; return false }
+            videoExt = openedVideo.first
+            val vFormat = openedVideo.third
             val videoTrack = muxer.addTrack(vFormat)
 
             // --- Track audio (AAC dalam MP4/M4A) via MediaExtractor ---
-            audioExt = MediaExtractor()
-            audioExt.setDataSource(audioMp4.absolutePath)
-            val aIndex = selectAudioTrack(audioExt) ?: run { runCatching { outMp4.delete() }; return false }
-            val aFormat = audioExt.getTrackFormat(aIndex)
-            audioExt.selectTrack(aIndex)
-            val audioTrack = muxer.addTrack(aFormat)
+            val openedAudio = openTrack(audioMp4, false) ?: run { runCatching { outMp4.delete() }; return false }
+            audioExt = openedAudio.first
+            val audioTrack = muxer.addTrack(openedAudio.third)
 
             muxer.start()
             val videoBuf = videoBufferSize(vFormat)
@@ -135,18 +128,14 @@ object HlsMp4Muxer {
             muxer = MediaMuxer(outMp4.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
             // --- Track video (MP4 video-only) via MediaExtractor ---
-            videoExt = MediaExtractor()
-            videoExt.setDataSource(videoMp4.absolutePath)
-            val vIndex = selectVideoTrack(videoExt) ?: run { runCatching { outMp4.delete() }; return false }
-            videoExt.selectTrack(vIndex)
-            val videoTrack = muxer.addTrack(videoExt.getTrackFormat(vIndex))
+            val openedVideo = openTrack(videoMp4, true) ?: run { runCatching { outMp4.delete() }; return false }
+            videoExt = openedVideo.first
+            val videoTrack = muxer.addTrack(openedVideo.third)
 
             // --- Track audio (AAC dalam MP4/M4A) via MediaExtractor ---
-            audioExt = MediaExtractor()
-            audioExt.setDataSource(audioMp4.absolutePath)
-            val aIndex = selectAudioTrack(audioExt) ?: run { runCatching { outMp4.delete() }; return false }
-            audioExt.selectTrack(aIndex)
-            val audioTrack = muxer.addTrack(audioExt.getTrackFormat(aIndex))
+            val openedAudio = openTrack(audioMp4, false) ?: run { runCatching { outMp4.delete() }; return false }
+            audioExt = openedAudio.first
+            val audioTrack = muxer.addTrack(openedAudio.third)
 
             muxer.start()
             writeTrackPts(videoExt, muxer, videoTrack)
@@ -176,6 +165,24 @@ object HlsMp4Muxer {
     private fun releaseAll(muxer: MediaMuxer?, vararg exts: MediaExtractor?) {
         exts.forEach { runCatching { it?.release() } }
         runCatching { muxer?.release() }
+    }
+
+    /** Buka extractor + pilih track pertama yang cocok (video/audio) + select.
+     *  Menggantikan tiga salinan blok setup identik di tiap remux. Extractor
+     *  gagal dibuka dilepas di sini; yang sukses dilepas pemanggil via
+     *  releaseAll di finally seperti sebelumnya. */
+    private fun openTrack(file: File, video: Boolean): Triple<MediaExtractor, Int, MediaFormat>? {
+        val ext = MediaExtractor()
+        return try {
+            ext.setDataSource(file.absolutePath)
+            val index = (if (video) selectVideoTrack(ext) else selectAudioTrack(ext))
+                ?: run { runCatching { ext.release() }; return null }
+            ext.selectTrack(index)
+            Triple(ext, index, ext.getTrackFormat(index))
+        } catch (t: Throwable) {
+            runCatching { ext.release() }
+            null
+        }
     }
 
     private fun selectVideoTrack(ext: MediaExtractor): Int? {
@@ -258,9 +265,7 @@ object HlsMp4Muxer {
             ext.setDataSource(file.absolutePath)
             val index = selectVideoTrack(ext) ?: return 0
             ext.selectTrack(index)
-            val size = runCatching {
-                ext.getTrackFormat(index).getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
-            }.getOrElse { 8 shl 20 }.coerceIn(1 shl 20, 16 shl 20)
+            val size = videoBufferSize(ext.getTrackFormat(index))
             val buffer = ByteBuffer.allocate(size)
             var count = 0
             while (true) {

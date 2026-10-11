@@ -415,7 +415,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialJob: Job? = null
         var socialDebounce: Job? = null
         fun platformLabelFrom(url: String): String {
-            val host = runCatching { url.toUri().host.orEmpty() }.getOrDefault("").lowercase()
+            val host = runCatching { url.toUri().host.orEmpty() }.getOrDefault("").lowercase(Locale.ROOT)
             fun matches(vararg domains: String): Boolean =
                 domains.any { d -> host == d || host.endsWith(".$d") }
             return when {
@@ -1552,7 +1552,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     /** Buka satu file selesai (dipisah agar path eksotis yang gagal tidak
      *  menggugurkan item lain dalam batch emisi yang sama). */
     private fun autoOpenSingle(item: DownloadItem) {
-        val ext = item.fileName.substringAfterLast('.', "").lowercase()
+        val ext = item.fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)
         val mime = MimeTypes.forFile(item.fileName)
         when {
             // APK -> installer (dikembalikan atas permintaan owner).
@@ -1595,7 +1595,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private fun openDownload(item: DownloadItem) {
         if (item.state != DownloadState.COMPLETED) return
         val mime = MimeTypes.forFile(item.fileName)
-        val isApk = item.fileName.lowercase().endsWith(".apk")
+        val isApk = item.fileName.lowercase(Locale.ROOT).endsWith(".apk")
         val file = item.filePath?.let { File(it) }
 
         // contentUri (MediaStore/SAF) → selalu pakai content://

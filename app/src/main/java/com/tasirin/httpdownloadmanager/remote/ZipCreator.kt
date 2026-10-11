@@ -16,6 +16,9 @@ object ZipCreator {
     /** Kedalaman maksimum rekursi ZIP (anti symlink-cycle). */
     private const val MAX_ZIP_DEPTH = 64
 
+    /** Buffer salin 64KB (default copyTo 8KB boros syscall untuk file besar). */
+    private const val IO_BUF = 64 * 1024
+
     /** Batas total entri per arsip: folder raksasa di TV box bisa memblokir
      *  thread HTTP ber menit-menit / OOM bila tak dibatasi. */
     const val MAX_ZIP_ENTRIES = 5000
@@ -108,7 +111,7 @@ object ZipCreator {
             runCatching {
                 zos.putNextEntry(ZipEntry(entryPath))
                 try {
-                    file.inputStream().use { it.copyTo(zos) }
+                    file.inputStream().use { it.copyTo(zos, IO_BUF) }
                 } finally {
                     runCatching { zos.closeEntry() }
                 }
@@ -178,7 +181,7 @@ object ZipCreator {
                 runCatching {
                     zos.putNextEntry(ZipEntry(entry))
                     try {
-                        input.use { it.copyTo(zos) }
+                        input.use { it.copyTo(zos, IO_BUF) }
                     } finally {
                         runCatching { zos.closeEntry() }
                     }
@@ -262,7 +265,7 @@ object ZipCreator {
                         runCatching {
                             zos.putNextEntry(ZipEntry(entry))
                             try {
-                                input.copyTo(zos)
+                                input.copyTo(zos, IO_BUF)
                             } finally {
                                 runCatching { zos.closeEntry() }
                             }

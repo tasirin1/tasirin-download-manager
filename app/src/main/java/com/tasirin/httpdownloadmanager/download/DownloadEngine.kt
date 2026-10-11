@@ -536,7 +536,7 @@ class DownloadEngine(appContext: Context) {
                 if (code !in 200..299) return emptyList()
                 val body = conn.inputStream.use { readBounded(it, HLS_PROBE_MAX_BYTES) }
                 val renditions = HlsParser.parseAudioRenditions(body, conn.url.toString())
-                renditions.distinctBy { it.language.lowercase() to it.name.lowercase() }
+                renditions.distinctBy { it.language.lowercase(Locale.ROOT) to it.name.lowercase(Locale.ROOT) }
             } finally {
                 conn.disconnect()
             }
@@ -3020,7 +3020,7 @@ class DownloadEngine(appContext: Context) {
             clean.startsWith("sha256:", ignoreCase = true) -> "SHA-256" to clean.substring(7)
             else -> "MD5" to clean
         }
-        val value = rest.trim().lowercase()
+        val value = rest.trim().lowercase(Locale.ROOT)
         if (value.length < 16) return null
         return algo to value
     }
@@ -3441,7 +3441,7 @@ internal fun redirectTarget(base: String, location: String?): String? {
  *  dan metadata cloud. Bukan blokir DNS umum agar unduhan LAN (NAS
  *  192.168.x/10.x) tetap jalan; hanya literal berbahaya yang ditolak. */
 internal fun isBlockedRedirectHost(host: String): Boolean {
-    val h = host.trim().trimEnd('.').lowercase()
+    val h = host.trim().trimEnd('.').lowercase(Locale.ROOT)
     if (h.isEmpty()) return true
     if (h == "localhost" || h.endsWith(".localhost")) return true
     if (h == "0.0.0.0" || h == "::" || h == "::1" || h == "[::1]" || h == "[::]") return true
@@ -3522,7 +3522,7 @@ internal fun isBlockedRedirectHost(host: String): Boolean {
 /** True bila host adalah literal IP (bukan nama yang butuh resolve DNS).
  *  Murni agar bisa di-unit-test. */
 internal fun isIpLiteral(host: String): Boolean {
-    val s = host.trim().trimEnd('.').lowercase().removePrefix("[").removeSuffix("]")
+    val s = host.trim().trimEnd('.').lowercase(Locale.ROOT).removePrefix("[").removeSuffix("]")
     if (s.contains(':')) return IPV6_LITERAL_RE.matches(s)
     val parts = s.split('.')
     if (parts.size == 1) return parseIpv4Part(s) != null
@@ -3537,7 +3537,7 @@ internal val HOSTNAME_RE = Regex(
 )
 
 internal fun parseIpv4Part(part: String): Int? {
-    val p = part.trim().lowercase()
+    val p = part.trim().lowercase(Locale.ROOT)
     if (p.isEmpty()) return null
     return runCatching {
         when {
@@ -3562,7 +3562,7 @@ internal val IPV6_LITERAL_RE = Regex(
  *  Murni agar bisa di-unit-test. */
 internal fun isEncryptedHlsPlaylist(body: String): Boolean {
     if (!body.contains("#EXT-X-KEY")) return false
-    val methods = HLS_KEY_METHOD_RE.findAll(body).map { it.groupValues[1].uppercase() }.toList()
+    val methods = HLS_KEY_METHOD_RE.findAll(body).map { it.groupValues[1].uppercase(Locale.ROOT) }.toList()
     // Tanpa METHOD eksplisit: anggap terenkripsi (fail-closed) daripada
     // mengunduh ciphertext yang dilaporkan sukses.
     if (methods.isEmpty()) return true
@@ -3661,7 +3661,7 @@ private class SpeedThrottle(
  *  boleh memicu mirror proxy pihak ketiga. Internal agar bisa di-unit-test. */
 internal fun isGitHubUrl(url: String): Boolean {
     if (!url.startsWith("https://", ignoreCase = true)) return false
-    val host = runCatching { java.net.URL(url).host }.getOrDefault("").lowercase()
+    val host = runCatching { java.net.URL(url).host }.getOrDefault("").lowercase(Locale.ROOT)
     return host == "github.com" || host.endsWith(".github.com") ||
         host == "githubusercontent.com" || host.endsWith(".githubusercontent.com") ||
         host == "github.io" || host.endsWith(".github.io")

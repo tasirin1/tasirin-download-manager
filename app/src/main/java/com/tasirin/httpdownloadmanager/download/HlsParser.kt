@@ -1,5 +1,7 @@
 package com.tasirin.httpdownloadmanager.download
 
+import java.util.Locale
+
 data class HlsVariant(
     val name: String,
     val url: String,
@@ -127,7 +129,7 @@ object HlsParser {
         if (relative.startsWith("//")) {
             // Protocol-relative: warisi skema basis (default https aman
             // bila basis rusak; hanya http/https yang diizinkan).
-            val scheme = cleanBase.substringBefore("://", "https").lowercase()
+            val scheme = cleanBase.substringBefore("://", "https").lowercase(Locale.ROOT)
                 .takeIf { it == "http" || it == "https" } ?: "https"
             return "$scheme:$relative"
         }

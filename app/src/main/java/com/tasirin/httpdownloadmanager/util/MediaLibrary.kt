@@ -306,7 +306,7 @@ object MediaLibrary {
         val cleanRoot: String = root.trim().trimEnd('/')
         val prefix: String = "$raw/"
         val relLc: String? =
-            if (raw.startsWith(cleanRoot)) raw.removePrefix(cleanRoot).trim('/').lowercase() else null
+            if (raw.startsWith(cleanRoot)) raw.removePrefix(cleanRoot).trim('/').lowercase(java.util.Locale.ROOT) else null
         val isWholeRoot: Boolean = raw == cleanRoot || relLc?.isEmpty() == true
     }
 

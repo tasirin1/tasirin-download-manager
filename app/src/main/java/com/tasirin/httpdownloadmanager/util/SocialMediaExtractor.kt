@@ -10,6 +10,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.io.InputStream
+import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 
 object SocialMediaExtractor {
@@ -167,7 +168,7 @@ object SocialMediaExtractor {
     )
 
     fun isSocialMediaUrl(url: String): Boolean {
-        val lower = url.lowercase()
+        val lower = url.lowercase(Locale.ROOT)
         // Jalur cepat: URL file langsung (kasus umum) gugur tanpa regex.
         if (!lower.contains("tiktok.com") && !lower.contains("instagram.com") &&
             !lower.contains("twitter.com") && !lower.contains("x.com/") &&
@@ -192,7 +193,7 @@ object SocialMediaExtractor {
 
     /** True bila URL adalah halaman HentaiHaven (butuh ekstraksi WebView). */
     fun isHentaiHavenUrl(url: String): Boolean =
-        HH_HOST_RE.containsMatchIn(url.lowercase())
+        HH_HOST_RE.containsMatchIn(url.lowercase(Locale.ROOT))
 
     /** Ekstrak URL terbaik (satu opsi). */
     suspend fun extract(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
@@ -207,7 +208,7 @@ object SocialMediaExtractor {
             // memakai API pihak ketiga sehingga tak menerima header user
             // (cookie tak boleh bocor ke host lain).
             val user = parseUserHeaders(headers)
-            val lower = url.lowercase()
+            val lower = url.lowercase(Locale.ROOT)
             when {
                 TT_HOST_RE.containsMatchIn(lower) -> extractTikTok(url)
                 IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractInstagram(url, user)
@@ -232,7 +233,7 @@ object SocialMediaExtractor {
         withTimeoutOrNull(EXTRACT_TOTAL_TIMEOUT_MS) {
             try {
                 val user = parseUserHeaders(headers)
-                val lower = url.lowercase()
+                val lower = url.lowercase(Locale.ROOT)
                 when {
                     TT_HOST_RE.containsMatchIn(lower) -> extractAllTikTok(url)
                     IG_BROAD_HOST_RE.containsMatchIn(lower) -> extractAllInstagram(url, user)
@@ -1375,7 +1376,7 @@ object SocialMediaExtractor {
     internal fun isExtractRedirectAllowed(target: String): Boolean {
         return try {
             val u = URL(target)
-            val scheme = u.protocol.lowercase()
+            val scheme = u.protocol.lowercase(Locale.ROOT)
             if (scheme != "http" && scheme != "https") return false
             !com.tasirin.httpdownloadmanager.download.isBlockedRedirectHost(u.host.orEmpty())
         } catch (_: Exception) { false }
