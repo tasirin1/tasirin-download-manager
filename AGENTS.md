@@ -371,11 +371,7 @@ kuat dan tanpa diskusi:
    dibandingkan `c2785a61...`) — membuktikan APK benar ditandatangani kunci resmi.
 7. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
 8. Publish release baru `v<versi>`: APK signed + **`mapping.txt`** (deobfuscation R8); rilis lama tidak dihapus.
-9. **VirusTotal scan** (opsional, hanya bila `VT_API_KEY` terisi) — submit APK
-   rilis/debug, polling sampai analisis selesai, lalu ringkasan deteksi (X/Y
-   engine) dicetak di log + job summary; jalan di push `main` DAN di PR
-   (repositori sama) supaya APK yang mau di-merge sudah di-scan.
-10. **Audit rilis** — setelah publish pada push/manual, dan pada build mingguan,
+9. **Audit rilis** — setelah publish pada push/manual, dan pada build mingguan,
     CI memvalidasi judul/status latest, APK sesuai versionCode, batas ukuran,
     serta `mapping.txt`.
 
@@ -394,7 +390,6 @@ Security & alerts repositori.
 | `KEYSTORE_PASSWORD`  | Password keystore                   |
 | `KEY_ALIAS`          | Alias kunci signing                 |
 | `KEY_PASSWORD`       | Password kunci alias                |
-| `VT_API_KEY`         | (Opsional) API key VirusTotal — scan APK di `main` & PR, tanpa ini step dilewati |
 
 Keystore yang sama dipakai juga oleh repo **Tasirin Vaultwarden Host** — simpan
 satu salinan aman (jangan di commit, jangan hanya di satu perangkat).
