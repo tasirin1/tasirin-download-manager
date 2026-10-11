@@ -22,10 +22,10 @@ android {
         // ditangani applyEdgeToEdge di 4 aktivitas; predictive back default aktif
         // (tidak ada onBackPressed custom, pakai OnBackPressedDispatcher AndroidX).
         targetSdk = 36
-        // Nilai dasar build lokal; CI menimpa name dan code per build
+        // Nilai dasar build lokal; CI mengoper -PverName/-PverCode per build
         // (name 1.0 titik run_number, code 100000 tambah run_number).
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (findProperty("verCode") as String?)?.toIntOrNull() ?: 1
+        versionName = (findProperty("verName") as String?) ?: "1.0"
     }
 
     // UI memakai Inggris (default values/); locale library lain (ar, de, fr,

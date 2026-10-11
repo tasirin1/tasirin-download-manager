@@ -52,7 +52,9 @@ Kontinuitas antar-sesi: di awal sesi jalankan `git -C /root/memori-agents-ai pul
 ├── docs/screenshots/                 # Screenshot README (remote-web.png, gallery.png, downloads.png)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → app/src/main/assets/remote.html + guard CI
+├── scripts/check_changelog.py        # Guard CI: perubahan kode wajib update CHANGELOG.md (dipakai job verify)
 ├── scripts/check_readme_sync.py      # Guard CI: struktur heading README.md vs README.en.md sinkron
+├── scripts/jacoco_summary.py         # Ringkasan coverage JaCoCo ke log + job summary (dipakai job build)
 ├── scripts/security_audit.py        # Audit statis bug/error/keamanan + self-test
 ├── scripts/upload_smoke_test.js      # Smoke test alur upload (stub DOM/XHR, tanpa dependensi)
 ├── scripts/check_repo.py             # Satu pintu guard cepat repo (tanpa --android untuk AI)
@@ -251,8 +253,8 @@ kuat dan tanpa diskusi:
 3. **Gaya commit**: `type(scope): deskripsi` — tipe yang dipakai di repo ini:
    `feat`, `fix`, `ui`, `perf`, `refactor`, `docs`, `chore`, `rebrand`
    (contoh: `ui(remote): ...`, `perf(gallery): ...`). Satu commit satu tujuan.
-4. **Jangan ubah `versionName`/`versionCode` manual** — CI menaikkan keduanya
-   otomatis per build: `versionName = "1.0.<run_number>"`, `versionCode = 100000 + run_number`.
+4. **Jangan ubah `versionName`/`versionCode` manual** — CI mengoper keduanya
+   per build via `-PverName="1.0.<run_number>" -PverCode=<100000 + run_number>`.
    Nilai di `app/build.gradle.kts` (`"1.0"`/`1`) hanya fallback build lokal/debug.
 5. **Jaga kompatibilitas Android 5 (minSdk 21)**: API baru harus punya fallback
    (contoh: `RELATIVE_PATH`, `NetworkCallback`); jangan naikkan minSdk.
@@ -353,26 +355,29 @@ kuat dan tanpa diskusi:
   (atau `gh workflow run build.yml -R tasirin1/tasirin-download-manager`).
 - **Jangan edit release manual** — selalu lewat workflow.
 
-## Alur pipeline (build.yml)
+Dua job: **`verify`** (cepat, tanpa SDK — gagal-cepat sebelum Gradle) lalu
+**`build`** (`needs: verify`).
 
-1. Checkout → **guard CHANGELOG** (perubahan kode wajib update `CHANGELOG.md`;
-   dikecualikan untuk PR Dependabot) → **`scripts/prepare_remote.py --check`**
-   (sinkron remote.html, node --check, guard i18n) + **cek sinkron
-   README/README.en** (struktur heading) → **audit statis
-   bug/error/keamanan (`security_audit.py --self-test`)** → JDK 17 → **cek kesehatan
-   keystore** (fingerprint `c2785a61...` + **masa berlaku**: error < 90 hari,
-   warning < 180 hari) → Android SDK → Gradle (cache + verifikasi wrapper +
-   **verifikasi dependensi strict** lewat `gradle/verification-metadata.xml`).
-2. **Bump versi**: `versionName = "1.0.<run_number>"` + `versionCode = 100000 + run_number` ditulis ke `app/build.gradle.kts` (nilai dasar hanya fallback lokal).
-3. `assembleDebug` (artifact `app-debug`) — **hanya di PR** (verifikasi compile; push `main`/manual langsung release agar hemat 1x compile).
-4. **Lint (hanya PR)** `lintDebug` (abortOnError) + **unit test (selalu)** `testDebugUnitTest`.
-5. `assembleRelease` **bila `KEYSTORE_BASE64` terisi dan bukan PR** (artifact `app-release`; dilewati di PR karena debug sudah verifikasi compile).
-6. **Verifikasi tanda tangan APK release** (`keytool -printcert -jarfile`
-   dibandingkan `c2785a61...`) — membuktikan APK benar ditandatangani kunci resmi.
-7. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
-8. Publish release baru `v<versi>`: APK signed + **`mapping.txt`** (deobfuscation R8); rilis lama tidak dihapus.
-9. **Audit rilis** — setelah publish pada push/manual, CI memvalidasi
-    judul/status latest, APK sesuai versionCode, batas ukuran, serta `mapping.txt`.
+**Job `verify`**: checkout → **guard CHANGELOG** (`scripts/check_changelog.py`;
+dikecualikan untuk PR Dependabot) → **`scripts/prepare_remote.py --check`**
+(sinkron remote.html, node --check, guard i18n) + **cek sinkron
+README/README.en** → **audit statis bug/error/keamanan
+(`security_audit.py --self-test`)**.
+
+**Job `build`**: checkout → JDK 17 → Android SDK → **cek kesehatan
+keystore** (fingerprint `c2785a61...` + **masa berlaku**: error < 90 hari,
+warning < 180 hari; decode sekali ke `/tmp/keystore.jks` dipakai ulang saat
+signing) → Gradle (cache + verifikasi wrapper + **verifikasi dependensi
+strict** lewat `gradle/verification-metadata.xml`) →
+`assembleDebug -PverName/-PverCode` (artifact `app-debug`) **hanya di PR** →
+**lint (hanya PR)** `lintDebug` (laporan di-upload sebagai artifact bila
+gagal) + **unit test (selalu)** `testDebugUnitTest` (+ JaCoCo via
+`scripts/jacoco_summary.py`) → `assembleRelease` **bila `KEYSTORE_BASE64`
+terisi dan bukan PR** (versi dari `-P`, tanpa `sed`; artifact `app-release`) →
+**verifikasi tanda tangan APK** (`keytool -printcert -jarfile` vs
+`c2785a61...`) → **cek batas ukuran** (APK maks 3,5 MB + `remote.html`) →
+**publish & audit rilis** (APK signed + **`mapping.txt`**; audit memvalidasi
+judul/status latest, versionCode, dan asset). Rilis lama tidak dihapus.
 
 Catatan: workflow memakai `concurrency` (run lama di ref sama dibatalkan).
 Build hanya berjalan saat ada perubahan (push/PR) atau dipicu manual —
@@ -432,7 +437,7 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
 - Tiap push ke `main` membuat release baru `v<versi>`; asset APK selalu
   `tasirin-download-manager-v<versi>.apk` dengan `versi = 1.0.<run_number>`,
   `code = 100000 + run_number`.
-- Jangan ubah `versionName`/`versionCode` manual (keduanya di-bump CI).
+- Jangan ubah `versionName`/`versionCode` manual (keduanya dioper CI via `-P`).
 
 ```bash
 gh run list --branch main --limit 1            # build terakhir

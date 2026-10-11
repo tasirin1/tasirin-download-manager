@@ -26,17 +26,14 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build APK
+  verify:
+    name: Verifikasi cepat (tanpa SDK)
     runs-on: ubuntu-24.04
-    env:
-      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          # Guard CHANGELOG butuh commit base (push/PR) — history penuh
-          # supaya git diff tidak gagal di clone shallow.
+          # Guard CHANGELOG butuh history penuh supaya git diff tidak gagal.
           fetch-depth: 0
 
       - name: Pastikan CHANGELOG diperbarui untuk perubahan kode
@@ -44,31 +41,7 @@ jobs:
         # rilis maintenance; perubahan dependensi wajib regenerasi
         # verification-metadata (lihat AGENTS.md).
         if: github.actor != 'dependabot[bot]'
-        run: |
-          BASE="${{ github.event.pull_request.base.sha }}"
-          if [ -z "$BASE" ] || [ "$BASE" = "null" ]; then
-            BASE="${{ github.event.before }}"
-          fi
-          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
-            echo "Base commit tidak tersedia (push pertama / manual) — lewati guard CHANGELOG."
-            exit 0
-          fi
-          # git fetch tidak diperlukan — checkout sudah fetch-depth: 0.
-          # Bandingkan terhadap base (PR) / before (push) supaya PR
-          # multi-commit tetap terjaga; fallback ke HEAD~1 bila base tak dikenal.
-          if git rev-parse --verify --quiet "$BASE" >/dev/null; then
-            CHANGED=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || git diff --name-only "$BASE" HEAD 2>/dev/null || true)
-          else
-            CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
-          fi
-          NEEDS_CHANGELOG=$(echo "$CHANGED" | grep -E '^(app/src/main/|remote\.src\.html$|app/build\.gradle\.kts$|scripts/)' || true)
-          HAS_CHANGELOG=$(echo "$CHANGED" | grep -x 'CHANGELOG.md' || true)
-          if [ -n "$NEEDS_CHANGELOG" ] && [ -z "$HAS_CHANGELOG" ]; then
-            echo "::error::Perubahan kode (app/src/main, remote.src.html, app/build.gradle.kts, scripts/) wajib menyertakan update CHANGELOG.md"
-            echo "$NEEDS_CHANGELOG"
-            exit 1
-          fi
-          echo "Guard CHANGELOG: OK"
+        run: python3 scripts/check_changelog.py "${{ github.event.pull_request.base.sha }}" "${{ github.event.before }}"
 
       - name: Siapkan & periksa remote web (minify + node check + i18n)
         run: python3 scripts/prepare_remote.py --check
@@ -80,6 +53,21 @@ jobs:
         run: |
           python3 scripts/security_audit.py --self-test
           python3 scripts/security_audit.py
+
+  build:
+    name: Build APK
+    runs-on: ubuntu-24.04
+    needs: verify
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      VER_CODE: ${{ 100000 + github.run_number }}
+      VER_NAME: 1.0.${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Catatan rilis memakai git diff CHANGELOG — history penuh.
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
@@ -132,23 +120,11 @@ jobs:
       - name: Set up Gradle (cache + verifikasi wrapper)
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Bump versi otomatis per build (versionName + versionCode)
-        # versionName dibangkitkan dari run_number (1.0.<run_number>) supaya
-        # versi tampil naik tiap rilis; versionCode = 100000 + run_number
-        # (monotonik untuk Play/PackageManager). Nilai dasar di
-        # app/build.gradle.kts hanya fallback build lokal.
-        run: |
-          CODE=$((100000 + ${{ github.run_number }}))
-          VER="1.0.${{ github.run_number }}"
-          sed -i "s/versionCode = [0-9]*/versionCode = ${CODE}/" app/build.gradle.kts
-          sed -i "s/versionName = \"[0-9.]*\"/versionName = \"${VER}\"/" app/build.gradle.kts
-          echo "Versi baru: ${VER} (code ${CODE})"
-
       - name: Build debug APK (verifikasi PR saja)
         # Push main/manual langsung build release (hemat 1x compile
         # penuh); debug hanya untuk verifikasi compile di PR.
         if: github.event_name == 'pull_request'
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug -PverCode="$VER_CODE" -PverName="$VER_NAME"
 
       - name: Lint (hanya PR)
         # lintDebug lambat (1-3 mnt); kode main normalnya sudah lolos saat PR.
@@ -158,39 +134,18 @@ jobs:
       - name: Unit test
         run: ./gradlew testDebugUnitTest
 
-      - name: Tampilkan laporan lint di log
-        if: always() && github.event_name == 'pull_request'
-        run: cat app/build/reports/lint-results-debug.txt || true
+      - name: Upload laporan lint (bila gagal)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.txt
+          if-no-files-found: ignore
 
       - name: Coverage JaCoCo (laporan + ambang batas)
         run: |
           ./gradlew jacocoTestReport jacocoTestCoverageVerification
-          python3 - <<'PY'
-          import glob, os, xml.etree.ElementTree as ET
-          files = glob.glob("app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
-          if not files:
-              print("::warning::Laporan JaCoCo tidak ditemukan")
-              raise SystemExit(0)
-          root = ET.parse(files[0]).getroot()
-          summary = []
-          for ctype in ("LINE", "BRANCH", "INSTRUCTION", "METHOD"):
-              covered = missed = 0
-              for c in root.iter("counter"):
-                  if c.get("type") == ctype:
-                      covered += int(c.get("covered", 0))
-                      missed += int(c.get("missed", 0))
-              total = covered + missed
-              if total:
-                  pct = covered / total
-                  line = f"- {ctype}: {pct:.1%} ({covered}/{total})"
-                  summary.append(line)
-                  print(f"JaCoCo {ctype}: {pct:.1%} ({covered}/{total})")
-          step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
-          if step_summary and summary:
-              with open(step_summary, "a", encoding="utf-8") as fh:
-                  fh.write("### JaCoCo coverage (unit test)\n\n")
-                  fh.write("\n".join(summary) + "\n")
-          PY
+          python3 scripts/jacoco_summary.py
 
       - name: Build release APK (jika secret signing tersedia)
         # Dilewati di PR: debug sudah verifikasi compile (hemat 1x build R8).
@@ -200,9 +155,9 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
-          ./gradlew assembleRelease \
-            -PstoreFile=keystore.jks \
+          [ -f /tmp/keystore.jks ] || echo "$KEYSTORE_BASE64" | base64 -d > /tmp/keystore.jks
+          ./gradlew assembleRelease -PverCode="$VER_CODE" -PverName="$VER_NAME" \
+            -PstoreFile=/tmp/keystore.jks \
             -PstorePassword="$KEYSTORE_PASSWORD" \
             -PkeyAlias="$KEY_ALIAS" \
             -PkeyPassword="$KEY_PASSWORD"
@@ -220,7 +175,7 @@ jobs:
           fi
           echo "APK release: ditandatangani kunci release resmi."
 
-      - name: Cek ukuran APK (jaga APK tetap kecil)
+      - name: Cek batas ukuran (APK + remote.html)
         if: always()
         run: |
           RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
@@ -232,17 +187,14 @@ jobs:
           fi
           if [ ! -f "$APK" ]; then
             echo "APK $LABEL belum ada (build sebelumnya gagal) — lewati cek ukuran."
-            exit 0
+          else
+            SIZE=$(stat -c %s "$APK")
+            echo "Ukuran APK $LABEL (${APK##*/}): $SIZE bytes"
+            if [ "$SIZE" -gt "$LIMIT" ]; then
+              echo "::error::APK $LABEL terlalu besar: $SIZE > $LIMIT bytes"
+              exit 1
+            fi
           fi
-          SIZE=$(stat -c %s "$APK")
-          echo "Ukuran APK $LABEL (${APK##*/}): $SIZE bytes"
-          if [ "$SIZE" -gt "$LIMIT" ]; then
-            echo "::error::APK $LABEL terlalu besar: $SIZE > $LIMIT bytes"
-            exit 1
-          fi
-
-      - name: Cek ukuran remote.html (minify tidak bocor)
-        run: |
           F="app/src/main/assets/remote.html"
           LIMIT=307200
           SIZE=$(stat -c %s "$F")
@@ -266,14 +218,14 @@ jobs:
           name: app-release
           path: app/build/outputs/apk/release/app-release.apk
 
-      - name: Publish GitHub Release
-        # Hanya PR yang tidak publish (push main + manual publish release).
+      - name: Publish & audit rilis
+        # Hanya PR yang tidak publish (push main + manual publish lalu audit).
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VER=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          CODE=$(grep -oP 'versionCode = \K[0-9]+' app/build.gradle.kts)
+          VER="$VER_NAME"
+          CODE="$VER_CODE"
           OUT="tasirin-download-manager-v${VER}.apk"
           if [ -n "$KEYSTORE_BASE64" ]; then
             cp app/build/outputs/apk/release/app-release.apk "$OUT"
@@ -304,16 +256,8 @@ jobs:
             --notes "$NOTES" \
             --latest
 
-      - name: Audit rilis terbaru
-        # Push/manual mem-publish rilis lebih dulu; audit memastikan judul,
-        # asset, dan mapping.txt benar pada rilis yang baru dibuat.
-        if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VER=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          CODE=$((100000 + ${{ github.run_number }}))
-          EXPECTED_APK="tasirin-download-manager-v${VER}.apk"
+          echo "--- Audit rilis v${VER} ---"
+          EXPECTED_APK="$OUT"
           LATEST_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name')
           RELEASE=$(gh release view "v${VER}" --json name,assets)
 
