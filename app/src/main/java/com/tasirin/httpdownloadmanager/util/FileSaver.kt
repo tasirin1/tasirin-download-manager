@@ -67,7 +67,7 @@ class FileSaver(context: Context) {
                 for (index in 0 until segmentCount) {
                     val part = partialFile(fileName, index)
                     if (!part.exists()) throw IOException("Segment $index not found")
-                    BufferedInputStream(part.inputStream(), 64 * 1024).use { input -> input.copyTo(out, 64 * 1024) }
+                    BufferedInputStream(part.inputStream(), IO_BUF).use { input -> input.copyTo(out, IO_BUF) }
                 }
             }
             // renameTo memakai rename(2) di Linux dan menggantikan target lama;
@@ -83,7 +83,7 @@ class FileSaver(context: Context) {
         } finally {
             if (staging.exists()) runCatching { staging.delete() }
         }
-        (0 until segmentCount).map { partialFile(fileName, it) }.forEach { part -> runCatching { part.delete() } }
+        for (index in 0 until segmentCount) runCatching { partialFile(fileName, index).delete() }
         return target
     }
 

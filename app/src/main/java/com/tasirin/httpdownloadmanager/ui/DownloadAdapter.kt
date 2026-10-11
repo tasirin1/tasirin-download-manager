@@ -17,7 +17,6 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.databinding.ItemDownloadBinding
 import com.tasirin.httpdownloadmanager.databinding.ItemSectionHeaderBinding
 import java.io.File
-import java.util.Locale
 
 /** Baris daftar: header grup status atau item download. */
 sealed class DownloadRow {
@@ -92,7 +91,7 @@ class DownloadAdapter(private val listener: Listener) :
     private fun bindHeader(holder: HeaderHolder, row: DownloadRow.Header) {
         val b = holder.binding
         b.textSectionTitle.text = row.title
-        b.textSectionCount.text = String.format(Locale.US, "%d", row.count)
+        b.textSectionCount.text = row.count.toString()
         val chevron = if (row.collapsed) R.drawable.ic_chevron else R.drawable.ic_chevron_up
         b.sectionChevron.setImageResource(chevron)
         b.sectionChevron.visibility = if (row.count > 0) View.VISIBLE else View.INVISIBLE

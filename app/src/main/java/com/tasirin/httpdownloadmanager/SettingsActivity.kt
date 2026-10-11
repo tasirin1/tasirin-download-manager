@@ -409,7 +409,7 @@ class SettingsActivity : AppCompatActivity() {
             Build.VERSION.SDK_INT >= 30 -> if (Permissions.needsAllFilesAccess(this))
                 View.VISIBLE else View.GONE
             Build.VERSION.SDK_INT >= 23 ->
-                if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
                         PackageManager.PERMISSION_GRANTED
                 ) View.VISIBLE else View.GONE
             else -> View.GONE

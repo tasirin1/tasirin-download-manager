@@ -3246,7 +3246,7 @@ class DownloadEngine(appContext: Context) {
         // Segmen path seperti "file=123.mp4" adalah nama valid (punya ekstensi);
         // tolak '=' hanya bila tanpa titik (kunci query nyasar ke path).
         if (candidate.isNotEmpty() && (!candidate.contains('=') || candidate.contains('.'))) return candidate
-        return "download_${(DEFAULT_NAME_FORMAT.get() ?: SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)).format(Date())}"
+        return "download_${DEFAULT_NAME_FORMAT.get().format(Date())}"
     }
 
     private val cookiePrefs by lazy {
