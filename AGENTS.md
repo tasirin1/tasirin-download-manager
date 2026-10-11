@@ -364,21 +364,19 @@ kuat dan tanpa diskusi:
    warning < 180 hari) → Android SDK → Gradle (cache + verifikasi wrapper +
    **verifikasi dependensi strict** lewat `gradle/verification-metadata.xml`).
 2. **Bump versi**: `versionName = "1.0.<run_number>"` + `versionCode = 100000 + run_number` ditulis ke `app/build.gradle.kts` (nilai dasar hanya fallback lokal).
-3. `assembleDebug` (artifact `app-debug`) — **hanya di PR** (verifikasi compile; push `main`/schedule/manual langsung release agar hemat 1x compile).
+3. `assembleDebug` (artifact `app-debug`) — **hanya di PR** (verifikasi compile; push `main`/manual langsung release agar hemat 1x compile).
 4. **Lint (hanya PR)** `lintDebug` (abortOnError) + **unit test (selalu)** `testDebugUnitTest`.
 5. `assembleRelease` **bila `KEYSTORE_BASE64` terisi dan bukan PR** (artifact `app-release`; dilewati di PR karena debug sudah verifikasi compile).
 6. **Verifikasi tanda tangan APK release** (`keytool -printcert -jarfile`
    dibandingkan `c2785a61...`) — membuktikan APK benar ditandatangani kunci resmi.
 7. **Cek ukuran APK** (maks 3,5 MB — jaga APK tetap kecil).
 8. Publish release baru `v<versi>`: APK signed + **`mapping.txt`** (deobfuscation R8); rilis lama tidak dihapus.
-9. **Audit rilis** — setelah publish pada push/manual, dan pada build mingguan,
-    CI memvalidasi judul/status latest, APK sesuai versionCode, batas ukuran,
-    serta `mapping.txt`.
+9. **Audit rilis** — setelah publish pada push/manual, CI memvalidasi
+    judul/status latest, APK sesuai versionCode, batas ukuran, serta `mapping.txt`.
 
-Catatan: workflow memakai `concurrency` (run lama di ref sama dibatalkan) dan
-ada **build terjadwal mingguan** (Senin 03:00 UTC) yang hanya memverifikasi
-build sekaligus mengaudit kesehatan asset release terbaru — tidak mem-publish
-release. **CodeQL** (Java/Kotlin) dan **gitleaks**
+Catatan: workflow memakai `concurrency` (run lama di ref sama dibatalkan).
+Build hanya berjalan saat ada perubahan (push/PR) atau dipicu manual —
+tidak ada build terjadwal. **CodeQL** (Java/Kotlin) dan **gitleaks**
 (deteksi secret) berjalan di tiap push/PR; temuan CodeQL muncul di tab
 Security & alerts repositori.
 

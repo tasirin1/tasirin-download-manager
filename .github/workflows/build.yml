@@ -16,10 +16,6 @@ on:
       - "docs/**"
       - ".gitignore"
   workflow_dispatch:
-  # Build terjadwal (mingguan): pastikan repo tetap build dengan toolchain
-  # terbaru walau tidak ada perubahan. Tidak mem-publish release.
-  schedule:
-    - cron: "0 3 * * 1"
 
 # Batal run lama saat push/PR baru di ref yang sama — hemat menit Actions.
 concurrency:
@@ -149,7 +145,7 @@ jobs:
           echo "Versi baru: ${VER} (code ${CODE})"
 
       - name: Build debug APK (verifikasi PR saja)
-        # Push main/schedule/manual langsung build release (hemat 1x compile
+        # Push main/manual langsung build release (hemat 1x compile
         # penuh); debug hanya untuk verifikasi compile di PR.
         if: github.event_name == 'pull_request'
         run: ./gradlew assembleDebug
@@ -271,8 +267,8 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Publish GitHub Release
-        # Schedule (build mingguan) hanya verifikasi build, tidak publish release.
-        if: github.event_name != 'pull_request' && github.event_name != 'schedule'
+        # Hanya PR yang tidak publish (push main + manual publish release).
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -309,8 +305,8 @@ jobs:
             --latest
 
       - name: Audit rilis terbaru
-        # Push/manual mem-publish rilis lebih dulu; schedule memeriksa bahwa
-        # rilis lama tetap sehat dan tidak kehilangan asset resmi.
+        # Push/manual mem-publish rilis lebih dulu; audit memastikan judul,
+        # asset, dan mapping.txt benar pada rilis yang baru dibuat.
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -324,19 +320,12 @@ jobs:
           [ "${LATEST_TAG}" = "v${VER}" ] \
             || { echo "::error::Release v${VER} bukan release terbaru (latest: ${LATEST_TAG})"; exit 1; }
 
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "$RELEASE" | jq -e \
-              '[.assets[] | select(.name | test("^tasirin-download-manager-v[0-9.]+\\.apk$"))] |
-               length >= 1 and all(.[]; .size > 0 and .size <= 3670016)' >/dev/null \
-              || { echo "::error::Tidak ada APK rilis yang sehat pada release v${VER}"; exit 1; }
-          else
-            EXPECTED_NAME="Tasirin Download Manager v${VER} (build ${CODE})"
-            echo "$RELEASE" | jq -e --arg name "${EXPECTED_NAME}" '.name == $name' >/dev/null \
-              || { echo "::error::Judul release v${VER} tidak sesuai build ${CODE}"; exit 1; }
-            echo "$RELEASE" | jq -e --arg apk "${EXPECTED_APK}" \
-              '[.assets[] | select(.name == $apk)] | length == 1 and .[0].size > 0 and .[0].size <= 3670016' >/dev/null \
-              || { echo "::error::Asset ${EXPECTED_APK} tidak ada, duplikat, kosong, atau melebihi batas"; exit 1; }
-          fi
+          EXPECTED_NAME="Tasirin Download Manager v${VER} (build ${CODE})"
+          echo "$RELEASE" | jq -e --arg name "${EXPECTED_NAME}" '.name == $name' >/dev/null \
+            || { echo "::error::Judul release v${VER} tidak sesuai build ${CODE}"; exit 1; }
+          echo "$RELEASE" | jq -e --arg apk "${EXPECTED_APK}" \
+            '[.assets[] | select(.name == $apk)] | length == 1 and .[0].size > 0 and .[0].size <= 3670016' >/dev/null \
+            || { echo "::error::Asset ${EXPECTED_APK} tidak ada, duplikat, kosong, atau melebihi batas"; exit 1; }
           echo "$RELEASE" | jq -e '.assets[] | select(.name == "mapping.txt") | .size > 0' >/dev/null \
             || { echo "::error::mapping.txt tidak ada atau kosong pada release v${VER}"; exit 1; }
           echo "Rilis v${VER}: asset ${EXPECTED_APK} + mapping.txt sehat."
