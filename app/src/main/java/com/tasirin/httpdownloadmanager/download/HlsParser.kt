@@ -68,16 +68,18 @@ object HlsParser {
                         .find(line)?.groupValues?.get(1) else null
                     val frameRate = if (line.contains("FRAME-RATE")) FRAME_RATE_RE
                         .find(line)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0 else 0
-                    val height = RESOLUTION_HEIGHT_RE
+                    // Guard contains seperti regex lain di atas: baris varian
+                    // tanpa RESOLUTION/CODECS tak perlu membayar find().
+                    val height = if (line.contains("RESOLUTION")) RESOLUTION_HEIGHT_RE
                         .find(line)?.groupValues?.let { g ->
                             // Label kualitas = dimensi terkecil: video portrait
                             // 720x1280 tetap "720p" (sesuai HlsParserTest).
                             val w = g[1].toIntOrNull()
                             val h = g[2].toIntOrNull()
                             if (w != null && h != null) minOf(w, h) else 0
-                        } ?: 0
-                    val codecs = CODECS_RE
-                        .find(line)?.groupValues?.get(1).orEmpty()
+                        } ?: 0 else 0
+                    val codecs = if (line.contains("CODECS")) CODECS_RE
+                        .find(line)?.groupValues?.get(1).orEmpty() else ""
                     val kbps = bandwidth?.div(1000L) ?: 0L
                     val label = name
                         ?: (res?.let { "$it · $kbps kbps" })

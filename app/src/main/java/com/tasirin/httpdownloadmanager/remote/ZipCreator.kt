@@ -80,10 +80,11 @@ object ZipCreator {
         if (canonicalForAllow == null || !isFileAllowed(canonicalForAllow)) return
         // Symlink melingkar (folder menunjuk leluhurnya) membuat rekursi tak
         // berujung -> StackOverflow; hentikan via canonical + batas kedalaman.
+        // Pakai ulang canonical di atas: resolusi kedua untuk File yang sama
+        // hanya mengulang syscall tanpa informasi baru.
         if (depth > MAX_ZIP_DEPTH) return
         if (file.isDirectory) {
-            val canonical = runCatching { file.canonicalPath }.getOrNull() ?: return
-            if (!seen.add(canonical)) return
+            if (!seen.add(canonicalForAllow)) return
         }
         // Dedupe seperti zipTokens/zipMedia: dua nama yang ternormalisasi
         // sama (kontrol C0 -> '_') membuat ZipException duplikat — cabang
@@ -160,9 +161,10 @@ object ZipCreator {
                             zipFile(zos, child, root, depth = 1, seen = dirSeen, isFileAllowed = isFileAllowed, budget = budget, usedNames = dirUsed) }
                         return@runCatching
                     }
+                    // canon + izin sudah diverifikasi di atas untuk File yang
+                    // sama: tanpa resolusi canonical dan cek izin kedua.
                     name = f.name
-                    val canonFile = runCatching { f.canonicalPath }.getOrNull()
-                    input = if (f.isFile && canonFile != null && isFileAllowed(canonFile)) f.inputStream() else null
+                    input = if (f.isFile) f.inputStream() else null
                 } else {
                     if (!raw.startsWith("u:")) return@forEach
                     val uri = raw.removePrefix("u:").toUri()

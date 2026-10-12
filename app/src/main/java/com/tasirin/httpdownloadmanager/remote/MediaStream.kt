@@ -35,7 +35,9 @@ internal fun streamMedia(
     } else {
         "inline; filename=\"$fallbackName\"; filename*=UTF-8''$encodedName"
     }
-    if (total > 0 && rangeHeader != null && parseRange(rangeHeader, total) == null && isSatisfiableRange(rangeHeader, total)) {
+    // Parse sekali: pemanggilan ganda berarti regex matchEntire 2x per request.
+    val range = if (total > 0) parseRange(rangeHeader, total) else null
+    if (range == null && total > 0 && rangeHeader != null && isSatisfiableRange(rangeHeader, total)) {
         runCatching { input.close() }
         return NanoHTTPD.newFixedLengthResponse(
             NanoHTTPD.Response.Status.RANGE_NOT_SATISFIABLE,
@@ -44,7 +46,6 @@ internal fun streamMedia(
         ).also { it.addHeader("Content-Range", "bytes */$total") }
     }
     val response = runCatching {
-        val range = if (total > 0) parseRange(rangeHeader, total) else null
         when {
             range != null -> {
                 val (start, end) = range
