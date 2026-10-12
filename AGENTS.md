@@ -242,7 +242,10 @@ kuat dan tanpa diskusi:
    lint, dan unit test berjalan di CI. Bila butuh verifikasi cepat, gunakan
    guard lintas-platform (`scripts/check_repo.py` tanpa `--android`,
    `tools/verifikasi-path.py`, `scripts/cek-cepat.sh`), dan serahkan
-   verifikasi compile penuh ke PR/CI.
+   verifikasi compile penuh ke PR/CI. Dilarang menginstal apa pun yang berat
+   di mesin lokal (emulator/system-image, NDK tambahan, dan sejenisnya) — jangan
+   unduh ratusan MB–GB ke mesin kerja untuk alasan apa pun, termasuk "cuma
+   emulator" atau "cuma coba".
 2. **Bahasa**:
    - **UI aplikasi memakai Bahasa Inggris** (default `values/strings.xml`, tanpa
      `values-en` lagi — terjemahan default = Inggris; `remote.html` juga Inggris).
@@ -329,6 +332,15 @@ kuat dan tanpa diskusi:
     DILARANG memantau workflow sampai selesai (`gh run watch`, polling status,
     menunggu release terbit) — CI yang menentukan hasil. Cukup pastikan guard
     lokal (`python3 scripts/check_repo.py`) hijau sebelum push.
+20. **Cek program lokal dulu, manfaatkan semaksimal mungkin** — di awal tiap
+    pekerjaan, cek program lokal yang terinstal (`command -v` + `--version`;
+    mis. `rg`, `fd`, `fzf`, `bat`, `eza`, `jq`, `file`, `lsof`, `htop`,
+    `strace`/`ltrace`, `gdb`, `git`, `python3`, `bash`, `node`, `gh`) lalu pakai
+    yang paling tepat semaksimal mungkin: `rg` untuk cari teks (bukan `grep`
+    lambat), `fd` untuk cari berkas, `jq` untuk JSON, `bat`/`eza` untuk
+    baca/daftar, sisanya sesuai kebutuhan (profil/debug). Tetap patuhi
+    aturan No. 1: program toolchain Android (`gradle`, `javac`/`kotlinc`,
+    `apktool`, emulator, `adb install`) dilarang dipakai walau terinstal.
 
 ## Cara memicu build & release
 
