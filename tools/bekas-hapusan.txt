@@ -13,3 +13,4 @@ SpeedChartView
 reRenderGalleryLoaded
 remoteUrl
 mediaDurations
+isReleasesList

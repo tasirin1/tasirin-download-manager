@@ -37,15 +37,18 @@ object Updater {
         // cache basi tersaji sebagai update. Daftar 20 rilis menemukan APK
         // terbaru yang sebenarnya; gagal jaringan baru pakai cache.
         get(context, LIST_API)?.let { body ->
-            val best = runCatching { bestFromReleasesList(org.json.JSONArray(body)) }.getOrNull()
+            // Satu parse: daftar sukses tapi tanpa APK = fakta baru (bukan
+            // gagal jaringan) sehingga jangan sajikan cache basi; body
+            // bukan-array = respons aneh sehingga fallback cache.
+            // Sebelumnya body di-parse 2x (bestFromReleasesList + isReleasesList).
+            val arr = runCatching { org.json.JSONArray(body) }.getOrNull()
+                ?: return loadCached(context)
+            val best = runCatching { bestFromReleasesList(arr) }.getOrNull()
             if (best != null) {
                 saveCached(context, best)
                 return best
             }
-            // Daftar sukses tapi tanpa APK = fakta baru, bukan gagal jaringan:
-            // jangan sajikan cache basi sebagai update.
-            if (isReleasesList(body)) return null
-            return loadCached(context)
+            return null
         }
         val body = get(context, LATEST_API) ?: return loadCached(context)
         val best = runCatching { bestFromRelease(JSONObject(body)) }.getOrNull()
@@ -59,11 +62,6 @@ object Updater {
         return null
     }.getOrElse { loadCached(context) }
 
-    /** true bila body adalah daftar rilis (array JSON), bukan objek error. */
-    internal fun isReleasesList(body: String): Boolean = runCatching {
-        org.json.JSONArray(body)
-        true
-    }.getOrDefault(false)
 
     /** APK terbaik dalam satu objek rilis (tag + assets). Murni agar bisa di-unit-test. */
     internal fun bestFromRelease(release: JSONObject): UpdateInfo? {

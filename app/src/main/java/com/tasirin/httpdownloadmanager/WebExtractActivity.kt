@@ -213,7 +213,7 @@ class WebExtractActivity : AppCompatActivity() {
             if (finished) return@evaluateJavascript
             val payload = raw?.trim('"')?.replace("\\\"", "\"")?.replace("\\\\", "\\").orEmpty()
             val obj = runCatching { JSONObject(payload) }.getOrNull() ?: return@evaluateJavascript
-            val episodesJson = trimEpisodes(obj.optJSONArray("episodes")?.toString().orEmpty())
+            val episodesJson = trimEpisodes(obj.optJSONArray("episodes"))
             if (episodesJson.isNotBlank() && episodesJson != "[]") lastEpisodesJson = episodesJson
             val src = obj.optString("src").replace("\\/", "/")
             if (src.startsWith("http")) {
@@ -278,9 +278,10 @@ class WebExtractActivity : AppCompatActivity() {
     }.getOrNull().orEmpty()
 
     /** Batasi daftar episode titipan JS agar intent hasil tetap ringan. */
-    private fun trimEpisodes(json: String): String {
-        if (json.isBlank()) return ""
-        val arr = runCatching { JSONArray(json) }.getOrNull() ?: return ""
+    private fun trimEpisodes(arr: JSONArray?): String {
+        // Terima array langsung: pemanggil sebelumnya me-serialize ke String
+        // lalu fungsi ini parse ulang tiap tick grab 1 detik (boros ganda).
+        if (arr == null) return ""
         if (arr.length() <= MAX_EPISODES) return arr.toString()
         val out = JSONArray()
         for (i in 0 until MAX_EPISODES) out.put(arr.optJSONObject(i) ?: continue)

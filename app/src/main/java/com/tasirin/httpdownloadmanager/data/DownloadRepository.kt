@@ -29,8 +29,11 @@ class DownloadRepository(context: Context) {
     @Synchronized
     fun load(): List<DownloadItem> {
         val raw = prefs.getString(KEY_ITEMS, null) ?: return emptyList()
-        val arrLen = runCatching { org.json.JSONArray(raw).length() }.getOrDefault(-1)
-        val items = DownloadItemCodec.decode(raw).map { item ->
+        // Satu parse untuk tiga kebutuhan (daftar + panjang degradasi +
+        // kredensial tersimpan): blob antrean besar sebelumnya di-parse 3x
+        // tiap load (length + decode + readStoredCreds).
+        val arr = runCatching { org.json.JSONArray(raw) }.getOrNull()
+        val items = if (arr != null) DownloadItemCodec.decode(arr).map { item ->
             // Kredensial dan secret header/body disimpan terenkripsi (API 23+);
             // Android 5.0-5.1 menyimpan plaintext (Keystore AES belum tersedia)
             // dan nilai lama tanpa prefix lolos apa adanya lewat decrypt.
@@ -40,17 +43,17 @@ class DownloadRepository(context: Context) {
                 headers = Crypto.decrypt(item.headers),
                 postBody = Crypto.decrypt(item.postBody)
             )
-        }
-        degradedLoad = items.isEmpty() && (arrLen != 0)
+        } else emptyList()
+        degradedLoad = items.isEmpty() && (arr?.length() ?: -1) != 0
         storedCreds.clear()
-        storedCreds.putAll(readStoredCreds(raw))
+        if (arr != null) storedCreds.putAll(readStoredCreds(arr))
         return DownloadItemCodec.overlayProgress(items, prefs.getString(KEY_PROGRESS, null))
     }
 
-    /** Baca kredensial tersimpan (masih terenkripsi) per id dari blob mentah. */
-    private fun readStoredCreds(raw: String): Map<String, Quad> {
+    /** Baca kredensial tersimpan (masih terenkripsi) per id dari array yang
+     *  sudah terparse oleh load (tanpa parse ulang blob mentah). */
+    private fun readStoredCreds(arr: org.json.JSONArray): Map<String, Quad> {
         val out = HashMap<String, Quad>()
-        val arr = runCatching { org.json.JSONArray(raw) }.getOrNull() ?: return out
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
             val id = o.optString("id")

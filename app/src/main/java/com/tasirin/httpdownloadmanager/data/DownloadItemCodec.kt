@@ -67,6 +67,13 @@ object DownloadItemCodec {
      *  status berjalan sehingga dibiarkan agar queue lanjut otomatis. */
     fun decode(raw: String, coerceActiveToPaused: Boolean = true): List<DownloadItem> {
         val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        return decode(arr, coerceActiveToPaused)
+    }
+
+    /** Varian array: pemanggil yang sudah memegang JSONArray terparse (mis.
+     *  DownloadRepository.load yang butuh panjang + kredensial dari blob yang
+     *  sama) tak perlu parse ulang blob besar yang sama berkali-kali. */
+    fun decode(arr: JSONArray, coerceActiveToPaused: Boolean = true): List<DownloadItem> {
         val items = mutableListOf<DownloadItem>()
         for (i in 0 until arr.length()) {
             parseItem(arr.optJSONObject(i), coerceActiveToPaused)?.let { items.add(it) }

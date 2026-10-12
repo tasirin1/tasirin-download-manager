@@ -59,10 +59,24 @@ object PinHash {
     }
 
     private fun String.hexToBytesOrNull(): ByteArray? {
-        if (isEmpty() || length % 2 != 0 || !HEX_RE.matches(this)) return null
-        return ByteArray(length / 2) { index ->
-            substring(index * 2, index * 2 + 2).toInt(16).toByte()
+        if (isEmpty() || length % 2 != 0) return null
+        // Validasi + konversi sekali jalan: versi lama menyapukan regex ke
+        // seluruh string lalu alokasi substring per byte (tiap verify login).
+        val out = ByteArray(length / 2)
+        for (i in out.indices) {
+            val hi = hexNibble(this[i * 2]) ?: return null
+            val lo = hexNibble(this[i * 2 + 1]) ?: return null
+            out[i] = ((hi shl 4) or lo).toByte()
         }
+        return out
+    }
+
+    // Salt/digest kami selalu hex huruf kecil (Hex.encode): huruf besar
+    // ditolak seperti HEX_RE agar penerimaan byte-identik dengan sebelumnya.
+    private fun hexNibble(c: Char): Int? = when (c) {
+        in '0'..'9' -> c - '0'
+        in 'a'..'f' -> c - 'a' + 10
+        else -> null
     }
 
     private const val PREFIX = "\$pbkdf2-sha1\$"

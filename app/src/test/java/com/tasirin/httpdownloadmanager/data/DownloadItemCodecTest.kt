@@ -194,6 +194,20 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `decode array terparse setara dengan decode string (satu parse load)`() {
+        val item = DownloadItem(
+            id = "1", url = "https://a/x", fileName = "x",
+            state = DownloadState.PAUSED, bytesDownloaded = 7, totalBytes = 70
+        )
+        val raw = DownloadItemCodec.encode(listOf(item))
+        val arr = org.json.JSONArray(raw)
+        val viaArr = DownloadItemCodec.decode(arr)
+        assertEquals(DownloadItemCodec.decode(raw), viaArr)
+        assertEquals("1", viaArr[0].id)
+        assertEquals(7L, viaArr[0].bytesDownloaded)
+    }
+
+    @Test
     fun `overlayProgress - bytes lama tidak mundur saat hanya total yang tumbuh`() {
         val items = listOf(
             DownloadItem(id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED, bytesDownloaded = 100, totalBytes = 500)

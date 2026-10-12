@@ -61,6 +61,19 @@ class PinUtilTest {
     }
 
     @Test
+    fun pinHash_menolakHexHurufBesar() {
+        val salt = ByteArray(16) { it.toByte() }
+        val valid = PinHash.hash("1234", salt, 10_000)
+        assertTrue(PinHash.verify("1234", valid))
+        // Huruf-besarkan HANYA salt+digest (prefix/iterasi utuh): memastikan
+        // penolakan datang dari parser hex, bukan dari prefix yang rusak.
+        val last = valid.lastIndexOf('$')
+        val prev = valid.lastIndexOf('$', last - 1)
+        val upper = valid.substring(0, prev + 1) + valid.substring(prev + 1).uppercase()
+        assertFalse(PinHash.verify("1234", upper))
+    }
+
+    @Test
     fun pinHash_menolakFormatRusak() {
         assertFalse(PinHash.isModern(""))
         assertFalse(PinHash.isModern("plain"))
