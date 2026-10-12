@@ -5902,6 +5902,8 @@ function rowMetaText(it) {
     : fmt(it.bytesDownloaded);
 }
 
+// Peta kelas badge di-hoist: literal objek per baris per tick hanya membuang alokasi.
+const BADGE_CLS = {PENDING:'b-paused', DOWNLOADING:'b-active', PAUSED:'b-paused', COMPLETED:'b-done', FAILED:'b-fail', CANCELLED:'b-fail'};
 function patchRowSub(li, it) {
   const sub = li._sub || li.querySelector('.item-sub');
   if (!sub) return;
@@ -5922,22 +5924,21 @@ function patchRowSub(li, it) {
     if (it.etaSeconds > 0) meta += ' \u00b7 ETA ' + fmtEta(it.etaSeconds);
   }
   const text = sub._text || (sub._text = sub.querySelector('.meta span:not(.badge)'));
-  if (text) text.textContent = meta;
+  // Guard teks meta: tulis DOM hanya bila berubah (tick 1 dtk x N baris).
+  if (text && text._meta !== meta) { text._meta = meta; text.textContent = meta; }
   const badge = sub._badge || (sub._badge = sub.querySelector('.badge'));
   if (badge) {
     const label = stateLabel(it.state);
     if (badge.textContent !== label) badge.textContent = label;
-    const map = {PENDING:'b-paused', DOWNLOADING:'b-active', PAUSED:'b-paused', COMPLETED:'b-done', FAILED:'b-fail', CANCELLED:'b-fail'};
-    const cls = map[it.state] || 'b-paused';
+    const cls = BADGE_CLS[it.state] || 'b-paused';
     if (!badge.classList.contains(cls)) badge.className = 'badge ' + cls;
   }
   const fill = sub._fill || (sub._fill = sub.querySelector('.fill'));
-  if (fill) {
-    fill.style.width = prog + '%';
-    fill.classList.toggle('done', done);
-  }
+  // Guard style/teks progres: sentuh DOM hanya bila nilai berubah.
+  if (fill && fill._w !== prog) { fill._w = prog; fill.style.width = prog + '%'; }
+  if (fill && fill._done !== done) { fill._done = done; fill.classList.toggle('done', done); }
   const pct = sub._pct || (sub._pct = sub.querySelector('.bar-pct'));
-  if (pct) pct.textContent = prog + '%';
+  if (pct && pct._p !== prog) { pct._p = prog; pct.textContent = prog + '%'; }
   // Update bar class based on state (remove downloading/hls when done)
   const barEl = sub._bar || (sub._bar = sub.querySelector('.bar'));
   if (barEl) {
@@ -5950,26 +5951,36 @@ function patchRowSub(li, it) {
     }
   }
   // Update pause/resume overlay based on state
-  var iconWrap = li.querySelector('.icon-wrap');
+  // Cache icon-wrap + overlay di node: 2 querySelector per baris per tick
+  // hanya membuang CPU (pola li._sub/li._name di atas). isConnected menjaga
+  // bila node diganti di luar patch (aman walau rebuild selalu buat li baru).
+  var iconWrap = (li._iconWrap && li._iconWrap.isConnected) ? li._iconWrap : (li._iconWrap = li.querySelector('.icon-wrap'));
   if (iconWrap) {
-    var existingOv = iconWrap.querySelector('.pause-overlay');
+    var existingOv = (li._ov && li._ov.isConnected) ? li._ov : (li._ov = iconWrap.querySelector('.pause-overlay'));
     var needsOv = it.state === 'DOWNLOADING' || it.state === 'PAUSED';
     if (needsOv && !existingOv) {
       var ov = document.createElement('div');
       ov.className = 'pause-overlay';
-      ov.setAttribute('data-action', it.state === 'DOWNLOADING' ? 'pause' : 'resume');
+      ov._act = it.state === 'DOWNLOADING' ? 'pause' : 'resume';
+      ov.setAttribute('data-action', ov._act);
       ov.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
       ov.innerHTML = it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play;
       ov.addEventListener('click', function (e) { e.stopPropagation(); doAction(it.id, ov.getAttribute('data-action')); });
       iconWrap.appendChild(ov);
+      li._ov = ov;
       armPauseOverlay(ov, iconWrap);
     } else if (needsOv && existingOv) {
+      // Guard innerHTML: rebuild ikon tiap tick membuat flicker + GC.
       var action = it.state === 'DOWNLOADING' ? 'pause' : 'resume';
-      existingOv.setAttribute('data-action', action);
-      existingOv.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
-      existingOv.innerHTML = it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play;
+      if (existingOv._act !== action) {
+        existingOv._act = action;
+        existingOv.setAttribute('data-action', action);
+        existingOv.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
+        existingOv.innerHTML = it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play;
+      }
     } else if (!needsOv && existingOv) {
       existingOv.remove();
+      if (li._ov === existingOv) li._ov = null;
     }
   }
 }

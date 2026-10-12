@@ -3640,6 +3640,7 @@ return locked > 0
 ? fmt(it.bytesDownloaded) + ' / ' + fmt(locked)
 : fmt(it.bytesDownloaded);
 }
+const BADGE_CLS = {PENDING:'b-paused', DOWNLOADING:'b-active', PAUSED:'b-paused', COMPLETED:'b-done', FAILED:'b-fail', CANCELLED:'b-fail'};
 function patchRowSub(li, it) {
 const sub = li._sub || li.querySelector('.item-sub');
 if (!sub) return;
@@ -3660,22 +3661,19 @@ meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
 if (it.etaSeconds > 0) meta += ' \u00b7 ETA ' + fmtEta(it.etaSeconds);
 }
 const text = sub._text || (sub._text = sub.querySelector('.meta span:not(.badge)'));
-if (text) text.textContent = meta;
+if (text && text._meta !== meta) { text._meta = meta; text.textContent = meta; }
 const badge = sub._badge || (sub._badge = sub.querySelector('.badge'));
 if (badge) {
 const label = stateLabel(it.state);
 if (badge.textContent !== label) badge.textContent = label;
-const map = {PENDING:'b-paused', DOWNLOADING:'b-active', PAUSED:'b-paused', COMPLETED:'b-done', FAILED:'b-fail', CANCELLED:'b-fail'};
-const cls = map[it.state] || 'b-paused';
+const cls = BADGE_CLS[it.state] || 'b-paused';
 if (!badge.classList.contains(cls)) badge.className = 'badge ' + cls;
 }
 const fill = sub._fill || (sub._fill = sub.querySelector('.fill'));
-if (fill) {
-fill.style.width = prog + '%';
-fill.classList.toggle('done', done);
-}
+if (fill && fill._w !== prog) { fill._w = prog; fill.style.width = prog + '%'; }
+if (fill && fill._done !== done) { fill._done = done; fill.classList.toggle('done', done); }
 const pct = sub._pct || (sub._pct = sub.querySelector('.bar-pct'));
-if (pct) pct.textContent = prog + '%';
+if (pct && pct._p !== prog) { pct._p = prog; pct.textContent = prog + '%'; }
 const barEl = sub._bar || (sub._bar = sub.querySelector('.bar'));
 if (barEl) {
 var isHlsU = it.state === 'DOWNLOADING' && (it.progressPercentOverride || -1) >= 0;
@@ -3686,26 +3684,32 @@ if (wantCls) wantCls.split(' ').forEach(function (c) { barEl.classList.add(c); }
 barEl._barCls = wantCls;
 }
 }
-var iconWrap = li.querySelector('.icon-wrap');
+var iconWrap = (li._iconWrap && li._iconWrap.isConnected) ? li._iconWrap : (li._iconWrap = li.querySelector('.icon-wrap'));
 if (iconWrap) {
-var existingOv = iconWrap.querySelector('.pause-overlay');
+var existingOv = (li._ov && li._ov.isConnected) ? li._ov : (li._ov = iconWrap.querySelector('.pause-overlay'));
 var needsOv = it.state === 'DOWNLOADING' || it.state === 'PAUSED';
 if (needsOv && !existingOv) {
 var ov = document.createElement('div');
 ov.className = 'pause-overlay';
-ov.setAttribute('data-action', it.state === 'DOWNLOADING' ? 'pause' : 'resume');
+ov._act = it.state === 'DOWNLOADING' ? 'pause' : 'resume';
+ov.setAttribute('data-action', ov._act);
 ov.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
 ov.innerHTML = it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play;
 ov.addEventListener('click', function (e) { e.stopPropagation(); doAction(it.id, ov.getAttribute('data-action')); });
 iconWrap.appendChild(ov);
+li._ov = ov;
 armPauseOverlay(ov, iconWrap);
 } else if (needsOv && existingOv) {
 var action = it.state === 'DOWNLOADING' ? 'pause' : 'resume';
+if (existingOv._act !== action) {
+existingOv._act = action;
 existingOv.setAttribute('data-action', action);
 existingOv.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
 existingOv.innerHTML = it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play;
+}
 } else if (!needsOv && existingOv) {
 existingOv.remove();
+if (li._ov === existingOv) li._ov = null;
 }
 }
 }
