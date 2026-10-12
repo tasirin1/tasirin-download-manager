@@ -55,6 +55,9 @@ class WebExtractActivity : AppCompatActivity() {
     private var manualGrab = false
     private var lastEpisodesJson = ""
     private var allowedHost = ""
+    // Host kecil dipakai tiap cek navigasi/redirect: hitung sekali saat URL
+    // awal ditetapkan, bukan lowercase ulang per callback shouldOverride.
+    private var allowedHostLower = ""
     private var cachedGrabScript: String? = null
     private val handler = Handler(Looper.getMainLooper())
 
@@ -87,6 +90,7 @@ class WebExtractActivity : AppCompatActivity() {
         // browser umum (tidak ada address bar), jadi jangan muat skema aneh
         // (intent:, file:, javascript:) yang bisa disalahgunakan pemanggil.
         allowedHost = runCatching { watchUrl.toUri() }.getOrNull()?.host.orEmpty()
+        allowedHostLower = allowedHost.lowercase(Locale.ROOT)
         if (watchUrl.isBlank() ||
             !(watchUrl.startsWith("http://", ignoreCase = true) ||
                 watchUrl.startsWith("https://", ignoreCase = true)) ||
@@ -120,7 +124,7 @@ class WebExtractActivity : AppCompatActivity() {
                 val host = runCatching { url.toUri() }.getOrNull()?.host.orEmpty()
                 if (host.isEmpty() || allowedHost.isEmpty()) return false
                 if (host.equals(allowedHost, ignoreCase = true)) return true
-                return host.lowercase(Locale.ROOT).endsWith("." + allowedHost.lowercase(Locale.ROOT))
+                return host.lowercase(Locale.ROOT).endsWith("." + allowedHostLower)
             }
 
             // Signature lama melayani API 21-23; versi request melayani 24+.

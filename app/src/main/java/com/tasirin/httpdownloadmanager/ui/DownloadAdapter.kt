@@ -106,6 +106,19 @@ class DownloadAdapter(private val listener: Listener) :
     private val colorCache = HashMap<Int, Int>()
     private fun cachedColor(ctx: android.content.Context, res: Int): Int =
         colorCache.getOrPut(res) { ContextCompat.getColor(ctx, res) }
+    // Cache tint: ColorStateList.valueOf() tiap tick mengalokasi objek baru per
+    // item aktif; dipakai ulang per warna seperti colorCache di atas.
+    private val tintCache = HashMap<Int, ColorStateList>()
+    private fun cachedTint(ctx: android.content.Context, res: Int): ColorStateList =
+        tintCache.getOrPut(res) { ColorStateList.valueOf(cachedColor(ctx, res)) }
+    // Lewati setText + layout ulang bila teks sama (tick progres 400ms):
+    // tag menahan string terakhir yang dipasang pada view ini.
+    private fun setTextIfChanged(view: android.widget.TextView, text: String) {
+        if (view.tag != text) {
+            view.text = text
+            view.tag = text
+        }
+    }
 
     private fun bindItem(holder: ItemHolder, item: DownloadItem) {
         val b = holder.binding
@@ -136,13 +149,10 @@ class DownloadAdapter(private val listener: Listener) :
     private fun bindProgress(holder: ItemHolder, item: DownloadItem) {
         val b = holder.binding
         val ctx = b.root.context
-        val prevProgress = b.progressBar.progress
-        smoothProgress(b.progressBar, prevProgress, item.progressPercent)
-        b.progressBar.progressTintList = ColorStateList.valueOf(
-            cachedColor(ctx, progressColor(item.state))
-        )
+        smoothProgress(b.progressBar, item.progressPercent)
+        b.progressBar.progressTintList = cachedTint(ctx, progressColor(item.state))
 
-        b.textProgress.text = if (item.state == DownloadState.COMPLETED) {
+        val progressText = if (item.state == DownloadState.COMPLETED) {
             // Selesai: 100% + ukuran riil. Jangan tampilkan "100% x / y" saat
             // totalBytes server lebih besar dari byte yang diterima (CDN
             // Instagram kerap melaporkan Content-Length berlebih).
@@ -165,14 +175,18 @@ class DownloadAdapter(private val listener: Listener) :
         } else {
             Formats.bytes(item.bytesDownloaded)
         }
+        setTextIfChanged(b.textProgress, progressText)
 
         val showSpeed = item.state == DownloadState.DOWNLOADING && item.speedBps > 0
         b.textSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
         if (showSpeed) {
-            b.textSpeed.text = ctx.getString(
-                R.string.speed_and_eta,
-                Formats.speed(item.speedBps),
-                Formats.eta(item.etaSeconds)
+            setTextIfChanged(
+                b.textSpeed,
+                ctx.getString(
+                    R.string.speed_and_eta,
+                    Formats.speed(item.speedBps),
+                    Formats.eta(item.etaSeconds)
+                )
             )
         }
     }
@@ -279,7 +293,7 @@ class DownloadAdapter(private val listener: Listener) :
 
     /** Tick progres 400ms: set langsung tanpa ObjectAnimator agar tak ada
      *  alokasi animator + cancel per item aktif per tick. */
-    private fun smoothProgress(bar: android.widget.ProgressBar, from: Int, to: Int) {
+    private fun smoothProgress(bar: android.widget.ProgressBar, to: Int) {
         if (bar.progress != to) bar.progress = to
     }
 
