@@ -58,6 +58,45 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun fastVarian_setaraKlasik_rootCanonicalSekali() {
+        val r = root()
+        val dalam = File(r, "sub/file.txt").absolutePath
+        val luar = File(tmp.root, "lain.txt").absolutePath
+        val roots = listOf(r)
+        val canonical = ServerSecurity.canonicalRootPaths(roots)
+        assertEquals(
+            ServerSecurity.isPathAllowed(dalam, roots),
+            ServerSecurity.isPathAllowedFast(dalam, canonical)
+        )
+        assertEquals(
+            ServerSecurity.isPathAllowed(luar, roots),
+            ServerSecurity.isPathAllowedFast(luar, canonical)
+        )
+        assertEquals(
+            ServerSecurity.isBrowseableAncestor(tmp.root.absolutePath, roots),
+            ServerSecurity.isBrowseableAncestorFast(tmp.root.absolutePath, canonical)
+        )
+        assertEquals(
+            ServerSecurity.isRemoteDestinationAllowed("f:$dalam", roots),
+            ServerSecurity.isRemoteDestinationAllowedFast("f:$dalam", canonical)
+        )
+        assertTrue(ServerSecurity.isPathAllowedFast(dalam, canonical))
+        assertFalse(ServerSecurity.isPathAllowedFast(luar, canonical))
+        // Cabang MediaStore (tanpa sentuh filesystem): segmen buruk ditolak.
+        assertEquals(
+            ServerSecurity.isMediaStorePathAllowed("Download/x.mp4", roots, false),
+            ServerSecurity.isMediaStorePathAllowedFast("Download/x.mp4", canonical, false)
+        )
+        assertFalse(ServerSecurity.isMediaStorePathAllowedFast("a/../b", canonical, false))
+        assertFalse(ServerSecurity.isMediaStorePathAllowedFast("a//b", canonical, false))
+        assertEquals(
+            ServerSecurity.isRemoteDestinationAllowed("m:Download/x.mp4", roots),
+            ServerSecurity.isRemoteDestinationAllowedFast("m:Download/x.mp4", canonical)
+        )
+        assertFalse(ServerSecurity.isRemoteDestinationAllowedFast("m:a/../b", canonical))
+    }
+
+    @Test
     fun isPathAllowed_diDalamRoot_true() {
         val r = root()
         val child = File(r, "sub/file.txt")

@@ -89,31 +89,40 @@ object ServerSecurity {
     /** ID internal upload hanya boleh token aman; larang separator dan traversal. */
     fun isUploadIdAllowed(id: String): Boolean = UPLOAD_ID_RE.matches(id)
 
-    /** Path dalam jangkauan root yang diizinkan (menangkal path traversal). */
-    fun isPathAllowed(path: String, roots: List<File>): Boolean {
+    /** Canonicalisasi daftar root SEKALI (satu I/O per root): hasilnya
+     *  dipakai ulang oleh isPathAllowedFast agar request file manager tak
+     *  membayar canonicalize N root di tiap dari belasan cek per request.
+     *  Root yang gagal di-canonical dibuang (sama seperti cek per-panggilan). */
+    fun canonicalRootPaths(roots: List<File>): List<String> =
+        roots.mapNotNull { runCatching { it.canonicalFile.absolutePath }.getOrNull() }.distinct()
+
+    /** Varian cepat isPathAllowed dengan root yang sudah di-canonical:
+     *  semantik identik (target tetap di-canonical per panggilan — satu path),
+     *  hemat canonicalize N root per panggilan. Murni agar bisa di-unit-test. */
+    fun isPathAllowedFast(path: String, canonicalRoots: List<String>): Boolean {
         if (path.isBlank()) return false
         val target = runCatching { File(path).canonicalFile.absolutePath }.getOrNull()
             ?: return false
-        return roots.any { root ->
-            val rp = runCatching { root.canonicalFile.absolutePath }.getOrNull()
-                ?: return@any false
-            target == rp || target.startsWith(rp + File.separator)
-        }
+        return canonicalRoots.any { rp -> target == rp || target.startsWith(rp + File.separator) }
     }
+
+    /** Path dalam jangkauan root yang diizinkan (menangkal path traversal). */
+    fun isPathAllowed(path: String, roots: List<File>): Boolean =
+        isPathAllowedFast(path, canonicalRootPaths(roots))
 
     /** Path adalah induk (strict) dari salah satu root? Dipakai untuk listing
      *  browse-only di File Manager: folder di atas root (mis. /storage di atas
      *  /storage/emulated/0/Download) boleh dilihat isinya, tapi aksi tulis
      *  tetap hanya untuk path yang lolos [isPathAllowed]. */
-    fun isBrowseableAncestor(path: String, roots: List<File>): Boolean {
+    fun isBrowseableAncestor(path: String, roots: List<File>): Boolean =
+        isBrowseableAncestorFast(path, canonicalRootPaths(roots))
+
+    /** Varian cepat isBrowseableAncestor (root sudah di-canonical). */
+    fun isBrowseableAncestorFast(path: String, canonicalRoots: List<String>): Boolean {
         if (path.isBlank()) return false
         val target = runCatching { File(path).canonicalFile.absolutePath }.getOrNull()
             ?: return false
-        return roots.any { root ->
-            val rp = runCatching { root.canonicalFile.absolutePath }.getOrNull()
-                ?: return@any false
-            rp.startsWith(target + File.separator)
-        }
+        return canonicalRoots.any { rp -> rp.startsWith(target + File.separator) }
     }
 
     /** Validasi tujuan tulis dari remote: blank memakai default, `m:` hanya
@@ -133,6 +142,38 @@ object ServerSecurity {
         return isPathAllowed(filePath, roots)
     }
 
+    /** true bila ada segmen kosong/./.. — validasi sekali jalan untuk
+     *  varian fast (jalur request, tanpa alokasi daftar antara). */
+    private fun hasBadSegment(s: String): Boolean {
+        var i = 0
+        val n = s.length
+        while (i <= n) {
+            var j = i
+            while (j < n && s[j] != '/') j++
+            val len = j - i
+            if (len == 0 || (len == 1 && s[i] == '.') ||
+                (len == 2 && s[i] == '.' && s[i + 1] == '.')
+            ) return true
+            i = j + 1
+        }
+        return false
+    }
+
+    /** Varian cepat isRemoteDestinationAllowed (root sudah di-canonical). */
+    fun isRemoteDestinationAllowedFast(path: String, canonicalRoots: List<String>): Boolean {
+        val clean = path.trim()
+        if (clean.isEmpty()) return true
+        if (clean.startsWith("m:")) {
+            val relative = clean.removePrefix("m:").trim().trim('/')
+            if (relative.isEmpty()) return true
+            if (relative.contains('\\')) return false
+            if (hasBadSegment(relative)) return false
+            return true
+        }
+        val filePath = if (clean.startsWith("f:")) clean.removePrefix("f:").trim() else clean
+        return isPathAllowedFast(filePath, canonicalRoots)
+    }
+
     /** Path relatif MediaStore hanya boleh dipakai bila berada di bawah root
      *  file yang sama; mode akses penuh tetap memvalidasi bentuk path. */
     fun isMediaStorePathAllowed(
@@ -149,6 +190,23 @@ object ServerSecurity {
         if (fullAccess) return true
         val virtualPath = "$mediaRoot/$clean"
         return isPathAllowed(virtualPath, roots)
+    }
+
+    /** Varian cepat isMediaStorePathAllowed (root sudah di-canonical). */
+    fun isMediaStorePathAllowedFast(
+        relativePath: String,
+        canonicalRoots: List<String>,
+        fullAccess: Boolean,
+        mediaRoot: String = "/storage/emulated/0"
+    ): Boolean {
+        val clean = relativePath.trim().trim('/')
+        if (clean.isEmpty()) return fullAccess
+        if (clean.contains('\\') || hasBadSegment(clean)) {
+            return false
+        }
+        if (fullAccess) return true
+        val virtualPath = "$mediaRoot/$clean"
+        return isPathAllowedFast(virtualPath, canonicalRoots)
     }
 
     /** Token stream parsial berumur pendek (id.expiry.signature HMAC-SHA256).

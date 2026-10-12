@@ -144,8 +144,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // polling cepat (1 req/detik/IP sudah cukup untuk UI responsif).
     private val snapshotLastHit = ConcurrentHashMap<String, Long>()
     // Cache allowedFsRoots: dibangun ulang hanya saat settings berubah,
-    // bukan setiap request (16x per request file manager).
+    // bukan setiap request (16x per request file manager). Varian canonical
+    // di-cache sejajar agar cek path tak membayar canonicalize N root
+    // per panggilan (satu I/O per root) — invalidasi ikut yang sama.
     @Volatile private var cachedFsRoots: List<File>? = null
+    @Volatile private var cachedFsRootsCanonical: List<String>? = null
 
     private fun newStatPool(): ThreadPoolExecutor {
         val pool = Executors.newFixedThreadPool(
@@ -2236,6 +2239,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Invalidate fsRoots cache saat settings berubah. */
     fun invalidateFsRootsCache() {
         cachedFsRoots = null
+        cachedFsRootsCanonical = null
         fsFileListingCache = null
         fsMediaCache.clear()
         galleryCache = null
@@ -2440,7 +2444,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun isNameValid(name: String): Boolean = ServerSecurity.isFileNameValid(name)
 
     private fun isFsBrowseAncestor(path: String): Boolean =
-        ServerSecurity.isBrowseableAncestor(path, allowedFsRoots())
+        ServerSecurity.isBrowseableAncestorFast(path, canonicalFsRoots())
 
     private fun fsListMedia(relative: String, offset: Int, limit: Int): Response {
         val items = JSONArray()
@@ -2862,22 +2866,30 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return roots
     }
 
+    /** Root di-canonical SEKALI per perubahan settings (bukan per request). */
+    private fun canonicalFsRoots(): List<String> {
+        cachedFsRootsCanonical?.let { return it }
+        val canonical = ServerSecurity.canonicalRootPaths(allowedFsRoots())
+        cachedFsRootsCanonical = canonical
+        return canonical
+    }
+
     private fun isFsPathAllowed(path: String): Boolean =
-        ServerSecurity.isPathAllowed(path, allowedFsRoots())
+        ServerSecurity.isPathAllowedFast(path, canonicalFsRoots())
 
     private fun isRemoteDestinationAllowed(path: String): Boolean {
-        if (!ServerSecurity.isRemoteDestinationAllowed(path, allowedFsRoots())) return false
+        if (!ServerSecurity.isRemoteDestinationAllowedFast(path, canonicalFsRoots())) return false
         if (!path.startsWith(MS_PREFIX)) return true
-        return ServerSecurity.isMediaStorePathAllowed(
-            path.removePrefix(MS_PREFIX), allowedFsRoots(),
+        return ServerSecurity.isMediaStorePathAllowedFast(
+            path.removePrefix(MS_PREFIX), canonicalFsRoots(),
             StoragePrefs.isFsFullAccessEnabled(context)
         )
     }
 
     private fun isMediaStorePathAllowed(relativePath: String): Boolean =
-        ServerSecurity.isMediaStorePathAllowed(
+        ServerSecurity.isMediaStorePathAllowedFast(
             relativePath,
-            allowedFsRoots(),
+            canonicalFsRoots(),
             StoragePrefs.isFsFullAccessEnabled(context)
         )
 
@@ -2929,8 +2941,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val fullAccess = StoragePrefs.isFsFullAccessEnabled(context)
                     if (Build.VERSION.SDK_INT >= 29) {
                         val relative = mediaStoreRelativePath(uri) ?: return@runCatching false
-                        ServerSecurity.isMediaStorePathAllowed(
-                            relative.trim('/'), allowedFsRoots(), fullAccess
+                        ServerSecurity.isMediaStorePathAllowedFast(
+                            relative.trim('/'), canonicalFsRoots(), fullAccess
                         )
                     } else {
                         val data = mediaStoreData(uri) ?: return@runCatching false
