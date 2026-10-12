@@ -2014,13 +2014,10 @@ class DownloadEngine(appContext: Context) {
         }
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
-            // Hanya baris URI segmen (bukan tag #... / baris kosong) yang sah:
-            // tanpa filter, tag ikut jadi URL http valid lalu gagal diunduh.
-            val segments = body.lines()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() && !it.startsWith("#") }
-                .map { HlsParser.resolveUrl(baseUrl, it) }
-                .filter { it.startsWith("http") }
+            // Satu lintasan: segmen + durasi #EXTINF dibaca sekaligus agar
+            // probe 1 MB tak membayar split/chaining ganda (lihat HlsParser).
+            val direct = HlsParser.parseDirectMedia(body, baseUrl)
+            val segments = direct.segments
             App.logEvent("HLS: direct media playlist, ${segments.size} segments")
             if (segments.isEmpty()) return null
             if (!body.contains("#EXT-X-ENDLIST")) {
@@ -2029,7 +2026,7 @@ class DownloadEngine(appContext: Context) {
             if (isEncryptedHlsPlaylist(body)) {
                 throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
             }
-            val durations = mediaDurations(body)
+            val durations = direct.durationsUs
             return HlsPlan(
                 segments, videoSegmentDurationsUs = durations,
                 estimateTotalBytes = estimateBytes(durations, 0L),
@@ -2037,28 +2034,14 @@ class DownloadEngine(appContext: Context) {
             )
         }
         var variants = HlsParser.parseMaster(body, baseUrl)
-        // Fallback: bila parseMaster gagal (mis. format YouTube 2026 yang
-        // memformat #EXT-X-STREAM-INF berbeda), coba ekstrak varian dengan
-        // regex manual dari semua pasangan STREAM-INF + baris berikutnya.
+        // Fallback longgar (sudah terurut): bila parseMaster gagal (mis. format
+        // YouTube 2026 yang memformat #EXT-X-STREAM-INF berbeda), pakai hasil
+        // parseMasterLenient dari HlsParser (satu-satunya pemilik regex varian).
         if (variants.isNullOrEmpty()) {
-            val fallbackVariants = mutableListOf<HlsVariant>()
-            val lines = body.lines()
-            for (idx in lines.indices) {
-                val ln = lines[idx].trim()
-                if (ln.startsWith("#EXT-X-STREAM-INF:")) {
-                    val next = lines.getOrNull(idx + 1)?.trim().orEmpty()
-                    if (next.isNotEmpty() && !next.startsWith("#") && (next.startsWith("http") || next.startsWith("/"))) {
-                        val bw = HLS_BW_RE.find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-                        val h = HLS_HEIGHT_RE.find(ln)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                        val codecs = HLS_CODECS_RE.find(ln)?.groupValues?.get(1).orEmpty()
-                        val fps = HLS_FPS_RE.find(ln)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
-                        fallbackVariants.add(HlsVariant("$h p", HlsParser.resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
-                    }
-                }
-            }
-            if (fallbackVariants.isNotEmpty()) {
+            val fallbackVariants = HlsParser.parseMasterLenient(body, baseUrl)
+            if (fallbackVariants != null) {
                 App.logEvent("HLS: parseMaster failed, fallback found ${fallbackVariants.size} variants")
-                variants = fallbackVariants.sortedByDescending { it.bandwidth }
+                variants = fallbackVariants
             } else {
                 App.logEvent("HLS: parseMaster failed, no fallback variants found, dumping first 500 chars")
                 App.logEvent("HLS: body[0..500]=${body.take(500).replace("\n","|").replace("\r","")}")
@@ -2215,20 +2198,6 @@ class DownloadEngine(appContext: Context) {
 
     private fun mediaSegments(playlistUrl: String, headers: String = ""): List<String>? =
         mediaSegmentsWithDurations(playlistUrl, headers)?.map { it.first }
-
-    /** Durasi #EXTINF (mikrodetik) dari body media playlist; kosong bila tidak
-     *  ada tag (fallback untuk direct media playlist). */
-    private fun mediaDurations(body: String): List<Long> {
-        val out = mutableListOf<Long>()
-        for (line in body.lines()) {
-            val t = line.trim()
-            if (t.startsWith("#EXTINF:")) {
-                val dur = t.substringAfter(":").substringBefore(",").trim().toDoubleOrNull() ?: 0.0
-                out.add(hlsSegmentDurationUs(dur))
-            }
-        }
-        return out
-    }
 
     /** Estimasi byte video dari BANDWIDTH (bit/detik) x total durasi #EXTINF.
      *  Sumber: master playlist — tersedia sebelum segmen diunduh. */
@@ -3315,11 +3284,6 @@ class DownloadEngine(appContext: Context) {
     }
 
     companion object {
-        // Regex fallback varian HLS (per-baris saat parseMaster gagal).
-        private val HLS_BW_RE = Regex("BANDWIDTH=(\\d+)")
-        private val HLS_HEIGHT_RE = Regex("RESOLUTION=\\d+x(\\d+)")
-        private val HLS_CODECS_RE = Regex("CODECS=\"([^\"]+)\"")
-        private val HLS_FPS_RE = Regex("FRAME-RATE=([\\d.]+)")
         private val CONTENT_DISPOSITION_STAR = Regex("filename\\*=([^;]+)")
         private val DEFAULT_NAME_FORMAT: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
             SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)

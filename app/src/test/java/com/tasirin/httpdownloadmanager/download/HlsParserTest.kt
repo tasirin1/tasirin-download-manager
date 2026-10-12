@@ -151,6 +151,63 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMasterLenient - fallback absolut saat parseMaster gagal`() {
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4D401E\",FRAME-RATE=30\n" +
+            "https://cdn.example.com/videos/360.m3u8\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=1600000,RESOLUTION=1280x720\n" +
+            "https://cdn.example.com/videos/720.m3u8\n"
+        val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(2, variants.size)
+        assertEquals(1600000L, variants[0].bandwidth)
+        assertEquals(720, variants[0].height)
+        assertEquals("720 p", variants[0].name)
+        assertEquals(30, variants[1].frameRate)
+        assertEquals("avc1.4D401E", variants[1].codecs)
+        assertEquals("https://cdn.example.com/videos/360.m3u8", variants[1].url)
+    }
+
+    @Test
+    fun `parseMasterLenient - relatif dan baris rusak diabaikan`() {
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=500000\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=854x480\n" +
+            "/rel/480.m3u8\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=100\n" +
+            "relative-tanpa-slash.m3u8\n"
+        val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")
+        assertEquals(1, variants!!.size)
+        assertEquals("https://cdn.example.com/rel/480.m3u8", variants[0].url)
+    }
+
+    @Test
+    fun `parseDirectMedia - satu lintasan segmen plus durasi`() {
+        val body = "#EXTM3U\n" +
+            "#EXT-X-TARGETDURATION:10\n" +
+            "#EXTINF:9.5,\n" +
+            "seg1.ts\n" +
+            "#EXTINF:10.0,judul\n" +
+            "/media/seg2.ts\n" +
+            "#EXT-X-KEY:METHOD=AES-128,URI=\"key.key\"\n" +
+            "seg3.ts\n"
+        val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/videos/media.m3u8")
+        assertEquals(3, direct.segments.size)
+        assertEquals("https://cdn.example.com/videos/seg1.ts", direct.segments[0])
+        assertEquals("https://cdn.example.com/media/seg2.ts", direct.segments[1])
+        assertEquals(2, direct.durationsUs.size)
+        assertEquals(9_500_000L, direct.durationsUs[0])
+        assertEquals(10_000_000L, direct.durationsUs[1])
+    }
+
+    @Test
+    fun `parseDirectMedia - tag dan baris kosong bukan segmen`() {
+        val body = "#EXTM3U\n\n#EXT-X-VERSION:3\nseg1.ts\n"
+        val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/a.m3u8")
+        assertEquals(listOf("https://cdn.example.com/seg1.ts"), direct.segments)
+        assertTrue(direct.durationsUs.isEmpty())
+    }
+
+    @Test
     fun `parse audio rendition - menghormati DEFAULT dan resolusi URL`() {
         val master = """
             #EXTM3U

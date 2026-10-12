@@ -99,6 +99,54 @@ object HlsParser {
         return if (variants.isEmpty()) null else variants.sortedByDescending { it.bandwidth }
     }
 
+    /** Fallback longgar bila [parseMaster] gagal (format STREAM-INF tak umum):
+     *  pindai pasangan `#EXT-X-STREAM-INF:` + baris URI absolut berikutnya.
+     *  Dipindah dari DownloadEngine agar regex varian hanya ada di satu tempat.
+     *  Murni; diurut menurun menurut bandwidth, null bila tak ada varian. */
+    fun parseMasterLenient(body: String, baseUrl: String): List<HlsVariant>? {
+        val out = mutableListOf<HlsVariant>()
+        val lines = body.lines()
+        for (idx in lines.indices) {
+            val ln = lines[idx].trim()
+            if (!ln.startsWith("#EXT-X-STREAM-INF:")) continue
+            val next = lines.getOrNull(idx + 1)?.trim().orEmpty()
+            if (next.isEmpty() || next.startsWith("#")) continue
+            if (!next.startsWith("http") && !next.startsWith("/")) continue
+            val bw = BANDWIDTH_RE.find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            val h = RESOLUTION_HEIGHT_RE.find(ln)?.groupValues?.get(2)?.toIntOrNull() ?: 0
+            val codecs = CODECS_RE.find(ln)?.groupValues?.get(1).orEmpty()
+            val fps = FRAME_RATE_RE.find(ln)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
+            out.add(HlsVariant("$h p", resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
+        }
+        return if (out.isEmpty()) null else out.sortedByDescending { it.bandwidth }
+    }
+
+    /** Hasil media playlist langsung: daftar URL segmen + durasi #EXTINF-nya.
+     *  Satu lintasan (tanpa split/chaining ganda): playlist probe bisa 1 MB
+     *  sehingga dua kali [String.lines] + empat list sementara itu boros GC. */
+    data class DirectMedia(val segments: List<String>, val durationsUs: List<Long>)
+
+    /** Parse media playlist langsung (bukan master) dalam satu lintasan.
+     *  Hanya baris URI segmen yang sah (bukan tag `#`/baris kosong); URL
+     *  relatif dilengkapi via [resolveUrl], non-http dibuang. Murni. */
+    fun parseDirectMedia(body: String, baseUrl: String): DirectMedia {
+        val segments = mutableListOf<String>()
+        val durations = mutableListOf<Long>()
+        for (raw in body.lines()) {
+            val line = raw.trim()
+            if (line.isEmpty()) continue
+            if (line.startsWith("#EXTINF:")) {
+                val dur = line.substringAfter(":").substringBefore(",").trim()
+                    .toDoubleOrNull() ?: 0.0
+                durations.add(hlsSegmentDurationUs(dur))
+            } else if (!line.startsWith("#")) {
+                val url = resolveUrl(baseUrl, line)
+                if (url.startsWith("http")) segments.add(url)
+            }
+        }
+        return DirectMedia(segments, durations)
+    }
+
     /** Parse rendition audio (#EXT-X-MEDIA:TYPE=AUDIO) pada master playlist. */
     fun parseAudioRenditions(body: String, baseUrl: String): List<HlsRendition> {
         val renditions = mutableListOf<HlsRendition>()

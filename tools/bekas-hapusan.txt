@@ -12,3 +12,4 @@ QrEncoder
 SpeedChartView
 reRenderGalleryLoaded
 remoteUrl
+mediaDurations
