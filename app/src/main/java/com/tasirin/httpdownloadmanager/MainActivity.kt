@@ -114,11 +114,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val id = pendingMoveId
         pendingMoveId = null
         if (uri != null && id != null) {
-            runCatching {
-                takePersistablePermission(uri)
-                App.engine.move(id, uri)
-            }.onFailure {
-                Toast.makeText(this, R.string.storage_picker_error, Toast.LENGTH_LONG).show()
+            // Salin SAF bisa ratusan MB (SD/USB-OTG): jangan di main thread
+            // (ANR/jank; callback ActivityResult jalan di main).
+            // Pola sama seperti openRemote() di atas.
+            lifecycleScope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        takePersistablePermission(uri)
+                        App.engine.move(id, uri)
+                    }.isSuccess
+                }
+                if (!ok) {
+                    Toast.makeText(this@MainActivity, R.string.storage_picker_error, Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

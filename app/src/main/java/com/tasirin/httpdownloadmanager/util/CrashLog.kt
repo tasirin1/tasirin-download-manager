@@ -29,8 +29,9 @@ object CrashLog {
                 // (terlihat dari file manager tanpa root; otomatis dihapus saat uninstall).
                 val dir = context.getExternalFilesDir(null) ?: context.filesDir
                 val file = File(dir, FILE_NAME)
-                val stamp = (stampFormat.get()
-                    ?: SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)).format(Date())
+                // withInitial tak pernah null: tanpa fallback Elvis mati
+                // (pola sama seperti DEFAULT_NAME_FORMAT jilid 3).
+                val stamp = stampFormat.get().format(Date())
                 val text = buildString {
                     appendLine("=== $stamp [$tag] ===")
                     appendLine(Log.getStackTraceString(t))
