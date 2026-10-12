@@ -165,6 +165,14 @@ class DownloadEngine(appContext: Context) {
         readTimeoutMs = StoragePrefs.getReadTimeoutSec(context) * 1000
     }
 
+    // Cached User-Agent — baca SharedPreferences tiap koneksi (segmen x retry)
+    // hanya membuang lock + lookup; pola sama seperti timeout di atas.
+    private var cachedUserAgent: String = StoragePrefs.getUserAgent(context)
+
+    fun refreshUserAgent() {
+        cachedUserAgent = StoragePrefs.getUserAgent(context)
+    }
+
     @Volatile
     private var interruptedResumed = false
 
@@ -616,8 +624,7 @@ class DownloadEngine(appContext: Context) {
             conn.requestMethod = method
             conn.connectTimeout = if (method == "HEAD") 8_000 else connectTimeoutMs
             conn.readTimeout = if (method == "HEAD") 8_000 else readTimeoutMs
-            val ua = StoragePrefs.getUserAgent(context)
-                .ifEmpty { DEFAULT_USER_AGENT }
+            val ua = cachedUserAgent.ifEmpty { DEFAULT_USER_AGENT }
             conn.setRequestProperty("User-Agent", ua)
             conn.setRequestProperty("Accept", "*/*")
             conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8")

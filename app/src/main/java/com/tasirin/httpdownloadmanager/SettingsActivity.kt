@@ -801,6 +801,7 @@ class SettingsActivity : AppCompatActivity() {
                 } else {
                     customUAInput.visibility = View.GONE
                     StoragePrefs.setUserAgent(this@SettingsActivity, value)
+                    runCatching { App.engine.refreshUserAgent() }
                 }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -811,6 +812,7 @@ class SettingsActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {
                 if (spinnerUA.selectedItemPosition == uaPresets.size - 1) {
                     StoragePrefs.setUserAgent(this@SettingsActivity, s?.toString().orEmpty())
+                    runCatching { App.engine.refreshUserAgent() }
                 }
             }
         })
