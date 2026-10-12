@@ -1540,13 +1540,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
             }
             if (chunkIdx == chunks - 1) {
-                if (tmp.length() > MAX_UPLOAD_BYTES) {
+                // Baca panjang sekali: stat ganda untuk file yang sama hanya
+                // membuang syscall, dan nilai tunggal menjamin cek ruang dan
+                // impor memakai ukuran yang sama.
+                val tmpLen = tmp.length()
+                if (tmpLen > MAX_UPLOAD_BYTES) {
                     tmp.delete()
                     return jsonResponse(
                         JSONObject().put("ok", false).put("error", "File too large (max ${MAX_UPLOAD_MB} MB)")
                     )
                 }
-                if (App.engine.freeSpaceBytesFor(folderPath) < tmp.length()) {
+                if (App.engine.freeSpaceBytesFor(folderPath) < tmpLen) {
                     tmp.delete()
                     return jsonResponse(
                         JSONObject().put("ok", false).put("error", "Not enough storage for upload")
@@ -1581,7 +1585,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 serverScope.launch {
                     try {
                         val published = App.engine.importStream(
-                            finalName, storage, folderPath, tmp.length()
+                            finalName, storage, folderPath, tmpLen
                         ) { out ->
                             tmp.inputStream().use { it.copyTo(out, SERVER_IO_BUF) }
                         }
