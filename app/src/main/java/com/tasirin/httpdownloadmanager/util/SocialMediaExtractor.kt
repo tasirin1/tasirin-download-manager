@@ -1244,7 +1244,9 @@ object SocialMediaExtractor {
         val distinct = candidates
             .filter { (url, _) -> url.startsWith("http") && seen.add(url) }
         // MP4 langsung diutamakan (lebih kompatibel di engine); HLS sesudahnya.
-        val ordered = distinct.filter { !it.second } + distinct.filter { it.second }
+        // Satu sort stabil (false dulu) sebagai ganti dua filter + gabung:
+        // urutan relatif dalam tiap grup identik, tanpa 3 daftar sementara.
+        val ordered = distinct.sortedBy { it.second }
         return ordered.map { (url, hls) ->
             if (hls) {
                 Result(url, "HentaiHaven_${safeName}.ts", title, "HLS", "application/x-mpegURL", isHls = true)
