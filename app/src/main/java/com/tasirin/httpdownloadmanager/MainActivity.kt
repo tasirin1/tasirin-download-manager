@@ -87,6 +87,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     // Signature progres terlihat: emisi tanpa perubahan tampil (tick stagnan)
     // tak perlu submitList + DiffUtil sama sekali.
     private var lastProgressSig = 0
+    private var lastStickyTitle: String? = null
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -1501,7 +1502,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
         binding.textSectionSticky.isVisible = scrolled && title != null
-        if (title != null) binding.textSectionSticky.text = title
+        // setText memicu layout ulang tiap tick progres: tulis hanya bila berubah.
+        if (title != null && title != lastStickyTitle) {
+            lastStickyTitle = title
+            binding.textSectionSticky.text = title
+        } else if (title == null) {
+            lastStickyTitle = null
+        }
     }
 
     /** Tempel URL dari clipboard ke dialog tambah download (untuk empty state). */

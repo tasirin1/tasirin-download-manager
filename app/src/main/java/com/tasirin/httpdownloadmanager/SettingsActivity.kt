@@ -714,6 +714,9 @@ class SettingsActivity : AppCompatActivity() {
                     this@SettingsActivity,
                     if (position < speedKbps.size) speedKbps[position] else currentSpeed
                 )
+                // Limiter global di-cache di engine: tanpa refresh, nilai baru
+                // tak berlaku sampai restart (kecuali dimatikan ke 0).
+                runCatching { App.engine.refreshSpeedLimit() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }

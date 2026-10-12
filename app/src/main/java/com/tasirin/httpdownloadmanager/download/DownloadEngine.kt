@@ -962,10 +962,27 @@ class DownloadEngine(appContext: Context) {
         }
         synchronized(limiterLock) {
             val current = sharedLimiter
-            if (current != null) return current
+            // Samakan nilai bila prefs berubah tanpa lewat refreshSpeedLimit
+            // (mis. ganti 512->2048 yang sebelumnya diam-diam tetap 512).
+            if (current != null) {
+                current.setLimit(limit)
+                return current
+            }
             val created = GlobalRateLimiter(limit)
             sharedLimiter = created
             return created
+        }
+    }
+
+    /** Samakan limiter global dengan prefs setelah spinner limit diubah:
+     *  instance dipegang bersama (termasuk download yang sedang jalan),
+     *  jadi setLimit langsung berlaku tanpa restart. Pola sama seperti
+     *  refreshMaxConcurrent/refreshTimeouts/refreshUserAgent. */
+    fun refreshSpeedLimit() {
+        val limit = StoragePrefs.speedLimitKbps(context)
+        synchronized(limiterLock) {
+            if (limit <= 0) sharedLimiter = null
+            else sharedLimiter?.setLimit(limit) ?: run { sharedLimiter = GlobalRateLimiter(limit) }
         }
     }
 
@@ -3697,10 +3714,16 @@ internal class DownloadHealthWatchdog(limitKbps: Int) {
 /** Pembatas kecepatan bersama antar item: sliding window 10 dtk.
  *  Window di-reset saat idle > 10 dtk, jadi pause/resume tidak menghentikan
  *  throttle (akumulasi sejak dibuat membuat throttle mati setelah jeda lama). */
-private class GlobalRateLimiter(private val limitKbps: Int) {
+private class GlobalRateLimiter(@Volatile private var limitKbps: Int) {
     private val lock = Any()
     private var windowStart = monotonicNow()
     private var windowBytes = 0L
+
+    /** Ganti batas tanpa mereset window: download yang sedang jalan langsung
+     *  ikut nilai baru (window lama tetap valid sebagai riwayat throughput). */
+    fun setLimit(kbps: Int) {
+        limitKbps = kbps.coerceAtLeast(1)
+    }
 
     fun waitFor(bytes: Long): Long {
         synchronized(lock) {
