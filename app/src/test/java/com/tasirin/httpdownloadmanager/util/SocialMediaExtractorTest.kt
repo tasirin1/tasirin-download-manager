@@ -385,6 +385,19 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `unescapeJsToken - unescape token contextJSON Instagram`() {
+        assertEquals(
+            "https://example.com/a/b?x=1&y=2",
+            SocialMediaExtractor.unescapeJsToken("https:\\/\\/example.com\\/a\\/b?x=1\\u0026y=2")
+        )
+        assertEquals(
+            "{\"a\":\"b/c\"}",
+            SocialMediaExtractor.unescapeJsToken("{\\\"a\\\":\\\"b\\/c\\\"}")
+        )
+        assertEquals("", SocialMediaExtractor.unescapeJsToken(""))
+    }
+
+    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))

@@ -366,11 +366,7 @@ object SocialMediaExtractor {
         val imgRegex = IG_IMG_URL_RE
         val decoded = mutableListOf<String>()
         imgRegex.findAll(html).forEach { match ->
-            val raw = match.value
-                .replace("\\u002F", "/")
-                .replace("\\u0026", "&")
-                .replace("\\/", "/")
-                .replace("&amp;", "&")
+            val raw = unescapePlayer(match.value)
             if (raw.startsWith("http") && !raw.contains("/t51.2885-")) {
                 decoded.add(raw)
             }
@@ -379,11 +375,7 @@ object SocialMediaExtractor {
             // Strategi cadangan: pola CDN lain yang belum tertangkap di atas
             val fallbackRegex = IG_IMG_URL_FALLBACK_RE
             fallbackRegex.findAll(html).forEach { match ->
-                val raw = match.value
-                    .replace("\\u002F", "/")
-                    .replace("\\u0026", "&")
-                    .replace("\\/", "/")
-                    .replace("&amp;", "&")
+                val raw = unescapePlayer(match.value)
                 if (raw.startsWith("http") && !raw.contains("/t51.2885-")) {
                     decoded.add(raw)
                 }
@@ -410,17 +402,12 @@ object SocialMediaExtractor {
         val idx = html.indexOf("video_versions")
         if (idx < 0) return null
         val raw = html.substring(idx, minOf(idx + 5000, html.length))
-        val unescaped = raw
-            .replace("\\u002F", "/")
-            .replace("\\u0026", "&")
-            .replace("\\/", "/")
-            .replace("&amp;", "&")
+        val unescaped = unescapePlayer(raw)
         val videoRegex = IG_VIDEO_URL_RE
         val match = videoRegex.find(unescaped) ?: return null
-        return match.groupValues[1]
-            .replace("\\u002F", "/")
-            .replace("\\u0026", "&")
-            .replace("&amp;", "&")
+        // Pass kedua via helper (semantik identik dengan rantai lama:
+        // amankan sisa escape ganda seperti `&amp;amp;` di URL hasil match).
+        return unescapePlayer(match.groupValues[1])
     }
 
     private fun extractContextJson(html: String): JSONObject? {
@@ -437,12 +424,7 @@ object SocialMediaExtractor {
                 i++
             }
             if (i > start) {
-                val token = html.substring(start, i)
-                    .replace("\\u002F", "/")
-                    .replace("\\u0026", "&")
-                    .replace("\\\"", "\"")
-                    .replace("\\/", "/")
-                    .replace("\\\\", "\\")
+                val token = unescapeJsToken(html.substring(start, i)).replace("\\\\", "\\")
                 try {
                     val obj = JSONObject(token)
                     val gql = obj.optJSONObject("gql_data")
@@ -461,11 +443,7 @@ object SocialMediaExtractor {
             IG_TOKEN_RE,
         )) {
             val match = pattern.find(html) ?: continue
-            val token = match.groupValues[1]
-                .replace("\\u002F", "/")
-                .replace("\\u0026", "&")
-                .replace("\\\"", "\"")
-                .replace("\\/", "/")
+            val token = unescapeJsToken(match.groupValues[1])
             try {
                 val obj = JSONObject(token)
                 val gql = obj.optJSONObject("gql_data")
@@ -1103,12 +1081,23 @@ object SocialMediaExtractor {
         return options
     }
 
-    /** Unescape URL/judul dari JS/HTML (`\\/`, `\\u0026`, `&amp;`). */
+    /** Unescape URL/judul dari JS/HTML (`\\/`, `\\u0026`, `&amp;`) — dipakai
+     *  bersama ekstraktor Instagram & Pornhub/XNXX agar satu definisi. */
     private fun unescapePlayer(raw: String): String {
         return raw.replace("\\/", "/")
             .replace("\\u002F", "/")
             .replace("\\u0026", "&")
             .replace("&amp;", "&")
+    }
+
+    /** Unescape token JSON ber-escape (`\\u002F`, `\\u0026`, `\\"`, `\\/`)
+     *  untuk `contextJSON`/`token` Instagram — satu definisi untuk 3 format.
+     *  Internal agar logika murni ini teruji langsung (Murni). */
+    internal fun unescapeJsToken(raw: String): String {
+        return raw.replace("\\u002F", "/")
+            .replace("\\u0026", "&")
+            .replace("\\\"", "\"")
+            .replace("\\/", "/")
     }
 
     // ── Pornhub ─────────────────────────────────────────────────────
