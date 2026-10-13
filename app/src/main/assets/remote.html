@@ -3287,12 +3287,13 @@ if (h > 0) return h + 'h ' + String(m).padStart(2, '0') + 'm';
 if (m > 0) return m + 'm ' + String(s).padStart(2, '0') + 's';
 return s + 's';
 }
+const STATE_LABELS = {PENDING:'Waiting', DOWNLOADING:'Downloading', PAUSED:'Paused', COMPLETED:'Completed', FAILED:'Failed', CANCELLED:'Cancelled'};
+const STATE_BADGE_CLS = {PENDING:'b-paused', DOWNLOADING:'b-active', PAUSED:'b-paused', COMPLETED:'b-done', FAILED:'b-fail', CANCELLED:'b-fail'};
 function stateLabel(s) {
-return {PENDING:'Waiting', DOWNLOADING:'Downloading', PAUSED:'Paused', COMPLETED:'Completed', FAILED:'Failed', CANCELLED:'Cancelled'}[s] || s;
+return STATE_LABELS[s] || s;
 }
 function stateBadge(s) {
-const map = {PENDING:'b-paused', DOWNLOADING:'b-active', PAUSED:'b-paused', COMPLETED:'b-done', FAILED:'b-fail', CANCELLED:'b-fail'};
-return '<span class="badge ' + (map[s] || 'b-paused') + '">' + stateLabel(s) + '</span>';
+return '<span class="badge ' + (STATE_BADGE_CLS[s] || 'b-paused') + '">' + stateLabel(s) + '</span>';
 }
 function socialHost(url) {
 try {
@@ -3640,7 +3641,7 @@ return locked > 0
 ? fmt(it.bytesDownloaded) + ' / ' + fmt(locked)
 : fmt(it.bytesDownloaded);
 }
-const BADGE_CLS = {PENDING:'b-paused', DOWNLOADING:'b-active', PAUSED:'b-paused', COMPLETED:'b-done', FAILED:'b-fail', CANCELLED:'b-fail'};
+const BADGE_CLS = STATE_BADGE_CLS;
 function patchRowSub(li, it) {
 const sub = li._sub || li.querySelector('.item-sub');
 if (!sub) return;
