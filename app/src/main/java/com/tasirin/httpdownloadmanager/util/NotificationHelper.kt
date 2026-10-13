@@ -72,8 +72,18 @@ object NotificationHelper {
         items: List<DownloadItem>,
         serverActive: Boolean = false
     ): Notification {
-        val active = items.filter {
-            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
+        // Satu pass (bukan filter + any + count): tiap refresh notifikasi
+        // saat download aktif memindai daftar 3x + 1 ArrayList buangan.
+        val active = ArrayList<DownloadItem>(items.size)
+        var hasResumable = false
+        var completed = 0
+        for (item in items) {
+            when (item.state) {
+                DownloadState.DOWNLOADING, DownloadState.PENDING -> active.add(item)
+                DownloadState.PAUSED, DownloadState.FAILED -> hasResumable = true
+                DownloadState.COMPLETED -> completed++
+                else -> {}
+            }
         }
         val intent = Intent(context, MainActivity::class.java)
             .setPackage(context.packageName)
@@ -89,9 +99,6 @@ object NotificationHelper {
             .setOnlyAlertOnce(true)
             .setContentIntent(pending)
 
-        val hasResumable = items.any {
-            it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED
-        }
         if (active.isNotEmpty()) {
             val pauseIntent = Intent(context, DownloadService::class.java)
                 .setAction(ACTION_PAUSE_ALL)
@@ -139,7 +146,6 @@ object NotificationHelper {
             builder.setContentText(context.getString(R.string.notification_server_active))
                 .setProgress(0, 0, false)
         } else {
-            val completed = items.count { it.state == DownloadState.COMPLETED }
             builder.setContentText(
                 context.resources.getQuantityString(
                     R.plurals.notification_done, completed, completed

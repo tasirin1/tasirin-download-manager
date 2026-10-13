@@ -124,20 +124,18 @@ class DownloadAdapter(private val listener: Listener) :
         val b = holder.binding
         val ctx = b.root.context
 
-        b.textName.text = item.fileName
+        // Guard teks sama (pola setTextIfChanged): rebind/full-bind saat scroll
+        // tak memicu layout ulang untuk nama yang tak berubah.
+        setTextIfChanged(b.textName, item.fileName)
         // Satu lookup mime per bind (sebelumnya 2x via fileIconRes + circle).
         val mime = MimeTypes.forFile(item.fileName)
         b.fileIcon.setImageResource(fileIconRes(mime))
-        b.fileIcon.imageTintList = ColorStateList.valueOf(
-            cachedColor(ctx, R.color.text_primary)
-        )
-        b.fileIconCircle.backgroundTintList = ColorStateList.valueOf(
-            cachedColor(ctx, fileIconCircleColor(mime))
-        )
-        b.statusBadge.text = badgeText(item, ctx)
-        b.statusBadge.backgroundTintList = ColorStateList.valueOf(
-            cachedColor(ctx, badgeBgColor(item.state))
-        )
+        // cachedTint (bukan valueOf baru): bind penuh tiap recycle-scroll
+        // tak mengalokasi 3 ColorStateList per baris.
+        b.fileIcon.imageTintList = cachedTint(ctx, R.color.text_primary)
+        b.fileIconCircle.backgroundTintList = cachedTint(ctx, fileIconCircleColor(mime))
+        setTextIfChanged(b.statusBadge, badgeText(item, ctx))
+        b.statusBadge.backgroundTintList = cachedTint(ctx, badgeBgColor(item.state))
         b.statusBadge.setTextColor(cachedColor(ctx, badgeTextColor(item.state)))
         bindProgress(holder, item)
         // Sisa bind struktural (ikon/badge/tombol) di bawah tidak tersentuh

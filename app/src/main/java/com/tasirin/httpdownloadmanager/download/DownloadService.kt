@@ -68,9 +68,15 @@ class DownloadService : Service() {
                         // terakhir rampung saat server background masih hidup),
                         // refresh wajib jalan: tanpa ini notifikasi beku di
                         // tampilan progress terakhir karena tak ada emisi berikutnya.
-                        val activeIds = items.filter {
-                            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-                        }.map { it.id }.toSet()
+                        // Satu pass tanpa daftar sementara: filter+map+toSet
+                        // membangun 2 ArrayList buangan per emisi tick.
+                        val activeIds = buildSet {
+                            for (item in items) {
+                                if (item.state == DownloadState.DOWNLOADING ||
+                                    item.state == DownloadState.PENDING
+                                ) add(item.id)
+                            }
+                        }
                         val membershipChanged = activeIds != lastActiveIds
                         lastActiveIds = activeIds
                         // Monotonik (bukan wall-clock): perubahan jam sistem maju/mundur
