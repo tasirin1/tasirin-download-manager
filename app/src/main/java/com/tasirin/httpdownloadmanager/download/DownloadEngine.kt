@@ -1118,7 +1118,7 @@ class DownloadEngine(appContext: Context) {
                 "DOWNLOAD FAILED: ${item.fileName} — YouTube blocked this URL (n-signature). " +
                 "Try again later or use another downloader."
             )
-            updateItem(id) {
+            val finished = updateItem(id) {
                 it.copy(
                     state = DownloadState.FAILED,
                     error = message,
@@ -1126,9 +1126,9 @@ class DownloadEngine(appContext: Context) {
                     speedBps = 0,
                     etaSeconds = 0
                 )
-            }
+            } ?: item
             flushSave()
-            NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == id } ?: item)
+            NotificationHelper.notifyItemFinished(context, finished)
             return
         }
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
@@ -1170,7 +1170,7 @@ class DownloadEngine(appContext: Context) {
             // sama hanya membuang waktu, jadi tandai gagal tanpa percobaan ulang.
             retryAttempts.remove(id)
             App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} (server refused resume; try another URL/mirror)")
-            updateItem(id) {
+            val finishedRange = updateItem(id) {
                 it.copy(
                     state = DownloadState.FAILED,
                     error = message,
@@ -1178,9 +1178,9 @@ class DownloadEngine(appContext: Context) {
                     speedBps = 0,
                     etaSeconds = 0
                 )
-            }
+            } ?: item
             flushSave()
-            NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == id } ?: item)
+            NotificationHelper.notifyItemFinished(context, finishedRange)
             return
         }
         if (maxRetries > 0 && attempts <= maxRetries && item.autoResume) {
@@ -1221,7 +1221,7 @@ class DownloadEngine(appContext: Context) {
         } else {
             retryAttempts.remove(id)
             App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"}")
-            updateItem(id) {
+            val finishedElse = updateItem(id) {
                 it.copy(
                     state = DownloadState.FAILED,
                     error = message,
@@ -1229,9 +1229,9 @@ class DownloadEngine(appContext: Context) {
                     speedBps = 0,
                     etaSeconds = 0
                 )
-            }
+            } ?: item
             flushSave()
-            NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == id } ?: item)
+            NotificationHelper.notifyItemFinished(context, finishedElse)
         }
     }
 
@@ -1895,7 +1895,7 @@ class DownloadEngine(appContext: Context) {
         finalName: String
     ) {
         speedTracker.reset(item.id)
-        updateItem(item.id) {
+        val finishedHls = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = finalName,
@@ -1910,9 +1910,9 @@ class DownloadEngine(appContext: Context) {
                 totalBytesEstimated = false,
                 finishedAt = System.currentTimeMillis()
             )
-        }
+        } ?: item
         flushSave()
-        NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == item.id } ?: item)
+        NotificationHelper.notifyItemFinished(context, finishedHls)
     }
 
     /** Unduh satu segmen HLS dengan retry sekali untuk error jaringan sementara
@@ -2431,7 +2431,7 @@ class DownloadEngine(appContext: Context) {
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
         val serverEtag = conn.getHeaderField("ETag").orEmpty()
-        updateItem(item.id) {
+        val finishedMulti = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = finalName,
@@ -2445,11 +2445,11 @@ class DownloadEngine(appContext: Context) {
                 etag = serverEtag,
                 finishedAt = System.currentTimeMillis()
             )
-        }
+        } ?: item
         flushSave()
         persistCookies()
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
-        NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == item.id } ?: item)
+        NotificationHelper.notifyItemFinished(context, finishedMulti)
         } catch (e: IOException) {
             if (!coroutineContext.isActive) throw CancellationException()
             throw e
@@ -2604,7 +2604,7 @@ class DownloadEngine(appContext: Context) {
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
-        updateItem(item.id) {
+        val finishedSingle = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = finalName,
@@ -2619,11 +2619,11 @@ class DownloadEngine(appContext: Context) {
                 etag = headers?.etag.orEmpty(),
                 finishedAt = System.currentTimeMillis()
             )
-        }
+        } ?: item
         flushSave()
         clearSegProgress(item.id)
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
-        NotificationHelper.notifyItemFinished(context, _items.value.find { it.id == item.id } ?: item)
+        NotificationHelper.notifyItemFinished(context, finishedSingle)
     }
 
     /** Minta URL CDN segar saat link kedaluwarsa di tengah unduhan:
@@ -3170,17 +3170,19 @@ class DownloadEngine(appContext: Context) {
         id: String,
         persist: Boolean = true,
         transform: (DownloadItem) -> DownloadItem
-    ) {
+    ): DownloadItem? {
         // Salin per-indeks + lewati emit bila sama: hindari map O(n) dengan
         // transform untuk semua item pada tiap tick progres 1 detik.
+        // Kembalikan item baru supaya pemanggil tak perlu find() ulang O(n).
         val cur = _items.value
         val idx = cur.indexOfFirst { it.id == id }
-        if (idx < 0) return
+        if (idx < 0) return null
         val next = transform(cur[idx])
-        if (next == cur[idx]) return
+        if (next == cur[idx]) return cur[idx]
         val copy = ArrayList(cur)
         copy[idx] = next
         update(copy, persist)
+        return next
     }
 
     @Synchronized

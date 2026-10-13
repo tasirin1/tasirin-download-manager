@@ -1689,7 +1689,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** ZIP folder/daftar token dibuat sekali lalu dipakai ulang dalam 60 detik.
      *  Browser mengunduh lewat beberapa request Range (206); tanpa cache ini
      *  folder di-zip ulang untuk tiap request (boros CPU + disk di Android TV). */
-    private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, File>>()
+    // Nilai = Triple(createdAt, file, size): ukuran disimpan saat insert agar
+    // prune tak perlu file.length() (stat syscall) per entri per pembuatan ZIP.
+    private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Triple<Long, File, Long>>()
     private val zipLocks = Array(8) { Any() }
     private val zipEvictionLock = Any()
 
@@ -1699,7 +1701,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun zipCached(key: String, create: () -> File?): File? {
         val now = System.currentTimeMillis()
         synchronized(zipLockFor(key)) {
-            zipCache[key]?.let { (createdAt, file) ->
+            zipCache[key]?.let { (createdAt, file, _) ->
                 if (now - createdAt < ZIP_CACHE_TTL_MS && file.isFile && file.length() > 0) {
                     return file
                 }
@@ -1707,14 +1709,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 runCatching { file.delete() }
             }
             val file = create() ?: return null
-            if (file.length() > ZIP_CACHE_MAX_BYTES) {
+            // Satu stat saja: dipakai untuk guard ukuran dan disimpan agar
+            // prune berikutnya tak perlu stat ulang tiap entri cache.
+            val size = file.length()
+            if (size > ZIP_CACHE_MAX_BYTES) {
                 runCatching { file.delete() }
                 return null
             }
             // Browser dapat membuka beberapa request Range sekaligus. Kunci per
             // key benar-benar mencegah ZIP yang sama dibuat dua kali; cukup 8
             // strip lock agar map kunci tidak tumbuh tanpa batas.
-            zipCache[key] = now to file
+            zipCache[key] = Triple(now, file, size)
             pruneZipCache(now, key)
             return file
         }
@@ -1727,16 +1732,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (expired) runCatching { value.second.delete() }
                 expired
             }
-            var totalBytes = zipCache.values.sumOf { it.second.length() }
+            // Ukuran dari nilai tersimpan: tanpa stat disk per entri (sebelumnya
+            // sumOf { length() } + length() per eviksi = 2N syscall per prune).
+            var totalBytes = zipCache.values.sumOf { it.third }
             val oldest = zipCache.entries.sortedBy { it.value.first }
             for (entry in oldest) {
                 if (zipCache.size <= ZIP_CACHE_MAX && totalBytes <= ZIP_CACHE_MAX_BYTES) break
                 if (entry.key == keepKey && zipCache.size == 1) continue
                 if (!zipCache.remove(entry.key, entry.value)) continue
                 val file = entry.value.second
-                val size = file.length()
                 runCatching { file.delete() }
-                totalBytes -= size
+                totalBytes -= entry.value.third
             }
         }
     }
@@ -2244,7 +2250,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         fsMediaCache.clear()
         galleryCache = null
         synchronized(zipEvictionLock) {
-            zipCache.values.forEach { (_, file) -> runCatching { file.delete() } }
+            zipCache.values.forEach { (_, file, _) -> runCatching { file.delete() } }
             zipCache.clear()
         }
     }

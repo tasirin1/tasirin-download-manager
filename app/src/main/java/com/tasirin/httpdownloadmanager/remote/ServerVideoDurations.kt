@@ -72,15 +72,16 @@ class ServerVideoDurations(
 
     fun cache(): JSONObject = synchronized(lock) { cacheLocked() }
 
-    /** Baca durasi token sambil prune cache bila terlalu besar. */
+    /** Baca durasi token: tanpa prune per-baca (of dipanggil per item galeri,
+     *  prune di sini berarti cek batas N kali per request). Prune hanya saat
+     *  tulis (cacheDuration) dan sekali baca di dalam lock yang sama. */
     fun of(token: String): Long = synchronized(lock) {
-        prune(cacheLocked())
         cacheLocked().optLong(token, 0L)
     }
 
     fun cacheDuration(token: String, ms: Long) {
         synchronized(lock) {
-            cacheLocked().put(token, ms)
+            prune(cacheLocked()).put(token, ms)
             probeFailAt.remove(token)
         }
     }
