@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import androidx.annotation.RequiresApi
 import androidx.core.app.ServiceCompat
 import com.tasirin.httpdownloadmanager.App
 import com.tasirin.httpdownloadmanager.data.DownloadState
@@ -106,6 +107,16 @@ class DownloadService : Service() {
             it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
         } || (StoragePrefs.isServerBackgroundEnabled(this) && App.httpServer.isAlive)
         return if (keepAlive) START_STICKY else START_NOT_STICKY
+    }
+
+    /** Android 15+: dataSync FGS dibatasi enam jam saat aplikasi di latar. */
+    @RequiresApi(35)
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        App.logEvent("SERVICE TIMEOUT: foreground type=$fgsType; pausing work")
+        runCatching { App.engine.pauseAll() }
+        runCatching { App.httpServer.stopServer() }
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
     }
 
     private fun startForegroundCompat() {

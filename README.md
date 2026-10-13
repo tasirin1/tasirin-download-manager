@@ -32,6 +32,8 @@ APK dirilis lewat GitHub Actions dan ditandatangani dengan kunci rilis resmi. Pe
 
 > Pengaturan menyediakan opsi pengecualian optimasi baterai untuk membantu unduhan panjang berjalan di latar belakang; persetujuannya tetap dikendalikan Android.
 
+> Di Android 15+, sistem dapat membatasi layanan transfer data setelah enam jam kumulatif di latar belakang. Aplikasi menyimpan progres parsial dan menjeda unduhan agar dapat dilanjutkan nanti.
+
 ## Remote Web
 
 1. Buka **Settings → Remote (HTTP)**.

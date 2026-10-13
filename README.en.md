@@ -32,6 +32,8 @@ Releases are built by GitHub Actions and signed with the official release key. I
 
 > Settings offers an optional battery optimization exemption to help long downloads continue in the background; Android still controls the user's approval.
 
+> On Android 15+, the system can limit data transfer services after six cumulative hours in the background. The app saves partial progress and pauses downloads so they can be resumed later.
+
 ## Remote Web
 
 1. Open **Settings → Remote (HTTP)**.
