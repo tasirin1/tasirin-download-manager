@@ -3355,10 +3355,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
         fun ipv4Addresses(): List<String> = runCatching {
             NetworkInterface.getNetworkInterfaces().toList().flatMap { ni ->
-                ni.inetAddresses.toList()
-                    .filter { it is Inet4Address && !it.isLoopbackAddress }
-                    .map { it.hostAddress.orEmpty() }
-            }
+                // Lewati interface yang mati (VPN putus, P2P idle, IMS): IP-nya
+                // tak terjangkau sehingga URL remote mati bila kepilih firstOrNull
+                // (urutan enumerasi acak; era multi-network Android 8+ makin ramai).
+                // Link-local (169.254.x.x) tak bisa dijangkau perangkat lain,
+                // string kosong merusak URL (http://:port/), duplikat + urutan
+                // acak bikin pilihan firstOrNull lotre — distinct+sorted.
+                if (runCatching { !ni.isUp }.getOrDefault(false)) emptyList()
+                else ni.inetAddresses.toList()
+                    .filter { it is Inet4Address && !it.isLoopbackAddress && !it.isLinkLocalAddress }
+                    .mapNotNull { it.hostAddress?.takeIf { h -> h.isNotEmpty() } }
+            }.distinct().sorted()
         }.getOrDefault(emptyList())
     }
 }
