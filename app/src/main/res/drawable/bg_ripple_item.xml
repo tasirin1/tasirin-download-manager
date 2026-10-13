@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ripple effect untuk item download card (API 21+).
-     Warna ripple biru muda lembut supaya tidak mengganggu card. -->
+<!-- Ripple effect untuk item download card (API 21+, foreground = 23+).
+     Warna ripple oranye lembut (ala vault: selalu oranye) — kilat biru
+     saat tekan OK di D-pad menipu seolah fokus pindah. -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="#401565C0">
+    android:color="#59F57C00">
     <item android:id="@android:id/mask">
         <shape android:shape="rectangle">
             <solid android:color="@color/white" />

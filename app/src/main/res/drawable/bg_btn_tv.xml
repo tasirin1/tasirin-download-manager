@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Tombol tonal gaya M3: terisi primary_container + teks primary (di style).
      Stroke 1dp primary di state normal/pressed agar tak menyatu dengan kartu
-     putih; fokus D-pad tetap tegas via stroke 2dp. -->
+     putih; fokus D-pad selalu aksen oranye 3dp (ala vault) agar tak tertukar
+     dengan biru primer saat navigasi remote TV. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
             <solid android:color="@color/primary_container" />
-            <stroke android:width="2dp" android:color="@color/primary" />
+            <stroke android:width="3dp" android:color="@color/accent" />
             <corners android:radius="20dp" />
         </shape>
     </item>
