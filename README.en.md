@@ -28,6 +28,8 @@ A download manager for Android with realtime web control, a remote file manager,
 
 Releases are built by GitHub Actions and signed with the official release key. In-app updates only notify about new versions; downloading and installation are done manually from the release page (the app never downloads APK files itself and requests no install-packages permission).
 
+> Android 10 requests media read access so the gallery can show videos from other apps. Android 11+ uses **All files access** for storage scanning.
+
 ## Remote Web
 
 1. Open **Settings → Remote (HTTP)**.

@@ -26,6 +26,14 @@ object Permissions {
         ) {
             needed.add(Manifest.permission.POST_NOTIFICATIONS)
         }
+        // Target SDK 36 selalu memakai scoped storage di Android 10; tanpa READ
+        // MediaStore hanya menampilkan video yang dibuat aplikasi ini sendiri.
+        if (Build.VERSION.SDK_INT == 29 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            needed.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
         if (Build.VERSION.SDK_INT in 23..28 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
             PackageManager.PERMISSION_GRANTED

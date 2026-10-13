@@ -28,6 +28,8 @@ Aplikasi unduhan untuk Android dengan kontrol web realtime, file manager jarak j
 
 APK dirilis lewat GitHub Actions dan ditandatangani dengan kunci rilis resmi. Pembaruan dalam aplikasi hanya memberi tahu versi baru; unduh dan instalasi dilakukan pengguna dari halaman rilis (aplikasi tidak mengunduh APK sendiri dan tidak meminta izin instal paket).
 
+> Android 10 meminta izin baca media agar galeri dapat menampilkan video dari aplikasi lain. Android 11+ memakai izin **Akses semua file** untuk pemindaian penyimpanan.
+
 ## Remote Web
 
 1. Buka **Settings → Remote (HTTP)**.
