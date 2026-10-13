@@ -6473,7 +6473,7 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
   const urls = rawUrl.split(/[\s,]+/).filter(function (u) {
     return u.indexOf('http://') === 0 || u.indexOf('https://') === 0;
   });
-  if (!urls.length) { alert('No valid URLs found.'); return; }
+  if (!urls.length) { showToast('No valid URLs found.', 3000, 'error'); return; }
   // For social media quality, use first URL only
   const url = urls[0];
   const body = new URLSearchParams({url: url});
@@ -6574,7 +6574,7 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
     toggleAddForm(false);
     refresh();
   } catch (err) {
-    alert('Failed to add download: ' + err.message);
+    showToast('Failed to add download: ' + err.message, 3000, 'error');
   }
 });
 
