@@ -30,6 +30,8 @@ APK dirilis lewat GitHub Actions dan ditandatangani dengan kunci rilis resmi. Pe
 
 > Android 10 meminta izin baca media agar galeri dapat menampilkan video dari aplikasi lain. Android 11+ memakai izin **Akses semua file** untuk pemindaian penyimpanan.
 
+> Pengaturan menyediakan opsi pengecualian optimasi baterai untuk membantu unduhan panjang berjalan di latar belakang; persetujuannya tetap dikendalikan Android.
+
 ## Remote Web
 
 1. Buka **Settings → Remote (HTTP)**.

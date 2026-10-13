@@ -30,6 +30,8 @@ Releases are built by GitHub Actions and signed with the official release key. I
 
 > Android 10 requests media read access so the gallery can show videos from other apps. Android 11+ uses **All files access** for storage scanning.
 
+> Settings offers an optional battery optimization exemption to help long downloads continue in the background; Android still controls the user's approval.
+
 ## Remote Web
 
 1. Open **Settings → Remote (HTTP)**.
