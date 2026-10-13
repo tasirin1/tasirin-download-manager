@@ -101,11 +101,13 @@ class DownloadEngine(appContext: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
-    private val pendingRetries = ConcurrentHashMap.newKeySet<String>()
-    /** URL HLS yang sudah gagal (media playlist 403/404) — jangan retry; re-extract dari YouTube URL. */
     // Set concurrent via newSetFromMap (bukan ConcurrentHashMap.newKeySet):
-    // KeySetView.size/clear butuh API 24 (lint NewApi, minSdk 21),
-    // sedangkan Set polos aman di semua API.
+    // newKeySet/KeySetView butuh API 24 — di Android 5-6 (minSdk 21) lempar
+    // NoSuchMethodError saat engine dibangun (crash tiap startup); Set polos
+    // aman di semua API. Berlaku untuk pendingRetries & failedHlsUrls.
+    private val pendingRetries: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    /** URL HLS yang sudah gagal (media playlist 403/404) — jangan retry; re-extract dari YouTube URL. */
     private val failedHlsUrls: MutableSet<String> =
         Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val FAILED_HLS_URLS_MAX = 256
