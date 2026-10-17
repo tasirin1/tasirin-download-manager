@@ -342,6 +342,19 @@ kuat dan tanpa diskusi:
     aturan No. 1: program toolchain Android (`gradle`, `javac`/`kotlinc`,
     `apktool`, emulator, `adb install`) dilarang dipakai walau terinstal.
 
+21. **Mode perbaiki = maraton** — perintah "perbaiki/fix/lanjutkan" atas temuan
+    audit dikerjakan sampai habis: satu temuan satu perbaikan akar masalah, tiap
+    perbaikan selesai langsung commit + push (aturan 19: tanpa memantau
+    workflow), tidak berhenti di tengah, tidak menumpuk perubahan di working
+    tree. Bila owner melapor build gagal, perbaiki itu dulu sebelum lanjut ke
+    temuan berikutnya.
+22. **Audit menyeluruh = sub-agen paralel + verifikasi mandiri** — pecah jadi
+    2–5 sub-agen per area (mis. engine download / server-keamanan / remote web /
+    UI-storage), lalu verifikasi sendiri tiap klaim berat langsung ke kode
+    (`rg`/`sed`) sebelum masuk laporan atau patch — klaim sub-agen bukan fakta
+    sampai terbukti. Temuan wajib memuat `file:baris` + kenapa berbahaya +
+    skenario pemicu + level bahaya (Kritikal/Tinggi/Sedang/Rendah).
+
 ## Cara memicu build & release
 
 - **Normal flow**: PR → build verifikasi tanpa publish → merge ke `main`.
