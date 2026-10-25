@@ -585,6 +585,15 @@ jangan digabung dengan PR fitur lain.
     Error wajib diperbaiki; warning ditinjau.
 21. **Unit test** — `python3 scripts/check_repo.py --android` (butuh Gradle).
     atau lewat CI: push ke branch → PR → Build APK workflow.
+22. **Setiap temuan audit dicatat sebagai issue dulu** — hasil audit (mode
+    baca-saja) tidak langsung diperbaiki: tiap temuan yang lolos verifikasi
+    dibuatkan satu issue GitHub (`gh issue create`, satu issue = satu temuan)
+    berisi `file:baris`, kenapa berbahaya, skenario pemicu, level, dan ronde
+    audit. Perintah "perbaiki/lanjut" mengambil antrean dari issue terbuka
+    (level terberat dulu, lalu nomor tertua); commit menyebut `Closes #N` dan
+    issue ditutup setelah perbaikan di-push (temuan yang digugurkan ditutup
+    dengan alasan). Bila Issues dimatikan/`gh` tak ada, catat daftar bernomor
+    di file memori repo. Versi kanonik: `SOUL.md` memori agen.
 
 ### Common mistakes yang harus dihindari
 
