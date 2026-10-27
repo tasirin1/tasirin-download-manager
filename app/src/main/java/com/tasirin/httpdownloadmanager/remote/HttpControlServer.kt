@@ -1137,9 +1137,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val storage = session.param("storage")?.trim().orEmpty()
         val folderPath = session.param("path")?.trim().orEmpty()
         if (!isRemoteDestinationAllowed(folderPath)) {
+            // Body unggahan mentah belum dibaca sama sekali di titik ini:
+            // tutup koneksi agar sisanya tak dibaca sebagai request
+            // keep-alive berikutnya (pola jalur read-only di atas).
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
-            )
+            ).closeConnection()
         }
         val chunkIdx = session.param("chunk")?.toIntOrNull() ?: -1
         val chunks = (session.param("chunks")?.toIntOrNull() ?: 1).coerceAtLeast(1)
@@ -2604,7 +2607,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun fsAction(session: IHTTPSession): Response {
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        // Body form belum dibaca di titik ini: tutup koneksi pada penolakan
+        // read-only agar sisa byte tak merusak request keep-alive berikutnya.
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
         val params = readForm(session)
         val action = params["action"].orEmpty()
         val path = params["path"].orEmpty()
