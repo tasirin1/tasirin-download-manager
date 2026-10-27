@@ -6431,6 +6431,9 @@ function probeSocialQuality() {
     fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        // Respons basi: pengguna sudah mengganti tautan selama probe
+        // berjalan — opsi tautan lama tidak boleh menimpa tautan sekarang.
+        if (document.getElementById('url').value.trim() !== u) return;
         if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
         socialPlatform = d.platform || 'social';
         var videos = d.videos || [];
@@ -6459,6 +6462,9 @@ function probeSocialQuality() {
         }
       })
       .catch(function () {
+        // Probe basi gagal pun tidak boleh menyembunyikan picker milik
+        // probe tautan yang lebih baru.
+        if (document.getElementById('url').value.trim() !== u) return;
         document.getElementById('platformBadge').classList.add('hidden');
         qualitySelect.classList.add('hidden');
         photoSelect.classList.add('hidden');
