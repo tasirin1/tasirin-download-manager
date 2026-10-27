@@ -1530,6 +1530,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // Tolak offset melampaui EOF: seek melewati ujung membuat lubang
                     // sparse berisi nol (file korup) saat ukuran chunk tak seragam.
                     RandomAccessFile(tmp, "rw").use { raf ->
+                        // Chunk 0 pada tmp yang SUDAH ada = unggahan dimulai
+                        // ulang memakai ID sama: potong dulu, sisa ekor
+                        // percobaan lama (total lebih besar) tak boleh ikut
+                        // terbit menjadi file korup (issue #160).
+                        if (chunkIdx == 0) raf.setLength(0)
                         if (offset > raf.length()) {
                             drainBody(session)
                             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: offset beyond EOF")
