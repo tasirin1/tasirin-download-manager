@@ -39,6 +39,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.core.content.FileProvider
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -214,8 +215,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             App.engine.items.collect { items ->
                 val sizeChanged = items.size != lastItems.size
                 lastItems = items
-                // Auto-open file yang baru selesai (video → player; APK tidak dibuka otomatis)
-                if (StoragePrefs.isAutoOpenComplete(this@MainActivity)) {
+                // Auto-open file yang baru selesai (video → player; APK → installer).
+                // Hanya saat activity di depan (STARTED): collector ini jalan
+                // di lifecycleScope polos sehingga tetap aktif saat STOPPED,
+                // dan startActivity dari latar ditahan sistem di API 29+ /
+                // menyela aplikasi lain di API lama. Transisi selesai tetap
+                // terdeteksi saat activity kembali ke depan karena
+                // lastItemStates tidak diperbarui selama di latar.
+                if (StoragePrefs.isAutoOpenComplete(this@MainActivity) &&
+                    lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                ) {
                     runCatching { autoOpenCompleted(items) }
                 }
                 runCatching {
