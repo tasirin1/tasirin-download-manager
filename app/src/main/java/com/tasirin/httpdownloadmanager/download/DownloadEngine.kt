@@ -1580,6 +1580,10 @@ class DownloadEngine(appContext: Context) {
                     )
                     val stream = AdtsAac.open(audioAdts)
                     if (stream != null && !stream.isEmpty) audioStream = stream
+                } catch (e: CancellationException) {
+                    // Pembatalan bukan kegagalan audio: jangan ditelan jadi
+                    // "audio skipped" (pola fetchHlsSegmentWithRetry).
+                    throw e
                 } catch (e: Exception) {
                     audioStream = null
                 }
@@ -1784,6 +1788,8 @@ class DownloadEngine(appContext: Context) {
             }
             App.logEvent("HLS: adaptive audio downloaded (${Formats.bytes(audioM4a.length())}), remuxing...")
             audioM4a
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             App.logEvent("HLS: adaptive audio download failed (${e.message?.take(50)}), skipped")
             null
