@@ -57,7 +57,17 @@ jobs:
       - name: Verifikasi path (tanpa SDK Android)
         # Dulu workflow verifikasi-path.yml tersendiri; kini satu gerbang di
         # sini agar satu status, satu runner, tanpa duplikasi checkout.
-        run: python3 tools/verifikasi-path.py
+        # Rentang event WAJIB diteruskan: tanpa --rentang skrip jatuh ke
+        # diff HEAD~1 sehingga cek berbasis diff hanya menilai commit
+        # terakhir dari push/PR multi-commit (issue #156).
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="${{ github.event.before }}"; fi
+          if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            python3 tools/verifikasi-path.py --rentang "$BASE...${{ github.sha }}"
+          else
+            python3 tools/verifikasi-path.py
+          fi
 
       - name: Cek cepat (vektor 0.x, README, secret, remote)
         run: bash scripts/cek-cepat.sh
