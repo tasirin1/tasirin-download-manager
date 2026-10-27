@@ -1602,7 +1602,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         completedUploads[id] = finalName to System.currentTimeMillis()
                         appendLog("UPLOAD #$id COMPLETED -> $finalName")
                     } catch (e: Exception) {
-                        failedUploads[id] = (e.message ?: "finalization failed") to System.currentTimeMillis()
+                        // Pesan mentah exception (bisa memuat path absolut
+                        // internal) hanya untuk log server; yang disimpan
+                        // untuk klien lewat uploadVerify adalah teks generik,
+                        // konsisten dengan jalur single-shot (issue #157).
+                        failedUploads[id] = "finalization failed" to System.currentTimeMillis()
                         appendLog("UPLOAD #$id finalization FAILED: ${e.message}")
                         logError(e)
                     } finally {
@@ -1639,7 +1643,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Body bisa baru terbaca setengah saat gagal (putus di tengah):
             // tutup koneksi agar sisa byte tak dibaca sebagai request
             // keep-alive berikutnya (semua jalur error lain drain/close).
-            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "upload failed"))
+            jsonResponse(JSONObject().put("ok", false).put("error", "upload failed"))
                 .closeConnection()
         }
     }
