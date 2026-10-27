@@ -110,6 +110,14 @@ object ServerSecurity {
     fun isPathAllowed(path: String, roots: List<File>): Boolean =
         isPathAllowedFast(path, canonicalRootPaths(roots))
 
+    /** True bila [canonicalTarget] PERSIS salah satu root yang diizinkan.
+     *  Root itu sendiri adalah batas wilayah, bukan isi yang boleh
+     *  dimanipulasi: tanpa penjaga ini satu panggilan delete bisa menghapus
+     *  utuh root (folder unduhan, atau /storage/emulated/0 saat Full access)
+     *  karena isPathAllowed menerima target == root. Murni, bisa diuji. */
+    fun isAllowedRootItself(canonicalTarget: String, canonicalRoots: List<String>): Boolean =
+        canonicalRoots.any { it == canonicalTarget }
+
     /** Path adalah induk (strict) dari salah satu root? Dipakai untuk listing
      *  browse-only di File Manager: folder di atas root (mis. /storage di atas
      *  /storage/emulated/0/Download) boleh dilihat isinya, tapi aksi tulis

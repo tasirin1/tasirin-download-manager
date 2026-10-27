@@ -2625,6 +2625,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // menyeret deleteRecursively ke target di luar root.
                     val canon = runCatching { file.canonicalPath }.getOrNull()
                     if (canon == null || !isFsPathAllowed(canon)) return@runCatching false
+                    // Root yang diizinkan itu sendiri tak boleh dihapus utuh
+                    // lewat satu panggilan (issue #158).
+                    if (ServerSecurity.isAllowedRootItself(canon, canonicalFsRoots())) {
+                        return@runCatching false
+                    }
                 }
                 val gone = if (file.isDirectory) file.deleteRecursively() else file.delete()
                 if (gone) {

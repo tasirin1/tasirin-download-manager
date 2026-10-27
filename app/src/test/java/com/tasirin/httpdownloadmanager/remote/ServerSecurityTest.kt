@@ -399,6 +399,17 @@ class ServerSecurityTest {
     }
 
     @Test
+    @Test
+    fun isAllowedRootItself_hanyaPersisRoot() {
+        val roots = listOf("/storage/emulated/0", "/storage/emulated/0/Download")
+        assertTrue(ServerSecurity.isAllowedRootItself("/storage/emulated/0", roots))
+        assertTrue(ServerSecurity.isAllowedRootItself("/storage/emulated/0/Download", roots))
+        // Isi di dalam root BUKAN root itu sendiri: boleh dimanipulasi.
+        assertFalse(ServerSecurity.isAllowedRootItself("/storage/emulated/0/Download/film.mp4", roots))
+        assertFalse(ServerSecurity.isAllowedRootItself("/storage/emulated/0/Download2", roots))
+        assertFalse(ServerSecurity.isAllowedRootItself("/storage/emulated/0", emptyList()))
+    }
+
     fun isFileNameValid_menolakSeparatorDanTraversal() {
         assertTrue(ServerSecurity.isFileNameValid("video.mp4"))
         assertTrue(ServerSecurity.isFileNameValid("file (1).mp4"))
