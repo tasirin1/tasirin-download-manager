@@ -62,6 +62,7 @@ else window.location.reload();
 const THEME_KEY = 'dm_theme';
 let themeMode = 'auto';
 try { themeMode = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) {}
+if (themeMode !== 'auto' && themeMode !== 'light' && themeMode !== 'dark') themeMode = 'auto';
 const themeMq = (window.matchMedia && typeof window.matchMedia === 'function')
 ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 function effectiveTheme() {
