@@ -118,6 +118,32 @@ object ServerSecurity {
     fun isAllowedRootItself(canonicalTarget: String, canonicalRoots: List<String>): Boolean =
         canonicalRoots.any { it == canonicalTarget }
 
+    /** True bila [dir] memuat direktori turunan (termasuk symlink direktori)
+     *  yang lokasi kanonikalnya KELUAR dari root yang diizinkan.
+     *  `deleteRecursively` mengikuti symlink direktori anak, jadi pra-cek
+     *  kanonikal hanya pada direktori teratas tidak cukup: symlink
+     *  bersarang bisa menyeret penghapusan ke target luar root (issue
+     *  #159). Symlink FILE tidak dinilai — menghapusnya hanya melepas
+     *  tautan, tidak menyentuh target. Ketidakmampuan memverifikasi satu
+     *  pun anak dianggap berbahaya (gagal-tertutup). */
+    fun hasEscapingSymlink(dir: File, canonicalRoots: List<String>): Boolean {
+        val visited = HashSet<String>()
+        val stack = ArrayDeque<File>()
+        stack.add(dir)
+        while (stack.isNotEmpty()) {
+            val cur = stack.removeLast()
+            val children = runCatching { cur.listFiles() }.getOrNull() ?: continue
+            for (child in children) {
+                if (!child.isDirectory) continue
+                val canon = runCatching { child.canonicalFile.absolutePath }.getOrNull()
+                    ?: return true
+                if (!isPathAllowedFast(canon, canonicalRoots)) return true
+                if (visited.add(canon)) stack.add(child)
+            }
+        }
+        return false
+    }
+
     /** Path adalah induk (strict) dari salah satu root? Dipakai untuk listing
      *  browse-only di File Manager: folder di atas root (mis. /storage di atas
      *  /storage/emulated/0/Download) boleh dilihat isinya, tapi aksi tulis

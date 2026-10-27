@@ -2630,6 +2630,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     if (ServerSecurity.isAllowedRootItself(canon, canonicalFsRoots())) {
                         return@runCatching false
                     }
+                    // Symlink direktori BERSARANG ikut diperiksa: cek teratas
+                    // saja tak cukup karena deleteRecursively mengikuti
+                    // symlink anak ke luar root (issue #159).
+                    if (ServerSecurity.hasEscapingSymlink(file, canonicalFsRoots())) {
+                        return@runCatching false
+                    }
                 }
                 val gone = if (file.isDirectory) file.deleteRecursively() else file.delete()
                 if (gone) {
