@@ -2004,6 +2004,13 @@ class DownloadEngine(appContext: Context) {
                     throttle.sleepIfNeeded { committed + segBytes }
                     notify(segBytes)
                 }
+                // Verifikasi panjang terhadap Content-Length yang dinyatakan:
+                // EOF prematur pada respons chunked bisa tiba tanpa exception
+                // sehingga segmen pendek ikut tergabung menjadi hasil korup
+                // berstatus COMPLETED. Lempar agar retry segmen berjalan.
+                if (declared != null && segBytes != declared) {
+                    throw IOException("HLS segment truncated: got $segBytes of $declared bytes")
+                }
             } finally {
                 runCatching { input.close() }
             }
