@@ -5473,7 +5473,13 @@ function showListSkeleton() {
   }
   box.innerHTML = html + '</div>';
 }
+// Penjaga urutan snapshot (pola sama seperti gallerySeq/fsLoadSeq): tiga
+// sumber (refresh, SSE, polling) bisa selesai tak berurutan; snapshot yang
+// lebih lama tidak boleh menimpa state yang lebih baru.
+let snapSeq = 0;
+let snapApplied = 0;
 async function refresh() {
+  const mySeq = ++snapSeq;
   if (!hasLoadedItems) showListSkeleton();
   try {
     const res = await fetch(API + '/api/downloads');
@@ -5483,6 +5489,8 @@ async function refresh() {
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    if (mySeq <= snapApplied) return;
+    snapApplied = mySeq;
     failCount = 0;
     hasLoadedItems = true;
     statusLine.textContent = '';
@@ -6639,6 +6647,9 @@ function connectEvents() {
         showConnBanner('Server stopped or port changed. Check the app → Remote (HTTP) for the new address.');
         return;
       }
+      // Push SSE adalah state terbaru menurut definisi: naikkan penanda
+      // agar fetch snapshot yang mulai lebih dulu dibuang saat selesai.
+      snapApplied = ++snapSeq;
       const items = data.items || [];
       lastItems = items;
       if (data.status) applyServerStatus(data.status);
@@ -6694,6 +6705,7 @@ function schedulePoll() {
 }
 
 async function pollSnapshot() {
+  const mySeq = ++snapSeq;
   try {
     const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
     if (!res.ok) {
@@ -6701,6 +6713,8 @@ async function pollSnapshot() {
       throw new Error('HTTP ' + res.status);
     }
     const data = await res.json();
+    if (mySeq <= snapApplied) return;
+    snapApplied = mySeq;
     failCount = 0;
     hasLoadedItems = true;
     statusLine.textContent = '';

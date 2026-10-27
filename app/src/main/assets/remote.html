@@ -3236,7 +3236,10 @@ html += '<div class="sk-item"><div class="sk-ico skeleton"></div><div class="sk-
 }
 box.innerHTML = html + '</div>';
 }
+let snapSeq = 0;
+let snapApplied = 0;
 async function refresh() {
+const mySeq = ++snapSeq;
 if (!hasLoadedItems) showListSkeleton();
 try {
 const res = await fetch(API + '/api/downloads');
@@ -3246,6 +3249,8 @@ return;
 }
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
+if (mySeq <= snapApplied) return;
+snapApplied = mySeq;
 failCount = 0;
 hasLoadedItems = true;
 statusLine.textContent = '';
@@ -4313,6 +4318,7 @@ if (data.shutdown) {
 showConnBanner('Server stopped or port changed. Check the app → Remote (HTTP) for the new address.');
 return;
 }
+snapApplied = ++snapSeq;
 const items = data.items || [];
 lastItems = items;
 if (data.status) applyServerStatus(data.status);
@@ -4350,6 +4356,7 @@ clearTimeout(pollTimer);
 pollTimer = setTimeout(pollTick, nextPollMs());
 }
 async function pollSnapshot() {
+const mySeq = ++snapSeq;
 try {
 const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
 if (!res.ok) {
@@ -4357,6 +4364,8 @@ if (res.status === 401) return;
 throw new Error('HTTP ' + res.status);
 }
 const data = await res.json();
+if (mySeq <= snapApplied) return;
+snapApplied = mySeq;
 failCount = 0;
 hasLoadedItems = true;
 statusLine.textContent = '';
