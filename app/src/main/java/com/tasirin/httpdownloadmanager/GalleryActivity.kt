@@ -45,6 +45,11 @@ class GalleryActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityGalleryBinding
     private var fullList: List<MediaLibrary.MediaEntry> = emptyList()
+
+    /** Generasi scan: hasil scan hanya diterapkan bila tidak ada scan yang
+     *  lebih baru dimulai sesudahnya (dua penulis fullList: muat awal dan
+     *  collector engine — hasil lama tidak boleh menimpa yang baru). */
+    private var galleryScanGen = 0
     private var loadedCount = GALLERY_PAGE
     private var loadingMore = false
     private var partialProgress: Map<String, Int> = emptyMap()
@@ -80,9 +85,11 @@ class GalleryActivity : AppCompatActivity() {
         lifecycleScope.launch {
             binding.progress.visibility = View.VISIBLE
             partialProgress = activeDownloadProgress()
-            fullList = withContext(Dispatchers.IO) {
+            val gen = ++galleryScanGen
+            val scanned = withContext(Dispatchers.IO) {
                 MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
             }
+            if (gen == galleryScanGen) fullList = scanned
             binding.progress.visibility = View.GONE
             loadMore() // halaman awal kurang dari satu layar -> isi otomatis
         }
@@ -104,9 +111,11 @@ class GalleryActivity : AppCompatActivity() {
                 if (!filesChanged && now - lastUiAt < 800L) return@collect
                 lastUiAt = now
                 if (filesChanged) {
-                    fullList = withContext(Dispatchers.IO) {
+                    val gen = ++galleryScanGen
+                    val scanned = withContext(Dispatchers.IO) {
                         MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
                     }
+                    if (gen == galleryScanGen) fullList = scanned
                 } else {
                     fullList = mergedProgress(fullList)
                 }
