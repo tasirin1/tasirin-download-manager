@@ -6536,7 +6536,10 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
   }
   try {
     if (sendAll && socialPhotoOptions.length > 1) {
-      // Download all carousel photos at once
+      // Download all carousel photos at once. Setiap respons WAJIB dicek:
+      // penolakan server yang ditelan diam-diam membuat foto hilang tanpa
+      // pemberitahuan apa pun.
+      var allFailed = 0;
       for (var ci = 0; ci < socialPhotoOptions.length; ci++) {
         var cOpt = socialPhotoOptions[ci];
         if (!cOpt || !cOpt.url) continue;
@@ -6552,12 +6555,15 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         } else {
           allBody.append('headers', document.getElementById('dlHeaders').value.trim());
         }
-        await fetch(API + '/api/add', {
+        var aRes = await fetch(API + '/api/add', {
           method: 'POST',
           body: allBody,
           headers: {'X-Requested-With': 'XMLHttpRequest'}
         });
+        var aData = await aRes.json().catch(function () { return null; });
+        if (!aRes.ok || !aData || !aData.ok) allFailed++;
       }
+      if (allFailed) throw new Error(allFailed + ' of ' + socialPhotoOptions.length + ' photos failed to add');
     } else {
     const res = await fetch(API + '/api/add', {
       method: 'POST',
@@ -6569,7 +6575,10 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
     }
     }
-    // Send additional URLs as separate requests
+    // Send additional URLs as separate requests. Kegagalan URL tambahan
+    // tidak boleh ditelan: URL yang gagal dikembalikan ke kolom agar bisa
+    // dicoba lagi, dan pengguna diberi tahu.
+    var failedExtras = [];
     for (var i = 1; i < urls.length; i++) {
       try {
         var extraBody = new URLSearchParams({url: urls[i]});
@@ -6577,11 +6586,19 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         extraBody.append('priority', document.getElementById('priority').value);
         extraBody.append('path', document.getElementById('storage').value.trim());
         extraBody.append('method', document.getElementById('dlMethod').value);
-        await fetch(API + '/api/add', {
+        var xRes = await fetch(API + '/api/add', {
           method: 'POST', body: extraBody,
           headers: {'X-Requested-With': 'XMLHttpRequest'}
         });
-      } catch (x) {}
+        var xData = await xRes.json().catch(function () { return null; });
+        if (!xRes.ok || !xData || !xData.ok) failedExtras.push(urls[i]);
+      } catch (x) { failedExtras.push(urls[i]); }
+    }
+    if (failedExtras.length) {
+      document.getElementById('url').value = failedExtras.join('\n');
+      refresh();
+      showToast(failedExtras.length + ' additional URL(s) failed — kept in the field for retry.', 4500, 'error');
+      return;
     }
     document.getElementById('url').value = '';
     toggleAddForm(false);
