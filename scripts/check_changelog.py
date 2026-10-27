@@ -18,7 +18,7 @@ def changed_files(base):
         proc = subprocess.run(args, capture_output=True, text=True)
         if proc.returncode == 0:
             return proc.stdout.split()
-    return []
+    return None
 
 
 def main():
@@ -31,8 +31,17 @@ def main():
         return 0
     if subprocess.run(["git", "rev-parse", "--verify", "--quiet", base],
                        capture_output=True).returncode != 0:
-        base = "HEAD~1"
+        # Gagal-TERTUTUP: base tak tertelusur (riwayat ditulis ulang) tidak
+        # boleh menyempitkan cek ke HEAD~1 — commit kode awal tanpa entri
+        # CHANGELOG bisa lolos diam-diam (issue #151).
+        print("::error::Base commit tidak terverifikasi (" + base + ") - "
+              "guard CHANGELOG gagal-tertutup, bukan fallback HEAD~1.")
+        return 1
     changed = changed_files(base)
+    if changed is None:
+        print("::error::git diff gagal untuk base " + base +
+              " - guard CHANGELOG gagal-tertutup.")
+        return 1
     needs = [f for f in changed
              if f.startswith(CODE_PREFIXES) or f in CODE_EXACT]
     if needs and "CHANGELOG.md" not in changed:
