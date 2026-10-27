@@ -3969,7 +3969,7 @@ throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
 }
 refresh();
 } catch (e) {
-fsMsg('Action failed: ' + e.message, true);
+showToast('Action failed: ' + e.message, 4000, 'error');
 }
 }
 const shareModal = document.getElementById('shareModal');

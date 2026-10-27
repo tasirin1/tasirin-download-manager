@@ -6262,7 +6262,10 @@ async function doActionNow(id, action, extra) {
     }
     refresh();
   } catch (e) {
-    fsMsg('Action failed: ' + e.message, true);
+    // Semua pemanggil doActionNow adalah UI Downloads; fsMsg menulis ke
+    // #fsStatus di dalam #fsView yang hidden di luar route files sehingga
+    // error (terutama delete gagal) tak terlihat sama sekali.
+    showToast('Action failed: ' + e.message, 4000, 'error');
   }
 }
 
