@@ -1528,9 +1528,15 @@ class DownloadEngine(appContext: Context) {
         }
 
         val baseName = outName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { outName }
-        val videoTs = saver.partialFile("$baseName.video", segment = null).apply { delete() }
-        val audioAdts = saver.partialFile("$baseName.audio", segment = null).apply { delete() }
-        val mp4 = saver.partialFile("$baseName.muxed", segment = null).apply { delete() }
+        // Nama temp WAJIB unik per item: baseName membuang ekstensi sehingga
+        // dua item yang namanya hanya beda ekstensi ("film.mp4" vs "film.ts")
+        // menghasilkan temp identik dan saling menghapus/menimpa saat jalan
+        // bersamaan. Potongan id item (UUID, aman nama file) jadi pembeda;
+        // nama final tetap dari baseName.
+        val tempBase = baseName + "~" + item.id.take(8)
+        val videoTs = saver.partialFile("$tempBase.video", segment = null).apply { delete() }
+        val audioAdts = saver.partialFile("$tempBase.audio", segment = null).apply { delete() }
+        val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
         val progress = HlsProgress()
         progress.estimateTotalBytes = plan.estimateTotalBytes
         if (plan.estimateTotalBytes > 0) {
@@ -1585,7 +1591,7 @@ class DownloadEngine(appContext: Context) {
             var adaptiveAudioFile: File? = null
             if (audioStream == null) {
                 adaptiveAudioFile = tryDownloadAdaptiveAudio(
-                    item, adaptiveAudioUrl, baseName, buffer, throttle, progress, saver
+                    item, adaptiveAudioUrl, tempBase, buffer, throttle, progress, saver
                 )
             }
 
@@ -1762,7 +1768,7 @@ class DownloadEngine(appContext: Context) {
     private suspend fun tryDownloadAdaptiveAudio(
         item: DownloadItem,
         adaptiveAudioUrl: String,
-        baseName: String,
+        tempBase: String,
         buffer: ByteArray,
         throttle: SpeedThrottle,
         progress: HlsProgress,
@@ -1770,7 +1776,7 @@ class DownloadEngine(appContext: Context) {
     ): File? {
         if (adaptiveAudioUrl.isBlank()) return null
         return try {
-            val audioM4a = saver.partialFile("$baseName.audioM4a", segment = null).apply { delete() }
+            val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
             val ok = downloadAdaptiveFile(item, adaptiveAudioUrl, audioM4a, buffer, throttle, progress)
             if (!ok || audioM4a.length() < 1_000L) {
                 App.logEvent("HLS: adaptive audio download failed, skipped")
@@ -1794,9 +1800,12 @@ class DownloadEngine(appContext: Context) {
     ) {
         val saver = fileSaver
         val baseName = outName.removeSuffix(".mp4").removeSuffix(".webm").ifBlank { outName }
-        val videoMp4 = saver.partialFile("$baseName.videoMp4", segment = null).apply { delete() }
-        val audioM4a = saver.partialFile("$baseName.audioM4a", segment = null).apply { delete() }
-        val mp4 = saver.partialFile("$baseName.muxed", segment = null).apply { delete() }
+        // Sama seperti downloadHls: temp unik per item lewat potongan id,
+        // karena baseName tanpa ekstensi bertabrakan antar item.
+        val tempBase = baseName + "~" + item.id.take(8)
+        val videoMp4 = saver.partialFile("$tempBase.videoMp4", segment = null).apply { delete() }
+        val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
+        val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
         val progress = HlsProgress()
         val buffer = ByteArray(BUFFER_SIZE)
         val globalLimit = StoragePrefs.speedLimitKbps(context)
