@@ -3452,6 +3452,10 @@ async function loadFs() {
       b.classList.toggle('hidden', !fsPath || serverReadOnly);
     });
     fsItems = data.items || [];
+    // Offset halaman berikutnya mulai sesudah halaman pertama ini; tanpa ini
+    // fsLoadMore meminta offset=0 lagi (halaman pertama dobel, sisa berkas
+    // tidak pernah termuat).
+    fsOffset = fsItems.length;
     fsTotal = data.total || fsItems.length;
     fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
     if (fsPath) localStorage.setItem(FS_LAST_PATH_KEY, fsPath);

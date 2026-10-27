@@ -1364,6 +1364,7 @@ fsToolsMenu.querySelectorAll('[data-up]').forEach(function (b) {
 b.classList.toggle('hidden', !fsPath || serverReadOnly);
 });
 fsItems = data.items || [];
+fsOffset = fsItems.length;
 fsTotal = data.total || fsItems.length;
 fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
 if (fsPath) localStorage.setItem(FS_LAST_PATH_KEY, fsPath);
