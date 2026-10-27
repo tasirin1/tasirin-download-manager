@@ -2892,16 +2892,20 @@ class DownloadEngine(appContext: Context) {
         val current = _items.value.find { it.id == id } ?: return
         // Jangan menimpa item yang sudah pause/gagal/selesai.
         if (current.state != DownloadState.DOWNLOADING) return
+        // Monoton WAJIB: buffer adalah snapshot berkala, sedangkan nilai final
+        // segmen ditulis langsung oleh updateSegment. Menerapkan snapshot yang
+        // lebih kecil dari nilai sekarang memundurkan progres dan membuat
+        // verifikasi akhir mengira segmen belum lengkap (unduhan 100% sempat
+        // berubah PAUSED). Pola sama seperti overlayProgress di codec.
         val dirty = current.segments.any { seg ->
-            seg.index < pending.size &&
-                pending[seg.index] >= 0 && pending[seg.index] != seg.downloaded
+            seg.index < pending.size && pending[seg.index] > seg.downloaded
         }
         if (!dirty) return
         updateItem(id, persist = false) { item ->
             var totalDone = 0L
             val segs = item.segments.map { seg ->
                 val p = if (seg.index < pending.size) pending[seg.index] else -1L
-                val next = if (p >= 0 && p != seg.downloaded) seg.copy(downloaded = p) else seg
+                val next = if (p > seg.downloaded) seg.copy(downloaded = p) else seg
                 totalDone += next.downloaded
                 next
             }
