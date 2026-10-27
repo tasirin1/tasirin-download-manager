@@ -3019,8 +3019,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // ---------- SSE: update real-time ----------
 
     private fun sseResponse(): Response {
+        // Cap koneksi SSE: tiap koneksi menahan satu thread server seumur
+        // koneksi; tanpa batas, klien di LAN bisa menguras thread/memori.
+        // Semua subsistem lain di server ini sudah dibatasi (issue #162).
+        // Klien resmi jatuh ke polling berkala bila SSE ditolak.
         val stream = SseStream()
-        sseClients.add(stream)
+        synchronized(sseClients) {
+            if (sseClients.size >= MAX_SSE_CLIENTS) {
+                return jsonResponse(JSONObject().put("ok", false).put("error", "Too many event streams"))
+            }
+            sseClients.add(stream)
+        }
         ensureSsePump()
         stream.push("data: ${downloadsPayload()}\n\n")
         val res = newChunkedResponse(
@@ -3323,6 +3332,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_UPLOAD_CHUNKS = 1024
         private const val MAX_UPLOAD_LOCKS = 512
         private const val MAX_UPLOAD_FINALIZING = 8
+        private const val MAX_SSE_CLIENTS = 32
         private const val MAX_COMPLETED_UPLOADS = 400
         private const val TARGET_COMPLETED_UPLOADS = 300
         private const val MAX_FAILED_UPLOADS = 50
