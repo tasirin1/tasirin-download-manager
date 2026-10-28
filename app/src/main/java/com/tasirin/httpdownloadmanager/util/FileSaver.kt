@@ -876,7 +876,10 @@ class FileSaver(context: Context) {
                             throw e
                         }
                         appContext.contentResolver.delete(uri, null, null)
-                        PublishResult(contentUri = target.uri.toString())
+                        // Nama hasil klaim ikut dikembalikan: nama unik
+                        // bisa beda dari fileName asal dan catatan item
+                        // wajib memakai nama aktual (issue #457).
+                        PublishResult(contentUri = target.uri.toString(), fileName = target.name)
                     }
                 }
                 !result.filePath.isNullOrEmpty() -> {
@@ -886,7 +889,7 @@ class FileSaver(context: Context) {
                     if (!subDir.isDirectory && !subDir.mkdirs()) return result
                     val target = uniqueTargetFile(File(subDir, file.name))
                     if (file.renameTo(target)) {
-                        PublishResult(filePath = target.absolutePath)
+                        PublishResult(filePath = target.absolutePath, fileName = target.name)
                     } else {
                         // Klaim kosong uniqueTargetFile tertinggal bila rename
                         // gagal: hapus bila masih kosong seperti rename().

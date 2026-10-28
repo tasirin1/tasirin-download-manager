@@ -2640,7 +2640,7 @@ class DownloadEngine(appContext: Context) {
         val finishedHls = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
-                fileName = finalName,
+                fileName = published.fileName ?: finalName,
                 bytesDownloaded = actualSize,
                 totalBytes = actualSize,
                 contentUri = published.contentUri,
@@ -3223,7 +3223,7 @@ class DownloadEngine(appContext: Context) {
         val finishedSingle = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
-                fileName = finalName,
+                fileName = published.fileName ?: finalName,
                 bytesDownloaded = downloaded,
                 totalBytes = if (total > 0) total else downloaded,
                 contentUri = published.contentUri,
@@ -3398,7 +3398,7 @@ class DownloadEngine(appContext: Context) {
         val finishedMulti = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
-                fileName = finalName,
+                fileName = published.fileName ?: finalName,
                 bytesDownloaded = current.bytesDownloaded,
                 totalBytes = current.totalBytes,
                 contentUri = published.contentUri,
