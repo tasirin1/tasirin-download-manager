@@ -1817,6 +1817,12 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            // Cabang terminal ketiga (issue #518): pemulihan monitor
+            // #512 dulu hanya terpasang di dua cabang terminal lain —
+            // penerus yang gagal di sini (mis. resume ditolak 416 oleh
+            // server yang isinya berubah) membunuh monitor diam-diam
+            // dengan cara yang sama.
+            hidupkanLagiMonitorPendahulu(item)
             if (finishedRange != null) NotificationHelper.notifyItemFinished(context, finishedRange)
             return
         }
