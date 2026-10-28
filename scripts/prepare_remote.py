@@ -10,6 +10,7 @@ Mode:
                                                  (scripts/upload_smoke_test.js).
                                                  (exit 1 bila ada masalah)
 """
+import html
 import re
 import subprocess
 import sys
@@ -134,7 +135,25 @@ _BANNED_PATTERNS = [
 ]
 
 
+def _normalisasi_guard(text: str) -> str:
+    # Normalisasi evasi guard bahasa (issue #335): kata terlarang yang
+    # disamarkan lewat escape unicode/hex JS-Kotlin ("hap\\u0075s"),
+    # entitas HTML ("hap&#117;s"), atau pemecahan string ("hap"+"us")
+    # tampil UTUH di layar tetapi lolos pencocokan teks mentah.
+    # Backslash ganda disamarkan lebih dulu: "\\u0075" harfiah
+    # (backslash + u0075) BUKAN escape dan tidak boleh ter-decode.
+    text = text.replace("\\\\", "\x00")
+    text = html.unescape(text)
+    text = re.sub(r"\\u([0-9a-fA-F]{4})",
+                  lambda m: chr(int(m.group(1), 16)), text)
+    text = re.sub(r"\\x([0-9a-fA-F]{2})",
+                  lambda m: chr(int(m.group(1), 16)), text)
+    text = re.sub(r"""["']\s*\+\s*["']""", "", text)
+    return text.replace("\x00", "\\\\")
+
+
 def banned_hits(text: str) -> list:
+    text = _normalisasi_guard(text)
     # Kata utuh ATAU bentuk berimbuhan Indonesia (meN-/di-/ter-/ber-/peN- + kata
     # dasar), mis. "Mengunggah" = meng + unggah. Awalan opsional + akar kata
     # dengan batas kata: "sizing" tidak tertangkap oleh akar "izin".
