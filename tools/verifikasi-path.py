@@ -1357,7 +1357,12 @@ def utama():
     diff = ""
     if args.jalur:
         berubah = [j for j in args.jalur if os.path.exists(os.path.join(AKAR, j))]
-        diff = jalan("git", "diff", "--", *berubah) or ""
+        # Lawan HEAD, bukan diff unstaged polos (issue #493): perubahan
+        # staged murni dulu menghasilkan diff kosong sehingga SELURUH
+        # keluarga cek berbasis diff (bekas-hapusan, fungsi hilang,
+        # pola berisiko) tak berjalan dan mode jalur menjawab LOLOS
+        # semu. git diff HEAD menilai gabungan staged+unstaged.
+        diff = jalan("git", "diff", "HEAD", "--", *berubah) or ""
     elif args.rentang:
         daftar = daftar_berkas_berubah(args.rentang)
         if daftar is None:
