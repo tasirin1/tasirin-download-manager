@@ -2630,8 +2630,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
     }
 
-    /** Path berada di atas (induk dari) salah satu root yang sah? Hanya untuk
-     *  listing browse-only — aksi tulis tetap butuh isFsPathAllowed. */
     /** Tambah header Connection: close (dipakai saat response error). */
     private fun Response.closeConnection(): Response {
         addHeader("Connection", "close")
@@ -2641,6 +2639,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Validasi nama file: satu definisi di ServerSecurity. */
     private fun isNameValid(name: String): Boolean = ServerSecurity.isFileNameValid(name)
 
+    /** Path berada di atas (induk dari) salah satu root yang sah? Hanya untuk
+     *  listing browse-only — aksi tulis tetap butuh isFsPathAllowed. */
     private fun isFsBrowseAncestor(path: String): Boolean =
         ServerSecurity.isBrowseableAncestorFast(path, canonicalFsRoots())
 
