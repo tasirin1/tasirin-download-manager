@@ -495,6 +495,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // pernah ada — hapus berkasnya sekarang agar tidak menahan kuota
         // buffer upload global sampai pembersihan 24 jam. Upload aktif
         // selalu memegang lock segar (lastUse disentuh tiap chunk).
+        // Finalisasi yang sedang berjalan dikecualikan (#251): chunk
+        // terakhir menghentikan penyegaran lock, jadi finalisasi berkas
+        // besar yang lambat bisa tampak "yatim" padahal tmp-nya sedang
+        // disalin — menghapusnya menggagalkan upload yang sudah lengkap.
         runCatching {
             context.cacheDir.listFiles()?.forEach { f ->
                 if (f.isFile && f.name.startsWith("up_") &&
@@ -502,8 +506,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 ) {
                     val id = f.name.removePrefix("up_").removeSuffix(".tmp")
                     val lock = uploadLocks[id]
-                    if (lock == null ||
-                        now - lock.lastUse.get() > 30 * 60 * 1000L
+                    if ((lock == null ||
+                            now - lock.lastUse.get() > 30 * 60 * 1000L) &&
+                        !finalizingUploads.containsKey(id)
                     ) {
                         f.delete()
                     }
