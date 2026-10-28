@@ -411,10 +411,18 @@ class DownloadEngine(appContext: Context) {
     private fun untrackConnection(id: String, connection: HttpURLConnection) {
         activeConns[id]?.remove(connection)
         activeConns.remove(id, emptySet())
-        if (activeConns[id] == null && _items.value.none { it.id == id }) cancelledConns.remove(id)
+        // Bendera batal dibuang saat koneksi terakhir id ini lepas, TANPA
+        // memindai seluruh daftar item seperti sebelumnya (issue #373):
+        // jalur panas per-segmen tidak boleh membayar O(jumlah item).
+        // Aman karena perlindungan koneksi yatim job yang dibatalkan
+        // tidak lagi bergantung pada bendera ini — trackOpenedConnection
+        // menilai identitas job coroutine lewat ensureActive (#200), dan
+        // launchItem selalu membersihkan bendera sebelum job baru mulai.
+        val wasCancelled = cancelledConns.containsKey(id)
+        if (activeConns[id] == null) cancelledConns.remove(id)
         // Sukses jangan disconnect: biarkan socket keep-alive dipakai ulang.
         // Cancel/pause tetap diputus via disconnectActive().
-        if (cancelledConns.containsKey(id)) runCatching { connection.disconnect() }
+        if (wasCancelled) runCatching { connection.disconnect() }
     }
 
     @Synchronized
