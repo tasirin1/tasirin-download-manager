@@ -202,6 +202,12 @@ class DownloadEngine(appContext: Context) {
      *  gerbang ini agar daftar yang belum utuh tidak menimpa data
      *  tersimpan atau membersihkan partial milik item yang belum termuat. */
     private val loadGate = CompletableDeferred<Unit>()
+    // True bila ada mutasi yang meminta simpan selama gerbang muat
+    // masih tertutup (scheduleSave/flushSave teredam diam-diam):
+    // flush penutup init wajib menghormatinya, kalau tidak mutasi
+    // pre-gate seperti remove() hilang tak tersimpan (#304).
+    @Volatile
+    private var saveDeferredPreGate = false
 
     /** Tunggu sampai muatan awal antrean terpasang (gerbang #242). */
     suspend fun awaitInitialLoad() = loadGate.await()
@@ -269,7 +275,7 @@ class DownloadEngine(appContext: Context) {
                         "STORAGE: weak credential storage found, re-encrypting"
                     )
                     flushSave()
-                } else if (extras.isNotEmpty() || reconciled) {
+                } else if (extras.isNotEmpty() || reconciled || saveDeferredPreGate) {
                     // Simpan yang teredam gerbang selama jendela muat
                     // (termasuk hasil rekonsiliasi: flushSave internalnya
                     // ikut teredam selama gerbang masih tertutup).
@@ -1404,10 +1410,15 @@ class DownloadEngine(appContext: Context) {
      *  menghapus entri pendahulu/penerus dari UI bisa menghapus berkas
      *  yang salah karena keduanya menunjuk path yang sama. */
     private fun reconcileOrphanedReplacements(): Boolean {
-        var working = _items.value
-        var changed = false
-        for (successor in working.filter { it.replacesItemId.isNotEmpty() }) {
-            val predecessor = working.find { it.id == successor.replacesItemId }
+        // Snapshot hanya INPUT keputusan berkas; hasil akhirnya
+        // diterapkan ke daftar TERKINI di dalam monitor di bawah —
+        // penetapan langsung _items.value dari salinan ini menimpa
+        // mutasi pengguna (pause/resume/remove/add) yang mendarat
+        // selama loop berkas berjalan (#304).
+        val snapshot = _items.value
+        val clearedIds = mutableSetOf<String>()
+        for (successor in snapshot.filter { it.replacesItemId.isNotEmpty() }) {
+            val predecessor = snapshot.find { it.id == successor.replacesItemId }
                 ?: continue
             val path = predecessor.filePath?.takeIf { it.isNotEmpty() } ?: continue
             val target = File(path)
@@ -1434,26 +1445,30 @@ class DownloadEngine(appContext: Context) {
             runCatching {
                 File(target.parentFile, target.name + ".replaced.stale").delete()
             }
-            changed = true
+            clearedIds += successor.id
             App.logEvent(
                 "REPLACE RECONCILE: restored ${target.name} from backup " +
                     "after process death"
             )
-            // Penerus tidak pernah selesai (commit selalu mendahului
-            // penandaan COMPLETED): kosongkan penunjuk berkas terbitnya.
-            working = working.map {
-                if (it.id == successor.id) {
+        }
+        if (clearedIds.isEmpty()) return false
+        // Penerus tidak pernah selesai (commit selalu mendahului
+        // penandaan COMPLETED): kosongkan penunjuk berkas terbitnya,
+        // dinilai atas daftar terkini di dalam kunci. flushSave tidak
+        // dipanggil di sini: satu-satunya pemanggil (init) berjalan
+        // pre-gate sehingga panggilan itu selalu no-op — persistensi
+        // ditanggung flush penutup init (lewat saveDeferredPreGate
+        // yang ditandai scheduleSave di updateTransformed ini).
+        updateTransformed { cur ->
+            cur.map {
+                if (it.id in clearedIds) {
                     it.copy(filePath = null, contentUri = null)
                 } else {
                     it
                 }
             }
         }
-        if (changed) {
-            _items.value = working
-            flushSave()
-        }
-        return changed
+        return true
     }
 
     /** Verifikasi penerus lolos: pensiunkan pendahulu (#215). */
@@ -3694,7 +3709,10 @@ class DownloadEngine(appContext: Context) {
         // sekarang bisa menimpa antrean tersimpan dengan daftar kosong
         // (#242). Penambahan selama jendela muat disimpan flushSave
         // penutup muatan.
-        if (!loadGate.isCompleted) return
+        if (!loadGate.isCompleted) {
+            saveDeferredPreGate = true
+            return
+        }
         saveJob?.cancel()
         saveJob = scope.launch {
             delay(SAVE_DEBOUNCE_MS)
@@ -3720,7 +3738,10 @@ class DownloadEngine(appContext: Context) {
     @Synchronized
     private fun flushSave() {
         // Sama seperti scheduleSave: jangan persist daftar belum utuh.
-        if (!loadGate.isCompleted) return
+        if (!loadGate.isCompleted) {
+            saveDeferredPreGate = true
+            return
+        }
         saveJob?.cancel()
         saveJob = null
         // Sinkron: state pause/cancel/selesai/add tidak boleh hilang bila
