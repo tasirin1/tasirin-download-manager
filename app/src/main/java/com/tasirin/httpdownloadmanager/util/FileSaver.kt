@@ -595,9 +595,15 @@ class FileSaver(context: Context) {
                             // rename menghasilkan dua berkas bernama sama
                             // persis di folder yang sama. Pola sama seperti
                             // saveToMediaStore yang meneruskan koleksinya.
+                            // Koleksi diturunkan dari mime nama LAMA
+                            // (issue #411): koleksi tempat berkas hidup
+                            // ditentukan jenisnya saat ini, jadi memakai
+                            // mime nama baru membuat rename lintas-ekstensi
+                            // (video .mp4 -> .bin) memeriksa koleksi yang
+                            // salah dan duplikat di Movies lolos lagi.
                             uniqueMediaStoreName(
                                 clean, rel,
-                                MediaLibrary.mediaCollectionFor(rel, MimeTypes.forFile(clean))
+                                MediaLibrary.mediaCollectionFor(rel, MimeTypes.forFile(item.fileName))
                             )
                         } else {
                             clean
