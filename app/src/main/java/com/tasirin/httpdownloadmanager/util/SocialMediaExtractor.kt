@@ -1632,6 +1632,17 @@ object SocialMediaExtractor {
         val first = fetchDrive(driveDownloadUrl(id), user) ?: return emptyList()
         val html = first.html
         if (html != null) {
+            // Berkas .html yang memang dibagikan sebagai berkas dilayani
+            // sebagai text/html + Content-Disposition: attachment — itu
+            // BERKAS, bukan halaman perantara (#248). Periksa disposition
+            // sebelum memperlakukan body sebagai halaman konfirmasi.
+            val cdName = parseContentDispositionFileName(first.contentDisposition)
+            if (cdName != null) {
+                val mime = first.contentType.substringBefore(';').trim()
+                return listOf(
+                    Result(first.finalUrl, cdName, cdName, "Original", mime, first.cookies)
+                )
+            }
             // Halaman perantara: hanya berguna bila memuat form konfirmasi
             // unduh; halaman kuota/masuk/tidak-ditemukan gagal dengan jujur.
             val confirmUrl = parseDriveConfirmUrl(html) ?: return emptyList()
