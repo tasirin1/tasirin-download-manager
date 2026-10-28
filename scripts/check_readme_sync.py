@@ -11,7 +11,17 @@ from pathlib import Path
 
 def headings(path: Path) -> list[int]:
     levels = []
+    # Lacak blok kode berpagar (issue #527): baris mirip-heading di
+    # dalam contoh kode (mis. komentar konfigurasi) BUKAN heading —
+    # tanpa pelacakan ini ia terhitung heading hantu dan menyalahkan
+    # struktur dokumen yang sebenarnya sinkron.
+    in_fence = False
     for line in path.read_text(encoding="utf-8").splitlines():
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
         m = re.match(r"^(#{1,6})\s+", line)
         if m:
             levels.append(len(m.group(1)))
