@@ -301,6 +301,16 @@ object MediaLibrary {
         }
     }
 
+    /** Kosongkan cache scan saja (issue #548): untuk terbitan
+     *  MediaStore yang tidak punya path filesystem untuk dipindai
+     *  MediaScannerConnection. Tanpa kait ini, invalidasi galeri
+     *  sesudah unduhan selesai lewat jalur MediaStore hanya
+     *  bergantung pada ContentObserver yang ter-debounce 10 detik,
+     *  jadi berkas baru bisa tak terlihat sampai TTL cache berakhir. */
+    fun invalidateScanCache() {
+        synchronized(scanLock) { scanCache = null }
+    }
+
     /** Kondisi cache scan terpakai: masih dalam TTL dan (hasil lama memuat
      *  cukup entry untuk limit ini ATAU scan lama tuntas). Dipisah jadi fungsi
      *  murni supaya bisa di-unit-test. */

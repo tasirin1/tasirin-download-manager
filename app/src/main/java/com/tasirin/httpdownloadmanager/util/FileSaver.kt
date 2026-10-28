@@ -103,13 +103,16 @@ class FileSaver(context: Context) {
         if (clean.startsWith("m:")) {
             if (Build.VERSION.SDK_INT < 29) return publishToPublicDir(partial, fileName)
             val relative = clean.removePrefix("m:").trim().trim('/')
-            return runCatching {
+            val published = runCatching {
                 val result = saveToMediaStore(fileName, relative.ifEmpty { null }) { out ->
                     partial.inputStream().use { it.copyTo(out, IO_BUF) }
                 }
                 partial.delete()
                 result
             }.getOrNull()
+            // Sama seperti publishToMediaStore (issue #548).
+            if (published != null) MediaLibrary.invalidateScanCache()
+            return published
         }
         // Bentuk f:<path> dan path absolut polos: selesaikan lewat helper
         // bersama agar publish menilai folder yang sama dengan pemeriksa
@@ -548,6 +551,10 @@ class FileSaver(context: Context) {
         }.getOrNull()
         if (result != null) {
             partial.delete()
+            // Terbitan MediaStore tak punya path untuk
+            // notifyMediaChanged: kosongkan cache scan galeri
+            // secara eksplisit (issue #548).
+            MediaLibrary.invalidateScanCache()
             return result
         }
         return publishToInternal(partial, fileName)
