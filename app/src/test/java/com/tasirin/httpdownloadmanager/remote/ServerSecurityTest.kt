@@ -52,11 +52,46 @@ class ServerSecurityTest {
             "?url=https://cdn.example/v.mp4?sig=<redacted>&hd=1",
             ServerSecurity.redactQueryForLog("?url=https://cdn.example/v.mp4?sig=ABC123&hd=1")
         )
+        // Nilai rahasia kini ditelan sampai & mentah/akhir (#310):
+        // parameter jinak sesudah sig di URL terenkode ikut tersamar
+        // (dulu berhenti di %26 dan ekor nilai bisa bocor).
         assertEquals(
-            "?url=https%3A%2F%2Fcdn.example%2Fv.mp4%3Fsig%3D<redacted>%26hd%3D1",
+            "?url=https%3A%2F%2Fcdn.example%2Fv.mp4%3Fsig%3D<redacted>",
             ServerSecurity.redactQueryForLog(
                 "?url=https%3A%2F%2Fcdn.example%2Fv.mp4%3Fsig%3DABC123%26hd%3D1"
             )
+        )
+        assertEquals(
+            "?token=<redacted>",
+            ServerSecurity.redactQueryForLog("?token=abc%26def")
+        )
+        // Nama rahasia tambahan (#310): lsig YouTube, oh Facebook,
+        // kredensial AWS, token akses generik.
+        assertEquals(
+            "?url=https%3A%2F%2Fx%2Fv.mp4%3Flsig%3D<redacted>",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fx%2Fv.mp4%3Flsig%3DXYZ9%26foo%3Dbar"
+            )
+        )
+        assertEquals(
+            "?oh=<redacted>&e=1",
+            ServerSecurity.redactQueryForLog("?oh=abcd1234&e=1")
+        )
+        assertEquals(
+            "?x-amz-credential=<redacted>&y=1",
+            ServerSecurity.redactQueryForLog("?x-amz-credential=AKID%2F2024&y=1")
+        )
+        assertEquals(
+            "?access_token=<redacted>&y=1",
+            ServerSecurity.redactQueryForLog("?access_token=XYZ&y=1")
+        )
+        assertEquals(
+            "?session=<redacted>&a=1",
+            ServerSecurity.redactQueryForLog("?session=zzz999&a=1")
+        )
+        assertEquals(
+            "?api_key=<redacted>&b=2",
+            ServerSecurity.redactQueryForLog("?api_key=K-123&b=2")
         )
         assertEquals(
             "?x-amz-signature=<redacted>&y=2",

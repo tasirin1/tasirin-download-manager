@@ -53,7 +53,14 @@ object ServerSecurity {
      *  (%3F/%26/%3D), dengan nilai berhenti di pemisah terenkode. */
     private val LOG_SECRET_RE =
         Regex(
-            "(^|[?&]|%3F|%26)((?:token|pin|verify|zt|password|secret|auth|sig|signature|hmac|x-amz-signature|x-goog-signature)(?:=|%3D))[^&]*?(?=%26|&|$)",
+            // Nilai berhenti hanya di & MENTAH atau akhir string:
+            // berhenti di %26 menyisakan ekor nilai yang memuat &
+            // terenkode sebagai data (bocor sebagian). Konsekuensinya
+            // parameter jinak sesudah rahasia di dalam URL terenkode
+            // ikut tersamar di log — aman untuk sebuah peredaksi.
+            // Nama diperluas (#310): lsig (YouTube), oh (Facebook),
+            // x-amz-credential, access_token, api_key, session.
+            "(^|[?&]|%3F|%26)((?:token|pin|verify|zt|password|secret|auth|sig|signature|hmac|x-amz-signature|x-goog-signature|lsig|oh|x-amz-credential|access_token|api_key|session)(?:=|%3D))[^&]*",
             RegexOption.IGNORE_CASE
         )
 
