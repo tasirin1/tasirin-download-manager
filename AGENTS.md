@@ -42,7 +42,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── CONTRIBUTING.md                   # Panduan kontribusi singkat (baca juga AGENTS.md)
 ├── .githooks/pre-commit              # Hook opsional: check_repo.py --pre-commit
 ├── gradle/libs.versions.toml          # Version catalog — pusat versi dependensi & plugin
-├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 37, desugaring, R8
+├── app/build.gradle.kts              # minSdk 23 / targetSdk 36, compileSdk 37, desugaring, R8
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
 ├── docs/index.html                    # WEBSITE GitHub Pages (satu file; deploy otomatis dari /docs)
 ├── docs/site.webmanifest             # PWA manifest (installable)
@@ -171,7 +171,9 @@ kuat dan tanpa diskusi:
   dan dependency test zxing sudah tidak ada. JANGAN hidupkan kembali tanpa
   alasan kuat dan diskusi.
 - **`values-en`** — tidak ada; default `values/strings.xml` = Inggris.
-- **minSdk** — tetap 21 (Android 5+), jangan naikkan.
+- **minSdk** — 23 (Android 6+). Dinaikkan dari 21 atas keputusan owner
+  2026-10-28 (syarat appcompat 1.8, PR #116); dukungan Android 5 berakhir.
+  Jangan diubah lagi tanpa keputusan owner.
 - **Tombol tab Downloads** — butuh handler klik sendiri (pola
   `tabGallery`/`tabFiles`); jangan hapus handler-nya.
 - **`fmtDate`** — hanya SATU definisi di `remote.src.html` (dua definisi

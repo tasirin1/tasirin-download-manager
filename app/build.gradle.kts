@@ -14,9 +14,10 @@ android {
 
     defaultConfig {
         applicationId = "com.tasirin.httpdownloadmanager"
-        minSdk = 21
-        // targetSdk 36: Android 5 (minSdk 21) tetap didukung penuh.
-        // Android 5–10: WRITE_EXTERNAL_STORAGE + legacy storage bekerja penuh.
+        minSdk = 23
+        // targetSdk 36: Android 6 (minSdk 23) tetap didukung penuh; minSdk
+        // naik 21 -> 23 atas keputusan owner 2026-10-28 (syarat appcompat 1.8).
+        // Android 6–10: WRITE_EXTERNAL_STORAGE + legacy storage bekerja penuh.
         // Android 11+: MANAGE_EXTERNAL_STORAGE ("Akses semua file").
         // targetSdk 35+: boot-start download lewat JobScheduler (BootResumeJobService)
         // karena dataSync FGS dilarang start dari BOOT_COMPLETED; edge-to-edge
