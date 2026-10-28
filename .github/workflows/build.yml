@@ -28,6 +28,10 @@ permissions:
 jobs:
   verify:
     name: Verifikasi cepat (tanpa SDK)
+    # Batas keras (issue #334): tanpa ini proses yang menggantung
+    # (mis. gh api) menahan job — dan seluruh antrean build — sampai
+    # batas default GitHub 360 menit. Job ini normalnya < 5 menit.
+    timeout-minutes: 15
     # Job ini mengeksekusi skrip dari checkout PR — baca saja (issue #185).
     permissions:
       contents: read

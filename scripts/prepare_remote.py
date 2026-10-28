@@ -119,7 +119,9 @@ def minify_html(html: str) -> str:
 AFFIXES = "me|men|mem|meng|di|ter|ber|ke|pe|peng|se|dip|memp|meny|memper|menge"
 
 # Pola terlarang dikompilasi SEKALI di level modul (#294): versi lama
-# mengompilasi 126 pola regex di SETIAP panggilan banned_hits.
+# mengompilasi seluruh pola BANNED_ID di SETIAP panggilan banned_hits.
+# (Jumlah persisnya tidak ditulis di sini: angka keras di komentar ini
+# pernah basi sesudah dedup daftarnya — issue #334.)
 _BANNED_PATTERNS = [
     (
         word,

@@ -42,11 +42,17 @@ def api_verified_bot(base):
     if not shas:
         return False
     for sha in shas:
-        out = subprocess.run(
-            ["gh", "api", "repos/" + slug + "/commits/" + sha,
-             "--jq", "(.author.login == \"dependabot[bot]\") and "
-                     "(.commit.verification.verified == true)"],
-            capture_output=True, text=True)
+        try:
+            out = subprocess.run(
+                ["gh", "api", "repos/" + slug + "/commits/" + sha,
+                 "--jq", "(.author.login == \"dependabot[bot]\") and "
+                         "(.commit.verification.verified == true)"],
+                capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            # gh menggantung tidak boleh menahan job verify sampai
+            # batas default runner (issue #334); gagal-tertutup:
+            # rentang tidak disertifikasi sebagai bot murni.
+            return False
         if out.returncode != 0 or out.stdout.strip() != "true":
             return False
     return True
