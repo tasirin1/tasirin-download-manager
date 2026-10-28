@@ -15,17 +15,17 @@ object Crypto {
 
     private const val ALIAS = "httpdm_cred_v1"
     private const val PREFIX = "v1:"
-    // Penanda eksplisit penyimpanan plaintext (API 21-22 tanpa Keystore AES
-    // atau fallback saat enkripsi gagal) agar bisa diaudit dan dimigrasi,
-    // bukan plaintext diam-diam yang dikira terenkripsi.
+    // Penanda eksplisit penyimpanan plaintext (fallback saat enkripsi
+    // gagal) agar bisa diaudit dan dimigrasi, bukan plaintext diam-diam
+    // yang dikira terenkripsi.
     internal const val PLAIN_PREFIX = "plain:"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private val KEY_LOCK = Any()
     @Volatile private var cachedKey: SecretKey? = null
 
-    /** True bila enkripsi terakhir jatuh ke plaintext (hanya API 23+; di
-     *  API 21-22 plaintext memang by-design). Pemanggil bisa memutar ulang
-     *  enkripsi setelah kunci pulih agar kredensial tak plaintext selamanya. */
+    /** True bila enkripsi terakhir jatuh ke plaintext. Pemanggil bisa
+     *  memutar ulang enkripsi setelah kunci pulih agar kredensial tak
+     *  plaintext selamanya. */
     @Volatile var encryptFallbackUsed: Boolean = false
         private set
 
@@ -38,12 +38,12 @@ object Crypto {
         return was
     }
 
-    /** Enkripsi nilai dengan kunci Android Keystore (AES-GCM, API 23+).
-     *  Di Android 5.0-5.1 (API 21-22) Keystore AES belum tersedia,
-     *  jadi nilai disimpan apa adanya. */
+    /** Enkripsi nilai dengan kunci Android Keystore (AES-GCM).
+     *  minSdk 23 menjamin Keystore AES selalu tersedia; plaintext hanya
+     *  menjadi fallback bila enkripsi sungguhan gagal (lihat
+     *  fallbackPlain). */
     fun encrypt(plain: String): String {
         if (plain.isEmpty()) return ""
-        if (Build.VERSION.SDK_INT < 23) return PLAIN_PREFIX + plain
         encryptOnce(plain).onSuccess { return it }
             .onFailure { e ->
                 // Hanya kunci invalid yang boleh dibuang: gagal sesaat dengan
@@ -67,9 +67,6 @@ object Crypto {
     }
 
     private fun encryptOnce(plain: String): Result<String> = runCatching {
-        // Guard dalam-metode (bukan hanya di encrypt): lint NewApi menuntut
-        // bukti API-23 di tiap fungsi yang menyentuh key().
-        if (Build.VERSION.SDK_INT < 23) throw IllegalStateException("keystore unavailable")
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())
         PREFIX + b64(cipher.iv) + ":" + b64(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)))
@@ -78,8 +75,6 @@ object Crypto {
     /** True bila rantai penyebab memuat kunci-invalid permanen. Internal agar
      *  bisa di-unit-test. */
     internal fun isKeyInvalidated(e: Throwable?): Boolean {
-        // Kelas pengecualian hanya ada di API 23+ (guard lint + runtime).
-        if (Build.VERSION.SDK_INT < 23) return false
         var cur = e
         while (cur != null) {
             if (cur is android.security.keystore.KeyPermanentlyInvalidatedException) return true
@@ -117,7 +112,6 @@ object Crypto {
         if (payload.isNullOrEmpty()) return ""
         if (payload.startsWith(PLAIN_PREFIX)) return payload.removePrefix(PLAIN_PREFIX)
         if (!payload.startsWith(PREFIX)) return payload
-        if (Build.VERSION.SDK_INT < 23) return ""
         return runCatching {
             val body = payload.removePrefix(PREFIX)
             val idx = body.indexOf(':')
@@ -130,8 +124,7 @@ object Crypto {
         }.getOrDefault("")
     }
 
-    /** AES AndroidKeyStore hanya tersedia API 23+; pemanggil (encrypt/decrypt)
-     *  sudah menangani fallback untuk Android 5.0-5.1. */
+    /** AES AndroidKeyStore tersedia sejak API 23 = minSdk aplikasi. */
     @RequiresApi(Build.VERSION_CODES.M)
     private fun key(): SecretKey {
         cachedKey?.let { return it }

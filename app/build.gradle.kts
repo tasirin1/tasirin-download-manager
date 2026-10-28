@@ -91,7 +91,7 @@ android {
     }
 
     lint {
-        // Pengaman kompatibilitas API 21: kegagalan lint (mis. NewApi) menggagalkan build.
+        // Pengaman kompatibilitas API 23 (minSdk): kegagalan lint (mis. NewApi) menggagalkan build.
         abortOnError = true
         // Laporan lint selalu dibuat otomatis; warning tampil sebagai annotation CI.
         // Sengaja dinonaktifkan:

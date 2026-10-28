@@ -413,11 +413,11 @@ class SettingsActivity : AppCompatActivity() {
         binding.storageBtn.visibility = when {
             Build.VERSION.SDK_INT >= 30 -> if (Permissions.needsAllFilesAccess(this))
                 View.VISIBLE else View.GONE
-            Build.VERSION.SDK_INT >= 23 ->
+            // minSdk 23: cabang else di sini = API 23-29 (izin runtime).
+            else ->
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
                         PackageManager.PERMISSION_GRANTED
                 ) View.VISIBLE else View.GONE
-            else -> View.GONE
         }
         binding.storageBtn.setOnClickListener {
             if (Build.VERSION.SDK_INT >= 30) {
@@ -1047,7 +1047,6 @@ class SettingsActivity : AppCompatActivity() {
 
     @SuppressLint("BatteryLife") // Penjelasan izin baterai jelas bagi pengguna TV box/HP.
     private fun requestBatteryExemption() {
-        if (Build.VERSION.SDK_INT < 23) return
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         if (pm.isIgnoringBatteryOptimizations(packageName)) return
         runCatching {
