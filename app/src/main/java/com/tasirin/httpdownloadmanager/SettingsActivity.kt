@@ -922,6 +922,11 @@ class SettingsActivity : AppCompatActivity() {
      *  menjalankan dua saveSettings paralel (balapan tulis prefs/server). */
     @Volatile private var savingSettings = false
 
+    // Penjaga in-flight Check Update (issue #524): tanpa ini dua
+    // ketuk cepat meluncurkan dua cek jaringan dan dialog update
+    // bisa bertumpuk dua lapis.
+    @Volatile private var checkingUpdate = false
+
     private fun wireSave() {
         binding.btnSave.setOnClickListener {
             if (savingSettings) return@setOnClickListener
@@ -1024,46 +1029,54 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun checkForUpdate() {
+        if (checkingUpdate) return
+        checkingUpdate = true
+        binding.btnCheckUpdate.isEnabled = false
         binding.updateStatus.text = getString(R.string.update_checking)
         lifecycleScope.launch {
-            val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@SettingsActivity) }
-            if (info == null) {
-                binding.updateStatus.text = getString(R.string.update_failed)
-                return@launch
-            }
-            val current = runCatching {
-                packageManager.packageInfoCompat(packageName).versionCodeCompat().toInt()
-            }.getOrDefault(0)
-            if (info.versionCode <= current) {
-                binding.updateStatus.text = getString(R.string.update_latest)
-                // Sudah terbaru: jangan unduh ulang APK yang sama (buang kuota).
-                return@launch
-            }
-            binding.updateStatus.text = getString(
-                R.string.update_available, info.versionName, info.versionCode
-            )
-            // Penjaga seumur activity (pola refreshLanIpsAsync, #300):
-            // cek update menunggu jaringan — pengguna bisa menekan Back
-            // di tengah jalan, dan show() pada activity yang sedang
-            // finishing melempar BadTokenException.
-            if (isFinishing || isDestroyed) return@launch
-            // Aplikasi tidak pernah mengunduh APK sendiri (pola dropper yang
-            // dicurigai Play Protect): pengguna mengambil versi baru lewat
-            // browser dari halaman rilis resmi.
-            AlertDialog.Builder(this@SettingsActivity)
-                .setTitle(R.string.update_title)
-                .setMessage(
-                    getString(
-                        R.string.update_available, info.versionName, info.versionCode
-                    ) + "\n\n" + getString(R.string.update_browser_note)
-                )
-                .setNegativeButton(R.string.update_later, null)
-                .setPositiveButton(R.string.update_open_release) { _, _ ->
-                    runCatching {
-                        startActivity(Intent(Intent.ACTION_VIEW, info.pageUrl.toUri()))
-                    }
+            try {
+                val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@SettingsActivity) }
+                if (info == null) {
+                    binding.updateStatus.text = getString(R.string.update_failed)
+                    return@launch
                 }
-                .show()
+                val current = runCatching {
+                    packageManager.packageInfoCompat(packageName).versionCodeCompat().toInt()
+                }.getOrDefault(0)
+                if (info.versionCode <= current) {
+                    binding.updateStatus.text = getString(R.string.update_latest)
+                    // Sudah terbaru: jangan unduh ulang APK yang sama (buang kuota).
+                    return@launch
+                }
+                binding.updateStatus.text = getString(
+                    R.string.update_available, info.versionName, info.versionCode
+                )
+                // Penjaga seumur activity (pola refreshLanIpsAsync, #300):
+                // cek update menunggu jaringan — pengguna bisa menekan Back
+                // di tengah jalan, dan show() pada activity yang sedang
+                // finishing melempar BadTokenException.
+                if (isFinishing || isDestroyed) return@launch
+                // Aplikasi tidak pernah mengunduh APK sendiri (pola dropper yang
+                // dicurigai Play Protect): pengguna mengambil versi baru lewat
+                // browser dari halaman rilis resmi.
+                AlertDialog.Builder(this@SettingsActivity)
+                    .setTitle(R.string.update_title)
+                    .setMessage(
+                        getString(
+                            R.string.update_available, info.versionName, info.versionCode
+                        ) + "\n\n" + getString(R.string.update_browser_note)
+                    )
+                    .setNegativeButton(R.string.update_later, null)
+                    .setPositiveButton(R.string.update_open_release) { _, _ ->
+                        runCatching {
+                            startActivity(Intent(Intent.ACTION_VIEW, info.pageUrl.toUri()))
+                        }
+                    }
+                    .show()
+            } finally {
+                checkingUpdate = false
+                binding.btnCheckUpdate.isEnabled = true
+            }
         }
     }
 
