@@ -3591,10 +3591,6 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun applyAuthHeaders(conn: HttpURLConnection, item: DownloadItem) {
-        applyAuthHeaders(conn, item.username, item.password, item.headers)
-    }
-
     private fun applyAuthHeaders(
         conn: HttpURLConnection,
         username: String,
