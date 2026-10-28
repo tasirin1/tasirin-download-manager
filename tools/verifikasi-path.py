@@ -1363,6 +1363,29 @@ def utama():
         # pola berisiko) tak berjalan dan mode jalur menjawab LOLOS
         # semu. git diff HEAD menilai gabungan staged+unstaged.
         diff = jalan("git", "diff", "HEAD", "--", *berubah) or ""
+        # Berkas tak terlacak yang disebut eksplisit (issue #496): git
+        # diff HEAD tak pernah mengeluarkan isinya, jadi suntikkan
+        # sebagai diff semu ber-header @@ seperti mode --semua (#213,
+        # penomoran diperbaiki #487) agar keluarga cek berbasis diff
+        # ikut menilainya — tanpa ini verifikasi per-path atas berkas
+        # yang baru dibuat menjawab LOLOS semu untuk cek isi.
+        tak_lacak = set(nama_tak_lacak())
+        for nama in berubah:
+            if nama not in tak_lacak:
+                continue
+            try:
+                with open(os.path.join(AKAR, nama), encoding="utf-8") as f:
+                    isi = f.read(2_000_000)
+            except (OSError, UnicodeDecodeError):
+                continue
+            nama_header = nama.replace("\n", "_").replace("\r", "_")
+            baris_isi = isi.splitlines()
+            diff += (
+                "\ndiff --git a/" + nama_header + " b/" + nama_header
+                + "\n+++ b/" + nama_header + "\n"
+                + "@@ -0,0 +1," + str(len(baris_isi)) + " @@\n"
+                + "\n".join("+" + baris for baris in baris_isi)
+            )
     elif args.rentang:
         daftar = daftar_berkas_berubah(args.rentang)
         if daftar is None:
