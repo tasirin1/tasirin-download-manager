@@ -70,6 +70,19 @@ def jalan(*args):
     return hasil.stdout if hasil.returncode == 0 else None
 
 
+def jalan_output(*args):
+    """Seperti jalan() tetapi stdout dikembalikan apa adanya walau
+    returncode bukan nol (None hanya bila perintah gagal dijalankan).
+    Untuk perintah yang justru BERISI informasi saat keluar bukan-nol,
+    mis. `git diff --check` (issue #407)."""
+    try:
+        hasil = subprocess.run(
+            list(args), cwd=AKAR, capture_output=True, text=True, timeout=60)
+    except Exception:
+        return None
+    return hasil.stdout
+
+
 def daftar_berkas_berubah(rentang):
     if rentang:
         for pemisah in ("...", ".."):
@@ -1043,7 +1056,11 @@ def cek_pola_berisiko(peringatan, diff):
             peringatan.append("println di diff (pakai Log/buffer): " + isi.strip()[:80])
         if ".printStackTrace()" in isi:
             peringatan.append("printStackTrace di diff (catat log eksplisit): " + isi.strip()[:80])
-    cek = jalan("git", "diff", "--check")
+    # jalan_output, BUKAN jalan (issue #407): git diff --check keluar
+    # bukan-nol justru saat menemukan masalah spasi, dan jalan() menelan
+    # stdout pada returncode bukan-nol — peringatan ini sebelumnya kode
+    # mati yang tak pernah bisa tampil.
+    cek = jalan_output("git", "diff", "--check")
     if cek:
         peringatan.append("Rapikan spasi diff --check: " + cek.strip().splitlines()[0][:100])
 
