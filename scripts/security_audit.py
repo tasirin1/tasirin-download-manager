@@ -409,16 +409,18 @@ def scan_text(
             )
 
     # Lintasan multi-baris (issue #193) untuk aturan bertanda multiline:
-    # varian pola tanpa batas '\n' (rentang dibatasi 300 karakter agar
-    # match tidak merembet ke pernyataan tak terkait) dijalankan pada
-    # teks utuh; temuan dipetakan ke baris awal match dan didedupe
-    # terhadap hasil per baris lewat `seen`.
+    # varian pola tanpa batas '\n' dijalankan pada teks utuh; rentang
+    # dibatasi 300 karakter DAN berhenti di ';' maupun ')' — kurung
+    # tutup mengakhiri pernyataan panggilan, jadi kata sensitif dari
+    # pernyataan LAIN sesudah panggilan selesai tidak ikut tertuduh
+    # (false positive issue #201). Temuan dipetakan ke baris awal
+    # match dan didedupe terhadap hasil per baris lewat `seen`.
     full = "\n".join(lines)
     for rule, pattern in compiled:
         if not rule.multiline:
             continue
         long_pattern = re.compile(
-            rule.pattern.replace("[^;\\n]*", "[^;]{0,300}"), rule.flags
+            rule.pattern.replace("[^;\\n]*", "[^;)]{0,300}"), rule.flags
         )
         for match in long_pattern.finditer(full):
             start_index = full.count("\n", 0, match.start())
@@ -525,6 +527,18 @@ def run_self_test() -> int:
             "        + u, null)",
             "}",
         ],
+        Path("sample_fp.kt"): [
+            # Regresi issue #201: Log polos yang kurungnya DITUTUP, lalu
+            # pernyataan LAIN menyebut token dalam jarak <300 karakter —
+            # tidak boleh tertuduh sensitive_log oleh lintasan multi-baris.
+            "class Fp {",
+            "    fun a() = Log.d(\"unduh\", \"mulai unduhan baru\")",
+            "    fun b(item: String) {",
+            "        val token = tokenUntuk(item)",
+            "        simpan(token)",
+            "    }",
+            "}",
+        ],
         Path("sample_str.kt"): [
             "class Grab {",
             '    val js = "(function(){try{work();}catch(e){}})"',
@@ -588,9 +602,13 @@ def run_self_test() -> int:
         and item["path"] == "sample_multi.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql:
+    fp_hit = any(
+        item["rule_id"] == "sensitive_log" and item["path"] == "sample_fp.kt"
+        for item in findings
+    )
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
