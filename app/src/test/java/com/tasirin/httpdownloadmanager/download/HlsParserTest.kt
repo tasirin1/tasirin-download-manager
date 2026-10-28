@@ -206,9 +206,12 @@ class HlsParserTest {
         assertEquals(3, direct.segments.size)
         assertEquals("https://cdn.example.com/videos/seg1.ts", direct.segments[0])
         assertEquals("https://cdn.example.com/media/seg2.ts", direct.segments[1])
-        assertEquals(2, direct.durationsUs.size)
+        // Sejajar indeks (issue #394): segmen tanpa EXTINF (seg3) mendapat
+        // durasi 0, BUKAN menggeser durasi segmen lain.
+        assertEquals(3, direct.durationsUs.size)
         assertEquals(9_500_000L, direct.durationsUs[0])
         assertEquals(10_000_000L, direct.durationsUs[1])
+        assertEquals(0L, direct.durationsUs[2])
     }
 
     @Test
@@ -216,7 +219,21 @@ class HlsParserTest {
         val body = "#EXTM3U\n\n#EXT-X-VERSION:3\nseg1.ts\n"
         val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/a.m3u8")
         assertEquals(listOf("https://cdn.example.com/seg1.ts"), direct.segments)
-        assertTrue(direct.durationsUs.isEmpty())
+        assertEquals(listOf(0L), direct.durationsUs)
+    }
+
+    @Test
+    fun `parseDirectMedia - EXTINF segmen terbuang tak menggeser durasi`() {
+        // Segmen skema non-http dibuang; EXTINF-nya tak boleh menempel ke
+        // segmen berikutnya (issue #394).
+        val body = "#EXTM3U\n" +
+            "#EXTINF:5.0,\n" +
+            "ftp://cdn.example.com/segA.ts\n" +
+            "#EXTINF:7.0,\n" +
+            "segB.ts\n"
+        val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/a.m3u8")
+        assertEquals(listOf("https://cdn.example.com/segB.ts"), direct.segments)
+        assertEquals(listOf(7_000_000L), direct.durationsUs)
     }
 
     @Test

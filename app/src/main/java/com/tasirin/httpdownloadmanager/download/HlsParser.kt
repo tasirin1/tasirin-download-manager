@@ -140,16 +140,28 @@ object HlsParser {
     fun parseDirectMedia(body: String, baseUrl: String): DirectMedia {
         val segments = mutableListOf<String>()
         val durations = mutableListOf<Long>()
+        // Durasi dipasangkan ke segmen BERIKUTNYA yang diterima (issue
+        // #394): sebelumnya kedua daftar dibangun independen — EXTINF
+        // yang segmennya terbuang (URI non-http) tetap terhitung dan
+        // menggeser indeks durasi terhadap segmen, padahal konsumen
+        // remux membaca durationsUs sejajar indeks segmen. Kini setiap
+        // segmen yang diterima selalu mendapat tepat satu durasi
+        // (EXTINF tertunda, atau 0 bila tak ada).
+        var pendingDurationUs: Long? = null
         for (raw in body.lines()) {
             val line = raw.trim()
             if (line.isEmpty()) continue
             if (line.startsWith("#EXTINF:")) {
                 val dur = line.substringAfter(":").substringBefore(",").trim()
                     .toDoubleOrNull() ?: 0.0
-                durations.add(hlsSegmentDurationUs(dur))
+                pendingDurationUs = hlsSegmentDurationUs(dur)
             } else if (!line.startsWith("#")) {
                 val url = resolveUrl(baseUrl, line)
-                if (url.startsWith("http")) segments.add(url)
+                if (url.startsWith("http")) {
+                    segments.add(url)
+                    durations.add(pendingDurationUs ?: 0L)
+                }
+                pendingDurationUs = null
             }
         }
         return DirectMedia(segments, durations)
