@@ -885,6 +885,15 @@ def run_self_test() -> int:
         # bukan terlewat diam-diam. Ditulis sebagai byte agar read_lines
         # gagal decode persis seperti berkas nyata yang terlewat.
         (root / "unscanned.js").write_bytes(b"\xff\xfe\x00 eval(userInput)")
+        # Regresi issue #344 cabang UKURAN (dikunci oleh #408): berkas
+        # valid-UTF-8 yang melebihi MAX_FILE_BYTES wajib diperlakukan
+        # sama — file_unscanned, dan pola berbahayanya TIDAK dilaporkan
+        # (bukti berkas benar-benar dilewati, bukan dipindai). Menghapus
+        # cek ukuran di read_lines membuat kedua asersi ini gagal.
+        padding = "// padding baris aman\n"
+        reps = MAX_FILE_BYTES // len(padding) + 100
+        (root / "big_unscanned.js").write_text(
+            padding * reps + "eval(userInput)\n", encoding="utf-8")
         findings = scan_path(root)
 
     by_rule = {str(item["rule_id"]) for item in findings}
@@ -939,6 +948,14 @@ def run_self_test() -> int:
         item["rule_id"] == "file_unscanned" and item["path"] == "unscanned.js"
         for item in findings
     )
+    big_unscanned_hit = any(
+        item["rule_id"] == "file_unscanned" and item["path"] == "big_unscanned.js"
+        for item in findings
+    )
+    big_not_scanned = not any(
+        item["rule_id"] == "js_dynamic_exec" and item["path"] == "big_unscanned.js"
+        for item in findings
+    )
     nested_log = any(
         item["rule_id"] == "sensitive_log" and item["path"] == "sample_nested.kt"
         for item in findings
@@ -991,9 +1008,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit:
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
