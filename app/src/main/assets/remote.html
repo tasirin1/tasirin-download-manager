@@ -62,6 +62,7 @@ else window.location.reload();
 const THEME_KEY = 'dm_theme';
 let themeMode = 'auto';
 try { themeMode = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) {}
+if (themeMode !== 'auto' && themeMode !== 'light' && themeMode !== 'dark') themeMode = 'auto';
 const themeMq = (window.matchMedia && typeof window.matchMedia === 'function')
 ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 function effectiveTheme() {
@@ -1041,6 +1042,8 @@ const FS_LAST_PATH_KEY = 'fsLastPath';
 let fsItems = [];
 let fsTotal = 0;
 let fsOffset = 0;
+let fsAfterName = '';
+let fsAfterDir = false;
 let fsLoadingMore = false;
 let fsLoadSeq = 0;
 const FS_PAGE = 250;
@@ -1342,10 +1345,17 @@ if (e.key === 'Escape' && fsToolsMenuOpen) closeFsToolsMenu();
 if (fsMenuBackdrop) fsMenuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeFsToolsMenu(); });
 let fsLocationsLoaded = false;
 let fsLocationsLoading = false;
+function fsSetAfterCursor() {
+const last = fsItems[fsItems.length - 1];
+fsAfterName = last ? String(last.name || '') : '';
+fsAfterDir = !!(last && last.kind === 'dir');
+}
 async function loadFs() {
 const seq = ++fsLoadSeq;
 showFsSkeleton();
 fsOffset = 0;
+fsAfterName = '';
+fsAfterDir = false;
 fsTotal = 0;
 try {
 const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
@@ -1364,6 +1374,8 @@ fsToolsMenu.querySelectorAll('[data-up]').forEach(function (b) {
 b.classList.toggle('hidden', !fsPath || serverReadOnly);
 });
 fsItems = data.items || [];
+fsOffset = fsItems.length;
+fsSetAfterCursor();
 fsTotal = data.total || fsItems.length;
 fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
 if (fsPath) localStorage.setItem(FS_LAST_PATH_KEY, fsPath);
@@ -1542,13 +1554,17 @@ btn.textContent = 'Loading\u2026';
 }
 try {
 const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
-'&offset=' + fsOffset + '&limit=' + FS_PAGE, undefined, 20000);
+(fsAfterName
+? '&after=' + encodeURIComponent(fsAfterName) + '&afterDir=' + (fsAfterDir ? '1' : '0')
+: '&offset=' + fsOffset) +
+'&limit=' + FS_PAGE, undefined, 20000);
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
 if (seq !== fsLoadSeq) return;
 const more = data.items || [];
 fsItems = fsItems.concat(more);
 fsOffset = fsItems.length;
+fsSetAfterCursor();
 fsTotal = data.total || fsItems.length;
 fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
 more.forEach(function (it) { fsAppendRow(fsList, it); });
@@ -3235,7 +3251,10 @@ html += '<div class="sk-item"><div class="sk-ico skeleton"></div><div class="sk-
 }
 box.innerHTML = html + '</div>';
 }
+let snapSeq = 0;
+let snapApplied = 0;
 async function refresh() {
+const mySeq = ++snapSeq;
 if (!hasLoadedItems) showListSkeleton();
 try {
 const res = await fetch(API + '/api/downloads');
@@ -3245,6 +3264,8 @@ return;
 }
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
+if (mySeq <= snapApplied) return;
+snapApplied = mySeq;
 failCount = 0;
 hasLoadedItems = true;
 statusLine.textContent = '';
@@ -3968,7 +3989,7 @@ throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
 }
 refresh();
 } catch (e) {
-fsMsg('Action failed: ' + e.message, true);
+showToast('Action failed: ' + e.message, 4000, 'error');
 }
 }
 const shareModal = document.getElementById('shareModal');
@@ -4097,6 +4118,9 @@ socialPhotoOptions = [];
 return;
 }
 setPlatformBadge(u);
+socialPlatform = '';
+socialVideoOptions = [];
+socialPhotoOptions = [];
 socialDebounce = setTimeout(function () {
 var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
 if (isYT) {
@@ -4126,6 +4150,7 @@ photoSelect.classList.add('hidden');
 fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
 .then(function (r) { return r.json(); })
 .then(function (d) {
+if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
 if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
 socialPlatform = d.platform || 'social';
 var videos = d.videos || [];
@@ -4152,6 +4177,7 @@ photoSelect.classList.add('hidden');
 }
 })
 .catch(function () {
+if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
 document.getElementById('platformBadge').classList.add('hidden');
 qualitySelect.classList.add('hidden');
 photoSelect.classList.add('hidden');
@@ -4214,6 +4240,7 @@ body.set('headers', merged);
 }
 try {
 if (sendAll && socialPhotoOptions.length > 1) {
+var allFailed = 0;
 for (var ci = 0; ci < socialPhotoOptions.length; ci++) {
 var cOpt = socialPhotoOptions[ci];
 if (!cOpt || !cOpt.url) continue;
@@ -4229,12 +4256,15 @@ allBody.append('headers', (uh ? uh + '\n' : '') + 'Cookie: ' + cOpt.cookies);
 } else {
 allBody.append('headers', document.getElementById('dlHeaders').value.trim());
 }
-await fetch(API + '/api/add', {
+var aRes = await fetch(API + '/api/add', {
 method: 'POST',
 body: allBody,
 headers: {'X-Requested-With': 'XMLHttpRequest'}
 });
+var aData = await aRes.json().catch(function () { return null; });
+if (!aRes.ok || !aData || !aData.ok) allFailed++;
 }
+if (allFailed) throw new Error(allFailed + ' of ' + socialPhotoOptions.length + ' photos failed to add');
 } else {
 const res = await fetch(API + '/api/add', {
 method: 'POST',
@@ -4246,6 +4276,7 @@ if (!res.ok || !data || !data.ok) {
 throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
 }
 }
+var failedExtras = [];
 for (var i = 1; i < urls.length; i++) {
 try {
 var extraBody = new URLSearchParams({url: urls[i]});
@@ -4253,11 +4284,24 @@ extraBody.append('speedLimitKbps', document.getElementById('speed').value);
 extraBody.append('priority', document.getElementById('priority').value);
 extraBody.append('path', document.getElementById('storage').value.trim());
 extraBody.append('method', document.getElementById('dlMethod').value);
-await fetch(API + '/api/add', {
+var xRes = await fetch(API + '/api/add', {
 method: 'POST', body: extraBody,
 headers: {'X-Requested-With': 'XMLHttpRequest'}
 });
-} catch (x) {}
+var xData = await xRes.json().catch(function () { return null; });
+if (!xRes.ok || !xData || !xData.ok) failedExtras.push(urls[i]);
+} catch (x) { failedExtras.push(urls[i]); }
+}
+if (failedExtras.length) {
+document.getElementById('url').value = failedExtras.join('\n');
+socialPlatform = '';
+socialVideoOptions = [];
+socialPhotoOptions = [];
+document.getElementById('socialQuality').style.display = 'none';
+document.getElementById('photoSelect').style.display = 'none';
+refresh();
+showToast(failedExtras.length + ' additional URL(s) failed — kept in the field for retry.', 4500, 'error');
+return;
 }
 document.getElementById('url').value = '';
 toggleAddForm(false);
@@ -4297,6 +4341,7 @@ if (data.shutdown) {
 showConnBanner('Server stopped or port changed. Check the app → Remote (HTTP) for the new address.');
 return;
 }
+snapApplied = ++snapSeq;
 const items = data.items || [];
 lastItems = items;
 if (data.status) applyServerStatus(data.status);
@@ -4334,6 +4379,7 @@ clearTimeout(pollTimer);
 pollTimer = setTimeout(pollTick, nextPollMs());
 }
 async function pollSnapshot() {
+const mySeq = ++snapSeq;
 try {
 const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
 if (!res.ok) {
@@ -4341,6 +4387,8 @@ if (res.status === 401) return;
 throw new Error('HTTP ' + res.status);
 }
 const data = await res.json();
+if (mySeq <= snapApplied) return;
+snapApplied = mySeq;
 failCount = 0;
 hasLoadedItems = true;
 statusLine.textContent = '';

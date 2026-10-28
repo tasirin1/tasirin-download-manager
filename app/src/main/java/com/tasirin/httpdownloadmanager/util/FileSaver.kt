@@ -389,7 +389,13 @@ class FileSaver(context: Context) {
         var freed = 0L
         runCatching {
             val expected = buildSet {
-                items.forEach { item -> addAll(protectedPartialNames(item)) }
+                items.forEach { item ->
+                    addAll(protectedPartialNames(item))
+                    // Nama file FINAL item ikut dilindungi: file milik item
+                    // yang dikenal tak pernah yatim, apa pun pola namanya
+                    // (mis. final bernama persis "clip.part.2").
+                    add(FileNames.safe(item.fileName))
+                }
             }
             downloadDir.listFiles()?.forEach { f ->
                 val name = f.name
@@ -750,8 +756,15 @@ internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.Do
     }
 }
 
+private val PART_SEGMENT_TAIL_RE = Regex("""\.part\.\d+$""")
+private val MERGE_STAGING_TAIL_RE = Regex("""\.merge\.\d+$""")
+
 /** File internal yang boleh disapu bila yatim: partial segmen/basis plus
- *  staging merge (`.merge.`) yang tertinggal bila proses mati di tengah merge.
+ *  staging merge (`.merge.<nanoTime>`) yang tertinggal bila proses mati di
+ *  tengah merge. Pola WAJIB terjangkar di ekor nama: pola longgar ".part."
+ *  di tengah nama ikut menyapu file FINAL selesai seperti `film.part.1.mp4`
+ *  atau `game.part.2.rar` (pola nama arsip pecahan yang umum).
  *  Murni agar bisa di-unit-test. */
 internal fun isSweepablePartial(name: String): Boolean =
-    name.endsWith(".part") || ".part." in name || ".merge." in name
+    name.endsWith(".part") || PART_SEGMENT_TAIL_RE.containsMatchIn(name) ||
+        MERGE_STAGING_TAIL_RE.containsMatchIn(name)

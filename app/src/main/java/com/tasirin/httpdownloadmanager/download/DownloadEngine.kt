@@ -1283,7 +1283,12 @@ class DownloadEngine(appContext: Context) {
             message.contains("failed to connect", ignoreCase = true) ||
             message.contains("connect exception", ignoreCase = true) ||
             message.contains("network", ignoreCase = true) ||
-            message.contains("socket", ignoreCase = true)
+            message.contains("socket", ignoreCase = true) ||
+            // Badan terpotong di tengah jalan (EOF prematur) adalah gangguan
+            // jaringan transien: pesan "HLS segment truncated" dari
+            // fetchHlsSegment wajib lolos klasifikasi ini agar retry segmen
+            // benar-benar berjalan (issue #167).
+            message.contains("truncated", ignoreCase = true)
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
@@ -1528,9 +1533,17 @@ class DownloadEngine(appContext: Context) {
         }
 
         val baseName = outName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { outName }
-        val videoTs = saver.partialFile("$baseName.video", segment = null).apply { delete() }
-        val audioAdts = saver.partialFile("$baseName.audio", segment = null).apply { delete() }
-        val mp4 = saver.partialFile("$baseName.muxed", segment = null).apply { delete() }
+        // Nama temp WAJIB unik per item: baseName membuang ekstensi sehingga
+        // dua item yang namanya hanya beda ekstensi ("film.mp4" vs "film.ts")
+        // menghasilkan temp identik dan saling menghapus/menimpa saat jalan
+        // bersamaan. Potongan id item (UUID, aman nama file) jadi pembeda;
+        // nama final tetap dari baseName. Pembeda ditaruh di DEPAN: di ekor
+        // ia bisa terpotong FileNames.safe untuk nama ±200 karakter sehingga
+        // tabrakan kembali pada kasus tepi itu (issue #171).
+        val tempBase = "~" + item.id.take(8) + baseName
+        val videoTs = saver.partialFile("$tempBase.video", segment = null).apply { delete() }
+        val audioAdts = saver.partialFile("$tempBase.audio", segment = null).apply { delete() }
+        val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
         val progress = HlsProgress()
         progress.estimateTotalBytes = plan.estimateTotalBytes
         if (plan.estimateTotalBytes > 0) {
@@ -1574,6 +1587,10 @@ class DownloadEngine(appContext: Context) {
                     )
                     val stream = AdtsAac.open(audioAdts)
                     if (stream != null && !stream.isEmpty) audioStream = stream
+                } catch (e: CancellationException) {
+                    // Pembatalan bukan kegagalan audio: jangan ditelan jadi
+                    // "audio skipped" (pola fetchHlsSegmentWithRetry).
+                    throw e
                 } catch (e: Exception) {
                     audioStream = null
                 }
@@ -1585,7 +1602,7 @@ class DownloadEngine(appContext: Context) {
             var adaptiveAudioFile: File? = null
             if (audioStream == null) {
                 adaptiveAudioFile = tryDownloadAdaptiveAudio(
-                    item, adaptiveAudioUrl, baseName, buffer, throttle, progress, saver
+                    item, adaptiveAudioUrl, tempBase, buffer, throttle, progress, saver
                 )
             }
 
@@ -1762,7 +1779,7 @@ class DownloadEngine(appContext: Context) {
     private suspend fun tryDownloadAdaptiveAudio(
         item: DownloadItem,
         adaptiveAudioUrl: String,
-        baseName: String,
+        tempBase: String,
         buffer: ByteArray,
         throttle: SpeedThrottle,
         progress: HlsProgress,
@@ -1770,7 +1787,7 @@ class DownloadEngine(appContext: Context) {
     ): File? {
         if (adaptiveAudioUrl.isBlank()) return null
         return try {
-            val audioM4a = saver.partialFile("$baseName.audioM4a", segment = null).apply { delete() }
+            val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
             val ok = downloadAdaptiveFile(item, adaptiveAudioUrl, audioM4a, buffer, throttle, progress)
             if (!ok || audioM4a.length() < 1_000L) {
                 App.logEvent("HLS: adaptive audio download failed, skipped")
@@ -1778,6 +1795,8 @@ class DownloadEngine(appContext: Context) {
             }
             App.logEvent("HLS: adaptive audio downloaded (${Formats.bytes(audioM4a.length())}), remuxing...")
             audioM4a
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             App.logEvent("HLS: adaptive audio download failed (${e.message?.take(50)}), skipped")
             null
@@ -1794,9 +1813,13 @@ class DownloadEngine(appContext: Context) {
     ) {
         val saver = fileSaver
         val baseName = outName.removeSuffix(".mp4").removeSuffix(".webm").ifBlank { outName }
-        val videoMp4 = saver.partialFile("$baseName.videoMp4", segment = null).apply { delete() }
-        val audioM4a = saver.partialFile("$baseName.audioM4a", segment = null).apply { delete() }
-        val mp4 = saver.partialFile("$baseName.muxed", segment = null).apply { delete() }
+        // Sama seperti downloadHls: temp unik per item lewat potongan id di
+        // DEPAN, karena baseName tanpa ekstensi bertabrakan antar item dan
+        // pembeda di ekor bisa terpotong untuk nama sangat panjang (#171).
+        val tempBase = "~" + item.id.take(8) + baseName
+        val videoMp4 = saver.partialFile("$tempBase.videoMp4", segment = null).apply { delete() }
+        val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
+        val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
         val progress = HlsProgress()
         val buffer = ByteArray(BUFFER_SIZE)
         val globalLimit = StoragePrefs.speedLimitKbps(context)
@@ -1994,6 +2017,17 @@ class DownloadEngine(appContext: Context) {
                     segBuf.write(buffer, 0, read)
                     throttle.sleepIfNeeded { committed + segBytes }
                     notify(segBytes)
+                }
+                // Verifikasi panjang terhadap Content-Length yang dinyatakan:
+                // EOF prematur pada respons chunked bisa tiba tanpa exception
+                // sehingga segmen pendek ikut tergabung menjadi hasil korup
+                // berstatus COMPLETED. Lempar agar retry segmen berjalan.
+                // Hanya KEKURANGAN byte yang digagalkan — kelebihan ditoleransi
+                // seperti kebijakan verifySize, karena klaim Content-Length
+                // bisa basi (gzip/proxy) dan stream-lah yang berkuasa
+                // (issue #170).
+                if (declared != null && segBytes < declared) {
+                    throw IOException("HLS segment truncated: got $segBytes of $declared bytes")
                 }
             } finally {
                 runCatching { input.close() }
@@ -2892,16 +2926,20 @@ class DownloadEngine(appContext: Context) {
         val current = _items.value.find { it.id == id } ?: return
         // Jangan menimpa item yang sudah pause/gagal/selesai.
         if (current.state != DownloadState.DOWNLOADING) return
+        // Monoton WAJIB: buffer adalah snapshot berkala, sedangkan nilai final
+        // segmen ditulis langsung oleh updateSegment. Menerapkan snapshot yang
+        // lebih kecil dari nilai sekarang memundurkan progres dan membuat
+        // verifikasi akhir mengira segmen belum lengkap (unduhan 100% sempat
+        // berubah PAUSED). Pola sama seperti overlayProgress di codec.
         val dirty = current.segments.any { seg ->
-            seg.index < pending.size &&
-                pending[seg.index] >= 0 && pending[seg.index] != seg.downloaded
+            seg.index < pending.size && pending[seg.index] > seg.downloaded
         }
         if (!dirty) return
         updateItem(id, persist = false) { item ->
             var totalDone = 0L
             val segs = item.segments.map { seg ->
                 val p = if (seg.index < pending.size) pending[seg.index] else -1L
-                val next = if (p >= 0 && p != seg.downloaded) seg.copy(downloaded = p) else seg
+                val next = if (p > seg.downloaded) seg.copy(downloaded = p) else seg
                 totalDone += next.downloaded
                 next
             }

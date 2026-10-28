@@ -399,6 +399,46 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun isAllowedRootItself_hanyaPersisRoot() {
+        val roots = listOf("/storage/emulated/0", "/storage/emulated/0/Download")
+        assertTrue(ServerSecurity.isAllowedRootItself("/storage/emulated/0", roots))
+        assertTrue(ServerSecurity.isAllowedRootItself("/storage/emulated/0/Download", roots))
+        // Isi di dalam root BUKAN root itu sendiri: boleh dimanipulasi.
+        assertFalse(ServerSecurity.isAllowedRootItself("/storage/emulated/0/Download/film.mp4", roots))
+        assertFalse(ServerSecurity.isAllowedRootItself("/storage/emulated/0/Download2", roots))
+        assertFalse(ServerSecurity.isAllowedRootItself("/storage/emulated/0", emptyList()))
+    }
+
+    @Test
+    fun hasEscapingSymlink_pohonNormalDanSymlinkKeDalam() {
+        val rootDir = root()
+        val sub = File(rootDir, "sub").apply { mkdirs() }
+        File(sub, "a.txt").writeText("x")
+        val roots = listOf(rootDir.canonicalPath)
+        assertFalse(ServerSecurity.hasEscapingSymlink(rootDir, roots))
+        // Symlink direktori ke target yang masih di dalam root: aman.
+        val inside = File(rootDir, "inside").apply { mkdirs() }
+        java.nio.file.Files.createSymbolicLink(
+            File(rootDir, "link-in").toPath(), inside.toPath()
+        )
+        assertFalse(ServerSecurity.hasEscapingSymlink(rootDir, roots))
+    }
+
+    @Test
+    fun hasEscapingSymlink_symlinkDirektoriKeLuarRoot() {
+        val rootDir = root()
+        File(rootDir, "sub").mkdirs()
+        val outside = tmp.newFolder("outside")
+        File(outside, "penting.txt").writeText("jangan hapus")
+        java.nio.file.Files.createSymbolicLink(
+            File(rootDir, "sub/link-out").toPath(), outside.toPath()
+        )
+        assertTrue(
+            ServerSecurity.hasEscapingSymlink(rootDir, listOf(rootDir.canonicalPath))
+        )
+    }
+
+    @Test
     fun isFileNameValid_menolakSeparatorDanTraversal() {
         assertTrue(ServerSecurity.isFileNameValid("video.mp4"))
         assertTrue(ServerSecurity.isFileNameValid("file (1).mp4"))

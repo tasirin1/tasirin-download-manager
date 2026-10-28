@@ -1137,9 +1137,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val storage = session.param("storage")?.trim().orEmpty()
         val folderPath = session.param("path")?.trim().orEmpty()
         if (!isRemoteDestinationAllowed(folderPath)) {
+            // Body unggahan mentah belum dibaca sama sekali di titik ini:
+            // tutup koneksi agar sisanya tak dibaca sebagai request
+            // keep-alive berikutnya (pola jalur read-only di atas).
             return jsonResponse(
                 JSONObject().put("ok", false).put("error", "Destination folder not allowed")
-            )
+            ).closeConnection()
         }
         val chunkIdx = session.param("chunk")?.toIntOrNull() ?: -1
         val chunks = (session.param("chunks")?.toIntOrNull() ?: 1).coerceAtLeast(1)
@@ -1460,6 +1463,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return jsonResponse(JSONObject().put("ok", false).put("error", "Too many uploads in progress"))
         }
         synchronized(lock.lock) {
+            // Finalisasi ID ini sedang berjalan membaca tmp: chunk baru
+            // (termasuk chunk 0 mulai ulang yang memotong tmp) akan merusak
+            // berkas yang sedang diterbitkan — tolak sampai finalisasi
+            // selesai dan entrinya terhapus (issue #173).
+            if (finalizingUploads.containsKey(id)) {
+                appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: finalization in progress")
+                drainBody(session)
+                return jsonResponse(
+                    JSONObject().put("ok", false).put("error", "Upload is being finalized")
+                )
+            }
             return writeUploadChunk(
                 session, id, name, storage, folderPath,
                 chunkIdx, chunks, length, offset
@@ -1530,6 +1544,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // Tolak offset melampaui EOF: seek melewati ujung membuat lubang
                     // sparse berisi nol (file korup) saat ukuran chunk tak seragam.
                     RandomAccessFile(tmp, "rw").use { raf ->
+                        // Chunk 0 pada tmp yang SUDAH ada = unggahan dimulai
+                        // ulang memakai ID sama: potong dulu, sisa ekor
+                        // percobaan lama (total lebih besar) tak boleh ikut
+                        // terbit menjadi file korup (issue #160).
+                        if (chunkIdx == 0) raf.setLength(0)
                         if (offset > raf.length()) {
                             drainBody(session)
                             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: offset beyond EOF")
@@ -1567,7 +1586,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     StoragePrefs.partialStreamSecret(context)
                 )
                 val accepted = synchronized(finalizingGate) {
-                    if (finalizingUploads.size >= MAX_UPLOAD_FINALIZING) {
+                    // ID yang sama tidak boleh finalisasi dua kali: entri
+                    // ditimpa akan membuat dua penyalinan membaca tmp yang
+                    // sama (issue #173).
+                    if (finalizingUploads.size >= MAX_UPLOAD_FINALIZING ||
+                        finalizingUploads.containsKey(id)
+                    ) {
                         false
                     } else {
                         finalizingUploads[id] = finalName
@@ -1602,7 +1626,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         completedUploads[id] = finalName to System.currentTimeMillis()
                         appendLog("UPLOAD #$id COMPLETED -> $finalName")
                     } catch (e: Exception) {
-                        failedUploads[id] = (e.message ?: "finalization failed") to System.currentTimeMillis()
+                        // Pesan mentah exception (bisa memuat path absolut
+                        // internal) hanya untuk log server; yang disimpan
+                        // untuk klien lewat uploadVerify adalah teks generik,
+                        // konsisten dengan jalur single-shot (issue #157).
+                        failedUploads[id] = "finalization failed" to System.currentTimeMillis()
                         appendLog("UPLOAD #$id finalization FAILED: ${e.message}")
                         logError(e)
                     } finally {
@@ -1639,7 +1667,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Body bisa baru terbaca setengah saat gagal (putus di tengah):
             // tutup koneksi agar sisa byte tak dibaca sebagai request
             // keep-alive berikutnya (semua jalur error lain drain/close).
-            jsonResponse(JSONObject().put("ok", false).put("error", it.message ?: "upload failed"))
+            jsonResponse(JSONObject().put("ok", false).put("error", "upload failed"))
                 .closeConnection()
         }
     }
@@ -2307,10 +2335,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val offset = (session.param("offset")?.toIntOrNull() ?: 0).coerceAtLeast(0)
         val limit = (session.param("limit")?.toIntOrNull() ?: FS_PAGE_SIZE)
             .coerceIn(1, FS_PAGE_MAX)
+        // Paginasi kursor (keyset): klien boleh mengirim nama entri terakhir
+        // halaman sebelumnya; offset posisional tetap didukung untuk klien
+        // lama. Kursor menang bila keduanya ada (issue #169).
+        val after = session.param("after")
+        val afterDir = session.param("afterDir") == "1"
         return when {
             raw.isEmpty() -> fsRoots()
             raw.startsWith(MS_PREFIX) -> fsListMedia(raw.removePrefix(MS_PREFIX), offset, limit)
-            else -> fsListFiles(raw.removePrefix(FS_PREFIX), offset, limit)
+            else -> fsListFiles(raw.removePrefix(FS_PREFIX), offset, limit, after, afterDir)
         }
     }
 
@@ -2388,7 +2421,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         fsFileListingCache = null
     }
 
-    private fun fsListFiles(path: String, offset: Int, limit: Int): Response {
+    private fun fsListFiles(
+        path: String, offset: Int, limit: Int,
+        after: String? = null, afterDir: Boolean = false
+    ): Response {
         val items = JSONArray()
         val dir = File(path)
         var total = 0
@@ -2403,7 +2439,25 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             total = listing?.first ?: 0
             // Hanya halaman aktif yang dibangun JSON-nya; statistik subfolder
             // (itemCount/totalSize) dihitung paralel untuk halaman itu saja.
-            val page = listing?.second?.drop(offset)?.take(limit).orEmpty()
+            // Kursor keyset: posisi mulai = entri pertama yang urutannya
+            // SESUDAH (jenis, nama) kursor dalam urutan listing yang sama
+            // (folder dulu, lalu nama abaikan huruf besar/kecil). Isi folder
+            // yang berubah antar-halaman tidak lagi menggeser jendela —
+            // entri tidak terlewat/terduplikasi seperti offset (issue #169).
+            // Kursor yang sudah terhapus pun tetap menunjuk posisi sisip
+            // yang benar. Nama yang hanya beda huruf besar/kecil + jenis
+            // sama dianggap posisi yang sama (kasus tepi sangat sempit).
+            val start = if (after != null) {
+                listing?.second?.indexOfFirst { e ->
+                    val eAfter = if (e.isFile != !afterDir) e.isFile else {
+                        e.name.compareTo(after, ignoreCase = true) > 0
+                    }
+                    eAfter
+                }?.let { if (it < 0) total else it } ?: 0
+            } else {
+                offset
+            }
+            val page = listing?.second?.drop(start)?.take(limit).orEmpty()
             val statFutures = if (allowed) {
                 page.filter { it.isDirectory }.associateWith { f ->
                     runCatching { liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) } }
@@ -2595,7 +2649,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun fsAction(session: IHTTPSession): Response {
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        // Body form belum dibaca di titik ini: tutup koneksi pada penolakan
+        // read-only agar sisa byte tak merusak request keep-alive berikutnya.
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
         val params = readForm(session)
         val action = params["action"].orEmpty()
         val path = params["path"].orEmpty()
@@ -2621,6 +2677,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // menyeret deleteRecursively ke target di luar root.
                     val canon = runCatching { file.canonicalPath }.getOrNull()
                     if (canon == null || !isFsPathAllowed(canon)) return@runCatching false
+                    // Root yang diizinkan itu sendiri tak boleh dihapus utuh
+                    // lewat satu panggilan (issue #158).
+                    if (ServerSecurity.isAllowedRootItself(canon, canonicalFsRoots())) {
+                        return@runCatching false
+                    }
+                    // Symlink direktori BERSARANG ikut diperiksa: cek teratas
+                    // saja tak cukup karena deleteRecursively mengikuti
+                    // symlink anak ke luar root (issue #159).
+                    if (ServerSecurity.hasEscapingSymlink(file, canonicalFsRoots())) {
+                        return@runCatching false
+                    }
                 }
                 val gone = if (file.isDirectory) file.deleteRecursively() else file.delete()
                 if (gone) {
@@ -2632,6 +2699,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }.getOrDefault(false)
             "rename" -> {
                 if (!isNameValid(name)) return false
+                // Root yang diizinkan itu sendiri tak boleh diganti namanya:
+                // rename memindahkan seluruh isi keluar dari folder yang
+                // dikenal aplikasi (penjaga yang sama seperti delete, #166).
+                if (file.isDirectory) {
+                    val canon = runCatching { file.canonicalPath }.getOrNull() ?: return false
+                    if (ServerSecurity.isAllowedRootItself(canon, canonicalFsRoots())) {
+                        return false
+                    }
+                }
                 // Cek + rename atomik dalam proses: renameTo(2) menimpa target
                 // yang muncul di sela cek, jadi dua rename paralel ke nama sama
                 // tak boleh lolos cek exists() bersamaan.
@@ -2660,6 +2736,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 val destDir = File(dest.removePrefix(FS_PREFIX))
                 if (!destDir.isDirectory || !isFsPathAllowed(destDir.absolutePath)) return false
+                // Root yang diizinkan itu sendiri tak boleh dipindahkan
+                // keluar dari tempatnya (penjaga yang sama seperti delete
+                // dan rename, issue #166).
+                if (file.isDirectory) {
+                    val canon = runCatching { file.canonicalPath }.getOrNull() ?: return false
+                    if (ServerSecurity.isAllowedRootItself(canon, canonicalFsRoots())) {
+                        return false
+                    }
+                }
                 // Bandingkan path kanonikal (bukan absolut): destDir symlink
                 // menembus perbandingan string di bawah dan menjebak
                 // copyRecursively ke dalam sumber itu sendiri.
@@ -2689,6 +2774,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 // renameTo gagal lintas volume: salin dulu baru hapus sumber.
                 // Direktori disalin rekursif (sebelumnya langsung false).
+                // Symlink direktori bersarang yang lepas ke luar root wajib
+                // ditolak dulu: copyRecursively akan membaca isi target luar
+                // dan deleteRecursively pada sumber menghapusnya — pola #159
+                // yang di jalur fallback ini belum dijaga (issue #172).
+                if (file.isDirectory &&
+                    ServerSecurity.hasEscapingSymlink(file, canonicalFsRoots())
+                ) {
+                    return false
+                }
                 runCatching {
                     try {
                         if (file.isDirectory) {
@@ -2994,8 +3088,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // ---------- SSE: update real-time ----------
 
     private fun sseResponse(): Response {
+        // Cap koneksi SSE: tiap koneksi menahan satu thread server seumur
+        // koneksi; tanpa batas, klien di LAN bisa menguras thread/memori.
+        // Semua subsistem lain di server ini sudah dibatasi (issue #162).
+        // Klien resmi jatuh ke polling berkala bila SSE ditolak.
         val stream = SseStream()
-        sseClients.add(stream)
+        synchronized(sseClients) {
+            if (sseClients.size >= MAX_SSE_CLIENTS) {
+                return jsonResponse(JSONObject().put("ok", false).put("error", "Too many event streams"))
+            }
+            sseClients.add(stream)
+        }
         ensureSsePump()
         stream.push("data: ${downloadsPayload()}\n\n")
         val res = newChunkedResponse(
@@ -3298,6 +3401,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_UPLOAD_CHUNKS = 1024
         private const val MAX_UPLOAD_LOCKS = 512
         private const val MAX_UPLOAD_FINALIZING = 8
+        private const val MAX_SSE_CLIENTS = 32
         private const val MAX_COMPLETED_UPLOADS = 400
         private const val TARGET_COMPLETED_UPLOADS = 300
         private const val MAX_FAILED_UPLOADS = 50
