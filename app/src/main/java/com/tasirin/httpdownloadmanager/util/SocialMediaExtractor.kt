@@ -209,7 +209,11 @@ object SocialMediaExtractor {
             }
         }
         val merged = mergeCookiePairs(userPairs.joinToString("; "), extra)
-        return (others + "Cookie: " + merged).joinToString("\n")
+        // Kurung wajib: tanpa itu '+' pada List menempelkan "Cookie: "
+        // dan isi gabungan sebagai DUA elemen terpisah, menghasilkan
+        // baris "Cookie: " kosong + baris sampah tanpa nama header
+        // (uji mergeCookiesIntoHeaders menangkapnya di CI).
+        return (others + ("Cookie: " + merged)).joinToString("\n")
     }
 
     /** Gabung dua nilai Cookie: pasangan [user] dipertahankan dan
