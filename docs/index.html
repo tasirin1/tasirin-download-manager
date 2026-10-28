@@ -369,20 +369,30 @@ if ('serviceWorker' in navigator) {
 }
 
 /* ── Release info ── */
-fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest')
+function showRelease(data){
+  var apk=data.assets&&data.assets.find(function(a){return a.name.endsWith('.apk')});
+  if(!apk)return false;
+  document.getElementById('download-btn').href=apk.browser_download_url;
+  var txt=data.tag_name+' · '+(apk.size/1024/1024).toFixed(1)+' MB';
+  document.getElementById('version-badge').textContent=txt;
+  document.getElementById('apk-size').textContent=(apk.size/1024/1024).toFixed(1)+' MB';
+  return true;
+}
+function fallbackBadge(){
+  var b=document.getElementById('version-badge');
+  if(b&&!b.textContent.trim())b.textContent='See GitHub Releases for the latest APK';
+}
+/* Jangan hanya releases/latest (issue #339): rilis terbaru bisa saja
+   mapping-only tanpa APK — pola yang sama ditangani Updater.kt di
+   aplikasi — sehingga badge macet di teks loading selamanya. Pindai
+   daftar rilis (terbaru dulu) dan pakai rilis pertama yang memuat APK;
+   tak ada satu pun -> teks fallback, bukan badge kosong abadi. */
+fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases?per_page=20')
   .then(function(r){return r.json()})
-  .then(function(data){
-    var apk=data.assets&&data.assets.find(function(a){return a.name.endsWith('.apk')});
-    if(apk){
-      document.getElementById('download-btn').href=apk.browser_download_url;
-      var txt=data.tag_name+' · '+(apk.size/1024/1024).toFixed(1)+' MB';
-      document.getElementById('version-badge').textContent=txt;
-      document.getElementById('apk-size').textContent=(apk.size/1024/1024).toFixed(1)+' MB';
-    }
-  }).catch(function(){
-    var b=document.getElementById('version-badge');
-    if(b&&!b.textContent.trim())b.textContent='See GitHub Releases for the latest APK';
-  });
+  .then(function(list){
+    var found=Array.isArray(list)&&list.some(showRelease);
+    if(!found)fallbackBadge();
+  }).catch(fallbackBadge);
 
 /* ── FAQ toggle ── */
 document.querySelectorAll('.faq-q').forEach(function(q){
