@@ -620,7 +620,21 @@ def cek_aturan_repo(gagal, berubah):
     bersih_teks = strip_komentar(tetap)
     cocok = re.search(r"minSdk\s*=\s*(\d+)", bersih_teks)
     minsdk_ambigu = False
-    if not cocok:
+    if cocok:
+        # Jalur literal ikut dinilai ambigu (issue #270): tanpa ini
+        # penetapan pertama selalu menang dan penetapan minSdk lain
+        # bernilai beda di berkas yang sama (umpan di blok lain) lolos
+        # begitu saja — jalur variabel #229 sudah gagal-tertutup untuk
+        # keadaan yang sama.
+        literal = re.findall(r"minSdk\s*=\s*(\d+)", bersih_teks)
+        if len(set(literal)) > 1:
+            gagal.append(
+                "penetapan minSdk literal ambigu (nilai %s) — kunci "
+                "minSdk menolak menebak di antara penetapan ganda"
+                % ", ".join(sorted(set(literal))))
+            minsdk_ambigu = True
+            cocok = None
+    if not cocok and not minsdk_ambigu:
         # Bentuk variabel (issue #212): 'minSdk = minSdkVersi' dengan
         # 'val minSdkVersi = 23' di berkas yang sama diselesaikan ke
         # nilainya — refactor sah yang memusatkan angka SDK tidak lagi
