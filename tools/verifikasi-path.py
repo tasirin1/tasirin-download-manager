@@ -476,8 +476,8 @@ TERLARANG_KEMBALI = [
 def cek_aturan_repo(gagal, berubah):
     tetap = baca("app/build.gradle.kts")
     cocok = re.search(r"minSdk\s*=\s*(\d+)", tetap)
-    if cocok and int(cocok.group(1)) != 21:
-        gagal.append("minSdk %s != 21 (aturan: tetap Android 5+)" % cocok.group(1))
+    if cocok and int(cocok.group(1)) != 23:
+        gagal.append("minSdk %s != 23 (aturan: tetap Android 6+, keputusan owner 2026-10-28)" % cocok.group(1))
     for path in berubah:
         rendah = path.lower()
         if "values-night" in rendah:
