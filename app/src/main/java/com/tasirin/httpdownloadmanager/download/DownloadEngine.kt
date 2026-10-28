@@ -3397,6 +3397,7 @@ class DownloadEngine(appContext: Context) {
         saveJob = scope.launch {
             delay(SAVE_DEBOUNCE_MS)
             repository.save(_items.value)
+            logEncryptFallbackIfUsed()
         }
     }
 
@@ -3428,10 +3429,16 @@ class DownloadEngine(appContext: Context) {
         } else {
             repository.saveImmediate(_items.value)
         }
-        // Konsumsi sinyal fallback enkripsi (issue #209): flag ini
-        // sebelumnya write-only — tak ada yang tahu kredensial jatuh ke
-        // plaintext saat keystore bermasalah. Catat lewat consume
-        // (setter properti memang private di Crypto).
+        logEncryptFallbackIfUsed()
+    }
+
+    /** Konsumsi sinyal fallback enkripsi (issue #209): flag ini sebelumnya
+     *  write-only — tak ada yang tahu kredensial jatuh ke plaintext saat
+     *  keystore bermasalah. Dipanggil dari flushSave DAN simpan debounce
+     *  (#222: jalur debounce dulu memanggil repository.save langsung,
+     *  melewati konsumsi ini, jadi kejadian fallback di sesi panjang bisa
+     *  tak pernah tercatat). */
+    private fun logEncryptFallbackIfUsed() {
         if (Crypto.consumeEncryptFallbackUsed()) {
             App.logEvent("STORAGE: encryption fallback used during save (keystore issue?)")
         }
