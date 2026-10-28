@@ -1070,7 +1070,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             } else if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
                 lifecycleScope.launch {
                     val variants = withContext(Dispatchers.IO) {
-                        runCatching { App.engine.probeHlsVariants(urls[0]) }.getOrNull()
+                        runCatching {
+                            App.engine.probeHlsVariants(urls[0], username, password, headers)
+                        }.getOrNull()
                     }
                     if (variants.isNullOrEmpty()) {
                         addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())

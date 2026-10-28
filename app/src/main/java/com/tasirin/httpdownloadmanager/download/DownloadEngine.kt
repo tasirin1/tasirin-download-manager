@@ -734,10 +734,20 @@ class DownloadEngine(appContext: Context) {
         return published
     }
 
-    fun probeHlsVariants(url: String): List<HlsVariant>? {
+    fun probeHlsVariants(
+        url: String,
+        username: String = "",
+        password: <redacted> = "",
+        headers: String = ""
+    ): List<HlsVariant>? {
         return runCatching {
+            // Kredensial/header dialog IKUT dibawa (issue #473): master
+            // m3u8 berproteksi Cookie/Referer/Authorization menjawab 403
+            // untuk probe buta konteks, sehingga pemilih kualitas gugur
+            // diam-diam padahal unduhannya sendiri sehat karena
+            // addDownload membawa konteks yang sama.
             val conn = openAuthenticatedConnection(
-                url, method = "GET", username = "", password = "", headers = ""
+                url, method = "GET", username = username, password = <redacted>, headers = headers
             )
             try {
                 val code = conn.responseCode
