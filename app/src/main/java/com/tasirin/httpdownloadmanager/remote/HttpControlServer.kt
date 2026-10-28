@@ -2643,6 +2643,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 items.put(o)
             }
+            // Batalkan Future statistik yang belum selesai (issue #466):
+            // tanpa ini tugas fsStats yang melewati deadline tetap
+            // mengantre sebagai pemindaian yatim dan menjenuhi pool
+            // kecil, sehingga refresh berikutnya kehabisan anggaran di
+            // antrean. cancel(false) membuang yang masih mengantre;
+            // yang sedang berjalan dibiarkan tuntas (hasilnya masuk
+            // cache fsStats dan berguna bagi request berikut).
+            statFutures.values.forEach { fut ->
+                if (fut != null && !fut.isDone) fut.cancel(false)
+            }
         }
         return jsonResponse(
             JSONObject().put("path", path).put("items", items).put("total", total)
