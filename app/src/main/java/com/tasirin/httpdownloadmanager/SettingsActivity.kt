@@ -713,6 +713,22 @@ class SettingsActivity : AppCompatActivity() {
             renderChecks()
         }
         binding.checkBattery.setOnClickListener {
+            // Exemption sistem sedang AKTIF (issue #531): aplikasi
+            // tidak bisa mencabutnya secara programatik, dan sesudah
+            // sinkronisasi #523 ketukan biasa menjadi no-op diam-diam
+            // (pref ditulis false lalu renderChecks mengembalikannya
+            // ke status sistem). Arahkan pengguna ke daftar optimasi
+            // baterai sistem — satu-satunya tempat pencabutan bisa
+            // terjadi — dan biarkan onResume menyelaraskan toggle.
+            val pmBatteryTap = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (pmBatteryTap.isIgnoringBatteryOptimizations(packageName)) {
+                runCatching {
+                    startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                }.onFailure {
+                    Toast.makeText(this, R.string.battery_request_failed, Toast.LENGTH_LONG).show()
+                }
+                return@setOnClickListener
+            }
             val next = !StoragePrefs.isBatteryExemptEnabled(this)
             StoragePrefs.setBatteryExemptEnabled(this, next)
             if (next) requestBatteryExemption()
