@@ -117,9 +117,17 @@ class DownloadService : Service() {
         if (action == NotificationHelper.ACTION_RESUME_ALL) return START_STICKY
         // STICKY hanya bila masih ada kerja: restart service kosong oleh sistem
         // hanya mem-flash notifikasi sesaat sebelum stopSelf di emisi pertama.
-        val keepAlive = App.engine.items.value.any {
-            it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-        } || (StoragePrefs.isServerBackgroundEnabled(this) && App.httpServer.isAlive)
+        // Selama muatan awal belum terpasang daftar bisa kosong
+        // PALSU (muatan latar #242): menilai keepAlive dari daftar
+        // kosong di jendela itu mengembalikan NOT_STICKY walau
+        // antrean tersimpan punya kerja aktif — perlindungan restart
+        // hilang untuk start ini (#319). Anggap hidup sampai muatan
+        // selesai; kolektor emisi pertama akan stopSelf bila memang
+        // tidak ada kerja.
+        val keepAlive = !App.engine.isInitialLoadComplete() ||
+            App.engine.items.value.any {
+                it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
+            } || (StoragePrefs.isServerBackgroundEnabled(this) && App.httpServer.isAlive)
         return if (keepAlive) START_STICKY else START_NOT_STICKY
     }
 

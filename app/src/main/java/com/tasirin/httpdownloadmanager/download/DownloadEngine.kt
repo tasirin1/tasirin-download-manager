@@ -251,6 +251,10 @@ class DownloadEngine(appContext: Context) {
 
     /** Tunggu sampai muatan awal antrean terpasang (gerbang #242). */
     suspend fun awaitInitialLoad() = loadGate.await()
+    /** True sesudah muatan awal terpasang. Sebelum itu daftar belum
+     *  boleh dinilai: masih bisa kosong palsu selama muatan latar
+     *  berjalan (#319). */
+    fun isInitialLoadComplete(): Boolean = loadGate.isCompleted
 
     private val _items = MutableStateFlow<List<DownloadItem>>(emptyList())
     val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
