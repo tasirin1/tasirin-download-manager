@@ -2771,9 +2771,34 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (cached != null && now - cached.first < FS_STATS_TTL_MS) return cached.second
         var itemCount = 0
         var totalSize = 0L
-        runCatching { File(path).listFiles() }.getOrNull()?.forEach { c ->
-            itemCount++
-            if (c.isFile) totalSize += c.length()
+        // Rekursif ke seluruh subtree (issue #398): versi dangkal
+        // sebelumnya hanya menjumlah berkas langsung, jadi folder yang
+        // isinya bersarang tampil berukuran 0/kecil dan penjaga klien
+        // "ZIP too large" bisa diloloskan folder besar bersarang.
+        // Dibatasi jumlah entri + himpunan path kanonikal direktori yang
+        // sudah dikunjungi (anti siklus symlink); hasil tetap di-cache
+        // per path dan dihitung di pool latar.
+        val visitedDirs = HashSet<String>()
+        val stack = ArrayDeque<File>()
+        runCatching { File(path).canonicalFile }.getOrNull()?.let { root ->
+            visitedDirs.add(root.path)
+            stack.addLast(root)
+        }
+        while (!stack.isEmpty() && itemCount < FS_STATS_MAX_ENTRIES) {
+            val dir = stack.removeLast()
+            val children = runCatching { dir.listFiles() }.getOrNull() ?: continue
+            for (c in children) {
+                if (itemCount >= FS_STATS_MAX_ENTRIES) break
+                itemCount++
+                if (c.isDirectory) {
+                    val canon = runCatching { c.canonicalFile }.getOrNull()
+                    if (canon != null && visitedDirs.add(canon.path)) {
+                        stack.addLast(canon)
+                    }
+                } else if (c.isFile) {
+                    totalSize += c.length()
+                }
+            }
         }
         val result = itemCount to totalSize
         fsStatsCache[path] = now to result
@@ -3710,6 +3735,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_ZIP_DL_TOKENS = 16
         private const val MAX_MEDIA_ZIP_TOKENS = 256
         private const val FS_STATS_TTL_MS = 10_000L
+        /** Plafon entri yang dihitung fsStats rekursif (issue #398):
+         *  pohon raksasa berhenti di angka ini agar satu request daftar
+         *  tak menggantungkan pool statistik. */
+        private const val FS_STATS_MAX_ENTRIES = 50_000
         private const val SSE_MIN_INTERVAL_MS = 1_000L
         // Heartbeat: tetap kirim walau tidak ada perubahan, supaya klien tahu
         // koneksi hidup (dan fallback polling klien tidak ikut jalan).
