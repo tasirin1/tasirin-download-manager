@@ -230,7 +230,18 @@ object HlsMp4Muxer {
         while (true) {
             buffer.clear()
             var size = ext.readSampleData(buffer, 0)
-            if (size < 0) break
+            if (size < 0) {
+                // Sampel korup di tengah aliran (bukan EOS): lewati
+                // tetapi PESAN slot waktunya. Penghitung frame
+                // (advance(), #277) menghitung sampel sesudah titik
+                // korup, jadi berhenti di sini seperti dulu membuat
+                // stepUs membagi durasi total ke frame yang tidak
+                // pernah ditulis — tempo video menyimpang dari
+                // audio (#320). advance() false = EOS sungguhan.
+                if (!ext.advance()) break
+                frameIndex++
+                continue
+            }
             // KEY_MAX_INPUT_SIZE bisa diklaim kekecilan oleh track nakal:
             // baca ulang dengan buffer lebih besar (tanpa advance, sampel
             // sama). Dibatasi agar ukuran bohong tak meledakkan RAM.
@@ -240,7 +251,12 @@ object HlsMp4Muxer {
                 }
                 buffer = ByteBuffer.allocate(size)
                 size = ext.readSampleData(buffer, 0)
-                if (size < 0) break
+                if (size < 0) {
+                    // Sama seperti cabang korup utama: pesan slotnya.
+                    if (!ext.advance()) break
+                    frameIndex++
+                    continue
+                }
             }
             buffer.position(0)
             buffer.limit(size)
