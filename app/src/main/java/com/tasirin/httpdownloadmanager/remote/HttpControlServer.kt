@@ -484,10 +484,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (failedUploads.size > 8) {
             failedUploads.entries.removeIf { now - it.value.second > 3_600_000L }
         }
-        // uploadLocks: entry > 30 menit
+        // uploadLocks: entry diam > retensi sesi (#252)
         if (uploadLocks.size > 4) {
             uploadLocks.entries.removeIf {
-                now - it.value.lastUse.get() > 30 * 60 * 1000L
+                now - it.value.lastUse.get() > UPLOAD_IDLE_RETENTION_MS
             }
         }
         // Berkas tmp upload yatim (#218): upload yang ditinggalkan (browser
@@ -507,7 +507,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val id = f.name.removePrefix("up_").removeSuffix(".tmp")
                     val lock = uploadLocks[id]
                     if ((lock == null ||
-                            now - lock.lastUse.get() > 30 * 60 * 1000L) &&
+                            now - lock.lastUse.get() > UPLOAD_IDLE_RETENTION_MS) &&
                         !finalizingUploads.containsKey(id)
                     ) {
                         f.delete()
@@ -1525,13 +1525,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val now = System.currentTimeMillis()
             if (uploadLocks.size > 256) {
                 uploadLocks.entries.removeIf {
-                    now - it.value.lastUse.get() > 30 * 60 * 1000L
+                    now - it.value.lastUse.get() > UPLOAD_IDLE_RETENTION_MS
                 }
             }
             // Tegakkan batas di lock yang sama dengan pembuatan: cek-terpisah
             // di canAcceptUploadLock bisa lolos ganda untuk dua ID baru paralel.
             if (uploadLocks.size >= MAX_UPLOAD_LOCKS) {
-                uploadLocks.entries.removeIf { now - it.value.lastUse.get() > 30 * 60 * 1000L }
+                uploadLocks.entries.removeIf { now - it.value.lastUse.get() > UPLOAD_IDLE_RETENTION_MS }
                 if (uploadLocks.size >= MAX_UPLOAD_LOCKS) return null
             }
             return uploadLocks.getOrPut(id) { UploadLock() }.also { it.lastUse.set(now) }
@@ -1543,7 +1543,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (uploadLocks.containsKey(id)) return true
             val now = System.currentTimeMillis()
             if (uploadLocks.size >= MAX_UPLOAD_LOCKS) {
-                uploadLocks.entries.removeIf { now - it.value.lastUse.get() > 30 * 60 * 1000L }
+                uploadLocks.entries.removeIf { now - it.value.lastUse.get() > UPLOAD_IDLE_RETENTION_MS }
             }
             return uploadLocks.size < MAX_UPLOAD_LOCKS
         }
@@ -3543,6 +3543,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_UPLOAD_CHUNKS = 1024
         private const val MAX_UPLOAD_LOCKS = 512
         private const val MAX_UPLOAD_FINALIZING = 8
+        /** Retensi diam sesi upload (#252): jeda yang disengaja (laptop
+         *  tidur, istirahat, jaringan putus) lazim melewati 30 menit —
+         *  ambang #218 itu membuang seluruh progres upload besar yang
+         *  sebenarnya bisa dilanjutkan. 4 jam adalah jalan tengah yang
+         *  dinyatakan: cukup untuk jeda wajar, tetap 6x lebih cepat
+         *  membebaskan buffer daripada retensi 24 jam lama. */
+        private const val UPLOAD_IDLE_RETENTION_MS = 4L * 60 * 60 * 1000
         private const val MAX_SSE_CLIENTS = 32
         private const val MAX_COMPLETED_UPLOADS = 400
         private const val TARGET_COMPLETED_UPLOADS = 300
