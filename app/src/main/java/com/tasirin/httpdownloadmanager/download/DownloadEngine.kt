@@ -1283,7 +1283,12 @@ class DownloadEngine(appContext: Context) {
             message.contains("failed to connect", ignoreCase = true) ||
             message.contains("connect exception", ignoreCase = true) ||
             message.contains("network", ignoreCase = true) ||
-            message.contains("socket", ignoreCase = true)
+            message.contains("socket", ignoreCase = true) ||
+            // Badan terpotong di tengah jalan (EOF prematur) adalah gangguan
+            // jaringan transien: pesan "HLS segment truncated" dari
+            // fetchHlsSegment wajib lolos klasifikasi ini agar retry segmen
+            // benar-benar berjalan (issue #167).
+            message.contains("truncated", ignoreCase = true)
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
