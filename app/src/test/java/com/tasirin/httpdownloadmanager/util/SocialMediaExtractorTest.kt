@@ -762,6 +762,29 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `bestAdaptivePair - seri codec dimenangkan height lalu bitrate tertinggi`() {
+        // Urutan itag menaik seperti respons Innertube nyata: 144p AVC
+        // datang lebih dulu, tetapi 1080p AVC wajib menang (issue #388);
+        // VP9 1080p tak mengalahkan kelas AVC; seri 1080p AVC dimenangkan
+        // bitrate lebih besar.
+        val sd = org.json.JSONObject(
+            """{"adaptiveFormats":[
+              {"itag":160,"mimeType":"video/mp4; codecs=\"avc1.42\"","url":"https://x/160","height":144,"bitrate":100},
+              {"itag":136,"mimeType":"video/mp4; codecs=\"avc1.4d\"","url":"https://x/136","height":720,"bitrate":800},
+              {"itag":248,"mimeType":"video/webm; codecs=\"vp9\"","url":"https://x/248","height":1080,"bitrate":2500},
+              {"itag":299,"mimeType":"video/mp4; codecs=\"avc1.64\"","url":"https://x/299","height":1080,"bitrate":1500},
+              {"itag":137,"mimeType":"video/mp4; codecs=\"avc1.64\"","url":"https://x/137","height":1080,"bitrate":2000},
+              {"itag":139,"mimeType":"audio/mp4","url":"https://x/139"},
+              {"itag":140,"mimeType":"audio/mp4","url":"https://x/140"}
+            ]}"""
+        )
+        val (video, audio) = SocialMediaExtractor.bestAdaptivePair(sd)
+        assertEquals("https://x/137", video)
+        assertEquals("https://x/140", audio)
+        assertEquals("" to "", SocialMediaExtractor.bestAdaptivePair(null))
+    }
+
+    @Test
     fun `parseContentDispositionFileName - bentuk quoted, token, dan RFC 5987`() {
         assertEquals("clip final.mp4", SocialMediaExtractor.parseContentDispositionFileName(
             "attachment; filename=\"clip final.mp4\""))

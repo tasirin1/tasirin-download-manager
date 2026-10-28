@@ -908,11 +908,13 @@ object SocialMediaExtractor {
     return null
 }
 
-    private fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
+    internal fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
     val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return "" to ""
     var videoUrl = ""
     var audioUrl = ""
     var videoRank = Int.MAX_VALUE
+    var videoHeight = -1
+    var videoBitrate = -1
     var audioRank = Int.MAX_VALUE
     for (i in 0 until adaptive.length()) {
         val fmt = adaptive.optJSONObject(i) ?: continue
@@ -926,8 +928,21 @@ object SocialMediaExtractor {
                     mime.contains("mp4") -> 1
                     else -> 2
                 }
-                if (rank < videoRank) {
+                // Seri peringkat codec dimenangkan kualitas tertinggi
+                // (issue #388): sebelumnya format PERTAMA per peringkat
+                // yang menang, dan adaptiveFormats terurut itag menaik
+                // sehingga cadangan VISIONOS berisi 144p walau 720p/1080p
+                // AVC tersedia. Kelas codec tetap utama (kompatibilitas
+                // remux), height lalu bitrate menjadi penentu dalam kelas.
+                val height = fmt.optInt("height", 0)
+                val bitrate = fmt.optInt("bitrate", 0)
+                if (rank < videoRank ||
+                    (rank == videoRank && (height > videoHeight ||
+                        (height == videoHeight && bitrate > videoBitrate)))
+                ) {
                     videoRank = rank
+                    videoHeight = height
+                    videoBitrate = bitrate
                     videoUrl = url
                 }
             }
