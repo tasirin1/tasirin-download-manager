@@ -100,7 +100,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // galeri kosong.
     @Volatile private var lastGalleryEmptyLog = 0L
     private val loginAttempts = ConcurrentHashMap<String, LoginAttempt>()
-    private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Pair<Int, Long>>>()
+    private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Triple<Int, Long, Boolean>>>()
     private val fsStatsCacheTtlMs = 60_000L
     // Cache listing folder media per root (MediaStore): membrowse halaman demi
     // halaman tidak perlu me-query ulang seluruh koleksi tiap request. Dibatalkan
@@ -2598,7 +2598,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val page = listing?.second?.drop(start)?.take(limit).orEmpty()
             val statFutures = if (allowed) {
                 page.filter { it.isDirectory }.associateWith { f ->
-                    runCatching { liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) } }
+                    runCatching { liveStatPool().submit<Triple<Int, Long, Boolean>> { fsStats(f.absolutePath) } }
                         .getOrNull()
                 }
             } else {
@@ -2612,13 +2612,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 o.put("size", if (f.isFile) f.length() else 0L)
                 o.put("modified", f.lastModified())
                 if (f.isDirectory) {
-                    val (itemCount, totalSize) = if (allowed) {
-                        runCatching { statFutures[f]?.get(STAT_FUTURE_TIMEOUT_SEC, TimeUnit.SECONDS) }.getOrNull() ?: (0 to 0L)
+                    val (itemCount, totalSize, sizeTruncated) = if (allowed) {
+                        runCatching { statFutures[f]?.get(STAT_FUTURE_TIMEOUT_SEC, TimeUnit.SECONDS) }.getOrNull() ?: Triple(0, 0L, false)
                     } else {
-                        0 to 0L
+                        Triple(0, 0L, false)
                     }
                     o.put("itemCount", itemCount)
                     o.put("totalSize", totalSize)
+                    if (sizeTruncated) o.put("sizeTruncated", true)
                 } else if (allowed) {
                     o.put("token", MediaLibrary.tokenForPath(f.absolutePath))
                 }
@@ -2765,12 +2766,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val uri: String
     )
 
-    private fun fsStats(path: String): Pair<Int, Long> {
+    /** Statistik subtree: (jumlah entri, total byte, TERPOTONG). Bendera
+     *  terpotong WAJIB ada (issue #415): hasil yang berhenti di plafon
+     *  entri tidak boleh di-cache/disajikan sebagai angka pasti, karena
+     *  penjaga "ZIP too large" klien menjumlah totalSize — undercount
+     *  senyap meloloskan folder raksasa persis seperti sebelum #398. */
+    private fun fsStats(path: String): Triple<Int, Long, Boolean> {
         val now = System.currentTimeMillis()
         val cached = fsStatsCache[path]
         if (cached != null && now - cached.first < FS_STATS_TTL_MS) return cached.second
         var itemCount = 0
         var totalSize = 0L
+        var truncated = false
         // Rekursif ke seluruh subtree (issue #398): versi dangkal
         // sebelumnya hanya menjumlah berkas langsung, jadi folder yang
         // isinya bersarang tampil berukuran 0/kecil dan penjaga klien
@@ -2788,7 +2795,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val dir = stack.removeLast()
             val children = runCatching { dir.listFiles() }.getOrNull() ?: continue
             for (c in children) {
-                if (itemCount >= FS_STATS_MAX_ENTRIES) break
+                if (itemCount >= FS_STATS_MAX_ENTRIES) {
+                    truncated = true
+                    break
+                }
                 itemCount++
                 if (c.isDirectory) {
                     val canon = runCatching { c.canonicalFile }.getOrNull()
@@ -2800,7 +2810,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
             }
         }
-        val result = itemCount to totalSize
+        if (!stack.isEmpty()) truncated = true
+        val result = Triple(itemCount, totalSize, truncated)
         fsStatsCache[path] = now to result
         if (fsStatsCache.size > 300) {
             val toRemove = fsStatsCache.size / 2

@@ -1499,7 +1499,7 @@ meta = fmt(it.size);
 if (it.modified > 0) meta += ' \u00b7 ' + fmtDate(it.modified);
 } else if (it.itemCount >= 0) {
 meta = it.itemCount + ' item';
-if (it.totalSize > 0) meta += ' \u00b7 ' + fmt(it.totalSize);
+if (it.totalSize > 0) meta += ' \u00b7 ' + fmt(it.totalSize) + (it.sizeTruncated ? '+' : '');
 }
 const sel = fsSelectMode && fsSelected.has(it);
 const check = fsSelectMode
@@ -1791,10 +1791,15 @@ if (!fsSelected.size) return;
 var tokens = [];
 var paths = [];
 var total = 0;
+var unknownSize = false;
 fsSelected.forEach(function (it) {
 if (it.kind === 'file') { tokens.push(it.token); total += it.size || 0; }
-else { paths.push(it.path); total += it.totalSize || 0; }
+else { paths.push(it.path); total += it.totalSize || 0; if (it.sizeTruncated) unknownSize = true; }
 });
+if (unknownSize) {
+mmShowToast('A selected folder is too large to measure exactly. Select fewer files.', 3000);
+return;
+}
 if (total > 200 * 1024 * 1024) {
 mmShowToast('ZIP too large (' + (total / 1024 / 1024).toFixed(0) + ' MB). Select fewer files.', 3000);
 return;
