@@ -235,11 +235,20 @@ class DownloadEngine(appContext: Context) {
                 runCatching { loadPersistedCookies() }
                 // Item yang ditambahkan selama jendela muat tidak hilang:
                 // gabungkan yang belum ada di hasil muatan.
-                val extras = _items.value.filter { cur ->
-                    loaded.none { it.id == cur.id }
+                // Penggabungan wajib atomik terhadap mutasi lain (#263):
+                // snapshot extras + penetapan daftar berjalan di dalam
+                // monitor yang sama dengan update()/updateItem
+                // (@Synchronized), supaya penambahan dari UI/remote yang
+                // masuk di antara keduanya tidak tertimpa salinan gabungan
+                // lalu hilang dari daftar dan penyimpanan sekaligus.
+                val extras = synchronized(this) {
+                    val ex = _items.value.filter { cur ->
+                        loaded.none { it.id == cur.id }
+                    }
+                    _items.value = (loaded + ex)
+                        .sortedByDescending { it.addedAt }
+                    ex
                 }
-                _items.value = (loaded + extras)
-                    .sortedByDescending { it.addedAt }
                 // Rekonsiliasi cadangan .replaced yatim (issue #237):
                 // proses yang mati di jendela verifikasi checksum
                 // meninggalkan penggantian terparkir (pendingReplacements
