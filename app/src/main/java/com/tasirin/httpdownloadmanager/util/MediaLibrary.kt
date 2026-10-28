@@ -143,6 +143,36 @@ object MediaLibrary {
         val relativePath: String? = null
     )
 
+    /** Kunci identitas lintas sumber untuk dedupe scan (issue #515).
+     *  Entri MediaStore ber-DATA null dulu berkunci contentUri sedangkan
+     *  pasangan filesystem-nya berkunci path absolut — kunci berbeda,
+     *  video yang sama tampil dua kali. Kini keduanya diturunkan ke
+     *  path relatif terhadap [galleryRoot] bila memungkinkan: entri
+     *  ber-filePath memakai path relatifnya, entri tanpa filePath
+     *  memakai relativePath MediaStore + nama. Di luar itu (API < 29
+     *  tanpa relativePath, atau path di luar root) jatuh ke identitas
+     *  lama. Murni agar bisa di-unit-test. */
+    internal fun kunciDedupeGaleri(
+        filePath: String?,
+        relativePath: String?,
+        name: String,
+        contentUri: String?,
+        token: String,
+        galleryRoot: String
+    ): String {
+        if (filePath != null) {
+            val root = galleryRoot.trimEnd('/')
+            return if (filePath.startsWith("$root/")) {
+                "rel:" + filePath.substring(root.length + 1)
+            } else {
+                "abs:$filePath"
+            }
+        }
+        val rel = relativePath?.trim('/')?.takeIf { it.isNotEmpty() }
+        if (rel != null) return "rel:$rel/$name"
+        return "uri:" + (contentUri ?: token)
+    }
+
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
     private val VIDEO_EXTS = setOf("mp4", "mkv", "webm", "avi", "mov", "3gp", "m4v", "mpg", "mpeg", "ts", "m2ts")
 
@@ -743,7 +773,12 @@ object MediaLibrary {
         // Total = distinct penuh SEBELUM take: total terpotong membuat
         // hasMore selalu false dan load-more berhenti di 3000 walau masih ada sisa.
         val allDistinct = list
-            .distinctBy { it.filePath ?: it.contentUri ?: it.token }
+            .distinctBy {
+                kunciDedupeGaleri(
+                    it.filePath, it.relativePath, it.name,
+                    it.contentUri, it.token, galleryRoot
+                )
+            }
             .sortedByDescending { it.modified }
         val deduped = allDistinct.take(GALLERY_MAX_ENTRIES)
         val usedFallback = !folderFilterActive && mediaStoreRows == 0
