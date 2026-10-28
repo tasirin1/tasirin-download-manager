@@ -3549,7 +3549,7 @@ class DownloadEngine(appContext: Context) {
             username = item.username,
             password = item.password,
             headers = item.headers
-        ) { connection, _ ->
+        ) { connection, _, _ ->
             connection.setRequestProperty("Range", "bytes=${segment.start + downloaded}-${segment.end}")
         }
         trackOpenedConnection(id, conn)
