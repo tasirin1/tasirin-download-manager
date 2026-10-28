@@ -1385,7 +1385,19 @@ class DownloadEngine(appContext: Context) {
             val path = predecessor.filePath?.takeIf { it.isNotEmpty() } ?: continue
             val target = File(path)
             val aside = File(target.parentFile, target.name + ".replaced")
-            if (!aside.isFile) continue
+            if (!aside.isFile) {
+                // Tanpa cadangan, .replaced.stale di sebelahnya yatim
+                // (#276): sisa proses yang mati di antara dua penghapusan
+                // commitReplacement (cadangan terhapus, stale belum).
+                // Byte percobaan tidak dirujuk item mana pun dan tidak
+                // bisa menjadi pasangan finalisasi berjalan (finalisasi
+                // selalu memegang cadangannya) — buang agar tidak menetap
+                // sebesar berkas penuh di folder terbit pengguna.
+                runCatching {
+                    File(target.parentFile, target.name + ".replaced.stale").delete()
+                }
+                continue
+            }
             if (target.exists()) runCatching { target.delete() }
             val restored = runCatching { aside.renameTo(target) }
                 .getOrDefault(false)
