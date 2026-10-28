@@ -263,11 +263,23 @@ def admin_consistency() -> Result:
         app_build = (ROOT / "app/build.gradle.kts").read_text(encoding="utf-8")
         gradle_ver = _re.search(r"gradle-(\d+\.\d+\.\d+)-bin\.zip", wrapper)
         agp_ver = _re.search(r'^agp\s*=\s*"([^"]+)"', catalog, _re.M)
-        if gradle_ver and gradle_ver.group(1) not in agents:
+        # Fail-closed (issue #561): pola yang tak cocok sama sekali
+        # adalah problem, bukan cek yang dilewati diam-diam — gerbang
+        # `if ver and ...` lama membuat migrasi format sumber
+        # (distribusi -all.zip, kutip tunggal TOML) mematikan cek
+        # sinkron versi selamanya tanpa satu pun pesan, sejajar
+        # perlakuan stale yang fail-closed sejak #196.
+        if gradle_ver is None:
+            problems.append("pola versi Gradle tak ditemukan di gradle-wrapper.properties")
+        elif gradle_ver.group(1) not in agents:
             problems.append(f"AGENTS.md tak menyebut Gradle {gradle_ver.group(1)}")
-        if agp_ver and agp_ver.group(1) not in agents:
+        if agp_ver is None:
+            problems.append("pola versi AGP tak ditemukan di libs.versions.toml")
+        elif agp_ver.group(1) not in agents:
             problems.append(f"AGENTS.md tak menyebut AGP {agp_ver.group(1)}")
         jacoco = _re.search(r'minimum\s*=\s*"0\.(\d+)"', app_build)
+        if jacoco is None:
+            problems.append("pola ambang JaCoCo tak ditemukan di app/build.gradle.kts")
         if jacoco:
             # Bentuk umum (issue #196): persen desimal eksak, mis.
             # "0.085" -> "8,5" di dokumen Indonesia — berlaku untuk
