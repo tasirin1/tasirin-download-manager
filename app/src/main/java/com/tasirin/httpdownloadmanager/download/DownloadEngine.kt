@@ -3619,10 +3619,32 @@ class DownloadEngine(appContext: Context) {
             clean.startsWith("md5:", ignoreCase = true) -> "MD5" to clean.substring(4)
             clean.startsWith("sha1:", ignoreCase = true) -> "SHA-1" to clean.substring(5)
             clean.startsWith("sha256:", ignoreCase = true) -> "SHA-256" to clean.substring(7)
-            else -> "MD5" to clean
+            else -> {
+                // Tanpa awalan: tebak algoritma dari panjang hex polos
+                // (MD5 32, SHA-1 40, SHA-256 64). Sebelumnya nilai polos
+                // selalu ditafsir MD5 sehingga hash SHA polos mustahil
+                // cocok dan unduhan utuh terhapus (issue #342).
+                val bare = clean.trim()
+                when (bare.length) {
+                    32 -> "MD5" to bare
+                    40 -> "SHA-1" to bare
+                    64 -> "SHA-256" to bare
+                    else -> return null
+                }
+            }
         }
         val value = rest.trim().lowercase(Locale.ROOT)
-        if (value.length < 16) return null
+        val expectedLen = when (algo) {
+            "MD5" -> 32
+            "SHA-1" -> 40
+            else -> 64
+        }
+        // Validasi format eksak per algoritma: nilai cacat/non-hex
+        // ditolak di muka sebagai "tanpa checksum", bukan disimpan
+        // sebagai ekspektasi yang mustahil cocok (issue #342).
+        if (value.length != expectedLen ||
+            !value.all { it in '0'..'9' || it in 'a'..'f' }
+        ) return null
         return algo to value
     }
 
