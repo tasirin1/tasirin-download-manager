@@ -3331,9 +3331,9 @@ class DownloadEngine(appContext: Context) {
         }
         // Konsumsi sinyal fallback enkripsi (issue #209): flag ini
         // sebelumnya write-only — tak ada yang tahu kredensial jatuh ke
-        // plaintext saat keystore bermasalah. Catat lalu reset.
-        if (Crypto.encryptFallbackUsed) {
-            Crypto.encryptFallbackUsed = false
+        // plaintext saat keystore bermasalah. Catat lewat consume
+        // (setter properti memang private di Crypto).
+        if (Crypto.consumeEncryptFallbackUsed()) {
             App.logEvent("STORAGE: encryption fallback used during save (keystore issue?)")
         }
     }

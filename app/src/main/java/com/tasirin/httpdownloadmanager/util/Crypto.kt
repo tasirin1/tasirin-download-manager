@@ -29,6 +29,15 @@ object Crypto {
     @Volatile var encryptFallbackUsed: Boolean = false
         private set
 
+    /** Konsumsi sinyal fallback: kembalikan nilai saat ini lalu reset.
+     *  Setter properti di atas sengaja private — pemanggil (engine saat
+     *  flushSave) memakai ini agar kejadian fallback tercatat sekali. */
+    fun consumeEncryptFallbackUsed(): Boolean {
+        val was = encryptFallbackUsed
+        if (was) encryptFallbackUsed = false
+        return was
+    }
+
     /** Enkripsi nilai dengan kunci Android Keystore (AES-GCM, API 23+).
      *  Di Android 5.0-5.1 (API 21-22) Keystore AES belum tersedia,
      *  jadi nilai disimpan apa adanya. */
