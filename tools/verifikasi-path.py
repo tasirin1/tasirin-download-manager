@@ -1356,7 +1356,14 @@ def utama():
     peringatan = []
     diff = ""
     if args.jalur:
-        berubah = [j for j in args.jalur if os.path.exists(os.path.join(AKAR, j))]
+        # Dedupe menjaga urutan pertama (issue #500): jalur yang disebut
+        # dua kali dulu dinilai dua kali — peringatan per-baris dari cek
+        # berbasis diff berduplikat (termasuk suntikan #496) dan
+        # penghitung "berkas diperiksa" mengganda, walau vonis akhir
+        # sama. Satu penyebutan cukup.
+        berubah = list(dict.fromkeys(
+            j for j in args.jalur if os.path.exists(os.path.join(AKAR, j))
+        ))
         # Lawan HEAD, bukan diff unstaged polos (issue #493): perubahan
         # staged murni dulu menghasilkan diff kosong sehingga SELURUH
         # keluarga cek berbasis diff (bekas-hapusan, fungsi hilang,
