@@ -143,18 +143,103 @@ def banned_hits(text: str) -> list:
     return hits
 
 
-# Token JS untuk pembuangan komentar yang sadar string (#273): string
-# biasa/template didahulukan dalam alternasi agar '//' atau '/*' DI DALAM
-# string (mis. "https://...") tidak dianggap awal komentar.
-_JS_TOKEN_RE = re.compile(
-    r"`(?:\\.|[^`\\])*`|'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\""
-    r"|//[^\n]*|/\*[\s\S]*?\*/"
-)
+# Kata kunci JS yang diikuti ekspresi: sesudah kata ini '/' membuka
+# literal regex, bukan pembagian.
+_JS_KATA_EKSPRESI = {
+    "return", "typeof", "case", "in", "of", "new", "delete", "void",
+    "instanceof", "yield", "await", "do", "else",
+}
 
 
-def _buang_komentar_js(match) -> str:
-    teks = match.group(0)
-    return teks if teks[0] in "'\"`" else ""
+def _buang_komentar_js_src(src: str) -> str:
+    r"""Buang komentar JS dengan pemindai sadar string DAN literal regex.
+
+    Tokenizer regex lama (#273) tidak mengenal literal regex: pada
+    /https?:\/\// dua garis miring terakhir terbaca sebagai awal
+    komentar '//', sehingga sisa baris terbuang sebelum guard bahasa
+    berjalan dan kata terlarang sesudahnya lolos (#314). Pemindai ini
+    membedakan '/' pembuka regex dari '/' pembagian lewat kategori
+    token sebelumnya (regex hanya sah sesudah operator/kata kunci
+    ekspresi), menyalin string/template/regex utuh, dan membuang
+    komentar baris/blok. Batas heuristik yang diterima: pembagian
+    langsung sesudah '++'/'--' bisa terbaca sebagai regex.
+    """
+    out = []
+    i, n = 0, len(src)
+    prev = ""  # "" awal | "op" operator | "val" nilai
+    while i < n:
+        c = src[i]
+        if c in "'\"`":
+            j = i + 1
+            while j < n:
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == c:
+                    j += 1
+                    break
+                if c != "`" and src[j] == "\n":
+                    break
+                j += 1
+            out.append(src[i:j])
+            i = j
+            prev = "val"
+            continue
+        if c == "/" and i + 1 < n and src[i + 1] == "/":
+            j = src.find("\n", i)
+            i = n if j == -1 else j
+            continue
+        if c == "/" and i + 1 < n and src[i + 1] == "*":
+            j = src.find("*/", i + 2)
+            i = n if j == -1 else j + 2
+            continue
+        if c == "/" and prev != "val":
+            j = i + 1
+            in_class = False
+            ok = False
+            while j < n:
+                ch = src[j]
+                if ch == "\\":
+                    j += 2
+                    continue
+                if ch == "\n":
+                    break
+                if ch == "[":
+                    in_class = True
+                elif ch == "]":
+                    in_class = False
+                elif ch == "/" and not in_class:
+                    ok = True
+                    j += 1
+                    break
+                j += 1
+            if ok:
+                while j < n and src[j].isalpha():
+                    j += 1
+                out.append(src[i:j])
+                i = j
+                prev = "val"
+                continue
+            out.append(c)
+            i += 1
+            prev = "op"
+            continue
+        if c.isalnum() or c in "_$":
+            j = i
+            while j < n and (src[j].isalnum() or src[j] in "_$"):
+                j += 1
+            kata = src[i:j]
+            out.append(kata)
+            prev = "op" if kata in _JS_KATA_EKSPRESI else "val"
+            i = j
+            continue
+        out.append(c)
+        if c in ")]":
+            prev = "val"
+        elif not c.isspace():
+            prev = "op"
+        i += 1
+    return "".join(out)
 
 
 def strip_comments(text: str) -> str:
@@ -167,7 +252,7 @@ def strip_comments(text: str) -> str:
     # membuang sisa baris termasuk string label UI sesudah URL pertama,
     # jadi kata terlarang di sana lolos dari guard bahasa (#273).
     def bersihkan(match):
-        return _JS_TOKEN_RE.sub(_buang_komentar_js, match.group(0))
+        return _buang_komentar_js_src(match.group(0))
 
     return re.sub(r"<script>.*?</script>", bersihkan, text, flags=re.S)
 
