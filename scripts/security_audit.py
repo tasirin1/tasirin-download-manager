@@ -662,6 +662,22 @@ def scan_path(root: Path, rules: Iterable[Rule] = RULES) -> list[dict[str, objec
         relative = absolute.resolve().relative_to(root.resolve())
         lines = read_lines(absolute)
         if lines is None:
+            # Berkas terlewat TIDAK boleh diam (issue #344): audit yang
+            # melewatkan berkas besar/non-UTF-8 tanpa jejak adalah
+            # fail-open -- CI hijau sementara berkas itu tidak terpindai
+            # aturan apa pun. Laporkan sebagai warning agar terlihat.
+            findings.append(
+                {
+                    "path": relative.as_posix(),
+                    "line": 1,
+                    "column": 1,
+                    "rule_id": "file_unscanned",
+                    "severity": "warning",
+                    "title": "File skipped by audit (over 2MB or not UTF-8); "
+                    "its contents were not scanned",
+                    "excerpt": "(file not scanned)",
+                }
+            )
             continue
         findings.extend(scan_text(relative, lines, rules))
     return sorted(
