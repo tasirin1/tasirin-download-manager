@@ -2062,14 +2062,38 @@ object SocialMediaExtractor {
                 conn.connectTimeout = timeoutMs
                 conn.readTimeout = timeoutMs
                 conn.instanceFollowRedirects = false
-                activeHeaders.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-                if (!activeHeaders.containsKey("User-Agent")) {
+                val currentHost = runCatching { java.net.URI(current).host }
+                    .getOrNull().orEmpty()
+                // Cookie jar WAJIB ikut dikirim ke hop berikutnya
+                // (pola fetchDrive): versi lama hanya MENGUMPULKAN
+                // Set-Cookie tiap hop untuk hasil akhir, tetapi tidak
+                // pernah mengirimkannya — hop lanjutan (endpoint
+                // youtubei, watch, plugin) berjalan tanpa cookie sesi
+                // yang dipasang hop perantara. Cookie user dipisah
+                // dulu (kunci huruf apa pun) lalu digabung, bukan
+                // ditimpa.
+                var userCookie = ""
+                val sendHeaders = LinkedHashMap<String, String>()
+                for ((k, v) in activeHeaders) {
+                    if (k.equals("Cookie", ignoreCase = true)) {
+                        userCookie = v
+                    } else {
+                        sendHeaders[k] = v
+                    }
+                }
+                val jarVisible = cookieJar.entries
+                    .filter { cookieJarVisible(it.value.second, currentHost) }
+                    .joinToString("; ") { "${it.key}=${it.value.first}" }
+                val effectiveCookie = mergeCookiePairs(userCookie, jarVisible)
+                if (effectiveCookie.isNotEmpty()) {
+                    sendHeaders["Cookie"] = effectiveCookie
+                }
+                sendHeaders.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+                if (!sendHeaders.containsKey("User-Agent")) {
                     conn.setRequestProperty("User-Agent",
                         DEFAULT_UA)
                 }
                 val code = conn.responseCode
-                val currentHost = runCatching { java.net.URI(current).host }
-                    .getOrNull().orEmpty()
                 conn.headerFields.entries
                     .filter { it.key?.equals("set-cookie", ignoreCase = true) == true }
                     .flatMap { it.value }
