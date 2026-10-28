@@ -2474,12 +2474,21 @@ class DownloadEngine(appContext: Context) {
         finalName: String
     ) {
         speedTracker.reset(item.id)
+        // Ukuran final dari berkas terbit sebenarnya bila terukur
+        // (issue #348): jumlah byte segmen MPEG-TS bukan ukuran MP4
+        // hasil remux (beda header MP4 dan padding TS), jadi memakai
+        // angka segmen membuat ukuran tampil tidak sama dengan berkas
+        // aslinya. Terbit MediaStore/SAF tanpa path lokal terukur
+        // jatuh kembali ke jumlah byte segmen.
+        val actualSize = published.filePath?.let { path ->
+            runCatching { File(path).takeIf { it.isFile }?.length() }.getOrNull()
+        }?.takeIf { it > 0 } ?: downloaded
         val finishedHls = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = finalName,
-                bytesDownloaded = downloaded,
-                totalBytes = downloaded,
+                bytesDownloaded = actualSize,
+                totalBytes = actualSize,
                 contentUri = published.contentUri,
                 filePath = published.filePath,
                 autoResume = false,
