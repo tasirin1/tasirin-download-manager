@@ -286,12 +286,13 @@ def repository_files(root: Path) -> list[Path]:
 
     if (root / ".git").exists():
         result = subprocess.run(
-            # --others --exclude-standard: berkas BELUM terlacak ikut
-            # terpindai (#292) — dulu audit hanya membaca daftar
-            # terlacak, jadi berkas baru berisi token lolos sampai ia
-            # di-stage/di-commit, padahal hook pra-commit berjalan
-            # SEBELUM staging selesai.
-            ["git", "ls-files", "-z", "--others", "--exclude-standard"],
+            # --cached + --others --exclude-standard: berkas terlacak
+            # DAN belum terlacak sama-sama terpindai (#292). Tanpa
+            # --cached, --others HANYA mendaftar berkas untracked
+            # sehingga audit memindai 0 berkas terlacak di pohon bersih
+            # dan lolos hampa (#302).
+            ["git", "ls-files", "-z", "--cached", "--others",
+             "--exclude-standard"],
             cwd=root,
             check=True,
             capture_output=True,
