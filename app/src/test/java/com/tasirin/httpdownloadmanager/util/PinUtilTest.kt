@@ -33,6 +33,19 @@ class PinUtilTest {
     }
 
     @Test
+    fun verifyStoredPin_modernDanWarisan_tanpaEfekSamping() {
+        val modern = PinHash.hash("123456")
+        assertTrue(StoragePrefs.verifyStoredPin(modern, "123456"))
+        assertFalse(StoragePrefs.verifyStoredPin(modern, "123457"))
+        // Warisan: hash SHA-256 polos dan plaintext lama sama-sama terverifikasi
+        // lewat normalisasi yang sama seperti jalur migrasi pinMatches.
+        assertTrue(StoragePrefs.verifyStoredPin(sha256Hex("1234"), "1234"))
+        assertTrue(StoragePrefs.verifyStoredPin("1234", "1234"))
+        assertFalse(StoragePrefs.verifyStoredPin(sha256Hex("1234"), "9999"))
+        assertFalse(StoragePrefs.verifyStoredPin("", "1234"))
+    }
+
+    @Test
     fun constantEquals_sama_true() {
         assertTrue(StoragePrefs.constantEquals("abc", "abc"))
     }

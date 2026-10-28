@@ -194,15 +194,34 @@ object StoragePrefs {
         val old = getServerPin(context)
         // PIN tak berubah (termasuk kosong->kosong): jangan rotate secret sesi —
         // tanpanya tiap simpan Pengaturan menendang semua sesi remote dan
-        // memaksa login ulang padahal PIN sama.
+        // memaksa login ulang padahal PIN sama. Ceknya wajib MURNI
+        // (verifyStoredPin): pinMatches punya efek samping migrasi yang
+        // ikut me-rotate secret untuk nilai warisan, sehingga memakainya
+        // di sini diam-diam membatalkan janji baris di atas (issue #375).
         val unchanged = (clean == null && old == null) ||
-            (clean != null && old != null && pinMatches(context, clean))
-        if (unchanged) return
+            (clean != null && old != null && verifyStoredPin(old, clean))
+        if (unchanged) {
+            // Nilai warisan yang tak berubah tetap dimigrasikan formatnya
+            // ke PBKDF2 — TANPA rotate secret, sesi remote tidak tertendang.
+            if (clean != null && old != null && !PinHash.isModern(old)) {
+                prefs(context).edit { putString(KEY_SERVER_PIN, PinHash.hash(clean)) }
+            }
+            return
+        }
         val hash = clean?.let { PinHash.hash(it) }
         rotateServerSessionSecret(context)
         prefs(context).edit {
             putString(KEY_SERVER_PIN, hash)
         }
+    }
+
+    /** Verifikasi MURNI PIN terhadap nilai tersimpan (tanpa migrasi,
+     *  tanpa rotate): modern lewat PinHash.verify, warisan lewat hash
+     *  SHA-256 ternormalisasi seperti jalur migrasi pinMatches. */
+    internal fun verifyStoredPin(stored: String, pin: String): Boolean {
+        if (PinHash.isModern(stored)) return PinHash.verify(pin, stored)
+        val expected = normalizePinHash(stored) ?: return false
+        return constantEquals(sha256Hex(pin), expected)
     }
 
     /** Nilai kredensial tersimpan; cukup untuk cek ada/tidaknya PIN. */
@@ -220,8 +239,7 @@ object StoragePrefs {
         // Hash yang bocor tidak boleh dipakai sebagai PIN: hanya terima hash
         // SHA-256 dari input, jangan pernah bandingkan input langsung dengan
         // nilai tersimpan 64-hex (itu membuat hash menjadi password).
-        val expected = normalizePinHash(stored) ?: return false
-        if (!constantEquals(sha256Hex(pin), expected)) return false
+        if (!verifyStoredPin(stored, pin)) return false
         prefs(context).edit { putString(KEY_SERVER_PIN, PinHash.hash(pin)) }
         rotateServerSessionSecret(context)
         return true
