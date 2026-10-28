@@ -2614,44 +2614,49 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // kehabisan anggaran jatuh ke triple tak-diketahui #439.
             val statDeadlineNs = System.nanoTime() +
                 TimeUnit.SECONDS.toNanos(STAT_FUTURE_TIMEOUT_SEC)
-            page.forEach { f ->
-                val o = JSONObject()
-                o.put("name", f.name)
-                o.put("path", FS_PREFIX + f.absolutePath)
-                o.put("kind", if (f.isDirectory) "dir" else "file")
-                o.put("size", if (f.isFile) f.length() else 0L)
-                o.put("modified", f.lastModified())
-                if (f.isDirectory) {
-                    val (itemCount, totalSize, sizeTruncated) = if (allowed) {
-                        // Timeout/gagal mengambil statistik berarti ukuran
-                        // TAK DIKETAHUI: tandai terpotong (issue #439) agar
-                        // tidak menyamar sebagai folder kosong — ini celah
-                        // jalur waktu dari undercount yang ditutup #415.
-                        runCatching {
-                            val sisaNs = statDeadlineNs - System.nanoTime()
-                            if (sisaNs <= 0L) null
-                            else statFutures[f]?.get(sisaNs, TimeUnit.NANOSECONDS)
-                        }.getOrNull() ?: Triple(0, 0L, true)
-                    } else {
-                        Triple(0, 0L, false)
+            try {
+                page.forEach { f ->
+                    val o = JSONObject()
+                    o.put("name", f.name)
+                    o.put("path", FS_PREFIX + f.absolutePath)
+                    o.put("kind", if (f.isDirectory) "dir" else "file")
+                    o.put("size", if (f.isFile) f.length() else 0L)
+                    o.put("modified", f.lastModified())
+                    if (f.isDirectory) {
+                        val (itemCount, totalSize, sizeTruncated) = if (allowed) {
+                            // Timeout/gagal mengambil statistik berarti ukuran
+                            // TAK DIKETAHUI: tandai terpotong (issue #439) agar
+                            // tidak menyamar sebagai folder kosong — ini celah
+                            // jalur waktu dari undercount yang ditutup #415.
+                            runCatching {
+                                val sisaNs = statDeadlineNs - System.nanoTime()
+                                if (sisaNs <= 0L) null
+                                else statFutures[f]?.get(sisaNs, TimeUnit.NANOSECONDS)
+                            }.getOrNull() ?: Triple(0, 0L, true)
+                        } else {
+                            Triple(0, 0L, false)
+                        }
+                        o.put("itemCount", itemCount)
+                        o.put("totalSize", totalSize)
+                        if (sizeTruncated) o.put("sizeTruncated", true)
+                    } else if (allowed) {
+                        o.put("token", MediaLibrary.tokenForPath(f.absolutePath))
                     }
-                    o.put("itemCount", itemCount)
-                    o.put("totalSize", totalSize)
-                    if (sizeTruncated) o.put("sizeTruncated", true)
-                } else if (allowed) {
-                    o.put("token", MediaLibrary.tokenForPath(f.absolutePath))
+                    items.put(o)
                 }
-                items.put(o)
-            }
-            // Batalkan Future statistik yang belum selesai (issue #466):
-            // tanpa ini tugas fsStats yang melewati deadline tetap
-            // mengantre sebagai pemindaian yatim dan menjenuhi pool
-            // kecil, sehingga refresh berikutnya kehabisan anggaran di
-            // antrean. cancel(false) membuang yang masih mengantre;
-            // yang sedang berjalan dibiarkan tuntas (hasilnya masuk
-            // cache fsStats dan berguna bagi request berikut).
-            statFutures.values.forEach { fut ->
-                if (fut != null && !fut.isDone) fut.cancel(false)
+            } finally {
+                // Batalkan Future statistik yang belum selesai (issue #466),
+                // di finally (issue #479) agar jaminan ini tak bergantung
+                // pada isi loop halaman yang kebetulan tak melempar:
+                // tanpa ini tugas fsStats yang melewati deadline tetap
+                // mengantre sebagai pemindaian yatim dan menjenuhi pool
+                // kecil, sehingga refresh berikutnya kehabisan anggaran di
+                // antrean. cancel(false) membuang yang masih mengantre;
+                // yang sedang berjalan dibiarkan tuntas (hasilnya masuk
+                // cache fsStats dan berguna bagi request berikut).
+                statFutures.values.forEach { fut ->
+                    if (fut != null && !fut.isDone) fut.cancel(false)
+                }
             }
         }
         return jsonResponse(
