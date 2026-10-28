@@ -23,6 +23,7 @@ REQUIRED_FILES = (
     "README.md",
     "README.en.md",
     "SECURITY.md",
+    "tools/bekas-hapusan.txt",
 )
 
 

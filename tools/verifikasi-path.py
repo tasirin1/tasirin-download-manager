@@ -32,17 +32,25 @@ KATA_KUNCI_KOTLIN = {
 
 
 def muat_bekas_hapusan():
+    # Fail-closed (issue #183): daftar hilang/kosong TIDAK boleh menurunkan
+    # guard diam-diam ke satu nama cadangan — gerbang harus berhenti keras
+    # supaya kehilangannya langsung terlihat.
+    path = os.path.join(AKAR, "tools", "bekas-hapusan.txt")
     nama = set()
     try:
-        with open(os.path.join(AKAR, "tools", "bekas-hapusan.txt"),
-                  encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             for baris in f:
                 baris = baris.strip()
                 if baris and not baris.startswith("#"):
                     nama.add(baris.split()[0])
     except OSError:
-        pass
-    return nama or {"QrEncoder"}
+        nama = set()
+    if not nama:
+        raise SystemExit(
+            "GAGAL: tools/bekas-hapusan.txt hilang atau kosong — daftar "
+            "nama terlarang adalah bagian dari gerbang; pulihkan berkasnya."
+        )
+    return nama
 
 
 BEKAS_HAPUSAN = muat_bekas_hapusan()
