@@ -99,6 +99,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
      *  batch episode selesai atau pengguna batal di tengah, supaya tombol
      *  ekstrak tak mati diam-diam (handler lama di-null tanpa pengganti). */
     private var fallbackWebExtractHandler: ((Intent?) -> Unit)? = null
+    /** Tumpukan handler per dialog tambah yang sedang terbuka: dua dialog
+     *  bisa menumpuk (share intent saat dialog pertama terbuka), jadi
+     *  penutupan satu dialog hanya memulihkan handler dialog di bawahnya,
+     *  tidak mem-null-kan handler dialog lain (issue #207). */
+    private val webExtractHandlerStack = mutableListOf<(Intent?) -> Unit>()
     private val webExtractLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
@@ -784,7 +789,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
         // Situs anti-bot (HentaiHaven): ambil video lewat browser dalam
         // aplikasi, lalu isi URL + cookie ke form agar engine unduh langsung.
-        onWebExtractResult = { data ->
+        val myExtractHandler: (Intent?) -> Unit = { data ->
             val videoUrl = data?.getStringExtra(WebExtractActivity.EXTRA_VIDEO_URL).orEmpty()
             val watch = data?.getStringExtra(WebExtractActivity.EXTRA_WATCH_URL).orEmpty()
             val episodes = SocialMediaExtractor.parseEpisodeLinks(
@@ -833,7 +838,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
         }
-        fallbackWebExtractHandler = onWebExtractResult
+        webExtractHandlerStack.add(myExtractHandler)
+        onWebExtractResult = myExtractHandler
+        fallbackWebExtractHandler = myExtractHandler
         btnWebExtract.setOnClickListener {
             val target = extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull().orEmpty()
             if (target.isBlank()) {
@@ -985,8 +992,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             dialog.dismiss()
         }
         dialog.setOnDismissListener {
-            onWebExtractResult = null
-            fallbackWebExtractHandler = null
+            // Hanya dialog pemilik sesi (fallback menunjuk handler-nya)
+            // yang boleh membersihkan field; dialog lain yang menumpuk
+            // cukup melepas entri tumpukannya. Pemilik yang ditutup
+            // memulihkan handler dialog di bawahnya bila masih ada.
+            webExtractHandlerStack.remove(myExtractHandler)
+            if (fallbackWebExtractHandler === myExtractHandler) {
+                val remaining = webExtractHandlerStack.lastOrNull()
+                onWebExtractResult = remaining
+                fallbackWebExtractHandler = remaining
+            }
             // Probe yang masih jalan menahan seluruh view dialog + bakar
             // ekstraksi jaringan sia-sia pasca-tutup: batalkan di sini.
             socialDebounce?.cancel()
