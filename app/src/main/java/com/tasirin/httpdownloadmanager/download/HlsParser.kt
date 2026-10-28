@@ -139,7 +139,17 @@ object HlsParser {
             } ?: 0
             val codecs = CODECS_RE.find(ln)?.groupValues?.get(1).orEmpty()
             val fps = FRAME_RATE_RE.find(ln)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
-            out.add(HlsVariant("$h p", resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
+            // Label tanpa RESOLUTION (issue #476): "$h p" memburuk jadi
+            // "0 p" untuk semua varian master tak umum (yang justru
+            // terjangkau dialog berkat #465) — tak bisa dibedakan dan
+            // menjadi nama berkas 0_p.m3u8. Jatuh ke bandwidth seperti
+            // label parseMaster, lalu ke nomor urut bila keduanya nol.
+            val label = when {
+                h > 0 -> "$h p"
+                bw > 0 -> "${bw / 1000} kbps"
+                else -> "Variant ${out.size + 1}"
+            }
+            out.add(HlsVariant(label, resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
         }
         return if (out.isEmpty()) null else out.sortedByDescending { it.bandwidth }
     }

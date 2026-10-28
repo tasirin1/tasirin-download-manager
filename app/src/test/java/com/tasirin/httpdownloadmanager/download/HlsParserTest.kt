@@ -188,6 +188,23 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMasterLenient - label tanpa RESOLUTION jatuh ke bandwidth lalu nomor urut`() {
+        // Tanpa RESOLUTION label "$h p" memburuk jadi "0 p" untuk semua
+        // varian (issue #476): jatuh ke kbps seperti parseMaster, lalu
+        // ke nomor urut bila bandwidth juga nol.
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000\n" +
+            "https://cdn.example.com/videos/a.m3u8\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1\n" +
+            "https://cdn.example.com/videos/b.m3u8\n"
+        val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(2, variants.size)
+        // Terurut menurun menurut bandwidth: yang ber-bandwidth di depan.
+        assertEquals("800 kbps", variants[0].name)
+        assertEquals("Variant 2", variants[1].name)
+    }
+
+    @Test
     fun `parseMasterLenient - fallback absolut saat parseMaster gagal`() {
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4D401E\",FRAME-RATE=30\n" +
