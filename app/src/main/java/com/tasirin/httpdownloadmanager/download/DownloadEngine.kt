@@ -314,16 +314,24 @@ class DownloadEngine(appContext: Context) {
                 // plaintext warisan/fallback ditulis ulang terenkripsi
                 // SEKARANG saat start, bukan menunggu persist penuh
                 // berikutnya yang entah kapan.
+                // Kedua flush penutup init dibungkus runCatching
+                // (issue #349): eksepsi persist di sini tidak boleh
+                // keluar dari launch init, karena startBackgroundLoops()
+                // sesudah blok ini adalah satu-satunya penjalan
+                // monitorLoop -- kegagalan simpan sesaat tidak boleh
+                // mematikan monitor untuk seluruh sesi proses.
                 if (repository.hasWeakStoredCredentials()) {
                     App.logEvent(
                         "STORAGE: weak credential storage found, re-encrypting"
                     )
-                    flushSave()
+                    runCatching { flushSave() }
+                        .onFailure { App.logEvent("STORAGE: re-encrypt flush failed: ${it.message}") }
                 } else if (extras.isNotEmpty() || reconciled || saveDeferredPreGate) {
                     // Simpan yang teredam gerbang selama jendela muat
                     // (termasuk hasil rekonsiliasi: flushSave internalnya
                     // ikut teredam selama gerbang masih tertutup).
-                    flushSave()
+                    runCatching { flushSave() }
+                        .onFailure { App.logEvent("STORAGE: deferred flush failed: ${it.message}") }
                 }
             } finally {
                 loadGate.complete(Unit)
