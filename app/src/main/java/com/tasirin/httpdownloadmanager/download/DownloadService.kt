@@ -53,6 +53,14 @@ class DownloadService : Service() {
             }
         }
         scope.launch(Dispatchers.IO) {
+            // Kolektor tidak boleh menilai emisi sebelum muatan awal
+            // terpasang (#264): emisi pertama saat cold start adalah
+            // daftar kosong muatan latar #242, dan cabang berhenti di
+            // bawah akan membunuh service sebelum antrean terbaca.
+            // StateFlow memutar ulang nilai terbaru begitu koleksi
+            // dimulai, jadi menunggu gerbang di sini tidak melewatkan
+            // emisi apa pun.
+            App.engine.awaitInitialLoad()
             App.engine.items.collect { items ->
                 runCatching {
                     val active = items.any {

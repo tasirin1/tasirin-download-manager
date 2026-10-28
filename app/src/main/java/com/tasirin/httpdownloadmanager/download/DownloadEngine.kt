@@ -203,6 +203,9 @@ class DownloadEngine(appContext: Context) {
      *  tersimpan atau membersihkan partial milik item yang belum termuat. */
     private val loadGate = CompletableDeferred<Unit>()
 
+    /** Tunggu sampai muatan awal antrean terpasang (gerbang #242). */
+    suspend fun awaitInitialLoad() = loadGate.await()
+
     private val _items = MutableStateFlow<List<DownloadItem>>(emptyList())
     val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
 
@@ -787,6 +790,16 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun pauseAll() {
+        // Aksi massal wajib menunggu muatan awal (#264): menilai daftar
+        // kosong di jendela muat membuat aksi pengguna batal diam-diam.
+        if (!loadGate.isCompleted) {
+            scope.launch { loadGate.await(); doPauseAll() }
+            return
+        }
+        doPauseAll()
+    }
+
+    private fun doPauseAll() {
         val targets = _items.value.filter {
             it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
         }
@@ -820,6 +833,16 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun resumeAll() {
+        // Aksi massal wajib menunggu muatan awal (#264): menilai daftar
+        // kosong di jendela muat membuat aksi pengguna batal diam-diam.
+        if (!loadGate.isCompleted) {
+            scope.launch { loadGate.await(); doResumeAll() }
+            return
+        }
+        doResumeAll()
+    }
+
+    private fun doResumeAll() {
         // Batch: satu filter + satu update, bukan N kali find() di resume().
         // DOWNLOADING zombie (tanpa job aktif) ikut diantrekan ulang —
         // selaras resume(id); DOWNLOADING ber-job aktif memang sedang
@@ -902,6 +925,18 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun resumeAutoPaused() {
+        // Callback jaringan wajib menunggu muatan awal (#264):
+        // onAvailable tidak menembak ulang sampai jaringan berubah
+        // lagi, jadi no-op di jendela muat membuat unduhan yang
+        // ter-auto-pause macet tanpa pemicu berikutnya.
+        if (!loadGate.isCompleted) {
+            scope.launch { loadGate.await(); doResumeAutoPaused() }
+            return
+        }
+        doResumeAutoPaused()
+    }
+
+    private fun doResumeAutoPaused() {
         if (!StoragePrefs.isBackgroundEnabled(context)) return
         val ids = _items.value.filter {
             it.autoResume && it.state == DownloadState.PAUSED
