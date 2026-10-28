@@ -2967,7 +2967,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // setidaknya cache sudah di-refresh dan file asli masih ada.
             MediaLibrary.notifyMediaChanged(context, file.absolutePath)
         }
-        return gone
+        // Laporkan SUKSES begitu salinan terbit (#231): dulu kegagalan
+        // menghapus sumber dilaporkan sebagai kegagalan operasi, padahal
+        // salinan sudah hidup — pengguna mengira pindah gagal, mencoba
+        // lagi, dan setiap percobaan menambah salinan bernama unik baru.
+        return true
     }
 
     private fun moveMediaToFile(uri: Uri, dest: String): Boolean {
