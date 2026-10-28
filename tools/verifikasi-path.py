@@ -1134,19 +1134,63 @@ def cek_fun_hilang(gagal, peringatan, diff, hapus=()):
             gagal.append(pesan)
 
 
+def tambah_kt_bernomor(diff):
+    """Seperti tambah_kt, tetapi menghasilkan juga nomor baris BARU
+    tiap baris tambah (dari header hunk @@), agar cek dapat mengupas
+    dengan konteks berkas utuh (issue #481)."""
+    path = ""
+    nomor = 0
+    for baris in diff.splitlines():
+        if baris.startswith("diff --git "):
+            path = path_dari_header_diff(baris)
+            nomor = 0
+        elif baris.startswith("@@"):
+            m = re.search(r"\+(\d+)", baris)
+            nomor = int(m.group(1)) if m else 0
+        elif baris.startswith("+") and not baris.startswith("+++"):
+            if path.endswith((".kt", ".java")):
+                yield path, nomor, baris[1:]
+            nomor += 1
+        elif baris.startswith(" "):
+            nomor += 1
+
+
 def cek_panggil_bekas_hapusan(gagal, diff):
+    # Baris tambah dikelompokkan per berkas, isi berkas UTUH dikupas,
+    # dan pencocokan hanya pada nomor baris tambah (issue #481): kupas
+    # per baris (pola #471) tak tahu baris lanjutan komentar blok
+    # multi-baris — KDoc tiga baris yang menyebut nama terhapus tetap
+    # GAGAL palsu karena baris lanjutannya tanpa penanda komentar.
+    # Pengupasnya sadar template (#483) + isi string dikosongkan
+    # (#484); berkas yang tak terbaca jatuh ke kupas per baris.
+    per_path = {}
+    for path, nomor, teks in tambah_kt_bernomor(diff):
+        per_path.setdefault(path, []).append((nomor, teks))
+    bersih_per_path = {}
+    for path in per_path:
+        isi = baca(path)
+        if isi:
+            bersih_per_path[path] = kupas_kode_jaga_baris(
+                isi, kosongkan_string=True
+            ).splitlines()
     for nama in sorted(BEKAS_HAPUSAN):
         pola = re.compile(r"\b%s\s*\(" % re.escape(nama))
-        for _, baris in tambah_kt(diff):
-            # Komentar dikupas dulu: menyebut nama terhapus di komentar
-            # (mis. KDoc "pengganti cacheDuration() yang lama") bukan
-            # panggilan dan tidak boleh menggagalkan gerbang (issue #471).
-            # Pengupas sadar template (issue #483) + isi string
-            # dikosongkan (issue #484).
-            if pola.search(kupas_kode_jaga_baris(baris, kosongkan_string=True)):
-                gagal.append("Baris baru memanggil %s() yang sudah dihapus: %s"
-                             % (nama, baris.strip()[:80]))
+        ketemu = None
+        for path, daftar in per_path.items():
+            bersih = bersih_per_path.get(path)
+            for nomor, teks in daftar:
+                if bersih is not None and 1 <= nomor <= len(bersih):
+                    kandidat = bersih[nomor - 1]
+                else:
+                    kandidat = kupas_kode_jaga_baris(teks, kosongkan_string=True)
+                if pola.search(kandidat):
+                    ketemu = teks
+                    break
+            if ketemu is not None:
                 break
+        if ketemu is not None:
+            gagal.append("Baris baru memanggil %s() yang sudah dihapus: %s"
+                         % (nama, ketemu.strip()[:80]))
 
 
 def hunk_fungsi(diff):
