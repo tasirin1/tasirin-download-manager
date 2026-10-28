@@ -2099,8 +2099,13 @@ class DownloadEngine(appContext: Context) {
         // ia bisa terpotong FileNames.safe untuk nama ±200 karakter sehingga
         // tabrakan kembali pada kasus tepi itu (issue #171).
         val tempBase = "~" + item.id.take(8) + baseName
-        val videoTs = saver.partialFile("$tempBase.video", segment = null).apply { delete() }
-        val audioAdts = saver.partialFile("$tempBase.audio", segment = null).apply { delete() }
+        // Temp video/audio TIDAK dihapus di awal (issue #385): segmen yang
+        // sudah selesai dipertahankan untuk resume percobaan berikutnya;
+        // downloadSegmentsToFile membuangnya sendiri bila penanda .segs
+        // tak cocok dengan rencana ini. Hasil remux selalu dibuat ulang
+        // dari nol (kerja lokal, bukan jaringan), jadi mp4 tetap dihapus.
+        val videoTs = saver.partialFile("$tempBase.video", segment = null)
+        val audioAdts = saver.partialFile("$tempBase.audio", segment = null)
         val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
         val progress = HlsProgress()
         progress.estimateTotalBytes = plan.estimateTotalBytes
@@ -2217,8 +2222,12 @@ class DownloadEngine(appContext: Context) {
             ensurePublishedKept(item.id, published0, published)
             finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
-            runCatching { videoTs.delete() }
-            runCatching { audioAdts.delete() }
+            // Temp video/audio dipertahankan untuk resume (issue #385) —
+            // termasuk jalur pause (CancellationException): membuangnya
+            // di sini berarti jeda/gagal di segmen terakhir tetap
+            // mengunduh ulang dari segmen 0. Temp yatim sesudah item
+            // selesai/dihapus dibersihkan pemindaian orphan .part seperti
+            // partial lain. Hanya hasil remux yang dibuang (dibuat ulang).
             runCatching { mp4.delete() }
             throw e
         }
@@ -2241,10 +2250,30 @@ class DownloadEngine(appContext: Context) {
         var estimateTotalBytes = 0L
     }
 
+    /** Sidik jari rencana segmen untuk resume HLS (issue #385): hash
+     *  daftar URL + mode strip; rencana yang berbeda (varian/kualitas
+     *  lain) menghasilkan sidik berbeda sehingga temp lama dibuang. */
+    private fun hlsSegmentsFingerprint(urls: List<String>, stripId3Segments: Boolean): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        digest.update((if (stripId3Segments) "strip\n" else "raw\n").toByteArray(Charsets.UTF_8))
+        for (u in urls) {
+            digest.update(u.toByteArray(Charsets.UTF_8))
+            digest.update(10)
+        }
+        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+    }
+
     /** Unduh daftar segmen ke satu file. Tiap segmen di-stream dulu ke
      *  berkas spool dan hanya disalin ke tujuan sesudah sukses penuh
      *  (anti-korup), tanpa ditampung utuh di RAM (issue #371); segmen
-     *  audio boleh di-strip ID3 secara streaming saat penyalinan. */
+     *  audio boleh di-strip ID3 secara streaming saat penyalinan.
+     *  Segmen yang sudah selesai dipertahankan antar-percobaan lewat
+     *  berkas penanda `.segs` (issue #385): percobaan berikutnya dengan
+     *  rencana yang sama melanjutkan dari segmen berikutnya dalam mode
+     *  append, bukan mengunduh ulang dari segmen 0. Penanda yang tak
+     *  cocok (rencana berubah / ukuran berkas tak sesuai catatan) membuat
+     *  unduhan mulai segar — resume tak pernah menempel pada data yang
+     *  tak terverifikasi. */
     private suspend fun downloadSegmentsToFile(
         item: DownloadItem,
         urls: List<String>,
@@ -2256,9 +2285,36 @@ class DownloadEngine(appContext: Context) {
         fallbackQuery: String = ""
     ) {
         val spool = File(target.absoluteFile.parentFile, target.name + ".spool")
+        val sidecar = File(target.absoluteFile.parentFile, target.name + ".segs")
+        val fingerprint = hlsSegmentsFingerprint(urls, stripId3Segments)
+        var startIndex = 0
+        // Penghitung PER BERKAS untuk penanda .segs (progress bersama
+        // video+audio, jadi tak bisa dipakai sebagai catatan per berkas).
+        var fileWritten = 0L
+        if (sidecar.isFile && target.isFile) {
+            val lines = runCatching { sidecar.readLines() }.getOrDefault(emptyList())
+            val done = lines.getOrNull(1)?.toIntOrNull() ?: -1
+            val writtenBytes = lines.getOrNull(2)?.toLongOrNull() ?: -1L
+            if (lines.getOrNull(0) == fingerprint && done in 0..urls.size &&
+                writtenBytes >= 0 && target.length() == writtenBytes
+            ) {
+                startIndex = done
+                fileWritten = writtenBytes
+                progress.downloaded += writtenBytes
+                progress.segmentsDone += done
+                progress.exactBytes += writtenBytes
+                if (done > 0) {
+                    App.logEvent("HLS: resuming from segment $done/${urls.size} (${target.name})")
+                }
+            } else {
+                runCatching { target.delete() }
+                runCatching { sidecar.delete() }
+            }
+        }
         try {
-            BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
-                for (url in urls) {
+            BufferedOutputStream(FileOutputStream(target, startIndex > 0), BUFFER_SIZE).use { out ->
+                for (index in startIndex until urls.size) {
+                    val url = urls[index]
                     coroutineContext.ensureActive()
                     fetchHlsSegmentWithRetry(
                         item, url, buffer, throttle, progress.downloaded, spool,
@@ -2302,7 +2358,17 @@ class DownloadEngine(appContext: Context) {
                         (if (remaining > 0 && progress.refSegBytes > 0) {
                             progress.refSegBytes * remaining
                         } else 0L)
+                    // Catat progres per berkas untuk resume (issue #385):
+                    // sesudah segmen ini utuh di target, penanda .segs
+                    // menunjuk segmen berikutnya. Gagal tulis penanda tak
+                    // menggagalkan unduhan — resume hanya tak terjadi.
+                    fileWritten += written
+                    runCatching {
+                        sidecar.writeText("$fingerprint\n${index + 1}\n$fileWritten\n")
+                    }
                 }
+                // Semua segmen selesai: penanda resume tak diperlukan lagi.
+                runCatching { sidecar.delete() }
             }
         } finally {
             spool.delete()
