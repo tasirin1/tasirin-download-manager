@@ -144,6 +144,32 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parse master - varian ber-URI asing non-http dibuang`() {
+        val body = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=900000
+            ftp://cdn.example.com/videos/alt.m3u8
+            #EXT-X-STREAM-INF:BANDWIDTH=500000
+            low.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals(500L, variants[0].bandwidth / 1000)
+    }
+
+    @Test
+    fun `parse audio renditions - rendisi ber-URI asing non-http dibuang`() {
+        val body = """
+            #EXTM3U
+            #EXT-X-MEDIA:URI="ftp://cdn.example.com/aud.m3u8",TYPE=AUDIO,GROUP-ID="aud",NAME="Asing"
+            #EXT-X-MEDIA:URI="audio.m3u8",TYPE=AUDIO,GROUP-ID="aud",NAME="Default",DEFAULT=YES
+        """.trimIndent()
+        val renditions = HlsParser.parseAudioRenditions(body, "https://cdn.example.com/videos/master.m3u8")
+        assertEquals(1, renditions.size)
+        assertEquals("Default", renditions[0].name)
+    }
+
+    @Test
     fun `parse master - audioGroupId dari atribut AUDIO`() {
         val master = """
             #EXTM3U

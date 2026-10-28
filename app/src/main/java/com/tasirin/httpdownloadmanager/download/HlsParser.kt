@@ -45,6 +45,14 @@ object HlsParser {
         return body.contains("#EXTINF") || body.contains("#EXT-X-TARGETDURATION")
     }
 
+    /** URI absolut berskema selain http/https (ftp:, rtmp:, ...): tak
+     *  bisa diunduh engine, jadi tak boleh masuk daftar kandidat varian,
+     *  rendisi, atau segmen (issue #453; predikat bersama). */
+    private fun isForeignAbsoluteUri(uri: String): Boolean =
+        ABSOLUTE_URI_RE.containsMatchIn(uri) &&
+            !uri.startsWith("http://", ignoreCase = true) &&
+            !uri.startsWith("https://", ignoreCase = true)
+
     /** Parse isi master playlist. baseUrl dipakai untuk melengkapi URL varian
      *  yang relatif. Hasil diurutkan menurun menurut bandwidth. */
     fun parseMaster(body: String, baseUrl: String): List<HlsVariant>? {
@@ -56,7 +64,7 @@ object HlsParser {
             val line = lines[i].trim()
             if (line.startsWith("#EXT-X-STREAM-INF")) {
                 val next = lines.getOrNull(i + 1)?.trim().orEmpty()
-                if (next.isNotEmpty() && !next.startsWith("#")) {
+                if (next.isNotEmpty() && !next.startsWith("#") && !isForeignAbsoluteUri(next)) {
                     // Guard contains dulu: regex find 6x per baris varian boros
                     // bila atributnya tidak ada di baris tersebut.
                     val bandwidth = if (line.contains("BANDWIDTH")) BANDWIDTH_RE
@@ -164,9 +172,7 @@ object HlsParser {
                 // saringan startsWith("http") di bawah sebagai segmen
                 // (membatalkan maksud #394; uji pendampingnya gagal di CI
                 // run 40705353588 — terbukti lewat port Python 1:1).
-                val foreignAbsolute = ABSOLUTE_URI_RE.containsMatchIn(line) &&
-                    !line.startsWith("http://", ignoreCase = true) &&
-                    !line.startsWith("https://", ignoreCase = true)
+                val foreignAbsolute = isForeignAbsoluteUri(line)
                 if (!foreignAbsolute) {
                     val url = resolveUrl(baseUrl, line)
                     if (url.startsWith("http")) {
@@ -190,6 +196,7 @@ object HlsParser {
             if (MEDIA_TYPE_RE.find(attrs)?.groupValues?.get(1) != "AUDIO") continue
             val groupId = MEDIA_GROUP_RE.find(attrs)?.groupValues?.get(1) ?: continue
             val uri = MEDIA_URI_RE.find(attrs)?.groupValues?.get(1) ?: continue
+            if (isForeignAbsoluteUri(uri)) continue
             val language = LANGUAGE_RE.find(attrs)?.groupValues?.get(1).orEmpty()
             val name = NAME_RE.find(attrs)?.groupValues?.get(1).orEmpty()
             renditions.add(HlsRendition(groupId, resolveUrl(baseUrl, uri), attrs.contains("DEFAULT=YES"), language, name))
