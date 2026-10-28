@@ -87,6 +87,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  membawa header XHR): nilai = kedaluwarsa ms. Dipakai sekali lalu hangus. */
     private val zipDlTokens = ConcurrentHashMap<String, Long>()
     private val lifecycleLock = Any()
+    // Penanda generasi stop: startServer berjalan sebagian di LUAR
+    // lifecycleLock (tidur antar-retry tak boleh memblokir request),
+    // jadi stopServer menaikkan penanda ini di dalam kunci dan
+    // startServer membatalkan dirinya bila penanda berubah (#311).
+    @Volatile
+    private var stopGeneration = 0L
     private val itemsCacheLock = Any()
     @Volatile private var galleryCache: Triple<Long, List<String>, MediaLibrary.MediaScanResult>? = null
     // Throttle log "galeri kosong karena filter folder" (maks 1x / 5 menit per
@@ -375,6 +381,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     fun startServer() {
+        var startGeneration = 0L
         synchronized(lifecycleLock) {
             if (isAlive) return
             // Retry loop: NanoHTTPD internal pool bisa belum ready setelah stop();
@@ -387,11 +394,29 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Pakai isShutdown: pool yang sedang shutdown tapi belum terminated
             // tetap menolak submit baru.
             if (statPool.isShutdown) statPool = newStatPool()
+            // Tangkap generasi DI DALAM kunci yang sama dengan setup:
+            // stop yang mendarat di antara setup dan tangkapan pun
+            // terdeteksi, bukan tertutup tangkapan yang lebih baru.
+            startGeneration = stopGeneration
         }
         var lastEx: IOException? = null
         for (attempt in 1..3) {
+            // Stop mendarat selama start berjalan di luar kunci:
+            // batalkan start daripada server berakhir MENYALA
+            // bertentangan dengan aksi stop terakhir (#311).
+            if (stopGeneration != startGeneration) {
+                appendLog("SERVER START ABORTED: stop requested during start")
+                return
+            }
             try {
                 super.start(SERVER_SOCKET_TIMEOUT_MS)
+                if (stopGeneration != startGeneration) {
+                    // Stop tiba tepat sesudah socket menyala: matikan
+                    // lagi sekarang juga, jangan biarkan menyala.
+                    runCatching { super.stop() }
+                    appendLog("SERVER START ABORTED: stop requested during start")
+                    return
+                }
                 lastError = null
                 cleanupCache()
                 startPeriodicCleanup()
@@ -576,6 +601,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     fun stopServer() {
         synchronized(lifecycleLock) {
+            stopGeneration++
             periodicCleanupJob?.cancel()
             periodicCleanupJob = null
             if (!isAlive && statPool.isShutdown) return

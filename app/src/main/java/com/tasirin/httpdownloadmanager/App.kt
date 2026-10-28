@@ -48,7 +48,11 @@ class App : Application() {
             StoragePrefs.isServerStartAllowed(this)
         ) {
             Thread {
-                runCatching { httpServer.startServer() }
+                // Wajib lewat helper berkunci yang sama dengan jalur
+                // lain (#286): start langsung di sini bisa menyela
+                // restartHttpServer yang sedang menukar instance,
+                // server berakhir menyala pada instance yang salah.
+                startHttpServer()
             }.start()
         }
         registerNetworkCallback()
