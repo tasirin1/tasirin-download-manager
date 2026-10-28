@@ -2191,8 +2191,8 @@ class DownloadEngine(appContext: Context) {
             if (remuxed) {
                 App.logEvent("HLS: remux OK → MP4 with audio")
                 val fileName = "$baseName.mp4"
-                videoTs.delete()
-                audioAdts.delete()
+                deleteHlsTempWithSidecar(videoTs)
+                deleteHlsTempWithSidecar(audioAdts)
                 adaptiveAudioFile?.delete()
                 ensureItemPresent(item.id, mp4)
                 val published0 = publishItem(saver, mp4, fileName, item)
@@ -2215,7 +2215,7 @@ class DownloadEngine(appContext: Context) {
             // 4) Fallback: publish video-only .ts seperti semula.
             App.logEvent("HLS: remux failed (no audio available), falling back to video-only .ts")
             runCatching { mp4.delete() }
-            runCatching { audioAdts.delete() }
+            runCatching { deleteHlsTempWithSidecar(audioAdts) }
             val fileName = "$baseName.ts"
             ensureItemPresent(item.id, videoTs)
             val published0 = publishItem(saver, videoTs, fileName, item)
@@ -2256,6 +2256,18 @@ class DownloadEngine(appContext: Context) {
         /** Estimasi awal total dari BANDWIDTH x durasi (dipakai sebelum segmen
          *  selesai — exactTotal masih 0). */
         var estimateTotalBytes = 0L
+    }
+
+    /** Hapus temp HLS beserta penanda resume (.segs) dan spool-nya
+     *  (issue #424): jalur akhir yang hanya menghapus berkas temp
+     *  meninggalkan sidecar yatim bila segmen audio gagal di tengah lalu
+     *  unduhan selesai lewat jalur lain (audio adaptive / fallback .ts).
+     *  Dipakai hanya di jalur SELESAI — jalur gagal/jeda sengaja
+     *  mempertahankan temp + penanda untuk resume (#385). */
+    private fun deleteHlsTempWithSidecar(temp: File) {
+        temp.delete()
+        File(temp.parent, temp.name + ".segs").delete()
+        File(temp.parent, temp.name + ".spool").delete()
     }
 
     /** Sidik jari rencana segmen untuk resume HLS (issue #385): hash
