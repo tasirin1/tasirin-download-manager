@@ -255,18 +255,37 @@ class FileSaver(context: Context) {
         }
     }
 
+    /** Klaim dokumen tujuan di folder kustom SAF secara atomik dalam
+     *  proses: pilih nama unik + findFile + createFile di dalam kunci
+     *  nama yang sama seperti klaim MediaStore (issue #404). Tanpa
+     *  kunci, dua publish paralel bernama sama sama-sama menilai satu
+     *  nama "bebas"; pada provider yang createFile-nya mengembalikan
+     *  berkas yang sudah ada, openOutputStream "wt" salah satu men-
+     *  truncate hasil publish yang lain. Mengembalikan pasangan
+     *  (dokumen, nama unik, baru-dibuat) atau null. */
+    private fun claimCustomDoc(
+        tree: DocumentFile,
+        fileName: String
+    ): Triple<DocumentFile, String, Boolean>? =
+        synchronized(mergeLockFor(FileNames.safe(fileName))) {
+            val unique = uniqueDocumentName(tree, fileName)
+            val existing = tree.findFile(unique)
+            if (existing != null) {
+                Triple(existing, unique, false)
+            } else {
+                val created = tree.createFile(MimeTypes.forFile(unique), unique)
+                    ?: return@synchronized null
+                Triple(created, unique, true)
+            }
+        }
+
     private fun writeCustomFolder(
         fileName: String,
         folderUri: Uri,
         writer: (OutputStream) -> Unit
     ): PublishResult? = runCatching {
         val tree = DocumentFile.fromTreeUri(appContext, folderUri) ?: return null
-        val unique = uniqueDocumentName(tree, fileName)
-        var createdDoc = false
-        val target = tree.findFile(unique)
-            ?: tree.createFile(MimeTypes.forFile(unique), unique)
-                ?.also { createdDoc = true }
-            ?: return null
+        val (target, unique, createdDoc) = claimCustomDoc(tree, fileName) ?: return null
         // Stream gagal dibuka sesudah dokumen dibuat: dokumen 0-byte
         // yatim tertinggal selamanya di folder pengguna (tak dirujuk
         // item mana pun, tak tersapu pembersih partial). Buang dokumen
@@ -291,12 +310,7 @@ class FileSaver(context: Context) {
         folderUri: Uri
     ): PublishResult? = runCatching {
         val tree = DocumentFile.fromTreeUri(appContext, folderUri) ?: return null
-        val unique = uniqueDocumentName(tree, fileName)
-        var createdDoc = false
-        val target = tree.findFile(unique)
-            ?: tree.createFile(MimeTypes.forFile(unique), unique)
-                ?.also { createdDoc = true }
-            ?: return null
+        val (target, unique, createdDoc) = claimCustomDoc(tree, fileName) ?: return null
         // Sama seperti writeCustomFolder: stream null sesudah dokumen
         // dibuat meninggalkan yatim 0-byte — buang yang baru dibuat.
         val output = appContext.contentResolver.openOutputStream(target.uri, "wt")
