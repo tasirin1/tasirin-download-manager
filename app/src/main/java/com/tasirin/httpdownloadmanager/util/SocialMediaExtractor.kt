@@ -1953,6 +1953,12 @@ object SocialMediaExtractor {
      *  buang. Murni. */
     internal fun isValidFacebookMediaUrl(url: String): Boolean {
         if (!url.startsWith("http") || url.length > 2000) return false
+        // Hasil dekode unescapeFb bisa memuat karakter hasil escape yang
+        // tidak sah di URL sungguhan (issue #351): tanda kutip dari
+        // u0022 serta karakter kontrol dari u0000-u001F/u007F. Validator
+        // lama hanya menangkap "<"; URL berkutip/kontrol lolos lalu
+        // gagal dipakai engine tanpa penjelasan.
+        if (url.any { it == '"' || it.code < 0x20 || it.code == 0x7F }) return false
         if (url.contains("/lookaside/crawler/")) return false
         if (url.contains("\\u") || url.contains("<") ||
             url.contains("BaseURL") || url.contains("SegmentBase")
