@@ -240,12 +240,14 @@ class DownloadEngine(appContext: Context) {
                 }
                 _items.value = (loaded + extras)
                     .sortedByDescending { it.addedAt }
-                loadGate.complete(Unit)
                 // Rekonsiliasi cadangan .replaced yatim (issue #237):
                 // proses yang mati di jendela verifikasi checksum
                 // meninggalkan penggantian terparkir (pendingReplacements
-                // hanya hidup di memori).
-                reconcileOrphanedReplacements()
+                // hanya hidup di memori). Wajib SEBELUM loadGate dibuka
+                // (#262): penunggu gerbang (resume/cleanup) tidak boleh
+                // berjalan bersamaan dengan penukaran berkas di sini.
+                val reconciled = reconcileOrphanedReplacements()
+                loadGate.complete(Unit)
                 // Migrasi penyimpanan lemah (issue #209): kredensial
                 // plaintext warisan/fallback ditulis ulang terenkripsi
                 // SEKARANG saat start, bukan menunggu persist penuh
@@ -255,8 +257,10 @@ class DownloadEngine(appContext: Context) {
                         "STORAGE: weak credential storage found, re-encrypting"
                     )
                     flushSave()
-                } else if (extras.isNotEmpty()) {
-                    // Simpan yang teredam gerbang selama jendela muat.
+                } else if (extras.isNotEmpty() || reconciled) {
+                    // Simpan yang teredam gerbang selama jendela muat
+                    // (termasuk hasil rekonsiliasi: flushSave internalnya
+                    // ikut teredam selama gerbang masih tertutup).
                     flushSave()
                 }
             } finally {
@@ -1318,7 +1322,7 @@ class DownloadEngine(appContext: Context) {
      *  dan entri penerus kehilangan penunjuk berkas terbitnya — tanpa itu,
      *  menghapus entri pendahulu/penerus dari UI bisa menghapus berkas
      *  yang salah karena keduanya menunjuk path yang sama. */
-    private fun reconcileOrphanedReplacements() {
+    private fun reconcileOrphanedReplacements(): Boolean {
         var working = _items.value
         var changed = false
         for (successor in working.filter { it.replacesItemId.isNotEmpty() }) {
@@ -1356,6 +1360,7 @@ class DownloadEngine(appContext: Context) {
             _items.value = working
             flushSave()
         }
+        return changed
     }
 
     /** Verifikasi penerus lolos: pensiunkan pendahulu (#215). */
