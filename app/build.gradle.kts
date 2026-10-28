@@ -93,6 +93,14 @@ android {
     lint {
         // Pengaman kompatibilitas API 23 (minSdk): kegagalan lint (mis. NewApi) menggagalkan build.
         abortOnError = true
+        // Laporan TEKS lint dipaksa ke path yang diunggah workflow
+        // (issue #429): tanpa ini lokasi laporan teks bergantung versi
+        // AGP (di AGP 8 ia tidak berada di build/reports melainkan di
+        // intermediates), sehingga langkah upload bisa menunjuk berkas
+        // yang tidak pernah dibuat dan kegagalan lint kehilangan
+        // diagnostiknya secara diam-diam.
+        textReport = true
+        textOutput = file("build/reports/lint-results-debug.txt")
         // Laporan lint selalu dibuat otomatis; warning tampil sebagai annotation CI.
         // Sengaja dinonaktifkan:
         // - OldTargetApi: targetSdk 36 sengaja (naik 37 menyusul setelah uji manual

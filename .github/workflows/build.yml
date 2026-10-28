@@ -192,7 +192,9 @@ jobs:
         with:
           name: lint-report
           path: app/build/reports/lint-results-debug.txt
-          if-no-files-found: ignore
+          # warn, BUKAN ignore (issue #429): path kosong harus terlihat
+          # sebagai peringatan, bukan sukses diam-diam tanpa artifact.
+          if-no-files-found: warn
 
       - name: Coverage JaCoCo (laporan + ambang batas)
         run: |
