@@ -350,6 +350,10 @@ def blank_literals(text: str) -> str:
     mentah triple-quote tidak punya escape tetapi templatenya tetap aktif.
     Literal char hanya diakui bila bentuknya sah (maks 8 char: '\\uXXXX');
     apostrof liar di luar literal dibiarkan sebagai char biasa.
+    Komentar baris dan blok (blok Kotlin bisa bersarang) ikut diblanko
+    (issue #271): tanpa itu tanda petik tiga di dalam komentar dianggap
+    membuka string mentah dan sisa berkas sesudahnya lolos dari
+    pemindaian multi-baris.
     """
     out = list(text)
     n = len(text)
@@ -439,10 +443,37 @@ def blank_literals(text: str) -> str:
             return scan_string_body(i + 3, raw=True)
         return scan_string_body(i + 1, raw=False)
 
+    def scan_line_comment(i: int) -> int:
+        # i di '//' pertama: blanko sampai sebelum newline.
+        j = text.find("\n", i)
+        end = n if j < 0 else j
+        blank(i, end)
+        return end
+
+    def scan_block_comment(i: int) -> int:
+        # i di '/*' pertama: komentar blok Kotlin bisa bersarang.
+        depth = 1
+        j = i + 2
+        while j < n and depth:
+            if text.startswith("/*", j):
+                depth += 1
+                j += 2
+            elif text.startswith("*/", j):
+                depth -= 1
+                j += 2
+            else:
+                j += 1
+        blank(i, j)
+        return j
+
     i = 0
     while i < n:
         if text[i] in "\"'":
             i = scan_literal(i)
+        elif text.startswith("//", i):
+            i = scan_line_comment(i)
+        elif text.startswith("/*", i):
+            i = scan_block_comment(i)
         else:
             i += 1
     return "".join(out)
@@ -702,6 +733,20 @@ def run_self_test() -> int:
             "        secret)",
             "}",
         ],
+        Path("sample_comment.kt"): [
+            # Regresi issue #271: tanda petik tiga di dalam komentar TIDAK
+            # boleh dianggap membuka string mentah — dengan bug itu sisa
+            # berkas diblanko dan bocoran multi-baris di bawahnya lolos.
+            "class Komentar {",
+            "    // catatan \"\"\" contoh penanda di komentar baris",
+            "    /* penanda \"\"\" di komentar blok */",
+            "    fun bocor() {",
+            "        Log.d(\"tag\",",
+            "            token)",
+            "    }",
+            "    val mentah = \"\"\"isi mentah sah\"\"\"",
+            "}",
+        ],
         Path("sample_str.kt"): [
             "class Grab {",
             '    val js = "(function(){try{work();}catch(e){}})"',
@@ -799,14 +844,19 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
+    comment_leak = any(
+        item["rule_id"] == "sensitive_log" and item["line"] == 5
+        and item["path"] == "sample_comment.kt"
+        for item in findings
+    )
     strparen_semi = any(
         item["rule_id"] == "sensitive_log" and item["line"] == 6
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi:
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
