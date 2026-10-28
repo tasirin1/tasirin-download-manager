@@ -223,6 +223,12 @@ def check_upload_call(text: str) -> list:
     problems = []
     start = text.find("function startFsUpload")
     if start < 0:
+        # Fail-closed (issue #194): jangkar hilang/berganti nama tidak
+        # boleh menonaktifkan guard ini diam-diam.
+        problems.append(
+            "startFsUpload tidak ditemukan — guard argumen uploadFiles() "
+            "tidak bisa memeriksa (jangkar hilang/berganti nama?)"
+        )
         return problems
     call = text.find("uploadFiles(", start)
     if call < 0:
