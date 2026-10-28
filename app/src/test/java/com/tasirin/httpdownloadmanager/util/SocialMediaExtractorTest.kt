@@ -499,6 +499,35 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parseDriveConfirmUrl - form tak lengkap pertama dilewati`() {
+        // Form unduh pertama yang field-nya tak lengkap tidak boleh
+        // menggugurkan form unduh sah sesudahnya (#284).
+        val good = """
+            <form id="download-form" action="https://drive.usercontent.google.com/download" method="get">
+            <input type="hidden" name="id" value="FILEID">
+            <input type="hidden" name="export" value="download">
+            <input type="hidden" name="uuid" value="UUID-1">
+            </form>
+        """.trimIndent()
+        val incomplete = """
+            <form action="https://drive.usercontent.google.com/download" method="get">
+            <input type="hidden" name="id" value="FILEID">
+            </form>
+        """.trimIndent()
+        assertEquals(
+            "https://drive.usercontent.google.com/download?id=FILEID&export=download&uuid=UUID-1",
+            SocialMediaExtractor.parseDriveConfirmUrl(incomplete + good)
+        )
+        // Action yang sudah membawa query digabung dengan &, bukan ? kedua.
+        assertEquals(
+            "https://drive.usercontent.google.com/download?at=xyz&id=FILEID&export=download&uuid=UUID-1",
+            SocialMediaExtractor.parseDriveConfirmUrl(
+                good.replace("/download\"", "/download?at=xyz\"")
+            )
+        )
+    }
+
+    @Test
     fun `parseDriveDisplayName - nama dari halaman perantara`() {
         val html = """<span class="uc-name-size"><a href="/open?id=x">My Video.mp4</a> (700M)</span>"""
         assertEquals("My Video.mp4", SocialMediaExtractor.parseDriveDisplayName(html))

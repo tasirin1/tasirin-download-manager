@@ -1484,12 +1484,15 @@ object SocialMediaExtractor {
                 fields.putIfAbsent(m.groupValues[2], m.groupValues[1])
             }
             if (fields["id"].isNullOrBlank() || fields["uuid"].isNullOrBlank()) {
-                return null
+                // Form unduh tak lengkap tidak menggugurkan form unduh
+                // sah BERIKUTNYA (#284): dulu langsung return null.
+                continue
             }
             val query = fields.entries.joinToString("&") { (k, v) ->
                 "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
             }
-            return "$action?$query"
+            val sep = if (action.contains('?')) "&" else "?"
+            return "$action$sep$query"
         }
         return null
     }
