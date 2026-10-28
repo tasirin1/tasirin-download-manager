@@ -618,7 +618,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // selesai secara natural (beberapa ms saja) — jangan cancel scope
         // karena bisa memutus operasi tulis file tengah jalan.
         val frame = "data: {\"shutdown\":true}\n\n"
-        sseClients.forEach { it.push(frame) }
+        // pushUrgent, bukan push biasa: frame ini tak boleh kalah
+        // oleh antrean penuh klien lambat (#327).
+        sseClients.forEach { it.pushUrgent(frame) }
         sseClients.forEach { it.closeStream() }
         sseClients.clear()
         shareTokens.clear()

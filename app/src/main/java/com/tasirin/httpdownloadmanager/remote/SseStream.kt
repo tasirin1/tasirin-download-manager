@@ -36,6 +36,21 @@ internal class SseStream : InputStream() {
         }
     }
 
+    /** Dorong frame yang TIDAK boleh hilang (frame shutdown): bila
+     *  antrean penuh, buang frame TERLAMA yang belum terbaca untuk
+     *  memberi tempat, bukan membuang frame ini. push biasa pada
+     *  antrean penuh justru membuang frame shutdown untuk klien
+     *  lambat — persis klien yang antreannya penuh — sehingga ia
+     *  hanya melihat EOF dan reconnect agresif ke server yang
+     *  sengaja dimatikan (kembali ke perilaku pra-#288, #327). */
+    fun pushUrgent(text: String) {
+        if (isClosed) return
+        if (!queue.offer(text.toByteArray(Charsets.UTF_8))) {
+            queue.poll()
+            queue.offer(text.toByteArray(Charsets.UTF_8))
+        }
+    }
+
     /** Bangunkan poll(25 dtk) yang sedang menunggu: flag saja tak cukup.
      *  offer dulu agar frame basi tak terbuang sia-sia; hanya bila penuh
      *  (offer gagal) buang satu lalu selipkan pil tutup. Non-blokir. */
