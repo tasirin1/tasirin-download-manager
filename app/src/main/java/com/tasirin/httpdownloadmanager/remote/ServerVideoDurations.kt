@@ -53,10 +53,13 @@ class ServerVideoDurations(
          *  mewarisi durasi video lama selamanya. Cap ubah (mtime berkas /
          *  DATE_MODIFIED MediaStore) berubah saat isi berganti, sehingga
          *  kunci lama tak lagi cocok dan durasi diprobe/dibaca ulang.
-         *  Cap tak tersedia (<= 0) jatuh ke token polos seperti dulu.
-         *  Murni agar bisa di-unit-test. */
-        fun keyFor(token: String, modified: Long): String =
-            if (modified > 0) "$token@$modified" else token
+         *  Ukuran ikut dikunci (issue #441, pola cap thumbnail #399):
+         *  penggantian yang MEMPERTAHANKAN mtime (salinan penjaga cap,
+         *  DATE_MODIFIED se-detik) tetap mengubah kunci bila ukurannya
+         *  beda. Cap tak tersedia (<= 0) jatuh ke token polos seperti
+         *  dulu. Murni agar bisa di-unit-test. */
+        fun keyFor(token: String, modified: Long, size: Long): String =
+            if (modified > 0) "$token@$modified:$size" else token
     }
 
     private val file = File(context.filesDir, "video_durations.json")

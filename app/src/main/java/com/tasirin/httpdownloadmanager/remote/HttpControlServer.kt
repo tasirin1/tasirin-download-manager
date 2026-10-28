@@ -2325,7 +2325,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // di luar aplikasi pada path yang sama tak mewarisi
                     // durasi lama. probeDurationMs tetap menerima token
                     // polos (ia mengurai token menjadi path/URI).
-                    val dKey = ServerVideoDurations.keyFor(e.token, e.modified)
+                    val dKey = ServerVideoDurations.keyFor(e.token, e.modified, e.size)
                     var d = videoDurations.of(dKey)
                     if (d <= 0 && e.durationMs > 0) d = e.durationMs
                     if (d <= 0 && extracted < 20 && videoDurations.shouldProbe(dKey)) {
