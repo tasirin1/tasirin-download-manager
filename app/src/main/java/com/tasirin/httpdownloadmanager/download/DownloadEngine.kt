@@ -178,6 +178,13 @@ class DownloadEngine(appContext: Context) {
 
     fun refreshMaxConcurrent() {
         cachedMaxConcurrent = StoragePrefs.maxConcurrent(context)
+        // Batas yang NAIK wajib langsung menggerakkan antrean (issue
+        // #503): tanpa pemicu ini item PENDING tak pernah dinilai ulang
+        // terhadap batas baru dan slot tambahan menganggur sampai ada
+        // unduhan aktif yang selesai sendiri. startQueued aman dan
+        // idempoten — ia menilai ulang slot dan melewati item yang
+        // sedang backoff retry.
+        startQueued()
     }
 
     // Cached timeout values — hindari recompute dari SharedPreferences tiap koneksi
