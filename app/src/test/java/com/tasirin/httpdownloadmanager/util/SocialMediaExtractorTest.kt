@@ -415,9 +415,19 @@ class SocialMediaExtractorTest {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl(
             "https://drive.google.com/uc?id=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs&export=download"
         ))
+        // Bentuk multi-akun /drive/u/<n>/ dari UI Drive (#243).
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://drive.google.com/drive/u/0/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view?usp=sharing"
+        ))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://drive.google.com/drive/u/12/open?id=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs"
+        ))
         // Link folder dan beranda Drive bukan unduhan berkas.
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(
             "https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs"
+        ))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://drive.google.com/drive/u/0/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs"
         ))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://drive.google.com/"))
         // Domain mirip tidak boleh lolos.
@@ -438,6 +448,8 @@ class SocialMediaExtractorTest {
             "https://drive.google.com/open?id=$id"))
         assertEquals(id, SocialMediaExtractor.parseDriveFileId(
             "https://drive.google.com/uc?id=$id&export=download"))
+        assertEquals(id, SocialMediaExtractor.parseDriveFileId(
+            "https://drive.google.com/drive/u/0/file/d/$id/view?usp=sharing"))
         assertEquals(null, SocialMediaExtractor.parseDriveFileId(
             "https://drive.google.com/drive/folders/$id"))
         assertEquals(null, SocialMediaExtractor.parseDriveFileId(

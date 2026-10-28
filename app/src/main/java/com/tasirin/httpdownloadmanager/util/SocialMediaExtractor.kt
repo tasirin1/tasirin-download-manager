@@ -69,7 +69,7 @@ object SocialMediaExtractor {
     private val PH_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?pornhub\.com/|(?:https?://)(?:www\.)?pornhubpremium\.com/""")
     /** Google Drive: hanya link berkas (file/d/, open?id=, uc?id=) — link
      *  folder dan halaman Drive lain tidak diekstrak. */
-    private val GD_HOST_RE = Regex("""(?:https?://)(?:www\.)?drive\.google\.com/(?:file/d/|open\?|uc\?)""")
+    private val GD_HOST_RE = Regex("""(?:https?://)(?:www\.)?drive\.google\.com/(?:drive/u/\d+/)?(?:file/d/|open\?|uc\?)""")
     /** Facebook: regex host presisi agar CDN fbsbx.com/fbcdn.net (media
      *  hasil ekstraksi) tidak ikut dikenali sebagai halaman. */
     private val FB_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mbasic\.)?facebook\.com/|(?:https?://)fb\.watch/""")
