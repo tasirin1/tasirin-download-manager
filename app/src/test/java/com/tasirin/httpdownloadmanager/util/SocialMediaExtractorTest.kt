@@ -403,4 +403,99 @@ class SocialMediaExtractorTest {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("file:///etc/passwd"))
     }
+
+    @Test
+    fun `isSocialMediaUrl - Google Drive hanya link berkas`() {
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view?usp=sharing"
+        ))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://drive.google.com/open?id=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs"
+        ))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://drive.google.com/uc?id=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs&export=download"
+        ))
+        // Link folder dan beranda Drive bukan unduhan berkas.
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs"
+        ))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://drive.google.com/"))
+        // Domain mirip tidak boleh lolos.
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://drive.google.com.evil.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view"
+        ))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://notdrive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view"
+        ))
+    }
+
+    @Test
+    fun `parseDriveFileId - tiga bentuk link berbagi`() {
+        val id = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs"
+        assertEquals(id, SocialMediaExtractor.parseDriveFileId(
+            "https://drive.google.com/file/d/$id/view?usp=sharing"))
+        assertEquals(id, SocialMediaExtractor.parseDriveFileId(
+            "https://drive.google.com/open?id=$id"))
+        assertEquals(id, SocialMediaExtractor.parseDriveFileId(
+            "https://drive.google.com/uc?id=$id&export=download"))
+        assertEquals(null, SocialMediaExtractor.parseDriveFileId(
+            "https://drive.google.com/drive/folders/$id"))
+        assertEquals(null, SocialMediaExtractor.parseDriveFileId(
+            "https://drive.google.com/file/d/pendek/view"))
+    }
+
+    @Test
+    fun `driveDownloadUrl - URL awal unduh Drive`() {
+        assertEquals(
+            "https://drive.google.com/uc?export=download&id=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs",
+            SocialMediaExtractor.driveDownloadUrl("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs")
+        )
+    }
+
+    @Test
+    fun `parseDriveConfirmUrl - rakit URL dari form halaman perantara`() {
+        val html = """
+            <form id="download-form" action="https://drive.usercontent.google.com/download" method="get">
+            <input type="hidden" name="id" value="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs">
+            <input type="hidden" name="export" value="download">
+            <input type="hidden" name="confirm" value="t">
+            <input type="hidden" name="uuid" value="12345678-1234-1234-1234-123456789abc">
+            </form>
+        """.trimIndent()
+        val expected = "https://drive.usercontent.google.com/download" +
+            "?id=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs&export=download&confirm=t" +
+            "&uuid=12345678-1234-1234-1234-123456789abc"
+        assertEquals(expected, SocialMediaExtractor.parseDriveConfirmUrl(html))
+        // Urutan atribut value-sebelum-name tetap terbaca.
+        val swapped = html.replace(
+            "name=\"uuid\" value=\"12345678-1234-1234-1234-123456789abc\"",
+            "value=\"12345678-1234-1234-1234-123456789abc\" name=\"uuid\""
+        )
+        assertEquals(expected, SocialMediaExtractor.parseDriveConfirmUrl(swapped))
+        // Halaman kuota habis / tanpa form unduh = null.
+        assertEquals(null, SocialMediaExtractor.parseDriveConfirmUrl(
+            "<html><body>Too many users have viewed this file</body></html>"))
+        // Form tanpa uuid tidak lengkap = null.
+        assertEquals(null, SocialMediaExtractor.parseDriveConfirmUrl(
+            html.replace("name=\"uuid\"", "name=\"bukanuuid\"")))
+    }
+
+    @Test
+    fun `parseDriveDisplayName - nama dari halaman perantara`() {
+        val html = """<span class="uc-name-size"><a href="/open?id=x">My Video.mp4</a> (700M)</span>"""
+        assertEquals("My Video.mp4", SocialMediaExtractor.parseDriveDisplayName(html))
+        assertEquals(null, SocialMediaExtractor.parseDriveDisplayName("<html></html>"))
+    }
+
+    @Test
+    fun `parseContentDispositionFileName - bentuk quoted, token, dan RFC 5987`() {
+        assertEquals("clip final.mp4", SocialMediaExtractor.parseContentDispositionFileName(
+            "attachment; filename=\"clip final.mp4\""))
+        assertEquals("clip.mp4", SocialMediaExtractor.parseContentDispositionFileName(
+            "attachment; filename=clip.mp4"))
+        assertEquals("video baru.mp4", SocialMediaExtractor.parseContentDispositionFileName(
+            "attachment; filename*=UTF-8''video%20baru.mp4"))
+        assertEquals(null, SocialMediaExtractor.parseContentDispositionFileName(null))
+        assertEquals(null, SocialMediaExtractor.parseContentDispositionFileName("attachment"))
+    }
 }

@@ -67,6 +67,9 @@ object SocialMediaExtractor {
     private val XV_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xvideos\.com/""")
     private val XN_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xnxx\.com/|(?:https?://)(?:www\.)?xnxxvideos\.me/""")
     private val PH_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?pornhub\.com/|(?:https?://)(?:www\.)?pornhubpremium\.com/""")
+    /** Google Drive: hanya link berkas (file/d/, open?id=, uc?id=) — link
+     *  folder dan halaman Drive lain tidak diekstrak. */
+    private val GD_HOST_RE = Regex("""(?:https?://)(?:www\.)?drive\.google\.com/(?:file/d/|open\?|uc\?)""")
     /** HentaiHaven: halaman watch (`/watch/<slug>/`) dilindungi challenge
      *  Cloudflare sehingga fetch server pasti 403; ekstraksi memakai WebView
      *  (`WebExtractActivity`) + parser murni di bawah sebagai fallback. */
@@ -176,7 +179,7 @@ object SocialMediaExtractor {
             !lower.contains("instagr.am") && !lower.contains("xvideos.com") &&
             !lower.contains("xnxx.com") && !lower.contains("xnxxvideos.me") &&
             !lower.contains("pornhub.com") && !lower.contains("pornhubpremium.com") &&
-            !lower.contains("hentaihaven")
+            !lower.contains("hentaihaven") && !lower.contains("drive.google.com")
         ) return false
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
@@ -188,7 +191,8 @@ object SocialMediaExtractor {
                 XV_HOST_RE.containsMatchIn(lower) ||
                 XN_HOST_RE.containsMatchIn(lower) ||
                 PH_HOST_RE.containsMatchIn(lower) ||
-                HH_HOST_RE.containsMatchIn(lower)
+                HH_HOST_RE.containsMatchIn(lower) ||
+                GD_HOST_RE.containsMatchIn(lower)
     }
 
     /** True bila URL adalah halaman HentaiHaven (butuh ekstraksi WebView). */
@@ -219,6 +223,7 @@ object SocialMediaExtractor {
                 XN_HOST_RE.containsMatchIn(lower) -> extractXnxx(url, user)
                 PH_HOST_RE.containsMatchIn(lower) -> extractPornhub(url, user)
                 HH_HOST_RE.containsMatchIn(lower) -> extractHentaiHaven(url, user)
+                GD_HOST_RE.containsMatchIn(lower) -> extractGoogleDrive(url, user)
                 else -> null
             }
         } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
@@ -244,6 +249,7 @@ object SocialMediaExtractor {
                     XN_HOST_RE.containsMatchIn(lower) -> extractAllXnxx(url, user)
                     PH_HOST_RE.containsMatchIn(lower) -> extractAllPornhub(url, user)
                     HH_HOST_RE.containsMatchIn(lower) -> extractAllHentaiHaven(url, user)
+                    GD_HOST_RE.containsMatchIn(lower) -> extractAllGoogleDrive(url, user)
                     else -> emptyList()
                 }
             } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; emptyList() }
@@ -1341,6 +1347,173 @@ object SocialMediaExtractor {
             start = nl + 1
         }
         return out
+    }
+
+    // ── Google Drive ─────────────────────────────────────────────────────
+
+    /** ID berkas Drive hanya memakai huruf, angka, '-' dan '_' (umumnya
+     *  28-44 karakter); ambang 12 membuang fragmen path yang bukan ID. */
+    private val GD_FILE_ID_RE = Regex("""/file/d/([A-Za-z0-9_-]{12,})""")
+    private val GD_ID_PARAM_RE = Regex("""[?&]id=([A-Za-z0-9_-]{12,})""")
+
+    /** Ambil ID berkas dari URL berbagi Drive (bentuk file/d/, open?id=,
+     *  uc?id=). Link folder dan halaman Drive lain mengembalikan null.
+     *  Host dinilai terpisah oleh GD_HOST_RE sebelum fungsi ini dipanggil.
+     *  Murni agar bisa di-unit-test. */
+    internal fun parseDriveFileId(url: String): String? {
+        GD_FILE_ID_RE.find(url)?.let { return it.groupValues[1] }
+        return GD_ID_PARAM_RE.find(url)?.groupValues?.get(1)
+    }
+
+    /** URL unduh awal Drive: berkas kecil langsung terunduh/ter-redirect
+     *  dari sini; berkas besar menjawab halaman konfirmasi HTML. */
+    internal fun driveDownloadUrl(fileId: String): String =
+        "https://drive.google.com/uc?export=download&id=$fileId"
+
+    private val GD_FORM_ACTION_RE =
+        Regex("<form[^>]+action=\"([^\"]+)\"", RegexOption.IGNORE_CASE)
+    private val GD_FORM_FIELD_A_RE =
+        Regex("<input[^>]+name=\"([^\"]+)\"[^>]+value=\"([^\"]*)\"", RegexOption.IGNORE_CASE)
+    private val GD_FORM_FIELD_B_RE =
+        Regex("<input[^>]+value=\"([^\"]*)\"[^>]+name=\"([^\"]+)\"", RegexOption.IGNORE_CASE)
+
+    /** Rakit URL unduh terkonfirmasi dari halaman perantara Drive
+     *  (peringatan pemindaian virus untuk berkas besar): form GET ke
+     *  drive.usercontent.google.com dengan field id/export/confirm/uuid.
+     *  Mengembalikan null bila form unduh tidak ada (halaman kuota habis,
+     *  wajib masuk, atau berkas tidak ditemukan). Murni. */
+    internal fun parseDriveConfirmUrl(html: String): String? {
+        val action = GD_FORM_ACTION_RE.find(html)?.groupValues?.get(1)
+            ?.replace("&amp;", "&") ?: return null
+        if (!action.contains("usercontent.google.com/download")) return null
+        val fields = LinkedHashMap<String, String>()
+        for (m in GD_FORM_FIELD_A_RE.findAll(html)) fields[m.groupValues[1]] = m.groupValues[2]
+        for (m in GD_FORM_FIELD_B_RE.findAll(html)) fields.putIfAbsent(m.groupValues[2], m.groupValues[1])
+        if (fields["id"].isNullOrBlank() || fields["uuid"].isNullOrBlank()) return null
+        val query = fields.entries.joinToString("&") { (k, v) ->
+            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
+        }
+        return "$action?$query"
+    }
+
+    private val GD_NAME_RE =
+        Regex("""<span class="uc-name-size"[^>]*>\s*<a[^>]*>([^<]+)</a>""", RegexOption.IGNORE_CASE)
+
+    /** Nama berkas yang ditampilkan halaman perantara Drive. Murni. */
+    internal fun parseDriveDisplayName(html: String): String? =
+        GD_NAME_RE.find(html)?.groupValues?.get(1)?.trim()
+            ?.takeIf { it.isNotEmpty() }?.let { sanitizeFileName(it) }
+
+    private val GD_CD_STAR_RE = Regex("""filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)""")
+    private val GD_CD_NAME_RE = Regex("""filename\s*=\s*"([^"]+)"|filename\s*=\s*([^;\s]+)""")
+
+    /** Nama berkas dari header Content-Disposition (bentuk filename*=
+     *  RFC 5987 didahulukan dari filename= biasa). Murni. */
+    internal fun parseContentDispositionFileName(cd: String?): String? {
+        if (cd.isNullOrBlank()) return null
+        GD_CD_STAR_RE.find(cd)?.let { m ->
+            runCatching { java.net.URLDecoder.decode(m.groupValues[1].trim(), "UTF-8") }
+                .getOrNull()?.takeIf { it.isNotBlank() }
+                ?.let { return sanitizeFileName(it) }
+        }
+        val raw = GD_CD_NAME_RE.find(cd)?.let { m ->
+            m.groupValues[1].ifEmpty { m.groupValues[2] }
+        }?.trim() ?: return null
+        return raw.takeIf { it.isNotEmpty() }?.let { sanitizeFileName(it) }
+    }
+
+    /** Hasil fetch Drive: header respons akhir + body hanya bila HTML. */
+    private data class DriveFetch(
+        val finalUrl: String,
+        val contentType: String,
+        val contentDisposition: String?,
+        val cookies: String,
+        val html: String?
+    )
+
+    /** GET URL Drive mengikuti redirect manual dengan aturan redirect
+     *  ekstraktor (hanya http(s) ke host yang diizinkan, kredensial dibuang
+     *  saat host berubah) sambil mengakumulasi cookie antar-hop — halaman
+     *  konfirmasi Drive memerlukannya. Body hanya dibaca bila respons HTML;
+     *  berkas media besar tidak pernah dimuat ke memori. */
+    private fun fetchDrive(urlStr: String, headers: Map<String, String>): DriveFetch? {
+        var current = urlStr
+        var activeHeaders = headers
+        val cookieJar = LinkedHashMap<String, String>()
+        repeat(6) {
+            val conn = openTlsConn(current)
+            try {
+                conn.connectTimeout = PAGE_TIMEOUT_MS
+                conn.readTimeout = PAGE_TIMEOUT_MS
+                conn.instanceFollowRedirects = false
+                val sendHeaders = LinkedHashMap(activeHeaders)
+                if (cookieJar.isNotEmpty() && !sendHeaders.containsKey("Cookie")) {
+                    sendHeaders["Cookie"] =
+                        cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                }
+                sendHeaders.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+                if (!sendHeaders.containsKey("User-Agent")) {
+                    conn.setRequestProperty("User-Agent", DEFAULT_UA)
+                }
+                val code = conn.responseCode
+                conn.headerFields.entries
+                    .filter { it.key.equals("set-cookie", ignoreCase = true) }
+                    .flatMap { it.value }
+                    .forEach { raw ->
+                        val pair = raw.substringBefore(';')
+                        val eq = pair.indexOf('=')
+                        if (eq > 0) {
+                            cookieJar[pair.substring(0, eq).trim()] =
+                                pair.substring(eq + 1).trim()
+                        }
+                    }
+                if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                    val loc = conn.getHeaderField("Location") ?: return null
+                    val next = try {
+                        java.net.URI(current).resolve(loc).toString()
+                    } catch (_: Exception) { return null }
+                    if (!isExtractRedirectAllowed(next)) return null
+                    if (!isExtractSameHost(current, next)) {
+                        activeHeaders = stripExtractCredentials(activeHeaders)
+                    }
+                    current = next
+                    return@repeat
+                }
+                if (code !in 200..299) return null
+                val type = conn.contentType.orEmpty()
+                val cd = conn.getHeaderField("Content-Disposition")
+                val cookiesStr =
+                    cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                val html = if (type.contains("text/html", ignoreCase = true)) {
+                    readBodyLimited(conn.inputStream)
+                } else {
+                    null
+                }
+                return DriveFetch(current, type, cd, cookiesStr, html)
+            } catch (_: Exception) { return null } finally { conn.disconnect() }
+        }
+        return null
+    }
+
+    private fun extractGoogleDrive(url: String, user: Map<String, String>): Result? {
+        val options = extractAllGoogleDrive(url, user)
+        return options.firstOrNull()
+    }
+
+    private fun extractAllGoogleDrive(url: String, user: Map<String, String>): List<Result> {
+        val id = parseDriveFileId(url) ?: return emptyList()
+        val first = fetchDrive(driveDownloadUrl(id), user) ?: return emptyList()
+        val html = first.html
+        if (html != null) {
+            // Halaman perantara: hanya berguna bila memuat form konfirmasi
+            // unduh; halaman kuota/masuk/tidak-ditemukan gagal dengan jujur.
+            val confirmUrl = parseDriveConfirmUrl(html) ?: return emptyList()
+            val name = parseDriveDisplayName(html)
+            return listOf(Result(confirmUrl, name, name, "Original", "", first.cookies))
+        }
+        val mime = first.contentType.substringBefore(';').trim()
+        val name = parseContentDispositionFileName(first.contentDisposition)
+        return listOf(Result(first.finalUrl, name, name, "Original", mime, first.cookies))
     }
 
     // ── HTTP ─────────────────────────────────────────────────────────────
