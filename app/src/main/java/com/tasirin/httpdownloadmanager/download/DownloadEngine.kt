@@ -1829,7 +1829,12 @@ class DownloadEngine(appContext: Context) {
             .filterNot { isFailedUrl(it) }
         // Error Range pasti gagal lagi di URL yang sama, dan mirror yang pernah
         // gagal tidak perlu dicoba ulang: langsung coba cadangan berikutnya.
-        if (allMirrors.isNotEmpty() && (rangeRejected || slowRejected || isConnectError(message))) {
+        // Kegagalan HTTP per-URL (issue #544) ikut memicu: skenario utama
+        // mirror adalah link mati di host asal, yang dulu tak pernah sampai
+        // ke cabang ini karena pesan "HTTP <kode>" tak cocok klasifikasi mana pun.
+        if (allMirrors.isNotEmpty() && (rangeRejected || slowRejected || isConnectError(message) ||
+                isHttpMirrorFailoverError(message))
+        ) {
             val next = allMirrors.first()
             App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} (switching to mirror: $next)")
             updateItem(id) {
@@ -4436,6 +4441,20 @@ internal fun isRangeRejectError(message: String?): Boolean {
     return message.contains("does not support Range", ignoreCase = true) ||
         message.contains("HTTP 416", ignoreCase = true) ||
         message.contains("refused resume", ignoreCase = true)
+}
+
+/** Kegagalan HTTP yang bersifat per-URL (issue #544): URL ini
+ *  sendiri yang mati/ditolak — 404/410 (hilang permanen), 403
+ *  (hotlink; 403 googlevideo sudah ditangani cabang khusus sebelum
+ *  gerbang mirror), dan 5xx (sisi server host ini) — jadi mirror
+ *  layak dicoba. Kode lain (401/407 kredensial, 429 batas laju)
+ *  sengaja tidak ikut: akan sama saja di mirror. Murni agar bisa
+ *  di-unit-test. */
+internal fun isHttpMirrorFailoverError(message: String?): Boolean {
+    if (message.isNullOrBlank()) return false
+    val code = Regex("""HTTP (\d{3})""").find(message)?.groupValues?.get(1)?.toIntOrNull()
+        ?: return false
+    return code == 404 || code == 410 || code == 403 || code in 500..599
 }
 
 /** Ekor terpotong (server menutup koneksi sebelum Content-Length terpenuhi):

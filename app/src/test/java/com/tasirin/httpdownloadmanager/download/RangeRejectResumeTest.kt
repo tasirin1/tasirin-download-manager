@@ -34,6 +34,21 @@ class RangeRejectResumeTest {
         assertFalse(isRangeRejectError(""))
     }
 
+    @Test fun httpMirrorFailoverMatchesPerUrlFailuresOnly() {
+        // Issue #544: kegagalan HTTP per-URL memicu failover mirror.
+        assertTrue(isHttpMirrorFailoverError("HTTP 404"))
+        assertTrue(isHttpMirrorFailoverError("HTTP 410"))
+        assertTrue(isHttpMirrorFailoverError("HTTP 403"))
+        assertTrue(isHttpMirrorFailoverError("HTTP 500"))
+        assertTrue(isHttpMirrorFailoverError("HTTP 503"))
+        assertFalse(isHttpMirrorFailoverError("HTTP 401"))
+        assertFalse(isHttpMirrorFailoverError("HTTP 429"))
+        assertFalse(isHttpMirrorFailoverError("HTTP 416"))
+        assertFalse(isHttpMirrorFailoverError("failed to connect"))
+        assertFalse(isHttpMirrorFailoverError(null))
+        assertFalse(isHttpMirrorFailoverError(""))
+    }
+
     @Test fun retryResumeMessageIsNotFinalReject() {
         assertFalse(
             isRangeRejectError(
