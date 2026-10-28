@@ -87,6 +87,11 @@ class HlsParserTest {
         )
         // base tanpa path -> relative menempel di akar
         assertEquals("https://cdn.example.com/low.m3u8", HlsParser.resolveUrl("https://cdn.example.com/master.m3u8", "low.m3u8"))
+        // URI absolut berskema asing dikembalikan apa adanya, BUKAN
+        // ditempel ke direktori basis menjadi URL rusak yang lolos
+        // saringan http di pemanggil (issue #452).
+        assertEquals("ftp://cdn.example.com/seg.ts", HlsParser.resolveUrl(base, "ftp://cdn.example.com/seg.ts"))
+        assertEquals("rtmp://cdn.example.com/s", HlsParser.resolveUrl(base, "rtmp://cdn.example.com/s"))
     }
 
     @Test

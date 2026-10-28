@@ -205,6 +205,12 @@ object HlsParser {
         if (relative.startsWith("http://", ignoreCase = true) ||
             relative.startsWith("https://", ignoreCase = true)
         ) return relative
+        // URI absolut berskema asing (ftp:, rtmp:, ...) dikembalikan apa
+        // adanya: menempelkannya ke direktori basis menghasilkan URL
+        // rusak yang justru lolos saringan startsWith("http") di
+        // pemanggil seperti mediaSegmentsWithDurations (issue #452;
+        // pola yang sama dengan penolakan parseDirectMedia a5b8651).
+        if (ABSOLUTE_URI_RE.containsMatchIn(relative)) return relative
         // Basis dipisahkan dari query/fragment dulu: '/' di dalam query
         // (mis. "?next=a/b") tidak boleh dianggap pemisah direktori, dan
         // query basis tidak diwariskan ke segmen (sesuai RFC 3986).
