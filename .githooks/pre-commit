@@ -4,4 +4,8 @@
 # Satu pintu pemeriksaan cepat; unit test otomatis bila Java/Gradle tersedia.
 set -u
 
+# Uji-diri pemasang (#296): membuktikan berkas ini SUNGGUHAN bisa
+# dieksekusi kernel (mount noexec menolak execve walau bit +x terbaca).
+if [ "${1:-}" = "--self-test" ]; then exit 0; fi
+
 exec python3 scripts/check_repo.py --pre-commit

@@ -2,5 +2,7 @@
 # Kait otomatis (satu paket .githooks, dipasang tools/pasang-hook.sh):
 # verifikasi path + cek cepat yang akan di-push. Keluar bukan-nol = push
 # dibatalkan.
+# Uji-diri pemasang (#296): lihat pre-commit.
+if [ "${1:-}" = "--self-test" ]; then exit 0; fi
 if ! python3 tools/verifikasi-path.py; then exit 1; fi
 exec bash scripts/cek-cepat.sh

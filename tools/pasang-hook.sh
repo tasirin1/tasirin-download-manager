@@ -13,8 +13,11 @@ if [ -f "$LEGACY" ] && grep -q "dipasang tools/pasang-hook.sh" "$LEGACY"; then
     echo "Kait lama $LEGACY (pemasangan gaya lama) dibersihkan."
 fi
 chmod +x .githooks/pre-commit .githooks/pre-push
-if [ -x .githooks/pre-commit ] && [ -x .githooks/pre-push ]; then
-    echo "Kait terpasang via core.hooksPath=.githooks:"
+# Bukti EKSEKUSI nyata, bukan sekadar bit izin (#296): [ -x ] hanya
+# membaca bit, sedangkan mount noexec menolak execve dan git lalu
+# mengabaikan kait diam-diam — jalankan uji-diri tiap kait sungguhan.
+if ./.githooks/pre-commit --self-test >/dev/null 2>&1 && ./.githooks/pre-push --self-test >/dev/null 2>&1; then
+    echo "Kait terpasang dan TERBUKTI bisa dieksekusi via core.hooksPath=.githooks:"
     echo "  pre-commit -> python3 scripts/check_repo.py --pre-commit"
     echo "  pre-push   -> python3 tools/verifikasi-path.py + bash scripts/cek-cepat.sh"
 else
