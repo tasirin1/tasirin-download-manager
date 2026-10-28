@@ -108,12 +108,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
      *  penutupan satu dialog hanya memulihkan handler dialog di bawahnya,
      *  tidak mem-null-kan handler dialog lain (issue #207). */
     private val webExtractHandlerStack = mutableListOf<(Intent?) -> Unit>()
-    /** Lambda batch episode milik dialog di bawah yang tergeser saat dialog
-     *  baru menumpuk (#224): handler aktif saat itu bukan handler form
-     *  pemiliknya (fallback), jadi ia disimpan bersama pemiliknya dan
-     *  dipulihkan saat dialog penumpuk ditutup, bukan dibuang. */
-    private var displacedExtractHandler: ((Intent?) -> Unit)? = null
-    private var displacedExtractOwner: ((Intent?) -> Unit)? = null
+    /** Tumpukan lambda batch episode milik dialog di bawah yang tergeser
+     *  saat dialog baru menumpuk (#224): handler aktif saat itu bukan
+     *  handler form pemiliknya (fallback), jadi ia disimpan bersama
+     *  pemiliknya dan dipulihkan saat dialog penumpuk ditutup, bukan
+     *  dibuang. Tumpukan — bukan satu slot — karena batch bisa tergeser
+     *  di dua tingkat dialog sekaligus (#258): slot tunggal menimpa
+     *  simpanan pertama dan batch terdalam hilang diam-diam. */
+    private val displacedExtractStack =
+        mutableListOf<Pair<(Intent?) -> Unit, (Intent?) -> Unit>>()
     private val webExtractLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
@@ -934,13 +937,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
         // Handler aktif yang bukan handler form pemiliknya = lambda batch
         // yang sedang berjalan di dialog bawah: simpan agar penutupan
-        // dialog ini memulihkannya, bukan membuangnya (#224).
+        // dialog ini memulihkannya, bukan membuangnya (#224). Didorong ke
+        // tumpukan agar batch yang sudah tergeser di tingkat bawah tidak
+        // tertimpa (#258).
         val activeBefore = onWebExtractResult
-        if (activeBefore != null && fallbackWebExtractHandler != null &&
-            activeBefore !== fallbackWebExtractHandler
+        val fallbackBefore = fallbackWebExtractHandler
+        if (activeBefore != null && fallbackBefore != null &&
+            activeBefore !== fallbackBefore
         ) {
-            displacedExtractHandler = activeBefore
-            displacedExtractOwner = fallbackWebExtractHandler
+            displacedExtractStack.add(activeBefore to fallbackBefore)
         }
         webExtractHandlerStack.add(myExtractHandler)
         onWebExtractResult = myExtractHandler
@@ -1096,20 +1101,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             // cukup melepas entri tumpukannya. Pemilik yang ditutup
             // memulihkan handler dialog di bawahnya bila masih ada.
             webExtractHandlerStack.remove(myExtractHandler)
-            if (displacedExtractOwner === myExtractHandler) {
-                // Dialog pemilik batch tergeser ini ikut tertutup: batch-nya
-                // tak punya rumah lagi, buang simpanannya.
-                displacedExtractHandler = null
-                displacedExtractOwner = null
-            }
+            // Dialog pemilik batch tergeser yang ikut tertutup: batch-nya
+            // tak punya rumah lagi, buang simpanannya dari tumpukan (#258).
+            displacedExtractStack.removeAll { it.second === myExtractHandler }
             if (fallbackWebExtractHandler === myExtractHandler) {
                 val remaining = webExtractHandlerStack.lastOrNull()
+                val idx = if (remaining == null) -1 else
+                    displacedExtractStack.indexOfLast { it.second === remaining }
                 onWebExtractResult =
-                    if (remaining != null && remaining === displacedExtractOwner) {
-                        val restored = displacedExtractHandler
-                        displacedExtractHandler = null
-                        displacedExtractOwner = null
-                        restored ?: remaining
+                    if (idx >= 0) {
+                        displacedExtractStack.removeAt(idx).first
                     } else {
                         remaining
                     }

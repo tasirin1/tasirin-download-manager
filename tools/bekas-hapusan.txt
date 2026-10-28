@@ -15,3 +15,5 @@ remoteUrl
 mediaDurations
 isReleasesList
 GD_FORM_ACTION_RE
+displacedExtractHandler
+displacedExtractOwner
