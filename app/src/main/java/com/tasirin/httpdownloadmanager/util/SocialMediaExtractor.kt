@@ -1805,14 +1805,21 @@ object SocialMediaExtractor {
     }
 
     /** Ambil halaman video Facebook. Browser asli dicoba dulu; bila kosong/
-     *  gagal, fallback ke Googlebot (kadang tetap memberi URL media). */
+     *  gagal, fallback ke Googlebot (kadang tetap memberi URL media).
+     *  Fallback bot SENGAJA tanpa header user dan hanya untuk konten
+     *  publik: cookie pengguna tidak menolong video yang butuh login di
+     *  jalur crawler dan tidak boleh tercampur ke sesi bot. */
     private fun facebookPage(url: String, headers: Map<String, String>): Pair<String, String> {
         val page = httpGetWithCookies(url, headers, PAGE_TIMEOUT_MS)
         if (page != null && page.body.isNotEmpty()) {
             return page.body to page.cookies
         }
         val bot = httpGetWithCookies(url, IG_HEADERS, PAGE_TIMEOUT_MS)
-        if (bot != null) return bot.body to bot.cookies
+        // Cookie sesi BOT tidak diteruskan (#279): cookie itu bukan
+        // cookie halaman watch, jadi tidak boleh menempel ke Result
+        // seolah cookie sesi pengguna. URL media dari tampilan crawler
+        // adalah URL publik bertanda tangan yang tidak membutuhkannya.
+        if (bot != null) return bot.body to ""
         return "" to ""
     }
 
