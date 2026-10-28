@@ -1,23 +1,25 @@
 #!/bin/sh
-# Pasang kait pre-push: tiap `git push` otomatis menjalankan verifikasi path.
-# Bila verifikasi GAGAL, push dibatalkan sebelum menyentuh GitHub/CI.
+# Pasang kait git lokal: pre-commit (check_repo) + pre-push (verifikasi
+# path + cek cepat) dari satu paket .githooks lewat core.hooksPath.
+# Dulu skrip ini menulis .git/hooks/pre-push langsung — begitu
+# core.hooksPath terpasang, git mengabaikan .git/hooks seluruhnya
+# sehingga kedua mekanisme saling menonaktifkan (issue #192).
 # Dipasang sekali per clone: sh tools/pasang-hook.sh
-# (Contek tasirin-vaultwarden-host.)
 set -e
-HOOK=".git/hooks/pre-push"
-cat > "$HOOK" <<'HOOK'
-#!/bin/sh
-# Kait otomatis (dipasang tools/pasang-hook.sh): verifikasi path + cek cepat
-# yang akan di-push. Keluar bukan-nol = push dibatalkan.
-if ! python3 tools/verifikasi-path.py; then exit 1; fi
-exec bash scripts/cek-cepat.sh
-HOOK
-chmod +x "$HOOK"
-if [ -x "$HOOK" ]; then
-    echo "Kait pre-push terpasang dan bisa dieksekusi: $HOOK"
+git config core.hooksPath .githooks
+LEGACY=".git/hooks/pre-push"
+if [ -f "$LEGACY" ] && grep -q "dipasang tools/pasang-hook.sh" "$LEGACY"; then
+    rm "$LEGACY"
+    echo "Kait lama $LEGACY (pemasangan gaya lama) dibersihkan."
+fi
+chmod +x .githooks/pre-commit .githooks/pre-push
+if [ -x .githooks/pre-commit ] && [ -x .githooks/pre-push ]; then
+    echo "Kait terpasang via core.hooksPath=.githooks:"
+    echo "  pre-commit -> python3 scripts/check_repo.py --pre-commit"
+    echo "  pre-push   -> python3 tools/verifikasi-path.py + bash scripts/cek-cepat.sh"
 else
-    echo "PERINGATAN: $HOOK tak bisa dieksekusi (penyimpanan noexec?) — kait"
-    echo "  git diabaikan di sini. Cadangan: workflow Verifikasi Path di CI"
+    echo "PERINGATAN: kait di .githooks tak bisa dieksekusi (penyimpanan"
+    echo "  noexec?) — git akan mengabaikannya di sini. Cadangan: gerbang CI"
     echo "  tetap memeriksa tiap push; atau jalankan manual sebelum commit:"
-    echo "  python3 tools/verifikasi-path.py"
+    echo "  python3 scripts/check_repo.py && python3 tools/verifikasi-path.py"
 fi

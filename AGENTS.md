@@ -60,7 +60,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── scripts/cek-cepat.sh              # Cek cepat pra-push tanpa SDK (vektor 0.x, README, secret, remote)
 ├── tools/verifikasi-path.py          # Verifikasi path tanpa SDK (acuan yatim, manifest, import mati, hapusan)
 ├── tools/bekas-hapusan.txt           # Daftar fun yang sengaja dihapus (regresi hapusan = GAGAL)
-├── tools/pasang-hook.sh              # Pasang pre-push hook (verifikasi-path + cek-cepat, gagal = push batal)
+├── tools/pasang-hook.sh              # Pasang hook lokal .githooks (pre-commit check_repo + pre-push verifikasi, gagal = batal)
 ├── app/src/main/
 │   ├── AndroidManifest.xml           # permission & komponen (service, receiver, provider)
 │   ├── assets/
@@ -322,9 +322,13 @@ kuat dan tanpa diskusi:
     owner boleh push hotfix langsung bila memang disengaja. Push docs-only
     (`.md`, `docs/`, `LICENSE`, `.gitignore`) tidak memicu build sama sekali
     (lihat `paths-ignore` di `build.yml`).
-17. **Pre-commit hook opsional** — aktifkan dengan `git config core.hooksPath
-    .githooks` (memanggil `scripts/check_repo.py --pre-commit`; unit test
-    otomatis hanya bila Java/Gradle tersedia). Hook tidak wajib; CI tetap penentu.
+17. **Hook lokal opsional (satu paket)** — pasang sekali per clone dengan
+    `sh tools/pasang-hook.sh` (mengatur `core.hooksPath .githooks`):
+    pre-commit memanggil `scripts/check_repo.py --pre-commit` (unit test
+    otomatis hanya bila Java/Gradle tersedia) dan pre-push menjalankan
+    verifikasi-path + cek-cepat. Jangan menulis hook ke `.git/hooks`
+    langsung — `core.hooksPath` membuat git mengabaikannya (issue #192).
+    Hook tidak wajib; CI tetap penentu.
 18. **Cek kesehatan keystore otomatis di CI** — workflow membandingkan
     fingerprint sertifikat signing dari `KEYSTORE_BASE64` dengan
     `c2785a61...`; mismatch = build gagal (keystore salah/korup terdeteksi
