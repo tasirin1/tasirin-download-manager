@@ -419,6 +419,42 @@ class FileSaver(context: Context) {
                     }
                 }
             }
+            // Direktori tujuan publish di LUAR downloadDir (issue #402):
+            // staging `<nama>.part` dari publishFileIntoDir bisa tertinggal
+            // di folder publik/teks/kustom saat proses mati di tengah
+            // salin. Sapu HANYA nama yang basisnya persis nama final item
+            // yang dikenal (isPublishStagingName) dan sudah tua >2 jam —
+            // di folder milik pengguna pola longgar tak aman. Tujuan milik
+            // item yang sudah tak ada di daftar memang tak terjangkau
+            // sapuan ini; itu batas yang disadari.
+            val finalNames = items.map { FileNames.safe(it.fileName) }.toSet()
+            val extraDirs = buildSet {
+                @Suppress("DEPRECATION")
+                add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS))
+                StoragePrefs.getTextFolder(appContext)?.let { add(File(it)) }
+                items.forEach { item ->
+                    item.filePath?.takeIf { it.startsWith("/") }
+                        ?.let { File(it).parentFile?.let { p -> add(p) } }
+                }
+            }
+            val downloadCanon = runCatching { downloadDir.canonicalFile }.getOrNull()
+            extraDirs.forEach { dir ->
+                if (!dir.isDirectory) return@forEach
+                if (downloadCanon != null &&
+                    runCatching { dir.canonicalFile }.getOrNull() == downloadCanon
+                ) return@forEach
+                runCatching { dir.listFiles() }.getOrNull()?.forEach { f ->
+                    if (!f.isFile) return@forEach
+                    if (!isPublishStagingName(f.name, finalNames)) return@forEach
+                    val age = System.currentTimeMillis() - f.lastModified()
+                    if (age > 2L * 60 * 60 * 1000) {
+                        runCatching {
+                            val size = f.length()
+                            if (f.delete()) freed += size
+                        }
+                    }
+                }
+            }
         }
         return freed
     }
@@ -461,7 +497,9 @@ class FileSaver(context: Context) {
      *    `<nama>.part` di direktori tujuan, lalu rename ke nama final.
      *  Dengan pola ini nama final tidak pernah berisi byte setengah
      *  jadi: kematian proses di tengah salin hanya meninggalkan
-     *  partial/staging yang memang dikenal pemindaian yatim, dan
+     *  partial/staging — di downloadDir disapu pemindaian yatim biasa,
+     *  di direktori tujuan luar disapu cleanupOrphanPartials lewat
+     *  pencocokan nama final item yang dikenal (issue #402) — dan
      *  rename dalam satu direktori bersifat atomik. */
     private fun publishFileIntoDir(partial: File, dir: File, fileName: String): PublishResult {
         val target = uniqueTargetFile(File(dir, fileName))
@@ -818,3 +856,19 @@ internal fun isSweepablePartial(name: String): Boolean =
     name.endsWith(".part") || PART_SEGMENT_TAIL_RE.containsMatchIn(name) ||
         MERGE_STAGING_TAIL_RE.containsMatchIn(name) ||
         name.endsWith(".part.spool") || name.endsWith(".part.segs")
+
+private val UNIQUE_SUFFIX_RE = Regex("""^(.+) \([^()]+\)$""")
+
+/** true bila [name] adalah staging publish (`<nama final>.part`, termasuk
+ *  varian unik `<nama final> (n).part` dari uniqueTargetFile) milik salah
+ *  satu nama final yang dikenal. Dipakai menyapu direktori TUJUAN di luar
+ *  downloadDir (issue #402): di folder milik pengguna, pola longgar
+ *  ".part" saja terlalu berbahaya — hanya staging yang basisnya persis
+ *  nama final item dikenal yang boleh dihapus. Murni, bisa di-unit-test. */
+internal fun isPublishStagingName(name: String, knownFinalNames: Set<String>): Boolean {
+    if (!name.endsWith(".part")) return false
+    val base = name.removeSuffix(".part")
+    if (base in knownFinalNames) return true
+    val stripped = UNIQUE_SUFFIX_RE.find(base)?.groupValues?.get(1) ?: return false
+    return stripped in knownFinalNames
+}

@@ -31,6 +31,19 @@ class FileSaverSweepTest {
     }
 
     @Test
+    fun `staging publish di folder luar hanya cocok untuk nama final dikenal`() {
+        val known = setOf("film.mp4", "lagu.mp3")
+        assertTrue(isPublishStagingName("film.mp4.part", known))
+        assertTrue(isPublishStagingName("film.mp4 (1).part", known))
+        assertTrue(isPublishStagingName("lagu.mp3 (12).part", known))
+        // Bukan staging kita: nama asing, ekstensi lain, atau .part di tengah.
+        assertFalse(isPublishStagingName("dokumen lain.mp4.part", known))
+        assertFalse(isPublishStagingName("film.mp4.part.0", known))
+        assertFalse(isPublishStagingName("film.mp4", known))
+        assertFalse(isPublishStagingName("film (1).mp4.part", known))
+    }
+
+    @Test
     fun `staging merge sweepable`() {
         assertTrue(isSweepablePartial("movie.mp4.merge.123456789"))
     }
