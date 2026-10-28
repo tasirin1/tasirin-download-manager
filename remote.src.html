@@ -6447,7 +6447,10 @@ function probeSocialQuality() {
       .then(function (d) {
         // Respons basi: pengguna sudah mengganti tautan selama probe
         // berjalan — opsi tautan lama tidak boleh menimpa tautan sekarang.
-        if (document.getElementById('url').value.trim() !== u) return;
+        // Bandingkan TOKEN PERTAMA terkini (cara capture u yang sama):
+        // membandingkan seluruh isi kolom membuat input multi-URL tidak
+        // pernah cocok sehingga picker mati total (issue #164).
+        if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
         if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
         socialPlatform = d.platform || 'social';
         var videos = d.videos || [];
@@ -6477,8 +6480,8 @@ function probeSocialQuality() {
       })
       .catch(function () {
         // Probe basi gagal pun tidak boleh menyembunyikan picker milik
-        // probe tautan yang lebih baru.
-        if (document.getElementById('url').value.trim() !== u) return;
+        // probe tautan yang lebih baru (token pertama, seperti di atas).
+        if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
         document.getElementById('platformBadge').classList.add('hidden');
         qualitySelect.classList.add('hidden');
         photoSelect.classList.add('hidden');

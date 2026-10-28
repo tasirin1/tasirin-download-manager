@@ -4133,7 +4133,7 @@ photoSelect.classList.add('hidden');
 fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
 .then(function (r) { return r.json(); })
 .then(function (d) {
-if (document.getElementById('url').value.trim() !== u) return;
+if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
 if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
 socialPlatform = d.platform || 'social';
 var videos = d.videos || [];
@@ -4160,7 +4160,7 @@ photoSelect.classList.add('hidden');
 }
 })
 .catch(function () {
-if (document.getElementById('url').value.trim() !== u) return;
+if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
 document.getElementById('platformBadge').classList.add('hidden');
 qualitySelect.classList.add('hidden');
 photoSelect.classList.add('hidden');
