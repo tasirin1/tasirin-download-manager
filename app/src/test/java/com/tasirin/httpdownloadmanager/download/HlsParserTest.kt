@@ -290,16 +290,32 @@ class HlsParserTest {
     }
 
     @Test
-    fun `parseMaster - NAME bersufiks Int MAX_VALUE dinaikkan tanpa meluap negatif`() {
-        // Issue #505: "X #2147483647" yang bertabrakan dulu menjadi
-        // "X #-2147483648" karena +1 meluap dalam aritmetika Int.
+    fun `parseMaster - NAME bersufiks Int MAX_VALUE dijepit ke penomoran ulang`() {
+        // Issue #505 memperkenalkan parse Long agar +1 tak meluap
+        // negatif; issue #507 lalu MENJEPT nomor di atas batas wajar,
+        // sehingga sufiks raksasa kini diperlakukan seperti gagal
+        // parse: dasar dipakai dan penomoran diulang dari 2.
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:BANDWIDTH=800000,NAME=\"Lagu #2147483647\"\n" +
             "https://cdn.example.com/videos/a.m3u8\n" +
             "#EXT-X-STREAM-INF:BANDWIDTH=800000,NAME=\"Lagu #2147483647\"\n" +
             "https://cdn.example.com/videos/b.m3u8\n"
         val variants = HlsParser.parseMaster(body, "https://cdn.example.com/videos/master.m3u8")!!
-        assertEquals(listOf("Lagu #2147483647", "Lagu #2147483648"), variants.map { it.name })
+        assertEquals(listOf("Lagu #2147483647", "Lagu #2"), variants.map { it.name })
+    }
+
+    @Test
+    fun `parseMaster - NAME bersufiks Long MAX_VALUE dijepit ke penomoran ulang`() {
+        // Issue #507: nomor sufiks di atas batas wajar (1.000.000)
+        // diperlakukan seperti gagal parse — dasar dipakai dan
+        // penomoran diulang dari 2, bukan meluap negatif.
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,NAME=\"Lagu #9223372036854775807\"\n" +
+            "https://cdn.example.com/videos/a.m3u8\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,NAME=\"Lagu #9223372036854775807\"\n" +
+            "https://cdn.example.com/videos/b.m3u8\n"
+        val variants = HlsParser.parseMaster(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(listOf("Lagu #9223372036854775807", "Lagu #2"), variants.map { it.name })
     }
 
     @Test
