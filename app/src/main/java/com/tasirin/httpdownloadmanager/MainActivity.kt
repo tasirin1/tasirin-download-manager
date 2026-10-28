@@ -694,6 +694,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             socialProbedUrl = ""
             socialQualitySection.isVisible = false
             socialCarouselSection.isVisible = false
+            // Audio ikut dibersihkan (issue #508): audio hanya milik
+            // YouTube; tanpa ini section bahasa audio basi dari video
+            // YouTube sebelumnya tetap tampil untuk URL non-YouTube
+            // (jalur datanya memang sudah aman oleh gerbang #502,
+            // tampilannya yang membingungkan).
+            socialAudioLanguages = emptyList()
+            socialAudioSection.isVisible = false
             socialJob = lifecycleScope.launch {
                 val probeTarget = target
                 val options = withContext(Dispatchers.IO) {
