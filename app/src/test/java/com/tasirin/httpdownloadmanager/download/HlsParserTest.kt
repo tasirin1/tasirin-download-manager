@@ -488,6 +488,58 @@ class HlsParserTest {
     }
 
     @Test
+    fun `isEncryptedHlsPlaylist - method selain NONE tertangkap, NONE murni lolos`() {
+        // Issue #554: gerbang enkripsi kini terkunci uji khusus
+        // sejajar gerbang byterange/MAP — semantiknya fail-closed
+        // dan sadar rotasi kunci, jangan sampai regresi senyap.
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"key.bin\"\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        assertFalse(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:METHOD=NONE\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        assertFalse(isEncryptedHlsPlaylist("#EXTM3U\n#EXTINF:10,\nseg.ts\n"))
+    }
+
+    @Test
+    fun `isEncryptedHlsPlaylist - rotasi kunci dan bentuk fail-closed`() {
+        // Rotasi NONE -> AES di tengah playlist tetap terenkripsi.
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:METHOD=NONE\n#EXTINF:10,\na.ts\n" +
+                    "#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:10,\nb.ts\n"
+            )
+        )
+        // Tanpa METHOD terbaca sama sekali: fail-closed.
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:URI=\"key.bin\"\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        // METHOD terkutip tidak terbaca regex: fail-closed juga.
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:METHOD=\"AES-128\",URI=\"key.bin\"\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        // METHOD sebagai atribut kedua (sesudah URI) tetap tertangkap.
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:URI=\"key.bin\",METHOD=AES-128\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+    }
+
+    @Test
     fun `isMapHlsPlaylist - mendeteksi tag segmen init fMP4`() {
         // Issue #514: gerbang fail-fast fMP4 bertumpu pada deteksi ini.
         assertTrue(
