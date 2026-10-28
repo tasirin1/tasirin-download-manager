@@ -317,7 +317,14 @@ class GalleryActivity : AppCompatActivity() {
         suspend fun loadThumb(context: Context, e: MediaLibrary.MediaEntry, req: Int): Bitmap? =
             withContext(Dispatchers.IO) {
                 val cache = cacheFor(context)
-                synchronized(cacheLock) { cache.get(e.token) }?.let { return@withContext it }
+                // Kunci cache memori memakai cap isi (mtime+ukuran), pola
+                // yang sama dengan lapisan disk #399 dan kunci durasi
+                // #441: token saja diturunkan murni dari path, jadi
+                // berkas yang diganti di path yang sama (unduh ulang
+                // bernama sama selesai di latar) tetap menyajikan bitmap
+                // lama selama galeri terbuka (issue #442).
+                val cacheKey = "${e.token}@${e.modified}:${e.size}"
+                synchronized(cacheLock) { cache.get(cacheKey) }?.let { return@withContext it }
 
                 // Satu generator/cache disk dipakai remote web & galeri native;
                 // ini menghindari dua file thumbnail berbeda untuk video sama.
@@ -332,7 +339,7 @@ class GalleryActivity : AppCompatActivity() {
                     ensureActive()
                     val tiny = scaleDown(direct, req)
                     if (tiny !== direct) direct.recycle()
-                    synchronized(cacheLock) { cache.put(e.token, tiny) }
+                    synchronized(cacheLock) { cache.put(cacheKey, tiny) }
                     return@withContext tiny
                 }
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -351,7 +358,7 @@ class GalleryActivity : AppCompatActivity() {
                 ensureActive()
                 val bitmap = scaleDown(decoded, req)
                 if (bitmap !== decoded) decoded.recycle()
-                synchronized(cacheLock) { cache.put(e.token, bitmap) }
+                synchronized(cacheLock) { cache.put(cacheKey, bitmap) }
                 bitmap
             }
     }
