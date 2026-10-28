@@ -57,6 +57,7 @@
     <string name="platform_pornhub">Pornhub</string>
     <string name="platform_hentaihaven">HentaiHaven</string>
     <string name="platform_gdrive">Google Drive</string>
+    <string name="platform_facebook">Facebook</string>
     <string name="web_extract_open">Open in app browser</string>
     <string name="web_extract_grab">Grab video</string>
     <string name="web_extract_close">Close</string>

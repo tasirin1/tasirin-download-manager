@@ -458,6 +458,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     getString(R.string.platform_instagram)
                 matches("drive.google.com") ->
                     getString(R.string.platform_gdrive)
+                matches("facebook.com", "fb.watch") ->
+                    getString(R.string.platform_facebook)
                 matches("twitter.com", "x.com") ->
                     getString(R.string.platform_x)
                 matches("xvideos.com") ->

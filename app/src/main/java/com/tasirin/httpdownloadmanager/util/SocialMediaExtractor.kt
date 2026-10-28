@@ -70,6 +70,9 @@ object SocialMediaExtractor {
     /** Google Drive: hanya link berkas (file/d/, open?id=, uc?id=) — link
      *  folder dan halaman Drive lain tidak diekstrak. */
     private val GD_HOST_RE = Regex("""(?:https?://)(?:www\.)?drive\.google\.com/(?:file/d/|open\?|uc\?)""")
+    /** Facebook: regex host presisi agar CDN fbsbx.com/fbcdn.net (media
+     *  hasil ekstraksi) tidak ikut dikenali sebagai halaman. */
+    private val FB_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mbasic\.)?facebook\.com/|(?:https?://)fb\.watch/""")
     /** HentaiHaven: halaman watch (`/watch/<slug>/`) dilindungi challenge
      *  Cloudflare sehingga fetch server pasti 403; ekstraksi memakai WebView
      *  (`WebExtractActivity`) + parser murni di bawah sebagai fallback. */
@@ -179,7 +182,8 @@ object SocialMediaExtractor {
             !lower.contains("instagr.am") && !lower.contains("xvideos.com") &&
             !lower.contains("xnxx.com") && !lower.contains("xnxxvideos.me") &&
             !lower.contains("pornhub.com") && !lower.contains("pornhubpremium.com") &&
-            !lower.contains("hentaihaven") && !lower.contains("drive.google.com")
+            !lower.contains("hentaihaven") && !lower.contains("drive.google.com") &&
+            !lower.contains("facebook.com") && !lower.contains("fb.watch")
         ) return false
         if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
         if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
@@ -192,7 +196,8 @@ object SocialMediaExtractor {
                 XN_HOST_RE.containsMatchIn(lower) ||
                 PH_HOST_RE.containsMatchIn(lower) ||
                 HH_HOST_RE.containsMatchIn(lower) ||
-                GD_HOST_RE.containsMatchIn(lower)
+                GD_HOST_RE.containsMatchIn(lower) ||
+                FB_HOST_RE.containsMatchIn(lower)
     }
 
     /** True bila URL adalah halaman HentaiHaven (butuh ekstraksi WebView). */
@@ -224,6 +229,7 @@ object SocialMediaExtractor {
                 PH_HOST_RE.containsMatchIn(lower) -> extractPornhub(url, user)
                 HH_HOST_RE.containsMatchIn(lower) -> extractHentaiHaven(url, user)
                 GD_HOST_RE.containsMatchIn(lower) -> extractGoogleDrive(url, user)
+                FB_HOST_RE.containsMatchIn(lower) -> extractFacebook(url, user)
                 else -> null
             }
         } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
@@ -250,6 +256,7 @@ object SocialMediaExtractor {
                     PH_HOST_RE.containsMatchIn(lower) -> extractAllPornhub(url, user)
                     HH_HOST_RE.containsMatchIn(lower) -> extractAllHentaiHaven(url, user)
                     GD_HOST_RE.containsMatchIn(lower) -> extractAllGoogleDrive(url, user)
+                    FB_HOST_RE.containsMatchIn(lower) -> extractAllFacebook(url, user)
                     else -> emptyList()
                 }
             } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; emptyList() }
@@ -1514,6 +1521,217 @@ object SocialMediaExtractor {
         val mime = first.contentType.substringBefore(';').trim()
         val name = parseContentDispositionFileName(first.contentDisposition)
         return listOf(Result(first.finalUrl, name, name, "Original", mime, first.cookies))
+    }
+
+    // ── Facebook ─────────────────────────────────────────────────────────
+    // Dihidupkan lagi atas permintaan owner (sempat dihapus total).
+    // Pelajaran iterasi lama yang dipertahankan: halaman video WAJIB diminta
+    // dengan UA browser asli — UA Googlebot hanya menerima halaman redirect
+    // JS lookaside (bukan file media); URL lookaside crawler + fragmen DASH
+    // disaring isValidFacebookMediaUrl; cookie halaman diteruskan ke hasil
+    // untuk konten terbatas. Cadangan terakhir kini Cobalt.
+
+    /** Header browser asli untuk halaman Facebook (Googlebot = cadangan). */
+    private val FB_HEADERS = mapOf(
+        "User-Agent" to YT_PAGE_UA,
+        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language" to "en-US,en;q=0.9,id;q=0.8"
+    )
+
+    private val FB_HD_SRC_RE = Regex("\"hd_src\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_BROWSER_HD_RE = Regex("\"browser_native_hd_url\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_PLAYABLE_HD_RE = Regex("\"playable_url_quality_hd\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_SD_SRC_RE = Regex("\"sd_src\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_BROWSER_SD_RE = Regex("\"browser_native_sd_url\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_PLAYABLE_RE = Regex("\"playable_url\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_BROWSER_URL_RE = Regex("\"browser_native_url\"\\s*:\\s*\"([^\"]+)\"")
+    private val FB_VIDEO_ID_JSON_RE = Regex("\"(?:video_id|videoID|videoId)\"\\s*:\\s*\"([0-9]+)\"")
+    private val FB_VIDEO_ID_ATTR_RE = Regex("data-video-id=\"([0-9]+)\"")
+    private val FB_OG_VIDEO_RE = Regex("<meta[^>]+property=\"og:video[^\"]*\"[^>]+content=\"([^\"]+)\"")
+    private val FB_URL_V_RE = Regex("[?&]v=([0-9]+)")
+    private val FB_URL_PATH_ID_RE = Regex("/(?:videos|reel)/([0-9]+)")
+    private val FB_SHARE_ID_RE = Regex("/v/([A-Za-z0-9_-]+)")
+
+    private fun extractFacebook(url: String, user: Map<String, String>): Result? {
+        val options = extractAllFacebook(url, user)
+        return options.firstOrNull { it.quality.contains("HD", ignoreCase = true) }
+            ?: options.firstOrNull()
+    }
+
+    private fun extractAllFacebook(url: String, user: Map<String, String>): List<Result> {
+        val (html, cookies) = facebookPage(url, FB_HEADERS + user)
+        val videoId = parseFacebookVideoId(url, html)
+        val nameId = videoId ?: FB_SHARE_ID_RE.find(url)?.groupValues?.get(1) ?: "video"
+        if (html.isNotEmpty()) {
+            val options = parseFacebookPage(html, nameId, cookies)
+            if (options.isNotEmpty()) return options
+        }
+        // Strategi 2: halaman plugin embed — sering memuat hd_src/sd_src
+        // walau halaman utama tidak.
+        val plugin = httpGetWithCookies(
+            "https://www.facebook.com/plugins/video.php?href=" +
+                URLEncoder.encode(url, "UTF-8") + "&show_text=false",
+            FB_HEADERS + user, PAGE_TIMEOUT_MS
+        )?.body.orEmpty()
+        if (plugin.isNotEmpty()) {
+            val fromPlugin = parseFacebookPage(plugin, nameId, cookies)
+            if (fromPlugin.isNotEmpty()) return fromPlugin
+        }
+        // Strategi 3: halaman embed lama — butuh ID numerik.
+        if (videoId != null) {
+            val embed = httpGetWithCookies(
+                "https://www.facebook.com/video/embed?video_id=$videoId",
+                FB_HEADERS + user, PAGE_TIMEOUT_MS
+            )?.body.orEmpty()
+            if (embed.isNotEmpty()) {
+                val fromEmbed = parseFacebookPage(embed, nameId, cookies)
+                if (fromEmbed.isNotEmpty()) return fromEmbed
+            }
+        }
+        // Strategi 4: Cobalt — tanpa header user (cookie tak boleh bocor ke
+        // pihak ketiga, pola yang sama dengan Twitter).
+        val cobalt = runCatching { extractFacebookViaCobalt(url) }.getOrNull()
+        return if (cobalt != null) listOf(cobalt) else emptyList()
+    }
+
+    /** Ambil halaman video Facebook. Browser asli dicoba dulu; bila kosong/
+     *  gagal, fallback ke Googlebot (kadang tetap memberi URL media). */
+    private fun facebookPage(url: String, headers: Map<String, String>): Pair<String, String> {
+        val page = httpGetWithCookies(url, headers, PAGE_TIMEOUT_MS)
+        if (page != null && page.body.isNotEmpty()) {
+            return page.body to page.cookies
+        }
+        val bot = httpGetWithCookies(url, IG_HEADERS, PAGE_TIMEOUT_MS)
+        if (bot != null) return bot.body to bot.cookies
+        return "" to ""
+    }
+
+    /** ID video numerik dari URL (watch?v=, /videos/<id>, /reel/<id>) atau
+     *  dari JSON/atribut/og halaman. Null bila tidak ditemukan. Murni. */
+    internal fun parseFacebookVideoId(url: String, html: String): String? {
+        FB_URL_V_RE.find(url)?.groupValues?.get(1)?.let { return it }
+        FB_URL_PATH_ID_RE.find(url)?.groupValues?.get(1)?.let { return it }
+        FB_VIDEO_ID_JSON_RE.find(html)?.groupValues?.get(1)?.let { return it }
+        FB_VIDEO_ID_ATTR_RE.find(html)?.groupValues?.get(1)?.let { return it }
+        FB_OG_VIDEO_RE.find(html)?.groupValues?.get(1)?.let { og ->
+            FB_URL_V_RE.find(og)?.groupValues?.get(1)?.let { return it }
+        }
+        return null
+    }
+
+    /** Parse halaman Facebook menjadi opsi unduhan (HD dulu, lalu SD).
+     *  Murni agar bisa di-unit-test. */
+    internal fun parseFacebookPage(html: String, videoId: String, cookies: String): List<Result> {
+        if (html.length < 200) return emptyList()
+        val found = linkedMapOf<String, String>()
+        val candidates = listOf(
+            FB_HD_SRC_RE to "HD",
+            FB_BROWSER_HD_RE to "HD",
+            FB_PLAYABLE_HD_RE to "HD",
+            FB_SD_SRC_RE to "SD",
+            FB_BROWSER_SD_RE to "SD",
+            FB_PLAYABLE_RE to "SD",
+            FB_BROWSER_URL_RE to ""
+        )
+        for ((regex, label) in candidates) {
+            for (m in regex.findAll(html)) {
+                val mediaUrl = unescapeFb(m.groupValues[1])
+                if (isValidFacebookMediaUrl(mediaUrl) && mediaUrl.length in 20..2000) {
+                    found.putIfAbsent(mediaUrl, label)
+                }
+            }
+        }
+        // Cadangan: URL mp4 langsung yang diapit tanda kutip di halaman.
+        extractFacebookMp4Urls(html).forEach { mediaUrl ->
+            val q = if (mediaUrl.contains("quality=hd") || mediaUrl.contains("_hd")) "HD" else "SD"
+            found.putIfAbsent(mediaUrl, q)
+        }
+        return found.map { (mediaUrl, quality) ->
+            Result(mediaUrl, "Facebook_$videoId.mp4", "Facebook $videoId", quality, MIME_MP4, cookies)
+        }
+    }
+
+    /** Pindai URL mp4 yang diapit tanda kutip di halaman (menangani escape
+     *  JSON \/); dedup dilakukan pemanggil. */
+    private fun extractFacebookMp4Urls(html: String): List<String> {
+        val out = mutableListOf<String>()
+        var idx = html.indexOf(".mp4")
+        var guard = 0
+        while (idx >= 0 && guard++ < 100) {
+            var start = idx
+            while (start > 0 && html[start - 1] != '"') start--
+            var end = idx + 4
+            while (end < html.length && html[end] != '"') end++
+            if (start >= 0 && end > idx + 4) {
+                val mediaUrl = unescapeFb(html.substring(start, end))
+                if (isValidFacebookMediaUrl(mediaUrl) && mediaUrl.contains(".mp4") &&
+                    mediaUrl.length in 20..2000
+                ) {
+                    out.add(mediaUrl)
+                }
+            }
+            idx = html.indexOf(".mp4", idx + 4)
+            if (out.size >= 8) break
+        }
+        return out
+    }
+
+    /** URL media Facebook yang masih bisa diunduh. Redirect JS lookaside
+     *  crawler dan fragmen DASH (BaseURL/SegmentBase) bukan file media —
+     *  buang. Murni. */
+    internal fun isValidFacebookMediaUrl(url: String): Boolean {
+        if (!url.startsWith("http") || url.length > 2000) return false
+        if (url.contains("/lookaside/crawler/")) return false
+        if (url.contains("\\u") || url.contains("<") ||
+            url.contains("BaseURL") || url.contains("SegmentBase")
+        ) {
+            return false
+        }
+        return true
+    }
+
+    /** URL media di JSON Facebook memakai escape JSON (\/, \u0026, \x26,
+     *  dst) — unescape. Murni. */
+    internal fun unescapeFb(s: String): String {
+        return s.replace("\\/", "/")
+            .replace("\\u0025", "%")
+            .replace("\\u0026", "&")
+            .replace("\\u003d", "=")
+            .replace("\\x26", "&")
+            .replace("\\x3d", "=")
+            .replace("\\u002F", "/")
+            .replace("&amp;", "&")
+    }
+
+    /** Cadangan Cobalt untuk Facebook: API yang sama dengan cadangan
+     *  YouTube; body dibangun via JSONObject agar aman dari karakter
+     *  khusus di URL. */
+    private fun extractFacebookViaCobalt(url: String): Result? {
+        val body = JSONObject()
+            .put("url", url)
+            .put("filenameStyle", "pretty")
+            .put("downloadMode", "auto")
+            .toString()
+        for (instance in COBALT_INSTANCES) {
+            val resp = httpPostJson(
+                "$instance/", body,
+                mapOf("User-Agent" to API_UA, "Accept" to "application/json"),
+                timeoutMs = 15000
+            ) ?: continue
+            val result = runCatching {
+                val obj = JSONObject(resp)
+                val status = obj.optString("status", "")
+                val mediaUrl = obj.optString("url", "")
+                if (status.isNotEmpty() && mediaUrl.startsWith("http")) {
+                    val fileName = obj.optString("filename", "Facebook.mp4")
+                    Result(mediaUrl, fileName, "Facebook", "Auto", MIME_MP4)
+                } else {
+                    null
+                }
+            }.getOrNull()
+            if (result != null) return result
+        }
+        return null
     }
 
     // ── HTTP ─────────────────────────────────────────────────────────────

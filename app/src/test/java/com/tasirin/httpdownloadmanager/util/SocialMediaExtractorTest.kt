@@ -36,8 +36,8 @@ class SocialMediaExtractorTest {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.instagram.com/p/abc/"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.instagram.com/reel/abc/"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://x.com/username/status/123"))
-        // Facebook tidak lagi didukung — jangan dikenali sebagai media sosial.
-        assertFalse(SocialMediaExtractor.isSocialMediaUrl("https://www.facebook.com/share/v/abc/"))
+        // Facebook didukung lagi atas permintaan owner (sempat dihapus total).
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.facebook.com/share/v/abc/"))
     }
 
     @Test
@@ -49,7 +49,7 @@ class SocialMediaExtractorTest {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(
             "https://v16m.tiktokcdn-us.com/video/tos/123.mp4"
         ))
-        // CDN Facebook tidak dikenali (fitur FB dihapus).
+        // CDN Facebook adalah media hasil ekstraksi, bukan URL halaman.
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(
             "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1020806507787076"
         ))
@@ -485,6 +485,85 @@ class SocialMediaExtractorTest {
         val html = """<span class="uc-name-size"><a href="/open?id=x">My Video.mp4</a> (700M)</span>"""
         assertEquals("My Video.mp4", SocialMediaExtractor.parseDriveDisplayName(html))
         assertEquals(null, SocialMediaExtractor.parseDriveDisplayName("<html></html>"))
+    }
+
+    @Test
+    fun `isSocialMediaUrl - Facebook halaman video, reel, dan share`() {
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://www.facebook.com/watch/?v=1020806507787076"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://www.facebook.com/somepage/videos/1020806507787076/"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://www.facebook.com/reel/1020806507787076"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://fb.watch/abcDEF123/"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl(
+            "https://m.facebook.com/watch/?v=1020806507787076"))
+        // Domain mirip tidak boleh lolos.
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://facebook.com.evil.com/watch/?v=1020806507787076"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://notfacebook.com/watch/?v=1020806507787076"))
+    }
+
+    @Test
+    fun `parseFacebookVideoId - dari URL dan JSON halaman`() {
+        val id = "1020806507787076"
+        assertEquals(id, SocialMediaExtractor.parseFacebookVideoId(
+            "https://www.facebook.com/watch/?v=$id", ""))
+        assertEquals(id, SocialMediaExtractor.parseFacebookVideoId(
+            "https://www.facebook.com/somepage/videos/$id/", ""))
+        assertEquals(id, SocialMediaExtractor.parseFacebookVideoId(
+            "https://www.facebook.com/reel/$id", ""))
+        assertEquals(id, SocialMediaExtractor.parseFacebookVideoId(
+            "https://www.facebook.com/share/v/abcDEF123/",
+            "{\"video_id\":\"$id\"}"))
+        assertEquals(null, SocialMediaExtractor.parseFacebookVideoId(
+            "https://www.facebook.com/share/v/abcDEF123/", ""))
+    }
+
+    @Test
+    fun `parseFacebookPage - browser native HD dan SD ter-unescaping`() {
+        val html = """{"require":[["VideoPlayer","video_id":"1020806507787076"]],"video":{"browser_native_hd_url":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/hd.mp4?_nc_cat=108\u0026oe=66F0","browser_native_sd_url":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/sd.mp4?_nc_cat=108\u0026oe=66F0"},"pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
+        val options = SocialMediaExtractor.parseFacebookPage(html, "1020806507787076", "c_user=1")
+        assertEquals(2, options.size)
+        assertEquals(
+            "https://video-jkt-1.xx.fbcdn.net/o1/v/t2/hd.mp4?_nc_cat=108&oe=66F0",
+            options[0].directUrl
+        )
+        assertEquals("HD", options[0].quality)
+        assertEquals("Facebook_1020806507787076.mp4", options[0].fileName)
+        assertEquals("c_user=1", options[0].cookies)
+        assertEquals(
+            "https://video-jkt-1.xx.fbcdn.net/o1/v/t2/sd.mp4?_nc_cat=108&oe=66F0",
+            options[1].directUrl
+        )
+        assertEquals("SD", options[1].quality)
+        // Halaman hanya berisi redirect lookaside = tidak ada media sah.
+        val lookasideOnly = """{"u":"https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1020806507787076","pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
+        assertTrue(SocialMediaExtractor.parseFacebookPage(lookasideOnly, "1", "").isEmpty())
+        // Halaman terlalu pendek ditolak.
+        assertTrue(SocialMediaExtractor.parseFacebookPage("{}", "1", "").isEmpty())
+    }
+
+    @Test
+    fun `isValidFacebookMediaUrl - lookaside dan fragmen DASH ditolak`() {
+        assertTrue(SocialMediaExtractor.isValidFacebookMediaUrl(
+            "https://video-jkt-1.xx.fbcdn.net/o1/v/t2/hd.mp4?_nc_cat=108&oe=66F0"))
+        assertFalse(SocialMediaExtractor.isValidFacebookMediaUrl(
+            "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1020806507787076"))
+        assertFalse(SocialMediaExtractor.isValidFacebookMediaUrl(
+            "https://video.xx.fbcdn.net/BaseURL/seg.mp4"))
+        assertFalse(SocialMediaExtractor.isValidFacebookMediaUrl("bukan url"))
+    }
+
+    @Test
+    fun `unescapeFb - escape JSON Facebook`() {
+        assertEquals(
+            "https://video.xx.fbcdn.net/v/a.mp4?x=1&y=2&z=3",
+            SocialMediaExtractor.unescapeFb(
+                "https:\\/\\/video.xx.fbcdn.net\\/v\\/a.mp4?x=1\\u0026y=2\\x26z=3"
+            )
+        )
     }
 
     @Test
