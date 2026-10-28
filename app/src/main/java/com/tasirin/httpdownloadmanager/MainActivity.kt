@@ -1588,6 +1588,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             h = h * 31 + it.fileName.hashCode()
             h = h * 31 + (it.error?.hashCode() ?: 0)
             h = h * 31 + (it.finishedAt % Int.MAX_VALUE).toInt()
+            // Field yang dibaca bind/tindakan baris wajib ikut (#316):
+            // tanpa ini Move yang mengganti filePath/contentUri pada
+            // state COMPLETED yang sama tidak mengubah sig, submitList
+            // tertahan gerbang throttle, dan daftar menampilkan lokasi
+            // lama (Open menembak berkas yang sudah dipindah).
+            h = h * 31 + (it.contentUri?.hashCode() ?: 0)
+            h = h * 31 + (it.filePath?.hashCode() ?: 0)
+            h = h * 31 + (if (it.checksumVerified) 1 else 0)
+            h = h * 31 + (if (it.monitor) 1 else 0)
+            h = h * 31 + (if (it.totalBytesEstimated) 1 else 0)
         }
         return h
     }
