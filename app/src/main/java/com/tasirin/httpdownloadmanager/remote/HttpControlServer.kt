@@ -3011,8 +3011,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             put(MediaStore.Downloads.RELATIVE_PATH, "$rel/")
         }
         val uri = resolver.insert(collection, values) ?: return MsMoveOutcome.FAILED
+        // Wajib return@runCatching, BUKAN return fungsi (#268): runCatching
+        // itu inline, jadi return polos keluar dari moveFileToMediaStore
+        // dan melewati resolver.delete di bawah — entri MediaStore yang
+        // baru dibuat tertinggal sebagai berkas 0-byte yatim bernama final.
         val written = runCatching {
-            val out = resolver.openOutputStream(uri) ?: return MsMoveOutcome.FAILED
+            val out = resolver.openOutputStream(uri) ?: return@runCatching false
             out.use { dst -> file.inputStream().use { src -> src.copyTo(dst, SERVER_IO_BUF) } }
             true
         }.getOrDefault(false)
