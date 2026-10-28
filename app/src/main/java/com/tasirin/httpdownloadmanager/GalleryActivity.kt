@@ -92,6 +92,13 @@ class GalleryActivity : AppCompatActivity() {
             if (gen == galleryScanGen) fullList = scanned
             binding.progress.visibility = View.GONE
             loadMore() // halaman awal kurang dari satu layar -> isi otomatis
+            // Terbitkan hasil scan awal SELALU (issue #384): loadMore
+            // return dini tanpa updateList() bila canLoadMore() false —
+            // untuk galeri < GALLERY_PAGE entri itu berarti hasil scan
+            // tak pernah sampai ke adapter dan galeri tampil kosong
+            // sampai emisi engine berikutnya (yang tak datang bila tak
+            // ada unduhan aktif).
+            if (gen == galleryScanGen) updateList()
         }
 
         // Update progres tanpa scan ulang MediaStore. Scan hanya saat daftar file
