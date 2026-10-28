@@ -34,7 +34,12 @@ object HlsParser {
     private val MEDIA_GROUP_RE: Regex = Regex("GROUP-ID=\"([^\"]+)\"")
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
     private val LANGUAGE_RE: Regex = Regex("LANGUAGE=\"([^\"]+)\"")
-    private val ABSOLUTE_URI_RE: Regex = Regex("^[A-Za-z][A-Za-z0-9+.-]*://")
+    // Prefiks skema URI (RFC 3986): ALPHA *(ALPHA/DIGIT/+/-/.) lalu ":".
+    // Himpunan karakternya tak memuat "/", jadi kecocokan menjamin titik
+    // dua berada di segmen pertama — skema tanpa "//" (data:, urn:,
+    // http:foo) ikut tertangkap, sedangkan nama relatif ber-titik-dua
+    // SESUDAH "/" pertama (dir/a:b.ts) tidak (issue #464).
+    private val SCHEME_RE: Regex = Regex("^[A-Za-z][A-Za-z0-9+.-]*:")
 
     /** True bila body adalah media playlist HLS (daftar segmen langsung),
      *  bukan master playlist: tidak ada STREAM-INF tapi ada tag media/segmen.
@@ -45,11 +50,12 @@ object HlsParser {
         return body.contains("#EXTINF") || body.contains("#EXT-X-TARGETDURATION")
     }
 
-    /** URI absolut berskema selain http/https (ftp:, rtmp:, ...): tak
-     *  bisa diunduh engine, jadi tak boleh masuk daftar kandidat varian,
-     *  rendisi, atau segmen (issue #453; predikat bersama). */
+    /** URI absolut berskema selain http/https (ftp:, rtmp:, data:,
+     *  urn:, ...): tak bisa diunduh engine, jadi tak boleh masuk daftar
+     *  kandidat varian, rendisi, atau segmen (issue #453; predikat
+     *  bersama). */
     private fun isForeignAbsoluteUri(uri: String): Boolean =
-        ABSOLUTE_URI_RE.containsMatchIn(uri) &&
+        SCHEME_RE.containsMatchIn(uri) &&
             !uri.startsWith("http://", ignoreCase = true) &&
             !uri.startsWith("https://", ignoreCase = true)
 
@@ -215,12 +221,12 @@ object HlsParser {
         if (relative.startsWith("http://", ignoreCase = true) ||
             relative.startsWith("https://", ignoreCase = true)
         ) return relative
-        // URI absolut berskema asing (ftp:, rtmp:, ...) dikembalikan apa
-        // adanya: menempelkannya ke direktori basis menghasilkan URL
+        // URI absolut berskema asing (ftp:, rtmp:, data:, ...) dikembalikan
+        // apa adanya: menempelkannya ke direktori basis menghasilkan URL
         // rusak yang justru lolos saringan startsWith("http") di
         // pemanggil seperti mediaSegmentsWithDurations (issue #452;
         // pola yang sama dengan penolakan parseDirectMedia a5b8651).
-        if (ABSOLUTE_URI_RE.containsMatchIn(relative)) return relative
+        if (SCHEME_RE.containsMatchIn(relative)) return relative
         // Basis dipisahkan dari query/fragment dulu: '/' di dalam query
         // (mis. "?next=a/b") tidak boleh dianggap pemisah direktori, dan
         // query basis tidak diwariskan ke segmen (sesuai RFC 3986).

@@ -92,6 +92,12 @@ class HlsParserTest {
         // saringan http di pemanggil (issue #452).
         assertEquals("ftp://cdn.example.com/seg.ts", HlsParser.resolveUrl(base, "ftp://cdn.example.com/seg.ts"))
         assertEquals("rtmp://cdn.example.com/s", HlsParser.resolveUrl(base, "rtmp://cdn.example.com/s"))
+        // Skema tanpa "//" juga absolut (issue #464): dikembalikan utuh,
+        // bukan ditempel ke direktori basis.
+        assertEquals("data:application/octet-stream;base64,AAAA", HlsParser.resolveUrl(base, "data:application/octet-stream;base64,AAAA"))
+        assertEquals("urn:isbn:123", HlsParser.resolveUrl(base, "urn:isbn:123"))
+        // Titik dua SESUDAH "/" pertama tetap nama relatif yang sah.
+        assertEquals("https://cdn.example.com/videos/dir/a:b.ts", HlsParser.resolveUrl(base, "dir/a:b.ts"))
     }
 
     @Test
@@ -260,6 +266,21 @@ class HlsParserTest {
         assertEquals("HTTPS://cdn.example.com/segK.ts", direct.segments[0])
         assertEquals(4_000_000L, direct.durationsUs[0])
         assertEquals(6_000_000L, direct.durationsUs[1])
+    }
+
+    @Test
+    fun `parseDirectMedia - segmen data dibuang tanpa menggeser durasi`() {
+        // Skema tanpa "//" (issue #464) sama asingnya dengan ftp://:
+        // dibuang sebelum resolusi dan EXTINF-nya tak menempel ke segmen
+        // berikutnya (pasangan #394).
+        val body = "#EXTM3U\n" +
+            "#EXTINF:3.0,\n" +
+            "data:application/octet-stream;base64,AAAA\n" +
+            "#EXTINF:7.0,\n" +
+            "seg2.ts\n"
+        val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/a.m3u8")
+        assertEquals(listOf("https://cdn.example.com/seg2.ts"), direct.segments)
+        assertEquals(listOf(7_000_000L), direct.durationsUs)
     }
 
     @Test
