@@ -2616,7 +2616,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 o.put("modified", f.lastModified())
                 if (f.isDirectory) {
                     val (itemCount, totalSize, sizeTruncated) = if (allowed) {
-                        runCatching { statFutures[f]?.get(STAT_FUTURE_TIMEOUT_SEC, TimeUnit.SECONDS) }.getOrNull() ?: Triple(0, 0L, false)
+                        // Timeout/gagal mengambil statistik berarti ukuran
+                        // TAK DIKETAHUI: tandai terpotong (issue #439) agar
+                        // tidak menyamar sebagai folder kosong — ini celah
+                        // jalur waktu dari undercount yang ditutup #415.
+                        runCatching { statFutures[f]?.get(STAT_FUTURE_TIMEOUT_SEC, TimeUnit.SECONDS) }.getOrNull() ?: Triple(0, 0L, true)
                     } else {
                         Triple(0, 0L, false)
                     }
