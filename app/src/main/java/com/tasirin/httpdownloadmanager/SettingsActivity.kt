@@ -1033,8 +1033,8 @@ class SettingsActivity : AppCompatActivity() {
                     renderServer()
                 }
             }
-            if (!portInvalid) {
-                val newPort = requestedPort!!
+            val newPort = requestedPort
+            if (!portInvalid && newPort != null) {
                 val oldPort = StoragePrefs.serverPort(this)
                 StoragePrefs.setServerPort(this, newPort)
                 if (newPort != oldPort) {
