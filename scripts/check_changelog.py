@@ -78,7 +78,55 @@ def all_dependabot(base):
                 r"\d+\+dependabot\[bot\]@users\.noreply\.github\.com",
                 email) is not None)
     return bool(authors) and all(is_bot(a) for a in authors) \
-        and api_verified_bot(base)
+        and api_verified_bot(base) and merges_clean(base)
+
+
+def merges_clean(base):
+    # Commit merge dikecualikan dari cek author (merge manual PR bot
+    # oleh owner sah), TETAPI merge bisa membawa perubahan pohonnya
+    # sendiri ("evil merge"): pohon hasil merge yang menyimpang dari
+    # gabungan kedua induknya menyelundupkan kode tanpa CHANGELOG
+    # dan tanpa satu pun commit non-merge manusia (issue #315).
+    # Merge dinyatakan bersih bila berkas yang berubah terhadap
+    # induk pertama adalah subset dari berkas yang dibawa induk
+    # kedua — resolusi konflik sah hanya menyentuh berkas yang memang
+    # berbeda di antara kedua induk.
+    proc = subprocess.run(
+        ["git", "log", "--merges", "--format=%H", base + "..HEAD"],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        return False
+    for sha in [x.strip() for x in proc.stdout.splitlines() if x.strip()]:
+        proc = subprocess.run(
+            ["git", "rev-list", "--parents", "-n", "1", sha],
+            capture_output=True, text=True)
+        if proc.returncode != 0:
+            return False
+        parts = proc.stdout.split()
+        if len(parts) < 3:
+            return False
+        first, others = parts[1], parts[2:]
+
+        def names(*args):
+            out = subprocess.run(
+                ["git", "diff", "--name-only", *args],
+                capture_output=True, text=True)
+            if out.returncode != 0:
+                return None
+            return set(out.stdout.split())
+
+        merged = names(first, sha)
+        if merged is None:
+            return False
+        brought = set()
+        for other in others:
+            got = names(first, other)
+            if got is None:
+                return False
+            brought |= got
+        if not merged <= brought:
+            return False
+    return True
 
 
 def changed_files(base):
