@@ -273,10 +273,20 @@ class FileSaver(context: Context) {
     ): PublishResult? = runCatching {
         val tree = DocumentFile.fromTreeUri(appContext, folderUri) ?: return null
         val unique = uniqueDocumentName(tree, fileName)
+        var createdDoc = false
         val target = tree.findFile(unique)
             ?: tree.createFile(MimeTypes.forFile(unique), unique)
+                ?.also { createdDoc = true }
             ?: return null
-        val output = appContext.contentResolver.openOutputStream(target.uri, "wt") ?: return null
+        // Stream gagal dibuka sesudah dokumen dibuat: dokumen 0-byte
+        // yatim tertinggal selamanya di folder pengguna (tak dirujuk
+        // item mana pun, tak tersapu pembersih partial). Buang dokumen
+        // yang BARU dibuat panggilan ini; dokumen lama tak disentuh.
+        val output = appContext.contentResolver.openOutputStream(target.uri, "wt")
+            ?: run {
+                if (createdDoc) runCatching { target.delete() }
+                return null
+            }
         try {
             output.use { writer(it) }
         } catch (e: Exception) {
@@ -293,11 +303,18 @@ class FileSaver(context: Context) {
     ): PublishResult? = runCatching {
         val tree = DocumentFile.fromTreeUri(appContext, folderUri) ?: return null
         val unique = uniqueDocumentName(tree, fileName)
+        var createdDoc = false
         val target = tree.findFile(unique)
             ?: tree.createFile(MimeTypes.forFile(unique), unique)
+                ?.also { createdDoc = true }
             ?: return null
+        // Sama seperti writeCustomFolder: stream null sesudah dokumen
+        // dibuat meninggalkan yatim 0-byte — buang yang baru dibuat.
         val output = appContext.contentResolver.openOutputStream(target.uri, "wt")
-            ?: return null
+            ?: run {
+                if (createdDoc) runCatching { target.delete() }
+                return null
+            }
         try {
             output.use { out ->
                 partial.inputStream().use { input -> input.copyTo(out, IO_BUF) }
