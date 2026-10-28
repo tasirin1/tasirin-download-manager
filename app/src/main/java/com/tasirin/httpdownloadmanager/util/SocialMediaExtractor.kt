@@ -159,7 +159,8 @@ object SocialMediaExtractor {
     private val HP_OG_VIDEO_RE = Regex("""<meta[^>]+property\s*=\s*["']og:video["'][^>]+content\s*=\s*["'](https?://[^"']+)["']""")
     private val HP_OG_TITLE_RE = Regex("""<meta[^>]+property\s*=\s*["']og:title["'][^>]+content\s*=\s*["'](.+?)["']""")
     private val HP_TITLE_TAG_RE = Regex("""<title>(.+?)</title>""")
-    private val PH_MEDIA_DEF_RE = Regex("\"videoUrl\"\\s*:\\s*\"(https?:[^\"]+)\"[^}]*?\"quality\"\\s*:\\s*\"?(\\d+)")
+    private val PH_MEDIA_VIDEO_URL_RE = Regex("\"videoUrl\"\\s*:\\s*\"(https?:[^\"]+)\"")
+    private val PH_MEDIA_QUALITY_RE = Regex("\"quality\"\\s*:\\s*\"?(\\d+)")
     private val PH_FLASHVARS_Q_RE = Regex("\"quality_(\\d+)p\"\\s*:\\s*\"(https?:[^\"]+)\"")
     private val PH_VIDEO_URL_RE = Regex("\"video_url\"\\s*:\\s*\"(https?:[^\"]+)\"")
     private val HH_VIDEO_TAG_RE = Regex("""<video[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
@@ -1279,8 +1280,24 @@ object SocialMediaExtractor {
             val prev = found[url]
             if (prev == null || quality > prev) found[url] = quality
         }
-        PH_MEDIA_DEF_RE.findAll(html).forEach {
-            addCandidate(it.groupValues.getOrNull(1), it.groupValues.getOrNull(2)?.toIntOrNull() ?: 0)
+        // Jangan menjodohkan videoUrl dan quality dengan satu regex
+        // berentang [^}]*?: setiap videoUrl tanpa quality dalam objek
+        // yang sama memindai ulang sisa objek (kuadratik, issue #360).
+        // Cari URL satu lintasan, lalu quality hanya pada sisa objek itu
+        // sendiri (berhenti di kurung tutup atau videoUrl berikutnya).
+        PH_MEDIA_VIDEO_URL_RE.findAll(html).forEach { match ->
+            val afterUrl = match.range.last + 1
+            val braceEnd = html.indexOf('}', afterUrl).takeIf { it >= 0 } ?: html.length
+            val nextVideo = html.indexOf("\"videoUrl\"", afterUrl)
+            val segmentEnd = if (nextVideo >= 0) minOf(braceEnd, nextVideo) else braceEnd
+            val qualityMatch = PH_MEDIA_QUALITY_RE.find(html, afterUrl)
+                ?.takeIf { it.range.first < segmentEnd }
+            if (qualityMatch != null) {
+                addCandidate(
+                    match.groupValues.getOrNull(1),
+                    qualityMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 0
+                )
+            }
         }
         PH_FLASHVARS_Q_RE.findAll(html).forEach {
             addCandidate(it.groupValues.getOrNull(2), it.groupValues.getOrNull(1)?.toIntOrNull() ?: 0)

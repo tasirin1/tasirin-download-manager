@@ -319,6 +319,19 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parsePornhubPage - field panjang satu objek dan videoUrl tanpa quality dilewati`() {
+        val longNote = "x".repeat(4096)
+        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
+            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/long.mp4\",\"note\":\"$longNote\",\"quality\":\"1080\"}," +
+            "{\"videoUrl\":\"https://cdn.ph.com/no-quality.mp4\",\"format\":\"mp4\"}]}" +
+            "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(1, opts.size)
+        assertTrue(opts[0].directUrl.endsWith("long.mp4"))
+        assertEquals("HD", opts[0].quality)
+    }
+
+    @Test
     fun `parsePornhubPage - cookie diteruskan ke hasil`() {
         val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
             "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":\"480\"}]}" +
