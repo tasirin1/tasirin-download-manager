@@ -114,6 +114,39 @@ class AdtsAacTest {
     }
 
     @Test
+    fun `stripId3Stream setara stripId3 pada stream menetes dan tag besar`() {
+        // Tag besar (300 byte badan) + tag di tengah + potongan baca kecil
+        // memaksa tag melewati banyak tepi potongan — jalur cepat per-run
+        // (issue #395) wajib menghasilkan byte yang sama persis dengan
+        // stripId3 versi array.
+        val bigTag = ByteArray(310)
+        System.arraycopy(id3, 0, bigTag, 0, id3.size)
+        // Ukuran syncsafe 300 pada header tag besar.
+        bigTag[6] = 0; bigTag[7] = 0; bigTag[8] = 2; bigTag[9] = 44
+        for (i in 10 until bigTag.size) bigTag[i] = 0x55
+        val data = bigTag + adtsFrame(1, 7, 2, 100) + id3 + adtsFrame(1, 7, 2, 50) + id3
+        val expected = AdtsAac.stripId3(data)
+        for (drip in intArrayOf(1, 3, 7, 64)) {
+            val trickle = object : java.io.InputStream() {
+                private var pos = 0
+                override fun read(): Int =
+                    if (pos >= data.size) -1 else data[pos++].toInt() and 0xFF
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    if (pos >= data.size) return -1
+                    val n = minOf(drip, len, data.size - pos)
+                    System.arraycopy(data, pos, b, off, n)
+                    pos += n
+                    return n
+                }
+            }
+            val out = java.io.ByteArrayOutputStream()
+            val written = AdtsAac.stripId3Stream(trickle, out)
+            assertEquals("drip=$drip", expected.size.toLong(), written)
+            assertEquals("drip=$drip", expected.toList(), out.toByteArray().toList())
+        }
+    }
+
+    @Test
     fun `stripId3Stream stream selalu nol - melempar bukan loop selamanya`() {
         // Kontrak InputStream membolehkan read() = 0; refill tanpa guard
         // berputar selamanya pada stream seperti ini (issue #389).

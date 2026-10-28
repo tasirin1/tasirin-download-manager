@@ -108,65 +108,93 @@ object AdtsAac {
         return out.toByteArray()
     }
 
+    /** true bila byte di [pos] adalah awalan "ID3" sejauh yang tersedia
+     *  (dipakai untuk menahan keputusan di tepi buffer streaming). */
+    private fun isId3PrefixAt(data: ByteArray, pos: Int): Boolean {
+        val n = minOf(3, data.size - pos)
+        for (k in 0 until n) {
+            if (data[pos + k] != ID3_MAGIC[k]) return false
+        }
+        return n > 0
+    }
+
+    private val ID3_MAGIC = byteArrayOf(0x49, 0x44, 0x33)
+
     /** Versi streaming dari [stripId3]: semantik yang sama (tag ID3 di
-     *  posisi mana pun dibuang), tetapi data mengalir lewat jendela
-     *  lihat-depan 10 byte sehingga segmen besar tidak ditampung utuh
-     *  di RAM (issue #371). Mengembalikan jumlah byte yang ditulis. */
+     *  posisi mana pun dibuang), tanpa menampung segmen utuh di RAM
+     *  (issue #371). Data diproses per potongan 8 KB dan payload disalin
+     *  PER RUN sampai tag berikutnya (issue #395): implementasi jendela
+     *  10 byte sebelumnya menulis + menggeser array untuk SETIAP byte.
+     *  Posisi di tepi potongan yang bisa menjadi awal tag ditahan ke
+     *  potongan berikutnya; badan tag yang melewati tepi dibuang
+     *  langsung dari stream. Kesetaraan dengan [stripId3] dibuktikan
+     *  lewat port Python 1:1 (312 kasus x 7 ukuran potongan, 0 beda)
+     *  dan uji unit di AdtsAacTest. */
     fun stripId3Stream(input: InputStream, out: OutputStream): Long {
         var written = 0L
-        val head = ByteArray(10)
-        var headLen = 0
-        fun refill() {
-            // Guard zero-read (issue #389): read() = 0 beruntun tak
-            // mengubah headLen sehingga loop ini berputar selamanya;
-            // readExact di berkas ini sudah menjaganya lewat
-            // MAX_ZERO_READS, refill kini setara.
-            var zeroStreak = 0
-            while (headLen < 10) {
-                val r = input.read(head, headLen, 10 - headLen)
-                if (r == -1) break
-                if (r == 0) {
+        val chunk = ByteArray(8192)
+        var pending = ByteArray(0)
+        var skipRemaining = 0
+        var eof = false
+        var zeroStreak = 0
+        while (true) {
+            if (skipRemaining > 0) {
+                val skipped = input.skip(skipRemaining.toLong())
+                if (skipped > 0) {
+                    skipRemaining -= skipped.toInt()
+                    continue
+                }
+                if (input.read() == -1) break
+                skipRemaining--
+                continue
+            }
+            if (!eof && pending.size < 10) {
+                val read = input.read(chunk)
+                if (read == -1) {
+                    eof = true
+                } else if (read == 0) {
+                    // Guard zero-read (issue #389), pola MAX_ZERO_READS.
                     if (++zeroStreak >= MAX_ZERO_READS) {
                         throw IOException("ID3 strip stream stalled (zero reads)")
                     }
                     continue
+                } else {
+                    zeroStreak = 0
+                    pending = pending + chunk.copyOf(read)
                 }
-                zeroStreak = 0
-                headLen += r
             }
-        }
-        refill()
-        while (headLen > 0) {
-            val tag = if (headLen == 10) id3TagSize(head, 0) else 0
-            if (tag > 0) {
-                // head memuat 10 byte pertama tag; buang sisanya langsung
-                // dari stream, lalu isi ulang jendela dari posisi baru.
-                var remaining = tag - headLen
-                while (remaining > 0) {
-                    val skipped = input.skip(remaining.toLong())
-                    if (skipped > 0) {
-                        remaining -= skipped.toInt()
-                    } else if (input.read() == -1) {
-                        remaining = 0
+            if (pending.isEmpty()) {
+                if (eof) break
+                continue
+            }
+            var pos = 0
+            var runStart = 0
+            while (pos < pending.size) {
+                val remaining = pending.size - pos
+                if (remaining < 10 && !eof && isId3PrefixAt(pending, pos)) break
+                val tag = if (remaining >= 10) id3TagSize(pending, pos) else 0
+                if (tag > 0) {
+                    if (pos > runStart) {
+                        out.write(pending, runStart, pos - runStart)
+                        written += pos - runStart
+                    }
+                    if (tag <= remaining) {
+                        pos += tag
                     } else {
-                        remaining--
+                        skipRemaining = tag - remaining
+                        pos = pending.size
                     }
-                }
-                headLen = 0
-                refill()
-            } else {
-                out.write(head[0].toInt())
-                written++
-                System.arraycopy(head, 1, head, 0, headLen - 1)
-                headLen--
-                if (headLen == 9) {
-                    val r = input.read()
-                    if (r != -1) {
-                        head[9] = r.toByte()
-                        headLen = 10
-                    }
+                    runStart = pos
+                } else {
+                    pos++
                 }
             }
+            if (runStart < pos) {
+                out.write(pending, runStart, pos - runStart)
+                written += pos - runStart
+            }
+            pending = pending.copyOfRange(pos, pending.size)
+            if (eof && pending.isEmpty() && skipRemaining == 0) break
         }
         return written
     }
