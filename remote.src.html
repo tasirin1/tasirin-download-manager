@@ -475,10 +475,12 @@
  transform: translateY(calc(100% + 8px)); }
 
   .gal-cell {
- display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; content-visibility: auto; contain: layout style paint; contain-intrinsic-size: auto 230px; }
+ display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; content-visibility: auto; contain: layout style paint; contain-intrinsic-size: auto 230px; }
 
+  @media (hover: hover) and (pointer: fine) {
   .gal-cell:hover {
  transform: translateY(-3px); box-shadow: 0 2px 4px rgba(23,32,58,.05), 0 14px 32px rgba(23,32,58,.10); }
+  }
 
   .gal-thumb {
  position: relative; padding-top: 56.25%; background: #1c2230; overflow: hidden; }
@@ -492,11 +494,13 @@
   .gal-thumb img.loaded {
  opacity: 1; }
 
+  @media (hover: hover) and (pointer: fine) {
   .gal-cell:hover .gal-thumb img {
  transform: scale(1.05); }
+  }
 
   .gal-thumb .ext {
- position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 7px; background: rgba(10,14,26,.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; border: 1px solid rgba(255,255,255,.14); }
+ position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 7px; background: rgba(10,14,26,.82); color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; border: 1px solid rgba(255,255,255,.14); }
 
   .gal-check {
  position: absolute; top: 6px; right: 6px; z-index: 4; width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); background: rgba(0,0,0,.45); color: #fff; font-size: 14px; font-weight: 700; display: none; align-items: center; justify-content: center; line-height: 1; }
@@ -505,7 +509,7 @@
  background: var(--primary); border-color: #fff; }
 
   .gal-resume {
- position: absolute; right: 8px; bottom: 8px; z-index: 3; padding: 3px 8px; border-radius: 7px; background: rgba(247,103,7,.92); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .2px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+ position: absolute; right: 8px; bottom: 8px; z-index: 3; padding: 3px 8px; border-radius: 7px; background: rgba(247,103,7,.96); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .2px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 
   .gal-thumb .gal-play {
  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.14); }
@@ -516,10 +520,12 @@
  .gal-thumb .gal-play span::before {
  content: ""; width: 0; height: 0; margin-left: 3px; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 12px solid var(--primary); }
 
- .gal-cell:hover .gal-play span { transform: scale(1.08); }
+ @media (hover: hover) and (pointer: fine) {
+  .gal-cell:hover .gal-play span { transform: scale(1.08); }
+  }
 
   .gal-thumb .gal-badge {
- position: absolute; left: 8px; bottom: 8px; z-index: 3; padding: 3px 8px; border-radius: 7px; background: rgba(10,14,26,.8); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; border: 1px solid rgba(255,255,255,.14); }
+ position: absolute; left: 8px; bottom: 8px; z-index: 3; padding: 3px 8px; border-radius: 7px; background: rgba(10,14,26,.88); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; border: 1px solid rgba(255,255,255,.14); }
 
   .gal-thumb .del {
  position: absolute; top: 6px; right: 6px; z-index: 3; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 14px; cursor: pointer; line-height: 1; }
