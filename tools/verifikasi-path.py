@@ -676,7 +676,10 @@ def cek_aturan_repo(gagal, berubah):
             gagal.append("Larangan historis: values-night (%s) — app selalu terang" % path)
         if rendah.endswith((".apk", ".aab", ".dex", ".jks", ".keystore")):
             gagal.append("Berkas terlarang masuk repo: " + path)
-        elif rendah.endswith((".env",)):
+        elif rendah.endswith((".env",)) or \
+                rendah.rsplit("/", 1)[-1].startswith(".env."):
+            # .env.* (mis. .env.local) sama berbahayanya dengan .env
+            # polos (#291): varian env lazim tidak boleh lolos gerbang.
             gagal.append("Berkas secret masuk diff: " + path)
         elif path.startswith("app/src/main/assets/bin/"):
             gagal.append("Binary tak boleh dibundel ke APK: " + path)
