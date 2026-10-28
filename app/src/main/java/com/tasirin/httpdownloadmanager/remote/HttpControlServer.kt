@@ -2063,12 +2063,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 parts.add(part)
             }
             if (parts.isEmpty()) return notFound()
-            val total = parts.sumOf { it.length() }
+            // Total diambil dari snapshot stream yang sama (#232): stream
+            // membekukan segmen saat dibuka, jadi total yang diumumkan dan
+            // byte yang mengalir selalu dari versi yang sama.
+            val chain = runCatching { ChainInputStream(parts) }.getOrNull()
+                ?: return notFound()
             return streamMedia(
                 name = item.fileName,
                 mime = mime,
-                input = ChainInputStream(parts),
-                total = total,
+                input = chain,
+                total = chain.totalLength,
                 rangeHeader = session.headers["range"] ?: session.headers["Range"],
                 download = false
             )

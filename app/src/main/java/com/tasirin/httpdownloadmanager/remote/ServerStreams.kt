@@ -8,45 +8,71 @@ import android.content.res.AssetFileDescriptor
 
 /** Gabungkan beberapa file partial menjadi satu stream (streaming resume
  *  multi-segmen tanpa menyusun file utuh di memori). */
-internal class ChainInputStream(private val files: List<File>) : InputStream() {
-    private var current: InputStream? = null
+internal class ChainInputStream(files: List<File>) : InputStream() {
+    // Semua segmen dibuka SEKALIGUS di konstruktor dan panjangnya dibekukan
+    // (#232): FD yang terbuka menahan inode versi saat request mulai, jadi
+    // unduhan sumber yang di-reset/ditulis ulang/dihapus di tengah stream
+    // tidak mencampur byte dua versi ke dalam respons yang totalnya sudah
+    // diumumkan; segmen yang menyusut dari snapshot dianggap habis.
+    private val streams: List<FileInputStream>
+    private val lengths: List<Long>
+    val totalLength: Long
     private var idx = 0
+    private var remainingInCurrent = 0L
     // Buffer skip dipakai ulang: alokasi 64KB per panggilan boros saat seek besar.
     // Aman: stream respons dipakai satu thread oleh NanoHTTPD.
     private val skipBuf = ByteArray(64 * 1024)
 
-    private fun next(): InputStream? {
-        current?.let { runCatching { it.close() } }
-        if (idx >= files.size) return null
-        val f = files[idx++]
-        val stream = FileInputStream(f)
-        current = stream
-        return stream
+    init {
+        val opened = mutableListOf<FileInputStream>()
+        val lens = mutableListOf<Long>()
+        try {
+            for (f in files) {
+                opened.add(FileInputStream(f))
+                lens.add(f.length())
+            }
+        } catch (e: Exception) {
+            opened.forEach { runCatching { it.close() } }
+            throw e
+        }
+        streams = opened
+        lengths = lens
+        totalLength = lens.sum()
+        remainingInCurrent = lens.firstOrNull() ?: 0L
+    }
+
+    private fun next(): FileInputStream? {
+        while (idx < streams.size && remainingInCurrent <= 0L) {
+            runCatching { streams[idx].close() }
+            idx++
+            if (idx < streams.size) remainingInCurrent = lengths[idx]
+        }
+        return if (idx < streams.size) streams[idx] else null
     }
 
     override fun read(): Int {
-        while (true) {
-            val cur = current ?: next() ?: return -1
-            val b = cur.read()
-            if (b != -1) return b
-            // Stream habis wajib ditutup di sini: next() hanya menutup current
-            // yang non-null sehingga fd segmen lama bocor per request.
-            runCatching { cur.close() }
-            current = null
+        val cur = next() ?: return -1
+        val b = cur.read()
+        if (b == -1) {
+            remainingInCurrent = 0
+            return read()
         }
+        remainingInCurrent--
+        return b
     }
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
         // Kontrak InputStream: tolak argumen di luar batas sebelum menyentuh file.
         if (off < 0 || len < 0 || off > b.size || len > b.size - off) throw IndexOutOfBoundsException()
         if (len == 0) return 0
-        while (true) {
-            val cur = current ?: next() ?: return -1
-            val n = cur.read(b, off, len)
-            if (n != -1) return n
-            runCatching { cur.close() }
-            current = null
+        val cur = next() ?: return -1
+        val n = cur.read(b, off, minOf(len.toLong(), remainingInCurrent).toInt())
+        if (n == -1) {
+            remainingInCurrent = 0
+            return read(b, off, len)
         }
+        remainingInCurrent -= n
+        return n
     }
 
     override fun skip(n: Long): Long {
@@ -62,8 +88,9 @@ internal class ChainInputStream(private val files: List<File>) : InputStream() {
     }
 
     override fun close() {
-        current?.let { runCatching { it.close() } }
-        current = null
+        streams.forEach { runCatching { it.close() } }
+        idx = streams.size
+        remainingInCurrent = 0
     }
 }
 
