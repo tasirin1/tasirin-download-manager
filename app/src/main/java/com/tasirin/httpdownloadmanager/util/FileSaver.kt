@@ -94,9 +94,13 @@ class FileSaver(context: Context) {
         // File() di bawah sehingga publish selalu gagal sesudah unduhan
         // 100% (issue #450). Terbitkan lewat saveToMediaStore dengan
         // relative path dari folderPath; kolom RELATIVE_PATH/IS_PENDING
-        // hanya ada di API 29+, di bawah itu null = pemanggil melempar.
+        // hanya ada di API 29+. Di API 23-28 samakan dengan saveStream
+        // (issue #470): jatuh ke dir publik/internal agar unduhan tetap
+        // terbit (folder relatif m: diabaikan, kompromi yang sama
+        // seperti upload), bukan gagal di garis finis dengan pesan
+        // folder tak valid.
         if (clean.startsWith("m:")) {
-            if (Build.VERSION.SDK_INT < 29) return null
+            if (Build.VERSION.SDK_INT < 29) return publishToPublicDir(partial, fileName)
             val relative = clean.removePrefix("m:").trim().trim('/')
             return runCatching {
                 val result = saveToMediaStore(fileName, relative.ifEmpty { null }) { out ->
