@@ -1968,8 +1968,8 @@ object SocialMediaExtractor {
     )
 
     internal fun unescapeFb(s: String): String {
-        // Dekode umum escape heksadesimal JSON (\uXXXX, huruf hex bebas
-        // besar/kecil) dan \xXX (#283): daftar replace literal lama
+        // Dekode umum escape heksadesimal JSON (\u(4 digit hex), huruf hex bebas
+        // besar/kecil) dan \x 2-digit hex (#283): daftar replace literal lama
         // hanya mengenal beberapa kode terpilih dalam satu ejaan huruf,
         // jadi URL sah bervarian \u002f / \u003D / \u003a tidak
         // ter-dekode lalu ditolak isValidFacebookMediaUrl sebagai URL
