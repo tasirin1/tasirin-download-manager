@@ -697,10 +697,16 @@ object MediaLibrary {
         //    video di folder pilihan tetap tampil apa pun isi MediaStore.
         //    Dedupe di bawah memakai filePath, jadi baris MediaStore yang sama
         //    tidak akan dobel (durasi dari MediaStore tetap menang karena
-        //    section 4 lebih dulu). Dibatasi anggaran sisa GALLERY_MAX_ENTRIES
-        //    (issue #413: sebelumnya take penuh PER folder, jadi N folder
-        //    terpilih bisa mematerialkan 3000 x N entri sebelum pangkas akhir).
+        //    section 4 lebih dulu). Dibatasi satu plafon GALLERY_MAX_ENTRIES
+        //    bersama untuk seluruh tambahan blok ini (issue #413: sebelumnya
+        //    take penuh PER folder, jadi N folder terpilih bisa mematerialkan
+        //    3000 x N entri sebelum pangkas akhir) — tetapi dihitung dari
+        //    tambahan blok ini SENDIRI, bukan sisa global (issue #446):
+        //    sisa global bisa nol tepat saat baris MediaStore >= plafon,
+        //    sehingga berkas tak-terindeks tak pernah masuk daftar dan
+        //    janji blok ini gugur pada perpustakaan besar.
         if (folderFilterActive) {
+            var addedByScan = 0
             for (folder in allowedFolders) {
                 val dir = File(folder.raw)
                 if (!dir.isDirectory) continue
@@ -712,8 +718,8 @@ object MediaLibrary {
                         true
                     }
                         .filter { it.isFile && isGalleryVideo(it.name) }
-                        .take((GALLERY_MAX_ENTRIES - list.size).coerceAtLeast(0))
-                        .forEach { addFile(it) }
+                        .take((GALLERY_MAX_ENTRIES - addedByScan).coerceAtLeast(0))
+                        .forEach { addFile(it); addedByScan++ }
                 }
             }
         }
