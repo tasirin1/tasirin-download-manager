@@ -18,7 +18,7 @@ Aplikasi unduhan untuk Android dengan kontrol web realtime, file manager jarak j
 - File manager: jelajah, unggah, buat folder, ubah nama, pindah, hapus, dan unduh ZIP.
 - Galeri video dengan thumbnail, durasi, lanjut putar, saran video, dan pemutar ramah D-pad.
 - Streaming media dengan dukungan Range serta tautan berbagi sementara.
-- Berjalan di Android 5.0+ dengan foreground service dan opsi auto-start.
+- Berjalan di Android 6.0+ dengan foreground service dan opsi auto-start.
 
 ## Unduh APK
 

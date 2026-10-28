@@ -18,7 +18,7 @@ A download manager for Android with realtime web control, a remote file manager,
 - File manager: browse, upload, create folders, rename, move, delete, and download ZIP archives.
 - Video gallery with thumbnails, durations, resume playback, suggestions, and D-pad-friendly controls.
 - Media streaming with Range support and temporary share links.
-- Runs on Android 5.0+ with a foreground service and optional auto-start.
+- Runs on Android 6.0+ with a foreground service and optional auto-start.
 
 ## Download APK
 
