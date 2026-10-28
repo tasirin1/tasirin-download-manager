@@ -202,6 +202,46 @@ class DownloadEngine(appContext: Context) {
      *  gerbang ini agar daftar yang belum utuh tidak menimpa data
      *  tersimpan atau membersihkan partial milik item yang belum termuat. */
     private val loadGate = CompletableDeferred<Unit>()
+    // Antrean aksi yang ditunda sampai gerbang muat terbuka (#318):
+    // dulu tiap pemanggil pre-gate melepas launch await sendiri —
+    // resumeAll yang dipanggil berkali-kali selama start melepas
+    // banyak coroutine yang bangun bersamaan dan urutannya tak
+    // dijamin. Kini satu job penunggu menjalankan aksi terdaftar
+    // berurutan; kunci yang sama terdaftar dua kali digabung.
+    private val deferredGateLock = Any()
+    private val deferredGateQueue = ArrayDeque<Pair<String, () -> Unit>>()
+    private var deferredGateJobActive = false
+
+    private fun deferUntilLoaded(key: String, action: () -> Unit) {
+        val startJob = synchronized(deferredGateLock) {
+            if (deferredGateQueue.any { it.first == key }) {
+                false
+            } else {
+                deferredGateQueue.addLast(key to action)
+                if (deferredGateJobActive) {
+                    false
+                } else {
+                    deferredGateJobActive = true
+                    true
+                }
+            }
+        }
+        if (!startJob) return
+        scope.launch {
+            loadGate.await()
+            while (true) {
+                val next = synchronized(deferredGateLock) {
+                    if (deferredGateQueue.isEmpty()) {
+                        deferredGateJobActive = false
+                        null
+                    } else {
+                        deferredGateQueue.removeFirst()
+                    }
+                } ?: break
+                next.second()
+            }
+        }
+    }
     // True bila ada mutasi yang meminta simpan selama gerbang muat
     // masih tertutup (scheduleSave/flushSave teredam diam-diam):
     // flush penutup init wajib menghormatinya, kalau tidak mutasi
@@ -819,7 +859,7 @@ class DownloadEngine(appContext: Context) {
         // Aksi massal wajib menunggu muatan awal (#264): menilai daftar
         // kosong di jendela muat membuat aksi pengguna batal diam-diam.
         if (!loadGate.isCompleted) {
-            scope.launch { loadGate.await(); doPauseAll() }
+            deferUntilLoaded("pauseAll") { doPauseAll() }
             return
         }
         doPauseAll()
@@ -870,7 +910,7 @@ class DownloadEngine(appContext: Context) {
         // Aksi massal wajib menunggu muatan awal (#264): menilai daftar
         // kosong di jendela muat membuat aksi pengguna batal diam-diam.
         if (!loadGate.isCompleted) {
-            scope.launch { loadGate.await(); doResumeAll() }
+            deferUntilLoaded("resumeAll") { doResumeAll() }
             return
         }
         doResumeAll()
@@ -989,7 +1029,7 @@ class DownloadEngine(appContext: Context) {
         // lagi, jadi no-op di jendela muat membuat unduhan yang
         // ter-auto-pause macet tanpa pemicu berikutnya.
         if (!loadGate.isCompleted) {
-            scope.launch { loadGate.await(); doResumeAutoPaused() }
+            deferUntilLoaded("resumeAutoPaused") { doResumeAutoPaused() }
             return
         }
         doResumeAutoPaused()
@@ -1032,7 +1072,7 @@ class DownloadEngine(appContext: Context) {
         // partial sebagai yatim dari daftar kosong akan menghapus berkas
         // milik item yang belum sempat termuat.
         if (!loadGate.isCompleted) {
-            scope.launch { loadGate.await(); cleanupOrphans() }
+            deferUntilLoaded("cleanupOrphans") { cleanupOrphans() }
             return
         }
         // Load terdegradasi (blob antrean corrupt): daftar kosong bukan
