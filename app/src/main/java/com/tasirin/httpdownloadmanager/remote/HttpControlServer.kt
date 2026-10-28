@@ -2657,6 +2657,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }.getOrDefault(false)
             "rename" -> {
                 if (!isNameValid(name)) return false
+                // Root yang diizinkan itu sendiri tak boleh diganti namanya:
+                // rename memindahkan seluruh isi keluar dari folder yang
+                // dikenal aplikasi (penjaga yang sama seperti delete, #166).
+                if (file.isDirectory) {
+                    val canon = runCatching { file.canonicalPath }.getOrNull() ?: return false
+                    if (ServerSecurity.isAllowedRootItself(canon, canonicalFsRoots())) {
+                        return false
+                    }
+                }
                 // Cek + rename atomik dalam proses: renameTo(2) menimpa target
                 // yang muncul di sela cek, jadi dua rename paralel ke nama sama
                 // tak boleh lolos cek exists() bersamaan.
@@ -2685,6 +2694,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 val destDir = File(dest.removePrefix(FS_PREFIX))
                 if (!destDir.isDirectory || !isFsPathAllowed(destDir.absolutePath)) return false
+                // Root yang diizinkan itu sendiri tak boleh dipindahkan
+                // keluar dari tempatnya (penjaga yang sama seperti delete
+                // dan rename, issue #166).
+                if (file.isDirectory) {
+                    val canon = runCatching { file.canonicalPath }.getOrNull() ?: return false
+                    if (ServerSecurity.isAllowedRootItself(canon, canonicalFsRoots())) {
+                        return false
+                    }
+                }
                 // Bandingkan path kanonikal (bukan absolut): destDir symlink
                 // menembus perbandingan string di bawah dan menjebak
                 // copyRecursively ke dalam sumber itu sendiri.
