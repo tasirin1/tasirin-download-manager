@@ -966,8 +966,14 @@ class SettingsActivity : AppCompatActivity() {
             } else {
                 withContext(Dispatchers.IO) {
                     val oldPinHash = StoragePrefs.storedPinHash(this@SettingsActivity)
+                    // Cek MURNI verifyStoredPin, BUKAN pinMatches (issue
+                    // #414): pinMatches memigrasi + me-rotate secret sesi
+                    // untuk hash warisan walau PIN-nya sama, sehingga
+                    // menyimpan ulang PIN yang sama diam-diam menendang
+                    // semua sesi remote — melawan janji #375 yang
+                    // setServerPin sendiri jaga dengan cek murni.
                     val event =
-                        if (oldPinHash == null || !StoragePrefs.pinMatches(this@SettingsActivity, newPin)) "PIN SET" else null
+                        if (oldPinHash == null || !StoragePrefs.verifyStoredPin(oldPinHash, newPin)) "PIN SET" else null
                     StoragePrefs.setServerPin(this@SettingsActivity, newPin)
                     event
                 }
