@@ -122,8 +122,8 @@ AFFIXES = "me|men|mem|meng|di|ter|ber|ke|pe|peng|se|dip|memp|meny|memper|menge"
 # Sufiks produktif Indonesia (issue #535): tanpa grup ini pola yang
 # menuntut batas kata tepat sesudah akar LOLOS untuk bentuk imperatif
 # dan posesif yang justru paling alami di teks UI — Tambahkan,
-# Simpankan, Hapuslah, gagalnya. Boleh BERTUMPUK sampai dua (issue
-# #539: Tambahkanlah, Tambahkannya, mengunduhkannya) dan daftarnya
+# Simpankan, Hapuslah, gagalnya. Boleh BERTUMPUK sampai tiga (issue
+# #539/#549: Tambahkanlah, Tambahkannya, tambahkannyalah) dan daftarnya
 # memuat posesif -ku/-mu.
 SUFFIXES = "kan|an|i|nya|lah|kah|ku|mu"
 
@@ -136,7 +136,7 @@ _BANNED_PATTERNS = [
         word,
         re.compile(
             r"\b(?:" + AFFIXES + r")?(?:" + re.escape(word) + r")"
-            r"(?:" + SUFFIXES + r"){0,2}\b",
+            r"(?:" + SUFFIXES + r"){0,3}\b",
             re.IGNORECASE,
         ),
     )
