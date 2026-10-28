@@ -132,11 +132,33 @@ def banned_hits(text: str) -> list:
     return hits
 
 
+# Token JS untuk pembuangan komentar yang sadar string (#273): string
+# biasa/template didahulukan dalam alternasi agar '//' atau '/*' DI DALAM
+# string (mis. "https://...") tidak dianggap awal komentar.
+_JS_TOKEN_RE = re.compile(
+    r"`(?:\\.|[^`\\])*`|'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\""
+    r"|//[^\n]*|/\*[\s\S]*?\*/"
+)
+
+
+def _buang_komentar_js(match) -> str:
+    teks = match.group(0)
+    return teks if teks[0] in "'\"`" else ""
+
+
 def strip_comments(text: str) -> str:
+    # Komentar HTML dibuang global (tidak bisa bersarang).
     text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
-    text = re.sub(r"//[^\n]*", "", text)
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    return text
+
+    # Komentar JS hanya dibuang DI DALAM blok <script>, secara sadar
+    # string. Regex lama menghapus dari '//' pertama di baris — pada
+    # berkas minified (satu baris bisa berisi seluruh script) itu
+    # membuang sisa baris termasuk string label UI sesudah URL pertama,
+    # jadi kata terlarang di sana lolos dari guard bahasa (#273).
+    def bersihkan(match):
+        return _JS_TOKEN_RE.sub(_buang_komentar_js, match.group(0))
+
+    return re.sub(r"<script>.*?</script>", bersihkan, text, flags=re.S)
 
 
 def scan_remote() -> list:
