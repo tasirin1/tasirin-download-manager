@@ -1795,13 +1795,15 @@ object SocialMediaExtractor {
         }
         val plugin = pluginRes?.body.orEmpty()
         if (plugin.isNotEmpty()) {
-            // Cookie halaman plugin sendiri didahulukan (#278): versi
-            // lama membuangnya dan selalu memakai cookie tahap 1, yang
-            // bisa kosong walau halaman ini menerima Set-Cookie sendiri
-            // — URL media hasil parse lalu berangkat tanpa cookie sesi.
+            // Cookie halaman plugin DIGABUNG dengan cookie tahap 1
+            // (#278 + perbaikannya): versi #278 memakai cookie plugin
+            // sebagai PENGGANTI total, jadi satu cookie pelacak dari
+            // plugin membuang seluruh cookie sesi tahap 1. Nama yang
+            // dipasang plugin menang (lebih segar/spesifik halaman),
+            // sisanya diisi tahap 1 lewat mergeCookiePairs.
             val fromPlugin = parseFacebookPage(
                 plugin, nameId,
-                pluginRes?.cookies?.takeIf { it.isNotEmpty() } ?: cookies
+                mergeCookiePairs(pluginRes?.cookies.orEmpty(), cookies)
             )
             if (fromPlugin.isNotEmpty()) return fromPlugin
         }
@@ -1815,11 +1817,11 @@ object SocialMediaExtractor {
             }
             val embed = embedRes?.body.orEmpty()
             if (embed.isNotEmpty()) {
-                // Sama seperti plugin (#278): cookie halaman embed
-                // sendiri didahulukan atas cookie tahap 1.
+                // Sama seperti plugin: cookie halaman embed digabung
+                // dengan cookie tahap 1, bukan menggantikannya.
                 val fromEmbed = parseFacebookPage(
                     embed, nameId,
-                    embedRes?.cookies?.takeIf { it.isNotEmpty() } ?: cookies
+                    mergeCookiePairs(embedRes?.cookies.orEmpty(), cookies)
                 )
                 if (fromEmbed.isNotEmpty()) return fromEmbed
             }
