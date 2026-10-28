@@ -414,11 +414,13 @@ def scan_text(
     # TIDAK seimbang — kurung tutup penutup panggilan mengakhiri
     # pernyataan, jadi kata sensitif dari pernyataan LAIN sesudah
     # panggilan selesai tidak ikut tertuduh (false positive issue #201),
-    # tetapi pasangan kurung seimbang satu tingkat di dalam rentang
-    # (panggilan bersarang ala foo() / COUNT(*) hasil formatter) boleh
-    # dilewati agar bocoran multi-baris bersarang tetap tertangkap
-    # (issue #216). Kelompok kurung di dalam string yang tak berpasangan
-    # tetap bisa memutus rentang lebih awal; batas yang disadari.
+    # tetapi pasangan kurung seimbang di dalam rentang (panggilan
+    # bersarang ala foo() / COUNT(*) hasil formatter) boleh dilewati agar
+    # bocoran multi-baris bersarang tetap tertangkap (issue #216), kini
+    # sampai sarang DUA tingkat — kelompok luar boleh memuat satu tingkat
+    # kelompok lagi di dalamnya (issue #240: foo(bar()) sempat lolos).
+    # Kelompok kurung di dalam string yang tak berpasangan tetap bisa
+    # memutus/memanjangkan rentang; batas yang disadari.
     # Temuan dipetakan ke baris awal match dan didedupe terhadap hasil
     # per baris lewat `seen`.
     full = "\n".join(lines)
@@ -427,7 +429,8 @@ def scan_text(
             continue
         long_pattern = re.compile(
             rule.pattern.replace(
-                "[^;\\n]*", r"(?:\([^()]*\)|[^();]){0,300}"
+                "[^;\\n]*",
+                r"(?:\((?:[^()]|\([^()]*\))*\)|[^();]){0,300}",
             ),
             rule.flags,
         )
@@ -549,6 +552,18 @@ def run_self_test() -> int:
             "        baseDir(ctx), parms[\"id\"])",
             "}",
         ],
+        Path("sample_nested2.kt"): [
+            # Regresi issue #240: sarang DUA tingkat sebelum kata sensitif
+            # (foo(bar()) / base(foo())) tetap wajib terdeteksi oleh
+            # lintasan multi-baris — dengan rentang satu tingkat keduanya
+            # lolos tanpa temuan.
+            "class Nested2 {",
+            "    fun leak() = Log.d(\"x\",",
+            "        foo(bar()) + token)",
+            "    fun f() = File(",
+            "        base(foo()), parms[\"id\"])",
+            "}",
+        ],
         Path("sample_fp.kt"): [
             # Regresi issue #201: Log polos yang kurungnya DITUTUP, lalu
             # pernyataan LAIN menyebut token dalam jarak <300 karakter —
@@ -640,9 +655,17 @@ def run_self_test() -> int:
         item["rule_id"] == "external_path_sink" and item["path"] == "sample_nested.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path:
+    nested2_log = any(
+        item["rule_id"] == "sensitive_log" and item["path"] == "sample_nested2.kt"
+        for item in findings
+    )
+    nested2_path = any(
+        item["rule_id"] == "external_path_sink" and item["path"] == "sample_nested2.kt"
+        for item in findings
+    )
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
