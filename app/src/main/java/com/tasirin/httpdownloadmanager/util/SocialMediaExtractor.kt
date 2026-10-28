@@ -1189,14 +1189,16 @@ object SocialMediaExtractor {
     }
 
     /** Ikuti redirect /latest_version dan kembalikan URL stream final non-HTML.
-     *  Seluruh body per-iteration dibungkus runCatching: timeout/koneksi gagal
-     *  (SocketTimeoutException, IOException) TIDAK boleh menghentikan rantai
-     *  fallback YouTube — cukup dianggap gagal dan lanjut ke instance lain. */
+     *  Pengecualian jaringan (SocketTimeoutException, IOException) TIDAK
+     *  boleh menghentikan rantai fallback YouTube — instance ini dianggap
+     *  gagal dan pemanggil lanjut ke instance lain (issue #546: dulu
+     *  pengecualian tertelan loop sehingga URL yang sama dicoba sampai
+     *  6x sebelum failover). Hanya redirect yang melanjutkan loop. */
     private fun resolveInvidiousLatest(instance: String, videoId: String, itag: String): String? {
         val start = "https://$instance/latest_version?id=$videoId&itag=$itag"
         var current = start
         for (i in 0 until 6) {
-            runCatching {
+            try {
                 val conn = openTlsConn(current)
                 try {
                     conn.instanceFollowRedirects = false
@@ -1218,7 +1220,7 @@ object SocialMediaExtractor {
                         // terlarang (loopback/metadata) seperti helper HTTP lain.
                         if (!isExtractRedirectAllowed(next)) return null
                         current = next
-                        return@runCatching null
+                        continue
                     }
                     val type = conn.contentType ?: ""
                     if (code in 200..299 && type.contains("video", ignoreCase = true)) {
@@ -1226,7 +1228,11 @@ object SocialMediaExtractor {
                     }
                     return null
                 } finally { runCatching { conn.disconnect() } }
-            }.getOrNull()
+            } catch (_: Exception) {
+                // Pengecualian jaringan: instance ini gagal — jangan
+                // ulang URL yang sama; serahkan failover ke pemanggil.
+                return null
+            }
         }
         return null
     }
