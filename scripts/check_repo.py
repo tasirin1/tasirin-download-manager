@@ -255,6 +255,13 @@ def admin_consistency() -> Result:
         problems.append(f"labeler.yml tak terbaca: {exc}")
     except ImportError:
         problems.append("modul yaml tak tersedia untuk validasi labeler")
+    except _yaml.YAMLError as exc:
+        # YAML rusak adalah problem berkas, bukan kematian gerbang
+        # (issue #562): ParserError (keluarga YAMLError, bukan
+        # OSError/ImportError) dulu lolos keluar dan menggugurkan
+        # seluruh lari check_repo dengan traceback mentah sehingga
+        # cek-cek tak terkait tak pernah menghasilkan vonis.
+        problems.append(f"labeler.yml tak ter-parse: {exc}")
     try:
         import re as _re
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
