@@ -117,16 +117,26 @@ def minify_html(html: str) -> str:
 
 AFFIXES = "me|men|mem|meng|di|ter|ber|ke|pe|peng|se|dip|memp|meny|memper|menge"
 
+# Pola terlarang dikompilasi SEKALI di level modul (#294): versi lama
+# mengompilasi 126 pola regex di SETIAP panggilan banned_hits.
+_BANNED_PATTERNS = [
+    (
+        word,
+        re.compile(
+            r"\b(?:" + AFFIXES + r")?(?:" + re.escape(word) + r")\b",
+            re.IGNORECASE,
+        ),
+    )
+    for word in BANNED_ID
+]
+
+
 def banned_hits(text: str) -> list:
     # Kata utuh ATAU bentuk berimbuhan Indonesia (meN-/di-/ter-/ber-/peN- + kata
     # dasar), mis. "Mengunggah" = meng + unggah. Awalan opsional + akar kata
     # dengan batas kata: "sizing" tidak tertangkap oleh akar "izin".
     hits = []
-    for word in BANNED_ID:
-        pat = re.compile(
-            r"\b(?:" + AFFIXES + r")?(?:" + re.escape(word) + r")\b",
-            re.IGNORECASE,
-        )
+    for word, pat in _BANNED_PATTERNS:
         for m in pat.finditer(text):
             hits.append((word, text[max(0, m.start() - 20):m.end() + 20]))
     return hits
