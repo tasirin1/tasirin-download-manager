@@ -291,6 +291,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     session.method == Method.GET && session.uri == "/api/snapshot" -> snapshotJson()
                     session.method == Method.GET && session.uri == "/api/events" -> sseResponse()
                     session.method == Method.POST && session.uri == "/api/share" -> createShare(session)
+                    session.method == Method.POST && session.uri == "/api/share_revoke" -> revokeShare(session)
                     session.method == Method.GET && session.uri == "/api/gallery" -> galleryJson(session)
                     session.method == Method.GET && session.uri == "/api/fs" -> fsList(session)
                     session.method == Method.GET && session.uri == "/api/thumb" -> serveThumb(session)
@@ -3340,12 +3341,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         synchronized(shareLock) { pruneShares() }
         val token = UUID.randomUUID().toString().replace("-", "")
         val expiresAt = System.currentTimeMillis() + SHARE_TTL_MS
-        synchronized(shareLock) {
-            while (shareTokens.size >= MAX_SHARE_TOKENS) {
-                val oldest = shareTokens.entries.minByOrNull { it.value.expiresAt } ?: break
-                shareTokens.remove(oldest.key)
+        // Penuh sesudah prune = tolak pembuatan baru (#235): dulu entri
+        // ber-expiresAt terdekat dibuang diam-diam, jadi mencetak share
+        // sampah bisa mematikan tautan sah yang sedang beredar.
+        val full = synchronized(shareLock) {
+            if (shareTokens.size >= MAX_SHARE_TOKENS) {
+                true
+            } else {
+                shareTokens[token] = ShareEntry(item.id, expiresAt)
+                false
             }
-            shareTokens[token] = ShareEntry(item.id, expiresAt)
+        }
+        if (full) {
+            return jsonResponse(
+                JSONObject().put("ok", false)
+                    .put("error", "Too many active share links. Revoke one or wait for expiry.")
+            )
         }
         appendLog("SHARE CREATED: ${item.fileName} (valid for $SHARE_TTL_HOURS hours)")
         return jsonResponse(
@@ -3353,6 +3364,21 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 .put("token", token)
                 .put("expiresInHours", SHARE_TTL_HOURS)
         )
+    }
+
+    /** Cabut satu tautan share per token (#235): sebelumnya pemilik tak
+     *  punya cara membatalkan tautan yang terlanjur tersebar selain
+     *  menunggu kedaluwarsa 24 jam. Token adalah rahasia pembawa —
+     *  jangan dicatat ke log. */
+    private fun revokeShare(session: IHTTPSession): Response {
+        val params = readForm(session)
+        val token = params["token"].orEmpty()
+        if (token.isEmpty()) {
+            return jsonResponse(JSONObject().put("ok", false).put("error", "token required"))
+        }
+        val removed = synchronized(shareLock) { shareTokens.remove(token) != null }
+        if (removed) appendLog("SHARE REVOKED")
+        return jsonResponse(JSONObject().put("ok", removed))
     }
 
     private fun pruneShares() {

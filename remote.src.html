@@ -1967,6 +1967,7 @@
     <div class="cm-row">
       <button id="shareCopy" type="button" class="btn-ghost">Copy</button>
       <button id="shareOpen" type="button" class="btn-main">Open</button>
+      <button id="shareRevoke" type="button" class="btn-ghost">Revoke link</button>
       <button id="shareClose" type="button" class="btn-ghost">Close</button>
     </div>
   </div>
@@ -6308,6 +6309,7 @@ async function doActionNow(id, action, extra) {
 }
 
 const shareModal = document.getElementById('shareModal');
+let currentShareToken = '';
 async function shareItem(id) {
   const body = new URLSearchParams({id: id});
   try {
@@ -6321,6 +6323,7 @@ async function shareItem(id) {
       showConfirm('Failed to create link', (data && data.error) || 'File not found.', 'OK', function () {});
       return;
     }
+    currentShareToken = data.token;
     const url = location.origin + '/share/' + data.token;
     document.getElementById('shareText').textContent =
       'Link valid for ' + data.expiresInHours + ' hours. Anyone with this link can download the file without a PIN.';
@@ -6347,6 +6350,26 @@ document.getElementById('shareCopy').addEventListener('click', function () {
   }
   if (!copied) {
     try { document.execCommand('copy'); } catch (e) {}
+  }
+});
+document.getElementById('shareRevoke').addEventListener('click', async function () {
+  if (!currentShareToken) return;
+  try {
+    const res = await fetch(API + '/api/share_revoke', {
+      method: 'POST',
+      body: new URLSearchParams({token: currentShareToken}),
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await res.json();
+    if (data && data.ok) {
+      currentShareToken = '';
+      closeShare();
+      showToast('Link revoked', 2500);
+    } else {
+      showToast('Failed to revoke link', 3000, 'error');
+    }
+  } catch (e) {
+    showToast('Failed to revoke link', 3000, 'error');
   }
 });
 document.getElementById('shareOpen').addEventListener('click', function () {
