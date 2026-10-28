@@ -1191,7 +1191,13 @@ class DownloadEngine(appContext: Context) {
     private suspend fun checkForUpdates() {
         val targets = _items.value.filter {
             it.monitor && it.state == DownloadState.COMPLETED &&
-                (it.url.startsWith("http://") || it.url.startsWith("https://"))
+                (it.url.startsWith("http://") || it.url.startsWith("https://")) &&
+                // Item HLS dikecualikan (issue #341): item.url adalah URL
+                // manifest sedangkan totalBytes adalah total byte segmen --
+                // dua besaran tak sebanding, dan etag HLS selalu kosong,
+                // sehingga probe HEAD ke manifest bisa selalu terbaca
+                // "ukuran berubah" dan memicu unduh ulang penuh berulang.
+                !isHlsManifestUrl(it.url)
         }
         for (item in targets) {
             runCatching {
