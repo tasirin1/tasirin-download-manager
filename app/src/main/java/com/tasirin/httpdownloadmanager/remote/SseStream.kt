@@ -86,7 +86,10 @@ internal class SseStream : InputStream() {
         while (true) {
             val cur = current
             if (cur != null && pos < cur.size) return cur[pos++].toInt() and 0xff
-            if (isClosed) return -1
+            // Stream tertutup hanya berakhir bila antrean juga kosong:
+            // frame asli yang terantre sebelum penutupan tetap disajikan
+            // (#288, lihat cabang pil tutup di bawah).
+            if (isClosed && queue.isEmpty()) return -1
             val next = try {
                 queue.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             } catch (_: InterruptedException) {
@@ -94,9 +97,15 @@ internal class SseStream : InputStream() {
                 return -1
             }
             if (next != null) {
-                // Pil tutup atau antrean yang ditutup: akhiri stream, jangan
-                // sajikan heartbeat palsu setelah klien/server menutup.
-                if (next.isEmpty() || isClosed) return -1
+                // Pil tutup: akhiri stream. Frame ASLI yang terantre
+                // sebelum penutupan tetap disajikan walau isClosed sudah
+                // naik (#288): frame {"shutdown":true} dari stopServer
+                // tiba persis dalam urutan ini (push lalu closeStream) —
+                // membuangnya membuat klien hanya melihat EOF dan
+                // reconnect agresif ke server yang memang dimatikan.
+                // Sesudah frame terakhir tersaji, antrean hanya
+                // menyisakan pil tutup sehingga read berikutnya berakhir.
+                if (next === POISON) return -1
                 current = next
                 pos = 0
             } else {
