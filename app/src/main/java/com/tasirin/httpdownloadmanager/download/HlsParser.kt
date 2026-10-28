@@ -164,10 +164,20 @@ object HlsParser {
             // terjangkau dialog berkat #465) — tak bisa dibedakan dan
             // menjadi nama berkas 0_p.m3u8. Jatuh ke bandwidth seperti
             // label parseMaster, lalu ke nomor urut bila keduanya nol.
-            val label = when {
+            var label = when {
                 h > 0 -> "$h p"
                 bw > 0 -> "${bw / 1000} kbps"
                 else -> "Variant ${out.size + 1}"
+            }
+            // Pembeda label ganda (issue #490): label jenjang adalah
+            // fungsi murni dari tinggi/bandwidth saja, jadi dua varian
+            // sebandwidth tanpa RESOLUTION (pasangan sah AVC vs HEVC)
+            // menghasilkan nama persis sama — tak bisa dibedakan di
+            // pemilih dan nama berkas hasil pilihan ikut bertabrakan.
+            if (out.any { it.name == label }) {
+                var n = 2
+                while (out.any { it.name == "$label #$n" }) n++
+                label = "$label #$n"
             }
             out.add(HlsVariant(label, resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
         }

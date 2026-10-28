@@ -246,6 +246,20 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMasterLenient - label kbps ganda untuk varian sebandwidth diberi pembeda`() {
+        // Issue #490: dua varian BANDWIDTH sama tanpa RESOLUTION
+        // (AVC vs HEVC) dulu sama-sama bernama "800 kbps".
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,CODECS=\"avc1.4D401E\"\n" +
+            "https://cdn.example.com/videos/a.m3u8\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,CODECS=\"hvc1.1.6.L93\"\n" +
+            "https://cdn.example.com/videos/b.m3u8\n"
+        val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(2, variants.size)
+        assertEquals(listOf("800 kbps", "800 kbps #2"), variants.map { it.name })
+    }
+
+    @Test
     fun `parseMasterLenient - fallback absolut saat parseMaster gagal`() {
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4D401E\",FRAME-RATE=30\n" +
