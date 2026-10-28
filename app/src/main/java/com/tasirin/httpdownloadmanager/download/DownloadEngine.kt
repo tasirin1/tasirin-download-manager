@@ -831,7 +831,7 @@ class DownloadEngine(appContext: Context) {
             if (headCode in 200..299) return null
             val fallback = openAuthenticatedConnection(
                 clean, method = "GET", username = username, password = password, headers = headers
-            ) { c, _ -> c.setRequestProperty("Range", "bytes=0-0") }
+            ) { c, _, _ -> c.setRequestProperty("Range", "bytes=0-0") }
             try {
                 val fcode = fallback.responseCode
                 if (fcode != 200 && fcode != 206) return null
@@ -866,15 +866,21 @@ class DownloadEngine(appContext: Context) {
         headers: String,
         presetRange: Long? = null,
         authAnchorUrl: String = url,
-        configure: (HttpURLConnection, String) -> Unit = { _, _ -> }
+        configure: (HttpURLConnection, String, String) -> Unit = { _, _, _ -> }
     ): HttpURLConnection {
         var current = url
+        // Metode efektif per hop (issue #504): redirect 301/302/303 atas
+        // POST berubah menjadi GET tanpa body di hop berikutnya
+        // (semantik RFC 9110 dan perilaku browser); hanya 307/308 yang
+        // mempertahankan metode+body. configure menerima metode efektif
+        // hop ini agar penulis body bisa melewati hop yang sudah GET.
+        var effectiveMethod = method
         repeat(MAX_REDIRECTS) {
             val conn = openConn(current)
             conn.instanceFollowRedirects = false
-            conn.requestMethod = method
-            conn.connectTimeout = if (method == "HEAD") 8_000 else connectTimeoutMs
-            conn.readTimeout = if (method == "HEAD") 8_000 else readTimeoutMs
+            conn.requestMethod = effectiveMethod
+            conn.connectTimeout = if (effectiveMethod == "HEAD") 8_000 else connectTimeoutMs
+            conn.readTimeout = if (effectiveMethod == "HEAD") 8_000 else readTimeoutMs
             val ua = cachedUserAgent.ifEmpty { DEFAULT_USER_AGENT }
             conn.setRequestProperty("User-Agent", ua)
             conn.setRequestProperty("Accept", "*/*")
@@ -903,7 +909,7 @@ class DownloadEngine(appContext: Context) {
             if (presetRange != null && presetRange > 0) {
                 conn.setRequestProperty("Range", "bytes=$presetRange-")
             }
-            configure(conn, current)
+            configure(conn, current, effectiveMethod)
             val code = conn.responseCode
             // Hanya redirect asli yang diikuti: 304 (Not Modified) serta
             // 305/306 (proxy/unused) bukan redirect dan tidak punya Location.
@@ -913,6 +919,9 @@ class DownloadEngine(appContext: Context) {
             conn.disconnect()
             val next = redirectTarget(current, location)
                 ?: throw IOException("Invalid redirect")
+            if ((code == 301 || code == 302 || code == 303) && effectiveMethod == "POST") {
+                effectiveMethod = "GET"
+            }
             current = next
         }
         throw IOException("Too many redirects")
@@ -2086,8 +2095,10 @@ class DownloadEngine(appContext: Context) {
             password = item.password,
             headers = item.headers,
             presetRange = resumeFrom.takeIf { it > 0 }
-        ) { connection, _ ->
-            if (item.method == "POST" && item.postBody.isNotEmpty()) {
+        ) { connection, _, hopMethod ->
+            // Body hanya ditulis pada hop yang metodenya masih POST
+            // (issue #504): hop hasil konversi 301/302/303 sudah GET.
+            if (item.method == "POST" && hopMethod == "POST" && item.postBody.isNotEmpty()) {
                 connection.doOutput = true
                 connection.outputStream.use { it.write(item.postBody.toByteArray(Charsets.UTF_8)) }
             }
