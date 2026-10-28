@@ -326,6 +326,20 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseDirectMedia - token ber-titik-dua di segmen pertama dibuang sebagai skema (keputusan RFC, issue 478)`() {
+        // Keputusan yang DIKUNCI, jangan diperbaiki mundur: segmen
+        // pertama referensi relatif tak boleh memuat ":" (RFC 3986),
+        // jadi seg-12:34.ts dinilai URI berskema asing dan dibuang
+        // (tradeoff #464). Pola aman: garis bawah memutus pola skema
+        // sehingga seg_12:30.ts tetap relatif yang sah.
+        val body = "#EXTM3U\n" +
+            "seg-12:34.ts\n" +
+            "seg_12:30.ts\n"
+        val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/a.m3u8")
+        assertEquals(listOf("https://cdn.example.com/seg_12:30.ts"), direct.segments)
+    }
+
+    @Test
     fun `parseDirectMedia - tag dan baris kosong bukan segmen`() {
         val body = "#EXTM3U\n\n#EXT-X-VERSION:3\nseg1.ts\n"
         val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/a.m3u8")
