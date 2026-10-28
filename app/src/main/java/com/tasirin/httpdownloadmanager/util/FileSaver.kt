@@ -655,22 +655,27 @@ class FileSaver(context: Context) {
         val col = collection ?: MediaStore.Downloads.EXTERNAL_CONTENT_URI
         return runCatching {
             val resolver = appContext.contentResolver
-            val existing = mutableSetOf<String>()
-            val selection = relativePath?.let { "${MediaStore.Downloads.RELATIVE_PATH}=?" }
-            val args = relativePath?.let { arrayOf(it.trim('/') + "/") }
-            resolver.query(
-                col,
-                arrayOf(MediaStore.Downloads.DISPLAY_NAME),
-                selection,
-                args,
-                null
-            )?.use { c ->
-                val idx = c.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
-                while (c.moveToNext()) {
-                    c.getString(idx)?.let(existing::add)
+            // Query keberadaan PER KANDIDAT (issue #374): cara lama memuat
+            // SELURUH DISPLAY_NAME koleksi ke HashSet pada setiap publish
+            // (linear terhadap isi folder Downloads pengguna) hanya untuk
+            // memeriksa kandidat FileNames.unique yang biasanya langsung
+            // bebas di kandidat pertama.
+            fun nameExists(name: String): Boolean {
+                val selection = StringBuilder("${MediaStore.Downloads.DISPLAY_NAME}=?")
+                val args = mutableListOf(name)
+                if (relativePath != null) {
+                    selection.append(" AND ${MediaStore.Downloads.RELATIVE_PATH}=?")
+                    args.add(relativePath.trim('/') + "/")
                 }
+                return resolver.query(
+                    col,
+                    arrayOf(MediaStore.Downloads.DISPLAY_NAME),
+                    selection.toString(),
+                    args.toTypedArray(),
+                    null
+                )?.use { c -> c.moveToFirst() } ?: false
             }
-            FileNames.unique(fileName) { existing.contains(it) }
+            FileNames.unique(fileName) { nameExists(it) }
         }.getOrDefault(fileName)
     }
 
