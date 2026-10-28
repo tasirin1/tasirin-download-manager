@@ -9,9 +9,13 @@ import java.io.InputStream
  *  di HttpBody (jilid 12) yang belum mencakup helper bersama ini. */
 private const val MAX_ZERO_READS = 32
 
-/** Baca stream paling banyak [max] byte lalu tutup; aman untuk probe URL yang
- *  tidak dikenal (hindari OOM dari body raksasa). Dipindah ke sini agar bisa
- *  diuji unit di CI (murni JVM). */
+/** Baca stream paling banyak [max] byte; aman untuk probe URL yang
+ *  tidak dikenal (hindari OOM dari body raksasa). Stream TIDAK ditutup
+ *  oleh fungsi ini (issue #422): kepemilikan tetap di pemanggil, yang
+ *  wajib menutupnya sendiri (use{} / disconnect()) — dok lama yang
+ *  menjanjikan "lalu tutup" membuat pemanggil baru bisa lupa menutup
+ *  dan membocorkan koneksi. Dipindah ke sini agar bisa diuji unit di
+ *  CI (murni JVM). */
 fun readBounded(input: InputStream, max: Int): String {
     val buf = ByteArray(16 * 1024)
     // Kapasitas awal kecil lalu tumbuh: ByteArrayOutputStream(max) mengalokasi
