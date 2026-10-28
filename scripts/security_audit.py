@@ -894,6 +894,36 @@ def run_self_test() -> int:
         reps = MAX_FILE_BYTES // len(padding) + 100
         (root / "big_unscanned.js").write_text(
             padding * reps + "eval(userInput)\n", encoding="utf-8")
+        # Cakupan aturan penuh (issue #427): 13 aturan sebelumnya tak
+        # punya sampel self-test sama sekali (6 di antaranya level
+        # error), sehingga suntingan regex yang membunuh salah satunya
+        # tak menggagalkan gerbang. Tiap berkas contoh di bawah wajib
+        # menembakkan aturan pasangannya; daftar id-nya diasersi di
+        # extra_rules_hit. Contoh dibuktikan menembak lewat probe
+        # scan_path sebelum dipasang di sini.
+        extra_samples = {
+            "extra.txt": [
+                "AKIAIOSFODNN7EXAMPLE",  # audit-ignore: secret_aws_access_key
+                "-----BEGIN RSA PRIVATE KEY-----",  # audit-ignore: secret_private_key
+            ],
+            "extra.kt": [
+                'webView.addJavascriptInterface(bridge, "x")',
+                "settings.setJavaScriptEnabled(true)",
+                "e.printStackTrace()",
+                "GlobalScope.launch { }",
+                "val x = y!!",
+                'if (conn.getHeaderField("ETag") == "abc") { }',
+                "try { f() } catch (_: Exception) { }",
+            ],
+            "extra.xml": [
+                '<application android:allowBackup="true">',
+                '<base-config cleartextTrafficPermitted="true"/>',
+            ],
+            "extra.py": ["subprocess.run(cmd, shell=True)"],  # audit-ignore: shell_true
+            "extra.js": ["window.open(url)"],
+        }
+        for path, lines in extra_samples.items():
+            (root / path).write_text("\n".join(lines) + "\n", encoding="utf-8")
         findings = scan_path(root)
 
     by_rule = {str(item["rule_id"]) for item in findings}
@@ -956,6 +986,14 @@ def run_self_test() -> int:
         item["rule_id"] == "js_dynamic_exec" and item["path"] == "big_unscanned.js"
         for item in findings
     )
+    # Ke-13 aturan yang sebelumnya tanpa sampel (#427) wajib menembak.
+    extra_rules_hit = {
+        "secret_aws_access_key", "secret_private_key", "webview_js_bridge",
+        "webview_javascript_enabled", "backup_enabled", "shell_true",
+        "unsafe_blank_window", "cleartext_base_config", "debug_stack_trace",
+        "global_coroutine_scope", "non_null_assertion",
+        "header_comparison_case_sensitive", "file_scoped_catch_all",
+    } <= by_rule
     nested_log = any(
         item["rule_id"] == "sensitive_log" and item["path"] == "sample_nested.kt"
         for item in findings
@@ -1008,9 +1046,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned:
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned or not extra_rules_hit:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}, extra_rules_hit={extra_rules_hit}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
