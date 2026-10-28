@@ -721,8 +721,7 @@ object SocialMediaExtractor {
             val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats")
             val allFormats = mutableListOf<JSONObject>()
             muxedFormats?.let { for (i in 0 until it.length()) it.optJSONObject(i)?.let { f -> allFormats.add(f) } }
-            adaptiveFormats?.let { for (i in 0 until it.length()) it.optJSONObject(i)?.let { f -> allFormats.add(f) } }
-            if (allFormats.isEmpty()) return emptyList()
+            if (allFormats.isEmpty() && adaptiveFormats == null) return emptyList()
             val options = mutableListOf<Result>()
 
             for (fmt in allFormats) {
@@ -733,6 +732,36 @@ object SocialMediaExtractor {
                     val ext = if (mimeType.contains("webm")) "webm" else "mp4"
                     val safeName = sanitizeFileName(title)
                     options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
+                }
+            }
+            // Entri adaptiveFormats dinilai terpisah (issue #537):
+            // format video-only di sana dulu dicampur setara dengan
+            // formats progresif sehingga ditawarkan sebagai unduhan
+            // utuh yang bisu. Kini video-only hanya masuk sebagai
+            // pasangan adaptif dengan audio terbaik dari daftar yang
+            // sama; tanpa pasangan, ia dilewati. Entri non-video-only
+            // (termasuk audio) mengikuti perilaku lama.
+            if (adaptiveFormats != null) {
+                val audioAd = bestAdaptivePair(streamingData).second
+                for (i in 0 until adaptiveFormats.length()) {
+                    val fmt = adaptiveFormats.optJSONObject(i) ?: continue
+                    val videoUrl = fmt.optString("url", "")
+                    if (!videoUrl.startsWith("http")) continue
+                    val quality = fmt.optString("qualityLabel", "Unknown")
+                    val mimeType = fmt.optString("mimeType", MIME_MP4)
+                    val ext = if (mimeType.contains("webm")) "webm" else "mp4"
+                    val safeName = sanitizeFileName(title)
+                    if (isVideoOnlyMime(mimeType)) {
+                        if (audioAd.isEmpty()) continue
+                        options.add(
+                            Result(
+                                videoUrl, "${safeName}.$ext", title, quality, mimeType,
+                                cookies = ytCookies, videoUrl = videoUrl, audioUrl = audioAd
+                            )
+                        )
+                    } else {
+                        options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
+                    }
                 }
             }
             // If the page-derived URLs are all n-transformed (403 on the CDN),
@@ -1008,6 +1037,42 @@ object SocialMediaExtractor {
         "api.piped.yt/streams/"
     )
 
+    /** URL audio terbaik dari audioStreams Piped untuk dipasangkan
+     *  ke stream video-only (issue #537): hanya keluarga MP4/M4A yang
+     *  diterima muxer (opus/WebM ditolak, sejajar bestAdaptivePair);
+     *  di dalam keluarga itu bitrate tertinggi menang. String kosong
+     *  = tidak ada pasangan yang bisa dimux. */
+    internal fun bestPipedAudioUrl(audioStreams: JSONArray?): String {
+        if (audioStreams == null) return ""
+        var best = ""
+        var bestBitrate = -1
+        for (i in 0 until audioStreams.length()) {
+            val a = audioStreams.optJSONObject(i) ?: continue
+            val u = a.optString("url", "")
+            if (!u.startsWith("http")) continue
+            val mime = a.optString("mimeType", "")
+            val codec = a.optString("codec", "")
+            if (!mime.contains("mp4") && !codec.startsWith("mp4a")) continue
+            val br = a.optInt("bitrate", 0)
+            if (br > bestBitrate) {
+                bestBitrate = br
+                best = u
+            }
+        }
+        return best
+    }
+
+    /** Format video tanpa komponen audio pada daftar codecs
+     *  mimeType-nya = video-only (issue #537). mimeType tanpa daftar
+     *  codecs tidak ditebak (false: perlakukan sebagai utuh). */
+    internal fun isVideoOnlyMime(mimeType: String): Boolean {
+        if (!mimeType.startsWith("video/")) return false
+        val codecs = mimeType.substringAfter("codecs=", "").trim().trim('"')
+        if (codecs.isEmpty()) return false
+        return listOf("mp4a", "opus", "vorbis", "aac", "mp3", "ac-3", "ec-3")
+            .none { codecs.contains(it, ignoreCase = true) }
+    }
+
     private fun extractYouTubeViaPiped(videoId: String): List<Result> {
         for (instance in PIPED_INSTANCES) {
             val result = runCatching {
@@ -1019,6 +1084,13 @@ object SocialMediaExtractor {
                 val obj = JSONObject(http.body)
                 val title = obj.optString("title", "YouTube_$videoId")
                 val streams = obj.optJSONArray("videoStreams") ?: return@runCatching null
+                // Pasangan audio untuk stream video-only (issue #537):
+                // videoStreams Piped mencampur stream progresif
+                // bersuara dengan stream adaptif video-only (1080p+
+                // hampir selalu video-only) — menawarkan yang bisu
+                // sebagai unduhan utuh menghasilkan video tanpa suara
+                // berstatus COMPLETED.
+                val audioPair = bestPipedAudioUrl(obj.optJSONArray("audioStreams"))
                 val options = mutableListOf<Result>()
                 for (i in 0 until streams.length()) {
                     val s = streams.optJSONObject(i) ?: continue
@@ -1031,7 +1103,20 @@ object SocialMediaExtractor {
                         // mimeType harus mime stream itu sendiri: ekstensi
                         // sudah diturunkan darinya, jadi berkas .webm yang
                         // tercatat video/mp4 salah label (issue #434).
-                        options.add(Result(u, "${safeName}.$ext", title, quality, mime))
+                        if (s.optBoolean("videoOnly", false)) {
+                            // Bisu: hanya ditawarkan sebagai pasangan
+                            // adaptif video+audio; tanpa pasangan yang
+                            // bisa dimux, lewati sama sekali.
+                            if (audioPair.isEmpty()) continue
+                            options.add(
+                                Result(
+                                    u, "${safeName}.$ext", title, quality, mime,
+                                    videoUrl = u, audioUrl = audioPair
+                                )
+                            )
+                        } else {
+                            options.add(Result(u, "${safeName}.$ext", title, quality, mime))
+                        }
                     }
                 }
                 options

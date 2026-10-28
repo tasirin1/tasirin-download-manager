@@ -808,6 +808,35 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `bestPipedAudioUrl - hanya keluarga MP4 bitrate tertinggi`() {
+        // Issue #537: pasangan audio untuk stream video-only Piped.
+        val streams = org.json.JSONArray(
+            """[
+              {"url":"https://x/opus","mimeType":"audio/webm","codec":"opus","bitrate":160000},
+              {"url":"https://x/m4a-low","mimeType":"audio/mp4","codec":"mp4a.40.5","bitrate":48000},
+              {"url":"https://x/m4a-high","mimeType":"audio/mp4","codec":"mp4a.40.2","bitrate":128000}
+            ]"""
+        )
+        assertEquals("https://x/m4a-high", SocialMediaExtractor.bestPipedAudioUrl(streams))
+        assertEquals("", SocialMediaExtractor.bestPipedAudioUrl(null))
+        val opusOnly = org.json.JSONArray(
+            """[{"url":"https://x/opus","mimeType":"audio/webm","codec":"opus","bitrate":160000}]"""
+        )
+        assertEquals("", SocialMediaExtractor.bestPipedAudioUrl(opusOnly))
+    }
+
+    @Test
+    fun `isVideoOnlyMime - codecs tanpa komponen audio`() {
+        // Issue #537: deteksi video-only pada format adaptif halaman WEB.
+        assertTrue(SocialMediaExtractor.isVideoOnlyMime("video/mp4; codecs=\"avc1.640028\""))
+        assertTrue(SocialMediaExtractor.isVideoOnlyMime("video/webm; codecs=\"vp09.00.10.08\""))
+        assertFalse(SocialMediaExtractor.isVideoOnlyMime("video/mp4; codecs=\"avc1.640028, mp4a.40.2\""))
+        assertFalse(SocialMediaExtractor.isVideoOnlyMime("video/webm; codecs=\"vp9, opus\""))
+        assertFalse(SocialMediaExtractor.isVideoOnlyMime("audio/mp4; codecs=\"mp4a.40.2\""))
+        assertFalse(SocialMediaExtractor.isVideoOnlyMime("video/mp4"))
+    }
+
+    @Test
     fun `parseContentDispositionFileName - bentuk quoted, token, dan RFC 5987`() {
         assertEquals("clip final.mp4", SocialMediaExtractor.parseContentDispositionFileName(
             "attachment; filename=\"clip final.mp4\""))
