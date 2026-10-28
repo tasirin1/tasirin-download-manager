@@ -68,6 +68,30 @@ private fun thumbLockFor(key: String): ThumbLock {
     }.also { it.lastUse.set(now) }
 }
 
+/** Cap identitas isi sumber thumbnail: mtime+ukuran untuk path berkas,
+ *  DATE_MODIFIED+SIZE MediaStore untuk URI media. Kosong bila tak bisa
+ *  dibaca (kunci jatuh ke path saja seperti perilaku lama). */
+private fun thumbSourceStamp(ctx: Context, raw: String): String = when {
+    raw.startsWith("f:") -> runCatching {
+        val f = File(raw.substring(2))
+        if (f.isFile) "${f.lastModified()}:${f.length()}" else ""
+    }.getOrDefault("")
+    raw.startsWith("u:") -> runCatching {
+        val uri = raw.substring(2).toUri()
+        ctx.contentResolver.query(
+            uri,
+            arrayOf(
+                android.provider.MediaStore.MediaColumns.DATE_MODIFIED,
+                android.provider.MediaStore.MediaColumns.SIZE
+            ),
+            null, null, null
+        )?.use { c ->
+            if (c.moveToFirst()) "${c.getLong(0)}:${c.getLong(1)}" else ""
+        } ?: ""
+    }.getOrDefault("")
+    else -> ""
+}
+
 internal fun getOrCreateThumb(
     ctx: Context,
     raw: String,
@@ -77,7 +101,12 @@ internal fun getOrCreateThumb(
     if (!isThumbSourceAllowed(ctx, raw, isFsPathAllowed, isMediaUriAllowed)) return null
     // Kunci cache memakai hash penuh 256-bit: 16 hex char (64 bit) bisa
     // tabrakan antar file dan menyajikan thumbnail milik video lain.
-    val key = sha256Hex(raw)
+    // Cap isi (mtime+ukuran) ikut dikunci (issue #399): berkas yang
+    // diganti di path yang sama — unduhan ulang bernama sama — mendapat
+    // kunci baru sehingga thumbnail video lama tidak tersaji selamanya;
+    // kelas perbaikan yang sama seperti invalidasi durasi #287/#325.
+    val stamp = thumbSourceStamp(ctx, raw)
+    val key = if (stamp.isEmpty()) sha256Hex(raw) else sha256Hex("$raw|$stamp")
     thumbFailures[key]?.let { at ->
         if (isThumbFailureFresh(at, System.currentTimeMillis())) return null
     }
