@@ -1246,7 +1246,11 @@ class DownloadEngine(appContext: Context) {
     private suspend fun checkForUpdates() {
         val targets = _items.value.filter {
             it.monitor && it.state == DownloadState.COMPLETED &&
-                (it.url.startsWith("http://") || it.url.startsWith("https://")) &&
+                // Skema tak peka huruf (issue #475): URL kapital yang
+                // ditempel persis dari dialog tetap terpantau, selaras
+                // pemeriksaan skema probeUrl yang ignoreCase.
+                (it.url.startsWith("http://", ignoreCase = true) ||
+                    it.url.startsWith("https://", ignoreCase = true)) &&
                 // Item HLS dikecualikan (issue #341): item.url adalah URL
                 // manifest sedangkan totalBytes adalah total byte segmen --
                 // dua besaran tak sebanding, dan etag HLS selalu kosong,
