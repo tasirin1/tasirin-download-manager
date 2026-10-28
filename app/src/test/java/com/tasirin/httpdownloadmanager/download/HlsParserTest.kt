@@ -289,7 +289,12 @@ class HlsParserTest {
     }
 
     @Test
-    fun `parseMasterLenient - relatif dan baris rusak diabaikan`() {
+    fun `parseMasterLenient - baris rusak diabaikan, relatif dilengkapi`() {
+        // Semantik diperbarui oleh issue #489 (uji ini dulu mengunci
+        // perilaku lama "relatif polos dibuang" dan menjadi satu-satunya
+        // kegagalan CI run 40718513071): pasangan STREAM-INF yang hilang
+        // tetap diabaikan, sedangkan URI relatif — root maupun polos —
+        // kini diterima dan dilengkapi resolveUrl seperti parseMaster.
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:BANDWIDTH=500000\n" +
             "#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=854x480\n" +
@@ -297,8 +302,9 @@ class HlsParserTest {
             "#EXT-X-STREAM-INF:BANDWIDTH=100\n" +
             "relative-tanpa-slash.m3u8\n"
         val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")
-        assertEquals(1, variants!!.size)
+        assertEquals(2, variants!!.size)
         assertEquals("https://cdn.example.com/rel/480.m3u8", variants[0].url)
+        assertEquals("https://cdn.example.com/videos/relative-tanpa-slash.m3u8", variants[1].url)
     }
 
     @Test
