@@ -129,6 +129,11 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
+          # Keystore hasil decode tidak boleh tertinggal di filesystem
+          # runner untuk langkah-langkah sesudahnya (#330): trap EXIT
+          # menghapusnya apa pun hasil langkah ini; langkah build
+          # men-decode ulang sendiri dari secret-nya.
+          trap 'rm -f /tmp/keystore.jks' EXIT
           echo "$KEYSTORE_BASE64" | base64 -d > /tmp/keystore.jks
           EXPECT="c2785a618082683755eeae867e0a2e01f450b1fd448859d1ec21cf854c5713d1"
           FP=$(keytool -exportcert -keystore /tmp/keystore.jks -alias "$KEY_ALIAS" -storepass "$KEYSTORE_PASSWORD" 2>/dev/null | openssl dgst -sha256 | awk '{print $2}')
@@ -197,6 +202,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          trap 'rm -f /tmp/keystore.jks' EXIT
           [ -f /tmp/keystore.jks ] || echo "$KEYSTORE_BASE64" | base64 -d > /tmp/keystore.jks
           ./gradlew assembleRelease -PverCode="$VER_CODE" -PverName="$VER_NAME" \
             -PstoreFile=/tmp/keystore.jks \
@@ -258,13 +264,16 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           VER="$VER_NAME"
           CODE="$VER_CODE"
           OUT="tasirin-download-manager-v${VER}.apk"
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::KEYSTORE_BASE64 kosong — tak ada APK release untuk dipublish (debug hanya dibangun di PR)."
+          # Cukup bendera kehadiran job (#330): nilai secret TIDAK
+          # disuntikkan ke langkah yang menjalankan rangkaian gh
+          # release ini — prinsip #297 (secret hanya di langkah yang
+          # benar-benar memakainya).
+          if [ "$HAS_KEYSTORE" != "true" ]; then
+            echo "::error::Secret signing tidak tersedia — tak ada APK release untuk dipublish (debug hanya dibangun di PR)."
             exit 1
           fi
           cp app/build/outputs/apk/release/app-release.apk "$OUT"
