@@ -10,7 +10,16 @@ import subprocess
 import sys
 
 CODE_PREFIXES = ("app/src/main/", "scripts/", "tools/", "gradle/", ".github/")
-CODE_EXACT = ("remote.src.html", "app/build.gradle.kts")
+# build.gradle.kts + settings.gradle.kts ROOT ikut tercakup (issue
+# #526): keduanya konfigurasi build kelas yang sama dengan
+# app/build.gradle.kts (plugin/toolchain + repositori/modul) dan
+# awalan "gradle/" hanya menaungi direktori gradle/, bukan keduanya.
+CODE_EXACT = (
+    "remote.src.html",
+    "app/build.gradle.kts",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+)
 
 
 def api_verified_bot(base):
