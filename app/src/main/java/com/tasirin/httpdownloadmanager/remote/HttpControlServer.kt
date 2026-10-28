@@ -2763,9 +2763,21 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val target = File(destDir, FileNames.safe(file.name))
                 // Cek + rename atomik dalam proses (lihat cabang rename):
                 // renameTo(2) menimpa target yang muncul di sela cek.
+                // Target yang SUDAH ADA harus dibedakan dari renameTo yang
+                // gagal: yang pertama wajib berhenti di sini — jatuh ke
+                // fallback salin akan melempar FileAlreadyExistsException
+                // dan pembersihan di catch menghapus berkas tujuan yang sah
+                // (issue #177).
+                var targetSudahAda = false
                 val renamed = synchronized(fsModifyGate) {
-                    if (target.exists()) false else file.renameTo(target)
+                    if (target.exists()) {
+                        targetSudahAda = true
+                        false
+                    } else {
+                        file.renameTo(target)
+                    }
                 }
+                if (targetSudahAda) return false
                 if (renamed) {
                     invalidateFsMediaCache()
                     invalidateGalleryCache()
@@ -2792,6 +2804,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             file.copyTo(target, overwrite = false)
                             if (!file.delete()) throw java.io.IOException("Failed to remove source")
                         }
+                    } catch (e: java.io.FileAlreadyExistsException) {
+                        // Target muncul di sela cek (bukan hasil salinan
+                        // operasi ini) — jangan pernah dihapus (issue #177).
+                        throw e
                     } catch (e: Exception) {
                         // Salin separuh jalan jangan tertinggal sebagai data ganda.
                         runCatching { if (target.isDirectory) target.deleteRecursively() else target.delete() }
