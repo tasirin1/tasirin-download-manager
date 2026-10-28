@@ -3625,7 +3625,12 @@ class DownloadEngine(appContext: Context) {
         coroutineContext.ensureActive()
         val result = runCatching { SocialMediaExtractor.extract(original, item.headers) }.getOrNull()
             ?: return null
-        if (result.directUrl == item.url || result.isHls) return null
+        // Result ber-audioUrl juga ditolak (issue #545): directUrl-nya
+        // stream video-only dari pasangan adaptif (#537) — memakai
+        // nya sebagai URL resume polos menggabung segmen progresif
+        // awal dengan segmen bisu. Pemanggil jatuh ke fallback
+        // satu-alur yang aman.
+        if (result.directUrl == item.url || result.isHls || result.audioUrl.isNotEmpty()) return null
         if (item.totalBytes > 0) {
             // Validasi HEAD tak boleh melempar: openAuthenticatedConnection
             // ikut menyambung + membaca responseCode saat redirect, sehingga
