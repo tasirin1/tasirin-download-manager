@@ -1442,8 +1442,16 @@ class DownloadEngine(appContext: Context) {
         val clearedIds = mutableSetOf<String>()
         for (successor in snapshot.filter { it.replacesItemId.isNotEmpty() }) {
             val predecessor = snapshot.find { it.id == successor.replacesItemId }
+            // Path target bisa juga diturunkan dari penerus sendiri
+            // (#317): pendahulu yang sudah dihapus pengguna (atau
+            // filePath-nya kosong) membuat loop lama berhenti SEBELUM
+            // cabang pembersih stale, jadi .replaced.stale di sebelah
+            // path terbit penerus menetap selamanya. Penerus terbit
+            // di path yang sama dengan pendahulunya, jadi filePath
+            // penerus adalah petunjuk yang sah.
+            val path = predecessor?.filePath?.takeIf { it.isNotEmpty() }
+                ?: successor.filePath?.takeIf { it.isNotEmpty() }
                 ?: continue
-            val path = predecessor.filePath?.takeIf { it.isNotEmpty() } ?: continue
             val target = File(path)
             val aside = File(target.parentFile, target.name + ".replaced")
             if (!aside.isFile) {
@@ -1454,6 +1462,18 @@ class DownloadEngine(appContext: Context) {
                 // bisa menjadi pasangan finalisasi berjalan (finalisasi
                 // selalu memegang cadangannya) — buang agar tidak menetap
                 // sebesar berkas penuh di folder terbit pengguna.
+                runCatching {
+                    File(target.parentFile, target.name + ".replaced.stale").delete()
+                }
+                continue
+            }
+            // Pendahulu sudah tidak ada di daftar: cadangannya JANGAN
+            // dipulihkan (itu menghidupkan lagi berkas yang sengaja
+            // dihapus pengguna). Stale-nya sudah dibuang di cabang
+            // tanpa cadangan bila tak ada; bila cadangan masih ada,
+            // biarkan apa adanya untuk keputusan jalur lain.
+            if (predecessor == null) {
+                // Stale tetap byte percobaan gagal: buang juga di sini.
                 runCatching {
                     File(target.parentFile, target.name + ".replaced.stale").delete()
                 }
