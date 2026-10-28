@@ -1304,7 +1304,15 @@ class DownloadEngine(appContext: Context) {
                         postBody = item.postBody,
                         speedLimitKbps = item.speedLimitKbps,
                         priority = item.priority,
-                        checksum = item.checksum,
+                        // Checksum TIDAK diwarisi (issue #512): checksum
+                        // pendahulu adalah sidik jari isi versi LAMA,
+                        // sedangkan pemicu penerus justru perubahan isi —
+                        // mewarisinya membuat verifikasi penerus mustahil
+                        // lolos. Kosong di sini agar captureHeaderChecksum
+                        // menangkap checksum segar versi baru dari header
+                        // responsnya; server tanpa checksum = penerus
+                        // terbit tanpa verifikasi, seperti unduhan biasa.
+                        checksum = "",
                         destination = item.destination,
                         folderPath = item.folderPath,
                         monitor = true,
@@ -1704,6 +1712,23 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
+    // Penerus monitor yang berakhir FAILED terminal: hidupkan lagi
+    // monitor pendahulunya (issue #512). Byte versi lama utuh
+    // (rollback penggantian), jadi pemantauan bisa mencoba lagi di
+    // tick berikut — tanpa ini monitor mati diam-diam: pendahulu
+    // monitor=false sejak penerus dibuat, dan penerus yang tidak
+    // COMPLETED tidak dinilai filter monitor siapa pun lagi.
+    private fun hidupkanLagiMonitorPendahulu(item: DownloadItem) {
+        val predId = item.replacesItemId ?: return
+        updateItem(predId) { p ->
+            if (p.state == DownloadState.COMPLETED && !p.monitor) {
+                p.copy(monitor = true)
+            } else {
+                p
+            }
+        }
+    }
+
     private fun handleFailure(id: String, message: String?) {
         val item = _items.value.find { it.id == id } ?: return
         speedTracker.reset(id)
@@ -1737,6 +1762,7 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            hidupkanLagiMonitorPendahulu(item)
             // Item terhapus di tengah pemrosesan gagal -> jangan kirim
             // notifikasi untuk unduhan yang sudah tidak ada (issue #392).
             if (finished != null) NotificationHelper.notifyItemFinished(context, finished)
@@ -1842,6 +1868,7 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            hidupkanLagiMonitorPendahulu(item)
             if (finishedElse != null) NotificationHelper.notifyItemFinished(context, finishedElse)
         }
     }
