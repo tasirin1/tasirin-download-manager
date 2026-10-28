@@ -1957,11 +1957,24 @@ object SocialMediaExtractor {
         var idx = html.indexOf(".mp4")
         var guard = 0
         while (idx >= 0 && guard++ < 100) {
+            // Batasi jendela mentah di kedua sisi .mp4 (issue #361):
+            // tanpa batas, tiap .mp4 dalam teks panjang tanpa kutip
+            // memindai ulang wilayah yang sama sampai awal/akhir dokumen
+            // (kuadratik). URL ter-decode maksimum 2000 karakter dan satu
+            // karakter hasil escape JSON terpanjang memakai 6 karakter
+            // mentah, jadi 12.000 per sisi adalah plafon yang aman.
+            val maxRawSide = 12_000
+            val startLimit = maxOf(0, idx - maxRawSide)
             var start = idx
-            while (start > 0 && html[start - 1] != '"') start--
+            while (start > startLimit && html[start - 1] != '"') start--
+            if (start == 0 || html[start - 1] != '"') {
+                idx = html.indexOf(".mp4", idx + 4)
+                continue
+            }
             var end = idx + 4
-            while (end < html.length && html[end] != '"') end++
-            if (start >= 0 && end > idx + 4) {
+            val endLimit = minOf(html.length, end + maxRawSide)
+            while (end < endLimit && html[end] != '"') end++
+            if (end < html.length && html[end] == '"' && end > idx + 4) {
                 val mediaUrl = unescapeFb(html.substring(start, end))
                 if (isValidFacebookMediaUrl(mediaUrl) && mediaUrl.contains(".mp4") &&
                     mediaUrl.length in 20..2000

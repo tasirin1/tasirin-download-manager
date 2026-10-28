@@ -629,6 +629,15 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parseFacebookPage - teks panjang tanpa kutip tidak menelan URL mp4 sah`() {
+        val junk = "x".repeat(13_000) + ".mp4"
+        val html = """{"pad":"$junk","u":"https://video.xx.fbcdn.net/v/valid.mp4?x=1","tail":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
+        val options = SocialMediaExtractor.parseFacebookPage(html, "123", "")
+        assertEquals(1, options.size)
+        assertTrue(options[0].directUrl.endsWith("valid.mp4?x=1"))
+    }
+
+    @Test
     fun `isValidFacebookMediaUrl - lookaside dan fragmen DASH ditolak`() {
         assertTrue(SocialMediaExtractor.isValidFacebookMediaUrl(
             "https://video-jkt-1.xx.fbcdn.net/o1/v/t2/hd.mp4?_nc_cat=108&oe=66F0"))
