@@ -380,44 +380,55 @@ class DownloadEngine(appContext: Context) {
             return ""
         }
         val customName = fileName?.trim().orEmpty()
-        // Nama dipakai sebagai kunci file partial (.part): dua item bernama
-        // sama (mis. fallback timestamp sedetik yang sama) akan menulis file
-        // yang sama dan saling merusak. Unikkan saat antre.
-        val name = FileNames.unique(FileNames.safe(customName.ifEmpty { guessFileName(cleanUrl) })) { n ->
-            // Penerus monitor (#199) mengambil alih nama pendahulunya —
-            // pendahulu dikecualikan dari tabrakan agar nama tidak
-            // bersufiks " (1)".
-            _items.value.any { it.fileName == n && it.id != replacesItemId }
+        // Nama + item dibuat dan disisipkan di DALAM monitor
+        // (updateTransformed): membaca _items.value di luar kunci lalu
+        // update() berbasis salinan itu membuat dua addDownload yang
+        // berjalan bersamaan saling menimpa — satu unduhan hilang
+        // dari daftar (pola #274).
+        var addedItem: DownloadItem? = null
+        updateTransformed { cur ->
+            // Nama dipakai sebagai kunci file partial (.part): dua item bernama
+            // sama (mis. fallback timestamp sedetik yang sama) akan menulis file
+            // yang sama dan saling merusak. Unikkan saat antre, dinilai
+            // terhadap daftar terkini di dalam kunci.
+            val name = FileNames.unique(FileNames.safe(customName.ifEmpty { guessFileName(cleanUrl) })) { n ->
+                // Penerus monitor (#199) mengambil alih nama pendahulunya —
+                // pendahulu dikecualikan dari tabrakan agar nama tidak
+                // bersufiks " (1)".
+                cur.any { it.fileName == n && it.id != replacesItemId }
+            }
+            val newItem = DownloadItem(
+                id = UUID.randomUUID().toString(),
+                url = cleanUrl,
+                fileName = name,
+                state = DownloadState.PENDING,
+                bytesDownloaded = 0,
+                totalBytes = 0,
+                nameIsCustom = customName.isNotEmpty(),
+                autoResume = true,
+                username = username,
+                password = <redacted>
+                headers = headers,
+                method = method,
+                postBody = postBody,
+                destination = destination,
+                folderPath = folderPath,
+                speedLimitKbps = speedLimitKbps,
+                priority = priority,
+                checksum = checksum,
+                mirrors = mirrors,
+                monitor = monitor,
+                replacesItemId = replacesItemId,
+                preferredHeight = preferredHeight,
+                preferredAudioLang = preferredAudioLang
+            )
+            addedItem = newItem
+            ArrayList<DownloadItem>(cur.size + 1).apply { add(newItem); addAll(cur) }
         }
-        val item = DownloadItem(
-            id = UUID.randomUUID().toString(),
-            url = cleanUrl,
-            fileName = name,
-            state = DownloadState.PENDING,
-            bytesDownloaded = 0,
-            totalBytes = 0,
-            nameIsCustom = customName.isNotEmpty(),
-            autoResume = true,
-            username = username,
-            password = password,
-            headers = headers,
-            method = method,
-            postBody = postBody,
-            destination = destination,
-            folderPath = folderPath,
-            speedLimitKbps = speedLimitKbps,
-            priority = priority,
-            checksum = checksum,
-            mirrors = mirrors,
-            monitor = monitor,
-            replacesItemId = replacesItemId,
-            preferredHeight = preferredHeight,
-            preferredAudioLang = preferredAudioLang
-        )
-        update(ArrayList<DownloadItem>(_items.value.size + 1).apply { add(item); addAll(_items.value) })
+        val item = addedItem ?: return ""
         flushSave()
         val host = runCatching { URL(cleanUrl).host }.getOrDefault("")
-        App.logEvent("DOWNLOAD ADDED: $name (${host.ifEmpty { "custom URL" }})")
+        App.logEvent("DOWNLOAD ADDED: ${item.fileName} (${host.ifEmpty { "custom URL" }})")
         attemptStart(item.id)
         return item.id
     }
@@ -629,7 +640,7 @@ class DownloadEngine(appContext: Context) {
             autoResume = false,
             finishedAt = System.currentTimeMillis()
         )
-        update(ArrayList<DownloadItem>(_items.value.size + 1).apply { add(item); addAll(_items.value) })
+        updateTransformed { cur -> ArrayList<DownloadItem>(cur.size + 1).apply { add(item); addAll(cur) } }
         flushSave()
         return published
     }
@@ -884,30 +895,46 @@ class DownloadEngine(appContext: Context) {
      *  Pertukaran posisi hanya pada item yang tidak aktif download, supaya
      *  tidak mengganggu segmen yang sedang berjalan. */
     fun moveUp(id: String) {
-        val list = _items.value
-        val idx = list.indexOfFirst { it.id == id }
-        if (idx <= 0) return
-        val item = list[idx]
-        val items = list.toMutableList()
-        items[idx] = items[idx - 1]
-        items[idx - 1] = item
-        update(items)
+        // Pertukaran dinilai + diterapkan di dalam monitor (#274):
+        // indeks dari snapshot luar kunci bisa basi saat daftar berubah
+        // bersamaan (item terhapus/bertambah) -> tukar salah sasaran
+        // atau IndexOutOfBounds.
+        var movedName: String? = null
+        updateTransformed { cur ->
+            val idx = cur.indexOfFirst { it.id == id }
+            if (idx <= 0) {
+                cur
+            } else {
+                movedName = cur[idx].fileName
+                val items = cur.toMutableList()
+                items[idx] = items[idx - 1]
+                items[idx - 1] = cur[idx]
+                items
+            }
+        }
+        val name = movedName ?: return
         scheduleSave()
-        App.logEvent("DOWNLOAD MOVED UP: ${item.fileName}")
+        App.logEvent("DOWNLOAD MOVED UP: $name")
     }
 
     /** Pindahkan item ke bawah antrean. */
     fun moveDown(id: String) {
-        val list = _items.value
-        val idx = list.indexOfFirst { it.id == id }
-        if (idx < 0 || idx >= list.size - 1) return
-        val item = list[idx]
-        val items = list.toMutableList()
-        items[idx] = items[idx + 1]
-        items[idx + 1] = item
-        update(items)
+        var movedName: String? = null
+        updateTransformed { cur ->
+            val idx = cur.indexOfFirst { it.id == id }
+            if (idx < 0 || idx >= cur.size - 1) {
+                cur
+            } else {
+                movedName = cur[idx].fileName
+                val items = cur.toMutableList()
+                items[idx] = items[idx + 1]
+                items[idx + 1] = cur[idx]
+                items
+            }
+        }
+        val name = movedName ?: return
         scheduleSave()
-        App.logEvent("DOWNLOAD MOVED DOWN: ${item.fileName}")
+        App.logEvent("DOWNLOAD MOVED DOWN: $name")
     }
 
     fun retryFailed() {
