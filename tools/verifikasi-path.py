@@ -1167,9 +1167,11 @@ def cek_panggil_bekas_hapusan(gagal, diff):
     for path, nomor, teks in tambah_kt_bernomor(diff):
         per_path.setdefault(path, []).append((nomor, teks))
     bersih_per_path = {}
+    mentah_per_path = {}
     for path in per_path:
         isi = baca(path)
         if isi:
+            mentah_per_path[path] = isi.splitlines()
             bersih_per_path[path] = kupas_kode_jaga_baris(
                 isi, kosongkan_string=True
             ).splitlines()
@@ -1178,8 +1180,22 @@ def cek_panggil_bekas_hapusan(gagal, diff):
         ketemu = None
         for path, daftar in per_path.items():
             bersih = bersih_per_path.get(path)
+            mentah = mentah_per_path.get(path)
             for nomor, teks in daftar:
-                if bersih is not None and 1 <= nomor <= len(bersih):
+                # Penjaga keselarasan (issue #487): nomor dari segmen
+                # diff gabungan (mode default: rentang HEAD + pohon
+                # kerja + staged disatukan) bisa menunjuk keadaan
+                # berkas yang BERBEDA dari yang dibaca baca(). Bila
+                # teks mentah pada nomor itu tak sama persis dengan
+                # teks tercatat, nilai baris tercatatnya sendiri
+                # dengan kupas per-baris — jangan menilai baris
+                # tetangga (panggilan nyata bisa LOLOS diam-diam).
+                selaras = (
+                    bersih is not None and mentah is not None
+                    and 1 <= nomor <= len(bersih)
+                    and mentah[nomor - 1] == teks
+                )
+                if selaras:
                     kandidat = bersih[nomor - 1]
                 else:
                     kandidat = kupas_kode_jaga_baris(teks, kosongkan_string=True)
@@ -1402,10 +1418,16 @@ def utama():
             # tak dinilai. Header ini semu — yang penting ekstensinya;
             # nama asli tetap dipakai cek per-path lewat `berubah`.
             nama_header = nama.replace("\n", "_").replace("\r", "_")
+            baris_isi = isi.splitlines()
+            # Header hunk semu WAJIB ada (issue #487): tanpa @@,
+            # tambah_kt_bernomor memulai nomor dari 0 sehingga baris
+            # ke-k dinomori k-1 — panggilan nyata di baris terakhir
+            # berkas LOLOS total dan kutipan GAGAL menunjuk tetangga.
             diff += (
                 "\ndiff --git a/" + nama_header + " b/" + nama_header
                 + "\n+++ b/" + nama_header + "\n"
-                + "\n".join("+" + baris for baris in isi.splitlines())
+                + "@@ -0,0 +1," + str(len(baris_isi)) + " @@\n"
+                + "\n".join("+" + baris for baris in baris_isi)
             )
 
     cek_xml(gagal)
