@@ -1114,7 +1114,7 @@ def cek_remote_dm(gagal):
         pass
 
 
-def cek_pola_berisiko(peringatan, diff):
+def cek_pola_berisiko(gagal, peringatan, diff):
     for _, isi in tambah_kt(diff):
         if "System.out.println" in isi:
             peringatan.append("println di diff (pakai Log/buffer): " + isi.strip()[:80])
@@ -1124,14 +1124,21 @@ def cek_pola_berisiko(peringatan, diff):
     # bukan-nol justru saat menemukan masalah spasi, dan jalan() menelan
     # stdout pada returncode bukan-nol — peringatan ini sebelumnya kode
     # mati yang tak pernah bisa tampil.
+    # Sejak issue #472 temuan whitespace adalah GAGAL, bukan peringatan:
+    # rantai pre-push (verifikasi-path + cek-cepat) adalah lapisan
+    # terakhir sebelum push dan cek-cepat tak memeriksa whitespace,
+    # jadi commit kotor yang melewati pre-commit (--no-verify/amend)
+    # dulu tetap lolos di titik push — insiden EOF ganda ae3f368
+    # putaran 14 buktinya. Perlakuan kini selaras check_repo.py yang
+    # memang keras untuk whitespace.
     cek = jalan_output("git", "diff", "--check")
     if cek:
-        peringatan.append("Rapikan spasi diff --check: " + cek.strip().splitlines()[0][:100])
+        gagal.append("Rapikan spasi diff --check: " + cek.strip().splitlines()[0][:100])
     # Varian staged (issue #426): diff polos tak melihat indeks, jadi
-    # whitespace yang sudah di-git add lolos peringatan ini juga.
+    # whitespace yang sudah di-git add lolos gerbang ini juga.
     cek_staged = jalan_output("git", "diff", "--cached", "--check")
     if cek_staged:
-        peringatan.append(
+        gagal.append(
             "Rapikan spasi diff --check (staged): " + cek_staged.strip().splitlines()[0][:100]
         )
 
@@ -1242,7 +1249,7 @@ def utama():
         cek_hapusan_belum_tercatat(peringatan, diff)
         cek_uji_baru(peringatan, diff)
         cek_uji_ubah(peringatan, diff)
-        cek_pola_berisiko(peringatan, diff)
+        cek_pola_berisiko(gagal, peringatan, diff)
         cek_pola_boros(peringatan, diff)
         cek_izin_baru(peringatan, diff)
         cek_definisi_baru(peringatan, diff)
