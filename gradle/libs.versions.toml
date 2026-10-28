@@ -11,7 +11,7 @@ activityKtx = "1.9.0"
 coroutinesAndroid = "1.11.0"
 desugarJdkLibs = "2.1.5"
 junit = "4.13.2"
-orgJson = "20240303"
+orgJson = "20260814"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
