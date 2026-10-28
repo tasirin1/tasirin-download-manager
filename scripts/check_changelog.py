@@ -12,6 +12,21 @@ CODE_PREFIXES = ("app/src/main/", "scripts/", "tools/", "gradle/", ".github/")
 CODE_EXACT = ("remote.src.html", "app/build.gradle.kts")
 
 
+def all_dependabot(base):
+    # Seluruh commit non-merge pada rentang authored dependabot[bot]?
+    # Commit merge sengaja dikecualikan: author-nya adalah orang yang
+    # menekan merge, jadi merge MANUAL PR bot oleh owner tetap terdeteksi
+    # sebagai rentang bot murni (issue #202). Pengecualian workflow
+    # (actor dependabot) hanya menolong event yang dipicu bot sendiri.
+    proc = subprocess.run(
+        ["git", "log", "--no-merges", "--format=%an", base + "..HEAD"],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        return False
+    authors = [a.strip() for a in proc.stdout.splitlines() if a.strip()]
+    return bool(authors) and all(a == "dependabot[bot]" for a in authors)
+
+
 def changed_files(base):
     for args in (["git", "diff", "--name-only", base + "...HEAD"],
                  ["git", "diff", "--name-only", base, "HEAD"]):
@@ -45,6 +60,11 @@ def main():
     needs = [f for f in changed
              if f.startswith(CODE_PREFIXES) or f in CODE_EXACT]
     if needs and "CHANGELOG.md" not in changed:
+        if all_dependabot(base):
+            print("Guard CHANGELOG: dilewati - seluruh commit non-merge "
+                  "pada rentang ini authored dependabot[bot] (PR bot murni, "
+                  "termasuk yang di-merge manual).")
+            return 0
         print("::error::Perubahan kode (app/src/main, remote.src.html, "
               "app/build.gradle.kts, scripts/) wajib menyertakan update CHANGELOG.md")
         print("\n".join(needs))
