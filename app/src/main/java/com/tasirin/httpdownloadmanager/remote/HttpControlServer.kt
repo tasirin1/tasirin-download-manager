@@ -652,7 +652,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     now - it.value.updatedAt > LOGIN_LOCK_MS
             }
             while (loginAttempts.size > MAX_LOGIN_ATTEMPT_ENTRIES) {
-                val oldest = loginAttempts.entries.minByOrNull { it.value.updatedAt } ?: break
+                // Entri yang sedang terkunci TIDAK boleh terbuang (#219):
+                // membuangnya menghapus masa kunci + penghitung gagal, jadi
+                // banjir entri dari alamat lain bisa mengencerkan throttle
+                // PIN. Request terkunci ditolak sebelum updatedAt diperbarui,
+                // jadi entri terkunci justru paling tua dan pertama terbuang
+                // bila tak dikecualikan. Bila semua entri terkunci, peta
+                // dibiarkan melebihi batas sementara daripada melepas kunci.
+                val oldest = loginAttempts.entries
+                    .filter { it.value.lockedUntil < now }
+                    .minByOrNull { it.value.updatedAt } ?: break
                 loginAttempts.remove(oldest.key)
             }
         }
