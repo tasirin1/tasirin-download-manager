@@ -87,6 +87,17 @@ def all_dependabot(base):
         and api_verified_bot(base) and merges_clean(base)
 
 
+def git_names(*args):
+    # Nama berkas wajib dipisah NUL (-z): tanpa itu git mengutip nama
+    # non-ASCII/spasi gaya C, dan split() whitespace merusak path-nya.
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", "-z", *args], capture_output=True)
+    if proc.returncode != 0:
+        return None
+    raw = proc.stdout.decode("utf-8", "surrogateescape")
+    return [name for name in raw.split("\0") if name]
+
+
 def merges_clean(base):
     # Commit merge dikecualikan dari cek author (merge manual PR bot
     # oleh owner sah), TETAPI merge bisa membawa perubahan pohonnya
@@ -114,12 +125,8 @@ def merges_clean(base):
         first, others = parts[1], parts[2:]
 
         def names(*args):
-            out = subprocess.run(
-                ["git", "diff", "--name-only", *args],
-                capture_output=True, text=True)
-            if out.returncode != 0:
-                return None
-            return set(out.stdout.split())
+            got = git_names(*args)
+            return None if got is None else set(got)
 
         merged = names(first, sha)
         if merged is None:
@@ -136,11 +143,10 @@ def merges_clean(base):
 
 
 def changed_files(base):
-    for args in (["git", "diff", "--name-only", base + "...HEAD"],
-                 ["git", "diff", "--name-only", base, "HEAD"]):
-        proc = subprocess.run(args, capture_output=True, text=True)
-        if proc.returncode == 0:
-            return proc.stdout.split()
+    for args in ((base + "...HEAD",), (base, "HEAD")):
+        got = git_names(*args)
+        if got is not None:
+            return got
     return None
 
 
