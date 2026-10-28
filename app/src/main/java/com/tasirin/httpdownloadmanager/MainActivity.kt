@@ -1075,6 +1075,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     if (variants.isNullOrEmpty()) {
                         addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
                     } else {
+                        // Penjaga umur activity (pola #300, issue #343):
+                        // probe jaringan di atas bisa berdetik-detik dan
+                        // pengguna bisa menekan Back selama itu; show()
+                        // pada activity yang finishing melempar
+                        // BadTokenException.
+                        if (isFinishing || isDestroyed) return@launch
                         showHlsPicker(
                             variants = variants,
                             originalUrl = urls[0],
