@@ -221,6 +221,27 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
+    /** Lacak koneksi yang BARU selesai dibuka. Job yang dibatalkan selama
+     *  connect/redirect (operasi soket blocking tidak langsung patuh
+     *  pembatalan coroutine) wajib membuang koneksinya di sini: tanpa cek
+     *  ini, koneksi yatim job lama bisa terdaftar ke job baru sesudah
+     *  pause-resume cepat menghapus bendera cancelledConns di launchItem,
+     *  lalu ikut menulis file parsial segmen yang sama (issue #200).
+     *  Cek ensureActive memakai identitas job coroutine itu sendiri,
+     *  jadi tidak bergantung pada bendera sama sekali. */
+    private suspend fun trackOpenedConnection(
+        id: String,
+        connection: HttpURLConnection
+    ): HttpURLConnection {
+        try {
+            coroutineContext.ensureActive()
+        } catch (e: CancellationException) {
+            runCatching { connection.disconnect() }
+            throw e
+        }
+        return trackConnection(id, connection)
+    }
+
     private fun trackConnection(id: String, connection: HttpURLConnection): HttpURLConnection {
         if (cancelledConns.containsKey(id)) {
             runCatching { connection.disconnect() }
@@ -1762,7 +1783,7 @@ class DownloadEngine(appContext: Context) {
         progress: HlsProgress
     ): Boolean {
         if (url.isBlank()) return false
-        val conn = trackConnection(
+        val conn = trackOpenedConnection(
             item.id,
             openAuthenticatedConnection(
                 url, method = "GET",
@@ -2016,7 +2037,7 @@ class DownloadEngine(appContext: Context) {
         notify: (Long) -> Unit,
         onLength: (Long) -> Unit = {}
     ): ByteArray {
-        val segConn = trackConnection(
+        val segConn = trackOpenedConnection(
             item.id,
             openAuthenticatedConnection(
                 url, method = "GET",
@@ -2774,7 +2795,7 @@ class DownloadEngine(appContext: Context) {
         ) { connection, _ ->
             connection.setRequestProperty("Range", "bytes=${segment.start + downloaded}-${segment.end}")
         }
-        trackConnection(id, conn)
+        trackOpenedConnection(id, conn)
         try {
             val code = conn.responseCode
             if (code != 206) throw IOException("Server does not support Range (HTTP $code)")
