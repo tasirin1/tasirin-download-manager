@@ -121,28 +121,39 @@ class App : Application() {
             runCatching { if (::httpServer.isInitialized) httpServer.appendLog(message) }
         }
 
+        // Kunci khusus restart server (issue #260): SettingsActivity
+        // memanggil restartHttpServer dari coroutine IO BARU tiap simpan,
+        // jadi dua restart bisa berjalan bersamaan dan saling menyela
+        // (snapshot dari instance yang sedang dihentikan, dua instance
+        // baru berebut port, satu instance bocor tak pernah dihentikan).
+        private val restartServerLock = Any()
+
         /** Buat ulang server remote dengan port terbaru dari prefs.
          *  NanoHTTPD mengunci port saat konstruksi, jadi ganti port = instance baru.
-         *  Server tetap hidup bila sebelumnya hidup. */
+         *  Server tetap hidup bila sebelumnya hidup. Seluruh rangkaian
+         *  snapshot -> stop -> tukar -> restore -> start berjalan di bawah
+         *  satu kunci agar restart paralel terserialisasi (#260). */
         fun restartHttpServer(context: Context) {
-            val wasAlive = httpServer.isAlive
-            // Ambil SEBELUM stop: stopServer mengosongkan shareTokens sehingga
-            // link /share 24 jam + status upload-selesai ikut hangus tiap
-            // ganti port. Sesi login aman (secret di SharedPreferences).
-            val keptShares = runCatching { httpServer.snapshotShares() }.getOrDefault(emptyMap())
-            val keptUploads = runCatching { httpServer.snapshotCompletedUploads() }.getOrDefault(emptyMap())
-            runCatching { httpServer.stopServer() }
-            // Wajib applicationContext: instance ini hidup seumur proses dan
-            // disimpan statis — Activity context (dari SettingsActivity) akan
-            // bocor. HttpControlServer juga menormalkan ulang di konstruktor.
-            httpServer = HttpControlServer(context.applicationContext)
-            runCatching { httpServer.restoreShares(keptShares) }
-            runCatching { httpServer.restoreCompletedUploads(keptUploads) }
-            if (keptShares.isNotEmpty() || keptUploads.isNotEmpty()) {
-                logEvent("SERVER RESTART: kept ${keptShares.size} share links, ${keptUploads.size} uploads")
-            }
-            if (wasAlive) {
-                runCatching { httpServer.startServer() }
+            synchronized(restartServerLock) {
+                val wasAlive = httpServer.isAlive
+                // Ambil SEBELUM stop: stopServer mengosongkan shareTokens sehingga
+                // link /share 24 jam + status upload-selesai ikut hangus tiap
+                // ganti port. Sesi login aman (secret di SharedPreferences).
+                val keptShares = runCatching { httpServer.snapshotShares() }.getOrDefault(emptyMap())
+                val keptUploads = runCatching { httpServer.snapshotCompletedUploads() }.getOrDefault(emptyMap())
+                runCatching { httpServer.stopServer() }
+                // Wajib applicationContext: instance ini hidup seumur proses dan
+                // disimpan statis — Activity context (dari SettingsActivity) akan
+                // bocor. HttpControlServer juga menormalkan ulang di konstruktor.
+                httpServer = HttpControlServer(context.applicationContext)
+                runCatching { httpServer.restoreShares(keptShares) }
+                runCatching { httpServer.restoreCompletedUploads(keptUploads) }
+                if (keptShares.isNotEmpty() || keptUploads.isNotEmpty()) {
+                    logEvent("SERVER RESTART: kept ${keptShares.size} share links, ${keptUploads.size} uploads")
+                }
+                if (wasAlive) {
+                    runCatching { httpServer.startServer() }
+                }
             }
         }
 
