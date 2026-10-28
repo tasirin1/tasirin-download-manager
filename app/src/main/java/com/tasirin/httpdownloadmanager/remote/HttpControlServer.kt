@@ -2324,11 +2324,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     var d = videoDurations.of(e.token)
                     if (d <= 0 && e.durationMs > 0) d = e.durationMs
                     if (d <= 0 && extracted < 20 && videoDurations.shouldProbe(e.token)) {
+                        // Generasi ditangkap SEBELUM probe lambat:
+                        // invalidate yang mendarat di tengah probe
+                        // membuat hasil ini basi — jangan tulis lagi
+                        // ke cache (#326). Tampilan request ini tetap
+                        // memakai d apa adanya.
+                        val gen = videoDurations.currentGeneration()
                         d = videoDurations.probeDurationMs(e.token)
                         if (d > 0) {
-                            videoDurations.cacheDuration(e.token, d)
+                            videoDurations.cacheDurationIfCurrent(e.token, d, gen)
                         } else {
-                            videoDurations.recordProbeFailure(e.token)
+                            videoDurations.recordProbeFailureIfCurrent(e.token, gen)
                         }
                         extracted++
                     }

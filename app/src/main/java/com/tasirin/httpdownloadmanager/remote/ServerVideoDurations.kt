@@ -51,6 +51,15 @@ class ServerVideoDurations(
     private val file = File(context.filesDir, "video_durations.json")
     private val lock = Any()
 
+    /** Nomor generasi cache: naik setiap invalidate(). Probe berjalan
+     *  LAMBAT di luar kunci (retriever), jadi hasil probe hanya boleh
+     *  ditulis bila generasi belum berubah sejak probe dimulai —
+     *  kalau tidak, durasi berkas lama hidup lagi untuk path yang
+     *  sudah berganti isi dan menggagalkan invalidasi (#326). */
+    private var generation = 0L
+
+    fun currentGeneration(): Long = synchronized(lock) { generation }
+
     /** Cache durasi per token; null = belum dimuat dari disk (dimuat malas). */
     private var cache: JSONObject? = null
 
@@ -86,6 +95,27 @@ class ServerVideoDurations(
         }
     }
 
+    /** Tulis hasil probe HANYA bila [expectedGeneration] masih
+     *  generasi berjalan (belum ada invalidate sejak probe mulai). */
+    fun cacheDurationIfCurrent(token: String, ms: Long, expectedGeneration: Long): Boolean {
+        synchronized(lock) {
+            if (generation != expectedGeneration) return false
+            prune(cacheLocked()).put(token, ms)
+            probeFailAt.remove(token)
+            return true
+        }
+    }
+
+    /** Catat gagal-probe hanya bila generasi belum berubah: throttle
+     *  dari probe basi tidak boleh menahan probe ulang berkas BARU
+     *  di path yang sama sesudah invalidasi. */
+    fun recordProbeFailureIfCurrent(token: String, expectedGeneration: Long) {
+        synchronized(lock) {
+            if (generation != expectedGeneration) return
+        }
+        recordProbeFailure(token)
+    }
+
     fun recordProbeFailure(token: String) {
         synchronized(lock) {
             if (probeFailAt.size > MAX_ENTRIES) {
@@ -117,6 +147,7 @@ class ServerVideoDurations(
      *  berikutnya menulis himpunan segar. */
     fun invalidate() {
         synchronized(lock) {
+            generation++
             cache = JSONObject()
             probeFailAt.clear()
             runCatching { file.delete() }
