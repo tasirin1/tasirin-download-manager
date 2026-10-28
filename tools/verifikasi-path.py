@@ -527,6 +527,18 @@ def cek_aturan_repo(gagal, berubah):
 
     bersih_teks = strip_komentar(tetap)
     cocok = re.search(r"minSdk\s*=\s*(\d+)", bersih_teks)
+    if not cocok:
+        # Bentuk variabel (issue #212): 'minSdk = minSdkVersi' dengan
+        # 'val minSdkVersi = 23' di berkas yang sama diselesaikan ke
+        # nilainya — refactor sah yang memusatkan angka SDK tidak lagi
+        # ditolak sebagai "tak ditemukan". Variabel tak dikenal tetap
+        # gagal-tertutup lewat cabang tak ditemukan di bawah.
+        via = re.search(r"minSdk\s*=\s*([A-Za-z_][\w.]*)", bersih_teks)
+        if via:
+            nama = re.escape(via.group(1).rsplit(".", 1)[-1])
+            cocok = re.search(
+                r"(?:val|var)\s+" + nama + r"\s*(?::\s*Int\s*)?=\s*(\d+)",
+                bersih_teks)
     if not cocok and os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
         gagal.append("minSdk tak ditemukan di app/build.gradle.kts — kunci minSdk tak bisa diverifikasi")
     if cocok and int(cocok.group(1)) != 23:
