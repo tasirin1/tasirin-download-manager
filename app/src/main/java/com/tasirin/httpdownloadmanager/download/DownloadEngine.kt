@@ -241,7 +241,13 @@ class DownloadEngine(appContext: Context) {
                         deferredGateQueue.removeFirst()
                     }
                 } ?: break
-                next.second()
+                // Satu aksi yang melempar tak boleh membunuh drain
+                // (issue #390): coroutine yang mati di sini meninggalkan
+                // deferredGateJobActive=true selamanya sehingga semua
+                // aksi tunda berikutnya hilang diam-diam. Tangkap, catat,
+                // dan lanjutkan ke aksi berikutnya.
+                runCatching { next.second() }
+                    .onFailure { App.logEvent("Deferred action failed (${next.first}): ${it.message?.take(60)}") }
             }
         }
     }
