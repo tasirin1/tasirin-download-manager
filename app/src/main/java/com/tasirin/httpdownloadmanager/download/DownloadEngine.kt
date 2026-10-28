@@ -629,6 +629,12 @@ class DownloadEngine(appContext: Context) {
         if (StoragePrefs.isDeletePartialOnCancel(context)) {
             runCatching { fileSaver.deleteFiles(target) }
         }
+        // Cancel atas penerus monitor (issue #520): flag pendahulu
+        // dimatikan saat penerus dibuat sebagai detail implementasi,
+        // bukan keputusan pengguna tentang pemantauan — hidupkan lagi
+        // agar membatalkan unduhan pembaruan tidak membunuh langganan
+        // pemantauan secara diam-diam. No-op untuk item biasa.
+        hidupkanLagiMonitorPendahulu(target)
         scheduleSave()
         return true
     }
@@ -646,6 +652,11 @@ class DownloadEngine(appContext: Context) {
         updateTransformed { daftar -> daftar.filterNot { it.id == id } }
         if (activeConns[id] == null) cancelledConns.remove(id)
         fileSaver.deleteFiles(item)
+        // Sama seperti cancel (issue #520): menghapus penerus monitor
+        // menghidupkan lagi pemantauan pendahulu. Pause sengaja tidak
+        // (penerus ter-pause + pendahulu hidup melahirkan penerus
+        // duplikat di tick berikut).
+        hidupkanLagiMonitorPendahulu(item)
         scheduleSave()
         // Hapus eksplisit item terakhir: niat antrean kosong jelas — tulis
         // blob kosong agar sisa blob korup (degraded) tak menetap selamanya.
