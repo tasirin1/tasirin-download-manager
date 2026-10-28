@@ -44,6 +44,34 @@ class MediaLibraryDedupeTest {
     }
 
     @Test
+    fun `berkas di akar volume ber-relativePath kosong menyatu dengan filesystem`() {
+        // Issue #525: RELATIVE_PATH "" (atau "/") untuk berkas tepat
+        // di akar volume — kuncinya harus sama dengan pasangan
+        // filesystem <root>/<nama>, bukan jatuh ke uri:.
+        val dariMediaStore = MediaLibrary.kunciDedupeGaleri(
+            filePath = null,
+            relativePath = "",
+            name = "akar.mp4",
+            contentUri = "content://media/external/video/media/7",
+            token = "u:7",
+            galleryRoot = root
+        )
+        val dariMediaStoreSlash = MediaLibrary.kunciDedupeGaleri(
+            null, "/", "akar.mp4", "content://media/external/video/media/7", "u:7", root
+        )
+        val dariFilesystem = MediaLibrary.kunciDedupeGaleri(
+            filePath = "/storage/emulated/0/akar.mp4",
+            relativePath = null,
+            name = "akar.mp4",
+            contentUri = null,
+            token = "f:1",
+            galleryRoot = root
+        )
+        assertEquals(dariFilesystem, dariMediaStore)
+        assertEquals(dariFilesystem, dariMediaStoreSlash)
+    }
+
+    @Test
     fun `tanpa relativePath jatuh ke contentUri seperti sebelumnya`() {
         val kunci = MediaLibrary.kunciDedupeGaleri(
             null, null, "a.mp4", "content://x/1", "u:1", root

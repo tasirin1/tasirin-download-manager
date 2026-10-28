@@ -168,8 +168,13 @@ object MediaLibrary {
                 "abs:$filePath"
             }
         }
-        val rel = relativePath?.trim('/')?.takeIf { it.isNotEmpty() }
-        if (rel != null) return "rel:$rel/$name"
+        if (relativePath != null) {
+            val rel = relativePath.trim('/')
+            // Kosong sesudah trim = berkas tepat di AKAR volume
+            // (issue #525): kuncinya rel:<nama>, sama seperti pasangan
+            // filesystem <root>/<nama> — bukan jatuh ke uri:.
+            return if (rel.isEmpty()) "rel:$name" else "rel:$rel/$name"
+        }
         return "uri:" + (contentUri ?: token)
     }
 
@@ -661,8 +666,13 @@ object MediaLibrary {
                 while (c.moveToNext()) {
                     val name = c.getString(iName) ?: continue
                     val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
+                    // Nilai mentah dipertahankan (issue #525): string
+                    // kosong berarti berkas di akar volume dan harus
+                    // sampai ke kunci dedupe sebagai akar, bukan null.
+                    // Konsumen lain (saringan folder, mediaCollectionFor)
+                    // memperlakukan "" dan null setara.
                     val relativePath = if (iRel >= 0) {
-                        c.getString(iRel)?.takeIf { it.isNotBlank() }
+                        c.getString(iRel)
                     } else {
                         null
                     }
