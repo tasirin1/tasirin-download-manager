@@ -513,6 +513,22 @@ def cek_aturan_repo(gagal, berubah):
                 j = n if j < 0 else j + 3
                 out.append('""')
                 i = j
+            elif teks[i] == "'":
+                # Literal char Kotlin ('a', '\'', '"'): tanpa cabang ini
+                # quote di dalam char membuka string hantu yang menelan
+                # komentar/baris berikutnya (regresi #211, issue #226).
+                # Pola tak cocok (bukan char literal sah) -> char biasa.
+                j = i + 1
+                if j < n and teks[j] == "\\":
+                    j += 2
+                elif j < n:
+                    j += 1
+                if j < n and teks[j] == "'":
+                    out.append(teks[i:j + 1])
+                    i = j + 1
+                else:
+                    out.append(teks[i])
+                    i += 1
             elif teks[i] == '"':
                 j = i + 1
                 while j < n and teks[j] != '"':
