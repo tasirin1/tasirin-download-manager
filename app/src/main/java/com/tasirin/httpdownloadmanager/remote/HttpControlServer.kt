@@ -2361,10 +2361,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     /** Hapus cache MediaStore setelah perubahan file; cache kecil dan event
-     *  jarang, sementara pemetaan path fisik ke key relatif rawan salah. */
+     *  jarang, sementara pemetaan path fisik ke key relatif rawan salah.
+     *  Cache durasi video ikut dibuang lewat corong yang sama (#325):
+     *  token durasi diturunkan dari path, jadi mutasi apa pun yang
+     *  mengubah isi di suatu path (hapus/rename/pindah/aksi media —
+     *  semua jalurnya lewat sini) membuat durasi tersimpan untuk path
+     *  itu basi; dulu hanya jalur terbit yang menginvalidasinya,
+     *  sehingga video pengganti di path yang sama menampilkan durasi
+     *  video lama selamanya. */
     private fun invalidateFsMediaCache() {
         fsMediaCache.clear()
         invalidateZipCache()
+        videoDurations.invalidate()
     }
 
     /** Invalidate fsRoots cache saat settings berubah. */
