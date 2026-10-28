@@ -399,7 +399,6 @@ class ServerSecurityTest {
     }
 
     @Test
-    @Test
     fun isAllowedRootItself_hanyaPersisRoot() {
         val roots = listOf("/storage/emulated/0", "/storage/emulated/0/Download")
         assertTrue(ServerSecurity.isAllowedRootItself("/storage/emulated/0", roots))
@@ -439,6 +438,7 @@ class ServerSecurityTest {
         )
     }
 
+    @Test
     fun isFileNameValid_menolakSeparatorDanTraversal() {
         assertTrue(ServerSecurity.isFileNameValid("video.mp4"))
         assertTrue(ServerSecurity.isFileNameValid("file (1).mp4"))
