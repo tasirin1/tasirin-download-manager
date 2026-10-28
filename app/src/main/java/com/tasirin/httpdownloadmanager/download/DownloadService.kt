@@ -28,6 +28,14 @@ class DownloadService : Service() {
     // mulai agar refresh notifikasi tidak ter-skip throttle (anti progress nyangkut).
     private var lastActiveIds: Set<String> = emptySet()
     private var wakeLock: PowerManager.WakeLock? = null
+    // Start server latar sedang berjalan di coroutine terpisah (issue
+    // #474): selama bendera ini menyala, kolektor dan onStartCommand
+    // tidak boleh menilai server "mati" hanya karena bind belum
+    // selesai (loop retry bind bisa ~600 ms) — menilai dari isAlive
+    // saja membuat emisi pertama bisa stopSelf dan membatalkan start
+    // yang sedang berjalan, sehingga server latar mati senyap.
+    @Volatile
+    private var serverStartPending = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -48,8 +56,13 @@ class DownloadService : Service() {
         if (StoragePrefs.isServerBackgroundEnabled(this) &&
             StoragePrefs.isServerStartAllowed(this) && !App.httpServer.isAlive
         ) {
+            serverStartPending = true
             scope.launch(Dispatchers.IO) {
-                App.startHttpServer()
+                try {
+                    App.startHttpServer()
+                } finally {
+                    serverStartPending = false
+                }
             }
         }
         scope.launch(Dispatchers.IO) {
@@ -68,7 +81,7 @@ class DownloadService : Service() {
                     }
                     updateWakeLock(active)
                     val serverActive = StoragePrefs.isServerBackgroundEnabled(this@DownloadService) &&
-                        App.httpServer.isAlive
+                        (App.httpServer.isAlive || serverStartPending)
                     if (!active && !serverActive) {
                         NotificationHelper.updateNotification(this@DownloadService, items, serverActive)
                         ServiceCompat.stopForeground(
@@ -127,7 +140,8 @@ class DownloadService : Service() {
         val keepAlive = !App.engine.isInitialLoadComplete() ||
             App.engine.items.value.any {
                 it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
-            } || (StoragePrefs.isServerBackgroundEnabled(this) && App.httpServer.isAlive)
+            } || (StoragePrefs.isServerBackgroundEnabled(this) &&
+                (App.httpServer.isAlive || serverStartPending))
         return if (keepAlive) START_STICKY else START_NOT_STICKY
     }
 
