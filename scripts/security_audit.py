@@ -368,7 +368,12 @@ def scan_text(
         for rule, pattern in compiled:
             if ignored_on_line(line, previous, rule.rule_id):
                 continue
-            if prev_next_ignore and rule.rule_id in prev_next_ignore.group(1):
+            # Token persis (belah koma + strip) seperti ignored_on_line:
+            # pencocokan substring membuat prosa yang kebetulan memuat id
+            # rule ikut menekan temuan (issue #175).
+            if prev_next_ignore and rule.rule_id in (
+                part.strip() for part in prev_next_ignore.group(1).split(",")
+            ):
                 continue
             match = pattern.search(line)
             if not match:
@@ -462,6 +467,12 @@ def run_self_test() -> int:
             "const value = eval(userInput);",
             "const capability = new Function('a => a');",
         ],
+        Path("sample2.js"): [
+            # Marker prosa yang hanya MEMUAT id rule sebagai substring
+            # tidak boleh menekan temuan (issue #175).
+            "// audit-ignore-next: bukan_js_dynamic_exec_sama_sekali",
+            "const other = eval(userInput);",
+        ],
         Path("sample.txt"): [
             f"GITHUB_TOKEN={github_token}",
             "TODO: validate this flow",  # audit-ignore: maintenance_marker
@@ -487,6 +498,7 @@ def run_self_test() -> int:
     missing = required - by_rule
     suppressed = any(
         item["rule_id"] == "js_dynamic_exec" and item["line"] == 2
+        and item["path"] == "sample.js"
         for item in findings
     )
     str_leak = [
@@ -494,9 +506,13 @@ def run_self_test() -> int:
         for item in findings
         if item["rule_id"] == "kotlin_empty_catch" and item["path"] == "sample_str.kt"
     ]
-    if missing or suppressed or str_leak:
+    prose_suppressed = not any(
+        item["rule_id"] == "js_dynamic_exec" and item["path"] == "sample2.js"
+        for item in findings
+    )
+    if missing or suppressed or str_leak or prose_suppressed:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
