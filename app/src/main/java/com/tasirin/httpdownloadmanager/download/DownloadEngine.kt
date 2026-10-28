@@ -2885,6 +2885,13 @@ class DownloadEngine(appContext: Context) {
         if (isByteRangeHlsPlaylist(body)) {
             throw IOException("Byte-range HLS (EXT-X-BYTERANGE) not supported")
         }
+        // Playlist fMP4 tak dikenal pengumpul segmen (issue #514):
+        // segmen init di atribut EXT-X-MAP tak pernah terunduh,
+        // fragmen digabung mentah lalu diterbitkan sebagai .ts yang
+        // tak bisa diputar. Gagal cepat, sejajar dua gerbang di atas.
+        if (isMapHlsPlaylist(body)) {
+            throw IOException("Fragmented MP4 HLS (EXT-X-MAP) not supported")
+        }
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
             // Satu lintasan: segmen + durasi #EXTINF dibaca sekaligus agar
@@ -3040,6 +3047,9 @@ class DownloadEngine(appContext: Context) {
         }
         if (isByteRangeHlsPlaylist(body)) {
             throw IOException("Byte-range HLS (EXT-X-BYTERANGE) not supported")
+        }
+        if (isMapHlsPlaylist(body)) {
+            throw IOException("Fragmented MP4 HLS (EXT-X-MAP) not supported")
         }
         val result = mutableListOf<Pair<String, Long>>()
         val lines = body.lines()
@@ -4525,6 +4535,12 @@ internal fun isEncryptedHlsPlaylist(body: String): Boolean {
  *  terpisah. Murni agar bisa di-unit-test. */
 internal fun isByteRangeHlsPlaylist(body: String): Boolean =
     body.contains("#EXT-X-BYTERANGE")
+
+/** Playlist fMP4 memakai #EXT-X-MAP: URI segmen inisialisasi (moov)
+ *  hidup di atribut tag itu, bukan baris segmen tersendiri. Murni agar
+ *  bisa di-unit-test. */
+internal fun isMapHlsPlaylist(body: String): Boolean =
+    body.contains("#EXT-X-MAP")
 
 internal fun isSameOrigin(first: String, second: String): Boolean = runCatching {
     val firstUrl = URL(first)

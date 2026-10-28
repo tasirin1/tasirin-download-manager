@@ -486,4 +486,17 @@ class HlsParserTest {
             isByteRangeHlsPlaylist("#EXTM3U\n#EXTINF:10,\nseg.ts\n")
         )
     }
+
+    @Test
+    fun `isMapHlsPlaylist - mendeteksi tag segmen init fMP4`() {
+        // Issue #514: gerbang fail-fast fMP4 bertumpu pada deteksi ini.
+        assertTrue(
+            isMapHlsPlaylist(
+                "#EXTM3U\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:10,\nseg1.m4s\n"
+            )
+        )
+        assertFalse(
+            isMapHlsPlaylist("#EXTM3U\n#EXTINF:10,\nseg.ts\n")
+        )
+    }
 }
