@@ -130,6 +130,13 @@ class DownloadEngine(appContext: Context) {
     /** URL HLS yang sudah gagal (media playlist 403/404) — jangan retry; re-extract dari YouTube URL. */
     private val failedHlsUrls: MutableSet<String> =
         Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    /** Id pendahulu yang flag monitor-nya DISENTUH eksplisit pengguna
+     *  selama jendela penerusnya (issue #521): sentuhan pengguna selalu
+     *  menang atas pemulihan otomatis #512/#518/#520. Murni memori —
+     *  proses mati mengembalikannya ke perilaku pulih-standar, bukan
+     *  regresi. */
+    private val monitorSentuhanPengguna: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val FAILED_HLS_URLS_MAX = 256
 
     /** Negative-cache sesi: aman dihapus total bila penuh (hanya memicu
@@ -1210,6 +1217,11 @@ class DownloadEngine(appContext: Context) {
 
     fun setMonitor(id: String, enabled: Boolean) {
         val item = _items.value.find { it.id == id } ?: return
+        // Catat sentuhan eksplisit (issue #521): bila item ini sedang
+        // menjadi pendahulu penerus yang berjalan, pemulihan otomatis
+        // tidak boleh membatalkan keputusan terakhir pengguna ini.
+        if (monitorSentuhanPengguna.size >= 256) monitorSentuhanPengguna.clear()
+        monitorSentuhanPengguna.add(id)
         updateItem(id) { it.copy(monitor = enabled && item.state == DownloadState.COMPLETED) }
         scheduleSave()
     }
@@ -1736,6 +1748,11 @@ class DownloadEngine(appContext: Context) {
     // COMPLETED tidak dinilai filter monitor siapa pun lagi.
     private fun hidupkanLagiMonitorPendahulu(item: DownloadItem) {
         val predId = item.replacesItemId ?: return
+        // Pengguna menyentuh flag pendahulu selama jendela penerus ini
+        // (issue #521): keputusan terakhirnya menang — jangan hidupkan
+        // paksa. Tanda dikonsumsi agar jendela penerus berikutnya
+        // dinilai segar.
+        if (monitorSentuhanPengguna.remove(predId)) return
         updateItem(predId) { p ->
             if (p.state == DownloadState.COMPLETED && !p.monitor) {
                 p.copy(monitor = true)
