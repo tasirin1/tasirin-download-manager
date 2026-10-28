@@ -489,8 +489,14 @@ class FileSaver(context: Context) {
                 // sehingga folder itu tak pernah masuk peta sapu dan
                 // staging-nya yatim permanen. Nama tetap dibatasi per item
                 // seperti aturan #412.
+                // Lewat dirForFolderPath (issue #460): File() mentah atas
+                // bentuk f:/storage/... adalah path relatif yang tak
+                // pernah ditemukan loop sapu, sehingga folder f: lolos
+                // dari #445 tanpa jejak. Bentuk m: memang bukan direktori
+                // File dan helper mengembalikannya null.
                 item.folderPath?.takeIf { it.isNotBlank() }
-                    ?.let { addSweepNames(File(it), setOf(FileNames.safe(item.fileName))) }
+                    ?.let { dirForFolderPath(it) }
+                    ?.let { addSweepNames(it, setOf(FileNames.safe(item.fileName))) }
                 item.filePath?.takeIf { it.startsWith("/") }
                     ?.let {
                         File(it).parentFile?.let { p ->
