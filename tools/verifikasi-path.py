@@ -434,10 +434,19 @@ def kupas_kotlin(isi):
             while i < n and isi[i] != '\n':
                 i += 1
         elif dua == '/*':
+            # Komentar blok Kotlin bisa BERSARANG (issue #482): berhenti
+            # di */ yang menyeimbangkan /* terluar, bukan */ pertama.
             i += 2
-            while i < n and isi[i:i + 2] != '*/':
-                i += 1
-            i += 2
+            kedalaman = 1
+            while i < n and kedalaman:
+                if isi[i:i + 2] == '/*':
+                    kedalaman += 1
+                    i += 2
+                elif isi[i:i + 2] == '*/':
+                    kedalaman -= 1
+                    i += 2
+                else:
+                    i += 1
         elif isi[i] in ('"', "'"):
             kutip = isi[i]
             i += 1
@@ -495,10 +504,18 @@ def kupas_komentar(isi):
             while i < n and isi[i] != '\n':
                 i += 1
         elif dua == '/*':
+            # Sadar sarang seperti kupas_kotlin (issue #482).
             i += 2
-            while i < n and isi[i:i + 2] != '*/':
-                i += 1
-            i += 2
+            kedalaman = 1
+            while i < n and kedalaman:
+                if isi[i:i + 2] == '/*':
+                    kedalaman += 1
+                    i += 2
+                elif isi[i:i + 2] == '*/':
+                    kedalaman -= 1
+                    i += 2
+                else:
+                    i += 1
         else:
             keluar.append(isi[i])
             i += 1
@@ -548,14 +565,23 @@ def kupas_komentar_jaga_baris(isi):
                 keluar.append(' ')
                 i += 1
         elif dua == '/*':
+            # Sadar sarang (issue #482): */ pertama di dalam sarang
+            # tidak menutup komentar terluar.
             keluar.append('  ')
             i += 2
-            while i < n and isi[i:i + 2] != '*/':
-                keluar.append('\n' if isi[i] == '\n' else ' ')
-                i += 1
-            if i < n:
-                keluar.append('  ')
-                i += 2
+            kedalaman = 1
+            while i < n and kedalaman:
+                if isi[i:i + 2] == '/*':
+                    kedalaman += 1
+                    keluar.append('  ')
+                    i += 2
+                elif isi[i:i + 2] == '*/':
+                    kedalaman -= 1
+                    keluar.append('  ')
+                    i += 2
+                else:
+                    keluar.append('\n' if isi[i] == '\n' else ' ')
+                    i += 1
         else:
             keluar.append(isi[i])
             i += 1
