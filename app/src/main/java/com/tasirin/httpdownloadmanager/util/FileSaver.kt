@@ -615,6 +615,21 @@ class FileSaver(context: Context) {
 
     fun deleteFiles(item: DownloadItem) {
         partialFiles(item).forEach { runCatching { it.delete() } }
+        // Temp HLS + scratch remux/adaptive item ikut dihapus sekarang
+        // (issue #461): tanpa ini, menghapus item HLS yang dijeda/gagal
+        // tidak membebaskan ruang sampai sapuan yatim berumur >2 jam
+        // berjalan — asimetris dengan partial di atas. Nama temp persis
+        // protectedPartialNames (sumber yang sama dengan perlindungan
+        // sapuan); scratch diturunkan dari tempBase engine yang sama.
+        val hlsBase = item.fileName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { item.fileName }
+        val tempBase = "~" + item.id.take(8) + hlsBase
+        val extraNames = buildSet {
+            addAll(protectedPartialNames(item))
+            for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
+                add(FileNames.safe("$tempBase.$kind") + ".part")
+            }
+        }
+        extraNames.forEach { name -> runCatching { File(downloadDir, name).delete() } }
         if (!item.contentUri.isNullOrEmpty()) {
             runCatching { appContext.contentResolver.delete(item.contentUri.toUri(), null, null) }
         }
