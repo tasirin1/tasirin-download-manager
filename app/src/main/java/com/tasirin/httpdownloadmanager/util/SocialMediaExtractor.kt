@@ -1651,7 +1651,7 @@ object SocialMediaExtractor {
                 }
                 val code = conn.responseCode
                 conn.headerFields.entries
-                    .filter { it.key.equals("set-cookie", ignoreCase = true) }
+                    .filter { it.key?.equals("set-cookie", ignoreCase = true) == true }
                     .flatMap { it.value }
                     .forEach { raw ->
                         val pair = raw.substringBefore(';')
