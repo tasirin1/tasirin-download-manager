@@ -162,12 +162,18 @@ class App : Application() {
                 val keptShares = runCatching { httpServer.snapshotShares() }.getOrDefault(emptyMap())
                 val keptUploads = runCatching { httpServer.snapshotCompletedUploads() }.getOrDefault(emptyMap())
                 runCatching { httpServer.stopServer() }
+                // Log diambil SESUDAH stop dari instance lama (issue
+                // #533): baris SERVER STOPPED ikut terbawa, dan
+                // riwayat diagnostik tidak hangus seperti shares dan
+                // uploads yang sudah lebih dulu di-snapshot.
+                val keptLog = runCatching { httpServer.snapshotLogLines() }.getOrDefault(emptyList())
                 // Wajib applicationContext: instance ini hidup seumur proses dan
                 // disimpan statis — Activity context (dari SettingsActivity) akan
                 // bocor. HttpControlServer juga menormalkan ulang di konstruktor.
                 httpServer = HttpControlServer(context.applicationContext)
                 runCatching { httpServer.restoreShares(keptShares) }
                 runCatching { httpServer.restoreCompletedUploads(keptUploads) }
+                runCatching { httpServer.restoreLogLines(keptLog) }
                 if (keptShares.isNotEmpty() || keptUploads.isNotEmpty()) {
                     logEvent("SERVER RESTART: kept ${keptShares.size} share links, ${keptUploads.size} uploads")
                 }

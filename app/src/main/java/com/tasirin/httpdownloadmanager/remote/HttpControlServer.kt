@@ -3756,6 +3756,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     fun snapshotLog(): String = serverLog.snapshot()
 
+    /** Baris log untuk dibawa ke instance baru saat restart (issue
+     *  #533). Baris tidak pernah memuat newline (appendLog
+     *  menyanitasinya), jadi membelah snapshot aman. */
+    internal fun snapshotLogLines(): List<String> =
+        serverLog.snapshot().split('\n').filter { it.isNotEmpty() }
+
+    internal fun restoreLogLines(lines: List<String>) = serverLog.restore(lines)
+
     fun clearLog() = serverLog.clear()
 
     private fun logError(e: Throwable) {

@@ -61,4 +61,18 @@ class ServerLog(
         cachedSnapshot = ""
         cachedRevision = revision
     }
+
+    /** Tanamkan baris log lama (sudah berstempel) sebagai awal buffer
+     *  instance baru — dipakai restart server agar riwayat diagnostik
+     *  tidak hangus saat instance ditukar (issue #533), sejajar
+     *  snapshot/restore share links dan completed uploads. Batas
+     *  maxLines sama: hanya ekor terbaru yang dipertahankan. */
+    fun restore(lines: List<String>) {
+        if (lines.isEmpty()) return
+        synchronized(lock) {
+            lines.takeLast(maxLines).forEach { buffer.addLast(it) }
+            while (buffer.size > maxLines) buffer.removeFirst()
+            revision++
+        }
+    }
 }
