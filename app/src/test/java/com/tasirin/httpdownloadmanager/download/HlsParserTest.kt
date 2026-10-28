@@ -260,6 +260,20 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMaster - label kbps ganda untuk varian sebandwidth tanpa NAME dan RESOLUTION diberi pembeda`() {
+        // Issue #495: kelas cacat #490 di parser ketat — label tanpa
+        // NAME/RESOLUTION adalah fungsi murni bandwidth.
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,CODECS=\"avc1.4D401E\"\n" +
+            "https://cdn.example.com/videos/a.m3u8\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,CODECS=\"hvc1.1.6.L93\"\n" +
+            "https://cdn.example.com/videos/b.m3u8\n"
+        val variants = HlsParser.parseMaster(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(2, variants.size)
+        assertEquals(listOf("800 kbps", "800 kbps #2"), variants.map { it.name })
+    }
+
+    @Test
     fun `parseMasterLenient - fallback absolut saat parseMaster gagal`() {
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4D401E\",FRAME-RATE=30\n" +

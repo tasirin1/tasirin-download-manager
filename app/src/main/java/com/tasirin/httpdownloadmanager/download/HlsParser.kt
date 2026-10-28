@@ -72,6 +72,17 @@ object HlsParser {
         url.startsWith("http://", ignoreCase = true) ||
             url.startsWith("https://", ignoreCase = true)
 
+    /** Pembeda label varian ganda (issue #490 untuk parser longgar,
+     *  #495 untuk parser ketat — helper bersama agar tak divergen):
+     *  label yang sudah dipakai varian sebelumnya dalam daftar yang
+     *  sama diberi sufiks urut " #2", " #3", dan seterusnya. */
+    private fun labelUnik(label: String, terpakai: List<HlsVariant>): String {
+        if (terpakai.none { it.name == label }) return label
+        var n = 2
+        while (terpakai.any { it.name == "$label #$n" }) n++
+        return "$label #$n"
+    }
+
     /** Parse isi master playlist. baseUrl dipakai untuk melengkapi URL varian
      *  yang relatif. Hasil diurutkan menurun menurut bandwidth. */
     fun parseMaster(body: String, baseUrl: String): List<HlsVariant>? {
@@ -109,9 +120,18 @@ object HlsParser {
                     val codecs = if (line.contains("CODECS")) CODECS_RE
                         .find(line)?.groupValues?.get(1).orEmpty() else ""
                     val kbps = bandwidth?.div(1000L) ?: 0L
-                    val label = name
-                        ?: (res?.let { "$it · $kbps kbps" })
-                        ?: "$kbps kbps"
+                    // Pembeda label ganda juga di parser ketat (issue
+                    // #495): tanpa NAME/RESOLUTION label adalah fungsi
+                    // murni bandwidth, jadi pasangan sebandwidth berbeda
+                    // codec sama-sama bernama "800 kbps" persis seperti
+                    // cacat #490 di parser longgar — helpernya kini
+                    // bersama agar kedua parser tak bisa divergen lagi.
+                    val label = labelUnik(
+                        name
+                            ?: (res?.let { "$it · $kbps kbps" })
+                            ?: "$kbps kbps",
+                        variants
+                    )
                     variants.add(
                         HlsVariant(
                             label, resolveUrl(baseUrl, next),
@@ -174,11 +194,7 @@ object HlsParser {
             // sebandwidth tanpa RESOLUTION (pasangan sah AVC vs HEVC)
             // menghasilkan nama persis sama — tak bisa dibedakan di
             // pemilih dan nama berkas hasil pilihan ikut bertabrakan.
-            if (out.any { it.name == label }) {
-                var n = 2
-                while (out.any { it.name == "$label #$n" }) n++
-                label = "$label #$n"
-            }
+            label = labelUnik(label, out)
             out.add(HlsVariant(label, resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
         }
         return if (out.isEmpty()) null else out.sortedByDescending { it.bandwidth }
