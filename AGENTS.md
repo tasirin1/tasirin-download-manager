@@ -521,7 +521,8 @@ jangan digabung dengan PR fitur lain.
   (auto-start boot, download background, server remote, galeri) — semua berjalan
   baik. `targetSdk 37` belum dinaikkan (opsional; lint `OldTargetApi` tetap
   di-suppress).
-- **Pantangan**: jangan naikkan `minSdk` (tetap 21), dan jangan gabung perubahan
+- **Pantangan**: jangan ubah `minSdk` (tetap 23 sejak keputusan owner
+  2026-10-28), dan jangan gabung perubahan
   targetSdk dengan PR fitur lain.
 
 ## Best practices untuk AI yang mengelola repo ini
