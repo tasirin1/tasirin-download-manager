@@ -729,10 +729,14 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun resumeAll() {
-        // Batch: satu filter + satu update, bukan N kali find() di resume()
+        // Batch: satu filter + satu update, bukan N kali find() di resume().
+        // DOWNLOADING zombie (tanpa job aktif) ikut diantrekan ulang —
+        // selaras resume(id); DOWNLOADING ber-job aktif memang sedang
+        // berjalan dan tidak disentuh (issue #203).
         val targets = _items.value.filter {
             it.state == DownloadState.PAUSED || it.state == DownloadState.FAILED ||
-                it.state == DownloadState.CANCELLED
+                it.state == DownloadState.CANCELLED ||
+                (it.state == DownloadState.DOWNLOADING && jobs[it.id]?.isActive != true)
         }
         if (targets.isEmpty()) return
         val ids = targets.map { it.id }.toSet()
