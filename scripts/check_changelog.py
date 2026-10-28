@@ -13,15 +13,53 @@ CODE_PREFIXES = ("app/src/main/", "scripts/", "tools/", "gradle/", ".github/")
 CODE_EXACT = ("remote.src.html", "app/build.gradle.kts")
 
 
+def api_verified_bot(base):
+    # Metadata git (nama+email) bisa dipalsukan siapa pun yang bisa push
+    # (issue #290): author DAN committer bebas diatur lewat git config,
+    # jadi cek nama+email saja tidak membuktikan apa pun. Kebenaran ada
+    # di sisi GitHub: commit bot ASLI terhubung ke akun dependabot[bot]
+    # (author.login hasil resolusi GitHub) DAN bertanda tangan
+    # terverifikasi GitHub (commit.verification.verified) — keduanya
+    # tidak bisa diproduksi dari push biasa. Gagal-tertutup: gh tidak
+    # tersedia, API gagal, atau satu commit tak terbukti -> BUKAN
+    # rentang bot (guard berjalan normal, tidak dilewati).
+    remote = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        capture_output=True, text=True)
+    if remote.returncode != 0:
+        return False
+    m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$",
+                  remote.stdout.strip())
+    if not m:
+        return False
+    slug = m.group(1) + "/" + m.group(2)
+    proc = subprocess.run(
+        ["git", "log", "--no-merges", "--format=%H", base + "..HEAD"],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        return False
+    shas = [x.strip() for x in proc.stdout.splitlines() if x.strip()]
+    if not shas:
+        return False
+    for sha in shas:
+        out = subprocess.run(
+            ["gh", "api", "repos/" + slug + "/commits/" + sha,
+             "--jq", "(.author.login == \"dependabot[bot]\") and "
+                     "(.commit.verification.verified == true)"],
+            capture_output=True, text=True)
+        if out.returncode != 0 or out.stdout.strip() != "true":
+            return False
+    return True
+
+
 def all_dependabot(base):
     # Seluruh commit non-merge pada rentang authored dependabot[bot]?
     # Commit merge sengaja dikecualikan: author-nya adalah orang yang
     # menekan merge, jadi merge MANUAL PR bot oleh owner tetap terdeteksi
     # sebagai rentang bot murni (issue #202). Pengecualian workflow
     # (actor dependabot) hanya menolong event yang dipicu bot sendiri.
-    # Nama DAN email wajib cocok (issue #228): nama author bisa dipalsukan
-    # siapa pun yang bisa commit (git -c user.name=...), email noreply
-    # GitHub milik bot tidak bisa diklaim commit pihak lain lewat UI PR.
+    # Nama DAN email wajib cocok (issue #228/#257) sebagai saringan awal,
+    # lalu kebenaran diputuskan verifikasi API GitHub (issue #290).
     proc = subprocess.run(
         ["git", "log", "--no-merges", "--format=%an%x1f%ae", base + "..HEAD"],
         capture_output=True, text=True)
@@ -39,7 +77,8 @@ def all_dependabot(base):
             or re.fullmatch(
                 r"\d+\+dependabot\[bot\]@users\.noreply\.github\.com",
                 email) is not None)
-    return bool(authors) and all(is_bot(a) for a in authors)
+    return bool(authors) and all(is_bot(a) for a in authors) \
+        and api_verified_bot(base)
 
 
 def changed_files(base):

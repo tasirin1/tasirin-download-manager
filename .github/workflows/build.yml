@@ -44,6 +44,9 @@ jobs:
         # rilis maintenance; perubahan dependensi wajib regenerasi
         # verification-metadata (lihat AGENTS.md).
         if: github.actor != 'dependabot[bot]'
+        env:
+          # Verifikasi API untuk pengecualian bot (#290) butuh token.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/check_changelog.py "${{ github.event.pull_request.base.sha }}" "${{ github.event.before }}"
 
       - name: Siapkan & periksa remote web (minify + node check + i18n)
