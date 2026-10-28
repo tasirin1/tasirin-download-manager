@@ -18,7 +18,11 @@ def main():
     summary = []
     for ctype in ("LINE", "BRANCH", "INSTRUCTION", "METHOD"):
         covered = missed = 0
-        for counter in root.iter("counter"):
+        # HANYA counter anak langsung <report> (issue #378): root.iter
+        # menjumlahkan juga counter package/class/sourcefile sehingga
+        # angka tercetak menghitung berlapis-lapis (mis. (36/40) untuk
+        # cakupan sejati (9/10)); persen kebetulan mirip, hitungannya salah.
+        for counter in root.findall("counter"):
             if counter.get("type") == ctype:
                 covered += int(counter.get("covered", 0))
                 missed += int(counter.get("missed", 0))
