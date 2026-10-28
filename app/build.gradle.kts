@@ -45,7 +45,7 @@ android {
             if (!storeFileProp.isNullOrBlank() && !storePasswordProp.isNullOrBlank() &&
                 !keyAliasProp.isNullOrBlank() && !keyPasswordProp.isNullOrBlank()
             ) {
-                storeFile = rootProject.file(storeFileProp)  // resolve dari root repo (workflow menaruh keystore.jks di sana)
+                storeFile = rootProject.file(storeFileProp)  // workflow meneruskan path absolut /tmp/keystore.jks; path absolut dipertahankan
                 storePassword = storePasswordProp
                 keyAlias = keyAliasProp
                 keyPassword = keyPasswordProp
