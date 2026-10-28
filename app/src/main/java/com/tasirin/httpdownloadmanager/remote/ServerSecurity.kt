@@ -45,13 +45,23 @@ object ServerSecurity {
      *  token verifikasi upload, token unduh ZIP, dan kredensial generik
      *  disamarkan; ID item/upload bukan rahasia sehingga tetap tampil agar
      *  log bisa dikorelasikan saat debug. Delimiter wajib ([?&] atau awal):
-     *  versi lama opsional sehingga `mytoken=x` ikut teredaksi. */
+     *  versi lama opsional sehingga `mytoken=x` ikut teredaksi.
+     *  Nama tanda tangan URL (sig/signature/hmac/X-Amz-Signature/dsb.)
+     *  ikut disamarkan walau bersarang DI DALAM nilai parameter lain
+     *  (#289: URL bertanda tangan yang ditempel ke `url=` di
+     *  /api/social_options) — termasuk bentuk terenkode penuhnya
+     *  (%3F/%26/%3D), dengan nilai berhenti di pemisah terenkode. */
     private val LOG_SECRET_RE =
-        Regex("(^|[?&])((?:token|pin|verify|zt|password|secret|auth)=)[^&]*", RegexOption.IGNORE_CASE)
+        Regex(
+            "(^|[?&]|%3F|%26)((?:token|pin|verify|zt|password|secret|auth|sig|signature|hmac|x-amz-signature|x-goog-signature)(?:=|%3D))[^&]*?(?=%26|&|$)",
+            RegexOption.IGNORE_CASE
+        )
 
     fun redactQueryForLog(query: String?): String {
         if (query.isNullOrEmpty()) return ""
-        return "?" + LOG_SECRET_RE.replace(query.trimStart('?'), "$1$2<redacted>")
+        return "?" + LOG_SECRET_RE.replace(query.trimStart('?')) { m ->
+            m.groupValues[1] + m.groupValues[2] + "<redacted>"
+        }
     }
 
     /** Redaksi token pada path untuk log request: `/share/<token>` dan

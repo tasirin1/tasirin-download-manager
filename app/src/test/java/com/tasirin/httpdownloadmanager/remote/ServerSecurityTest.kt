@@ -46,6 +46,22 @@ class ServerSecurityTest {
         // Delimiter wajib: mytoken= bukan nama param.
         assertEquals("?name=mytoken%3Dx", ServerSecurity.redactQueryForLog("?name=mytoken%3Dx"))
         assertEquals("?pin=<redacted>", ServerSecurity.redactQueryForLog("pin=1234"))
+        // Tanda tangan di dalam nilai url= ikut disamarkan (#289): URL
+        // bertanda tangan adalah kredensial pembawa untuk media itu.
+        assertEquals(
+            "?url=https://cdn.example/v.mp4?sig=<redacted>&hd=1",
+            ServerSecurity.redactQueryForLog("?url=https://cdn.example/v.mp4?sig=ABC123&hd=1")
+        )
+        assertEquals(
+            "?url=https%3A%2F%2Fcdn.example%2Fv.mp4%3Fsig%3D<redacted>%26hd%3D1",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fcdn.example%2Fv.mp4%3Fsig%3DABC123%26hd%3D1"
+            )
+        )
+        assertEquals(
+            "?x-amz-signature=<redacted>&y=2",
+            ServerSecurity.redactQueryForLog("?x-amz-signature=DEADBEEF&y=2")
+        )
     }
 
     @Test
