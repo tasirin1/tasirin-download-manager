@@ -506,14 +506,16 @@ def blank_literals(text: str) -> str:
     return "".join(out)
 
 
-def ignored_on_line(line: str, previous: str | None, rule_id: str) -> bool:
-    markers: list[str] = []
-    for source in (line, previous):
-        if not source:
-            continue
-        match = IGNORE_RE.search(source)
-        if match:
-            markers.extend(part.strip() for part in match.group(1).split(","))
+def ignored_on_line(line: str, rule_id: str) -> bool:
+    # HANYA baris ini (issue #449): memindai baris sebelumnya juga
+    # memberi penanda polos kekuatan penanda -next yang tidak
+    # terdokumentasi — penanda sebaris diam-diam ikut memutihkan
+    # aturan yang sama pada baris tepat sesudahnya. Jalur baris
+    # sebelum adalah wewenang NEXT_IGNORE_RE di pemanggil.
+    match = IGNORE_RE.search(line)
+    if not match:
+        return False
+    markers = [part.strip() for part in match.group(1).split(",")]
     return rule_id in markers
 
 
@@ -559,7 +561,7 @@ def scan_text(
         # jebakan laten yang membingungkan — diperbaiki di issue #150.
         prev_next_ignore = NEXT_IGNORE_RE.search(previous) if previous else None
         for rule, pattern in compiled:
-            if ignored_on_line(line, previous, rule.rule_id):
+            if ignored_on_line(line, rule.rule_id):
                 continue
             # Token persis (belah koma + strip) seperti ignored_on_line:
             # pencocokan substring membuat prosa yang kebetulan memuat id
@@ -630,7 +632,7 @@ def scan_text(
             start_index = full.count("\n", 0, match.start())
             line = lines[start_index]
             previous = lines[start_index - 1] if start_index else None
-            if ignored_on_line(line, previous, rule.rule_id):
+            if ignored_on_line(line, rule.rule_id):
                 continue
             prev_next_ignore = (
                 NEXT_IGNORE_RE.search(previous) if previous else None
@@ -860,6 +862,13 @@ def run_self_test() -> int:
             "// audit-ignore-next: bukan_js_dynamic_exec_sama_sekali",
             "const other = eval(userInput);",
         ],
+        Path("sample_leak.js"): [
+            # Regresi issue #449: penanda polos hanya menekan barisnya
+            # SENDIRI; baris tepat sesudahnya wajib tetap terflag.
+            # Kekuatan baris-sebelum hanya milik penanda -next.
+            "// audit-ignore: js_dynamic_exec",
+            "const leaked = eval(userInput);",
+        ],
         Path("sample_multi.js"): [
             # Regresi issue #345 (dikunci oleh #377): sink JS yang dipecah
             # baris formatter HANYA tertangkap lintasan multiline — pola
@@ -950,6 +959,10 @@ def run_self_test() -> int:
     ]
     prose_suppressed = not any(
         item["rule_id"] == "js_dynamic_exec" and item["path"] == "sample2.js"
+        for item in findings
+    )
+    leak_next_line = any(
+        item["rule_id"] == "js_dynamic_exec" and item["path"] == "sample_leak.js"
         for item in findings
     )
     multi_leak = any(
@@ -1046,9 +1059,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned or not extra_rules_hit:
+    if missing or suppressed or str_leak or prose_suppressed or not leak_next_line or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned or not extra_rules_hit:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}, extra_rules_hit={extra_rules_hit}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, leak_next_line={leak_next_line}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}, extra_rules_hit={extra_rules_hit}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0

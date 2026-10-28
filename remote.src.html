@@ -6506,7 +6506,7 @@ function isSocialUrl(u) {
     l.indexOf('twitter.com/') !== -1 || l.indexOf('x.com/') !== -1 ||
     l.indexOf('youtube.com/') !== -1 || l.indexOf('youtu.be/') !== -1 ||
     l.indexOf('xvideos.com/') !== -1 || l.indexOf('xnxx.com/') !== -1 || l.indexOf('xnxxvideos.me/') !== -1 || l.indexOf('pornhub.com/') !== -1 || l.indexOf('pornhubpremium.com/') !== -1 ||
-    // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
+    // audit-ignore-next: maintenance_marker (nama domain resmi situs, bukan marker)
     l.indexOf('hentaihaven.xxx/') !== -1;
 }
 
@@ -6518,7 +6518,7 @@ function socialPlatformLabel(u) {
   if (u.indexOf('xvideos.com/') !== -1) return 'XVideos';
   if (u.indexOf('xnxx.com/') !== -1 || u.indexOf('xnxxvideos.me/') !== -1) return 'XNXX';
   if (u.indexOf('pornhub.com/') !== -1 || u.indexOf('pornhubpremium.com/') !== -1) return 'Pornhub';
-  // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
+  // audit-ignore-next: maintenance_marker (nama domain resmi situs, bukan marker)
   if (u.indexOf('hentaihaven.xxx/') !== -1) return 'HentaiHaven';
   return 'Social media';
 }

@@ -7,7 +7,7 @@ import org.junit.Test
 
 class SocialMediaExtractorTest {
 
-    // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
+    // audit-ignore-next: maintenance_marker (nama domain resmi situs, bukan marker)
     private val hhDomain = "hentaihaven.xxx"
 
     @Test

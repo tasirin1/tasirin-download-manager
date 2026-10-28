@@ -87,7 +87,7 @@ object SocialMediaExtractor {
     /** HentaiHaven: halaman watch (`/watch/<slug>/`) dilindungi challenge
      *  Cloudflare sehingga fetch server pasti 403; ekstraksi memakai WebView
      *  (`WebExtractActivity`) + parser murni di bawah sebagai fallback. */
-    // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
+    // audit-ignore-next: maintenance_marker (nama domain resmi situs, bukan marker)
     private val HH_HOST_RE = Regex("""\A(?:https?://)(?:www\.)?hentaihaven\.xxx/""")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
@@ -1373,7 +1373,7 @@ object SocialMediaExtractor {
     private val HH_HEADERS = mapOf(
         "User-Agent" to DEFAULT_UA,
         "Accept" to "text/html,application/xhtml+xml",
-        // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
+        // audit-ignore-next: maintenance_marker (nama domain resmi situs, bukan marker)
         "Referer" to "https://hentaihaven.xxx/"
     )
 
