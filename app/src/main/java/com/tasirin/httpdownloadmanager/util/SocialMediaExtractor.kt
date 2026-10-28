@@ -1641,7 +1641,11 @@ object SocialMediaExtractor {
         // Jar per nama -> (nilai, host pemasang): cookie hanya dikirim ke
         // host/domain induk yang sama (#239), bukan ke host redirect mana
         // pun seperti jar polos sebelumnya.
-        val cookieJar = LinkedHashMap<String, Pair<String, String>>()
+        // Jar berkunci (nama, host) seperti httpGetWithCookies (issue
+        // #396): kunci nama saja membuat cookie bernama sama dari host
+        // kedua menimpa entri + tag host host pertama, sehingga saringan
+        // visibilitas menilai dari host pemasang yang salah.
+        val cookieJar = LinkedHashMap<Pair<String, String>, Pair<String, String>>()
         // Deadline total rantai hop (#246): 6 hop x 20 dtk bisa 120 dtk,
         // melampaui anggaran ekstraksi 60 dtk dan membuat tahap ini
         // ditinggal withTimeoutOrNull tanpa hasil. Hop berhenti di 45 dtk
@@ -1672,7 +1676,7 @@ object SocialMediaExtractor {
                 }
                 val jarVisible = cookieJar.entries
                     .filter { cookieJarVisible(it.value.second, currentHost) }
-                    .joinToString("; ") { "${it.key}=${it.value.first}" }
+                    .joinToString("; ") { "${it.key.first}=${it.value.first}" }
                 val effectiveCookie = mergeCookiePairs(userCookie, jarVisible)
                 if (effectiveCookie.isNotEmpty()) {
                     sendHeaders["Cookie"] = effectiveCookie
@@ -1697,9 +1701,9 @@ object SocialMediaExtractor {
                             if (value.isEmpty() ||
                                 raw.contains("max-age=0", ignoreCase = true)
                             ) {
-                                cookieJar.remove(name)
+                                cookieJar.remove(name to currentHost)
                             } else {
-                                cookieJar[name] = value to currentHost
+                                cookieJar[name to currentHost] = value to currentHost
                             }
                         }
                     }
@@ -1722,7 +1726,7 @@ object SocialMediaExtractor {
                 // final (bukan seluruh jar lintas host).
                 val cookiesStr = cookieJar.entries
                     .filter { cookieJarVisible(it.value.second, currentHost) }
-                    .joinToString("; ") { "${it.key}=${it.value.first}" }
+                    .joinToString("; ") { "${it.key.first}=${it.value.first}" }
                 val html = if (type.contains("text/html", ignoreCase = true)) {
                     readBodyLimited(conn.inputStream)
                 } else {
