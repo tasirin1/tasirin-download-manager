@@ -22,8 +22,8 @@ fi
 # -z + tr: tanpa itu git mengutip nama non-ASCII menjadi oktal
 # ("s\303\251cret.jks") sehingga pola ekstensi tak pernah cocok dan
 # keystore bernama non-ASCII lolos gerbang ini (issue #312).
-if git ls-files -z 2>/dev/null | tr '\0' '\n' | grep -E -q '\.(apk|aab|dex|zip|jks|keystore|p12|pfx)$|(^|/)keystore$|\.env($|\.)'; then
-  echo "GAGAL: binary/APK/zip/secret terlacak di repo (jks|keystore|p12|pfx|.env dilarang)"; gagal=1;
+if git ls-files -z 2>/dev/null | tr '\0' '\n' | grep -E -i -q '\.(apk|aab|dex|zip|jks|keystore|p12|pfx)$|(^|/)keystore$|\.env($|\.)|(^|/)\.envrc$'; then
+  echo "GAGAL: binary/APK/zip/secret terlacak di repo (jks|keystore|p12|pfx|.env|.envrc dilarang)"; gagal=1;
 fi
 # 3. Jumlah section README Indonesia vs Inggris wajib sama (jaga sinkron).
 a=$(grep -c '^## ' README.md 2>/dev/null || true)

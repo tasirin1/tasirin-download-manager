@@ -679,12 +679,19 @@ def cek_aturan_repo(gagal, berubah):
         rendah = path.lower()
         if "values-night" in rendah:
             gagal.append("Larangan historis: values-night (%s) — app selalu terang" % path)
-        if rendah.endswith((".apk", ".aab", ".dex", ".jks", ".keystore")):
+        nama = rendah.rsplit("/", 1)[-1]
+        if rendah.endswith((".apk", ".aab", ".dex", ".jks", ".keystore",
+                            ".p12", ".pfx", ".zip")) or nama == "keystore":
+            # Daftar diselaraskan dengan cek-cepat (#332): versi lama
+            # tak mengenal .p12/.pfx/.zip dan basename keystore polos.
             gagal.append("Berkas terlarang masuk repo: " + path)
-        elif rendah.endswith((".env",)) or \
-                rendah.rsplit("/", 1)[-1].startswith(".env."):
-            # .env.* (mis. .env.local) sama berbahayanya dengan .env
-            # polos (#291): varian env lazim tidak boleh lolos gerbang.
+        elif nama.startswith(".env") or ".env." in nama or \
+                nama.endswith(".env"):
+            # Semua varian env sama berbahayanya (#291 + #332):
+            # .env, .env.*, .envrc, *.env, dan config.env.local —
+            # dulu config.env.* lolos karena tak diawali '.env.' dan
+            # tak berakhiran '.env'. Path sudah di-lowercase di atas
+            # sehingga huruf besar ikut tertangkap.
             gagal.append("Berkas secret masuk diff: " + path)
         elif path.startswith("app/src/main/assets/bin/"):
             gagal.append("Binary tak boleh dibundel ke APK: " + path)
