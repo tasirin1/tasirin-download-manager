@@ -338,6 +338,116 @@ def _in_string(line: str, pos: int) -> bool:
     return in_str
 
 
+def blank_literals(text: str) -> str:
+    """Salinan teks dengan ISI literal string/char diblanko jadi spasi.
+
+    Panjang dan posisi newline dipertahankan persis 1:1, jadi offset dan
+    nomor baris hasil pemindaian pada salinan ini valid juga untuk teks
+    asli. Kurung dan titik-koma di dalam string tidak lagi bisa memutus
+    atau memanjangkan rentang multi-baris (issue #254). Ekspresi template
+    Kotlin `${...}` dan `$nama` di dalam string adalah KODE — disalin apa
+    adanya (literal bersarang di dalamnya ikut diblanko rekursif); string
+    mentah triple-quote tidak punya escape tetapi templatenya tetap aktif.
+    Literal char hanya diakui bila bentuknya sah (maks 8 char: '\\uXXXX');
+    apostrof liar di luar literal dibiarkan sebagai char biasa.
+    """
+    out = list(text)
+    n = len(text)
+
+    def blank(i: int, j: int) -> None:
+        for k in range(i, j):
+            if out[k] != "\n":
+                out[k] = " "
+
+    def char_literal_end(i: int) -> int | None:
+        j = i + 1
+        if j >= n:
+            return None
+        if text[j] == "\\":
+            if j + 1 < n and text[j + 1] == "u":
+                if (
+                    j + 6 < n
+                    and all(c in "0123456789abcdefABCDEF" for c in text[j + 2 : j + 6])
+                    and text[j + 6] == "'"
+                ):
+                    return j + 7
+                return None
+            if j + 2 < n and text[j + 2] == "'":
+                return j + 3
+            return None
+        if text[j] in "'\n":
+            return None
+        if j + 1 < n and text[j + 1] == "'":
+            return j + 2
+        return None
+
+    def scan_template(i: int) -> int:
+        # i tepat sesudah '${': ekspresi kode disalin apa adanya sampai '}'
+        # penyeimbang; literal di dalamnya diblanko lewat scan_literal.
+        depth = 1
+        while i < n and depth:
+            char = text[i]
+            if char == "{":
+                depth += 1
+                i += 1
+            elif char == "}":
+                depth -= 1
+                i += 1
+            elif char in "\"'":
+                i = scan_literal(i)
+            else:
+                i += 1
+        return i
+
+    def scan_string_body(i: int, raw: bool) -> int:
+        # i tepat sesudah pembuka string; blanko isi sampai penutup.
+        while i < n:
+            char = text[i]
+            if raw and text.startswith('"""', i):
+                return i + 3
+            if not raw:
+                if char == '"':
+                    return i + 1
+                if char == "\n":
+                    return i
+                if char == "\\":
+                    blank(i, min(i + 2, n))
+                    i += 2
+                    continue
+            if char == "$" and i + 1 < n and text[i + 1] == "{":
+                i = scan_template(i + 2)
+                continue
+            if char == "$" and i + 1 < n and (text[i + 1].isalpha() or text[i + 1] == "_"):
+                # Template sederhana $nama: referensi variabel = kode.
+                j = i + 1
+                while j < n and (text[j].isalnum() or text[j] == "_"):
+                    j += 1
+                i = j
+                continue
+            blank(i, i + 1)
+            i += 1
+        return i
+
+    def scan_literal(i: int) -> int:
+        if text[i] == "'":
+            end = char_literal_end(i)
+            if end is None:
+                return i + 1
+            blank(i + 1, end - 1)
+            return end
+        if text.startswith('"""', i):
+            return scan_string_body(i + 3, raw=True)
+        return scan_string_body(i + 1, raw=False)
+
+    i = 0
+    while i < n:
+        if text[i] in "\"'":
+            i = scan_literal(i)
+        else:
+            i += 1
+    return "".join(out)
+
+
 def ignored_on_line(line: str, previous: str | None, rule_id: str) -> bool:
     markers: list[str] = []
     for source in (line, previous):
@@ -419,11 +529,13 @@ def scan_text(
     # bocoran multi-baris bersarang tetap tertangkap (issue #216), kini
     # sampai sarang DUA tingkat — kelompok luar boleh memuat satu tingkat
     # kelompok lagi di dalamnya (issue #240: foo(bar()) sempat lolos).
-    # Kelompok kurung di dalam string yang tak berpasangan tetap bisa
-    # memutus/memanjangkan rentang; batas yang disadari.
+    # Lintasan ini berjalan pada salinan yang isi literal string/char-nya
+    # sudah diblanko (blank_literals, issue #254): kurung/titik-koma di
+    # dalam string tidak lagi memutus atau memanjangkan rentang, dengan
+    # offset yang tetap 1:1 terhadap teks asli.
     # Temuan dipetakan ke baris awal match dan didedupe terhadap hasil
     # per baris lewat `seen`.
-    full = "\n".join(lines)
+    full = blank_literals("\n".join(lines))
     for rule, pattern in compiled:
         if not rule.multiline:
             continue
@@ -576,6 +688,20 @@ def run_self_test() -> int:
             "    }",
             "}",
         ],
+        Path("sample_strparen.kt"): [
+            # Regresi issue #254: kurung/titik-koma DI DALAM string tidak
+            # boleh mengubah rentang multi-baris — "(" di string menelan
+            # token pernyataan berikut (FP), "(" tak berpasangan menutupi
+            # bocoran asli, dan ";" di string memutus rentang (FN).
+            "class StrParen {",
+            "    fun a() = Log.d(\"x (\", a)",
+            "    fun b() = token",
+            "    fun leak() = Log.d(\"tag (\",",
+            "        token)",
+            "    fun leak2() = Log.d(\"a;b\",",
+            "        secret)",
+            "}",
+        ],
         Path("sample_str.kt"): [
             "class Grab {",
             '    val js = "(function(){try{work();}catch(e){}})"',
@@ -663,9 +789,24 @@ def run_self_test() -> int:
         item["rule_id"] == "external_path_sink" and item["path"] == "sample_nested2.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path:
+    strparen_fp = any(
+        item["rule_id"] == "sensitive_log" and item["line"] == 2
+        and item["path"] == "sample_strparen.kt"
+        for item in findings
+    )
+    strparen_leak = any(
+        item["rule_id"] == "sensitive_log" and item["line"] == 4
+        and item["path"] == "sample_strparen.kt"
+        for item in findings
+    )
+    strparen_semi = any(
+        item["rule_id"] == "sensitive_log" and item["line"] == 6
+        and item["path"] == "sample_strparen.kt"
+        for item in findings
+    )
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
