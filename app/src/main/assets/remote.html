@@ -4104,6 +4104,9 @@ socialPhotoOptions = [];
 return;
 }
 setPlatformBadge(u);
+socialPlatform = '';
+socialVideoOptions = [];
+socialPhotoOptions = [];
 socialDebounce = setTimeout(function () {
 var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
 if (isYT) {

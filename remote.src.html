@@ -6414,6 +6414,13 @@ function probeSocialQuality() {
     return;
   }
   setPlatformBadge(u);
+  // Opsi milik tautan sebelumnya langsung dikosongkan saat input berubah,
+  // bukan menunggu timer debounce menyala: submit dalam jendela 400 ms
+  // tidak boleh memakai pilihan tautan lama (issue #168). Kedua select
+  // dibangun ulang oleh timer seperti biasa.
+  socialPlatform = '';
+  socialVideoOptions = [];
+  socialPhotoOptions = [];
   socialDebounce = setTimeout(function () {
     var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
     if (isYT) {
