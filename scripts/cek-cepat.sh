@@ -25,10 +25,14 @@ fi
 if git ls-files -z 2>/dev/null | tr '\0' '\n' | grep -E -i -q '\.(apk|aab|dex|zip|jks|keystore|p12|pfx)$|(^|/)keystore$|\.env($|\.)|(^|/)\.envrc$'; then
   echo "GAGAL: binary/APK/zip/secret terlacak di repo (jks|keystore|p12|pfx|.env|.envrc dilarang)"; gagal=1;
 fi
-# 3. Jumlah section README Indonesia vs Inggris wajib sama (jaga sinkron).
-a=$(grep -c '^## ' README.md 2>/dev/null || true)
-b=$(grep -c '^## ' README.en.md 2>/dev/null || true)
-if [ "$a" != "$b" ]; then echo "GAGAL: jumlah ## README.md ($a) != README.en.md ($b)"; gagal=1; fi
+# 3. Struktur heading README Indonesia vs Inggris wajib sinkron.
+# Delegasikan ke guard Python yang otoritatif (issue #541): hitungan
+# grep mentah di sini dulu ikut menghitung baris contoh di dalam blok
+# berpagar, sehingga vonisnya berlawanan dengan check_readme_sync.py
+# (yang sudah sadar pagar, #527/#534) atas dokumen yang sah.
+if ! python3 scripts/check_readme_sync.py >/dev/null 2>&1; then
+  echo "GAGAL: struktur heading README.md dan README.en.md tidak sinkron (check_readme_sync.py)"; gagal=1;
+fi
 # 4. Remote web: sumber readable wajib ada + extract.js wajib readable.
 if [ ! -f remote.src.html ]; then echo "GAGAL: remote.src.html hilang"; gagal=1; fi
 if [ ! -f app/src/main/assets/remote.html ]; then echo "GAGAL: app/src/main/assets/remote.html hilang"; gagal=1; fi
