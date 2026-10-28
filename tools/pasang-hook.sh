@@ -6,6 +6,10 @@
 # sehingga kedua mekanisme saling menonaktifkan (issue #192).
 # Dipasang sekali per clone: sh tools/pasang-hook.sh
 set -e
+# Selalu bekerja dari akar repo (#331): dijalankan dari subdirektori,
+# versi lama memasang core.hooksPath lebih dulu lalu chmod gagal
+# 'No such file' tanpa petunjuk dan repo tertinggal setengah terpasang.
+cd "$(git rev-parse --show-toplevel)"
 git config core.hooksPath .githooks
 LEGACY=".git/hooks/pre-push"
 if [ -f "$LEGACY" ] && grep -q "dipasang tools/pasang-hook.sh" "$LEGACY"; then
@@ -25,4 +29,7 @@ else
     echo "  noexec?) — git akan mengabaikannya di sini. Cadangan: gerbang CI"
     echo "  tetap memeriksa tiap push; atau jalankan manual sebelum commit:"
     echo "  python3 scripts/check_repo.py && python3 tools/verifikasi-path.py"
+    # Cabang peringatan = pemasangan GAGAL: keluar bukan-nol supaya
+    # pemanggil otomatis bisa membedakannya dari sukses (#331).
+    exit 1
 fi
