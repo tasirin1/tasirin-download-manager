@@ -227,12 +227,16 @@ def admin_consistency() -> Result:
                     # menandai wilayah path: tanpa ini, labeler yang
                     # bermigrasi ke {changed-files: [{any-glob-to-any-
                     # file: [...]}]} terkumpul 0 dan penjaga nol-path
-                    # #486 menembak GAGAL palsu.
+                    # #486 menembak GAGAL palsu. Varian -all-files
+                    # (issue #560) adalah dua dari empat varian glob
+                    # resmi actions/labeler yang tertinggal dari daftar
+                    # ini — kelas yang sama, lubang yang sama.
                     yield from _paths(
                         val,
                         dalam_any or key in (
                             "any", "all",
                             "any-glob-to-any-file", "all-glob-to-any-file",
+                            "any-glob-to-all-files", "all-glob-to-all-files",
                         ),
                     )
 
