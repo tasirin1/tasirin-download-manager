@@ -8,7 +8,7 @@ Keluar 1 + ::error:: bila kode berubah tanpa CHANGELOG.md.
 import subprocess
 import sys
 
-CODE_PREFIXES = ("app/src/main/", "scripts/")
+CODE_PREFIXES = ("app/src/main/", "scripts/", "tools/", "gradle/", ".github/")
 CODE_EXACT = ("remote.src.html", "app/build.gradle.kts")
 
 
