@@ -88,6 +88,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     // Signature progres terlihat: emisi tanpa perubahan tampil (tick stagnan)
     // tak perlu submitList + DiffUtil sama sekali.
     private var lastProgressSig = 0
+    /** Job trailing edge throttle daftar (#244): perubahan yang tertahan
+     *  jendela 400ms dijadwalkan ulang agar tetap tampil walau emisi
+     *  engine berhenti sesudahnya. */
+    private var trailingSubmitJob: Job? = null
     private var lastStickyTitle: String? = null
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -305,6 +309,28 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         lastUiSubmitMs = now
                         lastProgressSig = sig
                         adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
+                    } else if (sig != lastProgressSig &&
+                        trailingSubmitJob?.isActive != true
+                    ) {
+                        // Tertahan jendela throttle: jadwalkan trailing edge
+                        // dari snapshot terbaru (lastItems). Tanpa ini status
+                        // terakhir (mis. Completed) tidak pernah tampil bila
+                        // emisi engine berhenti sesudah perubahan itu (#244).
+                        trailingSubmitJob = lifecycleScope.launch {
+                            delay(400L)
+                            val latest = lastItems
+                            val latestSig = progressSig(latest)
+                            if (latestSig != lastProgressSig) {
+                                lastUiSubmitMs =
+                                    android.os.SystemClock.uptimeMillis()
+                                lastProgressSig = latestSig
+                                adapter.submitList(
+                                    DownloadAdapter.buildSections(
+                                        this@MainActivity, latest
+                                    )
+                                )
+                            }
+                        }
                     }
                     updateStickyHeader()
                     val showEmpty = items.isEmpty()
