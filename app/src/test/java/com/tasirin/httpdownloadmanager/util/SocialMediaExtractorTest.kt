@@ -646,6 +646,23 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `unescapeFb - satu lintasan tanpa dekode ganda`() {
+        // \\u005c adalah backslash HASIL dekode: pasangan 'x26'
+        // sesudahnya adalah data, bukan escape \\x yang baru —
+        // lintasan terpisah lama mengubahnya menjadi '&' (#323).
+        assertEquals(
+            "\\x26",
+            SocialMediaExtractor.unescapeFb("\\u005cx26")
+        )
+        // Simetris: \\u0026 sesudah backslash hasil dekode juga
+        // berhenti sebagai literal, bukan ikut ter-dekode.
+        assertEquals(
+            "\\u0026",
+            SocialMediaExtractor.unescapeFb("\\u005cu0026")
+        )
+    }
+
+    @Test
     fun `mergeCookiesIntoHeaders - cookie user tidak ditimpa cookie ekstraksi`() {
         // Tanpa header lama: baris Cookie baru.
         assertEquals("Cookie: a=1; b=2",

@@ -1946,8 +1946,15 @@ object SocialMediaExtractor {
 
     /** URL media di JSON Facebook memakai escape JSON (\/, \u0026, \x26,
      *  dst) — unescape. Murni. */
-    private val FB_UNICODE_ESCAPE_RE = Regex("""\\u([0-9a-fA-F]{4})""")
-    private val FB_HEX_ESCAPE_RE = Regex("""\\x([0-9a-fA-F]{2})""")
+    // SATU pola gabungan untuk semua bentuk escape (#323): lintasan
+    // terpisah per bentuk memindai ulang hasil dekode lintasan
+    // sebelumnya, jadi \\u005c (backslash hasil dekode) + 'x26'
+    // sesudahnya ter-dekode lagi menjadi '&' (dekode ganda), sementara
+    // \\u005cu0026 berhenti sebagai literal — asimetris. Satu
+    // lintasan Regex.replace tidak pernah memindai keluaran sendiri.
+    private val FB_ESCAPE_RE = Regex(
+        """\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\/|&amp;"""
+    )
 
     internal fun unescapeFb(s: String): String {
         // Dekode umum escape heksadesimal JSON (\uXXXX, huruf hex bebas
@@ -1956,13 +1963,16 @@ object SocialMediaExtractor {
         // jadi URL sah bervarian \u002f / \u003D / \u003a tidak
         // ter-dekode lalu ditolak isValidFacebookMediaUrl sebagai URL
         // rusak. Satu lintasan regex: hasil dekode tidak dipindai ulang.
-        var out = FB_UNICODE_ESCAPE_RE.replace(s) { m ->
-            m.groupValues[1].toInt(16).toChar().toString()
+        return FB_ESCAPE_RE.replace(s) { m ->
+            when {
+                m.groupValues[1].isNotEmpty() ->
+                    m.groupValues[1].toInt(16).toChar().toString()
+                m.groupValues[2].isNotEmpty() ->
+                    m.groupValues[2].toInt(16).toChar().toString()
+                m.value == "&amp;" -> "&"
+                else -> "/"
+            }
         }
-        out = FB_HEX_ESCAPE_RE.replace(out) { m ->
-            m.groupValues[1].toInt(16).toChar().toString()
-        }
-        return out.replace("\\/", "/").replace("&amp;", "&")
     }
 
     /** Cadangan Cobalt untuk Facebook: API yang sama dengan cadangan
