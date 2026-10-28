@@ -280,6 +280,17 @@ def berkas_dihapus(rentang):
     # penghapusan berkas non-ASCII luput dinilai — kelas bug yang sama
     # dengan #346/#358. Format -z: token status dan path bergantian
     # dipisah NUL; status R/C membawa DUA path (asal lalu tujuan).
+    return parse_hapus_name_status_z(out)
+
+
+def parse_hapus_name_status_z(out):
+    """Ekstrak path terhapus dari keluaran `git diff --name-status -z`.
+
+    Dipakai bersama oleh berkas_dihapus (diff kerja/rentang) dan cabang
+    staged di utama() (issue #406: cabang itu sebelumnya mem-parse
+    --name-status TANPA -z dengan split baris, sehingga penghapusan
+    staged berkas non-ASCII lolos dengan cara yang sama seperti #376).
+    """
     token = out.split("\0")
     hapus = []
     i = 0
@@ -1127,8 +1138,12 @@ def utama():
     cek_kurung(gagal, berubah)
     hapus = berkas_dihapus(args.rentang)
     if not args.rentang:
-        keluar = jalan("git", "diff", "--cached", "--name-status") or ""
-        hapus += [x.split(None, 1)[1] for x in keluar.splitlines() if x.startswith("D")]
+        # Cabang staged memakai parser -z yang sama (issue #406): cara
+        # lama tanpa -z + split baris membuat path non-ASCII terkuotasi
+        # gaya C gugur di syarat startswith cek_berkas_dihapus.
+        keluar = jalan("git", "diff", "--cached", "--name-status", "-z")
+        if keluar:
+            hapus += parse_hapus_name_status_z(keluar)
     cek_berkas_dihapus(gagal, hapus)
     if not args.semua:
         cek_pengingat_changelog(peringatan, berubah)
