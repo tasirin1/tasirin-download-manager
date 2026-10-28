@@ -410,17 +410,26 @@ def scan_text(
 
     # Lintasan multi-baris (issue #193) untuk aturan bertanda multiline:
     # varian pola tanpa batas '\n' dijalankan pada teks utuh; rentang
-    # dibatasi 300 karakter DAN berhenti di ';' maupun ')' — kurung
-    # tutup mengakhiri pernyataan panggilan, jadi kata sensitif dari
-    # pernyataan LAIN sesudah panggilan selesai tidak ikut tertuduh
-    # (false positive issue #201). Temuan dipetakan ke baris awal
-    # match dan didedupe terhadap hasil per baris lewat `seen`.
+    # dibatasi 300 karakter dan berhenti di ';' maupun kurung tutup yang
+    # TIDAK seimbang — kurung tutup penutup panggilan mengakhiri
+    # pernyataan, jadi kata sensitif dari pernyataan LAIN sesudah
+    # panggilan selesai tidak ikut tertuduh (false positive issue #201),
+    # tetapi pasangan kurung seimbang satu tingkat di dalam rentang
+    # (panggilan bersarang ala foo() / COUNT(*) hasil formatter) boleh
+    # dilewati agar bocoran multi-baris bersarang tetap tertangkap
+    # (issue #216). Kelompok kurung di dalam string yang tak berpasangan
+    # tetap bisa memutus rentang lebih awal; batas yang disadari.
+    # Temuan dipetakan ke baris awal match dan didedupe terhadap hasil
+    # per baris lewat `seen`.
     full = "\n".join(lines)
     for rule, pattern in compiled:
         if not rule.multiline:
             continue
         long_pattern = re.compile(
-            rule.pattern.replace("[^;\\n]*", "[^;)]{0,300}"), rule.flags
+            rule.pattern.replace(
+                "[^;\\n]*", r"(?:\([^()]*\)|[^();]){0,300}"
+            ),
+            rule.flags,
         )
         for match in long_pattern.finditer(full):
             start_index = full.count("\n", 0, match.start())
@@ -527,6 +536,19 @@ def run_self_test() -> int:
             "        + u, null)",
             "}",
         ],
+        Path("sample_nested.kt"): [
+            # Regresi issue #216: kata sensitif sesudah pasangan kurung
+            # seimbang satu tingkat (panggilan bersarang hasil formatter)
+            # tetap wajib terdeteksi oleh lintasan multi-baris.
+            "class Nested {",
+            "    fun leak() = Log.d(\"x\",",
+            "        foo() + token)",
+            "    fun q(db: SQLiteDatabase, u: String) = db.rawQuery(",
+            "        \"SELECT COUNT(*) FROM t WHERE u = '\" + u, null)",
+            "    fun f() = File(",
+            "        baseDir(ctx), parms[\"id\"])",
+            "}",
+        ],
         Path("sample_fp.kt"): [
             # Regresi issue #201: Log polos yang kurungnya DITUTUP, lalu
             # pernyataan LAIN menyebut token dalam jarak <300 karakter —
@@ -606,9 +628,21 @@ def run_self_test() -> int:
         item["rule_id"] == "sensitive_log" and item["path"] == "sample_fp.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit:
+    nested_log = any(
+        item["rule_id"] == "sensitive_log" and item["path"] == "sample_nested.kt"
+        for item in findings
+    )
+    nested_sql = any(
+        item["rule_id"] == "sql_injection_sink" and item["path"] == "sample_nested.kt"
+        for item in findings
+    )
+    nested_path = any(
+        item["rule_id"] == "external_path_sink" and item["path"] == "sample_nested.kt"
+        for item in findings
+    )
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
