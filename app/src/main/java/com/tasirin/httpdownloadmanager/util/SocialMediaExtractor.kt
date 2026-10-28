@@ -173,6 +173,42 @@ object SocialMediaExtractor {
         val videoUrl: String = ""
     )
 
+    /** Gabungkan cookie hasil ekstraksi ke blok header unduhan (#238).
+     *  Baris Cookie milik user TIDAK boleh ditimpa: applyAuthHeaders memakai
+     *  setRequestProperty per baris sehingga baris Cookie yang muncul
+     *  terakhir menang — menempelkan baris "Cookie: ..." baru di akhir
+     *  diam-diam membuang cookie akun yang ditempel user (berkas Drive
+     *  berbagi-terbatas langsung 403 walau ekstraksi sukses). Pasangan user
+     *  dipertahankan dan didahulukan; pasangan hasil ekstraksi hanya
+     *  ditambahkan bila namanya belum ada. Murni. */
+    internal fun mergeCookiesIntoHeaders(existing: String, cookies: String): String {
+        val extra = cookies.trim()
+        if (extra.isEmpty()) return existing
+        val userPairs = mutableListOf<String>()
+        val others = mutableListOf<String>()
+        for (rawLine in existing.split("\n")) {
+            val line = rawLine.trim()
+            if (line.isEmpty()) continue
+            val key = line.substringBefore(':', "").trim()
+            if (key.equals("Cookie", ignoreCase = true)) {
+                userPairs += line.substringAfter(':', "").split(';')
+                    .map { it.trim() }.filter { it.isNotEmpty() }
+            } else {
+                others += line
+            }
+        }
+        val seen = userPairs
+            .map { it.substringBefore('=').trim().lowercase(Locale.ROOT) }
+            .toMutableSet()
+        val merged = userPairs.toMutableList()
+        for (pair in extra.split(';').map { it.trim() }.filter { it.isNotEmpty() }) {
+            val name = pair.substringBefore('=').trim().lowercase(Locale.ROOT)
+            if (seen.add(name)) merged += pair
+        }
+        return (others + "Cookie: " + merged.joinToString("; "))
+            .joinToString("\n")
+    }
+
     fun isSocialMediaUrl(url: String): Boolean {
         val lower = url.lowercase(Locale.ROOT)
         // Jalur cepat: URL file langsung (kasus umum) gugur tanpa regex.

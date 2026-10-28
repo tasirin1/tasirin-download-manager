@@ -567,6 +567,30 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `mergeCookiesIntoHeaders - cookie user tidak ditimpa cookie ekstraksi`() {
+        // Tanpa header lama: baris Cookie baru.
+        assertEquals("Cookie: a=1; b=2",
+            SocialMediaExtractor.mergeCookiesIntoHeaders("", "a=1; b=2"))
+        // Header lain dipertahankan, Cookie ditambahkan di akhir.
+        assertEquals("Referer: https://x/\nCookie: a=1",
+            SocialMediaExtractor.mergeCookiesIntoHeaders("Referer: https://x/", "a=1"))
+        // Nama yang sama: nilai user menang; nama baru dari ekstraksi ditambahkan.
+        assertEquals("Cookie: session=U; NID=xyz",
+            SocialMediaExtractor.mergeCookiesIntoHeaders(
+                "Cookie: session=U", "session=J; NID=xyz"))
+        // Kunci cookie huruf kecil tetap dikenali.
+        assertEquals("Cookie: s=U; n=1",
+            SocialMediaExtractor.mergeCookiesIntoHeaders("cookie: s=U", "n=1"))
+        // Cookie ekstraksi kosong: header tidak berubah.
+        assertEquals("Cookie: a=1",
+            SocialMediaExtractor.mergeCookiesIntoHeaders("Cookie: a=1", ""))
+        // Dua baris Cookie lama disatukan jadi satu baris.
+        assertEquals("Cookie: a=1; b=2; c=3",
+            SocialMediaExtractor.mergeCookiesIntoHeaders(
+                "Cookie: a=1\nCookie: b=2", "c=3"))
+    }
+
+    @Test
     fun `parseContentDispositionFileName - bentuk quoted, token, dan RFC 5987`() {
         assertEquals("clip final.mp4", SocialMediaExtractor.parseContentDispositionFileName(
             "attachment; filename=\"clip final.mp4\""))

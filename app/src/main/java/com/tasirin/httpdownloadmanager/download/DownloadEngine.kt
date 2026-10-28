@@ -1582,10 +1582,10 @@ class DownloadEngine(appContext: Context) {
                 // Non-HLS extraction path (bukan HLS)
                 val newName = sanitizeFileName(result.fileName ?: item.fileName)
                 // Gabung cookies dari extraction ke headers untuk CDN download
-                val mergedHeaders = if (result.cookies.isNotEmpty()) {
-                    val existing = item.headers.trim()
-                    if (existing.isNotEmpty()) "${existing}\nCookie: ${result.cookies}" else "Cookie: ${result.cookies}"
-                } else item.headers
+                // (#238: cookie user tidak ditimpa cookie ekstraksi).
+                val mergedHeaders = SocialMediaExtractor.mergeCookiesIntoHeaders(
+                    item.headers, result.cookies
+                )
                 updateItem(item.id) { it.copy(
                     url = result.directUrl,
                     fileName = if (!item.nameIsCustom) newName else item.fileName,

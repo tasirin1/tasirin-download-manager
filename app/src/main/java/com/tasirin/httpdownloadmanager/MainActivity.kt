@@ -949,11 +949,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             } else if (carouselAll && socialPhotoOptions.isNotEmpty()) {
                 // Download semua foto carousel sekaligus
                 socialPhotoOptions.forEachIndexed { idx, opt ->
-                    val mergedHeaders = if (opt.cookies.isNotEmpty()) {
-                        val existing = headers.trim()
-                        if (existing.isNotEmpty()) "${existing}\nCookie: ${opt.cookies}"
-                        else "Cookie: ${opt.cookies}"
-                    } else headers
+                    val mergedHeaders =
+                        SocialMediaExtractor.mergeCookiesIntoHeaders(headers, opt.cookies)
                     App.engine.addDownload(
                         url = opt.directUrl,
                         fileName = opt.fileName,
@@ -967,11 +964,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     )
                 }
             } else if (selectedOption != null) {
-                val mergedHeaders = if (selectedOption.cookies.isNotEmpty()) {
-                    val existing = headers.trim()
-                    if (existing.isNotEmpty()) "${existing}\nCookie: ${selectedOption.cookies}"
-                    else "Cookie: ${selectedOption.cookies}"
-                } else headers
+                val mergedHeaders = SocialMediaExtractor.mergeCookiesIntoHeaders(
+                    headers, selectedOption.cookies
+                )
                 App.engine.addDownload(
                     url = selectedOption.directUrl,
                     fileName = selectedOption.fileName ?: name,
