@@ -229,7 +229,11 @@ def admin_consistency() -> Result:
                 expect = f"{utuh},{pecahan_str}"
             else:
                 expect = f"{utuh}"
-            if expect not in agents:
+            # Konteks persen wajib (issue #214): angka bulat polos
+            # ("10", "20", "50") cocok di mana-mana dalam dokumen
+            # sehingga ceknya vakum — dokumen menulis ambang sebagai
+            # "8,5%", jadi yang dicari bentuk ber-% nya.
+            if expect + "%" not in agents:
                 problems.append("AGENTS.md ambang JaCoCo tak sinkron dengan app/build.gradle.kts")
     except OSError as exc:
         problems.append(f"cek toolchain tak terbaca: {exc}")
