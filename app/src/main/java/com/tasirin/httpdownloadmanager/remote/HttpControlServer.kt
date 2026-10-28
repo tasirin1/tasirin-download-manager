@@ -1775,6 +1775,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
     }
 
+    /** Mutasi filesystem (hapus/pindah/ganti nama/upload) membatalkan
+     *  seluruh cache ZIP (#217): arsip adalah salinan byte utuh, jadi entri
+     *  basi akan menghidupkan lagi file yang sudah dihapus. Stream yang
+     *  sudah terbuka selamat dari unlink di Linux. */
+    private fun invalidateZipCache() {
+        val entries = zipCache.values.toList()
+        zipCache.clear()
+        entries.forEach { runCatching { it.second.delete() } }
+    }
+
     private fun createTempZip(fill: (ZipOutputStream) -> Unit): File? = try {
         File.createTempFile("fszip", ".zip", context.cacheDir).also { tmpFile ->
             try {
@@ -2268,6 +2278,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  jarang, sementara pemetaan path fisik ke key relatif rawan salah. */
     private fun invalidateFsMediaCache() {
         fsMediaCache.clear()
+        invalidateZipCache()
     }
 
     /** Invalidate fsRoots cache saat settings berubah. */
@@ -2424,6 +2435,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun invalidateFsListingCache() {
         fsFileListingCache = null
+        invalidateZipCache()
     }
 
     private fun fsListFiles(
@@ -2884,7 +2896,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (ok) {
                 // MediaStore berubah: buang cache listing folder media & snapshot
                 // galeri supaya nama/hapus/pindah langsung terlihat (bukan 5-15 dtk).
-                fsMediaCache.clear()
+                invalidateFsMediaCache()
                 invalidateGalleryCache()
             }
             ok
@@ -2917,7 +2929,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         // Invalidasi cache setelah copy ke MediaStore berhasil, supaya
         // listing media langsung mendeteksi file baru walau delete asli gagal.
-        fsMediaCache.clear()
+        invalidateFsMediaCache()
         invalidateGalleryCache()
         val gone = runCatching { file.delete() }.getOrDefault(false)
         if (!gone) {
@@ -2955,7 +2967,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             runCatching { target.delete() }
             return false
         }
-        fsMediaCache.clear()
+        invalidateFsMediaCache()
         invalidateGalleryCache()
         return true
     }
