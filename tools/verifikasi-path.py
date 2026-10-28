@@ -1086,14 +1086,25 @@ def nama_fun_hilang(diff, lewati_berkas=()):
             continue
         if path in lewati_berkas or not os.path.isfile(os.path.join(AKAR, path)):
             continue
-        cocok = re.search(r"\bfun\s+(?:<[^>]*>\s*)?(\w+)\s*[\(<]", baris)
+        # Segmen receiver opsional (issue #510): deklarasi ekstensi
+        # "fun String.nama(...)" atau "fun List<T>.nama(...)" dulu
+        # menangkap TIPE-nya sebagai nama lalu gagal di tuntutan kurung
+        # sesudahnya — penghapusan fungsi ekstensi tak tercatat sama
+        # sekali oleh keluarga cek ini.
+        cocok = re.search(
+            r"\bfun\s+(?:<[^>]*>\s*)?(?:[\w<][\w<>, ?]*\.)?(\w+)\s*[\(<]",
+            baris)
         if cocok and cocok.group(1) not in KATA_KUNCI_KOTLIN:
             hilang.append(cocok.group(1))
     return hilang
 
 
 def masih_didefinisikan(nama):
-    pola = re.compile(r"\bfun\s+(?:<[^>]*>\s*)?%s\s*[\(<]" % re.escape(nama))
+    # Bentuk simetris dengan nama_fun_hilang (issue #510): definisi
+    # ekstensi "fun Receiver.nama(...)" juga berarti nama masih hidup.
+    pola = re.compile(
+        r"\bfun\s+(?:<[^>]*>\s*)?(?:[\w<][\w<>, ?]*\.)?%s\s*[\(<]"
+        % re.escape(nama))
     for path in jalan_repo(os.path.join("app", "src", "main", "java"), ext=(".kt", ".java")):
         if pola.search(baca(path)):
             return True
