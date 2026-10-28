@@ -2787,8 +2787,14 @@ class DownloadEngine(appContext: Context) {
         // YouTube kadang memblokir media playlist varian tertinggi (404) tapi
         // membiarkan varian rendah lewat. Coba beberapa varian sampai ada yang berhasil.
         val candidates = if (preferredHeight > 0) {
-            // Saat user pilih resolusi: urutkan dari paling dekat target ke terjauh
-            variants.filter { it.codecs.contains("avc") }
+            // Saat user pilih resolusi: urutkan dari paling dekat target ke terjauh.
+            // AVC didahulukan, TETAPI saringan kerasnya tak boleh mengosongkan
+            // daftar (issue #386): varian HEVC/VP9/AV1 saja — atau CODECS
+            // kosong, umum pada master html5player — sebelumnya membuat
+            // unduhan gagal total padahal varian unduhable ada. Bila tak ada
+            // AVC, semua varian ikut diperingkat menurut kedekatan resolusi.
+            val avc = variants.filter { it.codecs.contains("avc") }
+            (if (avc.isNotEmpty()) avc else variants)
                 .sortedBy { kotlin.math.abs(it.height - preferredHeight) }
         } else {
             // Default: urutkan dari bandwidth tertinggi ke terendah
