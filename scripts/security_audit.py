@@ -860,6 +860,17 @@ def run_self_test() -> int:
             "// audit-ignore-next: bukan_js_dynamic_exec_sama_sekali",
             "const other = eval(userInput);",
         ],
+        Path("sample_multi.js"): [
+            # Regresi issue #345 (dikunci oleh #377): sink JS yang dipecah
+            # baris formatter HANYA tertangkap lintasan multiline — pola
+            # per baris tidak melihat 'eval' + '(' di baris berbeda, dan
+            # [^;\n]* dom_xss_source tidak menyeberangi baris. Mencabut
+            # multiline dari kedua aturan wajib menggagalkan self-test.
+            "const value = eval",
+            "    (userInput);",
+            "el.innerHTML =",
+            "    location.hash;",
+        ],
         Path("sample.txt"): [
             f"GITHUB_TOKEN={github_token}",
             "TODO: validate this flow",  # audit-ignore: maintenance_marker
@@ -869,6 +880,11 @@ def run_self_test() -> int:
         root = Path(directory)
         for path, lines in samples.items():
             (root / path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # Regresi issue #344 (dikunci oleh #377): berkas yang tak bisa
+        # dibaca (non-UTF-8) wajib melahirkan temuan file_unscanned,
+        # bukan terlewat diam-diam. Ditulis sebagai byte agar read_lines
+        # gagal decode persis seperti berkas nyata yang terlewat.
+        (root / "unscanned.js").write_bytes(b"\xff\xfe\x00 eval(userInput)")
         findings = scan_path(root)
 
     by_rule = {str(item["rule_id"]) for item in findings}
@@ -909,6 +925,18 @@ def run_self_test() -> int:
     )
     fp_hit = any(
         item["rule_id"] == "sensitive_log" and item["path"] == "sample_fp.kt"
+        for item in findings
+    )
+    multi_js = any(
+        item["rule_id"] == "js_dynamic_exec" and item["path"] == "sample_multi.js"
+        for item in findings
+    )
+    multi_xss = any(
+        item["rule_id"] == "dom_xss_source" and item["path"] == "sample_multi.js"
+        for item in findings
+    )
+    unscanned_hit = any(
+        item["rule_id"] == "file_unscanned" and item["path"] == "unscanned.js"
         for item in findings
     )
     nested_log = any(
@@ -963,9 +991,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak:
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
