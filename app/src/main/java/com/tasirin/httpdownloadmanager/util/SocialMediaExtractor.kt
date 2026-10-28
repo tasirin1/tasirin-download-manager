@@ -1657,8 +1657,18 @@ object SocialMediaExtractor {
                         val pair = raw.substringBefore(';')
                         val eq = pair.indexOf('=')
                         if (eq > 0) {
-                            cookieJar[pair.substring(0, eq).trim()] =
-                                pair.substring(eq + 1).trim() to currentHost
+                            val name = pair.substring(0, eq).trim()
+                            val value = pair.substring(eq + 1).trim()
+                            // Set-Cookie penghapusan tidak boleh disimpan
+                            // lalu terkirim lagi sebagai 'nama=' (#359,
+                            // menyelaraskan jar Drive dengan #321).
+                            if (value.isEmpty() ||
+                                raw.contains("max-age=0", ignoreCase = true)
+                            ) {
+                                cookieJar.remove(name)
+                            } else {
+                                cookieJar[name] = value to currentHost
+                            }
                         }
                     }
                 if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
