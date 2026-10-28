@@ -1382,9 +1382,18 @@ def utama():
                 continue
             try:
                 with open(os.path.join(AKAR, nama), encoding="utf-8") as f:
-                    isi = f.read(2_000_000)
+                    isi = f.read(2_000_001)
             except (OSError, UnicodeDecodeError):
                 continue
+            if len(isi) > 2_000_000:
+                # Batas baca tercapai: suntikan parsial WAJIB diberi
+                # tahu (issue #501) — tanpa ini cek berbasis diff buta
+                # diam-diam sesudah batas.
+                peringatan.append(
+                    "Isi " + nama + " terpotong di 2000000 karakter — "
+                    "cek berbasis diff parsial (issue #501)"
+                )
+                isi = isi[:2_000_000]
             nama_header = nama.replace("\n", "_").replace("\r", "_")
             baris_isi = isi.splitlines()
             diff += (
@@ -1441,9 +1450,17 @@ def utama():
         for nama in nama_tak_lacak():
             try:
                 with open(os.path.join(AKAR, nama), encoding="utf-8") as f:
-                    isi = f.read(2_000_000)
+                    isi = f.read(2_000_001)
             except (OSError, UnicodeDecodeError):
                 continue
+            if len(isi) > 2_000_000:
+                # Peringatan terpotong yang sama seperti mode jalur
+                # (issue #501): penilaian diff atas berkas ini parsial.
+                peringatan.append(
+                    "Isi " + nama + " terpotong di 2000000 karakter — "
+                    "cek berbasis diff parsial (issue #501)"
+                )
+                isi = isi[:2_000_000]
             # Format diff git sungguhan (header + +++): pengurai diff
             # (tambah_kt dkk.) hanya mengakui baris '+' di bawah header
             # 'diff --git' yang path-nya berakhiran .kt/.java. Nama di
