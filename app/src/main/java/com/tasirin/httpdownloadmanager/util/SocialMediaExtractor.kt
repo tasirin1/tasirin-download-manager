@@ -11,6 +11,10 @@ import java.net.URL
 import java.net.URLEncoder
 import java.io.InputStream
 import java.util.Locale
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.HttpsURLConnection
 
 object SocialMediaExtractor {
@@ -1519,11 +1523,19 @@ object SocialMediaExtractor {
         // host/domain induk yang sama (#239), bukan ke host redirect mana
         // pun seperti jar polos sebelumnya.
         val cookieJar = LinkedHashMap<String, Pair<String, String>>()
+        // Deadline total rantai hop (#246): 6 hop x 20 dtk bisa 120 dtk,
+        // melampaui anggaran ekstraksi 60 dtk dan membuat tahap ini
+        // ditinggal withTimeoutOrNull tanpa hasil. Hop berhenti di 45 dtk
+        // dan timeout per hop menyusut mengikuti sisa waktu.
+        val deadline = android.os.SystemClock.elapsedRealtime() + 45_000L
         repeat(6) {
+            val remainingMs = deadline - android.os.SystemClock.elapsedRealtime()
+            if (remainingMs <= 0L) return null
             val conn = openTlsConn(current)
             try {
-                conn.connectTimeout = PAGE_TIMEOUT_MS
-                conn.readTimeout = PAGE_TIMEOUT_MS
+                val hopTimeout = remainingMs.coerceIn(1_000L, PAGE_TIMEOUT_MS.toLong()).toInt()
+                conn.connectTimeout = hopTimeout
+                conn.readTimeout = hopTimeout
                 conn.instanceFollowRedirects = false
                 val currentHost = runCatching { java.net.URI(current).host }
                     .getOrNull().orEmpty()
@@ -1649,8 +1661,36 @@ object SocialMediaExtractor {
             ?: options.firstOrNull()
     }
 
+    /** Executor tahap ekstraksi berjangkar waktu (#246): fetch pemblokir
+     *  (soket) tidak patuh pembatalan coroutine, jadi withTimeoutOrNull
+     *  saja tidak bisa memotong tahap yang menggantung. Tahap dijalankan
+     *  di thread daemon pool ini dan ditunggu dengan batas keras; benang
+     *  yang terlambat selesai sendiri (timeout soketnya terbatas) dan
+     *  hasilnya dibuang. */
+    private val stageExecutor: ExecutorService by lazy {
+        Executors.newCachedThreadPool { r ->
+            Thread(r, "extract-stage").apply { isDaemon = true }
+        }
+    }
+
+    /** Jalankan [block] dengan batas tunggu [capMs]; null bila lewat. */
+    private fun <T> runStageCapped(capMs: Long, block: () -> T?): T? {
+        val future = stageExecutor.submit(Callable { runCatching { block() }.getOrNull() })
+        return try {
+            future.get(capMs, TimeUnit.MILLISECONDS)
+        } catch (_: Exception) {
+            future.cancel(false)
+            null
+        }
+    }
+
     private fun extractAllFacebook(url: String, user: Map<String, String>): List<Result> {
-        val (html, cookies) = facebookPage(url, FB_HEADERS + user)
+        // Tiap strategi punya jatah waktu sendiri (#246): tanpa jatah,
+        // tahap pertama yang lambat menghabiskan seluruh anggaran total
+        // 60 detik dan cadangan tidak pernah dicoba.
+        val (html, cookies) = runStageCapped(24_000L) {
+            facebookPage(url, FB_HEADERS + user)
+        } ?: ("" to "")
         val videoId = parseFacebookVideoId(url, html)
         val nameId = videoId ?: FB_SHARE_ID_RE.find(url)?.groupValues?.get(1) ?: "video"
         if (html.isNotEmpty()) {
@@ -1659,21 +1699,25 @@ object SocialMediaExtractor {
         }
         // Strategi 2: halaman plugin embed — sering memuat hd_src/sd_src
         // walau halaman utama tidak.
-        val plugin = httpGetWithCookies(
-            "https://www.facebook.com/plugins/video.php?href=" +
-                URLEncoder.encode(url, "UTF-8") + "&show_text=false",
-            FB_HEADERS + user, PAGE_TIMEOUT_MS
-        )?.body.orEmpty()
+        val plugin = runStageCapped(12_000L) {
+            httpGetWithCookies(
+                "https://www.facebook.com/plugins/video.php?href=" +
+                    URLEncoder.encode(url, "UTF-8") + "&show_text=false",
+                FB_HEADERS + user, PAGE_TIMEOUT_MS
+            )
+        }?.body.orEmpty()
         if (plugin.isNotEmpty()) {
             val fromPlugin = parseFacebookPage(plugin, nameId, cookies)
             if (fromPlugin.isNotEmpty()) return fromPlugin
         }
         // Strategi 3: halaman embed lama — butuh ID numerik.
         if (videoId != null) {
-            val embed = httpGetWithCookies(
-                "https://www.facebook.com/video/embed?video_id=$videoId",
-                FB_HEADERS + user, PAGE_TIMEOUT_MS
-            )?.body.orEmpty()
+            val embed = runStageCapped(12_000L) {
+                httpGetWithCookies(
+                    "https://www.facebook.com/video/embed?video_id=$videoId",
+                    FB_HEADERS + user, PAGE_TIMEOUT_MS
+                )
+            }?.body.orEmpty()
             if (embed.isNotEmpty()) {
                 val fromEmbed = parseFacebookPage(embed, nameId, cookies)
                 if (fromEmbed.isNotEmpty()) return fromEmbed
@@ -1681,7 +1725,7 @@ object SocialMediaExtractor {
         }
         // Strategi 4: Cobalt — tanpa header user (cookie tak boleh bocor ke
         // pihak ketiga, pola yang sama dengan Twitter).
-        val cobalt = runCatching { extractFacebookViaCobalt(url) }.getOrNull()
+        val cobalt = runStageCapped(12_000L) { extractFacebookViaCobalt(url) }
         return if (cobalt != null) listOf(cobalt) else emptyList()
     }
 
