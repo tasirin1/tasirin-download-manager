@@ -128,16 +128,4 @@ internal class RandomAccessOutputStream(private val raf: RandomAccessFile) : jav
     override fun write(b: ByteArray, off: Int, len: Int) = raf.write(b, off, len)
 }
 
-/** Tutup stream + hapus file sementara (tmp upload/ZIP) setelah selesai. */
-internal class DeleteOnCloseStream(
-    private val delegate: InputStream,
-    private val fileToDelete: File?
-) : InputStream() {
-    override fun read(): Int = delegate.read()
-    override fun read(b: ByteArray, off: Int, len: Int): Int = delegate.read(b, off, len)
-    override fun close() {
-        runCatching { delegate.close() }
-        val toDelete = fileToDelete
-        if (toDelete != null) runCatching { toDelete.delete() }
-    }
-}
+
