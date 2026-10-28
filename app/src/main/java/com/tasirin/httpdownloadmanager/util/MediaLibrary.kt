@@ -107,6 +107,22 @@ object MediaLibrary {
         }
     }
 
+    /** Koleksi tempat sebuah URI MediaStore BENAR-BENAR hidup, dibaca
+     *  dari segmen path URI-nya sendiri (issue #444) — bukan dari mime
+     *  nama berkas saat ini: sesudah rename lintas-ekstensi (video
+     *  .mp4 -> .bin) mime nama berjalan tak lagi mencerminkan koleksi
+     *  tempat berkas diterbitkan, dan kueri keunikan ke koleksi yang
+     *  salah membuat duplikat nama di folder asal lolos lagi. */
+    fun mediaCollectionForUri(uri: Uri): Uri {
+        val seg = uri.pathSegments
+        return when {
+            seg.contains("video") -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            seg.contains("images") -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            seg.contains("audio") -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            else -> downloadsCollection()
+        }
+    }
+
     /** Koleksi Downloads (API 29+); fallback aman "Files" untuk Android 5-9.
      *  Pemanggil sudah guard API 29, jadi fallback tidak pernah terpakai. */
     private fun downloadsCollection(): Uri =

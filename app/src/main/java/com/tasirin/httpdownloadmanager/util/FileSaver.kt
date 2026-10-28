@@ -611,15 +611,17 @@ class FileSaver(context: Context) {
                             // rename menghasilkan dua berkas bernama sama
                             // persis di folder yang sama. Pola sama seperti
                             // saveToMediaStore yang meneruskan koleksinya.
-                            // Koleksi diturunkan dari mime nama LAMA
-                            // (issue #411): koleksi tempat berkas hidup
-                            // ditentukan jenisnya saat ini, jadi memakai
-                            // mime nama baru membuat rename lintas-ekstensi
-                            // (video .mp4 -> .bin) memeriksa koleksi yang
-                            // salah dan duplikat di Movies lolos lagi.
+                            // Koleksi dibaca dari URI berkas itu sendiri
+                            // (issue #444): turunan mime nama LAMA (#411)
+                            // masih menyimpang pada rename KEDUA — sesudah
+                            // .mp4 -> .bin, "nama lama" adalah .bin yang
+                            // mime-nya bukan video, padahal berkas tetap
+                            // hidup di koleksi Video (rename tidak
+                            // memindahkan antar-koleksi). URI adalah
+                            // satu-satunya sumber yang selalu benar.
                             uniqueMediaStoreName(
                                 clean, rel,
-                                MediaLibrary.mediaCollectionFor(rel, MimeTypes.forFile(item.fileName))
+                                MediaLibrary.mediaCollectionForUri(uri)
                             )
                         } else {
                             clean
