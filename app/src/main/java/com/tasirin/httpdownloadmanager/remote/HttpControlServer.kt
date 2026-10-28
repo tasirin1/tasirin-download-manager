@@ -2814,9 +2814,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             file.copyTo(target, overwrite = false)
                             if (!file.delete()) throw java.io.IOException("Failed to remove source")
                         }
-                    } catch (e: java.io.FileAlreadyExistsException) {
+                    } catch (e: kotlin.io.FileAlreadyExistsException) {
                         // Target muncul di sela cek (bukan hasil salinan
                         // operasi ini) — jangan pernah dihapus (issue #177).
+                        // Kelasnya kotlin.io (yang dilempar copyTo/
+                        // copyRecursively); java.io tidak punya kelas ini
+                        // sehingga build gagal compile sejak 4e71cb8.
                         throw e
                     } catch (e: Exception) {
                         // Salin separuh jalan jangan tertinggal sebagai data ganda.
