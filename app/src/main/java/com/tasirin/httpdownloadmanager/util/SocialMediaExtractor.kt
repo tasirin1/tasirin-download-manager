@@ -1473,7 +1473,11 @@ object SocialMediaExtractor {
             val item = media.optJSONObject(i) ?: continue
             val suffix = if (media.length() > 1) "_${i + 1}" else ""
             when (item.optString("type")) {
-                "video" -> {
+                // "gif" (issue #420): vxtwitter melaporkan GIF sebagai tipe
+                // tersendiri dengan URL berkas MP4 di video.twimg.com.
+                // Tanpa cabang ini item terlewat diam-diam dan tweet
+                // khusus GIF gagal diekstrak total (daftar opsi kosong).
+                "video", "gif" -> {
                     val directUrl = item.optString("url")
                     if (directUrl.startsWith("http")) {
                         options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}$suffix.mp4", text, "Video", MIME_MP4))
