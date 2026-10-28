@@ -3657,8 +3657,11 @@ async function fsLoadMore() {
     btn.textContent = 'Loading\u2026';
   }
   try {
+    // Lokasi MediaStore (m:) selalu mode offset: fsListMedia di server
+    // berbasis offset dan mengabaikan kursor keyset — mengirim after ke
+    // sana mengulang halaman pertama selamanya (issue #178).
     const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
-      (fsAfterName
+      (fsAfterName && !fsPath.startsWith('m:')
         ? '&after=' + encodeURIComponent(fsAfterName) + '&afterDir=' + (fsAfterDir ? '1' : '0')
         : '&offset=' + fsOffset) +
       '&limit=' + FS_PAGE, undefined, 20000);
