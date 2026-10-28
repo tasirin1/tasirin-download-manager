@@ -3105,13 +3105,33 @@ class DownloadEngine(appContext: Context) {
                         groupRenditions.filter { !it.isDefault && isDubbed(it) }
                 }
                 var audioResult: List<String>? = null
+                var audioFatal: IOException? = null
                 for (rendition in ordered) {
-                    val segs = runCatching { mediaSegments(rendition.url, headers, baseUrl) }.getOrNull()
+                    val segs = try {
+                        mediaSegments(rendition.url, headers, baseUrl)
+                    } catch (e: IOException) {
+                        // Alasan fatal tak ditelan buta (issue #553):
+                        // gerbang yang sama yang melempar untuk video
+                        // (terenkripsi/live/byterange/MAP) dulu tertelan
+                        // runCatching di sini sehingga campuran video
+                        // bersih + audio terenkripsi terbit bisu
+                        // COMPLETED tanpa pesan. Catat dan lempar bila
+                        // tak ada rendition yang berhasil, sejajar
+                        // fatalError jalur video; kegagalan jaringan/
+                        // 404 per-rendition tetap degradasi seperti dulu.
+                        if (audioFatal == null &&
+                            e.message?.contains("not supported") == true
+                        ) {
+                            audioFatal = e
+                        }
+                        null
+                    }
                     if (!segs.isNullOrEmpty()) {
                         audioResult = segs
                         break
                     }
                 }
+                if (audioResult == null && audioFatal != null) throw audioFatal
                 audioResult
             }
             App.logEvent(
