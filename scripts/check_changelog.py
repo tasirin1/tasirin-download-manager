@@ -5,6 +5,7 @@ Dipakai job `verify` di build.yml (tanpa SDK). Argumen: base-sha PR dan
 event.before push; salah satunya boleh kosong (skrip memilih yang valid).
 Keluar 1 + ::error:: bila kode berubah tanpa CHANGELOG.md.
 """
+import re
 import subprocess
 import sys
 
@@ -29,8 +30,15 @@ def all_dependabot(base):
     authors = [a.strip() for a in proc.stdout.splitlines() if a.strip()]
     def is_bot(line):
         name, _, email = line.partition("\x1f")
-        return name == "dependabot[bot]" and email.endswith(
-            "dependabot[bot]@users.noreply.github.com")
+        # Email wajib PERSIS bentuk noreply bot (issue #257): endswith
+        # lama menerima alamat manusia/penyerang yang sekadar BERAKHIRAN
+        # sufiks bot, mis. 'xdependabot[bot]@users.noreply.github.com'.
+        # Dua bentuk sah: polos dan berawalan ID numerik GitHub.
+        return name == "dependabot[bot]" and (
+            email == "dependabot[bot]@users.noreply.github.com"
+            or re.fullmatch(
+                r"\d+\+dependabot\[bot\]@users\.noreply\.github\.com",
+                email) is not None)
     return bool(authors) and all(is_bot(a) for a in authors)
 
 
