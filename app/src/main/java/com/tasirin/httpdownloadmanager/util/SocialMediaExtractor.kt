@@ -1760,27 +1760,41 @@ object SocialMediaExtractor {
         }
         // Strategi 2: halaman plugin embed — sering memuat hd_src/sd_src
         // walau halaman utama tidak.
-        val plugin = runStageCapped(12_000L) {
+        val pluginRes = runStageCapped(12_000L) {
             httpGetWithCookies(
                 "https://www.facebook.com/plugins/video.php?href=" +
                     URLEncoder.encode(url, "UTF-8") + "&show_text=false",
                 FB_HEADERS + user, PAGE_TIMEOUT_MS
             )
-        }?.body.orEmpty()
+        }
+        val plugin = pluginRes?.body.orEmpty()
         if (plugin.isNotEmpty()) {
-            val fromPlugin = parseFacebookPage(plugin, nameId, cookies)
+            // Cookie halaman plugin sendiri didahulukan (#278): versi
+            // lama membuangnya dan selalu memakai cookie tahap 1, yang
+            // bisa kosong walau halaman ini menerima Set-Cookie sendiri
+            // — URL media hasil parse lalu berangkat tanpa cookie sesi.
+            val fromPlugin = parseFacebookPage(
+                plugin, nameId,
+                pluginRes?.cookies?.takeIf { it.isNotEmpty() } ?: cookies
+            )
             if (fromPlugin.isNotEmpty()) return fromPlugin
         }
         // Strategi 3: halaman embed lama — butuh ID numerik.
         if (videoId != null) {
-            val embed = runStageCapped(12_000L) {
+            val embedRes = runStageCapped(12_000L) {
                 httpGetWithCookies(
                     "https://www.facebook.com/video/embed?video_id=$videoId",
                     FB_HEADERS + user, PAGE_TIMEOUT_MS
                 )
-            }?.body.orEmpty()
+            }
+            val embed = embedRes?.body.orEmpty()
             if (embed.isNotEmpty()) {
-                val fromEmbed = parseFacebookPage(embed, nameId, cookies)
+                // Sama seperti plugin (#278): cookie halaman embed
+                // sendiri didahulukan atas cookie tahap 1.
+                val fromEmbed = parseFacebookPage(
+                    embed, nameId,
+                    embedRes?.cookies?.takeIf { it.isNotEmpty() } ?: cookies
+                )
                 if (fromEmbed.isNotEmpty()) return fromEmbed
             }
         }
