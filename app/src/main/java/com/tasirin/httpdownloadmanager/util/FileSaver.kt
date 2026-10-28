@@ -462,6 +462,14 @@ class FileSaver(context: Context) {
             )
             StoragePrefs.getTextFolder(appContext)?.let { addSweepNames(File(it), finalNames) }
             items.forEach { item ->
+                // Folder tujuan publish kustom item (issue #445): publish
+                // yang mati di tengah salin meninggalkan staging di folder
+                // folderPath, tetapi filePath item belum berpindah ke sana
+                // sehingga folder itu tak pernah masuk peta sapu dan
+                // staging-nya yatim permanen. Nama tetap dibatasi per item
+                // seperti aturan #412.
+                item.folderPath?.takeIf { it.isNotBlank() }
+                    ?.let { addSweepNames(File(it), setOf(FileNames.safe(item.fileName))) }
                 item.filePath?.takeIf { it.startsWith("/") }
                     ?.let {
                         File(it).parentFile?.let { p ->
