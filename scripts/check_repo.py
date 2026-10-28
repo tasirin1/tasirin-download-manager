@@ -89,13 +89,25 @@ def _local_sdk_markers() -> list[str]:
         # Tata letak SDK nyata tidak pernah menaruh sdkmanager di akar
         # (ia hidup di cmdline-tools/<versi>/bin), jadi syarat lama
         # (probe / "sdkmanager") membuat lapisan ini mati (issue
-        # #511). Yang menjadi penanda kini subdirektori khas SDK di
-        # calon akar — akar bawaan Android Studio ~/Android/Sdk ikut
-        # diprobe — sementara cek berkas langsung dipertahankan.
-        if (probe / "sdkmanager").exists() or any(
-            (probe / sub).exists()
+        # #511). Penanda kini ciri SDK yang kuat — sdkmanager di
+        # cmdline-tools/*/bin, adb di platform-tools, atau android.jar
+        # di platforms/android-* — atau minimal DUA dari tiga
+        # subdirektori khas hadir bersama; satu subdirektori polos
+        # bernama platforms/cmdline-tools/platform-tools saja TIDAK
+        # cukup (issue #517: folder proyek bernama "platforms" di
+        # bawah ~/Android menggagalkan gerbang secara keliru).
+        kuat = (
+            (probe / "sdkmanager").exists()
+            or (probe / "platform-tools" / "adb").exists()
+            or any((probe / "cmdline-tools").glob("*/bin/sdkmanager"))
+            or any((probe / "platforms").glob("android-*/android.jar"))
+        )
+        hadir = sum(
+            1
             for sub in ("cmdline-tools", "platform-tools", "platforms")
-        ):
+            if (probe / sub).exists()
+        )
+        if kuat or hadir >= 2:
             markers.append(str(probe))
     return markers
 
