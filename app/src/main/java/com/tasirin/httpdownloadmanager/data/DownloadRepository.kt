@@ -20,6 +20,14 @@ class DownloadRepository(context: Context) {
     // gagal di-decrypt (keystore invalid) agar save tak menimpa permanen "".
     private val storedCreds = HashMap<String, Quad>()
 
+    // True bila load terakhir menemukan kredensial tersimpan lemah
+    // (plaintext eksplisit/legacy) — engine menindaklanjutinya dengan
+    // penulisan ulang terenkripsi saat start (issue #209; isWeakStorage
+    // sebelumnya tak punya konsumen produksi sama sekali).
+    @Volatile private var weakStorageFound = false
+
+    fun hasWeakStoredCredentials(): Boolean = weakStorageFound
+
     /** Apakah prefs menyimpan blob antrean (bedakan fresh install vs corrupt). */
     fun hadStoredItems(): Boolean = prefs.contains(KEY_ITEMS)
 
@@ -47,6 +55,10 @@ class DownloadRepository(context: Context) {
         degradedLoad = items.isEmpty() && (arr?.length() ?: -1) != 0
         storedCreds.clear()
         if (arr != null) storedCreds.putAll(readStoredCreds(arr))
+        weakStorageFound = storedCreds.values.any { q ->
+            Crypto.isWeakStorage(q.first) || Crypto.isWeakStorage(q.second) ||
+                Crypto.isWeakStorage(q.third) || Crypto.isWeakStorage(q.fourth)
+        }
         return DownloadItemCodec.overlayProgress(items, prefs.getString(KEY_PROGRESS, null))
     }
 

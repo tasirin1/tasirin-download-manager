@@ -199,6 +199,13 @@ class DownloadEngine(appContext: Context) {
     private val throttleTotals = ConcurrentHashMap<String, AtomicLong>()
 
     init {
+        // Migrasi penyimpanan lemah (issue #209): kredensial plaintext
+        // warisan/fallback ditulis ulang terenkripsi SEKARANG saat start,
+        // bukan menunggu persist penuh berikutnya yang entah kapan.
+        if (repository.hasWeakStoredCredentials()) {
+            App.logEvent("STORAGE: weak credential storage found, re-encrypting")
+            flushSave()
+        }
         startBackgroundLoops()
     }
 
@@ -3321,6 +3328,13 @@ class DownloadEngine(appContext: Context) {
             scope.launch { repository.saveImmediate(snapshot) }
         } else {
             repository.saveImmediate(_items.value)
+        }
+        // Konsumsi sinyal fallback enkripsi (issue #209): flag ini
+        // sebelumnya write-only — tak ada yang tahu kredensial jatuh ke
+        // plaintext saat keystore bermasalah. Catat lalu reset.
+        if (Crypto.encryptFallbackUsed) {
+            Crypto.encryptFallbackUsed = false
+            App.logEvent("STORAGE: encryption fallback used during save (keystore issue?)")
         }
     }
 
