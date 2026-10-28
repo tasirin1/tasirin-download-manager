@@ -168,6 +168,18 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMasterLenient - portrait memakai dimensi terkecil seperti parseMaster`() {
+        // 720x1280 portrait wajib tercatat height 720 (bukan 1280 mentah)
+        // agar peringkat kedekatan resolusi setara jalur strict (#393).
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=1600000,RESOLUTION=720x1280\n" +
+            "https://cdn.example.com/videos/portrait.m3u8\n"
+        val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(720, variants[0].height)
+        assertEquals("720 p", variants[0].name)
+    }
+
+    @Test
     fun `parseMasterLenient - relatif dan baris rusak diabaikan`() {
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:BANDWIDTH=500000\n" +

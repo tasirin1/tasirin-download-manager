@@ -113,7 +113,15 @@ object HlsParser {
             if (next.isEmpty() || next.startsWith("#")) continue
             if (!next.startsWith("http") && !next.startsWith("/")) continue
             val bw = BANDWIDTH_RE.find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-            val h = RESOLUTION_HEIGHT_RE.find(ln)?.groupValues?.get(2)?.toIntOrNull() ?: 0
+            // Semantik height SAMA seperti parseMaster (issue #393):
+            // dimensi terkecil, agar video portrait 720x1280 tercatat
+            // 720 — bukan tinggi mentah 1280 yang mengacaukan peringkat
+            // kedekatan resolusi dan label.
+            val h = RESOLUTION_HEIGHT_RE.find(ln)?.groupValues?.let { g ->
+                val w = g[1].toIntOrNull()
+                val hh = g[2].toIntOrNull()
+                if (w != null && hh != null) minOf(w, hh) else 0
+            } ?: 0
             val codecs = CODECS_RE.find(ln)?.groupValues?.get(1).orEmpty()
             val fps = FRAME_RATE_RE.find(ln)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
             out.add(HlsVariant("$h p", resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
