@@ -582,9 +582,14 @@ object MediaLibrary {
         } else {
             emptyList()
         }
-        // Penghitung baris MediaStore mentah (sebelum filter) untuk deteksi
-        // "indeks MediaStore rusak/kosong" — memicu fallback scan filesystem.
-        var mediaStoreRows = 0
+        // Penghitung baris MediaStore yang LOLOS saringan keterbacaan
+        // dan benar-benar masuk daftar — memicu fallback scan
+        // filesystem. Dulu baris MENTAH kursor yang dihitung (issue
+        // #516): indeks berisi baris basi semua (setiap baris gugur di
+        // isMediaEntryReadable) tidak pernah memicu fallback sehingga
+        // galeri kosong padahal walk filesystem bisa menemukan
+        // berkasnya.
+        var mediaStoreAccepted = 0
         runCatching {
             val resolver = context.contentResolver
             val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
@@ -654,7 +659,6 @@ object MediaLibrary {
                     -1
                 }
                 while (c.moveToNext()) {
-                    mediaStoreRows++
                     val name = c.getString(iName) ?: continue
                     val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
                     val relativePath = if (iRel >= 0) {
@@ -665,6 +669,7 @@ object MediaLibrary {
                     val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
                     if (!isMediaEntryReadable(filePath, uri)) continue
                     if (folderFilterActive && !inSelectedFoldersPrecomputed(filePath, relativePath, allowedFolders)) continue
+                    mediaStoreAccepted++
                     list.add(
                         MediaEntry(
                             name = name,
@@ -686,7 +691,7 @@ object MediaLibrary {
         //     via USB/PC — indeks tidak pernah ter-scan): fallback scan
         //     filesystem seluruh storage primer supaya mode "scan semua" tetap
         //     menemukan video tanpa bergantung pada baris MediaStore.
-        if (!folderFilterActive && mediaStoreRows == 0) {
+        if (!folderFilterActive && mediaStoreAccepted == 0) {
             runCatching {
                 val root = File(galleryRoot)
                 if (root.isDirectory) {
@@ -781,7 +786,7 @@ object MediaLibrary {
             }
             .sortedByDescending { it.modified }
         val deduped = allDistinct.take(GALLERY_MAX_ENTRIES)
-        val usedFallback = !folderFilterActive && mediaStoreRows == 0
+        val usedFallback = !folderFilterActive && mediaStoreAccepted == 0
         return MediaScanResult(deduped, allDistinct.size, usedFallback)
     }
 
