@@ -1107,8 +1107,10 @@ def pemanggil(nama):
         # Komentar dikupas dulu (nomor baris dipertahankan): sebutan
         # nama di komentar bukan panggilan (issue #471 — insiden
         # "cache (" putaran 14 yang memaksa redaksi 5 komentar).
-        # Pengupas sadar template (issue #483).
-        bersih = kupas_kode_jaga_baris(baca(path)) if path.endswith((".kt", ".java")) else baca(path)
+        # Pengupas sadar template (issue #483) + isi string ikut
+        # dikosongkan (issue #484): sebutan nama di dalam string bukan
+        # panggilan; ekspresi template tetap kode dan tetap terhitung.
+        bersih = kupas_kode_jaga_baris(baca(path), kosongkan_string=True) if path.endswith((".kt", ".java")) else baca(path)
         for i, baris in enumerate(bersih.splitlines(), 1):
             if pola.search(baris):
                 temu.append("%s:%d" % (path, i))
@@ -1139,8 +1141,9 @@ def cek_panggil_bekas_hapusan(gagal, diff):
             # Komentar dikupas dulu: menyebut nama terhapus di komentar
             # (mis. KDoc "pengganti cacheDuration() yang lama") bukan
             # panggilan dan tidak boleh menggagalkan gerbang (issue #471).
-            # Pengupas sadar template (issue #483).
-            if pola.search(kupas_kode_jaga_baris(baris)):
+            # Pengupas sadar template (issue #483) + isi string
+            # dikosongkan (issue #484).
+            if pola.search(kupas_kode_jaga_baris(baris, kosongkan_string=True)):
                 gagal.append("Baris baru memanggil %s() yang sudah dihapus: %s"
                              % (nama, baris.strip()[:80]))
                 break
