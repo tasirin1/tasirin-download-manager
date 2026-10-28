@@ -295,14 +295,18 @@ def scan_remote() -> list:
     # string terkutip menyapu nama berkas aset url("...") dan nilai
     # properti lain yang bukan teks UI — positif palsu.
     hits = []
-    for block in re.findall(r"<style>(.*?)</style>", html, flags=re.S):
+    # Tag style boleh beratribut (issue #559): pola literal tanpa
+    # atribut membuat blok <style type=...> tak diekstrak dan tak
+    # dibuang, sehingga selektor CSS-nya terpindai mentah sebagai
+    # teks UI (positif palsu).
+    for block in re.findall(r"<style[^>]*>(.*?)</style>", html, flags=re.S):
         # IGNORECASE (issue #550): nama properti CSS tidak peka
         # huruf — CONTENT: kapital ter-render sama persis tetapi
         # dulu lolos dari ekstraksi ini.
         for decl in re.findall(r"content\s*:\s*([^;]+)", block, flags=re.IGNORECASE):
             for dq, sq in re.findall(r'"([^"\n]*)"|\'([^\'\n]*)\'', decl):
                 hits += banned_hits(dq or sq)
-    html = re.sub(r"<style>.*?</style>", "", html, flags=re.S)
+    html = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.S)
     return hits + banned_hits(strip_comments(html))
 
 
