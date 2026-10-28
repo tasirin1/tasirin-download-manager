@@ -274,6 +274,22 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMaster - NAME packager berpola sufiks turunan dinaikkan, bukan ditumpuk`() {
+        // Issue #498: urutan (1) tanpa NAME -> "800 kbps", (2) tanpa
+        // NAME -> "800 kbps #2", (3) NAME persis "800 kbps #2" dari
+        // packager -> dulu "800 kbps #2 #2", kini sufiksnya dinaikkan.
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,CODECS=\"avc1.4D401E\"\n" +
+            "https://cdn.example.com/videos/a.m3u8\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,CODECS=\"hvc1.1.6.L93\"\n" +
+            "https://cdn.example.com/videos/b.m3u8\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,NAME=\"800 kbps #2\"\n" +
+            "https://cdn.example.com/videos/c.m3u8\n"
+        val variants = HlsParser.parseMaster(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(listOf("800 kbps", "800 kbps #2", "800 kbps #3"), variants.map { it.name })
+    }
+
+    @Test
     fun `parseMasterLenient - fallback absolut saat parseMaster gagal`() {
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4D401E\",FRAME-RATE=30\n" +

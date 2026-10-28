@@ -31,6 +31,7 @@ object HlsParser {
     private val FRAME_RATE_RE: Regex = Regex("FRAME-RATE=([\\d.]+)")
     private val RESOLUTION_HEIGHT_RE: Regex = Regex("RESOLUTION=([\\d]+)x([\\d]+)")
     private val MEDIA_TYPE_RE: Regex = Regex("TYPE=([A-Z]+)")
+    private val SUFIKS_LABEL_RE: Regex = Regex("^(.*) #(\\d+)$")
     private val MEDIA_GROUP_RE: Regex = Regex("GROUP-ID=\"([^\"]+)\"")
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
     private val LANGUAGE_RE: Regex = Regex("LANGUAGE=\"([^\"]+)\"")
@@ -78,9 +79,15 @@ object HlsParser {
      *  sama diberi sufiks urut " #2", " #3", dan seterusnya. */
     private fun labelUnik(label: String, terpakai: List<HlsVariant>): String {
         if (terpakai.none { it.name == label }) return label
-        var n = 2
-        while (terpakai.any { it.name == "$label #$n" }) n++
-        return "$label #$n"
+        // Sufiks ekor yang sudah ada DINAIKKAN, bukan ditumpuk (issue
+        // #498): NAME packager yang kebetulan meniru pola turunan
+        // ("800 kbps #2") menjadi "800 kbps #3" saat bertabrakan,
+        // bukan "800 kbps #2 #2".
+        val m = SUFIKS_LABEL_RE.find(label)
+        val dasar = m?.groupValues?.get(1) ?: label
+        var n = (m?.groupValues?.get(2)?.toIntOrNull() ?: 1) + 1
+        while (terpakai.any { it.name == "$dasar #$n" }) n++
+        return "$dasar #$n"
     }
 
     /** Parse isi master playlist. baseUrl dipakai untuk melengkapi URL varian
