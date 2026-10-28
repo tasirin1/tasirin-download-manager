@@ -92,18 +92,7 @@ class FileSaver(context: Context) {
         if (!dir.isDirectory && !dir.mkdirs()) return null
         if (!dir.isDirectory) return null
         return runCatching {
-            val target = uniqueTargetFile(File(dir, fileName))
-            try {
-                target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
-            } catch (e: Exception) {
-                // Gagal di tengah salin: buang target setengah jadi agar tidak
-                // tertinggal sebagai file korup di folder tujuan.
-                runCatching { target.delete() }
-                throw e
-            }
-            partial.delete()
-            MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
-            PublishResult(filePath = target.absolutePath, fileName = target.name)
+            publishFileIntoDir(partial, dir, fileName)
         }.getOrNull()
     }
 
@@ -336,18 +325,7 @@ class FileSaver(context: Context) {
     ): PublishResult? = runCatching {
         val dir = File(folder)
         if (!dir.isDirectory && !dir.mkdirs()) return null
-        val target = uniqueTargetFile(File(dir, fileName))
-        try {
-            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
-        } catch (e: Exception) {
-            // Gagal di tengah salin: buang target setengah jadi agar tidak
-            // tertinggal sebagai file korup di folder teks (seperti publishToPath).
-            runCatching { target.delete() }
-            throw e
-        }
-        partial.delete()
-        MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
-        PublishResult(filePath = target.absolutePath, fileName = target.name)
+        publishFileIntoDir(partial, dir, fileName)
     }.getOrNull()
 
     fun freeBytes(): Long = runCatching {
@@ -464,34 +442,68 @@ class FileSaver(context: Context) {
         if (Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED) {
             runCatching { publicDir.mkdirs() }
             if (publicDir.isDirectory && publicDir.canWrite()) {
-                val target = uniqueTargetFile(File(publicDir, fileName))
-                try {
-                    target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
-                    partial.delete()
-                    MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
-                    return PublishResult(filePath = target.absolutePath, fileName = target.name)
-                } catch (_: Exception) {
-                    // Gagal di tengah salin: buang target setengah jadi agar
-                    // tidak tertinggal sebagai file korup di folder publik.
-                    runCatching { target.delete() }
-                    // fallback ke penyimpanan internal
-                }
+                // Gagal terbit di folder publik -> fallback ke internal.
+                runCatching { publishFileIntoDir(partial, publicDir, fileName) }
+                    .getOrNull()?.let { return it }
             }
         }
         return publishToInternal(partial, fileName)
     }
 
-    private fun publishToInternal(partial: File, fileName: String): PublishResult {
-        val target = uniqueTargetFile(File(downloadDir, fileName))
+    private fun publishToInternal(partial: File, fileName: String): PublishResult =
+        publishFileIntoDir(partial, downloadDir, fileName)
+
+    /** Terbitkan berkas partial ke nama final di [dir] tanpa menyalin
+     *  byte ke nama final secara langsung (issue #372):
+     *  - partial di direktori yang sama: rename langsung ke nama final
+     *    yang sudah diklaim (O(1), atomik) — bukan salinan penuh.
+     *  - partial di direktori lain: salin dulu ke staging bernama
+     *    `<nama>.part` di direktori tujuan, lalu rename ke nama final.
+     *  Dengan pola ini nama final tidak pernah berisi byte setengah
+     *  jadi: kematian proses di tengah salin hanya meninggalkan
+     *  partial/staging yang memang dikenal pemindaian yatim, dan
+     *  rename dalam satu direktori bersifat atomik. */
+    private fun publishFileIntoDir(partial: File, dir: File, fileName: String): PublishResult {
+        val target = uniqueTargetFile(File(dir, fileName))
+        var completed = false
         try {
-            target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
+            val sameDir = runCatching {
+                partial.canonicalFile.parentFile == dir.canonicalFile
+            }.getOrDefault(false)
+            if (sameDir) {
+                if (partial.renameTo(target)) {
+                    completed = true
+                } else {
+                    // renameTo menolak menimpa klaim di sebagian filesystem:
+                    // jatuh ke salinan langsung ke target yang sudah diklaim.
+                    target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
+                    completed = true
+                    partial.delete()
+                }
+            } else {
+                val staging = uniqueTargetFile(File(dir, fileName + ".part"))
+                try {
+                    staging.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
+                    if (staging.renameTo(target)) {
+                        completed = true
+                    } else {
+                        target.outputStream().use { out -> staging.inputStream().use { it.copyTo(out, IO_BUF) } }
+                        completed = true
+                    }
+                } finally {
+                    // Sesudah rename berhasil path staging sudah tidak ada;
+                    // sesudah salinan fallback staging dibuang di sini.
+                    runCatching { staging.delete() }
+                }
+                partial.delete()
+            }
         } catch (e: Exception) {
             // Target setengah jadi tidak disapu pemindaian orphan (.part saja):
-            // hapus di sini agar tidak yatim selamanya.
-            runCatching { target.delete() }
+            // hapus di sini agar tidak yatim selamanya. Target yang sudah
+            // terbit utuh (completed) tidak disentuh.
+            if (!completed) runCatching { target.delete() }
             throw e
         }
-        partial.delete()
         MediaLibrary.notifyMediaChanged(appContext, target.absolutePath)
         return PublishResult(filePath = target.absolutePath, fileName = target.name)
     }
