@@ -265,12 +265,15 @@ object HlsMp4Muxer {
             ext.setDataSource(file.absolutePath)
             val index = selectVideoTrack(ext) ?: return 0
             ext.selectTrack(index)
-            val size = videoBufferSize(ext.getTrackFormat(index))
-            val buffer = ByteBuffer.allocate(size)
+            // Cukup majukan posisi sampel tanpa membaca datanya (#277):
+            // versi lama menyalin SELURUH byte video sekali lagi ke
+            // buffer hanya untuk menghitung jumlah frame, jadi remux
+            // HLS menelan I/O + CPU dua kali lipat. Semantik hitungan
+            // sama: satu hitungan per sampel yang bisa diposisikan
+            // extractor, berhenti saat advance() melaporkan sampel
+            // terakhir (pola yang sama dengan loop penulis sampel).
             var count = 0
             while (true) {
-                buffer.clear()
-                if (ext.readSampleData(buffer, 0) < 0) break
                 count++
                 if (!ext.advance()) break
             }
