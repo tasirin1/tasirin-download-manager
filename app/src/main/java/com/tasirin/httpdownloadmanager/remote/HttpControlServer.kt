@@ -2607,6 +2607,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             } else {
                 emptyMap()
             }
+            // Anggaran waktu statistik berlaku untuk SELURUH halaman,
+            // bukan per-folder: tanpa ini halaman berisi banyak folder
+            // lambat menahan worker sampai jumlah-folder x timeout
+            // walau klien sudah menyerah (issue #451). Folder yang
+            // kehabisan anggaran jatuh ke triple tak-diketahui #439.
+            val statDeadlineNs = System.nanoTime() +
+                TimeUnit.SECONDS.toNanos(STAT_FUTURE_TIMEOUT_SEC)
             page.forEach { f ->
                 val o = JSONObject()
                 o.put("name", f.name)
@@ -2620,7 +2627,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         // TAK DIKETAHUI: tandai terpotong (issue #439) agar
                         // tidak menyamar sebagai folder kosong — ini celah
                         // jalur waktu dari undercount yang ditutup #415.
-                        runCatching { statFutures[f]?.get(STAT_FUTURE_TIMEOUT_SEC, TimeUnit.SECONDS) }.getOrNull() ?: Triple(0, 0L, true)
+                        runCatching {
+                            val sisaNs = statDeadlineNs - System.nanoTime()
+                            if (sisaNs <= 0L) null
+                            else statFutures[f]?.get(sisaNs, TimeUnit.NANOSECONDS)
+                        }.getOrNull() ?: Triple(0, 0L, true)
                     } else {
                         Triple(0, 0L, false)
                     }
