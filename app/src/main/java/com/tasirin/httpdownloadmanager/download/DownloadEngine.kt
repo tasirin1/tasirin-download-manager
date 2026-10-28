@@ -2167,7 +2167,7 @@ class DownloadEngine(appContext: Context) {
             // tercampur menjadi berkas korup berstatus COMPLETED.
             val segProbe = openAuthenticatedConnection(
                 item.url, method = "HEAD",
-                username = item.username, password = <redacted> headers = item.headers
+                username = item.username, password = item.password, headers = item.headers
             )
             var segHeaders: ServerHeaders? = null
             try {
