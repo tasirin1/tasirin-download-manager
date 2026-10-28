@@ -1715,7 +1715,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             else -> File(raw.removePrefix(FS_PREFIX)).name
         }.ifEmpty { "folder" }
         val key = "fs:" + raw
-        val tmp = zipCached(key) {
+        val (input, total) = openZipStream(key) {
             createTempZip { zos ->
                 if (raw.startsWith(MS_PREFIX)) {
                     ZipCreator.zipMedia(zos, raw.removePrefix(MS_PREFIX), context)
@@ -1727,17 +1727,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
             }
         } ?: return notFound()
-        if (tmp.length() == 0L) {
-            zipCache.remove(key)
-            runCatching { tmp.delete() }
-            return notFound()
-        }
-        appendLog("ZIP CREATED: $folderName.zip (${Formats.bytes(tmp.length())})")
+        appendLog("ZIP CREATED: $folderName.zip (${Formats.bytes(total)})")
         return streamMedia(
             name = "$folderName.zip",
             mime = "application/zip",
-            input = FileInputStream(tmp),
-            total = tmp.length(),
+            input = input,
+            total = total,
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
         )
@@ -1754,6 +1749,38 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun zipLockFor(key: String): Any =
         zipLocks[(key.hashCode() and Int.MAX_VALUE) % zipLocks.size]
+
+    /** Buka stream ZIP dari cache, total dibaca dari FD yang terbuka
+     *  (#234). Balapan eviction/invalidasi bisa menghapus berkas di antara
+     *  zipCached() dan FileInputStream: entri basi dibuang (hanya bila
+     *  masih memetakan berkas yang sama, bukan pemetaan yang lebih baru)
+     *  lalu pembuatan dicoba sekali lagi. Total dari channel FD kebal
+     *  unlink; null berarti tak ada ZIP atau ZIP sungguh kosong. */
+    private fun openZipStream(
+        key: String, create: () -> File?
+    ): Pair<java.io.InputStream, Long>? {
+        repeat(2) {
+            val tmp = zipCached(key, create) ?: return null
+            val input = runCatching { FileInputStream(tmp) }.getOrNull()
+            if (input == null) {
+                zipCache.entries.removeIf {
+                    it.key == key && it.value.second == tmp
+                }
+                return@repeat
+            }
+            val total = runCatching { input.channel.size() }.getOrDefault(-1L)
+            if (total <= 0L) {
+                runCatching { input.close() }
+                zipCache.entries.removeIf {
+                    it.key == key && it.value.second == tmp
+                }
+                runCatching { tmp.delete() }
+                return null
+            }
+            return input to total
+        }
+        return null
+    }
 
     private fun zipCached(key: String, create: () -> File?): File? {
         val now = System.currentTimeMillis()
@@ -1886,22 +1913,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val tokens = (requestedTokens.filter(::isMediaTokenAllowed) + pathTokens).distinct()
         if (tokens.isEmpty()) return notFound()
         val key = "tokens:" + tokens.sorted().joinToString(",")
-        val tmp = zipCached(key) {
+        val (input, total) = openZipStream(key) {
             createTempZip { zos ->
                 ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
             }
         } ?: return notFound()
-        if (tmp.length() == 0L) {
-            zipCache.remove(key)
-            runCatching { tmp.delete() }
-            return notFound()
-        }
-        appendLog("ZIP MEDIA: ${tokens.size} file (${Formats.bytes(tmp.length())})")
+        appendLog("ZIP MEDIA: ${tokens.size} file (${Formats.bytes(total)})")
         return streamMedia(
             name = "gallery-${tokens.size}-files.zip",
             mime = "application/zip",
-            input = FileInputStream(tmp),
-            total = tmp.length(),
+            input = input,
+            total = total,
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
         )
