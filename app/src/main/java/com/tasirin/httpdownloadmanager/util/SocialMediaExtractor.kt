@@ -1446,8 +1446,11 @@ object SocialMediaExtractor {
     internal fun driveDownloadUrl(fileId: String): String =
         "https://drive.google.com/uc?export=download&id=$fileId"
 
-    private val GD_FORM_ACTION_RE =
-        Regex("<form[^>]+action=\"([^\"]+)\"", RegexOption.IGNORE_CASE)
+    private val GD_FORM_BLOCK_RE =
+        Regex(
+            "<form[^>]+action=\"([^\"]+)\"[^>]*>(.*?)(?:</form>|$)",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        )
     private val GD_FORM_FIELD_A_RE =
         Regex("<input[^>]+name=\"([^\"]+)\"[^>]+value=\"([^\"]*)\"", RegexOption.IGNORE_CASE)
     private val GD_FORM_FIELD_B_RE =
@@ -1459,17 +1462,31 @@ object SocialMediaExtractor {
      *  Mengembalikan null bila form unduh tidak ada (halaman kuota habis,
      *  wajib masuk, atau berkas tidak ditemukan). Murni. */
     internal fun parseDriveConfirmUrl(html: String): String? {
-        val action = GD_FORM_ACTION_RE.find(html)?.groupValues?.get(1)
-            ?.replace("&amp;", "&") ?: return null
-        if (!action.contains("usercontent.google.com/download")) return null
-        val fields = LinkedHashMap<String, String>()
-        for (m in GD_FORM_FIELD_A_RE.findAll(html)) fields[m.groupValues[1]] = m.groupValues[2]
-        for (m in GD_FORM_FIELD_B_RE.findAll(html)) fields.putIfAbsent(m.groupValues[2], m.groupValues[1])
-        if (fields["id"].isNullOrBlank() || fields["uuid"].isNullOrBlank()) return null
-        val query = fields.entries.joinToString("&") { (k, v) ->
-            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
+        // Form yang dipakai adalah form UNDUH-nya, bukan form pertama
+        // dokumen (#247): halaman perantara bisa memuat form lain lebih
+        // dulu. Field juga hanya dibaca dari DALAM form itu — field asing
+        // bernama sama (mis. id) di luar form tidak boleh mencemari query
+        // atau menimpa nilai aslinya.
+        for (form in GD_FORM_BLOCK_RE.findAll(html)) {
+            val action = form.groupValues[1].replace("&amp;", "&")
+            if (!action.contains("usercontent.google.com/download")) continue
+            val body = form.groupValues[2]
+            val fields = LinkedHashMap<String, String>()
+            for (m in GD_FORM_FIELD_A_RE.findAll(body)) {
+                fields[m.groupValues[1]] = m.groupValues[2]
+            }
+            for (m in GD_FORM_FIELD_B_RE.findAll(body)) {
+                fields.putIfAbsent(m.groupValues[2], m.groupValues[1])
+            }
+            if (fields["id"].isNullOrBlank() || fields["uuid"].isNullOrBlank()) {
+                return null
+            }
+            val query = fields.entries.joinToString("&") { (k, v) ->
+                "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
+            }
+            return "$action?$query"
         }
-        return "$action?$query"
+        return null
     }
 
     private val GD_NAME_RE =

@@ -484,6 +484,12 @@ class SocialMediaExtractorTest {
             "value=\"12345678-1234-1234-1234-123456789abc\" name=\"uuid\""
         )
         assertEquals(expected, SocialMediaExtractor.parseDriveConfirmUrl(swapped))
+        // Form asing lebih dulu di dokumen tidak membuat menyerah, dan
+        // field asing bernama sama di luar form unduh tidak mencemari (#247).
+        val decoy = "<form action=\"https://example.com/search\">" +
+            "<input name=\"id\" value=\"JAHAT\"></form>" + html +
+            "<input name=\"id\" value=\"JAHAT2\">"
+        assertEquals(expected, SocialMediaExtractor.parseDriveConfirmUrl(decoy))
         // Halaman kuota habis / tanpa form unduh = null.
         assertEquals(null, SocialMediaExtractor.parseDriveConfirmUrl(
             "<html><body>Too many users have viewed this file</body></html>"))
