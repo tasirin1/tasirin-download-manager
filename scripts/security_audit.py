@@ -394,10 +394,20 @@ def blank_literals(text: str) -> str:
     def scan_template(i: int) -> int:
         # i tepat sesudah '${': ekspresi kode disalin apa adanya sampai '}'
         # penyeimbang; literal di dalamnya diblanko lewat scan_literal.
+        # Komentar di dalam ekspresi template WAJIB ikut dikenali
+        # (#329): tanpa itu, """ di dalam komentar blok dianggap
+        # membuka string mentah (sisa berkas diblanko) dan '}' di
+        # dalam komentar baris menutup template lebih awal — dua-duanya
+        # membuat bocoran multi-baris sesudahnya lolos. Meniru
+        # skip_template verifikasi-path yang sudah sadar komentar.
         depth = 1
         while i < n and depth:
             char = text[i]
-            if char == "{":
+            if text.startswith("//", i):
+                i = scan_line_comment(i)
+            elif text.startswith("/*", i):
+                i = scan_block_comment(i)
+            elif char == "{":
                 depth += 1
                 i += 1
             elif char == "}":
@@ -751,6 +761,22 @@ def run_self_test() -> int:
             "        a(b(c(d(e())))) + token)",
             "}",
         ],
+        Path("sample_tplcomment.kt"): [
+            # Regresi issue #329: komentar di dalam ekspresi template
+            # menipu pemindai literal — """ di komentar blok dianggap
+            # membuka string mentah, '}' di komentar baris menutup
+            # template lebih awal; bocoran multi-baris sesudahnya
+            # wajib tetap terdeteksi.
+            "class TplComment {",
+            "    val a = \"${ /* \"\"\" */ 1 }\"",
+            "    val b = \"\"\"${x // } \"\"\"",
+            "    }",
+            "    val c = \"\"\"sisa",
+            "    fun leak() = Log.d(\"x\",",
+            "        token)",
+            "    \"\"\"",
+            "}",
+        ],
         Path("sample_fp.kt"): [
             # Regresi issue #201: Log polos yang kurungnya DITUTUP, lalu
             # pernyataan LAIN menyebut token dalam jarak <300 karakter —
@@ -896,6 +922,10 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
+    tplcomment_leak = any(
+        item["rule_id"] == "sensitive_log" and item["path"] == "sample_tplcomment.kt"
+        for item in findings
+    )
     comment_leak = any(
         item["rule_id"] == "sensitive_log" and item["line"] == 5
         and item["path"] == "sample_comment.kt"
@@ -906,9 +936,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log:
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
