@@ -2056,11 +2056,25 @@ object SocialMediaExtractor {
         // Set-Cookie respons akhir, jadi cookie sesi yang dipasang hop
         // redirect perantara hilang dari hasil.
         val cookieJar = LinkedHashMap<String, Pair<String, String>>()
+        // Deadline total rantai (#307, pola fetchDrive #246): timeout
+        // per hop yang dipasang ulang PENUH membuat satu rantai 6 hop
+        // bisa 90-120 dtk — jauh melampaui cap tahap pemanggil — dan
+        // benang tahap yang sudah dicap (cancel tak menginterupsi
+        // soket) tetap menduduki stageExecutor selama itu, menolak
+        // tahap sehat berikutnya. Anggaran rantai dibatasi dan
+        // timeout tiap hop menyusut mengikuti sisa waktu.
+        val chainDeadline = android.os.SystemClock.elapsedRealtime() +
+            maxOf(timeoutMs * 2L, 30_000L)
         repeat(6) {
+            val remainingMs = chainDeadline -
+                android.os.SystemClock.elapsedRealtime()
+            if (remainingMs <= 0L) return null
             val conn = openTlsConn(current)
             try {
-                conn.connectTimeout = timeoutMs
-                conn.readTimeout = timeoutMs
+                val hopTimeout = remainingMs
+                    .coerceIn(1_000L, timeoutMs.toLong()).toInt()
+                conn.connectTimeout = hopTimeout
+                conn.readTimeout = hopTimeout
                 conn.instanceFollowRedirects = false
                 val currentHost = runCatching { java.net.URI(current).host }
                     .getOrNull().orEmpty()
@@ -2146,12 +2160,22 @@ object SocialMediaExtractor {
         var method = "POST"
         var payload: ByteArray? = body.toByteArray(Charsets.UTF_8)
         var activeHeaders = headers
+        // Deadline total rantai yang sama dengan httpGetWithCookies
+        // (#307): rantai POST youtubei juga berjalan di benang tahap
+        // yang slotnya terbatas.
+        val chainDeadline = android.os.SystemClock.elapsedRealtime() +
+            maxOf(timeoutMs * 2L, 30_000L)
         repeat(6) {
+            val remainingMs = chainDeadline -
+                android.os.SystemClock.elapsedRealtime()
+            if (remainingMs <= 0L) return null
             val conn = openTlsConn(current)
             try {
                 conn.requestMethod = method
-                conn.connectTimeout = timeoutMs
-                conn.readTimeout = timeoutMs
+                val hopTimeout = remainingMs
+                    .coerceIn(1_000L, timeoutMs.toLong()).toInt()
+                conn.connectTimeout = hopTimeout
+                conn.readTimeout = hopTimeout
                 conn.instanceFollowRedirects = false
                 if (method == "POST") {
                     conn.setRequestProperty("Content-Type", "application/json")
