@@ -2776,7 +2776,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  senyap meloloskan folder raksasa persis seperti sebelum #398. */
     private fun fsStats(path: String): Triple<Int, Long, Boolean> {
         val now = System.currentTimeMillis()
-        val cached = fsStatsCache[path]
+        // Kunci cache SELALU path kanonikal (issue #437): lookup sebelumnya
+        // memakai path absolut apa adanya, sedangkan memo hasil samping
+        // ditulis berkanonikal — untuk path yang mengandung komponen
+        // symlink, lookup tak pernah kena dan subtree dipindai ulang
+        // penuh. Akar dihitung sekali di sini dan dipakai ulang untuk
+        // frame awal.
+        val rootFile = runCatching { File(path).canonicalFile }.getOrNull()
+        val cacheKey = rootFile?.path ?: path
+        val cached = fsStatsCache[cacheKey]
         if (cached != null && now - cached.first < FS_STATS_TTL_MS) return cached.second
         var itemCount = 0
         var totalSize = 0L
@@ -2816,7 +2824,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // pindai segar untuk path itu, jadi cache akar tak terpengaruh.
         val tainted = HashSet<String>()
         val stack = ArrayDeque<FsFrame>()
-        runCatching { File(path).canonicalFile }.getOrNull()?.let { root ->
+        rootFile?.let { root ->
             visitedDirs.add(root.path)
             stack.addLast(FsFrame(root, root.path))
         }
@@ -2866,10 +2874,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
         }
         val result = Triple(itemCount, totalSize, truncated)
-        fsStatsCache[path] = now to result
+        fsStatsCache[cacheKey] = now to result
         if (!truncated) {
             for ((childPath, stats) in localStats) {
-                if (childPath != path && childPath !in tainted) fsStatsCache[childPath] = now to stats
+                if (childPath != cacheKey && childPath !in tainted) fsStatsCache[childPath] = now to stats
             }
         }
         if (fsStatsCache.size > 300) {
