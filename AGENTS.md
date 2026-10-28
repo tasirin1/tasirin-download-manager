@@ -487,7 +487,7 @@ server remote, galeri). Keputusan naik ke `targetSdk 37` masih **opsional** —
 jangan digabung dengan PR fitur lain.
 
 - **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
-  di-update bertahap via CI, toolchain Gradle 9.8.0 + AGP 9.4.1 (built-in
+  di-update bertahap via CI, toolchain Gradle 9.8.2 + AGP 9.4.1 (built-in
   Kotlin, KGP dibundel AGP), core library desugaring aktif.
   `versionName`/`versionCode` tetap diatur CI. Bila toolchain naik lagi,
   update angka di sini supaya sama dengan `gradle-wrapper.properties`
