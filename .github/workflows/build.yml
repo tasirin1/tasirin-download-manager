@@ -53,17 +53,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/check_changelog.py "${{ github.event.pull_request.base.sha }}" "${{ github.event.before }}"
 
-      - name: Siapkan & periksa remote web (minify + node check + i18n)
-        run: python3 scripts/prepare_remote.py --check
-
-      - name: Cek sinkron README & README.en (struktur heading)
-        run: python3 scripts/check_readme_sync.py
-
-      - name: Pindai bug, error, dan celah keamanan
-        run: |
-          python3 scripts/security_audit.py --self-test
-          python3 scripts/security_audit.py
-
       - name: Verifikasi path (tanpa SDK Android)
         # Dulu workflow verifikasi-path.yml tersendiri; kini satu gerbang di
         # sini agar satu status, satu runner, tanpa duplikasi checkout.
@@ -79,12 +68,16 @@ jobs:
             python3 tools/verifikasi-path.py
           fi
 
-      - name: Cek cepat (vektor 0.x, README, secret, remote)
-        run: bash scripts/cek-cepat.sh
-
       - name: Guard konsistensi repo (check_repo.py)
         # Dulu hanya jalan lewat hook pre-commit lokal yang opt-in —
         # drift AGENTS.md vs wrapper lolos saat merge PR #135 (issue #184).
+        # Langkah ini SUMBER TUNGGAL suite gerbang cepat (issue #379):
+        # fast_checks di check_repo.py sudah menjalankan prepare_remote
+        # --check, check_readme_sync, security_audit --self-test + audit
+        # penuh, verifikasi-path (tanpa rentang; versi ber-rentang event
+        # tetap langkah khusus di atas karena lebih kuat), dan cek-cepat
+        # — langkah per-alat terpisah untuk itu semua dihapus agar suite
+        # tidak berjalan dua kali per push/PR.
         run: python3 scripts/check_repo.py
 
   build:

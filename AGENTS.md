@@ -283,8 +283,9 @@ kuat dan tanpa diskusi:
    push otomatis terverifikasi dan batal bila GAGAL). Job `verify` di CI
    mengulang keduanya per push/PR sebagai satu-satunya gerbang sebelum job
    `build` (dulu workflow `verifikasi-path.yml` tersendiri — kini diserap
-   agar satu status dan satu runner). Step CI `scripts/prepare_remote.py --check`
-   memverifikasi
+   agar satu status dan satu runner). `scripts/prepare_remote.py --check`
+   (jalan di CI lewat langkah `check_repo.py` — sumber tunggal suite
+   gerbang cepat sejak issue #379) memverifikasi
    sinkron `remote.src.html` ↔ `remote.html`, `node --check` pada semua `<script>`,
    larangan kata Indonesia di string UI (remote.html, values/*.xml, Kotlin), dan
    smoke test alur upload klien (`scripts/upload_smoke_test.js`). Jalankan juga
