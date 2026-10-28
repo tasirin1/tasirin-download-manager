@@ -96,11 +96,20 @@ private fun thumbSourceStamp(ctx: Context, raw: String): String = when {
  *  dianggap sedang ditulis (unduhan berjalan). */
 internal const val THUMB_GROWING_WINDOW_MS = 20_000L
 
+/** Toleransi mtime masa depan (beda jam antar-perangkat): mtime sedikit
+ *  di depan jam lokal masih wajar untuk berkas yang baru ditulis, tetapi
+ *  mtime jauh di masa depan adalah cap yang salah, bukan pertumbuhan. */
+internal const val THUMB_FUTURE_SKEW_MS = 60_000L
+
 /** true bila cap [stamp] ("mtime:ukuran") menunjukkan berkas yang masih
  *  bertumbuh. Murni agar bisa di-unit-test. */
 internal fun isThumbStampGrowing(stamp: String, nowMs: Long): Boolean {
     val mtime = stamp.substringBefore(':').toLongOrNull() ?: return false
-    return nowMs - mtime < THUMB_GROWING_WINDOW_MS
+    val age = nowMs - mtime
+    // Tanpa batas masa depan, nowMs - mtime yang negatif selalu lolos
+    // jendela: berkas bertanggal masa depan dianggap bertumbuh SELAMANYA
+    // dan invalidasi thumbnail #399 tak pernah aktif untuknya (issue #440).
+    return age < THUMB_GROWING_WINDOW_MS && age > -THUMB_FUTURE_SKEW_MS
 }
 
 internal fun getOrCreateThumb(

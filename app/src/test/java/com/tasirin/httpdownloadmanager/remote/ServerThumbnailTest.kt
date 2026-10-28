@@ -19,8 +19,13 @@ class ServerThumbnailTest {
         val now = 1_000_000L
         // #418: mtime dalam jendela 20 dtk (termasuk sedikit di masa
         // depan karena jam tak sinkron) = bertumbuh; di luar = diam.
+        // #440: masa depan hanya ditoleransi sampai batas skew 60 dtk —
+        // mtime jauh di masa depan adalah cap salah, bukan pertumbuhan.
         assertTrue(isThumbStampGrowing("${now - 5_000}:100", now))
         assertTrue(isThumbStampGrowing("${now + 5_000}:100", now))
+        assertTrue(isThumbStampGrowing("${now + 30_000}:100", now))
+        assertFalse(isThumbStampGrowing("${now + 120_000}:100", now))
+        assertFalse(isThumbStampGrowing("${now + 86_400_000}:100", now))
         assertFalse(isThumbStampGrowing("${now - 25_000}:100", now))
         assertFalse(isThumbStampGrowing("", now))
         assertFalse(isThumbStampGrowing("bukan-angka:100", now))
