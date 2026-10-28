@@ -125,6 +125,16 @@ class App : Application() {
             runCatching { if (::httpServer.isInitialized) httpServer.appendLog(message) }
         }
 
+        /** Buang snapshot galeri milik server web (issue #558):
+         *  galleryCache adalah lapisan kedua di atas MediaLibrary
+         *  yang tak tersentuh notifikasi terbit FileSaver, jadi
+         *  penyelesaian unduhan harus membuangnya secara eksplisit
+         *  agar galeri web tak menyajikan daftar pra-selesai sampai
+         *  TTL berakhir. Aman dipanggil kapan pun. */
+        fun invalidateServerGalleryCache() {
+            runCatching { if (::httpServer.isInitialized) httpServer.invalidateGalleryCache() }
+        }
+
         // Kunci khusus siklus hidup server (issue #260): SettingsActivity
         // memanggil restartHttpServer dari coroutine IO BARU tiap simpan,
         // jadi dua restart bisa berjalan bersamaan dan saling menyela

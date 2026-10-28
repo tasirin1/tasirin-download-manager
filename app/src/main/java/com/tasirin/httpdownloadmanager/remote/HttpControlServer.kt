@@ -2366,8 +2366,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     /** Galeri berubah (hapus/upload/pindah media) — buang snapshot 15 detik
-     *  supaya request berikutnya langsung scan ulang, tidak tampil basi. */
-    private fun invalidateGalleryCache() {
+     *  supaya request berikutnya langsung scan ulang, tidak tampil basi.
+     *  internal (issue #558): penyelesaian unduhan di engine ikut
+     *  membuang snapshot ini lewat App.invalidateServerGalleryCache. */
+    internal fun invalidateGalleryCache() {
         galleryCache = null
     }
 
@@ -2540,13 +2542,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Invalidasi sesudah berkas baru terbit ke folder terlayani (dipakai
      *  finalisasi upload chunk DAN single-shot — #250 menyamakan keduanya):
-     *  tanpa ini ZIP/listing/galeri basi sampai TTL. Hanya untuk terbitan
-     *  ber-path berkas; terbitan MediaStore diberitahukan jalurnya sendiri. */
+     *  tanpa ini ZIP/listing/galeri basi sampai TTL. Cache berkas hanya
+     *  untuk terbitan ber-path; snapshot galeri tak bergantung path
+     *  (issue #558) sehingga terbitan MediaStore ber-filePath null pun
+     *  ikut membuangnya. */
     private fun invalidateAfterPublish(filePath: String?) {
+        invalidateGalleryCache()
         filePath?.let {
             fsMediaCache.clear()
             invalidateFsListingCache()
-            invalidateGalleryCache()
             videoDurations.invalidate()
             MediaLibrary.notifyMediaChanged(context, it)
         }

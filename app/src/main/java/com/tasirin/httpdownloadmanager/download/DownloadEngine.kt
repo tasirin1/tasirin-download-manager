@@ -1621,6 +1621,10 @@ class DownloadEngine(appContext: Context) {
                 }
             }
         }
+        // Buang snapshot galeri server (issue #558): publishItem
+        // adalah corong terbit semua jalur unduhan, dan galleryCache
+        // server tak tersentuh notifikasi FileSaver/MediaLibrary.
+        App.invalidateServerGalleryCache()
         return result
     }
 
