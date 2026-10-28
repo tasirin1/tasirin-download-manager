@@ -110,26 +110,35 @@ class ServerVideoDurations(
      *  dari probe basi tidak boleh menahan probe ulang berkas BARU
      *  di path yang sama sesudah invalidasi. */
     fun recordProbeFailureIfCurrent(token: String, expectedGeneration: Long) {
+        // Cek generasi + catat dalam SATU blok kunci (issue #352):
+        // sebelumnya keduanya terpisah sehingga invalidate() yang
+        // mendarat di celahnya membuat catatan basi tetap tertulis
+        // sesudah invalidasi (meniru cacheDurationIfCurrent di atas).
         synchronized(lock) {
             if (generation != expectedGeneration) return
+            recordProbeFailureLocked(token)
         }
-        recordProbeFailure(token)
     }
 
     fun recordProbeFailure(token: String) {
         synchronized(lock) {
-            if (probeFailAt.size > MAX_ENTRIES) {
-                val cutoff = System.currentTimeMillis() - PROBE_FAILURE_TTL_MS
-                probeFailAt.entries.removeAll { it.value < cutoff }
-                // Hanya hapus kedaluwarsa tak cukup bila gagal massal dalam TTL:
-                // paksa buang setengah tertua agar map tak tumbuh tanpa batas.
-                if (probeFailAt.size > MAX_ENTRIES) {
-                    val drop = probeFailAt.size / 2
-                    probeFailAt.entries.sortedBy { it.value }.take(drop).forEach { probeFailAt.remove(it.key) }
-                }
-            }
-            probeFailAt[token] = System.currentTimeMillis()
+            recordProbeFailureLocked(token)
         }
+    }
+
+    /** Isi recordProbeFailure; pemanggil WAJIB sudah memegang [lock]. */
+    private fun recordProbeFailureLocked(token: String) {
+        if (probeFailAt.size > MAX_ENTRIES) {
+            val cutoff = System.currentTimeMillis() - PROBE_FAILURE_TTL_MS
+            probeFailAt.entries.removeAll { it.value < cutoff }
+            // Hanya hapus kedaluwarsa tak cukup bila gagal massal dalam TTL:
+            // paksa buang setengah tertua agar map tak tumbuh tanpa batas.
+            if (probeFailAt.size > MAX_ENTRIES) {
+                val drop = probeFailAt.size / 2
+                probeFailAt.entries.sortedBy { it.value }.take(drop).forEach { probeFailAt.remove(it.key) }
+            }
+        }
+        probeFailAt[token] = System.currentTimeMillis()
     }
 
     fun shouldProbe(token: String): Boolean = synchronized(lock) {
