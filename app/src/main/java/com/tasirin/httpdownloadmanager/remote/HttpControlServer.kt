@@ -489,6 +489,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 now - it.value.lastUse.get() > 30 * 60 * 1000L
             }
         }
+        // Berkas tmp upload yatim (#218): upload yang ditinggalkan (browser
+        // ditutup/jaringan mati) lock-nya sudah gugur di atas atau tak
+        // pernah ada — hapus berkasnya sekarang agar tidak menahan kuota
+        // buffer upload global sampai pembersihan 24 jam. Upload aktif
+        // selalu memegang lock segar (lastUse disentuh tiap chunk).
+        runCatching {
+            context.cacheDir.listFiles()?.forEach { f ->
+                if (f.isFile && f.name.startsWith("up_") &&
+                    f.name.endsWith(".tmp")
+                ) {
+                    val id = f.name.removePrefix("up_").removeSuffix(".tmp")
+                    val lock = uploadLocks[id]
+                    if (lock == null ||
+                        now - lock.lastUse.get() > 30 * 60 * 1000L
+                    ) {
+                        f.delete()
+                    }
+                }
+            }
+        }
         // shareTokens: entry > 24 jam
         if (shareTokens.size > 8) {
             shareTokens.entries.removeIf {
