@@ -505,6 +505,63 @@ def kupas_komentar(isi):
     return "".join(keluar)
 
 
+def kupas_komentar_jaga_baris(isi):
+    """Seperti kupas_komentar, tetapi posisi baris DIPERTAHANKAN: isi
+    komentar diganti spasi dan newline di dalam komentar blok tetap
+    disalin, sehingga nomor baris hasil kupas sama persis dengan
+    sumbernya. String/char literal disalin utuh seperti kupas_komentar.
+    Dipakai cek-cek yang melaporkan nomor baris (pemanggil) dan yang
+    mencocokkan per baris diff (cek_panggil_bekas_hapusan) agar sebutan
+    nama fungsi di dalam KOMENTAR tidak divonis sebagai panggilan
+    (issue #471)."""
+    keluar = []
+    i, n = 0, len(isi)
+    while i < n:
+        dua = isi[i:i + 2]
+        tiga = isi[i:i + 3]
+        if tiga == '"""':
+            keluar.append('"""')
+            i += 3
+            while i < n and isi[i:i + 3] != '"""':
+                keluar.append(isi[i])
+                i += 1
+            keluar.append('"""')
+            i += 3
+        elif dua[0] == '"' or dua[0] == "'":
+            kutip = dua[0]
+            keluar.append(isi[i])
+            i += 1
+            while i < n:
+                if kutip == '"' and isi[i] == '\n':
+                    break
+                keluar.append(isi[i])
+                if isi[i] == '\\':
+                    i += 1
+                    if i < n:
+                        keluar.append(isi[i])
+                elif isi[i] == kutip:
+                    i += 1
+                    break
+                i += 1
+        elif dua == '//':
+            while i < n and isi[i] != '\n':
+                keluar.append(' ')
+                i += 1
+        elif dua == '/*':
+            keluar.append('  ')
+            i += 2
+            while i < n and isi[i:i + 2] != '*/':
+                keluar.append('\n' if isi[i] == '\n' else ' ')
+                i += 1
+            if i < n:
+                keluar.append('  ')
+                i += 2
+        else:
+            keluar.append(isi[i])
+            i += 1
+    return "".join(keluar)
+
+
 def cek_kurung(gagal, berubah):
     for path in berubah:
         if not path.endswith((".kt", ".java")):
@@ -916,7 +973,11 @@ def pemanggil(nama):
     pola = re.compile(r"\b%s\s*\(" % re.escape(nama))
     temu = []
     for path in jalan_repo("app", ext=(".kt", ".java", ".xml")):
-        for i, baris in enumerate(baca(path).splitlines(), 1):
+        # Komentar dikupas dulu (nomor baris dipertahankan): sebutan
+        # nama di komentar bukan panggilan (issue #471 — insiden
+        # "cache (" putaran 14 yang memaksa redaksi 5 komentar).
+        bersih = kupas_komentar_jaga_baris(baca(path)) if path.endswith((".kt", ".java")) else baca(path)
+        for i, baris in enumerate(bersih.splitlines(), 1):
             if pola.search(baris):
                 temu.append("%s:%d" % (path, i))
                 if len(temu) >= 6:
@@ -943,7 +1004,10 @@ def cek_panggil_bekas_hapusan(gagal, diff):
     for nama in sorted(BEKAS_HAPUSAN):
         pola = re.compile(r"\b%s\s*\(" % re.escape(nama))
         for _, baris in tambah_kt(diff):
-            if pola.search(baris):
+            # Komentar dikupas dulu: menyebut nama terhapus di komentar
+            # (mis. KDoc "pengganti cacheDuration() yang lama") bukan
+            # panggilan dan tidak boleh menggagalkan gerbang (issue #471).
+            if pola.search(kupas_komentar_jaga_baris(baris)):
                 gagal.append("Baris baru memanggil %s() yang sudah dihapus: %s"
                              % (nama, baris.strip()[:80]))
                 break
