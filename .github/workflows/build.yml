@@ -296,9 +296,6 @@ jobs:
           if [ -z "$NOTES" ]; then
             NOTES="APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box."
           fi
-          # Tag unik per build (v<VER_NAME>) — rilis lama dipertahankan
-          # sebagai riwayat; delete hanya untuk idempotensi bila job rerun.
-          gh release delete "v${VER}" --yes --cleanup-tag || true
           # --latest hanya bila nomor build ini >= latest saat ini: re-run
           # manual run lama tidak boleh menurunkan rilis yang lebih baru
           # menjadi sekadar riwayat (issue #153).
@@ -329,6 +326,14 @@ jobs:
           if [ -f app/build/outputs/mapping/release/mapping.txt ]; then
             MAPPING_ARGS="app/build/outputs/mapping/release/mapping.txt"
           fi
+          # Tag unik per build (v<VER_NAME>) -- rilis lama dipertahankan
+          # sebagai riwayat; delete hanya untuk idempotensi bila job
+          # rerun. Delete ditaruh SESESAAT sebelum create (issue #355):
+          # sebelumnya delete duduk jauh di atas (sebelum hitung catatan
+          # + panggilan API penjaga latest) sehingga pembatalan run oleh
+          # push baru (concurrency cancel-in-progress) di jendela itu
+          # menghapus rilis versi ini permanen tanpa pengganti.
+          gh release delete "v${VER}" --yes --cleanup-tag || true
           gh release create "v${VER}" "$OUT" $MAPPING_ARGS \
             --title "Tasirin Download Manager v${VER} (build ${CODE})" \
             --notes "$NOTES" \
