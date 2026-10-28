@@ -50,6 +50,10 @@ class Rule:
     # True = abaikan match yang jatuh di dalam string "..." (mis. pola
     # `catch(e){}` pada JavaScript yang ditempel di literal string Kotlin).
     skip_in_strings: bool = False
+    # True = jalankan juga lintasan multi-baris (issue #193): pola sink
+    # yang berhenti di '\n' buta terhadap argumen yang dibungkus ke baris
+    # berikut oleh formatter.
+    multiline: bool = False
 
 
 RULES = [
@@ -80,6 +84,7 @@ RULES = [
         "Sensitive identifier may be written to Android log",
         r"\bLog\.[vdiew]\s*\([^;\n]*(?:token|pin|password|secret|credential)",
         frozenset({"kotlin", "java"}),
+        multiline=True,
     ),
     Rule(
         "webview_js_bridge",
@@ -115,6 +120,7 @@ RULES = [
         "SQL statement appears to be concatenated at runtime",
         r"\b(?:rawQuery|execSQL)\s*\([^;\n]*(?:\+\s*|\$\{)",
         frozenset({"kotlin", "java"}),
+        multiline=True,
     ),
     Rule(
         "external_path_sink",
@@ -122,6 +128,7 @@ RULES = [
         "File path is built directly from an external request parameter",
         r"\b(?:File|Paths\.get)\s*\([^;\n]*(?:parms\[|getParameter|queryParameters|request\.query)",
         frozenset({"kotlin", "java"}),
+        multiline=True,
     ),
     Rule(
         "shell_true",
@@ -400,6 +407,57 @@ def scan_text(
                     "excerpt": excerpt,
                 }
             )
+
+    # Lintasan multi-baris (issue #193) untuk aturan bertanda multiline:
+    # varian pola tanpa batas '\n' (rentang dibatasi 300 karakter agar
+    # match tidak merembet ke pernyataan tak terkait) dijalankan pada
+    # teks utuh; temuan dipetakan ke baris awal match dan didedupe
+    # terhadap hasil per baris lewat `seen`.
+    full = "\n".join(lines)
+    for rule, pattern in compiled:
+        if not rule.multiline:
+            continue
+        long_pattern = re.compile(
+            rule.pattern.replace("[^;\\n]*", "[^;]{0,300}"), rule.flags
+        )
+        for match in long_pattern.finditer(full):
+            start_index = full.count("\n", 0, match.start())
+            line = lines[start_index]
+            previous = lines[start_index - 1] if start_index else None
+            if ignored_on_line(line, previous, rule.rule_id):
+                continue
+            prev_next_ignore = (
+                NEXT_IGNORE_RE.search(previous) if previous else None
+            )
+            if prev_next_ignore and rule.rule_id in (
+                part.strip() for part in prev_next_ignore.group(1).split(",")
+            ):
+                continue
+            if (rule.rule_id, relative_posix) in ACCEPTED_RISKS:
+                continue
+            key = (relative_path, start_index + 1, rule.rule_id)
+            if key in seen:
+                continue
+            line_start = full.rfind("\n", 0, match.start()) + 1
+            column = match.start() - line_start
+            if rule.skip_in_strings and _in_string(line, column):
+                continue
+            seen.add(key)
+            excerpt = line.strip()
+            if len(excerpt) > 180:
+                excerpt = excerpt[:177] + "..."
+            findings.append(
+                {
+                    "path": relative_path.as_posix(),
+                    "line": start_index + 1,
+                    "column": column + 1,
+                    "rule_id": rule.rule_id,
+                    "severity": rule.severity,
+                    "title": rule.title,
+                    "excerpt": excerpt,
+                }
+            )
+    findings.sort(key=lambda item: (int(item["line"]), int(item["column"])))
     return findings
 
 
@@ -457,6 +515,16 @@ def run_self_test() -> int:
             "    fun hdr(c: HttpURLConnection) = c.getHeaderField(\"Accept-Ranges\").equals(\"bytes\")",
             "}",
         ],
+        Path("sample_multi.kt"): [
+            # Pola multi-baris (issue #193): argumen dibungkus formatter
+            # ke baris berikut tetap wajib terdeteksi oleh lintasan kedua.
+            "class Wrap {",
+            "    fun leak(t: String) = Log.d(\"x\",",
+            "        t + token)",
+            "    fun q(db: SQLiteDatabase, u: String) = db.rawQuery(\"SELECT * FROM t WHERE u = '\"",
+            "        + u, null)",
+            "}",
+        ],
         Path("sample_str.kt"): [
             "class Grab {",
             '    val js = "(function(){try{work();}catch(e){}})"',
@@ -510,9 +578,19 @@ def run_self_test() -> int:
         item["rule_id"] == "js_dynamic_exec" and item["path"] == "sample2.js"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed:
+    multi_leak = any(
+        item["rule_id"] == "sensitive_log" and item["line"] == 2
+        and item["path"] == "sample_multi.kt"
+        for item in findings
+    )
+    multi_sql = any(
+        item["rule_id"] == "sql_injection_sink" and item["line"] == 4
+        and item["path"] == "sample_multi.kt"
+        for item in findings
+    )
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
