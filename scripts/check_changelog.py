@@ -18,13 +18,20 @@ def all_dependabot(base):
     # menekan merge, jadi merge MANUAL PR bot oleh owner tetap terdeteksi
     # sebagai rentang bot murni (issue #202). Pengecualian workflow
     # (actor dependabot) hanya menolong event yang dipicu bot sendiri.
+    # Nama DAN email wajib cocok (issue #228): nama author bisa dipalsukan
+    # siapa pun yang bisa commit (git -c user.name=...), email noreply
+    # GitHub milik bot tidak bisa diklaim commit pihak lain lewat UI PR.
     proc = subprocess.run(
-        ["git", "log", "--no-merges", "--format=%an", base + "..HEAD"],
+        ["git", "log", "--no-merges", "--format=%an%x1f%ae", base + "..HEAD"],
         capture_output=True, text=True)
     if proc.returncode != 0:
         return False
     authors = [a.strip() for a in proc.stdout.splitlines() if a.strip()]
-    return bool(authors) and all(a == "dependabot[bot]" for a in authors)
+    def is_bot(line):
+        name, _, email = line.partition("\x1f")
+        return name == "dependabot[bot]" and email.endswith(
+            "dependabot[bot]@users.noreply.github.com")
+    return bool(authors) and all(is_bot(a) for a in authors)
 
 
 def changed_files(base):
