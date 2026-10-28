@@ -140,7 +140,12 @@ object MediaLibrary {
         val isPartial: Boolean = false,
         val progressPercent: Int = -1,
         val durationMs: Long = 0L,
-        val relativePath: String? = null
+        val relativePath: String? = null,
+        // Nama volume MediaStore asal entri (API 29+; "external_primary"
+        // untuk penyimpanan internal). Dipakai kunci dedupe (issue
+        // #532): RELATIVE_PATH relatif terhadap volume ASAL, bukan
+        // selalu root primer.
+        val volumeName: String? = null
     )
 
     /** Kunci identitas lintas sumber untuk dedupe scan (issue #515).
@@ -158,7 +163,8 @@ object MediaLibrary {
         name: String,
         contentUri: String?,
         token: String,
-        galleryRoot: String
+        galleryRoot: String,
+        volumeName: String? = null
     ): String {
         if (filePath != null) {
             val root = galleryRoot.trimEnd('/')
@@ -167,6 +173,15 @@ object MediaLibrary {
             } else {
                 "abs:$filePath"
             }
+        }
+        // Volume non-primer (issue #532): relativePath entri ini
+        // relatif terhadap volume ASALNYA (mis. SD card), bukan
+        // galleryRoot primer — menyatukannya ke rel: akan menabrak
+        // berkas BERBEDA senama di akar/subfolder primer. Jatuh ke
+        // uri: seperti sebelum #515 (unik per baris, tanpa dedupe
+        // lintas sumber yang memang tak terjangkau untuk volume itu).
+        if (volumeName != null && volumeName != "external_primary") {
+            return "uri:" + (contentUri ?: token)
         }
         if (relativePath != null) {
             val rel = relativePath.trim('/')
@@ -605,6 +620,7 @@ object MediaLibrary {
                 add(MediaStore.MediaColumns.DATE_MODIFIED)
                 add(MediaStore.MediaColumns.DATA)
                 if (Build.VERSION.SDK_INT >= 29) add(MediaStore.MediaColumns.RELATIVE_PATH)
+                if (Build.VERSION.SDK_INT >= 29) add(MediaStore.MediaColumns.VOLUME_NAME)
                 add(MediaStore.Video.Media.DURATION)
             }.toTypedArray()
             // Bangun selection SQL untuk filter folder. API 29+ memakai
@@ -663,6 +679,11 @@ object MediaLibrary {
                 } else {
                     -1
                 }
+                val iVol = if (Build.VERSION.SDK_INT >= 29) {
+                    c.getColumnIndex(MediaStore.MediaColumns.VOLUME_NAME)
+                } else {
+                    -1
+                }
                 while (c.moveToNext()) {
                     val name = c.getString(iName) ?: continue
                     val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
@@ -690,7 +711,8 @@ object MediaLibrary {
                             filePath = filePath,
                             contentUri = uri,
                             durationMs = if (iDur >= 0) c.getLong(iDur) else 0L,
-                            relativePath = relativePath
+                            relativePath = relativePath,
+                            volumeName = if (iVol >= 0) c.getString(iVol) else null
                         )
                     )
                 }
@@ -791,7 +813,8 @@ object MediaLibrary {
             .distinctBy {
                 kunciDedupeGaleri(
                     it.filePath, it.relativePath, it.name,
-                    it.contentUri, it.token, galleryRoot
+                    it.contentUri, it.token, galleryRoot,
+                    volumeName = it.volumeName
                 )
             }
             .sortedByDescending { it.modified }

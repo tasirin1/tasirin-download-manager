@@ -72,6 +72,37 @@ class MediaLibraryDedupeTest {
     }
 
     @Test
+    fun `volume sekunder tidak menyatu dengan berkas senama di primer`() {
+        // Issue #532: relativePath relatif terhadap volume ASAL —
+        // entri SD card ber-DATA null tidak boleh berkunci rel: yang
+        // sama dengan berkas berbeda senama di akar primer.
+        val dariSdCard = MediaLibrary.kunciDedupeGaleri(
+            filePath = null,
+            relativePath = "",
+            name = "akar.mp4",
+            contentUri = "content://media/external/volume_sd/video/media/9",
+            token = "u:9",
+            galleryRoot = root,
+            volumeName = "external"
+        )
+        val dariFilesystemPrimer = MediaLibrary.kunciDedupeGaleri(
+            filePath = "/storage/emulated/0/akar.mp4",
+            relativePath = null,
+            name = "akar.mp4",
+            contentUri = null,
+            token = "f:1",
+            galleryRoot = root
+        )
+        assertNotEquals(dariFilesystemPrimer, dariSdCard)
+        // Volume primer bernama eksplisit tetap menyatu seperti biasa.
+        val dariPrimer = MediaLibrary.kunciDedupeGaleri(
+            null, "", "akar.mp4", "content://x/7", "u:7", root,
+            volumeName = "external_primary"
+        )
+        assertEquals(dariFilesystemPrimer, dariPrimer)
+    }
+
+    @Test
     fun `tanpa relativePath jatuh ke contentUri seperti sebelumnya`() {
         val kunci = MediaLibrary.kunciDedupeGaleri(
             null, null, "a.mp4", "content://x/1", "u:1", root
