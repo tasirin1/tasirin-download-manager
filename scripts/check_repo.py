@@ -199,7 +199,18 @@ def admin_consistency() -> Result:
                     yield from _paths(item, dalam_any)
             elif isinstance(node, dict):
                 for key, val in node.items():
-                    yield from _paths(val, dalam_any or key in ("any", "all"))
+                    # Kunci glob sintaks changed-files (issue #494) ikut
+                    # menandai wilayah path: tanpa ini, labeler yang
+                    # bermigrasi ke {changed-files: [{any-glob-to-any-
+                    # file: [...]}]} terkumpul 0 dan penjaga nol-path
+                    # #486 menembak GAGAL palsu.
+                    yield from _paths(
+                        val,
+                        dalam_any or key in (
+                            "any", "all",
+                            "any-glob-to-any-file", "all-glob-to-any-file",
+                        ),
+                    )
 
         ditemukan = list(_paths(labeler))
         if labeler and not ditemukan:
