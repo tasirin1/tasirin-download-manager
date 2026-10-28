@@ -57,27 +57,32 @@ object SocialMediaExtractor {
 
     /** Regex X/Twitter — x.com harus host (awal string atau setelah skema),
      *  bukan substring (mis. fbsbx.com mengandung "x.com/"). */
-    private val X_URL_RE = Regex("""(?:^|https?://)(?:www\.)?x\.com/""")
-    /** Regex presisi untuk deteksi domain — mencegah false-positive (mis. notyoutube.com) */
-    private val YT_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|music\.)?youtube\.com/|(?:https?://)youtu\.be/""")
-    private val TT_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.)?tiktok\.com/|(?:https?://)vm\.tiktok\.com/""")
-    private val IG_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/(?:p|reel|tv)/|(?:https?://)instagr\.am/(?:p|reel)/""")
-    private val TW_HOST_RE = Regex("""(?:https?://)(?:www\.)?twitter\.com/""")
-    private val IG_BROAD_HOST_RE = Regex("""(?:https?://)(?:www\.)?instagram\.com/|(?:https?://)instagr\.am/""")
-    private val XV_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xvideos\.com/""")
-    private val XN_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?xnxx\.com/|(?:https?://)(?:www\.)?xnxxvideos\.me/""")
-    private val PH_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mobile\.)?pornhub\.com/|(?:https?://)(?:www\.)?pornhubpremium\.com/""")
+    private val X_URL_RE = Regex("""\A(?:https?://)?(?:www\.)?x\.com/""")
+    /** Regex presisi untuk deteksi domain — mencegah false-positive (mis. notyoutube.com).
+     *  SEMUA regex host di bawah berjangkar \A (awal string) sejak #245:
+     *  tanpa jangkar, URL pembungkus host lain yang menyematkan teks URL
+     *  platform di query (evil.example/?next=https://facebook.com/...)
+     *  lolos deteksi dan halaman pembungkus diambil dengan header user —
+     *  Cookie akun bisa terkirim ke host pembungkus. */
+    private val YT_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.|m\.|music\.)?youtube\.com/|youtu\.be/)""")
+    private val TT_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.|m\.)?tiktok\.com/|vm\.tiktok\.com/)""")
+    private val IG_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.)?instagram\.com/(?:p|reel|tv)/|instagr\.am/(?:p|reel)/)""")
+    private val TW_HOST_RE = Regex("""\A(?:https?://)(?:www\.)?twitter\.com/""")
+    private val IG_BROAD_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.)?instagram\.com/|instagr\.am/)""")
+    private val XV_HOST_RE = Regex("""\A(?:https?://)(?:www\.|m\.|mobile\.)?xvideos\.com/""")
+    private val XN_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.|m\.|mobile\.)?xnxx\.com/|(?:www\.)?xnxxvideos\.me/)""")
+    private val PH_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.|m\.|mobile\.)?pornhub\.com/|(?:www\.)?pornhubpremium\.com/)""")
     /** Google Drive: hanya link berkas (file/d/, open?id=, uc?id=) — link
      *  folder dan halaman Drive lain tidak diekstrak. */
-    private val GD_HOST_RE = Regex("""(?:https?://)(?:www\.)?drive\.google\.com/(?:drive/u/\d+/)?(?:file/d/|open\?|uc\?)""")
+    private val GD_HOST_RE = Regex("""\A(?:https?://)(?:www\.)?drive\.google\.com/(?:drive/u/\d+/)?(?:file/d/|open\?|uc\?)""")
     /** Facebook: regex host presisi agar CDN fbsbx.com/fbcdn.net (media
      *  hasil ekstraksi) tidak ikut dikenali sebagai halaman. */
-    private val FB_HOST_RE = Regex("""(?:https?://)(?:www\.|m\.|mbasic\.)?facebook\.com/|(?:https?://)fb\.watch/""")
+    private val FB_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.|m\.|mbasic\.)?facebook\.com/|fb\.watch/)""")
     /** HentaiHaven: halaman watch (`/watch/<slug>/`) dilindungi challenge
      *  Cloudflare sehingga fetch server pasti 403; ekstraksi memakai WebView
      *  (`WebExtractActivity`) + parser murni di bawah sebagai fallback. */
     // audit-ignore: maintenance_marker (nama domain resmi situs, bukan marker)
-    private val HH_HOST_RE = Regex("""(?:https?://)(?:www\.)?hentaihaven\.xxx/""")
+    private val HH_HOST_RE = Regex("""\A(?:https?://)(?:www\.)?hentaihaven\.xxx/""")
 
     /* Regex tetap — dihoist agar tidak dikompilasi ulang di jalur ekstraksi
      * (Instagram & YouTube) yang dipanggil berulang saat unduh. */

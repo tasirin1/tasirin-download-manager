@@ -500,6 +500,19 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `isSocialMediaUrl - URL pembungkus berisi teks platform ditolak`() {
+        // Host sebenarnya evil.example; teks platform hanya di query (#245).
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://evil.example/?next=https://www.facebook.com/watch/?v=1020806507787076"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://evil.example/?u=https://www.tiktok.com/@user/video/7123456789"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://evil.example/?u=https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs/view"))
+        assertFalse(SocialMediaExtractor.isSocialMediaUrl(
+            "https://evil.example/?u=https://x.com/user/status/1234567890"))
+    }
+
+    @Test
     fun `isSocialMediaUrl - Facebook halaman video, reel, dan share`() {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl(
             "https://www.facebook.com/watch/?v=1020806507787076"))
