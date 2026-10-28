@@ -737,7 +737,7 @@ class DownloadEngine(appContext: Context) {
     fun probeHlsVariants(
         url: String,
         username: String = "",
-        password: <redacted> = "",
+        password: String = "",
         headers: String = ""
     ): List<HlsVariant>? {
         return runCatching {
@@ -747,7 +747,7 @@ class DownloadEngine(appContext: Context) {
             // diam-diam padahal unduhannya sendiri sehat karena
             // addDownload membawa konteks yang sama.
             val conn = openAuthenticatedConnection(
-                url, method = "GET", username = username, password = <redacted>, headers = headers
+                url, method = "GET", username = username, password = password, headers = headers
             )
             try {
                 val code = conn.responseCode
