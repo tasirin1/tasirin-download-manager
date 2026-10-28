@@ -670,7 +670,7 @@ class FileSaver(context: Context) {
             // Klaim berkunci seperti publish folder kustom (issue #410):
             // pola cek-lalu-buat tanpa kunci di sini bisa memilih nama yang
             // sama dengan publish paralel bernama sama.
-            val (target, _, _) = claimCustomDoc(tree, item.fileName) ?: return null
+            val (target, _, createdDoc) = claimCustomDoc(tree, item.fileName) ?: return null
             try {
                 // Sumber dibaca di dalam try: bila tak bisa dibuka (URI basi /
                 // file hilang / null), target kosong yang terlanjur dibuat
@@ -688,7 +688,13 @@ class FileSaver(context: Context) {
                     out.use { dst -> src.copyTo(dst, IO_BUF) }
                 }
             } catch (e: Exception) {
-                runCatching { target.delete() }
+                // Hanya dokumen yang BARU dibuat panggilan ini yang boleh
+                // dibuang (issue #447): claimCustomDoc bisa mengembalikan
+                // dokumen yang sudah ada (lomba eksternal), dan kegagalan
+                // sebelum openOutputStream (mis. sumber tak bisa dibuka)
+                // tidak menyentuhnya — menghapusnya menghancurkan berkas
+                // lama milik pengguna.
+                if (createdDoc) runCatching { target.delete() }
                 throw e
             }
             deleteFiles(item)
@@ -806,12 +812,16 @@ class FileSaver(context: Context) {
                         // #410): nama dipilih + dokumen dibuat atomik di
                         // dalam kunci nama, bukan cek-lalu-buat terpisah
                         // yang bisa tabrakan dengan klaim paralel senama.
-                        val (target, _, _) = claimCustomDoc(subDir, fileName)
+                        val (target, _, createdDoc) = claimCustomDoc(subDir, fileName)
                             ?: return result
                         val input = appContext.contentResolver.openInputStream(uri)
                             ?: run {
-                                // Target kosong sudah terlanjur dibuat di atas.
-                                runCatching { appContext.contentResolver.delete(target.uri, null, null) }
+                                // Target kosong yang BARU dibuat di atas
+                                // dibuang; dokumen yang sudah ada (klaim
+                                // lomba eksternal) tak disentuh (issue #447).
+                                if (createdDoc) {
+                                    runCatching { appContext.contentResolver.delete(target.uri, null, null) }
+                                }
                                 return result
                             }
                         try {
@@ -821,7 +831,9 @@ class FileSaver(context: Context) {
                                 out.use { dst -> src.copyTo(dst, IO_BUF) }
                             }
                         } catch (e: Exception) {
-                            runCatching { appContext.contentResolver.delete(target.uri, null, null) }
+                            if (createdDoc) {
+                                runCatching { appContext.contentResolver.delete(target.uri, null, null) }
+                            }
                             throw e
                         }
                         appContext.contentResolver.delete(uri, null, null)
