@@ -695,8 +695,16 @@ def utama():
     elif args.rentang:
         daftar = daftar_berkas_berubah(args.rentang)
         if daftar is None:
-            print("info: rentang tak valid (push pertama?) — cek keadaan penuh.")
-            berubah = [p for p in jalan_repo("app") if not p.endswith(".md")]
+            # Fail-closed (issue #182): dulu keadaan ini jatuh ke "cek
+            # keadaan penuh" dengan diff kosong sehingga SEMUA cek berbasis
+            # diff (larangan hidup lagi, fungsi terhapus, locale) terlewati
+            # dan hasil bisa LOLOS. Samakan dengan check_changelog (#151):
+            # rentang tak valid = gerbang gagal, bukan lolos diam-diam.
+            gagal.append(
+                "rentang " + args.rentang + " tak valid — diff tak bisa "
+                "diverifikasi; periksa base sebelum push (fail-closed)."
+            )
+            berubah = []
         else:
             berubah = daftar
             a, b = re.split(r"\.\.+", args.rentang, maxsplit=1)
