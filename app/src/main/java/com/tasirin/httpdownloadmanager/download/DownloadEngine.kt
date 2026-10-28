@@ -2219,6 +2219,9 @@ class DownloadEngine(appContext: Context) {
             // 4) Fallback: publish video-only .ts seperti semula.
             App.logEvent("HLS: remux failed (no audio available), falling back to video-only .ts")
             runCatching { mp4.delete() }
+            // Audio adaptive yang sudah terunduh penuh tak terpakai lagi
+            // di jalur .ts — hapus sekarang, jangan jadi yatim (issue #431).
+            adaptiveAudioFile?.delete()
             val fileName = "$baseName.ts"
             ensureItemPresent(item.id, videoTs)
             val published0 = publishItem(saver, videoTs, fileName, item)
@@ -2477,18 +2480,26 @@ class DownloadEngine(appContext: Context) {
         saver: FileSaver
     ): File? {
         if (adaptiveAudioUrl.isBlank()) return null
+        var audioM4a: File? = null
         return try {
-            val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
-            val ok = downloadAdaptiveFile(item, adaptiveAudioUrl, audioM4a, buffer, throttle, progress)
-            if (!ok || audioM4a.length() < 1_000L) {
+            val f = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
+            audioM4a = f
+            val ok = downloadAdaptiveFile(item, adaptiveAudioUrl, f, buffer, throttle, progress)
+            if (!ok || f.length() < 1_000L) {
                 App.logEvent("HLS: adaptive audio download failed, skipped")
+                f.delete()
                 return null
             }
-            App.logEvent("HLS: adaptive audio downloaded (${Formats.bytes(audioM4a.length())}), remuxing...")
-            audioM4a
+            App.logEvent("HLS: adaptive audio downloaded (${Formats.bytes(f.length())}), remuxing...")
+            f
         } catch (e: CancellationException) {
+            // Berkas adaptive tidak bisa di-resume (tiap percobaan mulai
+            // dari nol), jadi partial-nya dibuang juga saat batal —
+            // jangan tinggalkan yatim (issue #431).
+            audioM4a?.delete()
             throw e
         } catch (e: Exception) {
+            audioM4a?.delete()
             App.logEvent("HLS: adaptive audio download failed (${e.message?.take(50)}), skipped")
             null
         }
