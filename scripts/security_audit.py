@@ -143,13 +143,19 @@ RULES = [
         "Dynamic JavaScript execution/document write sink",
         r"\b(?:eval\s*\(|new\s+Function\s*\(|document\.write\s*\()",
         frozenset({"javascript", "html"}),
+        multiline=True,
     ),
     Rule(
         "dom_xss_source",
         "error",
         "External request data reaches innerHTML without a visible boundary",
-        r"\binnerHTML\s*=.*(location\.|location\[|window\.location|document\.URL|decodeURI|JSON\.parse|parms\[|request\.query)",
+        # [^;\n]* (bukan .*): lintasan multi-baris menggantinya dengan
+        # rentang bersarang terbatas sehingga sink yang dipecah baris
+        # formatter ikut tertangkap (issue #345); per baris pun rentang
+        # berhenti di ';' sehingga tak menuduh pernyataan lain.
+        r"\binnerHTML\s*=[^;\n]*(location\.|location\[|window\.location|document\.URL|decodeURI|JSON\.parse|parms\[|request\.query)",
         frozenset({"javascript", "html"}),
+        multiline=True,
     ),
     Rule(
         "unsafe_blank_window",
@@ -221,8 +227,13 @@ RULES = [
         "header_equals_case_sensitive",
         "warning",
         "HTTP header compared with equals() without ignoreCase",
-                "getHeaderField[(][^;\\n]*[.]equals[(]\\s*\"[^\"]*\"\\s*[)]",
+                # Kurung tutup panggilan disebut eksplisit di tengah pola:
+        # rentang multi-baris berhenti di kurung tak seimbang, jadi
+        # tanpa ini .equals di baris berikut sesudah ')' tak tertangkap
+        # (issue #345).
+        "getHeaderField[(][^;\\n]*[)][^;\\n]*[.]equals[(]\\s*\"[^\"]*\"\\s*[)]",
         frozenset({"kotlin", "java"}),
+        multiline=True,
     ),
     Rule(
         "file_scoped_catch_all",
