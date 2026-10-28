@@ -790,9 +790,21 @@ class FileSaver(context: Context) {
             val sumberMasihAda =
                 (!item.filePath.isNullOrEmpty() && File(item.filePath).exists()) ||
                 (!item.contentUri.isNullOrEmpty() && runCatching {
+                    val probeUri = item.contentUri.toUri()
+                    // Proyeksi per keluarga URI (issue #499): _id adalah
+                    // kolom MediaStore dan berada DI LUAR kontrak kolom
+                    // DocumentsProvider — provider dokumen pihak ketiga
+                    // yang ketat berhak melempar untuk kolom tak dikenal
+                    // (tertelan menjadi false, log bisu). URI dokumen
+                    // memakai kolom identitas kontraktualnya,
+                    // document_id (pola AndroidX DocumentFile.exists).
+                    val kolom = if (DocumentsContract.isDocumentUri(appContext, probeUri)) {
+                        arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    } else {
+                        arrayOf(MediaStore.MediaColumns._ID)
+                    }
                     appContext.contentResolver.query(
-                        item.contentUri.toUri(), arrayOf(MediaStore.MediaColumns._ID),
-                        null, null, null
+                        probeUri, kolom, null, null, null
                     )?.use { it.moveToFirst() } == true
                 }.getOrDefault(false))
             if (sumberMasihAda) {
