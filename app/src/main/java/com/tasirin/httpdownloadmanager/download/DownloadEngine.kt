@@ -457,7 +457,7 @@ class DownloadEngine(appContext: Context) {
                 nameIsCustom = customName.isNotEmpty(),
                 autoResume = true,
                 username = username,
-                password = <redacted>
+                password = password,
                 headers = headers,
                 method = method,
                 postBody = postBody,
