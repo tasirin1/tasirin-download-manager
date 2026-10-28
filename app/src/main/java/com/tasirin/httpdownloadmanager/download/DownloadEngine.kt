@@ -524,7 +524,10 @@ class DownloadEngine(appContext: Context) {
         scheduleSave()
         // Hapus eksplisit item terakhir: niat antrean kosong jelas — tulis
         // blob kosong agar sisa blob korup (degraded) tak menetap selamanya.
-        if (_items.value.isEmpty()) repository.clearAll()
+        // Wajib menunggu loadGate (#261): sebelum muatan awal terpasang,
+        // daftar yang kosong belum tentu antrean memang kosong — clearAll
+        // di jendela itu menimpa blob antrean tersimpan yang belum dibaca.
+        if (_items.value.isEmpty() && loadGate.isCompleted) repository.clearAll()
         return true
     }
 
@@ -547,7 +550,7 @@ class DownloadEngine(appContext: Context) {
         }
         update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
         scheduleSave()
-        if (_items.value.isEmpty()) repository.clearAll()
+        if (_items.value.isEmpty() && loadGate.isCompleted) repository.clearAll()
     }
 
     fun clearFailed() {
@@ -568,7 +571,7 @@ class DownloadEngine(appContext: Context) {
         failed.forEach { fileSaver.deleteFiles(it) }
         update(_items.value.filterNot { it.state == DownloadState.FAILED })
         scheduleSave()
-        if (_items.value.isEmpty()) repository.clearAll()
+        if (_items.value.isEmpty() && loadGate.isCompleted) repository.clearAll()
     }
 
     fun importStream(
