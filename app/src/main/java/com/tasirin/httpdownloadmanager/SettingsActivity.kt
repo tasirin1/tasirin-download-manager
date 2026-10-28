@@ -589,6 +589,17 @@ class SettingsActivity : AppCompatActivity() {
             StoragePrefs.isAutoStartEnabled(this),
             getString(R.string.settings_autostart)
         )
+        // Selaraskan toggle baterai dengan status exemption SISTEM
+        // (issue #523): pref ditulis optimistis sebelum dialog sistem
+        // yang tak memberi callback hasil, jadi tanpa rekonsiliasi ini
+        // toggle berbohong permanen sesudah pengguna menolak/menekan
+        // Back atau mencabut exemption dari Pengaturan sistem.
+        // renderChecks berjalan dari onResume, jadi status terpulihkan
+        // tiap kali pengguna kembali ke layar ini.
+        val pmBattery = getSystemService(Context.POWER_SERVICE) as PowerManager
+        StoragePrefs.setBatteryExemptEnabled(
+            this, pmBattery.isIgnoringBatteryOptimizations(packageName)
+        )
         renderToggle(
             binding.checkBattery,
             StoragePrefs.isBatteryExemptEnabled(this),
