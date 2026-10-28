@@ -1217,6 +1217,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val published = App.engine.importStream(finalName, storage, folderPath, length) { out ->
                 copyUploadBodyChecked(session, length, out, folderPath)
             }
+            // Jalur single-shot dulu melewatkan invalidasi ini (#250):
+            // ZIP/listing folder bisa basi sampai TTL tanpa berkas baru.
+            invalidateAfterPublish(published.filePath)
             jsonResponse(JSONObject().put("ok", true).put("name", published.fileName ?: finalName)).closeConnection()
         }.getOrElse {
             // Pesan exception bisa memuat path absolut internal: catat penuh di
@@ -1646,13 +1649,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         ) { out ->
                             tmp.inputStream().use { it.copyTo(out, SERVER_IO_BUF) }
                         }
-                        published.filePath?.let {
-                            fsMediaCache.clear()
-                            invalidateFsListingCache()
-                            invalidateGalleryCache()
-                            videoDurations.invalidate()
-                            MediaLibrary.notifyMediaChanged(context, it)
-                        }
+                        invalidateAfterPublish(published.filePath)
                         completedUploads[id] = finalName to System.currentTimeMillis()
                         appendLog("UPLOAD #$id COMPLETED -> $finalName")
                     } catch (e: Exception) {
@@ -2487,6 +2484,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             fsFileListingCache = null
         }
         return entries.size to entries
+    }
+
+    /** Invalidasi sesudah berkas baru terbit ke folder terlayani (dipakai
+     *  finalisasi upload chunk DAN single-shot — #250 menyamakan keduanya):
+     *  tanpa ini ZIP/listing/galeri basi sampai TTL. Hanya untuk terbitan
+     *  ber-path berkas; terbitan MediaStore diberitahukan jalurnya sendiri. */
+    private fun invalidateAfterPublish(filePath: String?) {
+        filePath?.let {
+            fsMediaCache.clear()
+            invalidateFsListingCache()
+            invalidateGalleryCache()
+            videoDurations.invalidate()
+            MediaLibrary.notifyMediaChanged(context, it)
+        }
     }
 
     private fun invalidateFsListingCache() {
