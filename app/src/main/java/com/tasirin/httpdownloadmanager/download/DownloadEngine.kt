@@ -2209,7 +2209,7 @@ class DownloadEngine(appContext: Context) {
             SpeedThrottle(limit, globalRateLimiter())
         }
 
-        val baseName = outName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { outName }
+        val baseName = buangSufiksEkstensi(outName, ".ts", ".mp4").ifBlank { outName }
         // Nama temp WAJIB unik per item: baseName membuang ekstensi sehingga
         // dua item yang namanya hanya beda ekstensi ("film.mp4" vs "film.ts")
         // menghasilkan temp identik dan saling menghapus/menimpa saat jalan
@@ -2625,7 +2625,7 @@ class DownloadEngine(appContext: Context) {
         outName: String
     ) {
         val saver = fileSaver
-        val baseName = outName.removeSuffix(".mp4").removeSuffix(".webm").ifBlank { outName }
+        val baseName = buangSufiksEkstensi(outName, ".mp4", ".webm").ifBlank { outName }
         // Sama seperti downloadHls: temp unik per item lewat potongan id di
         // DEPAN, karena baseName tanpa ekstensi bertabrakan antar item dan
         // pembeda di ekor bisa terpotong untuk nama sangat panjang (#171).
@@ -4574,6 +4574,21 @@ internal fun isEncryptedHlsPlaylist(body: String): Boolean {
  *  terpisah. Murni agar bisa di-unit-test. */
 internal fun isByteRangeHlsPlaylist(body: String): Boolean =
     body.contains("#EXT-X-BYTERANGE")
+
+/**
+ * Buang sufiks ekstensi dari nama dasar tanpa peka huruf besar/kecil
+ * (issue #522). removeSuffix bawaan Kotlin peka kapital, jadi nama
+ * kustom pengguna berakhiran .MP4/.TS/.WEBM tidak terbuang dan nama
+ * terbit berujung ekstensi ganda (Film.MP4.mp4). Sufiks dicoba
+ * berurutan seperti rantai removeSuffix yang digantikannya.
+ */
+internal fun buangSufiksEkstensi(nama: String, vararg sufiks: String): String {
+    var hasil = nama
+    for (s in sufiks) {
+        if (hasil.lowercase().endsWith(s)) hasil = hasil.dropLast(s.length)
+    }
+    return hasil
+}
 
 /** Playlist fMP4 memakai #EXT-X-MAP: URI segmen inisialisasi (moov)
  *  hidup di atribut tag itu, bukan baris segmen tersendiri. Murni agar

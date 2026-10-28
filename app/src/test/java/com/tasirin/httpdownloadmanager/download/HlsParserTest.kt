@@ -499,4 +499,16 @@ class HlsParserTest {
             isMapHlsPlaylist("#EXTM3U\n#EXTINF:10,\nseg.ts\n")
         )
     }
+
+    @Test
+    fun `buangSufiksEkstensi - tak peka kapital dan berurutan`() {
+        // Issue #522: nama kustom ber-ekstensi kapital tidak boleh
+        // menghasilkan nama terbit berekstensi ganda.
+        assertEquals("Film", buangSufiksEkstensi("Film.MP4", ".ts", ".mp4"))
+        assertEquals("Film", buangSufiksEkstensi("Film.TS", ".ts", ".mp4"))
+        assertEquals("Film", buangSufiksEkstensi("Film.webm", ".mp4", ".webm"))
+        assertEquals("Film", buangSufiksEkstensi("Film.mp4", ".ts", ".mp4"))
+        assertEquals("Film.mkv", buangSufiksEkstensi("Film.mkv", ".ts", ".mp4"))
+        assertEquals("Film.Ts", buangSufiksEkstensi("Film.Ts.Mp4", ".ts", ".mp4"))
+    }
 }
