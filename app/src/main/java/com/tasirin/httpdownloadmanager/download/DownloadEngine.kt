@@ -1443,10 +1443,27 @@ class DownloadEngine(appContext: Context) {
         val pending = pendingReplacements.remove(successorId) ?: return
         val target = pending.predecessor.filePath
             ?.takeIf { it.isNotEmpty() }?.let { File(it) } ?: return
-        if (!target.exists()) {
-            runCatching { pending.backup.renameTo(target) }
+        // Target yang masih ada di titik ini memuat byte penerus yang
+        // GAGAL verifikasi — pemanggil sudah mencoba deletePublished,
+        // tetapi kegagalannya ditelan diam-diam (#275). Singkirkan dulu
+        // agar cadangan bisa dipulihkan; tanpa ini byte korup bertahan
+        // menyamar sebagai versi lama yang bagus.
+        if (target.exists()) {
+            runCatching { target.delete() }
         }
-        pending.stale?.let { s -> runCatching { s.delete() } }
+        val restored = if (!target.exists()) {
+            runCatching { pending.backup.renameTo(target) }
+                .getOrDefault(false)
+        } else {
+            false
+        }
+        // Berkas percobaan (.stale) hanya dibuang bila pemulihan tuntas
+        // atau cadangan memang sudah hilang; bila cadangan masih ada
+        // (pemulihan gagal), keduanya dipertahankan agar rekonsiliasi
+        // start berikutnya (#237) masih bisa memulihkan versi lama.
+        if (restored || !pending.backup.exists()) {
+            pending.stale?.let { s -> runCatching { s.delete() } }
+        }
     }
 
     private fun organizeIfEnabled(
