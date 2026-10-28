@@ -152,8 +152,12 @@ object ZipCreator {
                         // fresh per child membuat nama ternormalisasi kembar
                         // (kontrol C0 -> '_') menimpa entri duplikat sehingga
                         // ZipException lalu file hilang diam-diam, dan symlink
-                        // ke target sama di-zip berulang sia-sia.
-                        val dirSeen = mutableSetOf<String>()
+                        // ke target sama di-zip berulang sia-sia. Folder akar
+                        // sendiri ditanam ke seen sejak awal: tanpa itu
+                        // symlink di dalam yang menunjuk balik ke akar lolos
+                        // sebagai belum-dikunjungi dan seluruh isi folder
+                        // tersalin lagi satu tingkat (issue #454).
+                        val dirSeen = mutableSetOf(canon)
                         val dirUsed = mutableMapOf<String, Int>()
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
