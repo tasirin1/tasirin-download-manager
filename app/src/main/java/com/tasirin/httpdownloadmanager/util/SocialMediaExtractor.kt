@@ -1465,19 +1465,24 @@ object SocialMediaExtractor {
         val media = tweet.optJSONArray("media") ?: return emptyList()
         val options = mutableListOf<Result>()
 
+        // Tweet multi-media: beri nomor urut pada nama (issue #397) —
+        // sebelumnya semua video/foto satu tweet bernama persis sama dan
+        // tak bisa dibedakan di daftar pilihan (Instagram sudah memberi
+        // indeks). Media tunggal mempertahankan nama lama tanpa nomor.
         for (i in 0 until media.length()) {
             val item = media.optJSONObject(i) ?: continue
+            val suffix = if (media.length() > 1) "_${i + 1}" else ""
             when (item.optString("type")) {
                 "video" -> {
                     val directUrl = item.optString("url")
                     if (directUrl.startsWith("http")) {
-                        options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}.mp4", text, "Video", MIME_MP4))
+                        options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}$suffix.mp4", text, "Video", MIME_MP4))
                     }
                 }
                 "photo" -> {
                     val directUrl = item.optString("url")
                     if (directUrl.startsWith("http")) {
-                        options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}.jpg", text, "Photo", "image/jpeg"))
+                        options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}$suffix.jpg", text, "Photo", "image/jpeg"))
                     }
                 }
             }
