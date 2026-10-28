@@ -59,7 +59,6 @@ object StoragePrefs {
     private const val KEY_PARTIAL_STREAM_SECRET = "partial_stream_secret"
     private const val KEY_SERVER_SESSION_SECRET = "server_session_secret"
     private const val KEY_USER_AGENT = "user_agent"
-    private const val KEY_FILE_ACCESS_OFFERED = "file_access_offered"
     private const val KEY_GALLERY_FOLDERS = "gallery_folders"
 
     // Cache set section collapsed: dibaca 4x per emisi StateFlow (buildSections
@@ -454,14 +453,6 @@ object StoragePrefs {
 
     fun setUserAgent(context: Context, value: String) {
         prefs(context).edit { putString(KEY_USER_AGENT, value) }
-    }
-
-    /** true = dialog tawaran akses file sudah pernah ditampilkan (sekali saja). */
-    fun isFileAccessOffered(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_FILE_ACCESS_OFFERED, false)
-
-    fun setFileAccessOffered(context: Context, offered: Boolean) {
-        prefs(context).edit { putBoolean(KEY_FILE_ACCESS_OFFERED, offered) }
     }
 
     /** Folder yang disertakan di galeri (path absolut, e.g. "/storage/emulated/0/DCIM/Camera").

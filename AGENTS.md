@@ -142,7 +142,7 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
   `speed_limit_kbps`, `max_retries`, `connect_timeout_sec`, `read_timeout_sec`,
   `small_first`, `delete_partial_on_cancel`,
   `auto_sort`, `battery_exempt`, `collapsed_sections`, `thumb_cleanup_last`, `partial_stream_secret`,
-  `server_session_secret`, `file_access_offered`, `fs_full_access_pending`,
+  `server_session_secret`, `fs_full_access_pending`,
   `auto_open_on_complete`, `user_agent`, `gallery_folders`.
   Kunci galeri foto/video terpisah sudah tidak dipakai; scanner galeri sekarang video-only.
 
