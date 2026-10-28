@@ -961,12 +961,14 @@ class SettingsActivity : AppCompatActivity() {
 
     /** Isi save dipisah agar suspend (hash PIN di IO) tanpa menahan main thread. */
     private suspend fun saveSettings(requestedPort: Int?) {
-            // Validasi port tetap di Main sebelum kerja berat apa pun.
-            if (requestedPort == null || requestedPort !in 1024..65535) {
-                Toast.makeText(this, R.string.settings_port_invalid, Toast.LENGTH_LONG).show()
-                renderServer()
-                return
-            }
+            // Validasi port per-bagian (issue #547): dulu port tak
+            // sah menggugurkan SELURUH Simpan di awal secara
+            // diam-diam — perubahan PIN dan folder pada layar yang
+            // sama hilang hanya dengan toast port. Kini bagian lain
+            // tetap diterapkan; hanya penerapan port yang dilewati,
+            // dan toast port tampil di akhir menggantikan toast
+            // tersimpan agar jelas bagian mana yang belum tersimpan.
+            val portInvalid = requestedPort == null || requestedPort !in 1024..65535
             // Folder: nilai mentah dibaca di main thread, normalisasi
             // path (canonicalPath/mkdirs) + simpan berjalan di
             // Dispatchers.IO (issue #400) — sebelumnya ketiganya sinkron
@@ -1031,17 +1033,23 @@ class SettingsActivity : AppCompatActivity() {
                     renderServer()
                 }
             }
-            val newPort = requestedPort
-            val oldPort = StoragePrefs.serverPort(this)
-            StoragePrefs.setServerPort(this, newPort)
-            if (newPort != oldPort) {
-                App.logEvent("PORT CHANGED: $oldPort -> $newPort")
-                lifecycleScope.launch(Dispatchers.IO) {
-                    App.restartHttpServer(applicationContext)
+            if (!portInvalid) {
+                val newPort = requestedPort!!
+                val oldPort = StoragePrefs.serverPort(this)
+                StoragePrefs.setServerPort(this, newPort)
+                if (newPort != oldPort) {
+                    App.logEvent("PORT CHANGED: $oldPort -> $newPort")
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        App.restartHttpServer(applicationContext)
+                    }
                 }
             }
             renderServer()
-            Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
+            if (portInvalid) {
+                Toast.makeText(this, R.string.settings_port_invalid, Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun checkForUpdate() {
