@@ -1692,9 +1692,11 @@ class DownloadEngine(appContext: Context) {
                     speedBps = 0,
                     etaSeconds = 0
                 )
-            } ?: item
+            }
             flushSave()
-            NotificationHelper.notifyItemFinished(context, finished)
+            // Item terhapus di tengah pemrosesan gagal -> jangan kirim
+            // notifikasi untuk unduhan yang sudah tidak ada (issue #392).
+            if (finished != null) NotificationHelper.notifyItemFinished(context, finished)
             return
         }
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
@@ -1744,9 +1746,9 @@ class DownloadEngine(appContext: Context) {
                     speedBps = 0,
                     etaSeconds = 0
                 )
-            } ?: item
+            }
             flushSave()
-            NotificationHelper.notifyItemFinished(context, finishedRange)
+            if (finishedRange != null) NotificationHelper.notifyItemFinished(context, finishedRange)
             return
         }
         if (maxRetries > 0 && attempts <= maxRetries && item.autoResume) {
@@ -1795,9 +1797,9 @@ class DownloadEngine(appContext: Context) {
                     speedBps = 0,
                     etaSeconds = 0
                 )
-            } ?: item
+            }
             flushSave()
-            NotificationHelper.notifyItemFinished(context, finishedElse)
+            if (finishedElse != null) NotificationHelper.notifyItemFinished(context, finishedElse)
         }
     }
 
