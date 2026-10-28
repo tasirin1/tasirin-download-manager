@@ -82,18 +82,24 @@
                  pembajak link. Berbagi URL tetap lewat Share (ACTION_SEND). -->
         </activity>
 
+        <!-- Galeri/Pengaturan/Log: configChanges selaras MainActivity
+             (#298) — rotasi/perubahan tema/font tidak lagi menghancurkan
+             activity dan membangun ulang seluruh layar dari nol. -->
         <activity
             android:name=".GalleryActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|fontScale|uiMode|locale|layoutDirection"
             android:exported="false"
             android:theme="@style/Theme.HttpDownloadManager" />
 
         <activity
             android:name=".SettingsActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|fontScale|uiMode|locale|layoutDirection"
             android:exported="false"
             android:theme="@style/Theme.HttpDownloadManager" />
 
         <activity
             android:name=".LogActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|fontScale|uiMode|locale|layoutDirection"
             android:exported="false"
             android:theme="@style/Theme.HttpDownloadManager" />
 
