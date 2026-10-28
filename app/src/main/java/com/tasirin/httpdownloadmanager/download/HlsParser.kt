@@ -59,6 +59,19 @@ object HlsParser {
             !uri.startsWith("http://", ignoreCase = true) &&
             !uri.startsWith("https://", ignoreCase = true)
 
+    /** URL yang benar-benar bisa di-fetch engine: skema http/https UTUH
+     *  (dengan "://"), bukan sekadar berawalan "http". Predikat bersama
+     *  semua situs penerimaan segmen/varian (issue #477): uji awalan
+     *  "http" saja menerima skema mirip-http tanpa "//" (http:seg.ts,
+     *  httpx://...) yang resolveUrl kembalikan apa adanya dari
+     *  pass-through skema asing, sedangkan situs ber-pre-check
+     *  isForeignAbsoluteUri membuangnya — tak konsisten antar-jalur.
+     *  Semua keluaran resolveUrl untuk referensi sah memuat "://",
+     *  jadi pengetatan ini tak membuang URL sah. */
+    fun isHttpUrl(url: String): Boolean =
+        url.startsWith("http://", ignoreCase = true) ||
+            url.startsWith("https://", ignoreCase = true)
+
     /** Parse isi master playlist. baseUrl dipakai untuk melengkapi URL varian
      *  yang relatif. Hasil diurutkan menurun menurut bandwidth. */
     fun parseMaster(body: String, baseUrl: String): List<HlsVariant>? {
@@ -126,7 +139,7 @@ object HlsParser {
             if (!ln.startsWith("#EXT-X-STREAM-INF:")) continue
             val next = lines.getOrNull(idx + 1)?.trim().orEmpty()
             if (next.isEmpty() || next.startsWith("#")) continue
-            if (!next.startsWith("http", ignoreCase = true) && !next.startsWith("/")) continue
+            if (!isHttpUrl(next) && !next.startsWith("/")) continue
             val bw = BANDWIDTH_RE.find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
             // Semantik height SAMA seperti parseMaster (issue #393):
             // dimensi terkecil, agar video portrait 720x1280 tercatat
@@ -191,10 +204,10 @@ object HlsParser {
                 val foreignAbsolute = isForeignAbsoluteUri(line)
                 if (!foreignAbsolute) {
                     val url = resolveUrl(baseUrl, line)
-                    // Skema tak peka huruf (RFC 3986): segmen HTTPS://
-                    // kapital sah dan resolveUrl mempertahankannya —
-                    // saringan peka huruf membuangnya diam-diam (issue #463).
-                    if (url.startsWith("http", ignoreCase = true)) {
+                    // Penerimaan lewat predikat bersama isHttpUrl
+                    // (issue #477; skema kapital HTTPS:// tetap sah
+                    // karena ignoreCase, issue #463).
+                    if (isHttpUrl(url)) {
                         segments.add(url)
                         durations.add(pendingDurationUs ?: 0L)
                     }

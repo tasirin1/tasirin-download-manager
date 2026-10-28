@@ -3011,7 +3011,11 @@ class DownloadEngine(appContext: Context) {
                 }
                 if (j < lines.size) {
                     val url = HlsParser.resolveUrl(playlistUrl, lines[j].trim())
-                    if (url.startsWith("http", ignoreCase = true)) {
+                    // Predikat bersama HlsParser.isHttpUrl (issue #477):
+                    // awalan "http" saja menerima skema mirip-http
+                    // tanpa "//" (http:seg.ts, httpx://) yang lolos
+                    // pass-through resolveUrl sebagai segmen gadungan.
+                    if (HlsParser.isHttpUrl(url)) {
                         result.add(url to hlsSegmentDurationUs(dur))
                     }
                     i = j + 1; continue

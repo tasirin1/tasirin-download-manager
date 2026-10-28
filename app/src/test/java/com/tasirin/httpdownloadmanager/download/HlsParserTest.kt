@@ -205,6 +205,31 @@ class HlsParserTest {
     }
 
     @Test
+    fun `isHttpUrl - hanya http dan https utuh yang diterima`() {
+        // Predikat bersama penerimaan (issue #477): awalan "http" saja
+        // tak cukup — skema mirip-http tanpa "//" harus tertolak.
+        assertTrue(HlsParser.isHttpUrl("https://cdn.example.com/x"))
+        assertTrue(HlsParser.isHttpUrl("HTTP://cdn.example.com/x"))
+        assertTrue(!HlsParser.isHttpUrl("http:seg.ts"))
+        assertTrue(!HlsParser.isHttpUrl("httpx://cdn.example.com/x"))
+        assertTrue(!HlsParser.isHttpUrl("ftp://cdn.example.com/x"))
+    }
+
+    @Test
+    fun `parseMasterLenient - varian skema mirip-http tanpa garis miring ganda dibuang`() {
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000\n" +
+            "httpx://cdn.example.com/videos/a.m3u8\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=900000\n" +
+            "http:seg.ts\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=1000000\n" +
+            "https://cdn.example.com/videos/ok.m3u8\n"
+        val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals("https://cdn.example.com/videos/ok.m3u8", variants[0].url)
+    }
+
+    @Test
     fun `parseMasterLenient - fallback absolut saat parseMaster gagal`() {
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4D401E\",FRAME-RATE=30\n" +
