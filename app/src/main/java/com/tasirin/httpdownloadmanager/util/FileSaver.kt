@@ -286,6 +286,14 @@ class FileSaver(context: Context) {
             if (resolver.update(uri, values, null, null) <= 0) {
                 throw IOException("Failed to publish MediaStore file (IS_PENDING not cleared)")
             }
+            // Corong invalidasi galeri (issue #557): SEMUA terbitan
+            // MediaStore — unduhan maupun upload server lewat
+            // saveStream — bermuara di sini, jadi satu panggilan ini
+            // menutup jalur upload yang dulu tak terinvalidasi sama
+            // sekali (invalidateAfterPublish server no-op untuk
+            // hasil ber-filePath null), melengkapi kait per-pintu
+            // #548 yang tetap dipertahankan.
+            MediaLibrary.invalidateScanCache()
             return PublishResult(contentUri = uri.toString(), fileName = unique)
         } catch (e: Exception) {
             runCatching { resolver.delete(uri, null, null) }
