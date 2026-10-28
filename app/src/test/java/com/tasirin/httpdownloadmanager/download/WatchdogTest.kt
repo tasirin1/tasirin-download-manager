@@ -30,7 +30,7 @@ class WatchdogTest {
         try {
             w.check(22_000L, 5000L, 1_000_000L, 1500L)
             fail("harus melempar IOException saat byte macet 20 detik")
-        } catch (_: IOException) {
+        } catch (_: IOException) { // audit-ignore: kotlin_empty_catch (pola uji: tangkapan IOException adalah jalur sukses yang diharapkan)
         }
     }
 
@@ -46,7 +46,7 @@ class WatchdogTest {
         try {
             w.check(31_000L, 5000L, 1_000_000L, 0L)
             fail("harus melempar IOException saat stall 30 detik")
-        } catch (_: IOException) {
+        } catch (_: IOException) { // audit-ignore: kotlin_empty_catch (pola uji: tangkapan IOException adalah jalur sukses yang diharapkan)
         }
     }
 
@@ -84,7 +84,7 @@ class WatchdogTest {
         try {
             w.check(31_000L, 5000L, 0L, 0L)
             fail("harus melempar IOException saat total tak diketahui tapi stall 30 detik")
-        } catch (_: IOException) {
+        } catch (_: IOException) { // audit-ignore: kotlin_empty_catch (pola uji: tangkapan IOException adalah jalur sukses yang diharapkan)
         }
     }
 }

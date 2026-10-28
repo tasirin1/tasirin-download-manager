@@ -178,6 +178,10 @@ RULES = [
         r"\bcatch\s*\([^)]*\)\s*\{\s*\}",
         frozenset({"kotlin", "java"}),
         skip_in_strings=True,
+        # Lintasan multi-baris menilai teks yang komentarnya sudah
+        # diblanko (blank_literals), jadi badan berisi komentar saja
+        # dan badan kosong multi-baris ikut terlihat (issue #509).
+        multiline=True,
     ),
     Rule(
         "debug_stack_trace",
@@ -241,6 +245,10 @@ RULES = [
         "Broad catch-all that swallows exceptions silently (no logging/throw)",
         r"""catch\s*\(_:\s*Exception\)\s*\{\s*\}""" ,
         frozenset({"kotlin"}),
+        # Sama seperti kotlin_empty_catch: badan berkomentar-saja dan
+        # multi-baris hanya terlihat lewat lintasan multi-baris atas
+        # teks terblanko (issue #509).
+        multiline=True,
     ),
 
 ]
@@ -851,6 +859,17 @@ def run_self_test() -> int:
             '    val js = "(function(){try{work();}catch(e){}})"',
             "}",
         ],
+        Path("sample_catch.kt"): [
+            # Regresi issue #509: badan catch berisi komentar saja dan
+            # badan kosong multi-baris hanya tertangkap lintasan
+            # multi-baris atas teks terblanko; mencabut multiline dari
+            # kedua aturan catch wajib menggagalkan self-test. Baris 4
+            # berisi kode nyata dan tidak boleh menembak.
+            "try { f() } catch (e: Exception) { /* abaikan */ }",
+            "try { g() } catch (_: Exception) {",
+            "}",
+            'try { h() } catch (e: Exception) { Log.w("x", e) }',
+        ],
         Path("sample.js"): [
             "// audit-ignore-next: js_dynamic_exec",
             "const value = eval(userInput);",
@@ -957,6 +976,21 @@ def run_self_test() -> int:
         for item in findings
         if item["rule_id"] == "kotlin_empty_catch" and item["path"] == "sample_str.kt"
     ]
+    catch_komentar = any(
+        item["rule_id"] == "kotlin_empty_catch" and item["path"] == "sample_catch.kt"
+        and item["line"] == 1
+        for item in findings
+    )
+    catch_multibaris = any(
+        item["rule_id"] == "file_scoped_catch_all" and item["path"] == "sample_catch.kt"
+        and item["line"] == 2
+        for item in findings
+    )
+    catch_berisi_fp = any(
+        item["rule_id"] in ("kotlin_empty_catch", "file_scoped_catch_all")
+        and item["path"] == "sample_catch.kt" and item["line"] == 4
+        for item in findings
+    )
     prose_suppressed = not any(
         item["rule_id"] == "js_dynamic_exec" and item["path"] == "sample2.js"
         for item in findings
@@ -1059,9 +1093,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not leak_next_line or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned or not extra_rules_hit:
+    if missing or suppressed or str_leak or prose_suppressed or not leak_next_line or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned or not extra_rules_hit or not catch_komentar or not catch_multibaris or catch_berisi_fp:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, leak_next_line={leak_next_line}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}, extra_rules_hit={extra_rules_hit}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, leak_next_line={leak_next_line}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}, extra_rules_hit={extra_rules_hit}, catch_komentar={catch_komentar}, catch_multibaris={catch_multibaris}, catch_berisi_fp={catch_berisi_fp}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0

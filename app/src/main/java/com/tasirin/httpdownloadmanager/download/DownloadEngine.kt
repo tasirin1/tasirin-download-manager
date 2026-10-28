@@ -888,7 +888,7 @@ class DownloadEngine(appContext: Context) {
             try {
                 val origin = java.net.URL(current).let { "${it.protocol}://${it.host}" }
                 conn.setRequestProperty("Referer", "$origin/")
-            } catch (_: Exception) { /* Referer opsional, tidak wajib */ }
+            } catch (_: Exception) { /* Referer opsional, tidak wajib */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (Referer opsional: URL tak ter-parse tidak boleh menggagalkan koneksi)
             // YouTube/Instagram CDN butuh Referer + Origin agar HTTP 403 tidak muncul
             if (current.contains("googlevideo.com") || current.contains("youtube.com")) {
                 conn.setRequestProperty("Referer", "https://www.youtube.com/")
@@ -2074,7 +2074,7 @@ class DownloadEngine(appContext: Context) {
                     segmentedTotal = total
                 }
             }
-        } catch (_: Exception) {
+        } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut dengan GET biasa)
             // HEAD tidak didukung; lanjut dengan GET biasa
         } finally {
             probe.disconnect()
@@ -4187,7 +4187,7 @@ class DownloadEngine(appContext: Context) {
             // Cookie (termasuk cookie sesi) dienkripsi seperti kredensial
             // item — bukan plaintext di SharedPreferences (issue #204).
             cookiePrefs.edit { putString("cookies", Crypto.encrypt(arr.toString())) }
-        } catch (_: Exception) { /* cookie persist is best-effort */ }
+        } catch (_: Exception) { /* cookie persist is best-effort */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (persist cookie best-effort: gagal tulis tak boleh menggagalkan unduhan)
     }
 
     /** Muat cookie dari SharedPreferences; yang kedaluwarsa dibuang. */
@@ -4223,7 +4223,7 @@ class DownloadEngine(appContext: Context) {
                     cookieManager.cookieStore.add(null, cookie)
                 }
             }
-        } catch (_: Exception) { /* cookie persist is best-effort */ }
+        } catch (_: Exception) { /* cookie persist is best-effort */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (persist cookie best-effort: gagal tulis tak boleh menggagalkan unduhan)
     }
 
     companion object {

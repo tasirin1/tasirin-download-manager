@@ -571,7 +571,7 @@ object SocialMediaExtractor {
                     val context = obj.optJSONObject("context")
                     val ctxMedia = context?.optJSONObject("media")
                     if (ctxMedia != null) return ctxMedia
-                } catch (_: Exception) { /* lanjut */ }
+                } catch (_: Exception) { /* lanjut */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (kandidat media tak ter-parse: lanjut ke kandidat berikut)
             }
         }
         // Format 2: contextJSON = "..." (JS assignment)
@@ -594,7 +594,7 @@ object SocialMediaExtractor {
                     val media = context.optJSONObject("media")
                     if (media != null) return media
                 }
-            } catch (_: Exception) { /* lanjut */ }
+            } catch (_: Exception) { /* lanjut */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (kandidat media tak ter-parse: lanjut ke kandidat berikut)
         }
         return null
     }
@@ -752,7 +752,7 @@ object SocialMediaExtractor {
                 }
             }
             return options
-        } catch (_: Exception) {
+        } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (gagal parse halaman YouTube: biarkan fallback lain lanjut)
             // Gagal mem-parse halaman/response YouTube — biarkan fallback lain lanjut.
         }
         return emptyList()
