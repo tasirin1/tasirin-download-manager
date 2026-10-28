@@ -799,7 +799,10 @@ class DownloadEngine(appContext: Context) {
     }
 
     /** Buka koneksi dengan redirect manual. Kredensial dan header sensitif
-     *  hanya dikirim ulang bila target tetap satu origin dengan URL awal. */
+     *  hanya dikirim bila target tetap satu origin dengan [authAnchorUrl]
+     *  (bawaan: URL awal koneksi ini). Pemanggil HLS meneruskan URL item
+     *  sebagai jangkar agar kredensial tidak ikut ke host segmen/varian
+     *  mana pun yang ditunjuk isi playlist (issue #340). */
     private fun openAuthenticatedConnection(
         url: String,
         method: String,
@@ -807,6 +810,7 @@ class DownloadEngine(appContext: Context) {
         password: String,
         headers: String,
         presetRange: Long? = null,
+        authAnchorUrl: String = url,
         configure: (HttpURLConnection, String) -> Unit = { _, _ -> }
     ): HttpURLConnection {
         var current = url
@@ -835,7 +839,7 @@ class DownloadEngine(appContext: Context) {
                 conn.setRequestProperty("Referer", "https://www.pornhub.com/")
                 conn.setRequestProperty("Origin", "https://www.pornhub.com")
             }
-            if (current == url || isSameOrigin(url, current)) {
+            if (current == authAnchorUrl || isSameOrigin(authAnchorUrl, current)) {
                 applyAuthHeaders(conn, username, password, headers)
             }
             // Header Range resume wajib di-set SEBELUM connect/responseCode:
@@ -2277,7 +2281,8 @@ class DownloadEngine(appContext: Context) {
                 url, method = "GET",
                 username = item.username,
                 password = item.password,
-                headers = item.headers
+                headers = item.headers,
+                authAnchorUrl = item.url
             )
         )
         try {
@@ -2537,7 +2542,8 @@ class DownloadEngine(appContext: Context) {
                 url, method = "GET",
                 username = item.username,
                 password = item.password,
-                headers = item.headers
+                headers = item.headers,
+                authAnchorUrl = item.url
             )
         )
         try {
@@ -2689,7 +2695,7 @@ class DownloadEngine(appContext: Context) {
         var fatalError: IOException? = null
         for (candidate in candidates) {
             val videoSegs = try {
-                mediaSegmentsWithDurations(candidate.url, headers)
+                mediaSegmentsWithDurations(candidate.url, headers, baseUrl)
             } catch (e: IOException) {
                 if (fatalError == null) fatalError = e
                 null
@@ -2721,7 +2727,7 @@ class DownloadEngine(appContext: Context) {
                 }
                 var audioResult: List<String>? = null
                 for (rendition in ordered) {
-                    val segs = runCatching { mediaSegments(rendition.url, headers) }.getOrNull()
+                    val segs = runCatching { mediaSegments(rendition.url, headers, baseUrl) }.getOrNull()
                     if (!segs.isNullOrEmpty()) {
                         audioResult = segs
                         break
@@ -2747,11 +2753,16 @@ class DownloadEngine(appContext: Context) {
     }
 
     /** Parse segmen dari media playlist, mengembalikan (url, durasi_us). */
-    private fun mediaSegmentsWithDurations(playlistUrl: String, headers: String = ""): List<Pair<String, Long>>? {
+    private fun mediaSegmentsWithDurations(
+        playlistUrl: String,
+        headers: String = "",
+        authAnchorUrl: String = playlistUrl
+    ): List<Pair<String, Long>>? {
         // Ambil media playlist; gagal HTTP/exception = null agar kandidat berikut dicoba.
         val body: String? = try {
             val conn = openAuthenticatedConnection(
-                playlistUrl, method = "GET", username = "", password = "", headers = headers
+                playlistUrl, method = "GET", username = "", password = "", headers = headers,
+                authAnchorUrl = authAnchorUrl
             )
             try {
                 val code = conn.responseCode
@@ -2792,8 +2803,12 @@ class DownloadEngine(appContext: Context) {
         return if (result.isEmpty()) null else result
     }
 
-    private fun mediaSegments(playlistUrl: String, headers: String = ""): List<String>? =
-        mediaSegmentsWithDurations(playlistUrl, headers)?.map { it.first }
+    private fun mediaSegments(
+        playlistUrl: String,
+        headers: String = "",
+        authAnchorUrl: String = playlistUrl
+    ): List<String>? =
+        mediaSegmentsWithDurations(playlistUrl, headers, authAnchorUrl)?.map { it.first }
 
     /** Estimasi byte video dari BANDWIDTH (bit/detik) x total durasi #EXTINF.
      *  Sumber: master playlist — tersedia sebelum segmen diunduh. */
