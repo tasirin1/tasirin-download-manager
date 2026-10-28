@@ -1444,8 +1444,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val selSpeed = spinnerSpeed.selectedItemPosition
                 App.engine.setLimitAndPriority(
                     item.id,
-                    if (selSpeed < speedKbps.size) speedKbps[selSpeed] else itemSpeed,
-                    priorityValues[spinnerPriority.selectedItemPosition]
+                    // Guard dua arah: selectedItemPosition -1 (tak ada
+                    // seleksi) dulu lolos syarat '< size' lalu mengindeks
+                    // negatif; spinner prioritas kini dijaga juga (issue #208).
+                    if (selSpeed in speedKbps.indices) speedKbps[selSpeed] else itemSpeed,
+                    priorityValues.getOrElse(spinnerPriority.selectedItemPosition) { item.priority }
                 )
             }
             .show()
