@@ -183,18 +183,30 @@ def admin_consistency() -> Result:
         import yaml as _yaml
         labeler = _yaml.safe_load((ROOT / ".github/labeler.yml").read_text(encoding="utf-8")) or {}
 
-        def _paths(node):
+        def _paths(node, dalam_any=False):
+            # Kumpulkan string path di bawah kunci any/all pada kedalaman
+            # berapa pun (issue #486): struktur nyata labeler adalah
+            # {nama-label: [{any: [path...]}]}, sedangkan penelusuran
+            # lama hanya menuruni nilai dict yang kuncinya any/all di
+            # tingkat yang sedang dilihat — dari dict teratas berkunci
+            # nama label ia tidak pernah mencapai daftar path mana pun
+            # (0 dari 43 path; cek mati total secara fail-open).
             if isinstance(node, str):
-                yield node
+                if dalam_any:
+                    yield node
             elif isinstance(node, list):
                 for item in node:
-                    yield from _paths(item)
+                    yield from _paths(item, dalam_any)
             elif isinstance(node, dict):
                 for key, val in node.items():
-                    if key in ("any", "all") and isinstance(val, list):
-                        yield from _paths(val)
+                    yield from _paths(val, dalam_any or key in ("any", "all"))
 
-        for path in _paths(labeler):
+        ditemukan = list(_paths(labeler))
+        if labeler and not ditemukan:
+            # Penjaga fail-open: labeler tak kosong tetapi nol path
+            # terkumpul berarti penelusuran rusak, bukan repo sehat.
+            problems.append("labeler: 0 path terkumpul dari labeler.yml tak kosong")
+        for path in ditemukan:
             clean = str(path).split("*")[0].rstrip("/")
             if not clean or clean.startswith("#"):
                 continue
