@@ -496,6 +496,24 @@ def ignored_on_line(line: str, previous: str | None, rule_id: str) -> bool:
     return rule_id in markers
 
 
+def _pola_rentang_bersarang(kedalaman: int) -> str:
+    """Pola rentang panggilan bersarang sampai [kedalaman] tingkat.
+
+    Dibangun berjenjang: pasangan tingkat k hanya merujuk alternatif
+    tingkat di bawahnya, sehingga alternatif tetap terpisah tegas
+    menurut karakter pertama (kurung buka vs bukan kurung) dan
+    backtracking tetap linear. Menggantikan pola tulis-tangan yang
+    berhenti di sarang tiga (#272 menaikkan satu tingkat, bukan
+    menutup kelasnya — sarang 4/5 lolos, issue #313).
+    """
+    alternatif = [r"[^()]"]
+    pasangan = ""
+    for _ in range(kedalaman):
+        pasangan = r"\((?:" + "|".join(alternatif) + r")*\)"
+        alternatif.append(pasangan)
+    return r"(?:" + pasangan + r"|[^();]){0,300}"
+
+
 def scan_text(
     relative_path: Path,
     lines: list[str],
@@ -563,9 +581,11 @@ def scan_text(
     # panggilan selesai tidak ikut tertuduh (false positive issue #201),
     # tetapi pasangan kurung seimbang di dalam rentang (panggilan
     # bersarang ala foo() / COUNT(*) hasil formatter) boleh dilewati agar
-    # bocoran multi-baris bersarang tetap tertangkap (issue #216), kini
-    # sampai sarang TIGA tingkat (issue #240 dua tingkat: foo(bar());
-    # issue #272 tiga tingkat: foo(bar(baz())) sempat lolos juga).
+    # bocoran multi-baris bersarang tetap tertangkap (issue #216).
+    # Pola sarangnya DIBANGUN berjenjang oleh _pola_rentang_bersarang
+    # sampai ENAM tingkat: pola tulis-tangan berhenti di tiga dan
+    # sarang 4/5 lolos (issue #313; sejarah: #240 dua tingkat,
+    # #272 tiga tingkat).
     # Alternatif pola tetap terpisah tegas menurut karakter pertama
     # (kurung buka vs bukan kurung) agar backtracking tetap linear.
     # Lintasan ini berjalan pada salinan yang isi literal string/char-nya
@@ -581,7 +601,7 @@ def scan_text(
         long_pattern = re.compile(
             rule.pattern.replace(
                 "[^;\\n]*",
-                r"(?:\((?:[^()]|\([^()]*\)|\((?:[^()]|\([^()]*\))*\))*\)|[^();]){0,300}",
+                _pola_rentang_bersarang(6),
             ),
             rule.flags,
         )
@@ -723,6 +743,14 @@ def run_self_test() -> int:
             "        foo(bar(baz())) + token)",
             "}",
         ],
+        Path("sample_nested5.kt"): [
+            # Regresi issue #313: sarang LIMA tingkat sebelum kata
+            # sensitif tetap wajib terdeteksi lintasan multi-baris.
+            "class Nested5 {",
+            "    fun leak() = Log.d(\"x\",",
+            "        a(b(c(d(e())))) + token)",
+            "}",
+        ],
         Path("sample_fp.kt"): [
             # Regresi issue #201: Log polos yang kurungnya DITUTUP, lalu
             # pernyataan LAIN menyebut token dalam jarak <300 karakter —
@@ -854,6 +882,10 @@ def run_self_test() -> int:
         item["rule_id"] == "sensitive_log" and item["path"] == "sample_nested3.kt"
         for item in findings
     )
+    nested5_log = any(
+        item["rule_id"] == "sensitive_log" and item["path"] == "sample_nested5.kt"
+        for item in findings
+    )
     strparen_fp = any(
         item["rule_id"] == "sensitive_log" and item["line"] == 2
         and item["path"] == "sample_strparen.kt"
@@ -874,9 +906,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log:
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
