@@ -135,7 +135,7 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
   (**cek-saja**: aplikasi tidak pernah mengunduh/memegang byte APK update —
   pengguna mengambil versi baru lewat browser dari halaman rilis). Instalasi
   tetap manual oleh pengguna.
-- **Kunci SharedPreferences aktif** (`storage_settings`): `folder_uri`, `folder_name`,
+- **Kunci SharedPreferences aktif** (`storage_settings`): `folder_uri`,
   `text_folder_path`, `extra_folders`, `background_download`, `auto_start_boot`,
   `server_background`, `server_autostart_boot`, `server_port`, `server_pin`,
   `pin_enforced`, `fs_full_access`, `server_read_only`, `max_concurrent`, `segments`,

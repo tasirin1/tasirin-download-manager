@@ -1028,7 +1028,7 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
         StoragePrefs.setTextFolder(this, normalized)
-        StoragePrefs.saveFolder(this, null, null)
+        StoragePrefs.saveFolder(this, null)
         refreshActiveStorageUi()
         Toast.makeText(
             this,

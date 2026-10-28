@@ -30,7 +30,6 @@ object StoragePrefs {
     }
     private const val HEX_CHARS = "0123456789abcdef"
     private const val KEY_FOLDER_URI = "folder_uri"
-    private const val KEY_FOLDER_NAME = "folder_name"
     private const val KEY_BACKGROUND = "background_download"
     private const val KEY_AUTOSTART = "auto_start_boot"
     private const val KEY_SERVER_BACKGROUND = "server_background"
@@ -95,10 +94,12 @@ object StoragePrefs {
         return raw?.takeIf { it.isNotEmpty() }?.let { it.toUri() }
     }
 
-    fun saveFolder(context: Context, uri: Uri?, name: String?) {
+    fun saveFolder(context: Context, uri: Uri?) {
         prefs(context).edit {
             putString(KEY_FOLDER_URI, uri?.toString())
-            putString(KEY_FOLDER_NAME, name)
+            // Kunci folder_name warisan tidak pernah dibaca (issue #365):
+            // jangan ditulis lagi, dan buang nilai yatim lama bila ada.
+            remove("folder_name")
         }
     }
 
