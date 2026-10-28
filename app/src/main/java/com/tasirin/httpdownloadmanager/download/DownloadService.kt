@@ -39,7 +39,7 @@ class DownloadService : Service() {
         // nama exception-nya saja sebagai jejak diagnosis (issue #205).
         runCatching { startForegroundCompat() }
             .onFailure {
-                App.logEvent("SERVICE: startForeground gagal (${it.javaClass.simpleName})")
+                App.logEvent("SERVICE: startForeground failed (${it.javaClass.simpleName})")
             }
         App.logEvent("SERVICE STARTED (background downloads)")
         if (StoragePrefs.isBackgroundEnabled(this)) {
