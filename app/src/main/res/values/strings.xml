@@ -66,6 +66,8 @@
     <string name="web_extract_found">Video found — starting download…</string>
     <string name="web_extract_failed">No video detected. Complete any verification on the page, then tap Grab video.</string>
     <string name="web_extract_done">Video link copied to the form — tap Download.</string>
+    <string name="web_extract_restored">The app was restarted while grabbing — the video was added to your downloads.</string>
+    <string name="web_extract_restored_episodes">The app was restarted while grabbing — reopen the episode grab from the form to continue.</string>
     <string name="batch_episodes_title">Episodes found</string>
     <plurals name="batch_episodes_message">
         <item quantity="one">Found %1$d episode on this page. Download it?</item>

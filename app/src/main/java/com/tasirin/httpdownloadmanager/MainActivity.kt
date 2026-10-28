@@ -114,7 +114,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
         if (res.resultCode == RESULT_OK) {
-            onWebExtractResult?.invoke(res.data)
+            val handler = onWebExtractResult
+            if (handler != null) {
+                handler.invoke(res.data)
+            } else {
+                // Activity sempat dibuat ulang sistem (proses mati) saat
+                // browser ekstrak terbuka: handler dialog sudah tidak ada,
+                // tetapi hasil grab TIDAK boleh hilang diam-diam (#241).
+                handleRestoredWebExtractResult(res.data)
+            }
         } else {
             // Batal di tengah batch = batch gugur: jangan biarkan handler
             // episode basi tetap terpasang untuk ketukan berikutnya.
@@ -144,11 +152,61 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
+    /** Hasil WebExtract yang tiba sesudah Activity dibuat ulang sistem
+     *  (proses mati saat browser ekstrak terbuka): dialog tambah dan
+     *  handler-nya sudah tidak ada, jadi hasil dipakai langsung — video
+     *  ditambahkan sebagai unduhan (pola handler batch), episode (URL
+     *  halaman, bukan video langsung) membuka lagi dialog tambah berisi
+     *  URL tontonan agar batch bisa diulang dari awal (#241). */
+    private fun handleRestoredWebExtractResult(data: Intent?) {
+        val videoUrl = data?.getStringExtra(WebExtractActivity.EXTRA_VIDEO_URL).orEmpty()
+        val watch = data?.getStringExtra(WebExtractActivity.EXTRA_WATCH_URL).orEmpty()
+        val episodes = SocialMediaExtractor.parseEpisodeLinks(
+            data?.getStringExtra(WebExtractActivity.EXTRA_EPISODES_JSON).orEmpty(),
+            watch
+        )
+        if (videoUrl.isNotBlank()) {
+            val cookies = data?.getStringExtra(WebExtractActivity.EXTRA_COOKIES).orEmpty()
+            val headers = buildString {
+                if (cookies.isNotBlank()) append("Cookie: ").append(cookies)
+                if (watch.isNotBlank()) {
+                    if (isNotEmpty()) append("\n")
+                    append("Referer: ").append(watch)
+                }
+            }
+            val title = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
+                ?.substringBefore(" - ").orEmpty().trim().take(80)
+            App.engine.addDownload(
+                url = videoUrl,
+                fileName = title.takeIf { it.isNotBlank() },
+                headers = headers
+            )
+            Toast.makeText(this, R.string.web_extract_restored, Toast.LENGTH_LONG).show()
+        } else if (episodes.isNotEmpty()) {
+            Toast.makeText(
+                this, R.string.web_extract_restored_episodes, Toast.LENGTH_LONG
+            ).show()
+            showAddDialog(watch.ifBlank { null })
+        } else {
+            Toast.makeText(this, R.string.web_extract_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Id item yang menunggu hasil pemilih folder: tanpa ini hasil
+        // OpenDocumentTree diabaikan diam-diam sesudah rekreasi (#241).
+        // (Rotasi sendiri kini tidak me-rekreasi MainActivity sama sekali
+        // berkat configChanges di manifest; jalur ini untuk proses mati.)
+        outState.putString(STATE_PENDING_MOVE_ID, pendingMoveId)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Splash klasik: tema splash dari manifest untuk window awal, lalu
         // pindah ke tema terang sebelum konten digambar (lihat themes.xml).
         setTheme(R.style.Theme_HttpDownloadManager)
         super.onCreate(savedInstanceState)
+        pendingMoveId = savedInstanceState?.getString(STATE_PENDING_MOVE_ID)
         try {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -1835,6 +1893,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     companion object {
+        private const val STATE_PENDING_MOVE_ID = "state_pending_move_id"
         private val AUTO_OPEN_VIDEO_EXTS = setOf("mp4", "mkv", "webm", "ts", "avi", "mov", "flv")
         private val URL_PATTERN = Regex("https?://[^\\s\"'<>]+")
         private fun extractUrls(text: String): List<String> =

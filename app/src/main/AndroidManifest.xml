@@ -60,6 +60,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|fontScale|uiMode|locale|layoutDirection"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.HttpDownloadManager.Splash">
