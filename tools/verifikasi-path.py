@@ -1294,7 +1294,7 @@ def cek_remote_dm(gagal):
         pass
 
 
-def cek_pola_berisiko(gagal, peringatan, diff):
+def cek_pola_berisiko(gagal, peringatan, diff, berubah=()):
     for _, isi in tambah_kt(diff):
         if "System.out.println" in isi:
             peringatan.append("println di diff (pakai Log/buffer): " + isi.strip()[:80])
@@ -1311,12 +1311,18 @@ def cek_pola_berisiko(gagal, peringatan, diff):
     # dulu tetap lolos di titik push — insiden EOF ganda ae3f368
     # putaran 14 buktinya. Perlakuan kini selaras check_repo.py yang
     # memang keras untuk whitespace.
-    cek = jalan_output("git", "diff", "--check")
+    # Cakupan DIBATASI ke berkas yang sedang diverifikasi (issue #485):
+    # tanpa pathspec, --check menilai seluruh pohon kerja/indeks
+    # sehingga kotoran WIP berkas tak terkait menggagalkan verifikasi
+    # per-path dan bahkan membatalkan push commit bersih (WIP unstaged
+    # yang tak ikut ter-push). Kekerasan status GAGAL-nya tetap.
+    ekor = ["--", *berubah] if berubah else []
+    cek = jalan_output("git", "diff", "--check", *ekor)
     if cek:
         gagal.append("Rapikan spasi diff --check: " + cek.strip().splitlines()[0][:100])
     # Varian staged (issue #426): diff polos tak melihat indeks, jadi
     # whitespace yang sudah di-git add lolos gerbang ini juga.
-    cek_staged = jalan_output("git", "diff", "--cached", "--check")
+    cek_staged = jalan_output("git", "diff", "--cached", "--check", *ekor)
     if cek_staged:
         gagal.append(
             "Rapikan spasi diff --check (staged): " + cek_staged.strip().splitlines()[0][:100]
@@ -1429,7 +1435,7 @@ def utama():
         cek_hapusan_belum_tercatat(peringatan, diff)
         cek_uji_baru(peringatan, diff)
         cek_uji_ubah(peringatan, diff)
-        cek_pola_berisiko(gagal, peringatan, diff)
+        cek_pola_berisiko(gagal, peringatan, diff, berubah)
         cek_pola_boros(peringatan, diff)
         cek_izin_baru(peringatan, diff)
         cek_definisi_baru(peringatan, diff)
