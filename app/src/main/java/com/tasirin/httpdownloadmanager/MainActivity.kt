@@ -1148,9 +1148,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val targetSdk = runCatching {
             packageManager.getApplicationInfo(packageName, 0).targetSdkVersion
         }.getOrDefault(36)
+        // minSdk dibaca dari paket terpasang (ApplicationInfo.minSdkVersion,
+        // API 24+); di API 23 — lantai aplikasi saat ini — nilainya memang
+        // 23. Dulu literal basi "21" dari aturan lama (issue #206).
+        val minSdk = if (android.os.Build.VERSION.SDK_INT >= 24) {
+            runCatching {
+                packageManager.getApplicationInfo(packageName, 0).minSdkVersion
+            }.getOrDefault(23)
+        } else {
+            23
+        }
         view.findViewById<TextView>(R.id.about_footer).text = getString(
             R.string.about_tech,
-            21, // minSdk dijaga 21 (aturan AGENTS.md: jangan naikkan)
+            minSdk,
             targetSdk,
             build
         )
