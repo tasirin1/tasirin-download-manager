@@ -15,12 +15,29 @@ def headings(path: Path) -> list[int]:
     # dalam contoh kode (mis. komentar konfigurasi) BUKAN heading —
     # tanpa pelacakan ini ia terhitung heading hantu dan menyalahkan
     # struktur dokumen yang sebenarnya sinkron.
-    in_fence = False
+    # Pagar dicatat KARAKTER + PANJANGNYA (issue #534): CommonMark
+    # mengakui pagar ~~~ dan pagar lebih panjang (4+ backtick, pola
+    # wajar untuk mendokumentasikan contoh pagar di dalam pagar);
+    # penutup harus sekarakter dan sepanjang minimal pembuka, tanpa
+    # info string.
+    fence_char = ""
+    fence_len = 0
     for line in path.read_text(encoding="utf-8").splitlines():
-        if line.lstrip().startswith("```"):
-            in_fence = not in_fence
+        stripped = line.lstrip()
+        fm = re.match(r"^(`{3,}|~{3,})", stripped)
+        if fence_char:
+            if (
+                fm
+                and fm.group(1)[0] == fence_char
+                and len(fm.group(1)) >= fence_len
+                and not stripped[len(fm.group(1)):].strip()
+            ):
+                fence_char = ""
+                fence_len = 0
             continue
-        if in_fence:
+        if fm:
+            fence_char = fm.group(1)[0]
+            fence_len = len(fm.group(1))
             continue
         m = re.match(r"^(#{1,6})\s+", line)
         if m:
