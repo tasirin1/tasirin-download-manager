@@ -797,11 +797,29 @@ class FileSaver(context: Context) {
                         if (!currentRel.isNullOrEmpty() &&
                             !currentRel.startsWith("Download", ignoreCase = true)
                         ) return result
+                        val targetRel = "Download/$sub"
+                        // Sudah di subfolder tujuan: tak ada yang dipindah
+                        // (dan cek unik di bawah akan menabrak namanya
+                        // sendiri).
+                        if (currentRel.equals(targetRel, ignoreCase = true)) return result
+                        // Cek keunikan nama di subfolder TUJUAN (issue
+                        // #448): update RELATIVE_PATH polos membuat dua
+                        // berkas bernama sama dari folder asal berbeda
+                        // berkumpul di subfolder yang sama karena
+                        // MediaStore menoleransi DISPLAY_NAME duplikat —
+                        // kelas masalah yang ditutup #403 untuk rename.
+                        val unique = uniqueMediaStoreName(
+                            fileName, targetRel,
+                            MediaLibrary.mediaCollectionForUri(uri)
+                        )
                         val values = ContentValues().apply {
-                            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/$sub/")
+                            put(MediaStore.MediaColumns.RELATIVE_PATH, "$targetRel/")
+                            if (unique != fileName) {
+                                put(MediaStore.MediaColumns.DISPLAY_NAME, unique)
+                            }
                         }
                         appContext.contentResolver.update(uri, values, null, null)
-                        result
+                        if (unique != fileName) result.copy(fileName = unique) else result
                     } else {
                         val doc = DocumentFile.fromSingleUri(appContext, uri) ?: return result
                         val parent = doc.parentFile ?: return result
