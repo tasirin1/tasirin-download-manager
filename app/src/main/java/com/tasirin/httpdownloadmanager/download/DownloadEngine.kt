@@ -1302,6 +1302,11 @@ class DownloadEngine(appContext: Context) {
                         headers = item.headers,
                         method = item.method,
                         postBody = item.postBody,
+                        // Mirror pendahulu ikut diwarisi (issue #519):
+                        // tanpa ini unduhan pembaruan tak punya jalur
+                        // cadangan yang dikonfigurasi pengguna untuk
+                        // berkas yang sama.
+                        mirrors = item.mirrors,
                         speedLimitKbps = item.speedLimitKbps,
                         priority = item.priority,
                         // Checksum TIDAK diwarisi (issue #512): checksum
