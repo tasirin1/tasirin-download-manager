@@ -2802,9 +2802,19 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             var expanded = false
             var ownCount = 0
             var ownSize = 0L
+            var hadSkip = false
             val childCanons = mutableListOf<String>()
         }
         val localStats = HashMap<String, Triple<Int, Long, Boolean>>()
+        // Direktori yang statistik lokalnya TIDAK setara pindai segar
+        // (issue #435): visitedDirs dibagi satu pemindaian, jadi frame
+        // yang melewati direktori karena sudah dikunjungi cabang lain
+        // kekurangan isi direktori itu, padahal fsStats(dir) segar akan
+        // menghitungnya. Frame seperti itu — dan leluhurnya, yang
+        // agregatnya dibangun dari angka lokal sang frame — tidak boleh
+        // di-memo sebagai angka pasti. Hasil akar sendiri selalu setara
+        // pindai segar untuk path itu, jadi cache akar tak terpengaruh.
+        val tainted = HashSet<String>()
         val stack = ArrayDeque<FsFrame>()
         runCatching { File(path).canonicalFile }.getOrNull()?.let { root ->
             visitedDirs.add(root.path)
@@ -2828,6 +2838,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         if (canon != null && visitedDirs.add(canon.path)) {
                             frame.childCanons.add(canon.path)
                             stack.addLast(FsFrame(canon, canon.path))
+                        } else if (canon != null) {
+                            // Sudah dikunjungi cabang lain: entri ini
+                            // terhitung, isinya tidak — statistik lokal
+                            // frame ini tak lagi setara pindai segar (#435).
+                            frame.hadSkip = true
                         }
                     } else if (c.isFile) {
                         val len = c.length()
@@ -2844,6 +2859,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     size += child.second
                 }
                 localStats[frame.canonPath] = Triple(count, size, truncated)
+                if (frame.hadSkip || frame.childCanons.any { it in tainted }) {
+                    tainted.add(frame.canonPath)
+                }
                 stack.removeLast()
             }
         }
@@ -2851,7 +2869,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         fsStatsCache[path] = now to result
         if (!truncated) {
             for ((childPath, stats) in localStats) {
-                if (childPath != path) fsStatsCache[childPath] = now to stats
+                if (childPath != path && childPath !in tainted) fsStatsCache[childPath] = now to stats
             }
         }
         if (fsStatsCache.size > 300) {
