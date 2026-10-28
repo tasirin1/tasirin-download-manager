@@ -160,7 +160,14 @@ class GalleryActivity : AppCompatActivity() {
                     first = false
                     val next = minOf(loadedCount + GALLERY_PAGE, MediaLibrary.GALLERY_MAX_ENTRIES)
                     val had = fullList.size
-                    fullList = withContext(Dispatchers.IO) {
+                    // Ikut penjaga generasi seperti dua penulis fullList
+                    // lain: scan basi (ada scan filesChanged lebih baru)
+                    // tidak boleh menimpa daftar, dan loadedCount hanya
+                    // maju bila hasil scan ini yang benar-benar terpasang —
+                    // kalau tidak, canLoadMore() mati dan sisa galeri tak
+                    // bisa dimuat lagi (issue #174).
+                    val gen = ++galleryScanGen
+                    val scanned = withContext(Dispatchers.IO) {
                         MediaLibrary.scan(
                             this@GalleryActivity,
                             partialProgress,
@@ -168,6 +175,8 @@ class GalleryActivity : AppCompatActivity() {
                             StoragePrefs.getGalleryFolders(this@GalleryActivity)
                         ).items
                     }
+                    if (gen != galleryScanGen) break
+                    fullList = scanned
                     loadedCount = next
                     if (fullList.size <= had) break
                 }
