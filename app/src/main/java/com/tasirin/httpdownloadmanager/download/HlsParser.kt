@@ -128,7 +128,8 @@ object HlsParser {
     }
 
     /** Fallback longgar bila [parseMaster] gagal (format STREAM-INF tak umum):
-     *  pindai pasangan `#EXT-X-STREAM-INF:` + baris URI absolut berikutnya.
+     *  pindai pasangan `#EXT-X-STREAM-INF:` + baris URI berikutnya (relatif
+     *  dilengkapi resolveUrl seperti [parseMaster], issue #489).
      *  Dipindah dari DownloadEngine agar regex varian hanya ada di satu tempat.
      *  Murni; diurut menurun menurut bandwidth, null bila tak ada varian. */
     fun parseMasterLenient(body: String, baseUrl: String): List<HlsVariant>? {
@@ -139,7 +140,13 @@ object HlsParser {
             if (!ln.startsWith("#EXT-X-STREAM-INF:")) continue
             val next = lines.getOrNull(idx + 1)?.trim().orEmpty()
             if (next.isEmpty() || next.startsWith("#")) continue
-            if (!isHttpUrl(next) && !next.startsWith("/")) continue
+            // Penerimaan sejajar parseMaster (issue #489): baris non-tag
+            // apa pun yang bukan URI absolut berskema asing diterima dan
+            // resolveUrl melengkapi relatifnya — saringan lama (hanya
+            // absolut http atau awalan /) membuang varian relatif polos
+            // yang sah, sehingga master tak umum ber-URI relatif gagal
+            // total di fallback ini padahal parseMaster menerimanya.
+            if (isForeignAbsoluteUri(next)) continue
             val bw = BANDWIDTH_RE.find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
             // Semantik height SAMA seperti parseMaster (issue #393):
             // dimensi terkecil, agar video portrait 720x1280 tercatat

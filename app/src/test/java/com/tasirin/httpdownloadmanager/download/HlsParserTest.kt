@@ -230,6 +230,22 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMasterLenient - varian relatif polos diterima dan dilengkapi seperti parseMaster`() {
+        // Issue #489: saringan lama membuang URI varian relatif polos
+        // yang diterima parseMaster, sehingga master tak umum ber-URI
+        // relatif gagal total di fallback. Kini sejajar: bukan skema
+        // asing -> diterima, resolveUrl melengkapinya.
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000\n" +
+            "360p/index.m3u8\n" +
+            "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=400000\n" +
+            "ftp://cdn.example.com/videos/asing.m3u8\n"
+        val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals("https://cdn.example.com/videos/360p/index.m3u8", variants[0].url)
+    }
+
+    @Test
     fun `parseMasterLenient - fallback absolut saat parseMaster gagal`() {
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4D401E\",FRAME-RATE=30\n" +
