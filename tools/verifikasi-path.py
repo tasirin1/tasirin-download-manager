@@ -77,9 +77,14 @@ def daftar_berkas_berubah(rentang):
                 a, b = rentang.split(pemisah, 1)
                 if set(a) == {"0"} or not a:
                     return None
-                out = jalan("git", "diff", "--name-only", a + pemisah + b)
+                # -z: nama non-ASCII tidak dikutip oktal oleh git,
+                # kalau tidak pola nama (secret/keystore) tak cocok
+                # pada nama asli dan berkasnya lolos (issue #312,
+                # jebakan yang sama dengan #213 di nama_tak_lacak).
+                out = jalan("git", "diff", "--name-only", "-z",
+                            a + pemisah + b)
                 if out is not None:
-                    return [x for x in out.splitlines() if x]
+                    return [x for x in out.split("\0") if x]
                 return None
     return None
 
@@ -909,12 +914,14 @@ def utama():
         hulu = jalan("git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
         if hulu:
             diff = jalan("git", "diff", hulu.strip() + "...HEAD") or ""
-            daftar = jalan("git", "diff", "--name-only", hulu.strip() + "...HEAD") or ""
-            berubah = daftar.splitlines()
+            daftar = jalan("git", "diff", "--name-only", "-z", hulu.strip() + "...HEAD") or ""
+            berubah = [x for x in daftar.split("\0") if x]
         else:
             diff = jalan("git", "diff", "HEAD~1...HEAD") or ""
-            berubah = (jalan("git", "diff", "--name-only", "HEAD~1...HEAD") or "").splitlines()
-        kotor = jalan("git", "status", "--porcelain") or ""
+            berubah = [x for x in (jalan("git", "diff", "--name-only", "-z", "HEAD~1...HEAD") or "").split("\0") if x]
+        # core.quotepath=false: nama non-ASCII tampil mentah, bukan
+        # kutipan oktal yang tak dikenali daftar berkas (#312).
+        kotor = jalan("git", "-c", "core.quotepath=false", "status", "--porcelain") or ""
         for baris in kotor.splitlines():
             nama = baris[3:].strip().strip('"')
             if nama and nama not in berubah:
