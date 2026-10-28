@@ -598,6 +598,25 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `unescapeFb - varian huruf hex dan titik dua`() {
+        // \u002f (f kecil), \u003D (D besar), dan \u003a (titik dua)
+        // wajib ter-dekode seperti ejaan lama (#283): escape \uXXXX
+        // dalam JSON sah memakai hex tak peka huruf besar/kecil.
+        assertEquals(
+            "https://video.xx.fbcdn.net/v/a.mp4?x=1&y=2",
+            SocialMediaExtractor.unescapeFb(
+                "https\\u003a\\u002f\\u002fvideo.xx.fbcdn.net\\u002fv\\u002fa.mp4?x\\u003d1\\u0026y\\u003D2"
+            )
+        )
+        // URL yang lolos dekode penuh juga harus lolos validasi media.
+        assertTrue(SocialMediaExtractor.isValidFacebookMediaUrl(
+            SocialMediaExtractor.unescapeFb(
+                "https\\u003a\\u002f\\u002fvideo.xx.fbcdn.net\\u002fv\\u002fa.mp4"
+            )
+        ))
+    }
+
+    @Test
     fun `mergeCookiesIntoHeaders - cookie user tidak ditimpa cookie ekstraksi`() {
         // Tanpa header lama: baris Cookie baru.
         assertEquals("Cookie: a=1; b=2",

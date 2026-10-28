@@ -1897,15 +1897,23 @@ object SocialMediaExtractor {
 
     /** URL media di JSON Facebook memakai escape JSON (\/, \u0026, \x26,
      *  dst) — unescape. Murni. */
+    private val FB_UNICODE_ESCAPE_RE = Regex("""\\u([0-9a-fA-F]{4})""")
+    private val FB_HEX_ESCAPE_RE = Regex("""\\x([0-9a-fA-F]{2})""")
+
     internal fun unescapeFb(s: String): String {
-        return s.replace("\\/", "/")
-            .replace("\\u0025", "%")
-            .replace("\\u0026", "&")
-            .replace("\\u003d", "=")
-            .replace("\\x26", "&")
-            .replace("\\x3d", "=")
-            .replace("\\u002F", "/")
-            .replace("&amp;", "&")
+        // Dekode umum escape heksadesimal JSON (\uXXXX, huruf hex bebas
+        // besar/kecil) dan \xXX (#283): daftar replace literal lama
+        // hanya mengenal beberapa kode terpilih dalam satu ejaan huruf,
+        // jadi URL sah bervarian \u002f / \u003D / \u003a tidak
+        // ter-dekode lalu ditolak isValidFacebookMediaUrl sebagai URL
+        // rusak. Satu lintasan regex: hasil dekode tidak dipindai ulang.
+        var out = FB_UNICODE_ESCAPE_RE.replace(s) { m ->
+            m.groupValues[1].toInt(16).toChar().toString()
+        }
+        out = FB_HEX_ESCAPE_RE.replace(out) { m ->
+            m.groupValues[1].toInt(16).toChar().toString()
+        }
+        return out.replace("\\/", "/").replace("&amp;", "&")
     }
 
     /** Cadangan Cobalt untuk Facebook: API yang sama dengan cadangan
