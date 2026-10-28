@@ -98,9 +98,10 @@ def baca(path):
 
 
 def jalan_repo(rel, ext=(".kt",)):
-    for akar, _, berkas in os.walk(os.path.join(AKAR, rel)):
+    for akar, dirs, berkas in os.walk(os.path.join(AKAR, rel)):
+        dirs[:] = [d for d in dirs if d != ".git"]
         for nama in berkas:
-            if nama.endswith(ext):
+            if ext is None or nama.endswith(ext):
                 yield os.path.relpath(os.path.join(akar, nama), AKAR)
 
 
@@ -762,7 +763,28 @@ def utama():
         diff += jalan("git", "diff", "--cached") or ""
     berubah += [b for b in nama_tak_lacak() if b not in berubah]
     if args.semua:
-        berubah = [p for p in jalan_repo("app")]
+        # Seluruh repo, semua jenis berkas (issue #198): versi lama hanya
+        # .kt di app/ sehingga larangan per-path cek_aturan_repo (ekstensi
+        # terlarang, binary di assets/bin/, ukuran) tak pernah menilai
+        # berkas lain pada mode ini.
+        berubah = [p for p in jalan_repo(".", ext=None)]
+        # Berkas baru belum terlacak tidak punya diff git — suntikkan
+        # isinya sebagai baris '+' agar cek berbasis diff (panggilan
+        # fungsi terhapus) ikut menilainya pada mode --semua.
+        for nama in nama_tak_lacak():
+            try:
+                with open(os.path.join(AKAR, nama), encoding="utf-8") as f:
+                    isi = f.read(2_000_000)
+            except (OSError, UnicodeDecodeError):
+                continue
+            # Format diff git sungguhan (header + +++): pengurai diff
+            # (tambah_kt dkk.) hanya mengakui baris '+' di bawah header
+            # 'diff --git' yang path-nya berakhiran .kt/.java.
+            diff += (
+                "\ndiff --git a/" + nama + " b/" + nama
+                + "\n+++ b/" + nama + "\n"
+                + "\n".join("+" + baris for baris in isi.splitlines())
+            )
 
     cek_xml(gagal, "")
     cek_acuan_yatim(gagal)
