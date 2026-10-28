@@ -73,7 +73,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
         // Kotlin 2.4 me-resolve forEach ke default method Java (Iterable#forEach, API 24).
-        // Desugaring membuatnya aman di minSdk 21 (Android 5+) tanpa mengubah kode.
+        // Desugaring membuatnya aman di minSdk 23 (Android 6+) tanpa mengubah kode.
         isCoreLibraryDesugaringEnabled = true
     }
 

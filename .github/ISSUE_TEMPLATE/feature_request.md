@@ -15,4 +15,4 @@ labels: enhancement
 <!-- Solusi lain bila ada; kosongkan bila tidak ada -->
 
 **Catatan tambahan**
-<!-- Dampak ke ukuran APK / minSdk 21 / remote ramah D-pad bila relevan -->
+<!-- Dampak ke ukuran APK / minSdk 23 / remote ramah D-pad bila relevan -->

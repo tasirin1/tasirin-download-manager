@@ -1627,7 +1627,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
     }
 
-    /** URI file untuk intent VIEW: installer/pemutar Android 5-6 hanya andal
+    /** URI file untuk intent VIEW: installer/pemutar Android 6 hanya andal
      *  dengan file:// (content:// FileProvider kerap tak bisa dibuka installer
      *  lama); Android 7+ wajib FileProvider (file:// melempar
      *  FileUriExposedException). */
@@ -1642,7 +1642,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val file = item.filePath?.let { File(it) }
 
         // contentUri (MediaStore/SAF) → selalu pakai content://
-        // filePath → fileUriForOpen(): file:// di Android 5-6 (installer lama
+        // filePath → fileUriForOpen(): file:// di Android 6 (installer lama
         //   tak andal dengan content://), FileProvider di 7+ (file://
         //   melempar FileUriExposedException).
         val uri: Uri? = when {
@@ -1742,7 +1742,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         )
                     )
                 }
-                // Fallback File URI (Android 5-6 TV box sering tidak punya DocumentsUI).
+                // Fallback File URI (Android 6 TV box sering tidak punya DocumentsUI).
                 if (Build.VERSION.SDK_INT < 24) {
                     list.add(
                         Intent(Intent.ACTION_VIEW)

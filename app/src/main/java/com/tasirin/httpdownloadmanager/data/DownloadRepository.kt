@@ -35,7 +35,7 @@ class DownloadRepository(context: Context) {
         val arr = runCatching { org.json.JSONArray(raw) }.getOrNull()
         val items = if (arr != null) DownloadItemCodec.decode(arr).map { item ->
             // Kredensial dan secret header/body disimpan terenkripsi (API 23+);
-            // Android 5.0-5.1 menyimpan plaintext (Keystore AES belum tersedia)
+            // data era Android 5.0-5.1 tersimpan plaintext (Keystore AES belum tersedia)
             // dan nilai lama tanpa prefix lolos apa adanya lewat decrypt.
             item.copy(
                 username = Crypto.decrypt(item.username),

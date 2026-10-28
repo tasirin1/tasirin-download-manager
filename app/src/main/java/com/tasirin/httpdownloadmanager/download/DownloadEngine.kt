@@ -102,7 +102,7 @@ class DownloadEngine(appContext: Context) {
     private val jobs = ConcurrentHashMap<String, Job>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
     // Set concurrent via newSetFromMap (bukan ConcurrentHashMap.newKeySet):
-    // newKeySet/KeySetView butuh API 24 — di Android 5-6 (minSdk 21) lempar
+    // newKeySet/KeySetView butuh API 24 — di Android 6 (minSdk 23) lempar
     // NoSuchMethodError saat engine dibangun (crash tiap startup); Set polos
     // aman di semua API. Berlaku untuk pendingRetries & failedHlsUrls.
     private val pendingRetries: MutableSet<String> =
@@ -228,7 +228,7 @@ class DownloadEngine(appContext: Context) {
         }
         // getOrPut Kotlin tidak atomik di ConcurrentHashMap: dua segmen yang
         // mulai bersamaan bisa membuat dua set dan satu set hilang (koneksi
-        // bocor saat pause/cancel). Kunci eksplisit (aman minSdk 21).
+        // bocor saat pause/cancel). Kunci eksplisit (aman minSdk 23).
         synchronized(activeConns) {
             activeConns.getOrPut(id) { Collections.newSetFromMap(ConcurrentHashMap()) }.add(connection)
         }

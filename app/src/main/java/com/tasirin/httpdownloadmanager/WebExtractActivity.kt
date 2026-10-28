@@ -134,7 +134,7 @@ class WebExtractActivity : AppCompatActivity() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
                 !isAllowedTarget(url)
 
-            @SuppressLint("NewApi") // Override API 24+; aman di minSdk 21 (tak pernah dipanggil di bawah 24).
+            @SuppressLint("NewApi") // Override API 24+; aman di minSdk 23 (tak pernah dipanggil di bawah 24).
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
                 !isAllowedTarget(request.url.toString())
 
@@ -143,7 +143,7 @@ class WebExtractActivity : AppCompatActivity() {
                 startGrabLoop()
             }
 
-            // Signature lama (deprecated di 23) sengaja dipakai agar aman minSdk 21:
+            // Signature lama (deprecated di 23) sengaja dipakai agar aman minSdk 23:
             // hanya error main frame yang dilaporkan, error sub-frame (iklan) diabaikan.
             @Suppress("DEPRECATION")
             override fun onReceivedError(

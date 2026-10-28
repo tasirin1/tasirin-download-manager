@@ -64,7 +64,7 @@ class App : Application() {
 
     // Android 7+ tidak menerima broadcast CONNECTIVITY_CHANGE untuk receiver
     // statis di manifest, jadi pakai NetworkCallback untuk fitur lanjutkan
-    // download otomatis saat koneksi pulih (Android 5-6 pakai varian lama).
+    // download otomatis saat koneksi pulih (Android 6 pakai varian lama).
     // Callback DITAHAN di field statis: instance lokal yang tak direferensikan
     // bisa dikumpulkan GC sehingga onAvailable berhenti dipanggil diam-diam
     // dan download jeda-jaringan tak pernah lanjut otomatis.

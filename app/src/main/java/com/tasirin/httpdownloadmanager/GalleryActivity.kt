@@ -242,7 +242,7 @@ class GalleryActivity : AppCompatActivity() {
         return null
     }
 
-    /** Sistem minta memori (Android 5+): buang cache thumbnail agar tidak
+    /** Sistem minta memori (Android 6+): buang cache thumbnail agar tidak
      *  ikut membebani device RAM kecil. Thumbnail akan di-decode ulang dari
      *  disk cache (thumbs/) saat galeri digulir lagi. */
     override fun onTrimMemory(level: Int) {
@@ -296,7 +296,7 @@ class GalleryActivity : AppCompatActivity() {
                     am.memoryClass
                 }.getOrDefault(128)
                 // Cap absolut: memoryClass/8 bagus, tapi jangan lebih dari
-                // 24 MB agar device RAM kecil (Android 5+) tetap lega.
+                // 24 MB agar device RAM kecil (Android 6+) tetap lega.
                 val maxKb = minOf((memoryClass / 8) * 1024, MAX_THUMB_CACHE_KB)
                 val cache = object : LruCache<String, Bitmap>(maxKb) {
                     override fun sizeOf(key: String, value: Bitmap): Int =

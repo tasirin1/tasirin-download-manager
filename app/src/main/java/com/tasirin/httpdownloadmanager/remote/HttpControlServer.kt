@@ -613,7 +613,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     // getOrPut Kotlin tidak atomik di ConcurrentHashMap sehingga brute-force
     // paralel bisa membuat dua instans dan merusak hitungan throttle; kunci
-    // eksplisit di bawah lock (aman minSdk 21, tanpa API 24+).
+    // eksplisit di bawah lock (aman minSdk 23, tanpa API 24+).
     private fun loginAttempt(ip: String): LoginAttempt {
         val key = ip.ifEmpty { "unknown" }
         loginAttempts[key]?.let { return it }
