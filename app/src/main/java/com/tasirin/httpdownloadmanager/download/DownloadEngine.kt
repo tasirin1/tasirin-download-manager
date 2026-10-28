@@ -1537,8 +1537,10 @@ class DownloadEngine(appContext: Context) {
         // dua item yang namanya hanya beda ekstensi ("film.mp4" vs "film.ts")
         // menghasilkan temp identik dan saling menghapus/menimpa saat jalan
         // bersamaan. Potongan id item (UUID, aman nama file) jadi pembeda;
-        // nama final tetap dari baseName.
-        val tempBase = baseName + "~" + item.id.take(8)
+        // nama final tetap dari baseName. Pembeda ditaruh di DEPAN: di ekor
+        // ia bisa terpotong FileNames.safe untuk nama ±200 karakter sehingga
+        // tabrakan kembali pada kasus tepi itu (issue #171).
+        val tempBase = "~" + item.id.take(8) + baseName
         val videoTs = saver.partialFile("$tempBase.video", segment = null).apply { delete() }
         val audioAdts = saver.partialFile("$tempBase.audio", segment = null).apply { delete() }
         val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
@@ -1811,9 +1813,10 @@ class DownloadEngine(appContext: Context) {
     ) {
         val saver = fileSaver
         val baseName = outName.removeSuffix(".mp4").removeSuffix(".webm").ifBlank { outName }
-        // Sama seperti downloadHls: temp unik per item lewat potongan id,
-        // karena baseName tanpa ekstensi bertabrakan antar item.
-        val tempBase = baseName + "~" + item.id.take(8)
+        // Sama seperti downloadHls: temp unik per item lewat potongan id di
+        // DEPAN, karena baseName tanpa ekstensi bertabrakan antar item dan
+        // pembeda di ekor bisa terpotong untuk nama sangat panjang (#171).
+        val tempBase = "~" + item.id.take(8) + baseName
         val videoMp4 = saver.partialFile("$tempBase.videoMp4", segment = null).apply { delete() }
         val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
         val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
