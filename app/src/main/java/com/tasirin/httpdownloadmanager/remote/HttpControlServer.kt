@@ -2873,10 +2873,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
         }
         if (fsStatsCache.size > 300) {
-            val toRemove = fsStatsCache.size / 2
-            var removed = 0
+            // Pangkas SAMPAI batas, bukan membagi dua (issue #436): satu
+            // pemindaian besar kini bisa menyisipkan puluhan ribu entri
+            // memo (#416), dan membuang separuh saja menyisakan puluhan
+            // ribu entri menetap di memori jauh di atas batas ~300 yang
+            // dimaksudkan.
+            var toRemove = fsStatsCache.size - 300
             val iter = fsStatsCache.keys.iterator()
-            while (iter.hasNext() && removed < toRemove) { iter.next(); iter.remove(); removed++ }
+            while (iter.hasNext() && toRemove > 0) { iter.next(); iter.remove(); toRemove-- }
         }
         return result
     }
