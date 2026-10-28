@@ -485,12 +485,12 @@ tes tambah URL/upload ringan, dan buka galeri video.
 
 ## Peta jalan: targetSdk 36/37 (Android 16/17)
 
-**Selesai (Fase 1–3).** `targetSdk 36` + `compileSdk 36` aktif dan sudah
+**Selesai (Fase 1–3).** `targetSdk 36` + `compileSdk 37` aktif dan sudah
 diuji manual di perangkat Android 15/16 (auto-start boot, download background,
 server remote, galeri). Keputusan naik ke `targetSdk 37` masih **opsional** —
 jangan digabung dengan PR fitur lain.
 
-- **Fase 1 — selesai**: lint + unit test aktif (pengaman API 21), dependensi
+- **Fase 1 — selesai**: lint + unit test aktif (pengaman API 23), dependensi
   di-update bertahap via CI, toolchain Gradle 9.8.2 + AGP 9.4.1 (built-in
   Kotlin, KGP dibundel AGP), core library desugaring aktif.
   `versionName`/`versionCode` tetap diatur CI. Bila toolchain naik lagi,
