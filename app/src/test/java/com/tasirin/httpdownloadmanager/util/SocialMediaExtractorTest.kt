@@ -490,6 +490,16 @@ class SocialMediaExtractorTest {
             "<input name=\"id\" value=\"JAHAT\"></form>" + html +
             "<input name=\"id\" value=\"JAHAT2\">"
         assertEquals(expected, SocialMediaExtractor.parseDriveConfirmUrl(decoy))
+        // Action berfragmen (#324): query ditempel SEBELUM '#',
+        // bukan sesudah fragmen (server tak akan menerimanya).
+        val frag = html.replace(
+            "action=\"https://drive.usercontent.google.com/download\"",
+            "action=\"https://drive.usercontent.google.com/download#frag\""
+        )
+        assertEquals(
+            expected + "#frag",
+            SocialMediaExtractor.parseDriveConfirmUrl(frag)
+        )
         // Halaman kuota habis / tanpa form unduh = null.
         assertEquals(null, SocialMediaExtractor.parseDriveConfirmUrl(
             "<html><body>Too many users have viewed this file</body></html>"))

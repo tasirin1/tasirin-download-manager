@@ -1535,8 +1535,15 @@ object SocialMediaExtractor {
             val query = fields.entries.joinToString("&") { (k, v) ->
                 "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
             }
-            val sep = if (action.contains('?')) "&" else "?"
-            return "$action$sep$query"
+            // Query wajib SEBELUM fragmen (#324): action yang memuat
+            // '#' (fragmen di akhir action form) membuat gabungan
+            // mentah menempelkan ?id=... SESUDAH fragmen, sehingga
+            // server tidak pernah menerima parameternya.
+            val hashIdx = action.indexOf('#')
+            val base = if (hashIdx >= 0) action.substring(0, hashIdx) else action
+            val fragment = if (hashIdx >= 0) action.substring(hashIdx) else ""
+            val sep = if (base.contains('?')) "&" else "?"
+            return "$base$sep$query$fragment"
         }
         return null
     }
