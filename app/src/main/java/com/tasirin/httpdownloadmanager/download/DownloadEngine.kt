@@ -170,16 +170,18 @@ class DownloadEngine(appContext: Context) {
         failedUrls.containsKey(url)
     }
 
-    // Cached maxConcurrent — hindari recompute dari SharedPreferences tiap cek
-    private var cachedMaxConcurrent: Int = StoragePrefs.maxConcurrent(context)
+    // Cached maxConcurrent — hindari recompute dari SharedPreferences tiap cek.
+    // Ditulis jalur pengaturan dan dibaca thread IO: wajib terlihat lintas
+    // thread, jadi @Volatile (issue #369).
+    @Volatile private var cachedMaxConcurrent: Int = StoragePrefs.maxConcurrent(context)
 
     fun refreshMaxConcurrent() {
         cachedMaxConcurrent = StoragePrefs.maxConcurrent(context)
     }
 
     // Cached timeout values — hindari recompute dari SharedPreferences tiap koneksi
-    private var connectTimeoutMs: Int = StoragePrefs.getConnectTimeoutSec(context) * 1000
-    private var readTimeoutMs: Int = StoragePrefs.getReadTimeoutSec(context) * 1000
+    @Volatile private var connectTimeoutMs: Int = StoragePrefs.getConnectTimeoutSec(context) * 1000
+    @Volatile private var readTimeoutMs: Int = StoragePrefs.getReadTimeoutSec(context) * 1000
 
     fun refreshTimeouts() {
         connectTimeoutMs = StoragePrefs.getConnectTimeoutSec(context) * 1000
@@ -188,7 +190,7 @@ class DownloadEngine(appContext: Context) {
 
     // Cached User-Agent — baca SharedPreferences tiap koneksi (segmen x retry)
     // hanya membuang lock + lookup; pola sama seperti timeout di atas.
-    private var cachedUserAgent: String = StoragePrefs.getUserAgent(context)
+    @Volatile private var cachedUserAgent: String = StoragePrefs.getUserAgent(context)
 
     fun refreshUserAgent() {
         cachedUserAgent = StoragePrefs.getUserAgent(context)
