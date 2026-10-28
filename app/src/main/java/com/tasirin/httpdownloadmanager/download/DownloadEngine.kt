@@ -205,6 +205,10 @@ class DownloadEngine(appContext: Context) {
     private val throttleTotals = ConcurrentHashMap<String, AtomicLong>()
 
     init {
+        // Rekonsiliasi cadangan .replaced yatim (issue #237): proses yang
+        // mati di jendela verifikasi checksum meninggalkan penggantian
+        // terparkir (pendingReplacements hanya hidup di memori).
+        reconcileOrphanedReplacements()
         // Migrasi penyimpanan lemah (issue #209): kredensial plaintext
         // warisan/fallback ditulis ulang terenkripsi SEKARANG saat start,
         // bukan menunggu persist penuh berikutnya yang entah kapan.
@@ -1206,6 +1210,50 @@ class DownloadEngine(appContext: Context) {
             }
         }
         return result
+    }
+
+    /** Pulihkan penggantian terparkir yang ditinggal mati proses (#237).
+     *  publishItem menggeser berkas pendahulu ke "<nama>.replaced" selama
+     *  checksum penerus diverifikasi; commit menghapus cadangan itu dan
+     *  rollback menamainya kembali. Bila proses mati di antaranya, cadangan
+     *  masih ada saat start dan keputusan yang aman adalah rollback: byte
+     *  penerus yang belum terverifikasi dibuang, byte pendahulu dipulihkan,
+     *  dan entri penerus kehilangan penunjuk berkas terbitnya — tanpa itu,
+     *  menghapus entri pendahulu/penerus dari UI bisa menghapus berkas
+     *  yang salah karena keduanya menunjuk path yang sama. */
+    private fun reconcileOrphanedReplacements() {
+        var working = _items.value
+        var changed = false
+        for (successor in working.filter { it.replacesItemId.isNotEmpty() }) {
+            val predecessor = working.find { it.id == successor.replacesItemId }
+                ?: continue
+            val path = predecessor.filePath?.takeIf { it.isNotEmpty() } ?: continue
+            val target = File(path)
+            val aside = File(target.parentFile, target.name + ".replaced")
+            if (!aside.isFile) continue
+            if (target.exists()) runCatching { target.delete() }
+            val restored = runCatching { aside.renameTo(target) }
+                .getOrDefault(false)
+            if (!restored) continue
+            changed = true
+            App.logEvent(
+                "REPLACE RECONCILE: restored ${target.name} from backup " +
+                    "after process death"
+            )
+            // Penerus tidak pernah selesai (commit selalu mendahului
+            // penandaan COMPLETED): kosongkan penunjuk berkas terbitnya.
+            working = working.map {
+                if (it.id == successor.id) {
+                    it.copy(filePath = null, contentUri = null)
+                } else {
+                    it
+                }
+            }
+        }
+        if (changed) {
+            _items.value = working
+            flushSave()
+        }
     }
 
     /** Verifikasi penerus lolos: pensiunkan pendahulu (#215). */
