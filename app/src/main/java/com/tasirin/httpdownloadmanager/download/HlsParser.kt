@@ -34,6 +34,7 @@ object HlsParser {
     private val MEDIA_GROUP_RE: Regex = Regex("GROUP-ID=\"([^\"]+)\"")
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
     private val LANGUAGE_RE: Regex = Regex("LANGUAGE=\"([^\"]+)\"")
+    private val ABSOLUTE_URI_RE: Regex = Regex("^[A-Za-z][A-Za-z0-9+.-]*://")
 
     /** True bila body adalah media playlist HLS (daftar segmen langsung),
      *  bukan master playlist: tidak ada STREAM-INF tapi ada tag media/segmen.
@@ -156,10 +157,22 @@ object HlsParser {
                     .toDoubleOrNull() ?: 0.0
                 pendingDurationUs = hlsSegmentDurationUs(dur)
             } else if (!line.startsWith("#")) {
-                val url = resolveUrl(baseUrl, line)
-                if (url.startsWith("http")) {
-                    segments.add(url)
-                    durations.add(pendingDurationUs ?: 0L)
+                // URI absolut berskema non-http (ftp:, dst.) dibuang
+                // SEBELUM resolveUrl: resolveUrl memperlakukan baris itu
+                // sebagai path relatif dan menempelkannya ke basis http,
+                // sehingga hasil rusak "https://host/ftp://..." LOLOS
+                // saringan startsWith("http") di bawah sebagai segmen
+                // (membatalkan maksud #394; uji pendampingnya gagal di CI
+                // run 40705353588 — terbukti lewat port Python 1:1).
+                val foreignAbsolute = ABSOLUTE_URI_RE.containsMatchIn(line) &&
+                    !line.startsWith("http://", ignoreCase = true) &&
+                    !line.startsWith("https://", ignoreCase = true)
+                if (!foreignAbsolute) {
+                    val url = resolveUrl(baseUrl, line)
+                    if (url.startsWith("http")) {
+                        segments.add(url)
+                        durations.add(pendingDurationUs ?: 0L)
+                    }
                 }
                 pendingDurationUs = null
             }
