@@ -492,24 +492,41 @@ def cek_aturan_repo(gagal, berubah):
         tetap = ""
     else:
         tetap = baca("app/build.gradle.kts")
-    bersih = []
-    dalam_blok = False
-    for baris in tetap.splitlines():
-        if dalam_blok:
-            if "*/" in baris:
-                baris = baris.split("*/", 1)[1]
-                dalam_blok = False
+    # Strip komentar SADAR string (issue #211): pemindai karakter
+    # melacak literal string (termasuk raw string tiga-quote) sehingga
+    # pola seperti "/*" atau "//" DI DALAM string tidak dianggap
+    # komentar — stripper baris sebelumnya masuk mode blok palsu dan
+    # menelan penetapan minSdk asli. Komentar sungguhan (termasuk
+    # spoof '// minSdk = 23') tetap terhapus.
+    def strip_komentar(teks):
+        out = []
+        i, n = 0, len(teks)
+        while i < n:
+            if teks.startswith('"""', i):
+                j = teks.find('"""', i + 3)
+                j = n if j < 0 else j + 3
+                out.append(teks[i:j])
+                i = j
+            elif teks[i] == '"':
+                j = i + 1
+                while j < n and teks[j] != '"':
+                    j += 2 if teks[j] == "\\" else 1
+                j = min(j + 1, n)
+                out.append(teks[i:j])
+                i = j
+            elif teks.startswith("//", i):
+                j = teks.find("\n", i)
+                i = n if j < 0 else j
+            elif teks.startswith("/*", i):
+                j = teks.find("*/", i + 2)
+                i = n if j < 0 else j + 2
             else:
-                continue
-        if "/*" in baris:
-            kepala, _, sisa = baris.partition("/*")
-            if "*/" in sisa:
-                baris = kepala + sisa.split("*/", 1)[1]
-            else:
-                baris = kepala
-                dalam_blok = True
-        bersih.append(baris.split("//", 1)[0])
-    cocok = re.search(r"minSdk\s*=\s*(\d+)", "\n".join(bersih))
+                out.append(teks[i])
+                i += 1
+        return "".join(out)
+
+    bersih_teks = strip_komentar(tetap)
+    cocok = re.search(r"minSdk\s*=\s*(\d+)", bersih_teks)
     if not cocok and os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
         gagal.append("minSdk tak ditemukan di app/build.gradle.kts — kunci minSdk tak bisa diverifikasi")
     if cocok and int(cocok.group(1)) != 23:
