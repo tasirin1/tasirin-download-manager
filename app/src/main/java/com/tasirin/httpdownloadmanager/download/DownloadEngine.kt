@@ -2673,33 +2673,11 @@ class DownloadEngine(appContext: Context) {
                 return null
             }
         }
-        // Hindari varian raksasa (4K/8K) dan varian ber-B-frame (avc1.64002A)
-        // agar remux MP4 mulus. Pilih varian AVC (avc1.4D, tanpa B-frame)
-        // dengan FRAME-RATE tertinggi — varian bitrate rendah (mis. 480p)
-        // adalah VFR yang frame-nya dibuang YouTube sehingga hasil download
-        // terlihat "frame drop". FRAME-RATE tertinggi (60 fps) menjaga semua
-        // frame asli; di antara fps sama, ambil bandwidth terendah.
-        val avc = variants.filter { it.codecs.contains("avc1.4D") }
-        // Saat user eksplisit memilih resolusi (preferredHeight), pakai semua
-        // varian AVC (termasuk itag 312 avc1.64002A untuk 1080p) yang paling
-        // mendekati tinggi target. JANGAN difilter by FRAME-RATE tertinggi
-        // di sini: resolusi rendah (240/360/480) memang 30fps sedangkan
-        // 720/1080 60fps — memaksa 60fps membuat semua pilihan jatuh ke
-        // varian tertinggi. Setiap resolusi memakai fps aslinya (wajar).
-        // Tanpa pilihan, pertahankan perilaku default (avc1.4D FRAME-RATE
-        // tertinggi) untuk kualitas terbaik.
-        val best = if (preferredHeight > 0) {
-            val targetAvc = variants.filter { it.codecs.contains("avc") }
-            targetAvc.minByOrNull { kotlin.math.abs(it.height - preferredHeight) }
-                ?: targetAvc.minByOrNull { it.bandwidth }
-        } else {
-            val bestFps = avc.maxOfOrNull { it.frameRate } ?: 0
-            if (bestFps > 0) {
-                avc.filter { it.frameRate == bestFps }.minByOrNull { it.bandwidth }
-            } else {
-                avc.minByOrNull { it.bandwidth }
-            }
-        } ?: variants.minByOrNull { it.bandwidth } ?: return null
+        // Pemilihan varian nyata dilakukan daftar candidates di bawah.
+        // Perhitungan calon tunggal sebelumnya dibuang tanpa dipakai
+        // (issue #363); yang dipertahankan hanya penjaga daftar kosong,
+        // termasuk hasil fallback yang boleh berupa daftar kosong.
+        if (variants.isEmpty()) return null
         // Urutkan varian dari kualitas tertinggi ke terendah untuk fallback.
         // YouTube kadang memblokir media playlist varian tertinggi (404) tapi
         // membiarkan varian rendah lewat. Coba beberapa varian sampai ada yang berhasil.
