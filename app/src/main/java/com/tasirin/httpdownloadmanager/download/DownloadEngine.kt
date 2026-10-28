@@ -101,6 +101,12 @@ class DownloadEngine(appContext: Context) {
     private val repository = DownloadRepository(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
+
+    // Penerus monitor yang menunggu hasil verifikasi checksum (#215):
+    // id penerus -> (item pendahulu, berkas pendahulu yang digeser ke nama
+    // cadangan). Dipensiunkan commitReplacement, dipulihkan rollbackReplacement.
+    private val pendingReplacements =
+        ConcurrentHashMap<String, Pair<DownloadItem, File>>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
     // Set concurrent via newSetFromMap (bukan ConcurrentHashMap.newKeySet):
     // newKeySet/KeySetView butuh API 24 — di Android 6 (minSdk 23) lempar
@@ -1117,33 +1123,110 @@ class DownloadEngine(appContext: Context) {
         item: DownloadItem
     ): FileSaver.PublishResult {
         val cleanName = FileNames.safe(fileName)
-        // Penerus monitor (#199): berkas terbit pendahulu dihapus SEBELUM
-        // publish agar nama tujuan bebas — tanpa ini semua jalur publish
-        // mengunikkkan nama menjadi " (1)" dan file asal tak pernah
-        // tertimpa. Entrinya dibuang sesudah publish berhasil. Bila
-        // publish/verify sesudahnya gagal, penerus tetap bisa di-retry
-        // (nama sudah bebas); pendahulu memang sudah tergantikan.
+        // Penerus monitor (#199, diperketat #215): berkas terbit pendahulu
+        // TIDAK dihapus di muka — versi lama adalah satu-satunya salinan
+        // bagus sampai penerus terbukti terbit DAN lolos checksum. Bila
+        // path-nya berkas biasa, berkas itu digeser ke nama cadangan
+        // (nama tujuan bebas, byte utuh); publish yang melempar di sini
+        // memulihkan cadangan sendiri. Pendahulu murni URI MediaStore
+        // (tanpa path) tidak bisa digeser, jadi tetap dihapus di muka.
         val predecessor = item.replacesItemId.takeIf { it.isNotEmpty() }
             ?.let { pid -> _items.value.find { it.id == pid } }
+        var backup: File? = null
         if (predecessor != null) {
+            val predFile = predecessor.filePath
+                ?.takeIf { it.isNotEmpty() }?.let { File(it) }
+            if (predFile != null && predFile.isFile) {
+                val aside = File(predFile.parentFile, predFile.name + ".replaced")
+                runCatching { if (aside.isFile) aside.delete() }
+                if (runCatching { predFile.renameTo(aside) }
+                        .getOrDefault(false)
+                ) {
+                    backup = aside
+                }
+            }
+            if (backup == null) {
+                deletePublished(
+                    FileSaver.PublishResult(
+                        contentUri = predecessor.contentUri,
+                        filePath = predecessor.filePath,
+                        fileName = predecessor.fileName
+                    )
+                )
+            }
+        }
+        val result = try {
+            if (item.folderPath.isNotBlank()) {
+                saver.publishToPath(partial, cleanName, item.folderPath)
+                    ?: throw IOException("Destination folder is invalid or not writable: ${item.folderPath}")
+            } else {
+                saver.publish(partial, cleanName, item.destination)
+            }
+        } catch (e: Exception) {
+            val b = backup
+            val target = predecessor?.filePath
+                ?.takeIf { it.isNotEmpty() }?.let { File(it) }
+            if (b != null && target != null && !target.exists()) {
+                runCatching { b.renameTo(target) }
+            }
+            throw e
+        }
+        if (predecessor != null) {
+            val b = backup
+            if (b == null) {
+                update(_items.value.filterNot { it.id == predecessor.id })
+            } else {
+                // Ada checksum yang akan diverifikasi pemanggil (tertulis
+                // di item atau sidecar di samping hasil terbit): entri
+                // pendahulu + berkas cadangan dipertahankan sampai hasil
+                // verifikasi jelas lewat commit/rollbackReplacement. Tanpa
+                // checksum, versi lama langsung dipensiunkan di sini.
+                val expectsVerify = parseChecksum(item.checksum) != null ||
+                    saver.sidecarChecksum(
+                        item.copy(
+                            contentUri = result.contentUri ?: item.contentUri,
+                            filePath = result.filePath ?: item.filePath
+                        )
+                    ) != null
+                if (expectsVerify) {
+                    pendingReplacements[item.id] = predecessor to b
+                } else {
+                    runCatching { b.delete() }
+                    update(_items.value.filterNot { it.id == predecessor.id })
+                }
+            }
+        }
+        return result
+    }
+
+    /** Verifikasi penerus lolos: pensiunkan pendahulu (#215). */
+    private fun commitReplacement(successorId: String) {
+        val pending = pendingReplacements.remove(successorId) ?: return
+        val predecessor = pending.first
+        runCatching { pending.second.delete() }
+        // Baris MediaStore pendahulu menunjuk path lama yang kini ditempati
+        // penerus; hapus HANYA baris URI-nya (filePath dikosongkan agar
+        // berkas penerus tidak ikut terhapus).
+        if (!predecessor.contentUri.isNullOrEmpty()) {
             deletePublished(
                 FileSaver.PublishResult(
                     contentUri = predecessor.contentUri,
-                    filePath = predecessor.filePath,
+                    filePath = null,
                     fileName = predecessor.fileName
                 )
             )
         }
-        val result = if (item.folderPath.isNotBlank()) {
-            saver.publishToPath(partial, cleanName, item.folderPath)
-                ?: throw IOException("Destination folder is invalid or not writable: ${item.folderPath}")
-        } else {
-            saver.publish(partial, cleanName, item.destination)
+        update(_items.value.filterNot { it.id == predecessor.id })
+    }
+
+    /** Verifikasi penerus gagal: pulihkan berkas pendahulu (#215). */
+    private fun rollbackReplacement(successorId: String) {
+        val pending = pendingReplacements.remove(successorId) ?: return
+        val target = pending.first.filePath
+            ?.takeIf { it.isNotEmpty() }?.let { File(it) } ?: return
+        if (!target.exists()) {
+            runCatching { pending.second.renameTo(target) }
         }
-        if (predecessor != null) {
-            update(_items.value.filterNot { it.id == predecessor.id })
-        }
-        return result
     }
 
     private fun organizeIfEnabled(
@@ -1689,6 +1772,7 @@ class DownloadEngine(appContext: Context) {
                 val finalName = published0.fileName ?: fileName
                 val published = organizeIfEnabled(saver, published0, finalName)
                 ensurePublishedKept(item.id, published0, published)
+                commitReplacement(item.id)
                 finishHls(item, progress.downloaded, published, finalName)
                 return
             }
@@ -1703,6 +1787,7 @@ class DownloadEngine(appContext: Context) {
             val finalName = published0.fileName ?: fileName
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
+            commitReplacement(item.id)
             finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
             runCatching { videoTs.delete() }
@@ -1906,6 +1991,7 @@ class DownloadEngine(appContext: Context) {
             val finalName = published0.fileName ?: fileName
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
+            commitReplacement(item.id)
             finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
             runCatching { videoMp4.delete() }
@@ -2522,8 +2608,10 @@ class DownloadEngine(appContext: Context) {
         val finalName = published0.fileName ?: fileName
         verifyChecksum(item.id, published0, saver)?.let {
             deletePublished(published0)
+            rollbackReplacement(item.id)
             throw IOException(it)
         }
+        commitReplacement(item.id)
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
@@ -2696,8 +2784,10 @@ class DownloadEngine(appContext: Context) {
         val finalName = published0.fileName ?: fileName
         verifyChecksum(item.id, published0, saver)?.let {
             deletePublished(published0)
+            rollbackReplacement(item.id)
             throw IOException(it)
         }
+        commitReplacement(item.id)
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
