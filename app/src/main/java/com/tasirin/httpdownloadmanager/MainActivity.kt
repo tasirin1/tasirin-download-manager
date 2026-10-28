@@ -529,6 +529,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialVideoOptions: List<SocialMediaExtractor.Result> = emptyList()
         var socialPhotoOptions: List<SocialMediaExtractor.Result> = emptyList()
         var socialYoutubeHeights: IntArray = intArrayOf()
+        // URL pemilik opsi sosial yang sedang tampil (issue #502):
+        // pilihan sosial hanya boleh dihormati submitDownload bila
+        // pemiliknya sama dengan URL yang tertulis di field saat itu.
+        var socialProbedUrl: String = ""
         var socialAudioLanguages: List<HlsRendition> = emptyList()
         var socialJob: Job? = null
         var socialDebounce: Job? = null
@@ -628,6 +632,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialVideoOptions = emptyList()
                 socialPhotoOptions = emptyList()
                 socialYoutubeHeights = intArrayOf(1080, 720, 480, 360, 240)
+                socialProbedUrl = target
                 val labels = listOf(getString(R.string.social_quality_default)) +
                     socialYoutubeHeights.map { "${it}p" }
                 setupSpinner(this@MainActivity, socialQualitySpinner, labels)
@@ -678,6 +683,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 return
             }
             socialYoutubeHeights = intArrayOf()
+            // Opsi URL sebelumnya dibersihkan SEKARANG, bukan saat hasil
+            // probe tiba (issue #502): membiarkannya selama ekstraksi
+            // berjalan (bisa lama) membuat submitDownload menghormati
+            // opsi basi milik URL lama dan konten yang salah terunduh
+            // diam-diam.
+            socialOptions = emptyList()
+            socialVideoOptions = emptyList()
+            socialPhotoOptions = emptyList()
+            socialProbedUrl = ""
+            socialQualitySection.isVisible = false
+            socialCarouselSection.isVisible = false
             socialJob = lifecycleScope.launch {
                 val probeTarget = target
                 val options = withContext(Dispatchers.IO) {
@@ -687,6 +703,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull() != probeTarget
                 ) return@launch
                 socialOptions = options
+                socialProbedUrl = probeTarget
                 // Pisahkan opsi video dan foto
                 socialVideoOptions = options.filter { it.mimeType.startsWith("video") || it.isHls }
                 socialPhotoOptions = options.filter { it.mimeType.startsWith("image") }
@@ -979,20 +996,29 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_SHORT).show()
                 return
             }
-            // Media sosial: pakai opsi yang dipilih dari spinner.
+            // Media sosial: pakai opsi yang dipilih dari spinner, HANYA
+            // bila opsi itu milik URL yang tertulis saat ini (issue
+            // #502). Tanpa gerbang pemilik ini, opsi basi URL sebelumnya
+            // yang masih tampil (probe baru berjalan / debounce belum
+            // menembak) mengunduh konten yang salah secara diam-diam.
+            val socialMilikUrlIni = socialProbedUrl.isNotEmpty() &&
+                socialProbedUrl == urls.firstOrNull()
             val socialSel = socialQualitySpinner.selectedItemPosition
             val selectedVideoOption = if (
+                socialMilikUrlIni &&
                 socialQualitySection.isVisible &&
                 socialVideoOptions.isNotEmpty() &&
                 socialSel in 1..socialVideoOptions.size
             ) socialVideoOptions[socialSel - 1] else null
             val selectedYtHeight = if (
+                socialMilikUrlIni &&
                 socialQualitySection.isVisible &&
                 socialYoutubeHeights.isNotEmpty() &&
                 socialSel in 1..socialYoutubeHeights.size
             ) socialYoutubeHeights[socialSel - 1] else 0
             val audioSel = socialAudioSpinner.selectedItemPosition
             val selectedAudioLang = if (
+                socialMilikUrlIni &&
                 socialAudioSection.isVisible &&
                 socialAudioLanguages.isNotEmpty() &&
                 audioSel in 1..socialAudioLanguages.size
@@ -1001,10 +1027,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             // Pilihan video eksplisit menang atas default "All": tanpa ini,
             // konten campuran (video + foto) selalu mengunduh foto saja dan
             // kualitas video yang dipilih user diabaikan diam-diam.
-            val carouselAll = socialCarouselSection.isVisible &&
+            val carouselAll = socialMilikUrlIni &&
+                socialCarouselSection.isVisible &&
                 socialPhotoOptions.size > 1 && carouselSel == 0 &&
                 selectedVideoOption == null
             val selectedPhotoOption = if (
+                socialMilikUrlIni &&
                 socialCarouselSection.isVisible &&
                 socialPhotoOptions.isNotEmpty() &&
                 carouselSel in 1..socialPhotoOptions.size
