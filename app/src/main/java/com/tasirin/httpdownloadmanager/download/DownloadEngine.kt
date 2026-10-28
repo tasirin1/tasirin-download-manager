@@ -23,6 +23,7 @@ import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.MimeTypes
 import com.tasirin.httpdownloadmanager.util.StorageCleanup
 import com.tasirin.httpdownloadmanager.util.NotificationHelper
+import com.tasirin.httpdownloadmanager.util.Crypto
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
@@ -3364,15 +3365,19 @@ class DownloadEngine(appContext: Context) {
                     put("expAt", now + ttlSec * 1000L)
                 })
             }
-            cookiePrefs.edit { putString("cookies", arr.toString()) }
+            // Cookie (termasuk cookie sesi) dienkripsi seperti kredensial
+            // item — bukan plaintext di SharedPreferences (issue #204).
+            cookiePrefs.edit { putString("cookies", Crypto.encrypt(arr.toString())) }
         } catch (_: Exception) { /* cookie persist is best-effort */ }
     }
 
     /** Muat cookie dari SharedPreferences; yang kedaluwarsa dibuang. */
     private fun loadPersistedCookies() {
         try {
+            // Decrypt menoleransi data lama: payload plaintext pra-#204
+            // (JSON tanpa prefix Crypto) dikembalikan apa adanya.
             val raw = cookiePrefs.getString("cookies", null) ?: return
-            val arr = JSONArray(raw)
+            val arr = JSONArray(Crypto.decrypt(raw))
             val now = System.currentTimeMillis()
             for (i in 0 until arr.length()) {
                 runCatching {
