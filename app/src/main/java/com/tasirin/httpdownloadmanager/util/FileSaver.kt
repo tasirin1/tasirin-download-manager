@@ -11,6 +11,7 @@ import android.provider.MediaStore
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.tasirin.httpdownloadmanager.data.DownloadItem
+import com.tasirin.httpdownloadmanager.download.buangSufiksEkstensi
 import java.io.File
 import java.io.IOException
 import java.io.BufferedInputStream
@@ -634,14 +635,14 @@ class FileSaver(context: Context) {
         // berjalan — asimetris dengan partial di atas. Nama temp persis
         // protectedPartialNames (sumber yang sama dengan perlindungan
         // sapuan); scratch diturunkan dari tempBase engine yang sama.
-        val hlsBase = item.fileName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { item.fileName }
+        val hlsBase = buangSufiksEkstensi(item.fileName, ".ts", ".mp4").ifBlank { item.fileName }
         // Basis adaptive BERBEDA dari basis HLS (issue #467):
         // downloadAdaptiveMuxed membuang .mp4/.webm sedangkan
         // downloadHls membuang .ts/.mp4 — untuk item .webm (hasil
         // strategi Piped) basis engine adalah "film" tetapi basis HLS
         // di sini "film.webm", sehingga scratch adaptive-nya lolos
         // bila hanya diturunkan dari basis HLS. Turunkan dari keduanya.
-        val adaptiveBase = item.fileName.removeSuffix(".mp4").removeSuffix(".webm").ifBlank { item.fileName }
+        val adaptiveBase = buangSufiksEkstensi(item.fileName, ".mp4", ".webm").ifBlank { item.fileName }
         val extraNames = buildSet {
             addAll(protectedPartialNames(item))
             for (base in setOf(hlsBase, adaptiveBase)) {
@@ -1093,7 +1094,12 @@ internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.Do
         // awalan "_" hanya di jalur perlindungan, dan nama berakhiran
         // spasi/titik kehilangan sufiks yang bisa dibuang hanya di sini —
         // sehingga temp HLS nama-nama itu tetap tak terlindungi.
-        val hlsBase = item.fileName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { item.fileName }
+        // Basis yang sama persis dengan engine (issue #529): sejak
+        // #522 engine membuang ekstensi tanpa peka kapital lewat
+        // buangSufiksEkstensi; turunan peka-kapital di sini membuat
+        // himpunan terlindungi menyimpang untuk nama kustom kapital
+        // sehingga temp resume tersapu yatim dan scratch lolos.
+        val hlsBase = buangSufiksEkstensi(item.fileName, ".ts", ".mp4").ifBlank { item.fileName }
         val tempBase = "~" + item.id.take(8) + hlsBase
         for (kind in listOf("video", "audio")) {
             val temp = FileNames.safe("$tempBase.$kind") + ".part"

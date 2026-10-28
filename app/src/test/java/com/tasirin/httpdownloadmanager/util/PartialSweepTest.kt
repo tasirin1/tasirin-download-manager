@@ -42,6 +42,21 @@ class PartialSweepTest {
     }
 
     @Test
+    fun `nama kapital basis temp HLS sama dengan basis engine`() {
+        // Issue #529: engine membuang ekstensi tanpa peka kapital
+        // (#522); protectedPartialNames harus menurunkan basis yang
+        // sama, kalau tidak temp resume nama kapital tersapu yatim.
+        assertEquals(
+            setOf(
+                "Film.MP4.part",
+                "~1Film.video.part", "~1Film.video.part.segs", "~1Film.video.part.spool",
+                "~1Film.audio.part", "~1Film.audio.part.segs", "~1Film.audio.part.spool"
+            ),
+            protectedPartialNames(item("Film.MP4"))
+        )
+    }
+
+    @Test
     fun `pola sapu mencakup merge staging`() {
         assertTrue(isSweepablePartial("video.mp4.part"))
         assertTrue(isSweepablePartial("video.mp4.part.2"))
