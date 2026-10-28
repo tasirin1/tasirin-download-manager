@@ -82,6 +82,11 @@ jobs:
 
   build:
     name: Build APK
+    # Batas keras seperti job verify (issue #334/#380): tanpa ini proses
+    # yang menggantung menahan rilis sampai batas default GitHub 360
+    # menit; build+test+lint+rilis normal jauh di bawah 60 menit
+    # (sejajar batas job CodeQL).
+    timeout-minutes: 60
     # Satu-satunya job yang butuh tulis (rilis GitHub) (issue #185).
     permissions:
       contents: write
