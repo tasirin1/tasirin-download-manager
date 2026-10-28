@@ -396,7 +396,20 @@ class FileSaver(context: Context) {
                 val first = runCatching {
                     side.readText().trim().split(WHITESPACE_RE).firstOrNull().orEmpty() // audit-ignore: unbounded_read_text (dibatasi length>8192 di atas)
                 }.getOrDefault("")
-                if (first.length >= 32) return algo to first.lowercase(java.util.Locale.ROOT)
+                // Validasi eksak per algoritma (issue #347): token
+                // diterima hanya bila panjangnya pas (MD5 32, SHA-1 40,
+                // SHA-256 64) dan seluruhnya heksadesimal. Token cacat
+                // diabaikan (dianggap tanpa checksum) daripada menjadi
+                // ekspektasi yang mustahil cocok.
+                val token = first.lowercase(java.util.Locale.ROOT)
+                val expectedLen = when (algo) {
+                    "MD5" -> 32
+                    "SHA-1" -> 40
+                    else -> 64
+                }
+                if (token.length == expectedLen &&
+                    token.all { it in '0'..'9' || it in 'a'..'f' }
+                ) return algo to token
             }
         }
         return null
