@@ -105,10 +105,20 @@ class DownloadEngine(appContext: Context) {
     private val jobs = ConcurrentHashMap<String, Job>()
 
     // Penerus monitor yang menunggu hasil verifikasi checksum (#215):
-    // id penerus -> (item pendahulu, berkas pendahulu yang digeser ke nama
-    // cadangan). Dipensiunkan commitReplacement, dipulihkan rollbackReplacement.
+    // id penerus -> penggantian terparkir. Dipensiunkan commitReplacement,
+    // dipulihkan rollbackReplacement.
+    private data class PendingReplacement(
+        val predecessor: DownloadItem,
+        /** Berkas byte pendahulu asli (nama .replaced). */
+        val backup: File,
+        /** Byte percobaan finalisasi sebelumnya yang belum terverifikasi
+         *  (#249): ada hanya bila .replaced asli sudah ada saat publishItem
+         *  berjalan lagi — dibuang di commit maupun rollback. */
+        val stale: File? = null
+    )
+
     private val pendingReplacements =
-        ConcurrentHashMap<String, Pair<DownloadItem, File>>()
+        ConcurrentHashMap<String, PendingReplacement>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
     // Set concurrent via newSetFromMap (bukan ConcurrentHashMap.newKeySet):
     // newKeySet/KeySetView butuh API 24 — di Android 6 (minSdk 23) lempar
@@ -1200,13 +1210,40 @@ class DownloadEngine(appContext: Context) {
         val predecessor = item.replacesItemId.takeIf { it.isNotEmpty() }
             ?.let { pid -> _items.value.find { it.id == pid } }
         var backup: File? = null
+        var stale: File? = null
         if (predecessor != null) {
             val predFile = predecessor.filePath
                 ?.takeIf { it.isNotEmpty() }?.let { File(it) }
             if (predFile != null && predFile.isFile) {
                 val aside = File(predFile.parentFile, predFile.name + ".replaced")
-                runCatching { if (aside.isFile) aside.delete() }
-                if (runCatching { predFile.renameTo(aside) }
+                if (aside.isFile) {
+                    // Cadangan dari finalisasi terputus masih ada: byte ASLI
+                    // pendahulu ada di dalamnya dan TIDAK boleh dihapus
+                    // sebelum ada yang terverifikasi (#249 — dulu aside lama
+                    // dihapus di sini sehingga rollback memulihkan byte
+                    // percobaan, bukan versi bagus asli). Aside lama tetap
+                    // cadangan resmi; berkas yang kini menempati path (byte
+                    // percobaan) digeser ke .stale untuk dibuang nanti.
+                    val staleFile = File(
+                        predFile.parentFile, predFile.name + ".replaced.stale"
+                    )
+                    runCatching { if (staleFile.isFile) staleFile.delete() }
+                    if (runCatching { predFile.renameTo(staleFile) }
+                            .getOrDefault(false)
+                    ) {
+                        backup = aside
+                        stale = staleFile
+                    } else {
+                        // Geser .stale gagal (kasus IO eksotik): kembali ke
+                        // perilaku lama agar alur tetap satu cadangan.
+                        runCatching { aside.delete() }
+                        if (runCatching { predFile.renameTo(aside) }
+                                .getOrDefault(false)
+                        ) {
+                            backup = aside
+                        }
+                    }
+                } else if (runCatching { predFile.renameTo(aside) }
                         .getOrDefault(false)
                 ) {
                     backup = aside
@@ -1236,6 +1273,7 @@ class DownloadEngine(appContext: Context) {
             if (b != null && target != null && !target.exists()) {
                 runCatching { b.renameTo(target) }
             }
+            stale?.let { s -> runCatching { s.delete() } }
             throw e
         }
         if (predecessor != null) {
@@ -1256,9 +1294,11 @@ class DownloadEngine(appContext: Context) {
                         )
                     ) != null
                 if (expectsVerify) {
-                    pendingReplacements[item.id] = predecessor to b
+                    pendingReplacements[item.id] =
+                        PendingReplacement(predecessor, b, stale)
                 } else {
                     runCatching { b.delete() }
+                    stale?.let { s -> runCatching { s.delete() } }
                     update(_items.value.filterNot { it.id == predecessor.id })
                 }
             }
@@ -1289,6 +1329,11 @@ class DownloadEngine(appContext: Context) {
             val restored = runCatching { aside.renameTo(target) }
                 .getOrDefault(false)
             if (!restored) continue
+            // Byte percobaan finalisasi sebelumnya (#249) ikut dibuang:
+            // rollback berarti kembali ke byte pendahulu asli.
+            runCatching {
+                File(target.parentFile, target.name + ".replaced.stale").delete()
+            }
             changed = true
             App.logEvent(
                 "REPLACE RECONCILE: restored ${target.name} from backup " +
@@ -1313,8 +1358,9 @@ class DownloadEngine(appContext: Context) {
     /** Verifikasi penerus lolos: pensiunkan pendahulu (#215). */
     private fun commitReplacement(successorId: String) {
         val pending = pendingReplacements.remove(successorId) ?: return
-        val predecessor = pending.first
-        runCatching { pending.second.delete() }
+        val predecessor = pending.predecessor
+        runCatching { pending.backup.delete() }
+        pending.stale?.let { s -> runCatching { s.delete() } }
         // Baris MediaStore pendahulu menunjuk path lama yang kini ditempati
         // penerus; hapus HANYA baris URI-nya (filePath dikosongkan agar
         // berkas penerus tidak ikut terhapus).
@@ -1333,11 +1379,12 @@ class DownloadEngine(appContext: Context) {
     /** Verifikasi penerus gagal: pulihkan berkas pendahulu (#215). */
     private fun rollbackReplacement(successorId: String) {
         val pending = pendingReplacements.remove(successorId) ?: return
-        val target = pending.first.filePath
+        val target = pending.predecessor.filePath
             ?.takeIf { it.isNotEmpty() }?.let { File(it) } ?: return
         if (!target.exists()) {
-            runCatching { pending.second.renameTo(target) }
+            runCatching { pending.backup.renameTo(target) }
         }
+        pending.stale?.let { s -> runCatching { s.delete() } }
     }
 
     private fun organizeIfEnabled(
