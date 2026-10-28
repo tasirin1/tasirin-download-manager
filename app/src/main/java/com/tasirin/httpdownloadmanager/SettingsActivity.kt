@@ -352,28 +352,37 @@ class SettingsActivity : AppCompatActivity() {
         box.addView(row)
     }
 
-    private fun applyGalleryFolders(view: View) {
-        val box = view.findViewById<LinearLayout>(R.id.gallery_folders_container)
-        val paths = mutableListOf<String>()
+    /** Baca nilai mentah baris-baris folder dari kontainer UI (WAJIB di
+     *  main thread — menyentuh hierarki view). Dipakai bersama folder
+     *  ekstra dan folder galeri; keduanya memakai id baris yang sama di
+     *  kontainer berbeda. */
+    private fun folderInputValues(containerId: Int): List<String> {
+        val box = findViewById<LinearLayout>(containerId)
+        val raws = mutableListOf<String>()
         for (i in 0 until box.childCount) {
             val input = box.getChildAt(i).findViewById<EditText>(R.id.extra_folder_path)
             val path = input.text?.toString()?.trim().orEmpty()
-            if (path.isEmpty()) continue
-            // Normalisasi path: canonicalPath bisa melempar IOException untuk
-            // path aneh — jangan crash coroutine save Pengaturan karenanya.
+            if (path.isNotEmpty()) raws.add(path)
+        }
+        return raws
+    }
+
+    /** Normalisasi daftar path folder: canonicalPath + cek direktori
+     *  (dibuat bila [createMissing]). Murni I/O berkas — aman dipanggil
+     *  dari Dispatchers.IO (issue #400). null bila ADA satu path tak
+     *  sah, meniru perilaku lama: kategori itu tak disimpan sama sekali.
+     *  canonicalPath bisa melempar IOException untuk path aneh, jadi
+     *  kegagalannya berarti tak sah, bukan crash. */
+    private fun normalizeFolderPaths(raws: List<String>, createMissing: Boolean): List<String>? {
+        val paths = mutableListOf<String>()
+        for (path in raws) {
             val normalized = runCatching { java.io.File(path).canonicalPath }.getOrNull()
-            if (normalized.isNullOrEmpty()) {
-                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
-                return
-            }
+            if (normalized.isNullOrEmpty()) return null
             val dir = java.io.File(normalized)
-            if (!dir.isDirectory) {
-                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
-                return
-            }
+            if (!dir.isDirectory && !(createMissing && dir.mkdirs())) return null
             paths.add(normalized)
         }
-        StoragePrefs.setGalleryFolders(this, paths)
+        return paths
     }
 
     private fun cleanupJunkFiles(): Pair<Int, Long> {
@@ -884,27 +893,12 @@ class SettingsActivity : AppCompatActivity() {
         box.addView(row)
     }
 
-    private fun applyExtraFolders(view: View) {
-        val box = view.findViewById<LinearLayout>(R.id.extra_folders_container)
-        val paths = mutableListOf<String>()
-        for (i in 0 until box.childCount) {
-            val input = box.getChildAt(i).findViewById<EditText>(R.id.extra_folder_path)
-            val path = input.text?.toString()?.trim().orEmpty()
-            if (path.isEmpty()) continue
-            val normalized = runCatching { java.io.File(path).canonicalPath }.getOrNull()
-            if (normalized.isNullOrEmpty()) {
-                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
-                return
-            }
-            val dir = java.io.File(normalized)
-            if (!dir.isDirectory && !dir.mkdirs()) {
-                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
-                return
-            }
-            paths.add(normalized)
-        }
-        StoragePrefs.setExtraFolders(this, paths)
-    }
+    // applyExtraFolders/applyGalleryFolders/applyStoragePath yang lama
+    // dihapus (issue #400): ketiganya membaca view lalu LANGSUNG
+    // menjalankan I/O path (canonicalPath/mkdirs) di main thread.
+    // Penggantinya folderInputValues (baca mentah di main) +
+    // normalizeFolderPaths (I/O di Dispatchers.IO), dirangkai di
+    // saveSettings.
 
     /** Cegah save ganda: tap cepat sebelum tombol nonaktif tidak boleh
      *  menjalankan dua saveSettings paralel (balapan tulis prefs/server). */
@@ -934,9 +928,30 @@ class SettingsActivity : AppCompatActivity() {
                 renderServer()
                 return
             }
-            applyStoragePath(findViewById<EditText>(R.id.input_storage_path))
-            applyExtraFolders(binding.root)
-            applyGalleryFolders(binding.root)
+            // Folder: nilai mentah dibaca di main thread, normalisasi
+            // path (canonicalPath/mkdirs) + simpan berjalan di
+            // Dispatchers.IO (issue #400) — sebelumnya ketiganya sinkron
+            // di main sehingga Simpan bisa jank pada storage lambat
+            // dengan banyak baris folder. Toast ketidak-sahan per
+            // kategori tampil kembali di main, meniru toast lama.
+            applyStoragePathRaw(
+                findViewById<EditText>(R.id.input_storage_path).text?.toString()?.trim().orEmpty()
+            )
+            val extraRaws = folderInputValues(R.id.extra_folders_container)
+            val galleryRaws = folderInputValues(R.id.gallery_folders_container)
+            var extraInvalid = false
+            var galleryInvalid = false
+            withContext(Dispatchers.IO) {
+                val extra = normalizeFolderPaths(extraRaws, createMissing = true)
+                if (extra == null) extraInvalid = true
+                else StoragePrefs.setExtraFolders(this@SettingsActivity, extra)
+                val gallery = normalizeFolderPaths(galleryRaws, createMissing = false)
+                if (gallery == null) galleryInvalid = true
+                else StoragePrefs.setGalleryFolders(this@SettingsActivity, gallery)
+            }
+            if (extraInvalid || galleryInvalid) {
+                Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
+            }
             App.httpServer.invalidateFsRootsCache()
             App.httpServer.invalidateStatusCache()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
@@ -1040,20 +1055,19 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun applyStoragePath(pathInput: EditText) {
+    /** Terapkan path penyimpanan teks dari nilai mentah yang sudah
+     *  dibaca di main thread: normalisasi + simpan berjalan di
+     *  Dispatchers.IO (issue #400); Toast dan refresh UI kembali di
+     *  main. Semantik sama seperti applyStoragePath lama: hanya bila
+     *  pengguna mengedit dan path tak kosong; path kanonikal yang
+     *  disimpan agar `..`/trailing slash tak lolos mentah. */
+    private suspend fun applyStoragePathRaw(raw: String) {
         if (!storagePathEdited) return
-        val path = pathInput.text?.toString()?.trim().orEmpty()
-        if (path.isEmpty()) return
-        // Samakan dengan folder galeri/ekstra: simpan path kanonikal agar
-        // `..`/trailing slash tak tersimpan mentah dan lolos perbandingan
-        // string di tempat lain. canonicalPath bisa melempar IOException.
-        val normalized = runCatching { java.io.File(path).canonicalPath }.getOrNull()
-        if (normalized.isNullOrEmpty()) {
-            Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
-            return
+        if (raw.isEmpty()) return
+        val normalized = withContext(Dispatchers.IO) {
+            normalizeFolderPaths(listOf(raw), createMissing = true)?.firstOrNull()
         }
-        val dir = java.io.File(normalized)
-        if (!dir.isDirectory && !dir.mkdirs()) {
+        if (normalized == null) {
             Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
             return
         }

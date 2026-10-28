@@ -19,3 +19,6 @@ displacedExtractHandler
 displacedExtractOwner
 isFileAccessOffered
 setFileAccessOffered
+applyStoragePath
+applyExtraFolders
+applyGalleryFolders
