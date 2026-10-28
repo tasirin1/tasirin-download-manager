@@ -268,6 +268,12 @@ EXTENSION_LANGUAGES = {
     ".toml": "text",
     ".properties": "text",
     ".txt": "text",
+    # Skrip shell dipetakan ke text (issue #551): tanpa ini berkas
+    # .sh dibuang repository_files sebelum pemindaian apa pun,
+    # sehingga aturan secret tak pernah menjangkaunya — padahal
+    # skrip justru berkas yang paling mungkin memegang token.
+    ".sh": "text",
+    ".bash": "text",
 }
 
 EXCLUDED_PARTS = {
@@ -297,7 +303,15 @@ ACCEPTED_RISKS = {
 
 
 def language_for(path: Path) -> str | None:
-    return EXTENSION_LANGUAGES.get(path.suffix.lower())
+    lang = EXTENSION_LANGUAGES.get(path.suffix.lower())
+    if lang is not None:
+        return lang
+    # Skrip hook tanpa ekstensi di .githooks/ (issue #551): sama
+    # seperti .sh, perlakukan sebagai text agar aturan secret
+    # menjangkaunya.
+    if path.suffix == "" and ".githooks" in path.parts:
+        return "text"
+    return None
 
 
 def repository_files(root: Path) -> list[Path]:
