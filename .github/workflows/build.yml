@@ -57,7 +57,17 @@ jobs:
       - name: Verifikasi path (tanpa SDK Android)
         # Dulu workflow verifikasi-path.yml tersendiri; kini satu gerbang di
         # sini agar satu status, satu runner, tanpa duplikasi checkout.
-        run: python3 tools/verifikasi-path.py
+        # Rentang event WAJIB diteruskan: tanpa --rentang skrip jatuh ke
+        # diff HEAD~1 sehingga cek berbasis diff hanya menilai commit
+        # terakhir dari push/PR multi-commit (issue #156).
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="${{ github.event.before }}"; fi
+          if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            python3 tools/verifikasi-path.py --rentang "$BASE...${{ github.sha }}"
+          else
+            python3 tools/verifikasi-path.py
+          fi
 
       - name: Cek cepat (vektor 0.x, README, secret, remote)
         run: bash scripts/cek-cepat.sh
@@ -252,6 +262,19 @@ jobs:
           # Tag unik per build (v1.0.<run_number>) — rilis lama dipertahankan
           # sebagai riwayat; delete hanya untuk idempotensi bila job rerun.
           gh release delete "v${VER}" --yes --cleanup-tag || true
+          # --latest hanya bila nomor build ini >= latest saat ini: re-run
+          # manual run lama tidak boleh menurunkan rilis yang lebih baru
+          # menjadi sekadar riwayat (issue #153).
+          LATEST_ARGS="--latest"
+          CURRENT_LATEST=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name' 2>/dev/null || true)
+          if [ -n "$CURRENT_LATEST" ]; then
+            CUR_NUM="${CURRENT_LATEST#v1.0.}"
+            case "$CUR_NUM" in *[!0-9]*|"") CUR_NUM=0 ;; esac
+            if [ "${{ github.run_number }}" -lt "$CUR_NUM" ]; then
+              LATEST_ARGS=""
+              echo "Build ${{ github.run_number }} lebih lama dari latest saat ini ($CURRENT_LATEST) - rilis dibuat TANPA --latest."
+            fi
+          fi
           # Lampirkan mapping.txt (deobfuscation R8) bila ada — tidak masuk APK.
           MAPPING_ARGS=""
           if [ -f app/build/outputs/mapping/release/mapping.txt ]; then
@@ -260,15 +283,19 @@ jobs:
           gh release create "v${VER}" "$OUT" $MAPPING_ARGS \
             --title "Tasirin Download Manager v${VER} (build ${CODE})" \
             --notes "$NOTES" \
-            --latest
+            $LATEST_ARGS
 
           echo "--- Audit rilis v${VER} ---"
           EXPECTED_APK="$OUT"
           LATEST_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name')
           RELEASE=$(gh release view "v${VER}" --json name,assets)
 
-          [ "${LATEST_TAG}" = "v${VER}" ] \
-            || { echo "::error::Release v${VER} bukan release terbaru (latest: ${LATEST_TAG})"; exit 1; }
+          if [ -n "$LATEST_ARGS" ]; then
+            [ "${LATEST_TAG}" = "v${VER}" ] \
+              || { echo "::error::Release v${VER} bukan release terbaru (latest: ${LATEST_TAG})"; exit 1; }
+          else
+            echo "Audit latest dilewati: build lama di-re-run, latest tetap ${LATEST_TAG}."
+          fi
 
           EXPECTED_NAME="Tasirin Download Manager v${VER} (build ${CODE})"
           echo "$RELEASE" | jq -e --arg name "${EXPECTED_NAME}" '.name == $name' >/dev/null \

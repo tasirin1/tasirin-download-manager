@@ -45,6 +45,11 @@ class GalleryActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityGalleryBinding
     private var fullList: List<MediaLibrary.MediaEntry> = emptyList()
+
+    /** Generasi scan: hasil scan hanya diterapkan bila tidak ada scan yang
+     *  lebih baru dimulai sesudahnya (dua penulis fullList: muat awal dan
+     *  collector engine — hasil lama tidak boleh menimpa yang baru). */
+    private var galleryScanGen = 0
     private var loadedCount = GALLERY_PAGE
     private var loadingMore = false
     private var partialProgress: Map<String, Int> = emptyMap()
@@ -80,9 +85,11 @@ class GalleryActivity : AppCompatActivity() {
         lifecycleScope.launch {
             binding.progress.visibility = View.VISIBLE
             partialProgress = activeDownloadProgress()
-            fullList = withContext(Dispatchers.IO) {
+            val gen = ++galleryScanGen
+            val scanned = withContext(Dispatchers.IO) {
                 MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
             }
+            if (gen == galleryScanGen) fullList = scanned
             binding.progress.visibility = View.GONE
             loadMore() // halaman awal kurang dari satu layar -> isi otomatis
         }
@@ -104,9 +111,11 @@ class GalleryActivity : AppCompatActivity() {
                 if (!filesChanged && now - lastUiAt < 800L) return@collect
                 lastUiAt = now
                 if (filesChanged) {
-                    fullList = withContext(Dispatchers.IO) {
+                    val gen = ++galleryScanGen
+                    val scanned = withContext(Dispatchers.IO) {
                         MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
                     }
+                    if (gen == galleryScanGen) fullList = scanned
                 } else {
                     fullList = mergedProgress(fullList)
                 }
@@ -151,7 +160,14 @@ class GalleryActivity : AppCompatActivity() {
                     first = false
                     val next = minOf(loadedCount + GALLERY_PAGE, MediaLibrary.GALLERY_MAX_ENTRIES)
                     val had = fullList.size
-                    fullList = withContext(Dispatchers.IO) {
+                    // Ikut penjaga generasi seperti dua penulis fullList
+                    // lain: scan basi (ada scan filesChanged lebih baru)
+                    // tidak boleh menimpa daftar, dan loadedCount hanya
+                    // maju bila hasil scan ini yang benar-benar terpasang —
+                    // kalau tidak, canLoadMore() mati dan sisa galeri tak
+                    // bisa dimuat lagi (issue #174).
+                    val gen = ++galleryScanGen
+                    val scanned = withContext(Dispatchers.IO) {
                         MediaLibrary.scan(
                             this@GalleryActivity,
                             partialProgress,
@@ -159,6 +175,8 @@ class GalleryActivity : AppCompatActivity() {
                             StoragePrefs.getGalleryFolders(this@GalleryActivity)
                         ).items
                     }
+                    if (gen != galleryScanGen) break
+                    fullList = scanned
                     loadedCount = next
                     if (fullList.size <= had) break
                 }
