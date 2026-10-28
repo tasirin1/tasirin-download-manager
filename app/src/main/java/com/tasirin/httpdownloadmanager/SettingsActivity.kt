@@ -829,8 +829,15 @@ class SettingsActivity : AppCompatActivity() {
         val uaLabels = uaPresets.map { it.first }
         setupSpinner(this, spinnerUA, uaLabels)
         val savedUA = StoragePrefs.getUserAgent(this)
+        // UA tersimpan yang tak cocok dengan preset mana pun adalah UA
+        // KUSTOM (disimpan mentah oleh TextWatcher): petakan ke indeks
+        // Custom, bukan dipaksa 0 (issue #506). Pemaksaan lama membuat
+        // spinner menampilkan Default dan menyembunyikan kolom kustom,
+        // padahal UA kustom itulah yang aktif di engine — dan callback
+        // awal listener di posisi 0 berisiko menimpa UA tersimpan
+        // menjadi kosong.
         val savedIdx = uaPresets.indexOfFirst { it.second == savedUA }
-            .coerceAtLeast(0)
+            .let { if (it >= 0) it else uaPresets.size - 1 }
         spinnerUA.setSelection(savedIdx)
         customUAInput.setText(savedUA)
         customUAInput.visibility = if (savedIdx == uaPresets.size - 1) View.VISIBLE else View.GONE
