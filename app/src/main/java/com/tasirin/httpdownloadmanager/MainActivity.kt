@@ -104,6 +104,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
      *  penutupan satu dialog hanya memulihkan handler dialog di bawahnya,
      *  tidak mem-null-kan handler dialog lain (issue #207). */
     private val webExtractHandlerStack = mutableListOf<(Intent?) -> Unit>()
+    /** Lambda batch episode milik dialog di bawah yang tergeser saat dialog
+     *  baru menumpuk (#224): handler aktif saat itu bukan handler form
+     *  pemiliknya (fallback), jadi ia disimpan bersama pemiliknya dan
+     *  dipulihkan saat dialog penumpuk ditutup, bukan dibuang. */
+    private var displacedExtractHandler: ((Intent?) -> Unit)? = null
+    private var displacedExtractOwner: ((Intent?) -> Unit)? = null
     private val webExtractLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
@@ -838,6 +844,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
         }
+        // Handler aktif yang bukan handler form pemiliknya = lambda batch
+        // yang sedang berjalan di dialog bawah: simpan agar penutupan
+        // dialog ini memulihkannya, bukan membuangnya (#224).
+        val activeBefore = onWebExtractResult
+        if (activeBefore != null && fallbackWebExtractHandler != null &&
+            activeBefore !== fallbackWebExtractHandler
+        ) {
+            displacedExtractHandler = activeBefore
+            displacedExtractOwner = fallbackWebExtractHandler
+        }
         webExtractHandlerStack.add(myExtractHandler)
         onWebExtractResult = myExtractHandler
         fallbackWebExtractHandler = myExtractHandler
@@ -997,9 +1013,23 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             // cukup melepas entri tumpukannya. Pemilik yang ditutup
             // memulihkan handler dialog di bawahnya bila masih ada.
             webExtractHandlerStack.remove(myExtractHandler)
+            if (displacedExtractOwner === myExtractHandler) {
+                // Dialog pemilik batch tergeser ini ikut tertutup: batch-nya
+                // tak punya rumah lagi, buang simpanannya.
+                displacedExtractHandler = null
+                displacedExtractOwner = null
+            }
             if (fallbackWebExtractHandler === myExtractHandler) {
                 val remaining = webExtractHandlerStack.lastOrNull()
-                onWebExtractResult = remaining
+                onWebExtractResult =
+                    if (remaining != null && remaining === displacedExtractOwner) {
+                        val restored = displacedExtractHandler
+                        displacedExtractHandler = null
+                        displacedExtractOwner = null
+                        restored ?: remaining
+                    } else {
+                        remaining
+                    }
                 fallbackWebExtractHandler = remaining
             }
             // Probe yang masih jalan menahan seluruh view dialog + bakar
