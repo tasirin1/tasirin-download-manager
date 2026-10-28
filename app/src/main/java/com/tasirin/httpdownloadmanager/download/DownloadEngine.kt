@@ -1233,8 +1233,20 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun shouldInvalidateResume(item: DownloadItem, currentEtag: String?): Boolean {
-        return item.bytesDownloaded > 0 && item.etag.isNotBlank() &&
-            !currentEtag.isNullOrBlank() && currentEtag != item.etag
+        if (item.bytesDownloaded <= 0 || currentEtag.isNullOrBlank()) return false
+        // Provenans tak terverifikasi (issue #552): byte parsial
+        // sudah ada tetapi etag tersimpan kosong — warisan versi
+        // pra-#543 yang tak pernah merekam etag, atau item yang
+        // baru pindah mirror (etag host asal dikosongkan saat
+        // pindah). Perlakukan sebagai tak terpercaya: mulai segar
+        // sekali ini agar byte lama tak terstempel buta sebagai
+        // milik resource yang sedang diprobe.
+        if (item.etag.isBlank()) return true
+        // Batas yang diterima: bila server/probe tak mengirim ETag
+        // sama sekali, perbandingan mustahil dan resume berjalan
+        // tanpa verifikasi identitas (kondisi di atas sudah pulang
+        // false lebih dulu untuk currentEtag kosong).
+        return currentEtag != item.etag
     }
 
     /** Hitung offset resume + selaraskan file parsial dengan catatan bytes.
@@ -1843,7 +1855,12 @@ class DownloadEngine(appContext: Context) {
                     mirrors = allMirrors.drop(1),
                     state = DownloadState.PENDING,
                     error = null,
-                    autoResume = true
+                    autoResume = true,
+                    // Etag host asal tak berlaku di host baru (issue
+                    // #552): kosongkan agar probe mirror berikutnya
+                    // yang ber-etag memicu perbandingan segar lewat
+                    // aturan provenans shouldInvalidateResume.
+                    etag = ""
                 )
             }
             retryAttempts.remove(id)
