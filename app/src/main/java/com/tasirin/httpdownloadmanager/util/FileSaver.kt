@@ -775,6 +775,20 @@ class FileSaver(context: Context) {
                 throw e
             }
             deleteFiles(item)
+            // Duplikat tertinggal wajib terlacak (issue #492): deleteFiles
+            // menelan semua kegagalan, jadi pindah yang "berhasil" bisa
+            // berarti sumber masih utuh di lokasi lama (ruang dobel
+            // diam-diam). Catat log bila sumber ternyata masih ada.
+            val sumberMasihAda = when {
+                !item.filePath.isNullOrEmpty() -> File(item.filePath).exists()
+                !item.contentUri.isNullOrEmpty() -> runCatching {
+                    DocumentFile.fromSingleUri(appContext, item.contentUri.toUri())?.exists() == true
+                }.getOrDefault(false)
+                else -> false
+            }
+            if (sumberMasihAda) {
+                android.util.Log.w("FileSaver", "move(): source still exists after move, duplicate left behind: ${item.fileName}")
+            }
             // Nama unik HASIL KLAIM (issue #468), bukan target.name:
             // DocumentFile.getName() nullable dari query DISPLAY_NAME
             // provider dan bisa null/berbeda, sedangkan komponen kedua
@@ -943,7 +957,18 @@ class FileSaver(context: Context) {
                             }
                             throw e
                         }
-                        appContext.contentResolver.delete(uri, null, null)
+                        // Hapus sumber WAJIB terkonfirmasi (issue #492):
+                        // delete yang mengembalikan 0 tanpa melempar
+                        // berarti sumber tetap di folder asal — salinan
+                        // baru dibuang (bila milik panggilan ini, #447)
+                        // dan pindah dianggap gagal, bukan duplikat
+                        // diam-diam yang tak pernah tersapu.
+                        if (appContext.contentResolver.delete(uri, null, null) <= 0) {
+                            if (createdDoc) {
+                                runCatching { appContext.contentResolver.delete(target.uri, null, null) }
+                            }
+                            return result
+                        }
                         // Nama hasil klaim ikut dikembalikan: nama unik
                         // bisa beda dari fileName asal dan catatan item
                         // wajib memakai nama aktual (issue #457). Yang
