@@ -2191,9 +2191,6 @@ class DownloadEngine(appContext: Context) {
             if (remuxed) {
                 App.logEvent("HLS: remux OK → MP4 with audio")
                 val fileName = "$baseName.mp4"
-                deleteHlsTempWithSidecar(videoTs)
-                deleteHlsTempWithSidecar(audioAdts)
-                adaptiveAudioFile?.delete()
                 ensureItemPresent(item.id, mp4)
                 val published0 = publishItem(saver, mp4, fileName, item)
                 val finalName = published0.fileName ?: fileName
@@ -2208,6 +2205,13 @@ class DownloadEngine(appContext: Context) {
                 commitReplacement(item.id)
                 val published = organizeIfEnabled(saver, published0, finalName)
                 ensurePublishedKept(item.id, published0, published)
+                // Temp + penanda resume baru dihapus SESUDAH publish dan
+                // verifikasi checksum berhasil (issue #430): gagal di
+                // jendela sebelumnya harus bisa retry dengan resume
+                // per segmen (#385), bukan unduh ulang dari segmen 0.
+                deleteHlsTempWithSidecar(videoTs)
+                deleteHlsTempWithSidecar(audioAdts)
+                adaptiveAudioFile?.delete()
                 finishHls(item, progress.downloaded, published, finalName)
                 return
             }
@@ -2215,7 +2219,6 @@ class DownloadEngine(appContext: Context) {
             // 4) Fallback: publish video-only .ts seperti semula.
             App.logEvent("HLS: remux failed (no audio available), falling back to video-only .ts")
             runCatching { mp4.delete() }
-            runCatching { deleteHlsTempWithSidecar(audioAdts) }
             val fileName = "$baseName.ts"
             ensureItemPresent(item.id, videoTs)
             val published0 = publishItem(saver, videoTs, fileName, item)
@@ -2228,6 +2231,10 @@ class DownloadEngine(appContext: Context) {
             commitReplacement(item.id)
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
+            // Sidecar audio baru dihapus sesudah publish + checksum
+            // berhasil (issue #430) — videoTs sendiri adalah sumber
+            // yang diterbitkan, bukan temp yang dihapus di sini.
+            deleteHlsTempWithSidecar(audioAdts)
             finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
             // Temp video/audio dipertahankan untuk resume (issue #385) —
@@ -2262,7 +2269,8 @@ class DownloadEngine(appContext: Context) {
      *  (issue #424): jalur akhir yang hanya menghapus berkas temp
      *  meninggalkan sidecar yatim bila segmen audio gagal di tengah lalu
      *  unduhan selesai lewat jalur lain (audio adaptive / fallback .ts).
-     *  Dipakai hanya di jalur SELESAI — jalur gagal/jeda sengaja
+     *  Dipakai hanya di jalur SELESAI, sesudah publish dan verifikasi
+     *  checksum berhasil (issue #430) — jalur gagal/jeda sengaja
      *  mempertahankan temp + penanda untuk resume (#385). */
     private fun deleteHlsTempWithSidecar(temp: File) {
         temp.delete()
