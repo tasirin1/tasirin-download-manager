@@ -588,6 +588,111 @@ def kupas_komentar_jaga_baris(isi):
     return "".join(keluar)
 
 
+def kupas_kode_jaga_baris(isi, kosongkan_string=False):
+    """Pengupas komentar SADAR TEMPLATE (issue #483) yang menjaga nomor
+    baris seperti kupas_komentar_jaga_baris, tetapi melacak keadaan
+    string secara benar: string bisa bersarang di dalam ekspresi
+    template ${...} dan ekspresi bisa memuat string lagi, sehingga
+    "/*" di dalam string bersarang TIDAK membuka komentar hantu yang
+    menelan kode sesudahnya (lubang LOLOS-palsu: panggilan nyata ke
+    fungsi terhapus lolos karena terkupas jadi spasi). Komentar blok
+    sadar sarang (#482). Bila kosongkan_string, isi string/raw-string
+    ikut dikosongkan (issue #484: sebutan nama di dalam string bukan
+    panggilan) — ekspresi template tetap diperlakukan sebagai kode
+    karena panggilan di dalam ${...} adalah panggilan nyata."""
+    keluar = []
+    i, n = 0, len(isi)
+    konteks = []  # tumpukan (mode, kedalaman_template) untuk dipulihkan
+    mode = "kode"  # 'kode' | 'string' | 'raw'
+    tpl = 0  # kedalaman {} ekspresi template yang sedang terbuka
+
+    def salin(teks):
+        keluar.append(teks if not (kosongkan_string and mode != "kode") else
+                      "".join("\n" if c == "\n" else " " for c in teks))
+
+    while i < n:
+        dua = isi[i:i + 2]
+        tiga = isi[i:i + 3]
+        if mode == "kode":
+            if dua == "//":
+                while i < n and isi[i] != "\n":
+                    keluar.append(" ")
+                    i += 1
+            elif dua == "/*":
+                keluar.append("  ")
+                i += 2
+                dalam = 1
+                while i < n and dalam:
+                    if isi[i:i + 2] == "/*":
+                        dalam += 1
+                        keluar.append("  ")
+                        i += 2
+                    elif isi[i:i + 2] == "*/":
+                        dalam -= 1
+                        keluar.append("  ")
+                        i += 2
+                    else:
+                        keluar.append("\n" if isi[i] == "\n" else " ")
+                        i += 1
+            elif tiga == '"""':
+                konteks.append((mode, tpl))
+                mode = "raw"
+                salin('"""')
+                i += 3
+            elif isi[i] == '"':
+                konteks.append((mode, tpl))
+                mode = "string"
+                salin('"')
+                i += 1
+            elif isi[i] == "'":
+                # Literal char: konsumsi utuh (tak ada template di dalamnya).
+                j = i + 1
+                while j < n:
+                    if isi[j] == "\\":
+                        j += 2
+                        continue
+                    if isi[j] == "'" or isi[j] == "\n":
+                        break
+                    j += 1
+                salin(isi[i:j + 1] if j < n and isi[j] == "'" else isi[i:j])
+                i = j + 1 if j < n and isi[j] == "'" else j
+            elif isi[i] == "{" and tpl > 0:
+                tpl += 1
+                keluar.append("{")
+                i += 1
+            elif isi[i] == "}" and tpl > 0:
+                tpl -= 1
+                keluar.append("}")
+                i += 1
+                if tpl == 0 and konteks:
+                    mode, tpl = konteks.pop()
+            else:
+                keluar.append(isi[i])
+                i += 1
+        else:  # 'string' atau 'raw'
+            if mode == "raw" and tiga == '"""':
+                salin('"""')
+                i += 3
+                mode, tpl = konteks.pop() if konteks else ("kode", 0)
+            elif mode == "string" and isi[i] == "\\":
+                salin(isi[i:i + 2])
+                i += 2
+            elif mode == "string" and isi[i] == '"':
+                salin('"')
+                i += 1
+                mode, tpl = konteks.pop() if konteks else ("kode", 0)
+            elif dua == "${":
+                konteks.append((mode, tpl))
+                mode = "kode"
+                tpl = 1
+                keluar.append("${")
+                i += 2
+            else:
+                salin(isi[i])
+                i += 1
+    return "".join(keluar)
+
+
 def cek_kurung(gagal, berubah):
     for path in berubah:
         if not path.endswith((".kt", ".java")):
@@ -1002,7 +1107,8 @@ def pemanggil(nama):
         # Komentar dikupas dulu (nomor baris dipertahankan): sebutan
         # nama di komentar bukan panggilan (issue #471 — insiden
         # "cache (" putaran 14 yang memaksa redaksi 5 komentar).
-        bersih = kupas_komentar_jaga_baris(baca(path)) if path.endswith((".kt", ".java")) else baca(path)
+        # Pengupas sadar template (issue #483).
+        bersih = kupas_kode_jaga_baris(baca(path)) if path.endswith((".kt", ".java")) else baca(path)
         for i, baris in enumerate(bersih.splitlines(), 1):
             if pola.search(baris):
                 temu.append("%s:%d" % (path, i))
@@ -1033,7 +1139,8 @@ def cek_panggil_bekas_hapusan(gagal, diff):
             # Komentar dikupas dulu: menyebut nama terhapus di komentar
             # (mis. KDoc "pengganti cacheDuration() yang lama") bukan
             # panggilan dan tidak boleh menggagalkan gerbang (issue #471).
-            if pola.search(kupas_komentar_jaga_baris(baris)):
+            # Pengupas sadar template (issue #483).
+            if pola.search(kupas_kode_jaga_baris(baris)):
                 gagal.append("Baris baru memanggil %s() yang sudah dihapus: %s"
                              % (nama, baris.strip()[:80]))
                 break
