@@ -973,6 +973,11 @@ class SettingsActivity : AppCompatActivity() {
             binding.updateStatus.text = getString(
                 R.string.update_available, info.versionName, info.versionCode
             )
+            // Penjaga seumur activity (pola refreshLanIpsAsync, #300):
+            // cek update menunggu jaringan — pengguna bisa menekan Back
+            // di tengah jalan, dan show() pada activity yang sedang
+            // finishing melempar BadTokenException.
+            if (isFinishing || isDestroyed) return@launch
             // Aplikasi tidak pernah mengunduh APK sendiri (pola dropper yang
             // dicurigai Play Protect): pengguna mengambil versi baru lewat
             // browser dari halaman rilis resmi.
