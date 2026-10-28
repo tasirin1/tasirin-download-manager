@@ -72,6 +72,11 @@ jobs:
       - name: Cek cepat (vektor 0.x, README, secret, remote)
         run: bash scripts/cek-cepat.sh
 
+      - name: Guard konsistensi repo (check_repo.py)
+        # Dulu hanya jalan lewat hook pre-commit lokal yang opt-in —
+        # drift AGENTS.md vs wrapper lolos saat merge PR #135 (issue #184).
+        run: python3 scripts/check_repo.py
+
   build:
     name: Build APK
     runs-on: ubuntu-24.04
