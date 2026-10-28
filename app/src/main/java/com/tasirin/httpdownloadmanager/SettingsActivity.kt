@@ -431,6 +431,9 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.btnOpenRemote.isEnabled = server.isAlive
         binding.btnCopyUrl.isEnabled = server.isAlive
+        // Tombol hapus PIN hanya tampil bila memang ada PIN tersimpan.
+        binding.btnRemovePin.visibility =
+            if (StoragePrefs.storedPinHash(this) != null) View.VISIBLE else View.GONE
 
         // 6. Server status badge (hijau ON / merah OFF)
         val badge = binding.serverBadge
@@ -650,8 +653,30 @@ class SettingsActivity : AppCompatActivity() {
             renderChecks()
         }
         // PIN disimpan sebagai hash — field dikosongkan, hint menjelaskan
-        // aturannya (kosongkan = nonaktif).
+        // aturannya: kosong saat Simpan = PIN lama DIPERTAHANKAN (issue
+        // #383: sebelumnya kosong berarti hapus, sehingga menyimpan
+        // perubahan apa pun diam-diam mencabut PIN). Penghapusan PIN
+        // adalah aksi eksplisit lewat tombol Remove PIN di bawah.
         binding.inputPin.setText("")
+        binding.btnRemovePin.setOnClickListener {
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) {
+                    StoragePrefs.setServerPin(this@SettingsActivity, null)
+                }
+                App.logEvent("PIN REMOVED")
+                // Sama seperti blok penegakan di saveSettings: PIN wajib
+                // yang hilang mematikan server agar tak berjalan terbuka.
+                if (StoragePrefs.isPinEnforced(this@SettingsActivity) &&
+                    StoragePrefs.getServerPin(this@SettingsActivity).isNullOrEmpty()
+                ) {
+                    StoragePrefs.setServerBackgroundEnabled(this@SettingsActivity, false)
+                    StoragePrefs.setServerAutoStartEnabled(this@SettingsActivity, false)
+                    withContext(Dispatchers.IO) { App.stopHttpServer() }
+                    stopServiceIfIdle()
+                }
+                renderServer()
+            }
+        }
         binding.inputPort.setText(
             StoragePrefs.serverPort(this).toString()
         )
@@ -917,15 +942,20 @@ class SettingsActivity : AppCompatActivity() {
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
             // PBKDF2 150k iterasi berat di HP lama: hash/verify di IO agar save tak jank.
             // (Tombol nonaktif + re-enable dijamin wireSave via try/finally.)
-            val pinEvent = withContext(Dispatchers.IO) {
-                val oldPinHash = StoragePrefs.storedPinHash(this@SettingsActivity)
-                val event = if (newPin.isEmpty()) {
-                    if (oldPinHash != null) "PIN REMOVED" else null
-                } else {
-                    if (oldPinHash == null || !StoragePrefs.pinMatches(this@SettingsActivity, newPin)) "PIN SET" else null
+            // Field kosong = PERTAHANKAN PIN lama (issue #383): field ini
+            // selalu kosong saat layar dibuka, jadi meneruskan kekosongan
+            // ke setServerPin menghapus PIN pada setiap Simpan yang tak
+            // terkait. Penghapusan hanya lewat tombol Remove PIN eksplisit.
+            val pinEvent = if (newPin.isEmpty()) {
+                null
+            } else {
+                withContext(Dispatchers.IO) {
+                    val oldPinHash = StoragePrefs.storedPinHash(this@SettingsActivity)
+                    val event =
+                        if (oldPinHash == null || !StoragePrefs.pinMatches(this@SettingsActivity, newPin)) "PIN SET" else null
+                    StoragePrefs.setServerPin(this@SettingsActivity, newPin)
+                    event
                 }
-                StoragePrefs.setServerPin(this@SettingsActivity, newPin)
-                event
             }
             if (pinEvent != null) App.logEvent(pinEvent)
             // PIN tidak boleh tertinggal terlihat di field setelah disimpan.

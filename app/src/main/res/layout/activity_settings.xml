@@ -330,6 +330,21 @@
                             tools:ignore="TextFields" />
 
                         <Button
+                            android:id="@+id/btn_remove_pin"
+                            style="@style/TvOutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:gravity="start|center_vertical"
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/settings_pin_remove"
+                            android:maxLines="2"
+                            android:ellipsize="end"
+                            android:textSize="13sp"
+                            android:visibility="gone" />
+
+                        <Button
                             android:id="@+id/check_pin_enforced"
                             style="@style/TvOutlinedButton"
                             android:layout_width="match_parent"
