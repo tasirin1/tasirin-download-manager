@@ -296,7 +296,10 @@ def scan_remote() -> list:
     # properti lain yang bukan teks UI — positif palsu.
     hits = []
     for block in re.findall(r"<style>(.*?)</style>", html, flags=re.S):
-        for decl in re.findall(r"content\s*:\s*([^;]+)", block):
+        # IGNORECASE (issue #550): nama properti CSS tidak peka
+        # huruf — CONTENT: kapital ter-render sama persis tetapi
+        # dulu lolos dari ekstraksi ini.
+        for decl in re.findall(r"content\s*:\s*([^;]+)", block, flags=re.IGNORECASE):
             for dq, sq in re.findall(r'"([^"\n]*)"|\'([^\'\n]*)\'', decl):
                 hits += banned_hits(dq or sq)
     html = re.sub(r"<style>.*?</style>", "", html, flags=re.S)
