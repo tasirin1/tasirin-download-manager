@@ -119,6 +119,12 @@ def minify_html(html: str) -> str:
 
 AFFIXES = "me|men|mem|meng|di|ter|ber|ke|pe|peng|se|dip|memp|meny|memper|menge"
 
+# Sufiks produktif Indonesia (issue #535): tanpa grup ini pola yang
+# menuntut batas kata tepat sesudah akar LOLOS untuk bentuk imperatif
+# dan posesif yang justru paling alami di teks UI — Tambahkan,
+# Simpankan, Hapuslah, gagalnya.
+SUFFIXES = "kan|i|nya|lah|kah"
+
 # Pola terlarang dikompilasi SEKALI di level modul (#294): versi lama
 # mengompilasi seluruh pola BANNED_ID di SETIAP panggilan banned_hits.
 # (Jumlah persisnya tidak ditulis di sini: angka keras di komentar ini
@@ -127,7 +133,8 @@ _BANNED_PATTERNS = [
     (
         word,
         re.compile(
-            r"\b(?:" + AFFIXES + r")?(?:" + re.escape(word) + r")\b",
+            r"\b(?:" + AFFIXES + r")?(?:" + re.escape(word) + r")"
+            r"(?:" + SUFFIXES + r")?\b",
             re.IGNORECASE,
         ),
     )
