@@ -289,14 +289,16 @@ def strip_comments(text: str) -> str:
 
 def scan_remote() -> list:
     html = OUT.read_text(encoding="utf-8")
-    # String terkutip di dalam blok style ikut dipindai (issue #536):
-    # teks CSS content: pada pseudo-element adalah teks UI yang
-    # ter-render (lencana/label) — membuang blok style buta membuat
-    # kata terlarang di dalamnya tak terlihat guard.
+    # Nilai properti content: di dalam blok style ikut dipindai
+    # (issue #536): teks itu ter-render sebagai UI (lencana/label).
+    # Dibatasi ke content: saja (issue #540): mengekstrak SEMUA
+    # string terkutip menyapu nama berkas aset url("...") dan nilai
+    # properti lain yang bukan teks UI — positif palsu.
     hits = []
     for block in re.findall(r"<style>(.*?)</style>", html, flags=re.S):
-        for dq, sq in re.findall(r'"([^"\n]*)"|\'([^\'\n]*)\'', block):
-            hits += banned_hits(dq or sq)
+        for decl in re.findall(r"content\s*:\s*([^;]+)", block):
+            for dq, sq in re.findall(r'"([^"\n]*)"|\'([^\'\n]*)\'', decl):
+                hits += banned_hits(dq or sq)
     html = re.sub(r"<style>.*?</style>", "", html, flags=re.S)
     return hits + banned_hits(strip_comments(html))
 
