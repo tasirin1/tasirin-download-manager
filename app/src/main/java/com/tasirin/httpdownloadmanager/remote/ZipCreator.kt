@@ -177,8 +177,13 @@ object ZipCreator {
                 }
                 // Konsumsi budget juga di jalur file tunggal: tanpa ini guard
                 // MAX_ZIP_ENTRIES mati untuk daftar token flat (hanya rekursi
-                // direktori via zipFile yang memanggil tryTake).
-                if (!budget.tryTake()) return@forEach
+                // direktori via zipFile yang memanggil tryTake). Stream yang
+                // sudah dibuka wajib ditutup di jalur budget habis (#233):
+                // return polos membocorkan satu FD per token sisa.
+                if (!budget.tryTake()) {
+                    runCatching { input.close() }
+                    return@forEach
+                }
                 val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
                 runCatching {
                     zos.putNextEntry(ZipEntry(entry))
