@@ -2,6 +2,7 @@ package com.tasirin.httpdownloadmanager.remote
 
 import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
+import com.tasirin.httpdownloadmanager.util.sha256Hex
 import java.io.File
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -351,6 +352,13 @@ object ServerSecurity {
 
     /** Token share kedaluwarsa (expiresAt == now masih dianggap valid). */
     fun isShareExpired(expiresAt: Long, now: Long): Boolean = expiresAt < now
+
+    /** ID pendek publik untuk satu token share (issue #259): 12 hex
+     *  pertama SHA-256(token). Token adalah rahasia pembawa — daftar
+     *  share di UI hanya membawa id turunan ini, dan pencabutan per id
+     *  mencari token yang hash-nya cocok. 48 bit cukup unik untuk
+     *  maksimal 256 token aktif. */
+    fun shareShortId(token: String): String = sha256Hex(token).take(12)
 
     /** Ambil nilai cookie persis per nama dari header Cookie. Pencarian
      *  substring mentah (indexOf) bisa cocok di dalam nama/nilai cookie lain

@@ -292,6 +292,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     session.method == Method.GET && session.uri == "/api/events" -> sseResponse()
                     session.method == Method.POST && session.uri == "/api/share" -> createShare(session)
                     session.method == Method.POST && session.uri == "/api/share_revoke" -> revokeShare(session)
+                    session.method == Method.GET && session.uri == "/api/shares" -> listShares(session)
+                    session.method == Method.POST && session.uri == "/api/share_revoke_id" -> revokeShareById(session)
                     session.method == Method.GET && session.uri == "/api/gallery" -> galleryJson(session)
                     session.method == Method.GET && session.uri == "/api/fs" -> fsList(session)
                     session.method == Method.GET && session.uri == "/api/thumb" -> serveThumb(session)
@@ -3414,6 +3416,48 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return jsonResponse(JSONObject().put("ok", false).put("error", "token required"))
         }
         val removed = synchronized(shareLock) { shareTokens.remove(token) != null }
+        if (removed) appendLog("SHARE REVOKED")
+        return jsonResponse(JSONObject().put("ok", removed))
+    }
+
+    /** Daftar share aktif untuk UI (#259): hanya metadata + id pendek
+     *  turunan hash — token pembawa tidak pernah keluar lewat endpoint
+     *  ini. Tanpa daftar ini pemilik tidak bisa mencabut tautan lama
+     *  sesudah reload halaman, dan kuota 256 terkunci sampai semua
+     *  token kedaluwarsa sendiri. */
+    private fun listShares(session: IHTTPSession): Response {
+        synchronized(shareLock) { pruneShares() }
+        val items = App.engine.items.value.associateBy { it.id }
+        val arr = JSONArray()
+        synchronized(shareLock) {
+            shareTokens.entries.sortedBy { it.value.expiresAt }.forEach { (token, entry) ->
+                arr.put(
+                    JSONObject()
+                        .put("sid", ServerSecurity.shareShortId(token))
+                        .put("name", items[entry.itemId]?.fileName ?: "(file no longer listed)")
+                        .put("expiresAt", entry.expiresAt)
+                )
+            }
+        }
+        return jsonResponse(JSONObject().put("ok", true).put("shares", arr))
+    }
+
+    /** Cabut share per id pendek dari daftar (#259): pasangan
+     *  revokeShare untuk token yang dibuat pada sesi halaman lain.
+     *  Id yang cocok ke lebih dari satu token ditolak (tabrakan hash
+     *  tak boleh mencabut tautan yang salah). */
+    private fun revokeShareById(session: IHTTPSession): Response {
+        val params = readForm(session)
+        val sid = params["sid"].orEmpty()
+        if (sid.isEmpty()) {
+            return jsonResponse(JSONObject().put("ok", false).put("error", "id required"))
+        }
+        val removed = synchronized(shareLock) {
+            val matches = shareTokens.keys.filter {
+                ServerSecurity.shareShortId(it) == sid
+            }
+            if (matches.size == 1) shareTokens.remove(matches[0]) != null else false
+        }
         if (removed) appendLog("SHARE REVOKED")
         return jsonResponse(JSONObject().put("ok", removed))
     }

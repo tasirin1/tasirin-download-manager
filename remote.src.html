@@ -1674,6 +1674,7 @@
         <button id="resumeAllBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span> Resume all</button>
         <button id="retryFailedBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 8 16 8"/></svg></span> Retry failed</button>
         <button id="clearCompletedBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/></svg></span> Clear completed</button>
+        <button id="shareLinksBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span> Share links</button>
         <div class="sep"></div>
         <button id="compactToggleBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg></span> Compact view</button>
         <button id="batchModeBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><polyline points="9 12 11 14 15 10"/></svg></span> Select</button>
@@ -1970,6 +1971,8 @@
       <button id="shareRevoke" type="button" class="btn-ghost">Revoke link</button>
       <button id="shareClose" type="button" class="btn-ghost">Close</button>
     </div>
+    <div class="cm-text" style="margin-top:12px;font-weight:600">Active share links</div>
+    <div id="shareList"></div>
   </div>
 </div>
 
@@ -6335,8 +6338,14 @@ async function shareItem(id) {
     const url = location.origin + '/share/' + data.token;
     document.getElementById('shareText').textContent =
       'Link valid for ' + data.expiresInHours + ' hours. Anyone with this link can download the file without a PIN.';
-    document.getElementById('shareLink').value = url;
+    const linkEl = document.getElementById('shareLink');
+    linkEl.value = url;
+    linkEl.classList.remove('hidden');
+    ['shareCopy', 'shareOpen', 'shareRevoke'].forEach(function (id) {
+      document.getElementById(id).classList.remove('hidden');
+    });
     shareModal.classList.remove('hidden');
+    refreshShareList();
   } catch (e) {
     showConfirm('Failed to create link', String(e), 'OK', function () {});
   }
@@ -6384,6 +6393,78 @@ document.getElementById('shareOpen').addEventListener('click', function () {
   const link = document.getElementById('shareLink').value;
   if (link) window.open(link, '_blank', 'noopener,noreferrer');
 });
+
+// Daftar share aktif (#259): token lama bisa dicabut dari sini walau
+// dibuat pada sesi halaman lain — sebelumnya kuota 256 terkunci sampai
+// kedaluwarsa karena Revoke hanya tahu token sesi halaman ini.
+async function refreshShareList() {
+  const box = document.getElementById('shareList');
+  if (!box) return;
+  box.textContent = '';
+  let data = null;
+  try {
+    const res = await fetch(API + '/api/shares');
+    data = await res.json();
+  } catch (e) {}
+  if (!data || !data.ok || !data.shares || !data.shares.length) {
+    const empty = document.createElement('div');
+    empty.className = 'cm-text';
+    empty.textContent = 'No active share links';
+    box.appendChild(empty);
+    return;
+  }
+  data.shares.forEach(function (s) {
+    const row = document.createElement('div');
+    row.className = 'cm-row';
+    row.style.justifyContent = 'space-between';
+    const label = document.createElement('span');
+    label.className = 'cm-text';
+    const ms = (s.expiresAt || 0) - Date.now();
+    const left = ms <= 0 ? 'expired'
+      : ('expires in ' + Math.floor(ms / 3600000) + 'h ' + Math.floor(ms % 3600000 / 60000) + 'm');
+    label.textContent = (s.name || '') + ' \u2014 ' + left;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-ghost';
+    btn.textContent = 'Revoke';
+    btn.addEventListener('click', function () { revokeShareSid(s.sid); });
+    row.appendChild(label);
+    row.appendChild(btn);
+    box.appendChild(row);
+  });
+}
+async function revokeShareSid(sid) {
+  try {
+    const res = await fetch(API + '/api/share_revoke_id', {
+      method: 'POST',
+      body: new URLSearchParams({sid: sid}),
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await res.json();
+    if (data && data.ok) {
+      showToast('Link revoked', 2500);
+    } else {
+      showToast('Failed to revoke link', 3000, 'error');
+    }
+  } catch (e) {
+    showToast('Failed to revoke link', 3000, 'error');
+  }
+  refreshShareList();
+}
+function openShareManager() {
+  currentShareToken = '';
+  document.getElementById('shareText').textContent =
+    'Share links stay valid until they expire or are revoked.';
+  const link = document.getElementById('shareLink');
+  link.value = '';
+  link.classList.add('hidden');
+  ['shareCopy', 'shareOpen', 'shareRevoke'].forEach(function (id) {
+    document.getElementById(id).classList.add('hidden');
+  });
+  shareModal.classList.remove('hidden');
+  refreshShareList();
+}
+document.getElementById('shareLinksBtn').addEventListener('click', openShareManager);
 
 function globalAction(action) {
   doAction('', action);

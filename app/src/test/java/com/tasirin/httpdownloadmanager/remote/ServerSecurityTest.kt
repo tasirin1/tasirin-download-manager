@@ -217,6 +217,17 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun shareShortId_duaBelasHexSha256() {
+        // Nilai harapan dihitung independen (SHA-256 token contoh,
+        // 12 hex pertama) — id turunan, bukan potongan token itu sendiri.
+        assertEquals(
+            "bc3737d2f139",
+            ServerSecurity.shareShortId("abcdef0123456789abcdef0123456789")
+        )
+        assertEquals(12, ServerSecurity.shareShortId("token-lain").length)
+    }
+
+    @Test
     fun isBrowseableAncestor_indukDariRoot_true() {
         val r = root()
         val induk = r.parentFile ?: return
