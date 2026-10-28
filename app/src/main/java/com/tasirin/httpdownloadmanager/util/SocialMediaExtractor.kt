@@ -2017,6 +2017,11 @@ object SocialMediaExtractor {
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
         var current = urlStr
         var activeHeaders = headers
+        // Jar per nama -> (nilai, host pemasang), diakumulasi TIAP hop
+        // (#280, pola fetchDrive #239): versi lama hanya membaca
+        // Set-Cookie respons akhir, jadi cookie sesi yang dipasang hop
+        // redirect perantara hilang dari hasil.
+        val cookieJar = LinkedHashMap<String, Pair<String, String>>()
         repeat(6) {
             val conn = openTlsConn(current)
             try {
@@ -2029,6 +2034,19 @@ object SocialMediaExtractor {
                         DEFAULT_UA)
                 }
                 val code = conn.responseCode
+                val currentHost = runCatching { java.net.URI(current).host }
+                    .getOrNull().orEmpty()
+                conn.headerFields.entries
+                    .filter { it.key?.equals("set-cookie", ignoreCase = true) == true }
+                    .flatMap { it.value }
+                    .forEach { raw ->
+                        val pair = raw.substringBefore(';')
+                        val eq = pair.indexOf('=')
+                        if (eq > 0) {
+                            cookieJar[pair.substring(0, eq).trim()] =
+                                pair.substring(eq + 1).trim() to currentHost
+                        }
+                    }
                 if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
                     val loc = conn.getHeaderField("Location") ?: return null
                     val next = try {
@@ -2042,11 +2060,12 @@ object SocialMediaExtractor {
                     return@repeat
                 }
                 if (code !in 200..299) return null
-                val cookies = conn.headerFields.entries
-                    .filter { it.key.equals("set-cookie", ignoreCase = true) }
-                    .flatMap { it.value }
-                    .map { it.substringBefore(';') }
-                    .joinToString("; ")
+                // Cookie hasil: seluruh jar yang ter-scope ke host final
+                // — cookie hop awal yang seinduk ikut terbawa; cookie
+                // lintas induk tidak (scoping cookieJarVisible #239).
+                val cookies = cookieJar.entries
+                    .filter { cookieJarVisible(it.value.second, currentHost) }
+                    .joinToString("; ") { "${it.key}=${it.value.first}" }
                 // Baca terbatas: hindari OOM dari body redirect/HTML raksasa.
                 val body = readBodyLimited(conn.inputStream)
                 return HttpResult(body, cookies)
