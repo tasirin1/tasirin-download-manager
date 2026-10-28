@@ -700,15 +700,26 @@ object SocialMediaExtractor {
         return emptyList()
     }
 
-    /** Strategi VISIONOS: player API mengembalikan URL HLS/adaptif tanpa
-     *  n-signature, sehingga bisa langsung di-download (tidak HTTP 403). */
-    private fun extractYouTubeViaVisionos(
+    /** Hasil mentah player VISIONOS: data streaming terparse + judul
+     *  + cookie halaman sumber (untuk ditempel ke Result pemanggil). */
+    private data class VisionosPlayer(
+        val streamingData: JSONObject?,
+        val title: String,
+        val cookies: String
+    )
+
+    /** Ambil visitorData dari [pageUrl] lalu POST ke player API
+     *  VISIONOS. Dipakai bersama kedua strategi Visionos (#281): blok
+     *  ini dulu tersalin dua kali dan sudah berbeda — versi adaptive
+     *  tidak meneruskan header user ke pengambilan halaman. */
+    private fun fetchVisionosPlayer(
+        pageUrl: String,
         videoId: String,
-        user: Map<String, String> = emptyMap()
-    ): Result? {
+        user: Map<String, String>
+    ): VisionosPlayer? {
         // Butuh visitorData + cookies dari halaman agar API tidak LOGIN_REQUIRED.
         val page = httpGetWithCookies(
-            "https://www.youtube.com/shorts/$videoId",
+            pageUrl,
             mapOf(
                 "User-Agent" to YT_UA,
                 "Accept-Language" to YT_LANG
@@ -745,12 +756,27 @@ object SocialMediaExtractor {
             ) + user),
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
-
         return runCatching {
             val obj = JSONObject(json)
             if (obj.optJSONObject("playabilityStatus")?.optString("status") != "OK") return null
-            val title = obj.optJSONObject("videoDetails")?.optString("title") ?: "YouTube_$videoId"
-            val streamingData = obj.optJSONObject("streamingData")
+            val title = obj.optJSONObject("videoDetails")?.optString("title")
+                ?: "YouTube_$videoId"
+            VisionosPlayer(obj.optJSONObject("streamingData"), title, page.cookies)
+        }.getOrNull()
+    }
+
+    /** Strategi VISIONOS: player API mengembalikan URL HLS/adaptif tanpa
+     *  n-signature, sehingga bisa langsung di-download (tidak HTTP 403). */
+    private fun extractYouTubeViaVisionos(
+        videoId: String,
+        user: Map<String, String> = emptyMap()
+    ): Result? {
+        val player = fetchVisionosPlayer(
+            "https://www.youtube.com/shorts/$videoId", videoId, user
+        ) ?: return null
+        return runCatching {
+            val title = player.title
+            val streamingData = player.streamingData
             val safeName = sanitizeFileName(title)
             // Strategi 1: HLS manifest — cobalah dulu untuk kualitas terbaik.
             val hls = streamingData?.optString("hlsManifestUrl")
@@ -760,7 +786,7 @@ object SocialMediaExtractor {
                 val (videoAd, audioAd) = bestAdaptivePair(streamingData)
                 return@runCatching Result(
                     hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL",
-                    cookies = page.cookies, isHls = true,
+                    cookies = player.cookies, isHls = true,
                     videoUrl = videoAd, audioUrl = audioAd
                 )
             }
@@ -782,7 +808,7 @@ object SocialMediaExtractor {
                     val ext = if (mime.contains("webm")) "webm" else "mp4"
                     return@runCatching Result(
                         url, "YouTube_$safeName.$ext", title, quality, mime,
-                        cookies = page.cookies, videoUrl = url, audioUrl = audioAd
+                        cookies = player.cookies, videoUrl = url, audioUrl = audioAd
                     )
                 }
             }
@@ -796,48 +822,12 @@ object SocialMediaExtractor {
         videoId: String,
         user: Map<String, String> = emptyMap()
     ): Result? {
-        val page = httpGetWithCookies(
-            "https://www.youtube.com/watch?v=$videoId",
-            mapOf(
-                "User-Agent" to YT_UA,
-                "Accept-Language" to YT_LANG
-            ),
-            timeoutMs = PAGE_TIMEOUT_MS
-        ) ?: return null
-        val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
-            ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
-            ?: return null
-        val body = buildString {
-            append("{\"context\":{\"client\":{")
-            append("\"clientName\":\"VISIONOS\",")
-            append("\"clientVersion\":\"1.02\",")
-            append("\"deviceMake\":\"Apple\",")
-            append("\"deviceModel\":\"RealityDevice17,1\",")
-            append("\"userAgent\":\"$VISIONOS_UA\",")
-            append("\"osName\":\"visionOS\",")
-            append("\"osVersion\":\"26.5.23O471\",")
-            append("\"hl\":\"en\",")
-            append("\"visitorData\":\"$visitor\"")
-            append("}},\"videoId\":\"$videoId\"}")
-        }
-        val json = httpPostJson(
-            "https://www.youtube.com/youtubei/v1/player",
-            body,
-            (mapOf(
-                "User-Agent" to YT_UA,
-                "Origin" to "https://www.youtube.com",
-                "Referer" to "https://www.youtube.com/",
-                "X-Goog-Visitor-Id" to visitor,
-                "X-YouTube-Client-Name" to "101",
-                "X-YouTube-Client-Version" to "1.02"
-            ) + user),
-            timeoutMs = PAGE_TIMEOUT_MS
+        val player = fetchVisionosPlayer(
+            "https://www.youtube.com/watch?v=$videoId", videoId, user
         ) ?: return null
         return runCatching {
-            val obj = JSONObject(json)
-            if (obj.optJSONObject("playabilityStatus")?.optString("status") != "OK") return null
-            val title = obj.optJSONObject("videoDetails")?.optString("title") ?: "YouTube_$videoId"
-            val streamingData = obj.optJSONObject("streamingData")
+            val title = player.title
+            val streamingData = player.streamingData
             val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return null
             val safeName = sanitizeFileName(title)
             // Pilih video AVC MP4 bila ada (remux MP4 mulus); WebM hanya
@@ -850,7 +840,7 @@ object SocialMediaExtractor {
             val ext = if (mime.contains("webm")) "webm" else "mp4"
             Result(
                 url, "YouTube_$safeName.$ext", title, quality, mime,
-                cookies = page.cookies, videoUrl = url, audioUrl = audioAd
+                cookies = player.cookies, videoUrl = url, audioUrl = audioAd
             )
         }.getOrNull()
     }
