@@ -251,7 +251,7 @@ class GalleryActivity : AppCompatActivity() {
 
     /** Sistem minta memori (Android 6+): buang cache thumbnail agar tidak
      *  ikut membebani device RAM kecil. Thumbnail akan di-decode ulang dari
-     *  disk cache (thumbs/) saat galeri digulir lagi. */
+     *  disk cache di folder thumbs/ saat galeri digulir lagi. */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {

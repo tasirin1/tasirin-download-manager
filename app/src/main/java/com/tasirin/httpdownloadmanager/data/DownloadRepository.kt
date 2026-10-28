@@ -207,7 +207,7 @@ class DownloadRepository(context: Context) {
             Crypto.encrypt(item.headers),
             Crypto.encrypt(item.postBody)
         )
-        // Hasil fallback plaintext TIDAK ikut ter-cache (issue #353):
+        // Hasil fallback plaintext TIDAK ikut ter-cache, issue #353:
         // satu glitch Keystore sesaat tidak boleh membuat Quad plain:
         // dipakai ulang seluruh sesi proses; tanpa cache, save
         // berikutnya mencoba enkripsi lagi dan pulih sendiri begitu

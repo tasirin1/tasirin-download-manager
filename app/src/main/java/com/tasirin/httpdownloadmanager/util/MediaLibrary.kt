@@ -407,8 +407,8 @@ object MediaLibrary {
             scanCache?.let { cached ->
                 if (scanCacheFolderKey == selectedFolders &&
                     scanCacheUsable(now - cached.ts, cached.ttlMs, cached.items.size, cached.total, limit)) {
-                    // usedFallback ikut diteruskan dari cache (issue
-                    // #405): sebelumnya cache-hit mengembalikannya false
+                    // usedFallback ikut diteruskan dari cache — issue
+                    // #405: sebelumnya cache-hit mengembalikannya false
                     // walau data yang sama datang dari fallback, membuat
                     // kontrak hasil tak konsisten antar panggilan.
                     return MediaScanResult(cached.items.take(limit), cached.total, cached.usedFallback)

@@ -93,20 +93,11 @@ class ServerVideoDurations(
     /** Timestamp kegagalan probe per token — probe ulang hanya setelah TTL. */
     private val probeFailAt = HashMap<String, Long>()
 
-    fun cache(): JSONObject = synchronized(lock) { cacheLocked() }
-
     /** Baca durasi token: tanpa prune per-baca (of dipanggil per item galeri,
      *  prune di sini berarti cek batas N kali per request). Prune hanya saat
-     *  tulis (cacheDuration) dan sekali baca di dalam lock yang sama. */
+     *  tulis (cacheDurationIfCurrent) dan sekali baca di dalam lock yang sama. */
     fun of(token: String): Long = synchronized(lock) {
         cacheLocked().optLong(token, 0L)
-    }
-
-    fun cacheDuration(token: String, ms: Long) {
-        synchronized(lock) {
-            prune(cacheLocked()).put(token, ms)
-            probeFailAt.remove(token)
-        }
     }
 
     /** Tulis hasil probe HANYA bila [expectedGeneration] masih
@@ -134,13 +125,7 @@ class ServerVideoDurations(
         }
     }
 
-    fun recordProbeFailure(token: String) {
-        synchronized(lock) {
-            recordProbeFailureLocked(token)
-        }
-    }
-
-    /** Isi recordProbeFailure; pemanggil WAJIB sudah memegang [lock]. */
+    /** Isi recordProbeFailureIfCurrent; pemanggil WAJIB sudah memegang [lock]. */
     private fun recordProbeFailureLocked(token: String) {
         if (probeFailAt.size > MAX_ENTRIES) {
             val cutoff = System.currentTimeMillis() - PROBE_FAILURE_TTL_MS

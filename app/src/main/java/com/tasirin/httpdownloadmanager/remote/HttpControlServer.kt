@@ -2332,7 +2332,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         // Generasi ditangkap SEBELUM probe lambat:
                         // invalidate yang mendarat di tengah probe
                         // membuat hasil ini basi — jangan tulis lagi
-                        // ke cache (#326). Tampilan request ini tetap
+                        // ke cache, lihat #326. Tampilan request ini tetap
                         // memakai d apa adanya.
                         val gen = videoDurations.currentGeneration()
                         d = videoDurations.probeDurationMs(e.token)
@@ -2508,7 +2508,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     /** Listing terurut untuk halaman aktif. Folder sangat besar tidak disimpan
-     *  di cache (cukup dipakai sekali) supaya slot cache tidak menahan RAM. */
+     *  di cache — cukup dipakai sekali — supaya slot cache tidak menahan RAM. */
     private fun cachedDirectoryListing(path: String): Pair<Int, List<File>>? {
         val normalized = File(path).absolutePath.trimEnd('/')
         val now = System.currentTimeMillis()

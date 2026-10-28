@@ -22,3 +22,5 @@ setFileAccessOffered
 applyStoragePath
 applyExtraFolders
 applyGalleryFolders
+cacheDuration
+recordProbeFailure
