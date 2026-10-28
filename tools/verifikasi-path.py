@@ -1063,6 +1063,13 @@ def cek_pola_berisiko(peringatan, diff):
     cek = jalan_output("git", "diff", "--check")
     if cek:
         peringatan.append("Rapikan spasi diff --check: " + cek.strip().splitlines()[0][:100])
+    # Varian staged (issue #426): diff polos tak melihat indeks, jadi
+    # whitespace yang sudah di-git add lolos peringatan ini juga.
+    cek_staged = jalan_output("git", "diff", "--cached", "--check")
+    if cek_staged:
+        peringatan.append(
+            "Rapikan spasi diff --check (staged): " + cek_staged.strip().splitlines()[0][:100]
+        )
 
 
 def utama():

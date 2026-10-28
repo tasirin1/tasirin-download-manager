@@ -261,10 +261,32 @@ def fast_checks() -> list[Result]:
         ]
     )
     if shutil.which("git"):
-        results.append(run("whitespace", ["git", "diff", "--check"]))
+        results.append(whitespace_result())
     else:
         results.append(Result("whitespace", True, 0.0, "Git tidak tersedia; dilewati."))
     return results
+
+
+def whitespace_result() -> Result:
+    """Whitespace dinilai dari returncode `git diff --check` untuk
+    perubahan unstaged DAN staged (issue #426): diff polos hanya melihat
+    yang belum di-stage, sehingga whitespace yang sudah ter-stage lolos
+    semua gerbang (lokal maupun langkah ini)."""
+    started = time.monotonic()
+    ok = True
+    outputs: list[str] = []
+    for argv in (["git", "diff", "--check"], ["git", "diff", "--cached", "--check"]):
+        completed = subprocess.run(
+            argv, cwd=ROOT, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+        )
+        if completed.returncode != 0:
+            ok = False
+            if completed.stdout.strip():
+                outputs.append(completed.stdout.strip())
+    return Result(
+        "whitespace", ok, time.monotonic() - started, "\n".join(outputs)
+    )
 
 
 def android_checks(gradle: str) -> list[Result]:
