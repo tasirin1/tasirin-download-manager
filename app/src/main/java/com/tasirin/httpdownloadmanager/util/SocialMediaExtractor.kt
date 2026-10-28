@@ -13,7 +13,9 @@ import java.io.InputStream
 import java.util.Locale
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.HttpsURLConnection
 
@@ -1709,16 +1711,32 @@ object SocialMediaExtractor {
      *  saja tidak bisa memotong tahap yang menggantung. Tahap dijalankan
      *  di thread daemon pool ini dan ditunggu dengan batas keras; benang
      *  yang terlambat selesai sendiri (timeout soketnya terbatas) dan
-     *  hasilnya dibuang. */
+     *  hasilnya dibuang. Jumlah thread berbatas maksimum 8 (#267): tahap
+     *  yang menggantung tidak bisa dibunuh (cancel tidak menginterupsi
+     *  soket), jadi pola cached pool (core 0 + SynchronousQueue +
+     *  keepAlive 60 dtk) dipertahankan polanya tetapi diberi plafon;
+     *  submit berlebih ditolak dan dianggap tahap gagal. */
     private val stageExecutor: ExecutorService by lazy {
-        Executors.newCachedThreadPool { r ->
-            Thread(r, "extract-stage").apply { isDaemon = true }
-        }
+        ThreadPoolExecutor(
+            0,
+            8,
+            60L,
+            TimeUnit.SECONDS,
+            SynchronousQueue(),
+            ThreadFactory { r ->
+                Thread(r, "extract-stage").apply { isDaemon = true }
+            }
+        )
     }
 
     /** Jalankan [block] dengan batas tunggu [capMs]; null bila lewat. */
     private fun <T> runStageCapped(capMs: Long, block: () -> T?): T? {
-        val future = stageExecutor.submit(Callable { runCatching { block() }.getOrNull() })
+        // Pool penuh (#267) = tahap gagal, bukan pengecualian ke pemanggil.
+        val future = try {
+            stageExecutor.submit(Callable { runCatching { block() }.getOrNull() })
+        } catch (_: Exception) {
+            return null
+        }
         return try {
             future.get(capMs, TimeUnit.MILLISECONDS)
         } catch (_: Exception) {
