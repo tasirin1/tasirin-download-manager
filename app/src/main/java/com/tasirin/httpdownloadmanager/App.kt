@@ -105,9 +105,15 @@ class App : Application() {
         private const val THUMB_CLEANUP_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
         // StaticFieldLeak: sengaja ditahan — kedua objek menyimpan Application
         // context saja (dijamin di konstruktor) dan hidup seumur proses.
+        // @Volatile: httpServer DITUKAR saat runtime (restartHttpServer
+        // dari SettingsActivity) dan keduanya dibaca lintas thread (UI,
+        // engine, server) — publikasi penukaran harus dijamin terlihat
+        // (issue #210).
         @SuppressLint("StaticFieldLeak")
+        @Volatile
         lateinit var engine: DownloadEngine
         @SuppressLint("StaticFieldLeak")
+        @Volatile
         lateinit var httpServer: HttpControlServer
 
         /** Catat kejadian ke log realtime server (aman dipanggil dari mana saja). */
