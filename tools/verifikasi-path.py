@@ -260,18 +260,42 @@ def cek_duplikat_definisi(gagal):
 
 
 def berkas_dihapus(rentang):
+    args = None
     if rentang and ("..." in rentang or ".." in rentang):
         for pemisah in ("...", ".."):
             if pemisah in rentang:
                 a, b = rentang.split(pemisah, 1)
                 if set(a) == {"0"} or not a:
                     return []
-                out = jalan("git", "diff", "--name-status", a + pemisah + b)
-                if out is None:
-                    return []
-                return [x.split(None, 1)[1] for x in out.splitlines() if x.startswith("D")]
-    out = jalan("git", "diff", "--name-status")
-    return [x.split(None, 1)[1] for x in (out or "").splitlines() if x.startswith("D")]
+                args = ["git", "diff", "--name-status", "-z", a + pemisah + b]
+                break
+    if args is None:
+        args = ["git", "diff", "--name-status", "-z"]
+    out = jalan(*args)
+    if out is None:
+        return []
+    # -z (issue #376): tanpa ini git mengutip path non-ASCII gaya C
+    # ('"Prob\303\251.kt"') sehingga path hasil split tidak cocok dengan
+    # syarat app/src/main/java/ + .kt/.java di cek_berkas_dihapus dan
+    # penghapusan berkas non-ASCII luput dinilai — kelas bug yang sama
+    # dengan #346/#358. Format -z: token status dan path bergantian
+    # dipisah NUL; status R/C membawa DUA path (asal lalu tujuan).
+    token = out.split("\0")
+    hapus = []
+    i = 0
+    while i < len(token):
+        status = token[i]
+        i += 1
+        if not status:
+            continue
+        jumlah_path = 2 if status[0] in "RC" else 1
+        for _ in range(jumlah_path):
+            if i >= len(token):
+                break
+            if status.startswith("D"):
+                hapus.append(token[i])
+            i += 1
+    return hapus
 
 
 def disebut_kata(nama, lewat=()):
