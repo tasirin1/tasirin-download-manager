@@ -623,23 +623,91 @@ def cek_aturan_repo(gagal, berubah):
         return "".join(out)
 
     bersih_teks = strip_komentar(tetap)
-    cocok = re.search(r"minSdk\s*=\s*(\d+)", bersih_teks)
+    def nilai_konstanta(ekspresi):
+        # Penilai ekspresi int konstan terbatas (issue #333): literal
+        # dengan underskor di antara digit (2_3 sah di Kotlin), kurung,
+        # dan operator + - * / %. Bentuk sah seperti '20 + 3' dan '(23)'
+        # dulu ditolak regex digit polos walau nilainya tetap 23. Di
+        # luar tata bahasa ini -> None (gagal-tertutup lewat jalur lain).
+        token = re.findall(r"\d(?:_?\d)*|[()+\-*/%]", ekspresi)
+        if not token or "".join(token) != re.sub(r"\s+", "", ekspresi):
+            return None
+        pos = [0]
+
+        def faktor():
+            if pos[0] >= len(token):
+                raise ValueError
+            t = token[pos[0]]
+            if t == "(":
+                pos[0] += 1
+                v = jumlah()
+                if pos[0] >= len(token) or token[pos[0]] != ")":
+                    raise ValueError
+                pos[0] += 1
+                return v
+            if t == "-":
+                pos[0] += 1
+                return -faktor()
+            if not re.fullmatch(r"\d(?:_?\d)*", t):
+                raise ValueError
+            pos[0] += 1
+            return int(t.replace("_", ""))
+
+        def suku():
+            v = faktor()
+            while pos[0] < len(token) and token[pos[0]] in ("*", "/", "%"):
+                op = token[pos[0]]
+                pos[0] += 1
+                w = faktor()
+                if op == "*":
+                    v = v * w
+                elif w == 0:
+                    raise ValueError
+                elif op == "/":
+                    # Pembagian Int Kotlin memotong ke arah nol.
+                    q = abs(v) // abs(w)
+                    v = q if (v < 0) == (w < 0) else -q
+                else:
+                    r = abs(v) % abs(w)
+                    v = r if v >= 0 else -r
+            return v
+
+        def jumlah():
+            v = suku()
+            while pos[0] < len(token) and token[pos[0]] in ("+", "-"):
+                op = token[pos[0]]
+                pos[0] += 1
+                w = suku()
+                v = v + w if op == "+" else v - w
+            return v
+
+        try:
+            hasil = jumlah()
+        except ValueError:
+            return None
+        return hasil if pos[0] == len(token) else None
+
+    nilai_minsdk = None
     minsdk_ambigu = False
-    if cocok:
-        # Jalur literal ikut dinilai ambigu (issue #270): tanpa ini
-        # penetapan pertama selalu menang dan penetapan minSdk lain
-        # bernilai beda di berkas yang sama (umpan di blok lain) lolos
-        # begitu saja — jalur variabel #229 sudah gagal-tertutup untuk
-        # keadaan yang sama.
-        literal = re.findall(r"minSdk\s*=\s*(\d+)", bersih_teks)
+    # Semua penetapan minSdk berupa ekspresi konstan dinilai nilainya
+    # (issue #333). Jalur literal ikut dinilai ambigu (issue #270):
+    # penetapan bernilai beda di berkas yang sama (umpan di blok lain)
+    # tidak boleh kalah oleh penetapan pertama.
+    literal = []
+    for rhs in re.findall(r"minSdk\s*=\s*([^\n;]+)", bersih_teks):
+        v = nilai_konstanta(rhs.strip())
+        if v is not None:
+            literal.append(v)
+    if literal:
         if len(set(literal)) > 1:
             gagal.append(
                 "penetapan minSdk literal ambigu (nilai %s) — kunci "
                 "minSdk menolak menebak di antara penetapan ganda"
-                % ", ".join(sorted(set(literal))))
+                % ", ".join(str(v) for v in sorted(set(literal))))
             minsdk_ambigu = True
-            cocok = None
-    if not cocok and not minsdk_ambigu:
+        else:
+            nilai_minsdk = literal[0]
+    if nilai_minsdk is None and not minsdk_ambigu:
         # Bentuk variabel (issue #212): 'minSdk = minSdkVersi' dengan
         # 'val minSdkVersi = 23' di berkas yang sama diselesaikan ke
         # nilainya — refactor sah yang memusatkan angka SDK tidak lagi
@@ -651,30 +719,39 @@ def cek_aturan_repo(gagal, berubah):
             # Semua definisi dinilai (issue #229): definisi pertama menang
             # dulu kalah oleh shadowing val lokal bernilai lain (false
             # accept). Nilai yang berbeda-beda = ambigu -> gagal-tertutup
-            # dengan pesan jelas, bukan menebak salah satu.
-            semua = re.findall(
-                r"(?:val|var)\s+" + nama + r"\s*(?::\s*Int\s*)?=\s*(\d+)",
-                bersih_teks)
+            # dengan pesan jelas, bukan menebak salah satu. Nilai
+            # definisi boleh ekspresi konstan juga (issue #333).
+            semua = []
+            for rhs in re.findall(
+                    r"(?:val|var)\s+" + nama +
+                    r"\s*(?::\s*Int\s*)?=\s*([^\n;]+)", bersih_teks):
+                v = nilai_konstanta(rhs.strip())
+                if v is not None:
+                    semua.append(v)
             # Definisi delegasi 'by lazy { 23 }' ikut dinilai (issue
             # #256): tanpa ini refactor lazy yang sah ditolak sebagai
             # tak ditemukan, dan definisi lazy bayangan bernilai lain
             # lolos dari cek ambigu di bawah.
-            semua += re.findall(
-                r"(?:val|var)\s+" + nama +
-                r"\s*(?::\s*Int\s*)?by\s+lazy\s*\{\s*(\d+)",
-                bersih_teks)
+            for rhs in re.findall(
+                    r"(?:val|var)\s+" + nama +
+                    r"\s*(?::\s*Int\s*)?by\s+lazy\s*\{\s*([^\n}]+)",
+                    bersih_teks):
+                v = nilai_konstanta(rhs.strip())
+                if v is not None:
+                    semua.append(v)
             if len(set(semua)) > 1:
                 gagal.append(
                     "definisi %s ambigu (nilai %s) — kunci minSdk menolak "
                     "menebak di antara definisi ganda/shadowing"
-                    % (via.group(1), ", ".join(sorted(set(semua)))))
+                    % (via.group(1),
+                       ", ".join(str(v) for v in sorted(set(semua)))))
                 minsdk_ambigu = True
             elif semua:
-                cocok = re.match(r"(\d+)", semua[0])
-    if not cocok and not minsdk_ambigu and os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
+                nilai_minsdk = semua[0]
+    if nilai_minsdk is None and not minsdk_ambigu and os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
         gagal.append("minSdk tak ditemukan di app/build.gradle.kts — kunci minSdk tak bisa diverifikasi")
-    if cocok and int(cocok.group(1)) != 23:
-        gagal.append("minSdk %s != 23 (aturan: tetap Android 6+, keputusan owner 2026-10-28)" % cocok.group(1))
+    if nilai_minsdk is not None and nilai_minsdk != 23:
+        gagal.append("minSdk %s != 23 (aturan: tetap Android 6+, keputusan owner 2026-10-28)" % nilai_minsdk)
     for path in berubah:
         rendah = path.lower()
         if "values-night" in rendah:
