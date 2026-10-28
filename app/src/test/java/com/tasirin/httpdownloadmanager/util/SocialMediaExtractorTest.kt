@@ -691,6 +691,17 @@ class SocialMediaExtractorTest {
             "google.com", "google.com.evil.com"))
         assertFalse(SocialMediaExtractor.cookieJarVisible("", "x.com"))
         assertFalse(SocialMediaExtractor.cookieJarVisible("x.com", ""))
+        // Akhiran publik dua lapis (#285): a.co.uk dan b.co.uk adalah
+        // dua pemilik berbeda; subdomain satu domain teregistrasi sama
+        // tetap satu induk.
+        assertFalse(SocialMediaExtractor.cookieJarVisible("a.co.uk", "b.co.uk"))
+        assertTrue(SocialMediaExtractor.cookieJarVisible(
+            "a.example.co.uk", "b.example.co.uk"))
+        assertFalse(SocialMediaExtractor.cookieJarVisible(
+            "tenant1.github.io", "tenant2.github.io"))
+        // Alamat IP hanya terlihat oleh dirinya sendiri (#285).
+        assertFalse(SocialMediaExtractor.cookieJarVisible("10.0.0.7", "192.168.0.7"))
+        assertTrue(SocialMediaExtractor.cookieJarVisible("10.0.0.7", "10.0.0.7"))
     }
 
     @Test

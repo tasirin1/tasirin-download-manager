@@ -229,19 +229,54 @@ object SocialMediaExtractor {
     }
 
     /** Cookie yang dipasang [setHost] boleh dikirim ke [targetHost] hanya
-     *  bila host sama atau berbagi domain induk yang sama (dua label
-     *  terakhir, mis. drive.google.com -> drive.usercontent.google.com).
+     *  bila host sama atau berbagi domain TEREGISTRASI yang sama
+     *  (mis. drive.google.com -> drive.usercontent.google.com).
      *  Tanpa scoping ini jar fetchDrive mengirim cookie ke host redirect
-     *  mana pun (#239). Aproksimasi sadar: akhiran publik dua lapis
-     *  (co.uk dsb.) dianggap satu induk. Murni. */
+     *  mana pun (#239). Murni. */
     internal fun cookieJarVisible(setHost: String, targetHost: String): Boolean {
         val s = setHost.trim().lowercase(Locale.ROOT)
         val t = targetHost.trim().lowercase(Locale.ROOT)
         if (s.isEmpty() || t.isEmpty()) return false
         if (s == t) return true
-        val sd = s.split('.').takeLast(2).joinToString(".")
-        val td = t.split('.').takeLast(2).joinToString(".")
+        // Alamat IP tidak punya domain induk (#285): dua IP berbeda yang
+        // dua oktet terakhirnya sama (10.0.0.7 vs 192.168.0.7) dulu
+        // dianggap satu induk oleh potongan dua label.
+        if (isIpv4Literal(s) || isIpv4Literal(t)) return false
+        val sd = registrableDomainOf(s)
+        val td = registrableDomainOf(t)
         return sd == td && sd.contains('.')
+    }
+
+    /** Akhiran publik dua lapis yang umum: di bawah akhiran ini domain
+     *  teregistrasi adalah TIGA label (a.co.uk dan b.co.uk adalah dua
+     *  pemilik berbeda; example.co.uk satu pemilik). Daftar kurasi
+     *  sebagian, bukan daftar suffix publik lengkap. */
+    private val TWO_LEVEL_PUBLIC_SUFFIXES = setOf(
+        "co.uk", "org.uk", "ac.uk", "gov.uk",
+        "com.au", "net.au", "org.au",
+        "co.id", "or.id", "ac.id", "go.id", "web.id",
+        "co.in", "co.jp", "co.kr", "com.br", "com.cn", "com.tw",
+        "co.nz", "co.za", "github.io"
+    )
+
+    /** Domain teregistrasi [host]: dua label terakhir, atau tiga bila
+     *  dua label terakhirnya akhiran publik dua lapis (#285). */
+    private fun registrableDomainOf(host: String): String {
+        val labels = host.split('.')
+        val last2 = labels.takeLast(2).joinToString(".")
+        return if (last2 in TWO_LEVEL_PUBLIC_SUFFIXES) {
+            labels.takeLast(3).joinToString(".")
+        } else {
+            last2
+        }
+    }
+
+    private fun isIpv4Literal(host: String): Boolean {
+        val parts = host.split('.')
+        return parts.size == 4 && parts.all { part ->
+            part.isNotEmpty() && part.length <= 3 &&
+                part.all { c -> c.isDigit() } && part.toInt() <= 255
+        }
     }
 
     fun isSocialMediaUrl(url: String): Boolean {
