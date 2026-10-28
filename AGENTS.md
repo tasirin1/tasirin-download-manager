@@ -42,7 +42,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── CONTRIBUTING.md                   # Panduan kontribusi singkat (baca juga AGENTS.md)
 ├── .githooks/pre-commit              # Hook opsional: check_repo.py --pre-commit
 ├── gradle/libs.versions.toml          # Version catalog — pusat versi dependensi & plugin
-├── app/build.gradle.kts              # minSdk 21 / targetSdk 36, compileSdk 36, desugaring, R8
+├── app/build.gradle.kts              # minSdk 23 / targetSdk 36, compileSdk 37, desugaring, R8
 ├── CHANGELOG.md                       # Riwayat perubahan per rilis (update manual)
 ├── docs/index.html                    # WEBSITE GitHub Pages (satu file; deploy otomatis dari /docs)
 ├── docs/site.webmanifest             # PWA manifest (installable)
@@ -171,7 +171,9 @@ kuat dan tanpa diskusi:
   dan dependency test zxing sudah tidak ada. JANGAN hidupkan kembali tanpa
   alasan kuat dan diskusi.
 - **`values-en`** — tidak ada; default `values/strings.xml` = Inggris.
-- **minSdk** — tetap 21 (Android 5+), jangan naikkan.
+- **minSdk** — 23 (Android 6+). Dinaikkan dari 21 atas keputusan owner
+  2026-10-28 (syarat appcompat 1.8, PR #116); dukungan Android 5 berakhir.
+  Jangan diubah lagi tanpa keputusan owner.
 - **Tombol tab Downloads** — butuh handler klik sendiri (pola
   `tabGallery`/`tabFiles`); jangan hapus handler-nya.
 - **`fmtDate`** — hanya SATU definisi di `remote.src.html` (dua definisi
@@ -493,6 +495,9 @@ jangan digabung dengan PR fitur lain.
   update angka di sini supaya sama dengan `gradle-wrapper.properties`
   dan `gradle/libs.versions.toml` (dijaga `check_repo.py`).
 - **Fase 2a — selesai**: `compileSdk 36`.
+- **Fase 2c — selesai**: `compileSdk 37` (syarat androidx.core 1.19.1; masuk
+  lewat PR #116 atas keputusan owner 2026-10-28). `targetSdk` tetap 36 —
+  keputusan naik ke `targetSdk 37` tetap terpisah dan opsional.
 - **Fase 2b — selesai**: `targetSdk 35`.
   - **FGS dari `BOOT_COMPLETED`**: `dataSync` FGS dilarang start langsung dari
     receiver boot — `BootReceiver` kini menjadwalkan `BootResumeJobService`

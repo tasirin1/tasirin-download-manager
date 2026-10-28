@@ -7,15 +7,17 @@ plugins {
 
 android {
     namespace = "com.tasirin.httpdownloadmanager"
-    // compileSdk 36 / targetSdk 36 (Android 16): unblocks lifecycle 2.11 / activity 1.13.
+    // compileSdk 37 / targetSdk 36: compileSdk 37 disyaratkan androidx.core
+    // 1.19.1 (PR #116, keputusan owner 2026-10-28); targetSdk tetap 36.
     // Perilaku runtime baru aktif saat targetSdk naik — lihat AGENTS.md.
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.tasirin.httpdownloadmanager"
-        minSdk = 21
-        // targetSdk 36: Android 5 (minSdk 21) tetap didukung penuh.
-        // Android 5–10: WRITE_EXTERNAL_STORAGE + legacy storage bekerja penuh.
+        minSdk = 23
+        // targetSdk 36: Android 6 (minSdk 23) tetap didukung penuh; minSdk
+        // naik 21 -> 23 atas keputusan owner 2026-10-28 (syarat appcompat 1.8).
+        // Android 6–10: WRITE_EXTERNAL_STORAGE + legacy storage bekerja penuh.
         // Android 11+: MANAGE_EXTERNAL_STORAGE ("Akses semua file").
         // targetSdk 35+: boot-start download lewat JobScheduler (BootResumeJobService)
         // karena dataSync FGS dilarang start dari BOOT_COMPLETED; edge-to-edge
