@@ -178,7 +178,7 @@ def himpun_definisi():
     return definisi, acuan
 
 
-def cek_xml(gagal, basis_desc):
+def cek_xml(gagal):
     buruk = []
     for path in jalan_repo(os.path.join("app", "src", "main", "res"), ext=(".xml",)):
         try:
@@ -254,7 +254,7 @@ def cek_duplikat_definisi(gagal):
             gagal.append("Definisi ganda di %s: %s" % (path, ", ".join(ganda[:5])))
 
 
-def berkas_dihapus(rentang, diff_biasa):
+def berkas_dihapus(rentang):
     if rentang and ("..." in rentang or ".." in rentang):
         for pemisah in ("...", ".."):
             if pemisah in rentang:
@@ -816,8 +816,9 @@ def cek_import_mati(gagal):
                 continue
             nama = jalan_imp.split(".")[-1]
             if not re.search(r"\b%s\b" % re.escape(nama), tanpa):
+                # Tanpa break (#295): SEMUA import mati di berkas ini
+                # dilaporkan sekaligus, bukan hanya yang pertama.
                 gagal.append("Import mati di %s: %s" % (path, jalan_imp))
-                break
 
 
 def disebut_di_uji(nama):
@@ -863,7 +864,7 @@ def cek_remote_dm(gagal):
         pass
 
 
-def cek_pola_berisiko(peringatan, diff, berubah):
+def cek_pola_berisiko(peringatan, diff):
     for _, isi in tambah_kt(diff):
         if "System.out.println" in isi:
             peringatan.append("println di diff (pakai Log/buffer): " + isi.strip()[:80])
@@ -951,7 +952,7 @@ def utama():
                 + "\n".join("+" + baris for baris in isi.splitlines())
             )
 
-    cek_xml(gagal, "")
+    cek_xml(gagal)
     cek_acuan_yatim(gagal)
     cek_manifest(gagal)
     cek_duplikat_definisi(gagal)
@@ -960,7 +961,7 @@ def utama():
     cek_aturan_repo(gagal, berubah)
     cek_larangan_hidup_lagi(gagal, diff)
     cek_kurung(gagal, berubah)
-    hapus = berkas_dihapus(args.rentang, diff)
+    hapus = berkas_dihapus(args.rentang)
     if not args.rentang:
         keluar = jalan("git", "diff", "--cached", "--name-status") or ""
         hapus += [x.split(None, 1)[1] for x in keluar.splitlines() if x.startswith("D")]
@@ -974,7 +975,7 @@ def utama():
         cek_hapusan_belum_tercatat(peringatan, diff)
         cek_uji_baru(peringatan, diff)
         cek_uji_ubah(peringatan, diff)
-        cek_pola_berisiko(peringatan, diff, berubah)
+        cek_pola_berisiko(peringatan, diff)
         cek_pola_boros(peringatan, diff)
         cek_izin_baru(peringatan, diff)
         cek_definisi_baru(peringatan, diff)
