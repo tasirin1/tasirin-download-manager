@@ -698,7 +698,10 @@ class DownloadEngine(appContext: Context) {
 
     fun clearFailed() {
         // Hanya membersihkan daftar item gagal; file parsial ikut dibersihkan.
-        val failed = _items.value.filter { it.state == DownloadState.FAILED }
+        // CANCELLED ikut (issue #556): sejajar grup seksi "Failed".
+        val failed = _items.value.filter {
+            it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED
+        }
         failed.forEach { item ->
             retryAttempts.remove(item.id)
             pendingRetries.remove(item.id)
@@ -1095,7 +1098,12 @@ class DownloadEngine(appContext: Context) {
     fun retryFailed() {
         // Batch: satu salinan daftar + satu emisi StateFlow, bukan N kali
         // updateItem saat pengguna menekan Retry Failed (sama seperti pauseAll).
-        val ids = _items.value.filter { it.state == DownloadState.FAILED }.map { it.id }
+        // CANCELLED ikut (issue #556): grup seksi "Failed" di daftar
+        // memang menampung FAILED + CANCELLED, jadi aksi massalnya
+        // harus menjangkau isi grup yang sama.
+        val ids = _items.value.filter {
+            it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED
+        }.map { it.id }
         if (ids.isEmpty()) return
         val idSet = ids.toSet()
         ids.forEach { id ->
@@ -1108,7 +1116,8 @@ class DownloadEngine(appContext: Context) {
                 // snapshot yang sudah di-resume manual lalu selesai
                 // tidak boleh dipaksa PENDING lagi (unduh ulang ganda).
                 val stillTarget = item.id in idSet &&
-                    item.state == DownloadState.FAILED
+                    (item.state == DownloadState.FAILED ||
+                        item.state == DownloadState.CANCELLED)
                 if (stillTarget) {
                     item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
                 } else {

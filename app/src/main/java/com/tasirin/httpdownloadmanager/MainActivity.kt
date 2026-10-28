@@ -1664,7 +1664,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             when (item.state) {
                 DownloadState.DOWNLOADING, DownloadState.PENDING -> active++
                 DownloadState.PAUSED -> paused++
-                DownloadState.FAILED -> failed++
+                // CANCELLED terhitung ember yang sama (issue #556):
+                // grup seksi "Failed" menampung keduanya, jadi header,
+                // ringkasan toolbar, dan visibilitas aksi massal harus
+                // memakai hitungan yang sama.
+                DownloadState.FAILED, DownloadState.CANCELLED -> failed++
                 DownloadState.COMPLETED -> done++
                 else -> {}
             }
