@@ -2904,11 +2904,28 @@ class DownloadEngine(appContext: Context) {
                 // Format: #EXTINF:<durasi>, atau #EXTINF:<durasi>, ...
                 val dur = line.substringAfter(":").substringBefore(",").trim()
                     .toDoubleOrNull() ?: 0.0
-                val url = HlsParser.resolveUrl(playlistUrl, lines.getOrNull(i + 1)?.trim().orEmpty())
-                if (url.startsWith("http")) {
-                    result.add(url to hlsSegmentDurationUs(dur))
+                // URI segmen adalah baris non-kosong non-tag BERIKUTNYA
+                // (issue #387): asumsi lama "tepat di baris sesudahnya"
+                // membuat baris kosong/tag di tengah (mis.
+                // #EXT-X-PROGRAM-DATE-TIME dari sebagian CDN) melewatkan
+                // segmen asli — dan untuk baris kosong, resolveUrl
+                // mengembalikan URL playlist itu sendiri sehingga playlist
+                // terunduh sebagai segmen. Durasi hanya dicatat berpasangan
+                // dengan URI yang benar-benar ditemukan.
+                var j = i + 1
+                while (j < lines.size) {
+                    val next = lines[j].trim()
+                    if (next.isNotEmpty() && !next.startsWith("#")) break
+                    j++
                 }
-                i += 2; continue
+                if (j < lines.size) {
+                    val url = HlsParser.resolveUrl(playlistUrl, lines[j].trim())
+                    if (url.startsWith("http")) {
+                        result.add(url to hlsSegmentDurationUs(dur))
+                    }
+                    i = j + 1; continue
+                }
+                i = j; continue
             }
             i++
         }
