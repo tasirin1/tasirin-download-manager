@@ -1499,9 +1499,16 @@ object SocialMediaExtractor {
     internal fun driveDownloadUrl(fileId: String): String =
         "https://drive.google.com/uc?export=download&id=$fileId"
 
+    // Semua rentang dibatasi (issue #350): pola tak terbatas bersifat
+    // kuadratik pada HTML berisi banyak "<form " tanpa penutup (tiap
+    // posisi awal findAll memindai ulang jauh ke depan), dan
+    // withTimeoutOrNull tidak bisa menginterupsi loop regex. Batasnya
+    // jauh di atas ukuran form perantara Drive nyata (tag < 1KB, isi
+    // form hanya beberapa field tersembunyi) dan hasil parse terbukti
+    // setara untuk halaman realistis.
     private val GD_FORM_BLOCK_RE =
         Regex(
-            "<form[^>]+action=\"([^\"]+)\"[^>]*>(.*?)(?:</form>|$)",
+            "<form[^>]{0,1024}?action=\"([^\"]+)\"[^>]{0,1024}?>(.{0,16384}?)(?:</form>|$)",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
         )
     private val GD_FORM_FIELD_A_RE =
