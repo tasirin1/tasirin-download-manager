@@ -313,7 +313,12 @@ jobs:
             CUR_PATCH="${CUR_VER##*.}"
             case "$CUR_MINOR" in *[!0-9]*|"") CUR_MINOR=0 ;; esac
             case "$CUR_PATCH" in *[!0-9]*|"") CUR_PATCH=0 ;; esac
-            CUR_NUM=$((CUR_MINOR * 1000 + CUR_PATCH))
+            # Paksa basis-10 (10#): komponen tag manual ber-nol-di-depan
+            # (mis. v1.08.1) ditafsir bash sebagai oktal dan melempar
+            # "value too great for base" yang mematikan langkah ini
+            # sebelum rilis dibuat (issue #354). Penjaga case di atas
+            # sudah memastikan keduanya murni digit sebelum baris ini.
+            CUR_NUM=$((10#$CUR_MINOR * 1000 + 10#$CUR_PATCH))
             if [ "${{ github.run_number }}" -lt "$CUR_NUM" ]; then
               LATEST_ARGS=""
               echo "Build ${{ github.run_number }} lebih lama dari latest saat ini ($CURRENT_LATEST) - rilis dibuat TANPA --latest."
