@@ -504,7 +504,14 @@ class DownloadEngine(appContext: Context) {
             val idSet = ids.toSet()
             updateTransformed { daftar ->
                 daftar.map { item ->
-                    if (item.id in idSet) {
+                    // Cek ulang status SEGAR di dalam kunci (pola #220):
+                    // item yang berubah sejak filter snapshot (mis. baru
+                    // selesai/di-pause pengguna) tidak dipaksa PENDING.
+                    val stillTarget = item.id in idSet && item.autoResume &&
+                        (item.state == DownloadState.PAUSED ||
+                            item.state == DownloadState.PENDING ||
+                            item.state == DownloadState.DOWNLOADING)
+                    if (stillTarget) {
                         item.copy(state = DownloadState.PENDING, autoResume = true)
                     } else {
                         item
@@ -838,7 +845,13 @@ class DownloadEngine(appContext: Context) {
         val ids = targets.map { it.id }.toSet()
         updateTransformed { daftar ->
             daftar.map { item ->
-                if (item.id in ids) {
+                // Cek ulang status SEGAR (pola #220): item yang selesai
+                // atau sudah ter-pause di antara filter dan transform
+                // tidak dipaksa dari snapshot basi.
+                val stillTarget = item.id in ids &&
+                    (item.state == DownloadState.DOWNLOADING ||
+                        item.state == DownloadState.PENDING)
+                if (stillTarget) {
                     item.copy(
                         state = DownloadState.PAUSED,
                         autoResume = false,
@@ -955,7 +968,12 @@ class DownloadEngine(appContext: Context) {
         }
         updateTransformed { daftar ->
             daftar.map { item ->
-                if (item.id in idSet) {
+                // Cek ulang status SEGAR (pola #220): item FAILED dari
+                // snapshot yang sudah di-resume manual lalu selesai
+                // tidak boleh dipaksa PENDING lagi (unduh ulang ganda).
+                val stillTarget = item.id in idSet &&
+                    item.state == DownloadState.FAILED
+                if (stillTarget) {
                     item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
                 } else {
                     item
@@ -994,7 +1012,12 @@ class DownloadEngine(appContext: Context) {
         }
         updateTransformed { daftar ->
             daftar.map { item ->
-                if (item.id in idSet) {
+                // Cek ulang status SEGAR (pola #220): pemicu otomatis
+                // NetworkCallback tidak boleh menghidupkan lagi item
+                // yang sudah selesai/diambil alih sejak snapshot.
+                val stillTarget = item.id in idSet && item.autoResume &&
+                    item.state == DownloadState.PAUSED
+                if (stillTarget) {
                     item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
                 } else {
                     item
