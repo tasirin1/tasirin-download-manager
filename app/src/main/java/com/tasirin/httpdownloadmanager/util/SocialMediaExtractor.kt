@@ -1406,27 +1406,31 @@ object SocialMediaExtractor {
     private val GD_NAME_RE =
         Regex("""<span class="uc-name-size"[^>]*>\s*<a[^>]*>([^<]+)</a>""", RegexOption.IGNORE_CASE)
 
-    /** Nama berkas yang ditampilkan halaman perantara Drive. Murni. */
+    /** Nama berkas yang ditampilkan halaman perantara Drive. Murni.
+     *  Ini nama berkas ASLI (bukan judul halaman), jadi dibersihkan
+     *  FileNames.safe seperti nama unduhan biasa — spasi/unicode utuh,
+     *  bukan sanitizeFileName judul yang mengubah spasi jadi garis bawah. */
     internal fun parseDriveDisplayName(html: String): String? =
         GD_NAME_RE.find(html)?.groupValues?.get(1)?.trim()
-            ?.takeIf { it.isNotEmpty() }?.let { sanitizeFileName(it) }
+            ?.takeIf { it.isNotEmpty() }?.let { FileNames.safe(it) }
 
     private val GD_CD_STAR_RE = Regex("""filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)""")
     private val GD_CD_NAME_RE = Regex("""filename\s*=\s*"([^"]+)"|filename\s*=\s*([^;\s]+)""")
 
     /** Nama berkas dari header Content-Disposition (bentuk filename*=
-     *  RFC 5987 didahulukan dari filename= biasa). Murni. */
+     *  RFC 5987 didahulukan dari filename= biasa). Murni. Nama asli dari
+     *  server: dibersihkan FileNames.safe seperti unduhan biasa. */
     internal fun parseContentDispositionFileName(cd: String?): String? {
         if (cd.isNullOrBlank()) return null
         GD_CD_STAR_RE.find(cd)?.let { m ->
             runCatching { java.net.URLDecoder.decode(m.groupValues[1].trim(), "UTF-8") }
                 .getOrNull()?.takeIf { it.isNotBlank() }
-                ?.let { return sanitizeFileName(it) }
+                ?.let { return FileNames.safe(it) }
         }
         val raw = GD_CD_NAME_RE.find(cd)?.let { m ->
             m.groupValues[1].ifEmpty { m.groupValues[2] }
         }?.trim() ?: return null
-        return raw.takeIf { it.isNotEmpty() }?.let { sanitizeFileName(it) }
+        return raw.takeIf { it.isNotEmpty() }?.let { FileNames.safe(it) }
     }
 
     /** Hasil fetch Drive: header respons akhir + body hanya bila HTML. */
