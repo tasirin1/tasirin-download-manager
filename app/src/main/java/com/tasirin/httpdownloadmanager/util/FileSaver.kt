@@ -572,7 +572,17 @@ class FileSaver(context: Context) {
                     if (Build.VERSION.SDK_INT >= 29 && uri.authority == MediaStore.AUTHORITY) {
                         val rel = mediaRelativePath(uri)?.trim('/')
                         val finalName = if (rel != null) {
-                            uniqueMediaStoreName(clean, rel)
+                            // Cek keunikan di koleksi tempat berkas BENAR-
+                            // BENAR hidup (issue #403): default Downloads
+                            // membuat nama yang sudah dipakai di Movies
+                            // (koleksi Video) dinyatakan bebas, sehingga
+                            // rename menghasilkan dua berkas bernama sama
+                            // persis di folder yang sama. Pola sama seperti
+                            // saveToMediaStore yang meneruskan koleksinya.
+                            uniqueMediaStoreName(
+                                clean, rel,
+                                MediaLibrary.mediaCollectionFor(rel, MimeTypes.forFile(clean))
+                            )
                         } else {
                             clean
                         }
