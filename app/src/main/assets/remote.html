@@ -1498,7 +1498,7 @@ if (it.kind === 'file') {
 meta = fmt(it.size);
 if (it.modified > 0) meta += ' \u00b7 ' + fmtDate(it.modified);
 } else if (it.itemCount >= 0) {
-meta = it.itemCount + ' item';
+meta = it.itemCount + (it.sizeTruncated ? '+' : '') + ' item';
 if (it.totalSize > 0) meta += ' \u00b7 ' + fmt(it.totalSize) + (it.sizeTruncated ? '+' : '');
 }
 const sel = fsSelectMode && fsSelected.has(it);
@@ -1732,10 +1732,12 @@ function updateFsBatch() {
 fsBatch.classList.toggle('hidden', fsSelected.size === 0);
 document.getElementById('fsBatchCount').textContent = fsSelected.size + ' selected';
 let total = 0;
+let approx = false;
 fsSelected.forEach(function (it) {
 total += (it.kind === 'file' ? it.size : (it.totalSize || 0)) || 0;
+if (it.kind !== 'file' && it.sizeTruncated) approx = true;
 });
-document.getElementById('fsBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt(total) : '';
+document.getElementById('fsBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt(total) + (approx ? '+' : '') : '';
 document.getElementById('fsBatchAll').textContent = (fsItems || []).length > 0 && fsSelected.size === fsItems.length ? 'Cancel all' : 'Select all';
 }
 function resetFsSelection() {
@@ -2178,7 +2180,7 @@ const b = document.createElement('button');
 b.type = 'button';
 b.className = 'move-folder';
 let meta = '';
-if (it.itemCount >= 0) meta = '<span class="mv-meta">' + it.itemCount + ' item</span>';
+if (it.itemCount >= 0) meta = '<span class="mv-meta">' + it.itemCount + (it.sizeTruncated ? '+' : '') + ' item</span>';
 b.innerHTML = '<span class="mv-ico">\u{1F4C1}</span><span class="mv-name">' + escapeHtml(it.name) + '</span>' + meta;
 b.addEventListener('click', function () { movePickOpen(it.path); });
 list.appendChild(b);
