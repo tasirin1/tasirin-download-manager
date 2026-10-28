@@ -482,8 +482,35 @@ TERLARANG_KEMBALI = [
 
 
 def cek_aturan_repo(gagal, berubah):
-    tetap = baca("app/build.gradle.kts")
-    cocok = re.search(r"minSdk\s*=\s*(\d+)", tetap)
+    # Fail-closed (issue #190): berkas hilang/kosong tidak boleh membuat
+    # kunci minSdk terlewati diam-diam, dan komentar tidak boleh menyamar
+    # sebagai penetapan minSdk (regex lama mengambil kecocokan pertama
+    # termasuk dari komentar '// minSdk = 23').
+    if not os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
+        gagal.append("app/build.gradle.kts tak ditemukan — kunci minSdk tak bisa diverifikasi")
+        tetap = ""
+    else:
+        tetap = baca("app/build.gradle.kts")
+    bersih = []
+    dalam_blok = False
+    for baris in tetap.splitlines():
+        if dalam_blok:
+            if "*/" in baris:
+                baris = baris.split("*/", 1)[1]
+                dalam_blok = False
+            else:
+                continue
+        if "/*" in baris:
+            kepala, _, sisa = baris.partition("/*")
+            if "*/" in sisa:
+                baris = kepala + sisa.split("*/", 1)[1]
+            else:
+                baris = kepala
+                dalam_blok = True
+        bersih.append(baris.split("//", 1)[0])
+    cocok = re.search(r"minSdk\s*=\s*(\d+)", "\n".join(bersih))
+    if not cocok and os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
+        gagal.append("minSdk tak ditemukan di app/build.gradle.kts — kunci minSdk tak bisa diverifikasi")
     if cocok and int(cocok.group(1)) != 23:
         gagal.append("minSdk %s != 23 (aturan: tetap Android 6+, keputusan owner 2026-10-28)" % cocok.group(1))
     for path in berubah:
