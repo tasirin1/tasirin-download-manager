@@ -23,11 +23,14 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
     name: Verifikasi cepat (tanpa SDK)
+    # Job ini mengeksekusi skrip dari checkout PR — baca saja (issue #185).
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -79,6 +82,9 @@ jobs:
 
   build:
     name: Build APK
+    # Satu-satunya job yang butuh tulis (rilis GitHub) (issue #185).
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     needs: verify
     env:
