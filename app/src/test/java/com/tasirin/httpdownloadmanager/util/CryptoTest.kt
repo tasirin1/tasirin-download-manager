@@ -29,10 +29,13 @@ class CryptoTest {
     @Test
     fun `encrypt kosong tetap kosong dan JVM tanpa keystore jatuh ke plain`() {
         assertEquals("", Crypto.encrypt(""))
-        // Unit JVM: SDK_INT=0 sehingga jalur API 21-22 (plain by-design),
-        // bukan jalur gagal yang menaikkan flag.
+        // Unit JVM: AndroidKeyStore tidak tersedia di JVM polos, jadi
+        // enkripsi jatuh ke fallback plaintext DAN menaikkan flag-nya.
+        // Jalur API 21-22 plain-by-design dari era minSdk 21 sudah tidak
+        // ada sejak minSdk 23: encrypt selalu mencoba Keystore lebih
+        // dulu. consume... juga me-reset flag agar uji lain bersih.
         assertEquals("plain:x", Crypto.encrypt("x"))
-        assertTrue(!Crypto.encryptFallbackUsed)
+        assertTrue(Crypto.consumeEncryptFallbackUsed())
     }
 
     @Test
