@@ -500,7 +500,10 @@ def cek_aturan_repo(gagal, berubah):
     # pola seperti "/*" atau "//" DI DALAM string tidak dianggap
     # komentar — stripper baris sebelumnya masuk mode blok palsu dan
     # menelan penetapan minSdk asli. Komentar sungguhan (termasuk
-    # spoof '// minSdk = 23') tetap terhapus.
+    # spoof '// minSdk = 23') tetap terhapus. ISI string dikosongkan
+    # (issue #225): teks bersih ini hanya dipakai kunci minSdk, dan
+    # string berisi 'minSdk = 23' sebelum penetapan asli dulu menipu
+    # regex kecocokan pertama menjadi false accept.
     def strip_komentar(teks):
         out = []
         i, n = 0, len(teks)
@@ -508,14 +511,14 @@ def cek_aturan_repo(gagal, berubah):
             if teks.startswith('"""', i):
                 j = teks.find('"""', i + 3)
                 j = n if j < 0 else j + 3
-                out.append(teks[i:j])
+                out.append('""')
                 i = j
             elif teks[i] == '"':
                 j = i + 1
                 while j < n and teks[j] != '"':
                     j += 2 if teks[j] == "\\" else 1
                 j = min(j + 1, n)
-                out.append(teks[i:j])
+                out.append('""')
                 i = j
             elif teks.startswith("//", i):
                 j = teks.find("\n", i)
