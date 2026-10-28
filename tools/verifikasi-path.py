@@ -562,6 +562,7 @@ def cek_aturan_repo(gagal, berubah):
 
     bersih_teks = strip_komentar(tetap)
     cocok = re.search(r"minSdk\s*=\s*(\d+)", bersih_teks)
+    minsdk_ambigu = False
     if not cocok:
         # Bentuk variabel (issue #212): 'minSdk = minSdkVersi' dengan
         # 'val minSdkVersi = 23' di berkas yang sama diselesaikan ke
@@ -571,10 +572,24 @@ def cek_aturan_repo(gagal, berubah):
         via = re.search(r"minSdk\s*=\s*([A-Za-z_][\w.]*)", bersih_teks)
         if via:
             nama = re.escape(via.group(1).rsplit(".", 1)[-1])
-            cocok = re.search(
+            # Semua definisi dinilai (issue #229): definisi pertama menang
+            # dulu kalah oleh shadowing val lokal bernilai lain (false
+            # accept). Nilai yang berbeda-beda = ambigu -> gagal-tertutup
+            # dengan pesan jelas, bukan menebak salah satu.
+            semua = re.findall(
                 r"(?:val|var)\s+" + nama + r"\s*(?::\s*Int\s*)?=\s*(\d+)",
                 bersih_teks)
-    if not cocok and os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
+            if len(set(semua)) > 1:
+                gagal.append(
+                    "definisi %s ambigu (nilai %s) — kunci minSdk menolak "
+                    "menebak di antara definisi ganda/shadowing"
+                    % (via.group(1), ", ".join(sorted(set(semua)))))
+                minsdk_ambigu = True
+            elif semua:
+                cocok = re.search(
+                    r"(?:val|var)\s+" + nama + r"\s*(?::\s*Int\s*)?=\s*(\d+)",
+                    bersih_teks)
+    if not cocok and not minsdk_ambigu and os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
         gagal.append("minSdk tak ditemukan di app/build.gradle.kts — kunci minSdk tak bisa diverifikasi")
     if cocok and int(cocok.group(1)) != 23:
         gagal.append("minSdk %s != 23 (aturan: tetap Android 6+, keputusan owner 2026-10-28)" % cocok.group(1))
