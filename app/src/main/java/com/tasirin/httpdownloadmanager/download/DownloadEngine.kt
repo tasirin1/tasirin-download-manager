@@ -1140,14 +1140,21 @@ class DownloadEngine(appContext: Context) {
             n != item.fileName && _items.value.any { it.fileName == n }
         }
         if (clean.isBlank() || clean == item.fileName) return false
-        val newPath = fileSaver.rename(item, clean)
-        if (newPath != null) {
+        val renamed = fileSaver.rename(item, clean)
+        if (renamed != null) {
             // FileSaver.rename mengembalikan URI untuk item MediaStore/SAF dan
             // path untuk file: salah kolom membuat serveFile gagal (File("content://…")
-            // tak ada -> notFound tanpa mencoba contentUri).
+            // tak ada -> notFound tanpa mencoba contentUri). Nama yang dicatat
+            // adalah nama AKTUAL hasil rename (bisa diunikkkan lagi di dalam
+            // FileSaver terhadap berkas asing), bukan nama yang diminta
+            // (issue #458).
+            val actualName = renamed.fileName ?: clean
             updateItem(id) {
-                if (!it.contentUri.isNullOrEmpty()) it.copy(fileName = clean, contentUri = newPath)
-                else it.copy(fileName = clean, filePath = newPath)
+                if (!it.contentUri.isNullOrEmpty()) {
+                    it.copy(fileName = actualName, contentUri = renamed.contentUri ?: it.contentUri)
+                } else {
+                    it.copy(fileName = actualName, filePath = renamed.filePath ?: it.filePath)
+                }
             }
             return true
         }

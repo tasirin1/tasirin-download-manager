@@ -617,9 +617,11 @@ class FileSaver(context: Context) {
         }
     }
 
-    /** Rename file di disk/MediaStore. Kembalikan path/URI baru bila berhasil
-     *  (dipakai DownloadEngine untuk update DownloadItem.filePath). */
-    fun rename(item: DownloadItem, newName: String): String? {
+    /** Rename file di disk/MediaStore. Kembalikan PublishResult berisi
+     *  path/URI baru DAN nama aktual bila berhasil: nama bisa diunikkkan
+     *  lagi di dalam sini terhadap berkas asing (bukan hanya item lain),
+     *  dan nama hasil unik itu wajib sampai ke catatan item (issue #458). */
+    fun rename(item: DownloadItem, newName: String): PublishResult? {
         // Sanitasi: nama dari dialog user bisa mengandung '/' sehingga File(parent, name)
         // lolos ke subpath dan fileName tersimpan merusak pemetaan partialFile.
         val clean = FileNames.safe(newName.trim())
@@ -659,10 +661,10 @@ class FileSaver(context: Context) {
                             put(MediaStore.Downloads.DISPLAY_NAME, finalName)
                         }
                         val ok = appContext.contentResolver.update(uri, values, null, null) > 0
-                        if (ok) item.contentUri else null
+                        if (ok) PublishResult(contentUri = item.contentUri, fileName = finalName) else null
                     } else {
                         val newUri = DocumentsContract.renameDocument(appContext.contentResolver, uri, clean)
-                        if (newUri != null) newUri.toString() else null
+                        if (newUri != null) PublishResult(contentUri = newUri.toString(), fileName = clean) else null
                     }
                 }
                 !item.filePath.isNullOrEmpty() -> {
@@ -672,7 +674,7 @@ class FileSaver(context: Context) {
                     val target = uniqueTargetFile(File(file.parentFile, clean))
                     if (file.exists() && file.renameTo(target)) {
                         MediaLibrary.notifyMediaChanged(appContext, file.absolutePath, target.absolutePath)
-                        target.absolutePath
+                        PublishResult(filePath = target.absolutePath, fileName = target.name)
                     } else {
                         // Klaim kosong dari uniqueTargetFile tertinggal bila
                         // rename gagal (mis. beda volume): hapus bila masih kosong.
