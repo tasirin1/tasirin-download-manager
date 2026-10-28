@@ -3201,7 +3201,7 @@ class DownloadEngine(appContext: Context) {
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
         val serverEtag = conn.getHeaderField("ETag").orEmpty()
-        val finishedMulti = updateItem(item.id) {
+        val finishedSingle = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = finalName,
@@ -3219,7 +3219,7 @@ class DownloadEngine(appContext: Context) {
         flushSave()
         persistCookies()
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
-        NotificationHelper.notifyItemFinished(context, finishedMulti)
+        NotificationHelper.notifyItemFinished(context, finishedSingle)
         } catch (e: IOException) {
             if (!coroutineContext.isActive) throw CancellationException()
             throw e
@@ -3376,7 +3376,7 @@ class DownloadEngine(appContext: Context) {
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
-        val finishedSingle = updateItem(item.id) {
+        val finishedMulti = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = finalName,
@@ -3397,7 +3397,7 @@ class DownloadEngine(appContext: Context) {
         persistCookies()
         clearSegProgress(item.id)
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
-        NotificationHelper.notifyItemFinished(context, finishedSingle)
+        NotificationHelper.notifyItemFinished(context, finishedMulti)
     }
 
     /** Minta URL CDN segar saat link kedaluwarsa di tengah unduhan:
