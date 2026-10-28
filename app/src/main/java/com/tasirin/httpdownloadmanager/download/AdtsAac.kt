@@ -3,6 +3,7 @@ package com.tasirin.httpdownloadmanager.download
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -116,9 +117,21 @@ object AdtsAac {
         val head = ByteArray(10)
         var headLen = 0
         fun refill() {
+            // Guard zero-read (issue #389): read() = 0 beruntun tak
+            // mengubah headLen sehingga loop ini berputar selamanya;
+            // readExact di berkas ini sudah menjaganya lewat
+            // MAX_ZERO_READS, refill kini setara.
+            var zeroStreak = 0
             while (headLen < 10) {
                 val r = input.read(head, headLen, 10 - headLen)
                 if (r == -1) break
+                if (r == 0) {
+                    if (++zeroStreak >= MAX_ZERO_READS) {
+                        throw IOException("ID3 strip stream stalled (zero reads)")
+                    }
+                    continue
+                }
+                zeroStreak = 0
                 headLen += r
             }
         }

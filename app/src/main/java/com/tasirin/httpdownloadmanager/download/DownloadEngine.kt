@@ -2404,9 +2404,19 @@ class DownloadEngine(appContext: Context) {
                 val input = conn.inputStream
                 try {
                     var bytes = 0L
+                    var zeroStreak = 0
                     while (true) {
                         val read = input.read(buffer)
                         if (read == -1) break
+                        // Guard zero-read (issue #389), pola yang sama
+                        // seperti loop streaming lain di berkas ini.
+                        if (read == 0) {
+                            if (++zeroStreak >= MAX_ZERO_READS) {
+                                throw IOException("adaptive file stalled (zero reads)")
+                            }
+                            continue
+                        }
+                        zeroStreak = 0
                         bytes += read
                         if (bytes > HLS_SEGMENT_MAX_BYTES * 8L) {
                             throw IOException("adaptive file too large")
@@ -2683,9 +2693,21 @@ class DownloadEngine(appContext: Context) {
             val input = segConn.inputStream
             try {
                 BufferedOutputStream(FileOutputStream(spool), BUFFER_SIZE).use { segOut ->
+                    var zeroStreak = 0
                     while (true) {
                         val read = input.read(buffer)
                         if (read == -1) break
+                        // Guard zero-read seperti runSingle/downloadSegment
+                        // (issue #389): tanpa ini stream yang mengembalikan
+                        // 0 beruntun membuat loop busy-spin selamanya —
+                        // jalur HLS tak punya watchdog stall.
+                        if (read == 0) {
+                            if (++zeroStreak >= MAX_ZERO_READS) {
+                                throw IOException("HLS segment stalled (zero reads)")
+                            }
+                            continue
+                        }
+                        zeroStreak = 0
                         segBytes += read
                         if (segBytes > HLS_SEGMENT_MAX_BYTES) {
                             throw IOException("HLS segment too large")

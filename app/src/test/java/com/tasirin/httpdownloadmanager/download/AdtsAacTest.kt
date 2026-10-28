@@ -4,6 +4,7 @@ import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdtsAacTest {
@@ -109,6 +110,22 @@ class AdtsAacTest {
             assertEquals(listOf(100, 100, 100), sizes)
         } finally {
             tmp.delete()
+        }
+    }
+
+    @Test
+    fun `stripId3Stream stream selalu nol - melempar bukan loop selamanya`() {
+        // Kontrak InputStream membolehkan read() = 0; refill tanpa guard
+        // berputar selamanya pada stream seperti ini (issue #389).
+        val zeroStream = object : java.io.InputStream() {
+            override fun read(): Int = 0
+            override fun read(b: ByteArray, off: Int, len: Int): Int = 0
+        }
+        try {
+            AdtsAac.stripId3Stream(zeroStream, java.io.ByteArrayOutputStream())
+            org.junit.Assert.fail("harus melempar IOException zero-read")
+        } catch (e: java.io.IOException) {
+            assertTrue(e.message!!.contains("zero reads"))
         }
     }
 
