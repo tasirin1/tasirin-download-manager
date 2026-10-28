@@ -3803,6 +3803,10 @@ class DownloadEngine(appContext: Context) {
         val copy = ArrayList(cur)
         copy[idx] = next
         update(copy, persist)
+        // URL sosial asli hanya dibaca untuk item yang masih bisa
+        // berjalan ulang; sesudah COMPLETED ia tidak dibaca lagi dan
+        // tidak boleh menetap seumur proses (issue #364).
+        if (next.state == DownloadState.COMPLETED) originalSocialUrls.remove(id)
         return next
     }
 
