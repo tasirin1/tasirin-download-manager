@@ -308,7 +308,14 @@ class DownloadEngine(appContext: Context) {
                 // hanya hidup di memori). Wajib SEBELUM loadGate dibuka
                 // (#262): penunggu gerbang (resume/cleanup) tidak boleh
                 // berjalan bersamaan dengan penukaran berkas di sini.
-                val reconciled = reconcileOrphanedReplacements()
+                // Bungkus seperti tetangga init lain (issue #368):
+                // eksepsi rekonsiliasi tidak boleh keluar dari launch
+                // init dan melewatkan startBackgroundLoops().
+                val reconciled = runCatching { reconcileOrphanedReplacements() }
+                    .onFailure {
+                        App.logEvent("REPLACE RECONCILE: failed at startup: ${it.message}")
+                    }
+                    .getOrDefault(false)
                 loadGate.complete(Unit)
                 // Migrasi penyimpanan lemah (issue #209): kredensial
                 // plaintext warisan/fallback ditulis ulang terenkripsi
