@@ -92,6 +92,17 @@ private fun thumbSourceStamp(ctx: Context, raw: String): String = when {
     else -> ""
 }
 
+/** Jendela "masih bertumbuh": berkas yang mtime-nya dalam jendela ini
+ *  dianggap sedang ditulis (unduhan berjalan). */
+internal const val THUMB_GROWING_WINDOW_MS = 20_000L
+
+/** true bila cap [stamp] ("mtime:ukuran") menunjukkan berkas yang masih
+ *  bertumbuh. Murni agar bisa di-unit-test. */
+internal fun isThumbStampGrowing(stamp: String, nowMs: Long): Boolean {
+    val mtime = stamp.substringBefore(':').toLongOrNull() ?: return false
+    return nowMs - mtime < THUMB_GROWING_WINDOW_MS
+}
+
 internal fun getOrCreateThumb(
     ctx: Context,
     raw: String,
@@ -105,8 +116,16 @@ internal fun getOrCreateThumb(
     // diganti di path yang sama — unduhan ulang bernama sama — mendapat
     // kunci baru sehingga thumbnail video lama tidak tersaji selamanya;
     // kelas perbaikan yang sama seperti invalidasi durasi #287/#325.
+    // Pengecualian berkas yang MASIH BERTUMBUH (issue #418): cap-nya
+    // berubah tiap potongan data, jadi kunci bercap tak pernah kena
+    // cache dan meninggalkan satu .jpg yatim per cap. Selama mtime
+    // masih dalam jendela bertumbuh, kunci jatuh ke path saja (satu
+    // slot stabil); sesudah berkas diam, kunci bercap berlaku lagi dan
+    // thumbnail dibuat ulang sekali dari isi final.
     val stamp = thumbSourceStamp(ctx, raw)
-    val key = if (stamp.isEmpty()) sha256Hex(raw) else sha256Hex("$raw|$stamp")
+    val effectiveStamp =
+        if (raw.startsWith("f:") && isThumbStampGrowing(stamp, System.currentTimeMillis())) "" else stamp
+    val key = if (effectiveStamp.isEmpty()) sha256Hex(raw) else sha256Hex("$raw|$effectiveStamp")
     thumbFailures[key]?.let { at ->
         if (isThumbFailureFresh(at, System.currentTimeMillis())) return null
     }

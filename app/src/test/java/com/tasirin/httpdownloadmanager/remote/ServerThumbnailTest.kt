@@ -15,6 +15,18 @@ class ServerThumbnailTest {
     }
 
     @Test
+    fun `cap segar berarti masih bertumbuh`() {
+        val now = 1_000_000L
+        // #418: mtime dalam jendela 20 dtk (termasuk sedikit di masa
+        // depan karena jam tak sinkron) = bertumbuh; di luar = diam.
+        assertTrue(isThumbStampGrowing("${now - 5_000}:100", now))
+        assertTrue(isThumbStampGrowing("${now + 5_000}:100", now))
+        assertFalse(isThumbStampGrowing("${now - 25_000}:100", now))
+        assertFalse(isThumbStampGrowing("", now))
+        assertFalse(isThumbStampGrowing("bukan-angka:100", now))
+    }
+
+    @Test
     fun `kegagalan thumbnail kedaluwarsa - boleh dicoba ulang`() {
         val ttl = 30L * 60 * 1000
         val now = System.currentTimeMillis()
