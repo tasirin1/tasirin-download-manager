@@ -21,6 +21,16 @@ class FileSaverSweepTest {
     }
 
     @Test
+    fun `spool dan penanda resume HLS sweepable`() {
+        assertTrue(isSweepablePartial("movie.video.part.spool"))
+        assertTrue(isSweepablePartial("movie.video.part.segs"))
+        assertTrue(isSweepablePartial("movie.audio.part.segs"))
+        // Nama final yang kebetulan memuat kata itu di tengah tetap aman.
+        assertFalse(isSweepablePartial("movie.spool.mp4"))
+        assertFalse(isSweepablePartial("movie.segs.mp4"))
+    }
+
+    @Test
     fun `staging merge sweepable`() {
         assertTrue(isSweepablePartial("movie.mp4.merge.123456789"))
     }

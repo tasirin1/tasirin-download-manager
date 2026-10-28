@@ -808,10 +808,13 @@ private val MERGE_STAGING_TAIL_RE = Regex("""\.merge\.\d+$""")
 
 /** File internal yang boleh disapu bila yatim: partial segmen/basis plus
  *  staging merge (`.merge.<nanoTime>`) yang tertinggal bila proses mati di
- *  tengah merge. Pola WAJIB terjangkar di ekor nama: pola longgar ".part."
- *  di tengah nama ikut menyapu file FINAL selesai seperti `film.part.1.mp4`
- *  atau `game.part.2.rar` (pola nama arsip pecahan yang umum).
- *  Murni agar bisa di-unit-test. */
+ *  tengah merge, spool segmen HLS (`.part.spool`, issue #401) dan penanda
+ *  resume HLS (`.part.segs`, #385) yang finally-nya hanya berjalan bila
+ *  proses masih hidup. Pola WAJIB terjangkar di ekor nama: pola longgar
+ *  ".part." di tengah nama ikut menyapu file FINAL selesai seperti
+ *  `film.part.1.mp4` atau `game.part.2.rar` (pola nama arsip pecahan
+ *  yang umum). Murni agar bisa di-unit-test. */
 internal fun isSweepablePartial(name: String): Boolean =
     name.endsWith(".part") || PART_SEGMENT_TAIL_RE.containsMatchIn(name) ||
-        MERGE_STAGING_TAIL_RE.containsMatchIn(name)
+        MERGE_STAGING_TAIL_RE.containsMatchIn(name) ||
+        name.endsWith(".part.spool") || name.endsWith(".part.segs")
