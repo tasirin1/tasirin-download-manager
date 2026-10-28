@@ -540,8 +540,21 @@ def cek_aturan_repo(gagal, berubah):
                 j = teks.find("\n", i)
                 i = n if j < 0 else j
             elif teks.startswith("/*", i):
-                j = teks.find("*/", i + 2)
-                i = n if j < 0 else j + 2
+                # Komentar blok Kotlin BERSARANG (issue #227): hitung
+                # kedalaman, jangan berhenti di */ pertama — sisa
+                # ' minSdk = 23 */' sesudahnya dulu bocor sebagai kode.
+                depth = 1
+                j = i + 2
+                while j < n and depth > 0:
+                    if teks.startswith("/*", j):
+                        depth += 1
+                        j += 2
+                    elif teks.startswith("*/", j):
+                        depth -= 1
+                        j += 2
+                    else:
+                        j += 1
+                i = j
             else:
                 out.append(teks[i])
                 i += 1
