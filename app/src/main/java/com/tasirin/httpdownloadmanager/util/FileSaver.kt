@@ -443,25 +443,41 @@ class FileSaver(context: Context) {
             // di folder milik pengguna pola longgar tak aman. Tujuan milik
             // item yang sudah tak ada di daftar memang tak terjangkau
             // sapuan ini; itu batas yang disadari.
+            // Cakupan nama PER DIREKTORI (issue #412): folder induk
+            // filePath sebuah item hanya boleh menyapu staging milik item
+            // ITU — bukan nama semua item — agar berkas .part asing milik
+            // pengguna yang kebetulan bernama sama dengan item LAIN di
+            // folder itu tak ikut terhapus. Dua tujuan publish bawaan
+            // aplikasi (Download publik + folder teks) tetap memakai
+            // himpunan global karena item mana pun bisa terbit ke sana.
             val finalNames = items.map { FileNames.safe(it.fileName) }.toSet()
-            val extraDirs = buildSet {
-                @Suppress("DEPRECATION")
-                add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS))
-                StoragePrefs.getTextFolder(appContext)?.let { add(File(it)) }
-                items.forEach { item ->
-                    item.filePath?.takeIf { it.startsWith("/") }
-                        ?.let { File(it).parentFile?.let { p -> add(p) } }
-                }
+            val namesByDir = mutableMapOf<File, Set<String>>()
+            fun addSweepNames(dir: File, names: Set<String>) {
+                namesByDir[dir] = (namesByDir[dir] ?: emptySet()) + names
+            }
+            @Suppress("DEPRECATION")
+            addSweepNames(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                finalNames
+            )
+            StoragePrefs.getTextFolder(appContext)?.let { addSweepNames(File(it), finalNames) }
+            items.forEach { item ->
+                item.filePath?.takeIf { it.startsWith("/") }
+                    ?.let {
+                        File(it).parentFile?.let { p ->
+                            addSweepNames(p, setOf(FileNames.safe(item.fileName)))
+                        }
+                    }
             }
             val downloadCanon = runCatching { downloadDir.canonicalFile }.getOrNull()
-            extraDirs.forEach { dir ->
+            namesByDir.forEach { (dir, dirNames) ->
                 if (!dir.isDirectory) return@forEach
                 if (downloadCanon != null &&
                     runCatching { dir.canonicalFile }.getOrNull() == downloadCanon
                 ) return@forEach
                 runCatching { dir.listFiles() }.getOrNull()?.forEach { f ->
                     if (!f.isFile) return@forEach
-                    if (!isPublishStagingName(f.name, finalNames)) return@forEach
+                    if (!isPublishStagingName(f.name, dirNames)) return@forEach
                     val age = System.currentTimeMillis() - f.lastModified()
                     if (age > 2L * 60 * 60 * 1000) {
                         runCatching {
