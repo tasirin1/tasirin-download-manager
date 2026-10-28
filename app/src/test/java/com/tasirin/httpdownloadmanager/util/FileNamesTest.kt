@@ -25,6 +25,17 @@ class FileNamesTest {
     }
 
     @Test
+    fun `safe - ekstensi raksasa tidak dipertahankan dan tetap di bawah batas byte`() {
+        // Issue #336: ekstensi sendiri 451 byte membuat budget lama
+        // negatif; hasil akhir waktu itu ekstensi utuh 451 byte (gagal
+        // ENAMETOOLONG). Kini ekstensi raksasa diperlakukan sebagai
+        // bagian nama: "a." (2 byte) + 79 huruf CJK (237 byte) = 239.
+        val clean = FileNames.safe("a." + "あ".repeat(150))
+        assertTrue(clean.toByteArray(Charsets.UTF_8).size <= 240)
+        assertEquals("a." + "あ".repeat(79), clean)
+    }
+
+    @Test
     fun `unique - nama bebas tidak diubah`() {
         val result = FileNames.unique("video.mp4") { false }
         assertEquals("video.mp4", result)

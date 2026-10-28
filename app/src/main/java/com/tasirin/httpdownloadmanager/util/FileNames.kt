@@ -47,8 +47,15 @@ object FileNames {
         // mempertahankan ekstensi.
         if (clean.toByteArray(Charsets.UTF_8).size > 240) {
             val dot = clean.lastIndexOf('.')
-            val ext = if (dot in 1..239) clean.substring(dot) else ""
-            val base = if (dot in 1..239) clean.substring(0, dot) else clean
+            val extRaw = if (dot in 1..239) clean.substring(dot) else ""
+            // Ekstensi yang SENDIRINYA >= 240 byte (nama sampah dari
+            // server, mis. "a." + 150 huruf CJK) tidak dipertahankan
+            // (#336): budget lama menjadi negatif, loop potong berhenti
+            // di cut=0, dan hasilnya ekstensi utuh >240 byte yang tetap
+            // gagal ENAMETOOLONG. Ekstensi raksasa diperlakukan sebagai
+            // bagian nama biasa lalu dipangkas per byte seperti sisanya.
+            val ext = if (extRaw.toByteArray(Charsets.UTF_8).size < 240) extRaw else ""
+            val base = if (ext.isNotEmpty()) clean.substring(0, dot) else clean
             val budget = 240 - ext.toByteArray(Charsets.UTF_8).size
             // Hitung per karakter sekali jalan (surrogate pair = 4 byte):
             // loop lama meng-encode ulang seluruh base tiap dropLast (O(n^2)).
