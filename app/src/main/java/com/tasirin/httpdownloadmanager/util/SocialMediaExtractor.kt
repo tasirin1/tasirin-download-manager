@@ -916,6 +916,7 @@ object SocialMediaExtractor {
     var videoHeight = -1
     var videoBitrate = -1
     var audioRank = Int.MAX_VALUE
+    var audioBitrate = -1
     for (i in 0 until adaptive.length()) {
         val fmt = adaptive.optJSONObject(i) ?: continue
         val mime = fmt.optString("mimeType", "")
@@ -953,8 +954,15 @@ object SocialMediaExtractor {
                     139 -> 1
                     else -> 2
                 }
-                if (rank < audioRank) {
+                // Seri peringkat itag dimenangkan bitrate tertinggi
+                // (issue #421, menyelaraskan sisi audio dengan #388):
+                // semua audio di luar 139/140 berbagi peringkat 2,
+                // sehingga tanpa tie-break ini pemenang ditentukan
+                // urutan array, bukan kualitas.
+                val bitrate = fmt.optInt("bitrate", 0)
+                if (rank < audioRank || (rank == audioRank && bitrate > audioBitrate)) {
                     audioRank = rank
+                    audioBitrate = bitrate
                     audioUrl = url
                 }
             }

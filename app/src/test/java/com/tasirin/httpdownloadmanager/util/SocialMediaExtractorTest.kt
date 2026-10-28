@@ -785,6 +785,29 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `bestAdaptivePair - seri peringkat audio dimenangkan bitrate tertinggi`() {
+        // Tanpa itag 139/140 semua audio berbagi peringkat 2: bitrate
+        // tertinggi wajib menang walau datang belakangan (issue #421);
+        // ekspektasi dibuktikan lebih dulu lewat port Python 1:1.
+        val sd = org.json.JSONObject(
+            """{"adaptiveFormats":[
+              {"itag":256,"mimeType":"audio/mp4","url":"https://x/256","bitrate":60000},
+              {"itag":141,"mimeType":"audio/mp4","url":"https://x/141","bitrate":256000}
+            ]}"""
+        )
+        assertEquals("https://x/141", SocialMediaExtractor.bestAdaptivePair(sd).second)
+        // Peringkat itag tetap utama: 139 (peringkat 1) mengalahkan
+        // peringkat 2 berbitrate lebih besar.
+        val sd2 = org.json.JSONObject(
+            """{"adaptiveFormats":[
+              {"itag":141,"mimeType":"audio/mp4","url":"https://x/141","bitrate":256000},
+              {"itag":139,"mimeType":"audio/mp4","url":"https://x/139","bitrate":48000}
+            ]}"""
+        )
+        assertEquals("https://x/139", SocialMediaExtractor.bestAdaptivePair(sd2).second)
+    }
+
+    @Test
     fun `parseContentDispositionFileName - bentuk quoted, token, dan RFC 5987`() {
         assertEquals("clip final.mp4", SocialMediaExtractor.parseContentDispositionFileName(
             "attachment; filename=\"clip final.mp4\""))
