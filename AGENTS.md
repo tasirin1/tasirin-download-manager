@@ -260,8 +260,9 @@ kuat dan tanpa diskusi:
 4. **Jangan ubah `versionName`/`versionCode` manual** — CI mengoper keduanya
    per build via `-PverName="1.0.<run_number>" -PverCode=<100000 + run_number>`.
    Nilai di `app/build.gradle.kts` (`"1.0"`/`1`) hanya fallback build lokal/debug.
-5. **Jaga kompatibilitas Android 5 (minSdk 21)**: API baru harus punya fallback
-   (contoh: `RELATIVE_PATH`, `NetworkCallback`); jangan naikkan minSdk.
+5. **Jaga kompatibilitas Android 6 (minSdk 23)**: API di atas API 23 harus
+   punya fallback/guard (contoh: `RELATIVE_PATH` API 29+, `NetworkCallback`
+   pemakaian lanjut); jangan naikkan minSdk tanpa keputusan owner.
 6. **`targetSdk 36`**: storage di Android 11+ wajib `MANAGE_EXTERNAL_STORAGE`
    ("Akses semua file") — jangan turunkan tanpa strategi storage pengganti.
 7. **Remote web = UI utama**: setiap perubahan halaman remote (dan endpoint API)
@@ -530,8 +531,9 @@ jangan digabung dengan PR fitur lain.
 2. **Jangan sentuh yang sudah stabil** — kalau kode sudah benar dan teruji
    (mis. `ServerSecurity.isPathAllowed`, `PinHash`), jangan refactor tanpa
    alasan kuat. Refactor yang tidak perlu meningkatkan risiko regresi.
-3. **Pertahankan minSdk 21** — semua fitur harus punya fallback untuk
-   Android 5. Jangan gunakan API yang hanya tersedia di API 23+ tanpa guard.
+3. **Pertahankan minSdk 23** — Android 6 adalah lantai dukungan (keputusan
+   owner 2026-10-28). Jangan gunakan API yang hanya tersedia di API 24+
+   tanpa guard.
 4. **Jangan menambah dependensi** — APK harus tetap kecil (< 3.5 MB).
 
 ### Saat memperbaiki bug
