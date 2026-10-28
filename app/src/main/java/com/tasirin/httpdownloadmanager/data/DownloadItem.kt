@@ -36,6 +36,10 @@ data class DownloadItem(
     val checksumVerified: Boolean = false,
     val mirrors: List<String> = emptyList(),
     val monitor: Boolean = false,
+    // Id item pendahulu yang digantikan item ini (penerus monitor, #199):
+    // nama pendahulu boleh diambil alih dan berkas terbitnya dihapus saat
+    // item ini publish. Kosong = bukan penerus.
+    val replacesItemId: String = "",
     val etag: String = "",
     val method: String = "GET",
     val postBody: String = "",

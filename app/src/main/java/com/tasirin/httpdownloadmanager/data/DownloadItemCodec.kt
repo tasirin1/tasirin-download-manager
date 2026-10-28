@@ -38,6 +38,7 @@ object DownloadItemCodec {
             item.mirrors.forEach { mirrorArr.put(it) }
             o.put("mirrors", mirrorArr)
             o.put("monitor", item.monitor)
+            o.put("replacesItemId", item.replacesItemId)
             o.put("method", item.method)
             o.put("postBody", item.postBody)
             o.put("etag", item.etag)
@@ -126,6 +127,7 @@ object DownloadItemCodec {
                 method = o.optString("method", "GET"),
                 postBody = o.optString("postBody"),
                 monitor = o.optBoolean("monitor", false),
+                replacesItemId = o.optString("replacesItemId", ""),
                 etag = o.optString("etag"),
                 segments = parseSegments(o),
                 preferredHeight = o.optInt("preferredHeight", 0),

@@ -263,6 +263,7 @@ class DownloadEngine(appContext: Context) {
         folderPath: String = "",
         mirrors: List<String> = emptyList(),
         monitor: Boolean = false,
+        replacesItemId: String = "",
         preferredHeight: Int = 0,
         preferredAudioLang: String = ""
     ): String {
@@ -281,7 +282,10 @@ class DownloadEngine(appContext: Context) {
         // sama (mis. fallback timestamp sedetik yang sama) akan menulis file
         // yang sama dan saling merusak. Unikkan saat antre.
         val name = FileNames.unique(FileNames.safe(customName.ifEmpty { guessFileName(cleanUrl) })) { n ->
-            _items.value.any { it.fileName == n }
+            // Penerus monitor (#199) mengambil alih nama pendahulunya —
+            // pendahulu dikecualikan dari tabrakan agar nama tidak
+            // bersufiks " (1)".
+            _items.value.any { it.fileName == n && it.id != replacesItemId }
         }
         val item = DownloadItem(
             id = UUID.randomUUID().toString(),
@@ -304,6 +308,7 @@ class DownloadEngine(appContext: Context) {
             checksum = checksum,
             mirrors = mirrors,
             monitor = monitor,
+            replacesItemId = replacesItemId,
             preferredHeight = preferredHeight,
             preferredAudioLang = preferredAudioLang
         )
@@ -940,7 +945,8 @@ class DownloadEngine(appContext: Context) {
                         checksum = item.checksum,
                         destination = item.destination,
                         folderPath = item.folderPath,
-                        monitor = true
+                        monitor = true,
+                        replacesItemId = item.id
                     )
                     if (newId.isNotEmpty()) {
                         updateItem(item.id) { it.copy(monitor = false) }
@@ -1078,11 +1084,33 @@ class DownloadEngine(appContext: Context) {
         item: DownloadItem
     ): FileSaver.PublishResult {
         val cleanName = FileNames.safe(fileName)
-        if (item.folderPath.isNotBlank()) {
-            return saver.publishToPath(partial, cleanName, item.folderPath)
-                ?: throw IOException("Destination folder is invalid or not writable: ${item.folderPath}")
+        // Penerus monitor (#199): berkas terbit pendahulu dihapus SEBELUM
+        // publish agar nama tujuan bebas — tanpa ini semua jalur publish
+        // mengunikkkan nama menjadi " (1)" dan file asal tak pernah
+        // tertimpa. Entrinya dibuang sesudah publish berhasil. Bila
+        // publish/verify sesudahnya gagal, penerus tetap bisa di-retry
+        // (nama sudah bebas); pendahulu memang sudah tergantikan.
+        val predecessor = item.replacesItemId.takeIf { it.isNotEmpty() }
+            ?.let { pid -> _items.value.find { it.id == pid } }
+        if (predecessor != null) {
+            deletePublished(
+                FileSaver.PublishResult(
+                    contentUri = predecessor.contentUri,
+                    filePath = predecessor.filePath,
+                    fileName = predecessor.fileName
+                )
+            )
         }
-        return saver.publish(partial, cleanName, item.destination)
+        val result = if (item.folderPath.isNotBlank()) {
+            saver.publishToPath(partial, cleanName, item.folderPath)
+                ?: throw IOException("Destination folder is invalid or not writable: ${item.folderPath}")
+        } else {
+            saver.publish(partial, cleanName, item.destination)
+        }
+        if (predecessor != null) {
+            update(_items.value.filterNot { it.id == predecessor.id })
+        }
+        return result
     }
 
     private fun organizeIfEnabled(
