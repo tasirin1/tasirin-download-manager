@@ -610,7 +610,10 @@ object SocialMediaExtractor {
                 if (node.optBoolean("is_video", false)) {
                     val cv = node.optString("video_url", "")
                     if (cv.startsWith("http")) {
-                        results.add(Result(cv, "Instagram_${shortcode}.mp4", "Instagram $shortcode", "Video", MIME_MP4, cookies = cookies))
+                        // Berindeks seperti node foto di loop yang sama:
+                        // carousel berisi >=2 video sebelumnya menghasilkan
+                        // nama + label yang persis sama (issue #432).
+                        results.add(Result(cv, "Instagram_${shortcode}_${i+1}.mp4", "Instagram $shortcode", "Video ${i+1}", MIME_MP4, cookies = cookies))
                     }
                 } else {
                     val img = node.optString("display_url", "")
