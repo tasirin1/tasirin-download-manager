@@ -694,7 +694,18 @@ class FileSaver(context: Context) {
                         if (ok) PublishResult(contentUri = item.contentUri, fileName = finalName) else null
                     } else {
                         val newUri = DocumentsContract.renameDocument(appContext.contentResolver, uri, clean)
-                        if (newUri != null) PublishResult(contentUri = newUri.toString(), fileName = clean) else null
+                        if (newUri != null) {
+                            // Nama AKTUAL yang ditetapkan provider
+                            // (issue #469): kontrak renameDocument tak
+                            // menjamin nama tampil persis seperti yang
+                            // diminta — provider boleh menormalisasi
+                            // atau mengunikkkan. Baca balik dari URI
+                            // hasil; jatuh ke clean hanya bila gagal.
+                            val actual = runCatching {
+                                DocumentFile.fromSingleUri(appContext, newUri)?.name
+                            }.getOrNull()?.takeIf { it.isNotBlank() } ?: clean
+                            PublishResult(contentUri = newUri.toString(), fileName = actual)
+                        } else null
                     }
                 }
                 !item.filePath.isNullOrEmpty() -> {
