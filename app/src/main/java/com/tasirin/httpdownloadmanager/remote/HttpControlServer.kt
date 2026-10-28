@@ -2742,6 +2742,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return result
     }
 
+    /** Info tambahan hasil fs action untuk respons (#253): sumber pindah
+     *  yang tertinggal harus sampai ke UI, bukan tenggelam di Boolean. */
+    private class FsActionOutcome {
+        var sourceLeft = false
+    }
+
     private fun fsAction(session: IHTTPSession): Response {
         // Body form belum dibaca di titik ini: tutup koneksi pada penolakan
         // read-only agar sisa byte tak merusak request keep-alive berikutnya.
@@ -2751,17 +2757,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val path = params["path"].orEmpty()
         val name = params["name"]?.trim().orEmpty()
         val dest = params["dest"]?.trim().orEmpty()
+        val outcome = FsActionOutcome()
         val ok = when {
             path.isEmpty() -> false
             path.startsWith(MS_PREFIX) -> fsActionMedia(action, path.removePrefix(MS_PREFIX), name, dest)
-            else -> fsActionFiles(action, path.removePrefix(FS_PREFIX), name, dest)
+            else -> fsActionFiles(action, path.removePrefix(FS_PREFIX), name, dest, outcome)
         }
         if (ok) invalidateFsListingCache()
         appendLog("FS ${action.uppercase(java.util.Locale.ROOT)}: $path -> ${if (ok) "OK" else "FAILED"}")
-        return jsonResponse(JSONObject().put("ok", ok))
+        val resp = JSONObject().put("ok", ok)
+        if (outcome.sourceLeft) resp.put("sourceLeft", true)
+        return jsonResponse(resp)
     }
 
-    private fun fsActionFiles(action: String, path: String, name: String, dest: String): Boolean {
+    private fun fsActionFiles(
+        action: String, path: String, name: String, dest: String,
+        outcome: FsActionOutcome
+    ): Boolean {
         if (!isFsPathAllowed(path)) return false
         val file = File(path)
         return when (action) {
@@ -2825,7 +2837,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (dest.isBlank()) return false
                 if (dest.startsWith(MS_PREFIX)) {
                     return runCatching {
-                        moveFileToMediaStore(file, dest.removePrefix(MS_PREFIX))
+                        val r = moveFileToMediaStore(file, dest.removePrefix(MS_PREFIX))
+                        if (r == MsMoveOutcome.MOVED_SOURCE_LEFT) outcome.sourceLeft = true
+                        r != MsMoveOutcome.FAILED
                     }.getOrDefault(false)
                 }
                 val destDir = File(dest.removePrefix(FS_PREFIX))
@@ -2975,10 +2989,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrDefault(false)
     }
 
-    private fun moveFileToMediaStore(file: File, relative: String): Boolean {
-        if (Build.VERSION.SDK_INT < 29) return false
-        if (!isFsPathAllowed(file.absolutePath)) return false
-        if (!isMediaStorePathAllowed(relative)) return false
+    /** Hasil pindah berkas ke MediaStore (#253): salinan terbit saja tidak
+     *  cukup dibedakan dari pindah utuh — sumber yang gagal terhapus harus
+     *  terlihat di respons agar UI tidak melaporkan sukses penuh. */
+    private enum class MsMoveOutcome { FAILED, MOVED, MOVED_SOURCE_LEFT }
+
+    private fun moveFileToMediaStore(file: File, relative: String): MsMoveOutcome {
+        if (Build.VERSION.SDK_INT < 29) return MsMoveOutcome.FAILED
+        if (!isFsPathAllowed(file.absolutePath)) return MsMoveOutcome.FAILED
+        if (!isMediaStorePathAllowed(relative)) return MsMoveOutcome.FAILED
         val rel = relative.trim('/')
         val resolver = context.contentResolver
         val mime = MimeTypes.forFile(file.name)
@@ -2989,15 +3008,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             put(MediaStore.Downloads.MIME_TYPE, mime)
             put(MediaStore.Downloads.RELATIVE_PATH, "$rel/")
         }
-        val uri = resolver.insert(collection, values) ?: return false
+        val uri = resolver.insert(collection, values) ?: return MsMoveOutcome.FAILED
         val written = runCatching {
-            val out = resolver.openOutputStream(uri) ?: return false
+            val out = resolver.openOutputStream(uri) ?: return MsMoveOutcome.FAILED
             out.use { dst -> file.inputStream().use { src -> src.copyTo(dst, SERVER_IO_BUF) } }
             true
         }.getOrDefault(false)
         if (!written) {
             resolver.delete(uri, null, null)
-            return false
+            return MsMoveOutcome.FAILED
         }
         // Invalidasi cache setelah copy ke MediaStore berhasil, supaya
         // listing media langsung mendeteksi file baru walau delete asli gagal.
@@ -3014,7 +3033,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // menghapus sumber dilaporkan sebagai kegagalan operasi, padahal
         // salinan sudah hidup — pengguna mengira pindah gagal, mencoba
         // lagi, dan setiap percobaan menambah salinan bernama unik baru.
-        return true
+        // #253: suksesnya tetap sukses, tetapi sumber yang tertinggal kini
+        // dibedakan (MOVED_SOURCE_LEFT) agar batch tidak melapor bersih.
+        return if (gone) MsMoveOutcome.MOVED else MsMoveOutcome.MOVED_SOURCE_LEFT
     }
 
     private fun moveMediaToFile(uri: Uri, dest: String): Boolean {

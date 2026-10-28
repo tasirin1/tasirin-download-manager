@@ -2119,6 +2119,7 @@ if (!res.ok || !data || !data.ok) {
 const message = (data && data.error) ? data.error : ('HTTP ' + res.status);
 throw new Error(message);
 }
+return data;
 } catch (e) {
 fsMsg('Operation failed: ' + e, true);
 throw e;
@@ -2302,12 +2303,14 @@ const t0 = Date.now();
 const out = {done: 0, cancelled: false, failed: false};
 showFsTask(title);
 let done = 0;
+let leftCount = 0;
 try {
 for (const it of items) {
 if (fsTaskCancelFlag) break;
 const label = it.name || it.path || '';
 updateFsTask((done + 1) + ' of ' + total + ' \u2014 ' + label, total > 1 ? (done / total) * 100 : 15);
-await postFsAction(makeParams(it));
+const r = await postFsAction(makeParams(it));
+if (r && r.sourceLeft) leftCount++;
 done++;
 updateFsTask(done + ' of ' + total, total > 1 ? (done / total) * 100 : 15);
 }
@@ -2319,13 +2322,16 @@ out.failed = true;
 mmShowToast('Failed: ' + e.message, 3000);
 }
 const doneLabel = out.done + (out.done === 1 ? ' item ' + verbDone : ' items ' + verbDone);
+const leftNote = leftCount
+? ' \u2014 ' + leftCount + (leftCount === 1 ? ' original' : ' originals') + ' could not be removed'
+: '';
 fsTaskCancelBtn.disabled = true;
 if (out.failed) {
-updateFsTask('Failed \u2014 ' + (out.done ? doneLabel : 'nothing ' + verbDone), out.done ? 100 : 4);
+updateFsTask('Failed \u2014 ' + (out.done ? doneLabel : 'nothing ' + verbDone) + leftNote, out.done ? 100 : 4);
 } else if (out.cancelled) {
-updateFsTask('Stopped \u2014 ' + doneLabel, total > 1 ? (out.done / total) * 100 : 100);
+updateFsTask('Stopped \u2014 ' + doneLabel + leftNote, total > 1 ? (out.done / total) * 100 : 100);
 } else {
-updateFsTask('Done \u2014 ' + doneLabel, 100);
+updateFsTask('Done \u2014 ' + doneLabel + leftNote, 100);
 }
 const remain = FS_TASK_MIN_MS - (Date.now() - t0);
 if (remain > 0) await delayMs(remain);
