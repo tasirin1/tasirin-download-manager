@@ -485,13 +485,15 @@ class DownloadEngine(appContext: Context) {
         }.map { it.id }
         if (ids.isNotEmpty()) {
             val idSet = ids.toSet()
-            update(_items.value.map { item ->
-                if (item.id in idSet) {
-                    item.copy(state = DownloadState.PENDING, autoResume = true)
-                } else {
-                    item
+            updateTransformed { daftar ->
+                daftar.map { item ->
+                    if (item.id in idSet) {
+                        item.copy(state = DownloadState.PENDING, autoResume = true)
+                    } else {
+                        item
+                    }
                 }
-            })
+            }
         }
         startQueued()
     }
@@ -513,7 +515,7 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
-        update(_items.value.filterNot { it.id == id })
+        updateTransformed { daftar -> daftar.filterNot { it.id == id } }
         if (activeConns[id] == null) cancelledConns.remove(id)
         // Opsi "Delete partial file when cancelled": tanpa ini toggle
         // Pengaturan tidak berpengaruh (partial menumpuk sampai cleanup).
@@ -534,7 +536,7 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
-        update(_items.value.filterNot { it.id == id })
+        updateTransformed { daftar -> daftar.filterNot { it.id == id } }
         if (activeConns[id] == null) cancelledConns.remove(id)
         fileSaver.deleteFiles(item)
         scheduleSave()
@@ -564,7 +566,7 @@ class DownloadEngine(appContext: Context) {
             // koneksi aktif (segmen yang datang terlambat tetap diputus).
             if (activeConns[it.id] == null) cancelledConns.remove(it.id)
         }
-        update(_items.value.filterNot { it.state == DownloadState.COMPLETED })
+        updateTransformed { daftar -> daftar.filterNot { it.state == DownloadState.COMPLETED } }
         scheduleSave()
         if (_items.value.isEmpty() && loadGate.isCompleted) repository.clearAll()
     }
@@ -585,7 +587,7 @@ class DownloadEngine(appContext: Context) {
         }
         // Batch delete: satu loop, bukan N kali filter list
         failed.forEach { fileSaver.deleteFiles(it) }
-        update(_items.value.filterNot { it.state == DownloadState.FAILED })
+        updateTransformed { daftar -> daftar.filterNot { it.state == DownloadState.FAILED } }
         scheduleSave()
         if (_items.value.isEmpty() && loadGate.isCompleted) repository.clearAll()
     }
@@ -817,18 +819,20 @@ class DownloadEngine(appContext: Context) {
             clearSegProgress(item.id)
         }
         val ids = targets.map { it.id }.toSet()
-        update(_items.value.map { item ->
-            if (item.id in ids) {
-                item.copy(
-                    state = DownloadState.PAUSED,
-                    autoResume = false,
-                    speedBps = 0,
-                    etaSeconds = 0
-                )
-            } else {
-                item
+        updateTransformed { daftar ->
+            daftar.map { item ->
+                if (item.id in ids) {
+                    item.copy(
+                        state = DownloadState.PAUSED,
+                        autoResume = false,
+                        speedBps = 0,
+                        etaSeconds = 0
+                    )
+                } else {
+                    item
+                }
             }
-        })
+        }
         scheduleSave()
     }
 
@@ -859,18 +863,20 @@ class DownloadEngine(appContext: Context) {
             pendingRetries.remove(item.id)
             clearSegProgress(item.id)
         }
-        update(_items.value.map { item ->
-            // Periksa ulang status di daftar SEGAR (#220): item yang berubah
-            // di antara filter dan update (selesai lewat resume per-item atau
-            // baru di-pause) tidak boleh dipaksa kembali ke PENDING.
-            val stillTarget = item.id in ids &&
-                (item.state == DownloadState.PAUSED ||
-                    item.state == DownloadState.FAILED ||
-                    item.state == DownloadState.CANCELLED ||
-                    (item.state == DownloadState.DOWNLOADING &&
-                        jobs[item.id]?.isActive != true))
-            if (stillTarget) item.copy(state = DownloadState.PENDING, autoResume = true) else item
-        })
+        updateTransformed { daftar ->
+            daftar.map { item ->
+                // Periksa ulang status di daftar SEGAR (#220): item yang berubah
+                // di antara filter dan update (selesai lewat resume per-item atau
+                // baru di-pause) tidak boleh dipaksa kembali ke PENDING.
+                val stillTarget = item.id in ids &&
+                    (item.state == DownloadState.PAUSED ||
+                        item.state == DownloadState.FAILED ||
+                        item.state == DownloadState.CANCELLED ||
+                        (item.state == DownloadState.DOWNLOADING &&
+                            jobs[item.id]?.isActive != true))
+                if (stillTarget) item.copy(state = DownloadState.PENDING, autoResume = true) else item
+            }
+        }
         startQueued()
     }
 
@@ -914,13 +920,15 @@ class DownloadEngine(appContext: Context) {
             retryAttempts.remove(id)
             pendingRetries.remove(id)
         }
-        update(_items.value.map { item ->
-            if (item.id in idSet) {
-                item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
-            } else {
-                item
+        updateTransformed { daftar ->
+            daftar.map { item ->
+                if (item.id in idSet) {
+                    item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
+                } else {
+                    item
+                }
             }
-        })
+        }
         startQueued()
     }
 
@@ -951,13 +959,15 @@ class DownloadEngine(appContext: Context) {
             pendingRetries.remove(id)
             clearSegProgress(id)
         }
-        update(_items.value.map { item ->
-            if (item.id in idSet) {
-                item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
-            } else {
-                item
+        updateTransformed { daftar ->
+            daftar.map { item ->
+                if (item.id in idSet) {
+                    item.copy(state = DownloadState.PENDING, autoResume = true, error = null)
+                } else {
+                    item
+                }
             }
-        })
+        }
         startQueued()
     }
 
@@ -1330,7 +1340,7 @@ class DownloadEngine(appContext: Context) {
         if (predecessor != null) {
             val b = backup
             if (b == null) {
-                update(_items.value.filterNot { it.id == predecessor.id })
+                updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
             } else {
                 // Ada checksum yang akan diverifikasi pemanggil (tertulis
                 // di item atau sidecar di samping hasil terbit): entri
@@ -1350,7 +1360,7 @@ class DownloadEngine(appContext: Context) {
                 } else {
                     runCatching { b.delete() }
                     stale?.let { s -> runCatching { s.delete() } }
-                    update(_items.value.filterNot { it.id == predecessor.id })
+                    updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
                 }
             }
         }
@@ -1425,7 +1435,7 @@ class DownloadEngine(appContext: Context) {
                 )
             )
         }
-        update(_items.value.filterNot { it.id == predecessor.id })
+        updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
     }
 
     /** Verifikasi penerus gagal: pulihkan berkas pendahulu (#215). */
@@ -3602,6 +3612,18 @@ class DownloadEngine(appContext: Context) {
         copy[idx] = next
         update(copy, persist)
         return next
+    }
+
+    /** Terapkan [transform] ke daftar TERKINI secara atomik (#274):
+     *  baca-ubah-tulis berjalan di dalam monitor yang sama dengan
+     *  update()/updateItem(), bukan membaca _items.value di luar kunci
+     *  lalu menulis hasil berbasis salinan basi — mutasi konkuren
+     *  (finalisasi paralel vs aksi pengguna) bisa tertimpa dan hilang. */
+    @Synchronized
+    private fun updateTransformed(
+        transform: (List<DownloadItem>) -> List<DownloadItem>
+    ) {
+        update(transform(_items.value))
     }
 
     @Synchronized
