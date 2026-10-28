@@ -6610,6 +6610,15 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
     }
     if (failedExtras.length) {
       document.getElementById('url').value = failedExtras.join('\n');
+      // Keadaan sosial milik kiriman lama dibersihkan: kolom kini berisi
+      // URL lain dan submit berikutnya adalah unduhan biasa — tanpa ini,
+      // sendAll/pilihan lama dari carousel sebelumnya ikut terkirim
+      // padahal URL-nya sudah tidak ada di kolom (issue #165).
+      socialPlatform = '';
+      socialVideoOptions = [];
+      socialPhotoOptions = [];
+      document.getElementById('socialQuality').style.display = 'none';
+      document.getElementById('photoSelect').style.display = 'none';
       refresh();
       showToast(failedExtras.length + ' additional URL(s) failed — kept in the field for retry.', 4500, 'error');
       return;

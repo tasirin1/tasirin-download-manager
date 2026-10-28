@@ -4277,6 +4277,11 @@ if (!xRes.ok || !xData || !xData.ok) failedExtras.push(urls[i]);
 }
 if (failedExtras.length) {
 document.getElementById('url').value = failedExtras.join('\n');
+socialPlatform = '';
+socialVideoOptions = [];
+socialPhotoOptions = [];
+document.getElementById('socialQuality').style.display = 'none';
+document.getElementById('photoSelect').style.display = 'none';
 refresh();
 showToast(failedExtras.length + ' additional URL(s) failed — kept in the field for retry.', 4500, 'error');
 return;
