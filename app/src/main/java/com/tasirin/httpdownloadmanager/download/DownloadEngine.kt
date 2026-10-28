@@ -3883,9 +3883,14 @@ class DownloadEngine(appContext: Context) {
         // Tapi commit() sinkron di main thread = ANR saat daftar besar,
         // jadi di main thread tulis apply dulu lalu commit di IO.
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            val snapshot = _items.value
-            repository.save(snapshot)
-            scope.launch { repository.saveImmediate(snapshot) }
+            // Encode SEKALI, tulis dua cara (issue #370): apply dulu
+            // supaya antrean tulis segera berjalan, lalu commit hasil
+            // encode yang sama di latar — bukan encode ulang penuh.
+            val prepared = repository.prepareSave(_items.value)
+            if (prepared != null) {
+                repository.applyPrepared(prepared)
+                scope.launch { repository.commitPrepared(prepared) }
+            }
         } else {
             repository.saveImmediate(_items.value)
         }

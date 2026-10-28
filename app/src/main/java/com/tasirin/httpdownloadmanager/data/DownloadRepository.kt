@@ -19,6 +19,11 @@ class DownloadRepository(context: Context) {
     // Kredensial terenkripsi apa adanya per id, untuk memulihkan field yang
     // gagal di-decrypt (keystore invalid) agar save tak menimpa permanen "".
     private val storedCreds = HashMap<String, Quad>()
+    // Penjaga urutan snapshot PreparedSave dan versi progres ringan;
+    // keduanya hanya disentuh di dalam monitor persist (issue #370).
+    private var persistSeq = 0L
+    private var writtenPersistSeq = 0L
+    private var progressVersion = 0L
 
     // True bila load terakhir menemukan kredensial tersimpan lemah
     // (plaintext eksplisit/legacy) — engine menindaklanjutinya dengan
@@ -92,6 +97,7 @@ class DownloadRepository(context: Context) {
     // commit sesuai urutan encode.
     @Synchronized
     fun saveProgress(items: List<DownloadItem>) {
+        progressVersion++
         prefs.edit(commit = true) {
             putString(KEY_PROGRESS, DownloadItemCodec.encodeProgress(items))
         }
@@ -107,6 +113,24 @@ class DownloadRepository(context: Context) {
         persistItems(items, blocking = true)
     }
 
+    /** Snapshot yang SUDAH ter-encode sekali untuk pola apply-dulu +
+     *  commit-kemudian pada flush main thread (issue #370): tanpa ini
+     *  flushSave membayar encode JSON + peta kredensial yang sama dua
+     *  kali untuk data yang identik. Urutan antar-snapshot dijaga nomor
+     *  urut di writePrepared — snapshot basi tidak menimpa yang baru. */
+    class PreparedSave internal constructor(
+        internal val seq: Long,
+        internal val encoded: String,
+        internal val progressVersion: Long
+    )
+
+    fun prepareSave(items: List<DownloadItem>): PreparedSave? =
+        preparePersist(items, userCleared = false)
+
+    fun applyPrepared(prepared: PreparedSave) = writePrepared(prepared, blocking = false)
+
+    fun commitPrepared(prepared: PreparedSave) = writePrepared(prepared, blocking = true)
+
     /** Penghapusan eksplisit pengguna saat antrean kosong: tulis blob kosong
      *  dan lepas flag degraded agar sisa blob korup tak menetap selamanya.
      *  Hanya untuk aksi clear/hapus eksplisit, bukan save rutin. */
@@ -114,13 +138,18 @@ class DownloadRepository(context: Context) {
         persistItems(emptyList(), blocking = true, userCleared = true)
     }
 
-    @Synchronized
     private fun persistItems(items: List<DownloadItem>, blocking: Boolean, userCleared: Boolean = false) {
+        val prepared = preparePersist(items, userCleared) ?: return
+        writePrepared(prepared, blocking)
+    }
+
+    @Synchronized
+    private fun preparePersist(items: List<DownloadItem>, userCleared: Boolean): PreparedSave? {
         // Load terdegradasi + daftar kosong = blob corrupt, bukan antrean
         // kosong sungguhan: jangan timpa blob mentah (forensik + pemulihan).
         // Pengecualian: penghapusan eksplisit pengguna (niat jelas) agar
         // blob korup tak menetap selamanya dan tak bisa pulih via clear.
-        if (shouldBlockEmptySave(items.isEmpty(), degradedLoad, userCleared)) return
+        if (shouldBlockEmptySave(items.isEmpty(), degradedLoad, userCleared)) return null
         val encItems = items.map { item ->
             val stored = storedCreds[item.id]
             if (stored != null && (shouldRestoreStored(item.username, stored.first) ||
@@ -148,12 +177,22 @@ class DownloadRepository(context: Context) {
         storedCreds.clear()
         encItems.forEach { storedCreds[it.id] = Quad(it.username, it.password, it.headers, it.postBody) }
         if (items.isNotEmpty() || userCleared) degradedLoad = false
-        // Snapshot penuh sudah memuat progres terbaru -> hapus progres ringan
-        // supaya tidak menimpa data yang lebih lama saat load berikutnya.
+        return PreparedSave(++persistSeq, DownloadItemCodec.encode(encItems), progressVersion)
+    }
+
+    @Synchronized
+    private fun writePrepared(prepared: PreparedSave, blocking: Boolean) {
+        // Snapshot basi (nomor urut lebih kecil dari yang sudah tertulis)
+        // tidak boleh menimpa snapshot yang lebih baru.
+        if (prepared.seq < writtenPersistSeq) return
         prefs.edit(commit = blocking) {
-            putString(KEY_ITEMS, DownloadItemCodec.encode(encItems))
-            remove(KEY_PROGRESS)
+            putString(KEY_ITEMS, prepared.encoded)
+            // Snapshot penuh memuat progres saat ia di-encode -> hapus
+            // progres ringan hanya bila belum ada progres yang lebih
+            // baru mendarat sesudah encode itu.
+            if (progressVersion == prepared.progressVersion) remove(KEY_PROGRESS)
         }
+        writtenPersistSeq = prepared.seq
     }
 
     private fun encryptedCreds(item: DownloadItem): Quad {
