@@ -1330,6 +1330,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             val current = runCatching {
                 packageManager.packageInfoCompat(packageName).versionCodeCompat().toInt()
             }.getOrDefault(0)
+            // Penjaga umur activity sebelum dialog apa pun di bawah
+            // (pola #300 di SettingsActivity): pengguna bisa menekan
+            // Back selama cek jaringan berjalan, dan show() pada
+            // activity yang finishing melempar BadTokenException.
+            if (isFinishing || isDestroyed) return@launch
             if (info == null) {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle(R.string.update_check)
