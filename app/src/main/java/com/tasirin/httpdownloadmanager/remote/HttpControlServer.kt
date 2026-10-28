@@ -2786,33 +2786,71 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // sudah dikunjungi (anti siklus symlink); hasil tetap di-cache
         // per path dan dihitung di pool latar.
         val visitedDirs = HashSet<String>()
-        val stack = ArrayDeque<File>()
+        // Lintasan PASCA-URUT dengan tumpukan frame (issue #416): statistik
+        // tiap subdirektori yang selesai dihitung menjadi hasil samping
+        // yang ikut di-cache, jadi membuka folder induk mengisi cache
+        // folder anak (dan sebaliknya permintaan anak sesudahnya tak
+        // memindai ulang subtree yang sama). Sebelumnya tiap folder pada
+        // halaman listing memindai subtree penuh sendiri-sendiri tanpa
+        // memo antar-folder. Hasil samping hanya ditulis bila TIDAK
+        // terpotong — angka parsial plafon tak boleh menyamar sebagai
+        // statistik pasti direktori mana pun (#415).
+        class FsFrame(val dir: File, val canonPath: String) {
+            var expanded = false
+            var ownCount = 0
+            var ownSize = 0L
+            val childCanons = mutableListOf<String>()
+        }
+        val localStats = HashMap<String, Triple<Int, Long, Boolean>>()
+        val stack = ArrayDeque<FsFrame>()
         runCatching { File(path).canonicalFile }.getOrNull()?.let { root ->
             visitedDirs.add(root.path)
-            stack.addLast(root)
+            stack.addLast(FsFrame(root, root.path))
         }
-        while (!stack.isEmpty() && itemCount < FS_STATS_MAX_ENTRIES) {
-            val dir = stack.removeLast()
-            val children = runCatching { dir.listFiles() }.getOrNull() ?: continue
-            for (c in children) {
-                if (itemCount >= FS_STATS_MAX_ENTRIES) {
-                    truncated = true
-                    break
-                }
-                itemCount++
-                if (c.isDirectory) {
-                    val canon = runCatching { c.canonicalFile }.getOrNull()
-                    if (canon != null && visitedDirs.add(canon.path)) {
-                        stack.addLast(canon)
+        while (!stack.isEmpty()) {
+            val frame = stack.last()
+            if (!frame.expanded) {
+                frame.expanded = true
+                if (truncated) continue
+                val children = runCatching { frame.dir.listFiles() }.getOrNull() ?: continue
+                for (c in children) {
+                    if (itemCount >= FS_STATS_MAX_ENTRIES) {
+                        truncated = true
+                        break
                     }
-                } else if (c.isFile) {
-                    totalSize += c.length()
+                    itemCount++
+                    frame.ownCount++
+                    if (c.isDirectory) {
+                        val canon = runCatching { c.canonicalFile }.getOrNull()
+                        if (canon != null && visitedDirs.add(canon.path)) {
+                            frame.childCanons.add(canon.path)
+                            stack.addLast(FsFrame(canon, canon.path))
+                        }
+                    } else if (c.isFile) {
+                        val len = c.length()
+                        totalSize += len
+                        frame.ownSize += len
+                    }
                 }
+            } else {
+                var count = frame.ownCount
+                var size = frame.ownSize
+                for (childCanon in frame.childCanons) {
+                    val child = localStats[childCanon] ?: continue
+                    count += child.first
+                    size += child.second
+                }
+                localStats[frame.canonPath] = Triple(count, size, truncated)
+                stack.removeLast()
             }
         }
-        if (!stack.isEmpty()) truncated = true
         val result = Triple(itemCount, totalSize, truncated)
         fsStatsCache[path] = now to result
+        if (!truncated) {
+            for ((childPath, stats) in localStats) {
+                if (childPath != path) fsStatsCache[childPath] = now to stats
+            }
+        }
         if (fsStatsCache.size > 300) {
             val toRemove = fsStatsCache.size / 2
             var removed = 0
