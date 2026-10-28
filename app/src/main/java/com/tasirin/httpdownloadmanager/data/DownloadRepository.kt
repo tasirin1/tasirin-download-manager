@@ -168,6 +168,14 @@ class DownloadRepository(context: Context) {
             Crypto.encrypt(item.headers),
             Crypto.encrypt(item.postBody)
         )
+        // Hasil fallback plaintext TIDAK ikut ter-cache (issue #353):
+        // satu glitch Keystore sesaat tidak boleh membuat Quad plain:
+        // dipakai ulang seluruh sesi proses; tanpa cache, save
+        // berikutnya mencoba enkripsi lagi dan pulih sendiri begitu
+        // Keystore sehat.
+        val hasPlainFallback = listOf(pair.first, pair.second, pair.third, pair.fourth)
+            .any { it.startsWith(Crypto.PLAIN_PREFIX) }
+        if (hasPlainFallback) return pair
         // Cache dibatasi: sesi panjang dengan banyak kredensial unik tidak
         // boleh menumpuk (entries lama yang tidak terpakai dibuang).
         // synchronized(credCache): eviction (size + iterator + remove) harus atomic
