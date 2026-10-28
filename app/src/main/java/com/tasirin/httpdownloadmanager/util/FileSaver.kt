@@ -88,7 +88,28 @@ class FileSaver(context: Context) {
     }
 
     fun publishToPath(partial: File, fileName: String, folder: String): PublishResult? {
-        val dir = File(folder)
+        val clean = folder.trim()
+        // Bentuk MediaStore m:<relPath> — diterima validator server dan
+        // ditangani jalur upload saveStream, tetapi dulu lolos mentah ke
+        // File() di bawah sehingga publish selalu gagal sesudah unduhan
+        // 100% (issue #450). Terbitkan lewat saveToMediaStore dengan
+        // relative path dari folderPath; kolom RELATIVE_PATH/IS_PENDING
+        // hanya ada di API 29+, di bawah itu null = pemanggil melempar.
+        if (clean.startsWith("m:")) {
+            if (Build.VERSION.SDK_INT < 29) return null
+            val relative = clean.removePrefix("m:").trim().trim('/')
+            return runCatching {
+                val result = saveToMediaStore(fileName, relative.ifEmpty { null }) { out ->
+                    partial.inputStream().use { it.copyTo(out, IO_BUF) }
+                }
+                partial.delete()
+                result
+            }.getOrNull()
+        }
+        // Bentuk f:<path> dan path absolut polos: selesaikan lewat helper
+        // bersama agar publish menilai folder yang sama dengan pemeriksa
+        // ruang (statFsDirForFolderPath) dan sapuan yatim.
+        val dir = dirForFolderPath(clean) ?: return null
         if (!dir.isDirectory && !dir.mkdirs()) return null
         if (!dir.isDirectory) return null
         return runCatching {
@@ -914,6 +935,19 @@ internal fun statFsDirForFolderPath(folderPath: String): java.io.File? {
     var cur: java.io.File? = dir
     while (cur != null && !cur.exists()) cur = cur.parentFile
     return cur?.takeIf { it.isDirectory }
+}
+
+/** folderPath item -> direktori File persisnya: prefiks `f:` dibuang,
+ *  spasi pinggir dibuang. Kosong / `m:` (MediaStore, bukan direktori
+ *  File) -> null. Berbeda dari statFsDirForFolderPath yang hanya membaca
+ *  (naik ke induk yang ada): pemanggil di sini (publish, sapuan yatim)
+ *  memakai direktori persisnya, termasuk yang belum ada. Murni JVM agar
+ *  bisa di-unit-test. */
+internal fun dirForFolderPath(folderPath: String): java.io.File? {
+    val clean = folderPath.trim()
+    if (clean.isEmpty() || clean.startsWith("m:")) return null
+    val path = clean.removePrefix("f:").trim()
+    return if (path.isEmpty()) null else java.io.File(path)
 }
 
 /** Nama partial milik satu item yang wajib dilindungi sweeper yatim: basis

@@ -18,6 +18,17 @@ class StatFsTargetTest {
     }
 
     @Test
+    fun `dirForFolderPath membuang prefiks f dan menolak m serta kosong`() {
+        assertNull(dirForFolderPath(""))
+        assertNull(dirForFolderPath("m:Download"))
+        assertNull(dirForFolderPath("f:"))
+        assertEquals("/storage/emulated/0/Movies", dirForFolderPath("f:/storage/emulated/0/Movies")?.path)
+        assertEquals("/storage/emulated/0/Movies", dirForFolderPath("/storage/emulated/0/Movies")?.path)
+        // Relatif dipertahankan apa adanya (publish membuatkan direktorinya).
+        assertEquals("relatif/sub", dirForFolderPath("f:relatif/sub")?.path)
+    }
+
+    @Test
     fun `direktori ada dipakai langsung, hilang naik ke induk ada`() {
         val tmp = Files.createTempDirectory("statfstarget").toFile()
         try {
