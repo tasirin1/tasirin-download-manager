@@ -16,9 +16,11 @@ elif grep -R -P '' . >/dev/null 2>&1; then
 elif grep -R -E -n '(^|[^0-9])\.-?[0-9]' app/src/main/res/drawable 2>/dev/null | grep -q .; then
   echo "GAGAL: path vektor tanpa nol depan (pakai 0.9 bukan .9)"; gagal=1;
 fi
-# 2. Jangan commit binary/APK/zip/secret ke repo.
-if git diff --cached --name-only 2>/dev/null | grep -E -q '\.(apk|aab|dex|zip|jks|p12|pfx)$|keystore|\.env$'; then
-  echo "GAGAL: binary/APK/zip/secret ikut staged (jks|keystore|p12|pfx|.env dilarang)"; gagal=1;
+# 2. Jangan commit binary/APK/zip/secret ke repo. Pindai berkas TERLACAK
+# (git ls-files), bukan index staged: versi lama (diff --cached) selalu
+# kosong di CI sehingga cek ini no-op permanen di sana (issue #195).
+if git ls-files 2>/dev/null | grep -E -q '\.(apk|aab|dex|zip|jks|p12|pfx)$|keystore|\.env$'; then
+  echo "GAGAL: binary/APK/zip/secret terlacak di repo (jks|keystore|p12|pfx|.env dilarang)"; gagal=1;
 fi
 # 3. Jumlah section README Indonesia vs Inggris wajib sama (jaga sinkron).
 a=$(grep -c '^## ' README.md 2>/dev/null || true)
