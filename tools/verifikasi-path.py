@@ -299,12 +299,63 @@ def cek_berkas_dihapus(gagal, hapus):
                          % (path, kelas, ", ".join(siapa)))
 
 
+def _urai_path_git(token):
+    """Urai satu token path dari header 'diff --git'.
+
+    Git mengutip path non-ASCII/berkarakter khusus dengan gaya C
+    ("b/Prob\\303\\251.kt"); tanpa penguraian ini path hasil parse
+    berakhir dengan 'kt"' dan tersaring keluar dari syarat .kt/.java
+    sehingga isi berkas itu luput dari semua cek isi-diff (issue
+    #346). Token tak terutip dikembalikan apa adanya.
+    """
+    if not token.startswith('"'):
+        return token
+    mentah = bytearray()
+    i = 1
+    while i < len(token) and token[i] != '"':
+        c = token[i]
+        if c == "\\" and i + 1 < len(token):
+            nxt = token[i + 1]
+            if nxt in "01234567":
+                j = i + 1
+                oktal = ""
+                while j < len(token) and len(oktal) < 3 and token[j] in "01234567":
+                    oktal += token[j]
+                    j += 1
+                mentah.append(int(oktal, 8))
+                i = j
+                continue
+            mentah.extend(
+                {"n": b"\n", "t": b"\t", '"': b'"', "\\": b"\\"}.get(
+                    nxt, nxt.encode("utf-8", "surrogateescape")
+                )
+            )
+            i += 2
+            continue
+        mentah.extend(c.encode("utf-8", "surrogateescape"))
+        i += 1
+    return mentah.decode("utf-8", "surrogateescape")
+
+
+_HEADER_DIFF_RE = re.compile(
+    r'^diff --git ("(?:[^"\\]|\\.)*"|\S+) ("(?:[^"\\]|\\.)*"|\S+)\s*$'
+)
+
+
+def path_dari_header_diff(baris):
+    """Path sisi-b dari baris header 'diff --git'; "" bila tak terurai."""
+    m = _HEADER_DIFF_RE.match(baris)
+    if not m:
+        return ""
+    path = _urai_path_git(m.group(2))
+    return path[2:] if path.startswith("b/") else path
+
+
 def tambah_kt(diff):
     path = ""
     for baris in diff.splitlines():
         if baris.startswith("diff --git "):
-            bagian = baris.split()
-            path = bagian[-1][2:] if len(bagian) >= 4 else ""
+            path = path_dari_header_diff(baris)
         elif baris.startswith("+") and not baris.startswith("+++"):
             if path.endswith((".kt", ".java")):
                 yield path, baris[1:]
@@ -314,8 +365,7 @@ def hapus_kt(diff):
     path = ""
     for baris in diff.splitlines():
         if baris.startswith("diff --git "):
-            bagian = baris.split()
-            path = bagian[-1][2:] if len(bagian) >= 4 else ""
+            path = path_dari_header_diff(baris)
         elif baris.startswith("-") and not baris.startswith("---"):
             if path.endswith((".kt", ".java")):
                 yield path, baris[1:]
@@ -855,8 +905,7 @@ def hunk_fungsi(diff):
     path = ""
     for baris in diff.splitlines():
         if baris.startswith("diff --git "):
-            bagian = baris.split()
-            path = bagian[-1][2:] if len(bagian) >= 4 else ""
+            path = path_dari_header_diff(baris)
         elif baris.startswith("@@ ") and path.endswith((".kt", ".java")):
             ekor = baris.split("@@", 2)[-1]
             cocok = re.search(r"(\w+)\s*\(", ekor)
