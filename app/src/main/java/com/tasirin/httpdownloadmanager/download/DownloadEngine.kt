@@ -713,6 +713,12 @@ class DownloadEngine(appContext: Context) {
         // Batch delete: satu loop, bukan N kali filter list
         failed.forEach { fileSaver.deleteFiles(it) }
         updateTransformed { daftar -> daftar.filterNot { it.state == DownloadState.FAILED } }
+        // Penerus monitor yang ikut terhapus massal (issue #530):
+        // hidupkan lagi pemantauan pendahulunya, sama seperti
+        // cancel/remove per item (#520) — membersihkan daftar gagal
+        // tidak boleh membuang langganan pemantauan diam-diam.
+        // Helper menghormati tanda sentuhan pengguna #521/#528.
+        failed.forEach { hidupkanLagiMonitorPendahulu(it) }
         scheduleSave()
         if (_items.value.isEmpty() && loadGate.isCompleted) repository.clearAll()
     }
