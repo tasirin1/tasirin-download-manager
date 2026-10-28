@@ -278,7 +278,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     ItemTouchHelper.RIGHT -> when (item.state) {
                         DownloadState.DOWNLOADING, DownloadState.PENDING ->
                             App.engine.pause(item.id)
-                        DownloadState.PAUSED -> App.engine.resume(item.id)
+                        // FAILED/CANCELLED ikut resume (issue #555):
+                        // sejajar onTap dan tombol Retry baris — dulu
+                        // keduanya jatuh ke else tanpa aksi sehingga
+                        // gesture kanan terasa rusak tanpa penjelasan.
+                        DownloadState.PAUSED, DownloadState.FAILED,
+                        DownloadState.CANCELLED -> App.engine.resume(item.id)
                         else -> Unit
                     }
                     ItemTouchHelper.LEFT -> confirmSwipeDelete(item)
