@@ -2019,7 +2019,11 @@ class DownloadEngine(appContext: Context) {
                 // EOF prematur pada respons chunked bisa tiba tanpa exception
                 // sehingga segmen pendek ikut tergabung menjadi hasil korup
                 // berstatus COMPLETED. Lempar agar retry segmen berjalan.
-                if (declared != null && segBytes != declared) {
+                // Hanya KEKURANGAN byte yang digagalkan — kelebihan ditoleransi
+                // seperti kebijakan verifySize, karena klaim Content-Length
+                // bisa basi (gzip/proxy) dan stream-lah yang berkuasa
+                // (issue #170).
+                if (declared != null && segBytes < declared) {
                     throw IOException("HLS segment truncated: got $segBytes of $declared bytes")
                 }
             } finally {
