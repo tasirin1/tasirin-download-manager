@@ -2323,9 +2323,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     .put("isVideo", true)
                     .put("token", e.token)
                 if (!e.isPartial) {
-                    var d = videoDurations.of(e.token)
+                    // Kunci cache bercap ubah (#417): berkas yang diganti
+                    // di luar aplikasi pada path yang sama tak mewarisi
+                    // durasi lama. probeDurationMs tetap menerima token
+                    // polos (ia mengurai token menjadi path/URI).
+                    val dKey = ServerVideoDurations.keyFor(e.token, e.modified)
+                    var d = videoDurations.of(dKey)
                     if (d <= 0 && e.durationMs > 0) d = e.durationMs
-                    if (d <= 0 && extracted < 20 && videoDurations.shouldProbe(e.token)) {
+                    if (d <= 0 && extracted < 20 && videoDurations.shouldProbe(dKey)) {
                         // Generasi ditangkap SEBELUM probe lambat:
                         // invalidate yang mendarat di tengah probe
                         // membuat hasil ini basi — jangan tulis lagi
@@ -2334,9 +2339,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         val gen = videoDurations.currentGeneration()
                         d = videoDurations.probeDurationMs(e.token)
                         if (d > 0) {
-                            videoDurations.cacheDurationIfCurrent(e.token, d, gen)
+                            videoDurations.cacheDurationIfCurrent(dKey, d, gen)
                         } else {
-                            videoDurations.recordProbeFailureIfCurrent(e.token, gen)
+                            videoDurations.recordProbeFailureIfCurrent(dKey, gen)
                         }
                         extracted++
                     }

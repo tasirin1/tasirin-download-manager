@@ -24,6 +24,19 @@ class ServerVideoDurationsTest {
     }
 
     @Test
+    fun `keyFor memasang cap ubah pada token`() {
+        // #417: cap berubah -> kunci berubah -> durasi lama tak terwarisi.
+        assertEquals("f:abc@123", ServerVideoDurations.keyFor("f:abc", 123L))
+        assertTrue(
+            ServerVideoDurations.keyFor("f:abc", 123L) !=
+                ServerVideoDurations.keyFor("f:abc", 456L)
+        )
+        // Cap tak tersedia jatuh ke token polos seperti perilaku lama.
+        assertEquals("f:abc", ServerVideoDurations.keyFor("f:abc", 0L))
+        assertEquals("f:abc", ServerVideoDurations.keyFor("f:abc", -5L))
+    }
+
+    @Test
     fun `probe failure dalam TTL - throttled`() {
         val ttl = ServerVideoDurations.PROBE_FAILURE_TTL_MS
         val now = System.currentTimeMillis()

@@ -46,6 +46,17 @@ class ServerVideoDurations(
             now: Long,
             ttlMs: Long = PROBE_FAILURE_TTL_MS
         ): Boolean = storedAt != null && now - storedAt < ttlMs
+
+        /** Kunci cache durasi untuk satu entri galeri: token + cap ubah
+         *  sumber (issue #417). Token saja diturunkan murni dari path,
+         *  jadi berkas yang DIGANTI di luar aplikasi pada path yang sama
+         *  mewarisi durasi video lama selamanya. Cap ubah (mtime berkas /
+         *  DATE_MODIFIED MediaStore) berubah saat isi berganti, sehingga
+         *  kunci lama tak lagi cocok dan durasi diprobe/dibaca ulang.
+         *  Cap tak tersedia (<= 0) jatuh ke token polos seperti dulu.
+         *  Murni agar bisa di-unit-test. */
+        fun keyFor(token: String, modified: Long): String =
+            if (modified > 0) "$token@$modified" else token
     }
 
     private val file = File(context.filesDir, "video_durations.json")
