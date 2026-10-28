@@ -1779,9 +1779,17 @@ class DownloadEngine(appContext: Context) {
                 ensureItemPresent(item.id, mp4)
                 val published0 = publishItem(saver, mp4, fileName, item)
                 val finalName = published0.fileName ?: fileName
+                // Sama seperti jalur berkas tunggal: checksum diverifikasi
+                // SEBELUM pendahulu dipensiunkan (#236 — commitReplacement
+                // tanpa verifikasi menghapus versi lama yang bagus).
+                verifyChecksum(item.id, published0, saver)?.let {
+                    deletePublished(published0)
+                    rollbackReplacement(item.id)
+                    throw IOException(it)
+                }
+                commitReplacement(item.id)
                 val published = organizeIfEnabled(saver, published0, finalName)
                 ensurePublishedKept(item.id, published0, published)
-                commitReplacement(item.id)
                 finishHls(item, progress.downloaded, published, finalName)
                 return
             }
@@ -1794,9 +1802,14 @@ class DownloadEngine(appContext: Context) {
             ensureItemPresent(item.id, videoTs)
             val published0 = publishItem(saver, videoTs, fileName, item)
             val finalName = published0.fileName ?: fileName
+            verifyChecksum(item.id, published0, saver)?.let {
+                deletePublished(published0)
+                rollbackReplacement(item.id)
+                throw IOException(it)
+            }
+            commitReplacement(item.id)
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
-            commitReplacement(item.id)
             finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
             runCatching { videoTs.delete() }
@@ -1998,9 +2011,14 @@ class DownloadEngine(appContext: Context) {
             ensureItemPresent(item.id, mp4)
             val published0 = publishItem(saver, mp4, fileName, item)
             val finalName = published0.fileName ?: fileName
+            verifyChecksum(item.id, published0, saver)?.let {
+                deletePublished(published0)
+                rollbackReplacement(item.id)
+                throw IOException(it)
+            }
+            commitReplacement(item.id)
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
-            commitReplacement(item.id)
             finishHls(item, progress.downloaded, published, finalName)
         } catch (e: Exception) {
             runCatching { videoMp4.delete() }
