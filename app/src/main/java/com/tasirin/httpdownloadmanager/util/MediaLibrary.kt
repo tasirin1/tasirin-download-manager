@@ -33,7 +33,8 @@ object MediaLibrary {
         val ts: Long,
         val items: List<MediaEntry>,
         val total: Int,
-        val ttlMs: Long
+        val ttlMs: Long,
+        val usedFallback: Boolean
     )
     @Volatile
     private var scanCache: ScanCache? = null
@@ -390,13 +391,18 @@ object MediaLibrary {
             scanCache?.let { cached ->
                 if (scanCacheFolderKey == selectedFolders &&
                     scanCacheUsable(now - cached.ts, cached.ttlMs, cached.items.size, cached.total, limit)) {
-                    return MediaScanResult(cached.items.take(limit), cached.total)
+                    // usedFallback ikut diteruskan dari cache (issue
+                    // #405): sebelumnya cache-hit mengembalikannya false
+                    // walau data yang sama datang dari fallback, membuat
+                    // kontrak hasil tak konsisten antar panggilan.
+                    return MediaScanResult(cached.items.take(limit), cached.total, cached.usedFallback)
                 }
             }
             val result = scanUncached(context, selectedFolders)
             scanCache = ScanCache(
                 now, result.items, result.total,
-                if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS
+                if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS,
+                result.usedFallback
             )
             scanCacheFolderKey = selectedFolders
             return MediaScanResult(result.items.take(limit), result.total, result.usedFallback)
