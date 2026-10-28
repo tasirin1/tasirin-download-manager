@@ -3,7 +3,20 @@ name: CodeQL
 on:
   push:
     branches: ["main"]
+    # Samakan pola build.yml (issue #381): push/PR docs-only tidak
+    # mengubah kode yang dianalisis — analisis terjadwal mingguan tetap
+    # menangkap keadaan pohon apa pun.
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "docs/**"
+      - ".gitignore"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "docs/**"
+      - ".gitignore"
   schedule:
     - cron: "0 5 * * 1"
   workflow_dispatch:
