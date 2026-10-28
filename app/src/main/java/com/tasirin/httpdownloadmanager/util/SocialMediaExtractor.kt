@@ -256,7 +256,16 @@ object SocialMediaExtractor {
         "com.au", "net.au", "org.au",
         "co.id", "or.id", "ac.id", "go.id", "web.id",
         "co.in", "co.jp", "co.kr", "com.br", "com.cn", "com.tw",
-        "co.nz", "co.za", "github.io"
+        "co.nz", "co.za", "github.io",
+        // Akhiran multi-penyewa (#322): tiap penyewa adalah subdomain
+        // langsung dan pemilik berbeda, jadi domain teregistrasi
+        // adalah tiga label (a.blogspot.com vs b.blogspot.com tidak
+        // boleh saling melihat cookie).
+        "blogspot.com", "wordpress.com", "tumblr.com", "livejournal.com",
+        "gitlab.io", "netlify.app", "vercel.app", "pages.dev",
+        "web.app", "firebaseapp.com", "azurewebsites.net",
+        "herokuapp.com", "glitch.me", "surge.sh", "onrender.com",
+        "fly.dev", "pythonanywhere.com"
     )
 
     /** Domain teregistrasi [host]: dua label terakhir, atau tiga bila

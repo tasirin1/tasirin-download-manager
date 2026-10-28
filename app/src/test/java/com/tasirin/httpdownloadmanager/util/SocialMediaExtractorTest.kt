@@ -695,6 +695,14 @@ class SocialMediaExtractorTest {
         // dua pemilik berbeda; subdomain satu domain teregistrasi sama
         // tetap satu induk.
         assertFalse(SocialMediaExtractor.cookieJarVisible("a.co.uk", "b.co.uk"))
+        // Akhiran multi-penyewa (#322): penyewa berbeda di bawah
+        // suffix yang sama adalah pemilik berbeda.
+        assertFalse(SocialMediaExtractor.cookieJarVisible(
+            "a.blogspot.com", "b.blogspot.com"))
+        assertFalse(SocialMediaExtractor.cookieJarVisible(
+            "a.netlify.app", "b.netlify.app"))
+        assertTrue(SocialMediaExtractor.cookieJarVisible(
+            "www.a.blogspot.com", "a.blogspot.com"))
         assertTrue(SocialMediaExtractor.cookieJarVisible(
             "a.example.co.uk", "b.example.co.uk"))
         assertFalse(SocialMediaExtractor.cookieJarVisible(
