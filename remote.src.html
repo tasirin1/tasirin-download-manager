@@ -6397,15 +6397,22 @@ document.getElementById('shareOpen').addEventListener('click', function () {
 // Daftar share aktif (#259): token lama bisa dicabut dari sini walau
 // dibuat pada sesi halaman lain — sebelumnya kuota 256 terkunci sampai
 // kedaluwarsa karena Revoke hanya tahu token sesi halaman ini.
+let shareListSeq = 0;
 async function refreshShareList() {
   const box = document.getElementById('shareList');
   if (!box) return;
+  const seq = ++shareListSeq;
   box.textContent = '';
   let data = null;
   try {
     const res = await fetch(API + '/api/shares');
     data = await res.json();
   } catch (e) {}
+  // Respons basi tidak boleh menimpa daftar yang lebih baru (#269,
+  // pola fsLoadSeq yang sama): refresh yang dipicu revoke bisa selesai
+  // lebih lambat dari refresh berikutnya dan menghidupkan lagi baris
+  // tautan yang sebenarnya sudah dicabut.
+  if (seq !== shareListSeq) return;
   if (!data || !data.ok || !data.shares || !data.shares.length) {
     const empty = document.createElement('div');
     empty.className = 'cm-text';

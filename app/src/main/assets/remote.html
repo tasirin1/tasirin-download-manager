@@ -4072,15 +4072,18 @@ document.getElementById('shareOpen').addEventListener('click', function () {
 const link = document.getElementById('shareLink').value;
 if (link) window.open(link, '_blank', 'noopener,noreferrer');
 });
+let shareListSeq = 0;
 async function refreshShareList() {
 const box = document.getElementById('shareList');
 if (!box) return;
+const seq = ++shareListSeq;
 box.textContent = '';
 let data = null;
 try {
 const res = await fetch(API + '/api/shares');
 data = await res.json();
 } catch (e) {}
+if (seq !== shareListSeq) return;
 if (!data || !data.ok || !data.shares || !data.shares.length) {
 const empty = document.createElement('div');
 empty.className = 'cm-text';
