@@ -636,6 +636,14 @@ def cek_aturan_repo(gagal, berubah):
             semua = re.findall(
                 r"(?:val|var)\s+" + nama + r"\s*(?::\s*Int\s*)?=\s*(\d+)",
                 bersih_teks)
+            # Definisi delegasi 'by lazy { 23 }' ikut dinilai (issue
+            # #256): tanpa ini refactor lazy yang sah ditolak sebagai
+            # tak ditemukan, dan definisi lazy bayangan bernilai lain
+            # lolos dari cek ambigu di bawah.
+            semua += re.findall(
+                r"(?:val|var)\s+" + nama +
+                r"\s*(?::\s*Int\s*)?by\s+lazy\s*\{\s*(\d+)",
+                bersih_teks)
             if len(set(semua)) > 1:
                 gagal.append(
                     "definisi %s ambigu (nilai %s) — kunci minSdk menolak "
@@ -643,9 +651,7 @@ def cek_aturan_repo(gagal, berubah):
                     % (via.group(1), ", ".join(sorted(set(semua)))))
                 minsdk_ambigu = True
             elif semua:
-                cocok = re.search(
-                    r"(?:val|var)\s+" + nama + r"\s*(?::\s*Int\s*)?=\s*(\d+)",
-                    bersih_teks)
+                cocok = re.match(r"(\d+)", semua[0])
     if not cocok and not minsdk_ambigu and os.path.isfile(os.path.join(AKAR, "app/build.gradle.kts")):
         gagal.append("minSdk tak ditemukan di app/build.gradle.kts — kunci minSdk tak bisa diverifikasi")
     if cocok and int(cocok.group(1)) != 23:
