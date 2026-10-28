@@ -1561,6 +1561,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
         // Peta state di-update in-place (bukan associate per emisi): emisi
         // StateFlow tiap tick tak perlu membangun HashMap N-entry baru.
+        // Maksimal SATU berkas dibuka per emisi: sejak gerbang STARTED
+        // (#149), semua unduhan yang selesai selama aplikasi di latar tiba
+        // dalam satu emisi saat pengguna kembali — membuka semuanya
+        // menumpuk player/installer berurutan. Sisanya tetap ditandai
+        // sudah ditangani (tidak menembak di emisi berikutnya) dan bisa
+        // dibuka manual dari daftar (issue #176).
+        var openedThisEmission = false
         for (item in items) {
             val prev = lastItemStates[item.id]
             if (item.state == DownloadState.COMPLETED &&
@@ -1569,8 +1576,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 prev != null && prev != DownloadState.COMPLETED
             ) {
                 autoOpenedIds.add(item.id)
-                runCatching {
-                    autoOpenSingle(item)
+                if (!openedThisEmission) {
+                    openedThisEmission = true
+                    runCatching {
+                        autoOpenSingle(item)
+                    }
                 }
             }
             if (prev != item.state) lastItemStates[item.id] = item.state
