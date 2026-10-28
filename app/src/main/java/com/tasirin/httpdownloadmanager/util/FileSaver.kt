@@ -272,7 +272,16 @@ class FileSaver(context: Context) {
                 ?: throw IOException("Failed to open MediaStore output")
             values.clear()
             values.put(MediaStore.Downloads.IS_PENDING, 0)
-            resolver.update(uri, values, null, null)
+            // Hasil update WAJIB diperiksa (issue #491): update yang
+            // mengenai 0 baris tanpa melempar meninggalkan baris tetap
+            // IS_PENDING = 1 — berkas selesai dan catatan normal, tetapi
+            // tak terlihat aplikasi lain/pemindaian pihak ketiga.
+            // Perlakukan seperti gagal tulis: lempar agar catch di bawah
+            // membuang baris dan pemanggil jatuh ke fallback, selaras
+            // pola verifikasi rename dan organize (#480).
+            if (resolver.update(uri, values, null, null) <= 0) {
+                throw IOException("Failed to publish MediaStore file (IS_PENDING not cleared)")
+            }
             return PublishResult(contentUri = uri.toString(), fileName = unique)
         } catch (e: Exception) {
             runCatching { resolver.delete(uri, null, null) }
