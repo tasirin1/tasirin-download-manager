@@ -2024,7 +2024,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         } ?: return notFound()
         val download = session.param("dl") == "1"
         val mime = MimeTypes.forFile(item.fileName)
-        val input: InputStream
         val total: Long
         val stream: InputStream
         if (!item.filePath.isNullOrEmpty()) {
@@ -2215,7 +2214,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val raw = MediaLibrary.decodeToken(token) ?: return notFound()
         val download = session.param("dl") == "1"
         val rangeHeader = session.headers["range"] ?: session.headers["Range"]
-        val input: InputStream
         val total: Long
         when {
             raw.startsWith("f:") -> {
