@@ -760,7 +760,16 @@ class DownloadEngine(appContext: Context) {
             clearSegProgress(item.id)
         }
         update(_items.value.map { item ->
-            if (item.id in ids) item.copy(state = DownloadState.PENDING, autoResume = true) else item
+            // Periksa ulang status di daftar SEGAR (#220): item yang berubah
+            // di antara filter dan update (selesai lewat resume per-item atau
+            // baru di-pause) tidak boleh dipaksa kembali ke PENDING.
+            val stillTarget = item.id in ids &&
+                (item.state == DownloadState.PAUSED ||
+                    item.state == DownloadState.FAILED ||
+                    item.state == DownloadState.CANCELLED ||
+                    (item.state == DownloadState.DOWNLOADING &&
+                        jobs[item.id]?.isActive != true))
+            if (stillTarget) item.copy(state = DownloadState.PENDING, autoResume = true) else item
         })
         startQueued()
     }
