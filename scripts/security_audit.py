@@ -558,8 +558,10 @@ def scan_text(
     # tetapi pasangan kurung seimbang di dalam rentang (panggilan
     # bersarang ala foo() / COUNT(*) hasil formatter) boleh dilewati agar
     # bocoran multi-baris bersarang tetap tertangkap (issue #216), kini
-    # sampai sarang DUA tingkat — kelompok luar boleh memuat satu tingkat
-    # kelompok lagi di dalamnya (issue #240: foo(bar()) sempat lolos).
+    # sampai sarang TIGA tingkat (issue #240 dua tingkat: foo(bar());
+    # issue #272 tiga tingkat: foo(bar(baz())) sempat lolos juga).
+    # Alternatif pola tetap terpisah tegas menurut karakter pertama
+    # (kurung buka vs bukan kurung) agar backtracking tetap linear.
     # Lintasan ini berjalan pada salinan yang isi literal string/char-nya
     # sudah diblanko (blank_literals, issue #254): kurung/titik-koma di
     # dalam string tidak lagi memutus atau memanjangkan rentang, dengan
@@ -573,7 +575,7 @@ def scan_text(
         long_pattern = re.compile(
             rule.pattern.replace(
                 "[^;\\n]*",
-                r"(?:\((?:[^()]|\([^()]*\))*\)|[^();]){0,300}",
+                r"(?:\((?:[^()]|\([^()]*\)|\((?:[^()]|\([^()]*\))*\))*\)|[^();]){0,300}",
             ),
             rule.flags,
         )
@@ -707,6 +709,14 @@ def run_self_test() -> int:
             "        base(foo()), parms[\"id\"])",
             "}",
         ],
+        Path("sample_nested3.kt"): [
+            # Regresi issue #272: sarang TIGA tingkat sebelum kata
+            # sensitif tetap wajib terdeteksi lintasan multi-baris.
+            "class Nested3 {",
+            "    fun leak() = Log.d(\"x\",",
+            "        foo(bar(baz())) + token)",
+            "}",
+        ],
         Path("sample_fp.kt"): [
             # Regresi issue #201: Log polos yang kurungnya DITUTUP, lalu
             # pernyataan LAIN menyebut token dalam jarak <300 karakter —
@@ -834,6 +844,10 @@ def run_self_test() -> int:
         item["rule_id"] == "external_path_sink" and item["path"] == "sample_nested2.kt"
         for item in findings
     )
+    nested3_log = any(
+        item["rule_id"] == "sensitive_log" and item["path"] == "sample_nested3.kt"
+        for item in findings
+    )
     strparen_fp = any(
         item["rule_id"] == "sensitive_log" and item["line"] == 2
         and item["path"] == "sample_strparen.kt"
@@ -854,9 +868,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak:
+    if missing or suppressed or str_leak or prose_suppressed or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
