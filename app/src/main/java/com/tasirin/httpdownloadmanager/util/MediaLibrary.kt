@@ -344,7 +344,8 @@ object MediaLibrary {
         dataPath: String?,
         relativePath: String?,
         externalRoot: String,
-        selectedFolders: List<String>
+        selectedFolders: List<String>,
+        volumeName: String? = null
     ): Boolean {
         if (selectedFolders.isEmpty()) return true
         // Normalisasi semua path: trim whitespace + trailing slash. Komparasi
@@ -352,7 +353,7 @@ object MediaLibrary {
         // yang dipakai MediaStore API < 29, dan aman untuk filesystem
         // FAT/SD yang case-insensitive.
         val allowed = selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
-        return inSelectedFolders(dataPath, relativePath, externalRoot, allowed)
+        return inSelectedFolders(dataPath, relativePath, externalRoot, allowed, volumeName)
     }
 
     /** Alias root penyimpanan primer Android 5-6: kolom DATA MediaStore kadang
@@ -388,20 +389,28 @@ object MediaLibrary {
         dataPath: String?,
         relativePath: String?,
         externalRoot: String,
-        allowed: List<String>
+        allowed: List<String>,
+        volumeName: String? = null
     ): Boolean = inSelectedFoldersPrecomputed(
-        dataPath, relativePath, allowedFoldersFor(allowed, externalRoot)
+        dataPath, relativePath, allowedFoldersFor(allowed, externalRoot), volumeName
     )
 
     private fun inSelectedFoldersPrecomputed(
         dataPath: String?,
         relativePath: String?,
-        allowed: List<AllowedFolder>
+        allowed: List<AllowedFolder>,
+        volumeName: String? = null
     ): Boolean {
         val fp = dataPath?.trim()?.trimEnd('/').orEmpty()
         if (fp.isNotEmpty()) {
             return allowed.any { pathMatchesFolder(fp, it) }
         }
+        // Volume non-primer (issue #538): relativePath baris ini
+        // relatif terhadap volume ASALNYA (mis. SD card), bukan root
+        // primer tempat folder terpilih tinggal — cabang relatif di
+        // bawah tidak boleh meloloskannya; hanya cabang filePath di
+        // atas (path absolut) yang sah untuk baris seperti itu.
+        if (volumeName != null && volumeName != "external_primary") return false
         val rel = relativePath?.trim('/')?.trimEnd('/').orEmpty()
         if (rel.isNotEmpty()) {
             return allowed.any { folder ->
@@ -698,8 +707,9 @@ object MediaLibrary {
                         null
                     }
                     val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
+                    val volumeName = if (iVol >= 0) c.getString(iVol) else null
                     if (!isMediaEntryReadable(filePath, uri)) continue
-                    if (folderFilterActive && !inSelectedFoldersPrecomputed(filePath, relativePath, allowedFolders)) continue
+                    if (folderFilterActive && !inSelectedFoldersPrecomputed(filePath, relativePath, allowedFolders, volumeName)) continue
                     mediaStoreAccepted++
                     list.add(
                         MediaEntry(
@@ -712,7 +722,7 @@ object MediaLibrary {
                             contentUri = uri,
                             durationMs = if (iDur >= 0) c.getLong(iDur) else 0L,
                             relativePath = relativePath,
-                            volumeName = if (iVol >= 0) c.getString(iVol) else null
+                            volumeName = volumeName
                         )
                     )
                 }
@@ -800,7 +810,7 @@ object MediaLibrary {
         // dilewatkan seperti bug lama).
         if (folderFilterActive) {
             list.retainAll { entry ->
-                inSelectedFoldersPrecomputed(entry.filePath, entry.relativePath, allowedFolders)
+                inSelectedFoldersPrecomputed(entry.filePath, entry.relativePath, allowedFolders, entry.volumeName)
             }
         }
         // Simpan sampai GALLERY_MAX_ENTRIES (bukan hanya maxEntries halaman):

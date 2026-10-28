@@ -16,6 +16,25 @@ class GalleryFolderFilterTest {
     }
 
     @Test
+    fun `volume sekunder - cabang relatif ditolak, cabang path absolut tetap sah`() {
+        // Issue #538: relativePath baris SD card relatif terhadap
+        // volume asalnya, bukan root primer — walau nama relatifnya
+        // sama persis dengan folder terpilih, ia tidak boleh lolos
+        // lewat cabang relatif. Primer bernama eksplisit tetap lolos.
+        val movies = "$root/Movies"
+        assertFalse(
+            MediaLibrary.isInGalleryFolders(null, "Movies/", root, listOf(movies), volumeName = "external")
+        )
+        assertTrue(
+            MediaLibrary.isInGalleryFolders(null, "Movies/", root, listOf(movies), volumeName = "external_primary")
+        )
+        // Baris volume sekunder ber-DATA terisi diputuskan path absolutnya.
+        assertTrue(
+            MediaLibrary.isInGalleryFolders("$movies/VID.mp4", null, root, listOf(movies), volumeName = "external")
+        )
+    }
+
+    @Test
     fun `path absolut - file di folder atau subfolder cocok`() {
         assertTrue(MediaLibrary.isInGalleryFolders("$folder/VID.mp4", null, root, listOf(folder)))
         assertTrue(MediaLibrary.isInGalleryFolders("$folder/sub/VID.mp4", null, root, listOf(folder)))
