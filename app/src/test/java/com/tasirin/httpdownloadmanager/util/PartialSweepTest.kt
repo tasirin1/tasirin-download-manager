@@ -51,6 +51,23 @@ class PartialSweepTest {
     }
 
     @Test
+    fun `temp HLS nama tepi mengikuti derivasi engine`() {
+        // #443: derivasi harus meniru urutan engine (buang sufiks dari
+        // nama mentah, safe() pada gabungan). Nama reserved: engine
+        // menghasilkan "~1CON..." TANPA awalan "_" yang ditambahkan
+        // safe() bila diterapkan pada nama item lebih dulu.
+        val reserved = protectedPartialNames(item("CON.mp4"))
+        assertTrue(reserved.contains("~1CON.video.part"))
+        assertTrue(reserved.contains("~1CON.audio.part"))
+        assertFalse(reserved.contains("~1_CON.video.part"))
+        // Nama berakhiran spasi: sufiks .mp4 TIDAK terbuang oleh engine
+        // (string berakhir spasi), jadi tempnya memuat ".mp4 " utuh.
+        val trailing = protectedPartialNames(item("film.mp4 "))
+        assertTrue(trailing.contains("~1film.mp4 .video.part"))
+        assertTrue(trailing.contains("~1film.mp4 .video.part.segs"))
+    }
+
+    @Test
     fun `temp resume HLS ikut dilindungi`() {
         // Turunan DownloadEngine.downloadHls: tempBase = "~" + id8 + basis
         // tanpa ekstensi; id uji "1" sehingga tempBase "~1video".

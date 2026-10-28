@@ -892,8 +892,14 @@ internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.Do
         item.segments.forEach { add("$base.part.${it.index}") }
         // Turunan tempBase engine: basis tanpa ekstensi .ts/.mp4, prefiks
         // "~" + 8 char id. FileNames.safe diterapkan pada nama gabungan
-        // persis seperti partialFile di engine.
-        val hlsBase = base.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { base }
+        // persis seperti partialFile di engine. URUTAN WAJIB sama dengan
+        // engine (issue #443): engine membuang sufiks dari nama MENTAH
+        // (outName) lalu safe() pada gabungan; safe() lebih dulu di sini
+        // menyimpang untuk nama tepi — nama reserved (CON.mp4) mendapat
+        // awalan "_" hanya di jalur perlindungan, dan nama berakhiran
+        // spasi/titik kehilangan sufiks yang bisa dibuang hanya di sini —
+        // sehingga temp HLS nama-nama itu tetap tak terlindungi.
+        val hlsBase = item.fileName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { item.fileName }
         val tempBase = "~" + item.id.take(8) + hlsBase
         for (kind in listOf("video", "audio")) {
             val temp = FileNames.safe("$tempBase.$kind") + ".part"
