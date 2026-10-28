@@ -2621,6 +2621,9 @@ class DownloadEngine(appContext: Context) {
             )
         } ?: item
         flushSave()
+        // Cookie sesi dari unduhan HLS ikut dipersists (issue #391):
+        // sebelumnya hanya jalur single-stream yang memanggil ini.
+        persistCookies()
         NotificationHelper.notifyItemFinished(context, finishedHls)
     }
 
@@ -3376,6 +3379,8 @@ class DownloadEngine(appContext: Context) {
             )
         } ?: item
         flushSave()
+        // Cookie sesi dari unduhan multi-segmen ikut dipersists (issue #391).
+        persistCookies()
         clearSegProgress(item.id)
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
         NotificationHelper.notifyItemFinished(context, finishedSingle)
