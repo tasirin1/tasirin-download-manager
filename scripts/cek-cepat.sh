@@ -19,7 +19,7 @@ fi
 # 2. Jangan commit binary/APK/zip/secret ke repo. Pindai berkas TERLACAK
 # (git ls-files), bukan index staged: versi lama (diff --cached) selalu
 # kosong di CI sehingga cek ini no-op permanen di sana (issue #195).
-if git ls-files 2>/dev/null | grep -E -q '\.(apk|aab|dex|zip|jks|p12|pfx)$|keystore|\.env($|\.)'; then
+if git ls-files 2>/dev/null | grep -E -q '\.(apk|aab|dex|zip|jks|keystore|p12|pfx)$|(^|/)keystore$|\.env($|\.)'; then
   echo "GAGAL: binary/APK/zip/secret terlacak di repo (jks|keystore|p12|pfx|.env dilarang)"; gagal=1;
 fi
 # 3. Jumlah section README Indonesia vs Inggris wajib sama (jaga sinkron).
