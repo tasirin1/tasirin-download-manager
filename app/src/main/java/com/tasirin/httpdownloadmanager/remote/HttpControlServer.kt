@@ -2758,6 +2758,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 // renameTo gagal lintas volume: salin dulu baru hapus sumber.
                 // Direktori disalin rekursif (sebelumnya langsung false).
+                // Symlink direktori bersarang yang lepas ke luar root wajib
+                // ditolak dulu: copyRecursively akan membaca isi target luar
+                // dan deleteRecursively pada sumber menghapusnya — pola #159
+                // yang di jalur fallback ini belum dijaga (issue #172).
+                if (file.isDirectory &&
+                    ServerSecurity.hasEscapingSymlink(file, canonicalFsRoots())
+                ) {
+                    return false
+                }
                 runCatching {
                     try {
                         if (file.isDirectory) {
