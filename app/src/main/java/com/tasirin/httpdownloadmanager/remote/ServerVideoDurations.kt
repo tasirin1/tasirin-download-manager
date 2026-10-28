@@ -106,10 +106,21 @@ class ServerVideoDurations(
         !isProbeFailureThrottled(probeFailAt[token], System.currentTimeMillis())
     }
 
-    /** File media baru masuk/berubah: cache durasi lama tidak lagi relevan.
-     *  null = muat ulang dari disk saat diakses berikutnya. */
+    /** File media baru masuk/berubah: cache durasi lama tidak lagi
+     *  relevan. Wajib mengosongkan SUNGGUHAN (#287): versi lama hanya
+     *  men-null-kan cache memori, jadi cacheLocked() memuat ulang berkas
+     *  JSON di disk apa adanya dan durasi basi tidak pernah diperbarui
+     *  (token diturunkan dari path — video yang diganti berkas lain di
+     *  path yang sama mewarisi durasi video lama selamanya). Cache kini
+     *  diganti objek kosong, berkas persisten dihapus, dan throttle
+     *  gagal-probe direset, supaya galeri mem-probe ulang dan save()
+     *  berikutnya menulis himpunan segar. */
     fun invalidate() {
-        synchronized(lock) { cache = null }
+        synchronized(lock) {
+            cache = JSONObject()
+            probeFailAt.clear()
+            runCatching { file.delete() }
+        }
     }
 
     /** Tulis cache ke disk (sedikit & jarang; tidak wajib thread-safe ekstra).
