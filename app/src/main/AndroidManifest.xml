@@ -97,9 +97,13 @@
             android:exported="false"
             android:theme="@style/Theme.HttpDownloadManager" />
 
-        <!-- Browser ekstraksi video (WebView) untuk situs anti-bot/Cloudflare. -->
+        <!-- Browser ekstraksi video (WebView) untuk situs anti-bot/Cloudflare.
+             configChanges selaras MainActivity (#241/#265): rotasi tidak
+             menghancurkan activity, jadi WebView tidak memuat ulang halaman
+             dan challenge anti-bot yang sudah lolos tidak diulang. -->
         <activity
             android:name=".WebExtractActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|fontScale|uiMode|locale|layoutDirection"
             android:exported="false"
             android:theme="@style/Theme.HttpDownloadManager" />
 
