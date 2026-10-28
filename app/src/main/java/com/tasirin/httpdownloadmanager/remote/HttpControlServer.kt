@@ -2319,10 +2319,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val offset = (session.param("offset")?.toIntOrNull() ?: 0).coerceAtLeast(0)
         val limit = (session.param("limit")?.toIntOrNull() ?: FS_PAGE_SIZE)
             .coerceIn(1, FS_PAGE_MAX)
+        // Paginasi kursor (keyset): klien boleh mengirim nama entri terakhir
+        // halaman sebelumnya; offset posisional tetap didukung untuk klien
+        // lama. Kursor menang bila keduanya ada (issue #169).
+        val after = session.param("after")
+        val afterDir = session.param("afterDir") == "1"
         return when {
             raw.isEmpty() -> fsRoots()
             raw.startsWith(MS_PREFIX) -> fsListMedia(raw.removePrefix(MS_PREFIX), offset, limit)
-            else -> fsListFiles(raw.removePrefix(FS_PREFIX), offset, limit)
+            else -> fsListFiles(raw.removePrefix(FS_PREFIX), offset, limit, after, afterDir)
         }
     }
 
@@ -2400,7 +2405,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         fsFileListingCache = null
     }
 
-    private fun fsListFiles(path: String, offset: Int, limit: Int): Response {
+    private fun fsListFiles(
+        path: String, offset: Int, limit: Int,
+        after: String? = null, afterDir: Boolean = false
+    ): Response {
         val items = JSONArray()
         val dir = File(path)
         var total = 0
@@ -2415,7 +2423,25 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             total = listing?.first ?: 0
             // Hanya halaman aktif yang dibangun JSON-nya; statistik subfolder
             // (itemCount/totalSize) dihitung paralel untuk halaman itu saja.
-            val page = listing?.second?.drop(offset)?.take(limit).orEmpty()
+            // Kursor keyset: posisi mulai = entri pertama yang urutannya
+            // SESUDAH (jenis, nama) kursor dalam urutan listing yang sama
+            // (folder dulu, lalu nama abaikan huruf besar/kecil). Isi folder
+            // yang berubah antar-halaman tidak lagi menggeser jendela —
+            // entri tidak terlewat/terduplikasi seperti offset (issue #169).
+            // Kursor yang sudah terhapus pun tetap menunjuk posisi sisip
+            // yang benar. Nama yang hanya beda huruf besar/kecil + jenis
+            // sama dianggap posisi yang sama (kasus tepi sangat sempit).
+            val start = if (after != null) {
+                listing?.second?.indexOfFirst { e ->
+                    val eAfter = if (e.isFile != !afterDir) e.isFile else {
+                        e.name.compareTo(after, ignoreCase = true) > 0
+                    }
+                    eAfter
+                }?.let { if (it < 0) total else it } ?: 0
+            } else {
+                offset
+            }
+            val page = listing?.second?.drop(start)?.take(limit).orEmpty()
             val statFutures = if (allowed) {
                 page.filter { it.isDirectory }.associateWith { f ->
                     runCatching { liveStatPool().submit<Pair<Int, Long>> { fsStats(f.absolutePath) } }

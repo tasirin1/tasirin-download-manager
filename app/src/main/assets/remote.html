@@ -1042,6 +1042,8 @@ const FS_LAST_PATH_KEY = 'fsLastPath';
 let fsItems = [];
 let fsTotal = 0;
 let fsOffset = 0;
+let fsAfterName = '';
+let fsAfterDir = false;
 let fsLoadingMore = false;
 let fsLoadSeq = 0;
 const FS_PAGE = 250;
@@ -1343,10 +1345,17 @@ if (e.key === 'Escape' && fsToolsMenuOpen) closeFsToolsMenu();
 if (fsMenuBackdrop) fsMenuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeFsToolsMenu(); });
 let fsLocationsLoaded = false;
 let fsLocationsLoading = false;
+function fsSetAfterCursor() {
+const last = fsItems[fsItems.length - 1];
+fsAfterName = last ? String(last.name || '') : '';
+fsAfterDir = !!(last && last.kind === 'dir');
+}
 async function loadFs() {
 const seq = ++fsLoadSeq;
 showFsSkeleton();
 fsOffset = 0;
+fsAfterName = '';
+fsAfterDir = false;
 fsTotal = 0;
 try {
 const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
@@ -1366,6 +1375,7 @@ b.classList.toggle('hidden', !fsPath || serverReadOnly);
 });
 fsItems = data.items || [];
 fsOffset = fsItems.length;
+fsSetAfterCursor();
 fsTotal = data.total || fsItems.length;
 fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
 if (fsPath) localStorage.setItem(FS_LAST_PATH_KEY, fsPath);
@@ -1544,13 +1554,17 @@ btn.textContent = 'Loading\u2026';
 }
 try {
 const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
-'&offset=' + fsOffset + '&limit=' + FS_PAGE, undefined, 20000);
+(fsAfterName
+? '&after=' + encodeURIComponent(fsAfterName) + '&afterDir=' + (fsAfterDir ? '1' : '0')
+: '&offset=' + fsOffset) +
+'&limit=' + FS_PAGE, undefined, 20000);
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
 if (seq !== fsLoadSeq) return;
 const more = data.items || [];
 fsItems = fsItems.concat(more);
 fsOffset = fsItems.length;
+fsSetAfterCursor();
 fsTotal = data.total || fsItems.length;
 fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
 more.forEach(function (it) { fsAppendRow(fsList, it); });
