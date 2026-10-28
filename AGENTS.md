@@ -371,9 +371,10 @@ kuat dan tanpa diskusi:
   (mis. update GitHub Actions) di-**auto-merge** setelah CI hijau (workflow
   `auto-merge.yml`). PR dependensi Gradle tetap manual karena wajib
   regenerasi metadata verifikasi. Yang di-ignore (perlu upgrade toolchain
-  manual): major AGP & Kotlin, `activity`, `lifecycle` (minSdk 23),
-  `androidx.core` (compileSdk 37). Guard CHANGELOG dikecualikan untuk author
-  `dependabot[bot]`.
+  manual): hanya major AGP & Kotlin. Ignore lama untuk `activity`,
+  `lifecycle`, dan `androidx.core` dicabut 2026-10-28 karena alasannya
+  (minSdk 21 / compileSdk 36) sudah tidak berlaku. Guard CHANGELOG
+  dikecualikan untuk author `dependabot[bot]`.
 - **Setiap perubahan dependensi wajib ikut regenerasi metadata verifikasi**
   (`gradle/verification-metadata.xml`) — verifikasi strict aktif, jadi
   dependensi baru/tanpa checksum membuat CI gagal. Alur: jalankan workflow

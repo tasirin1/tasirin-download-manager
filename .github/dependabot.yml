@@ -33,16 +33,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "org.jetbrains.kotlin.android"
         update-types: ["version-update:semver-major"]
-      # Semua material > 1.12 menuntut minSdk 23; proyek wajib minSdk 21 (Android 5+).
-      # Di-ignore total sampai ada strategi storage/fallback pengganti.
-      - dependency-name: "com.google.android.material:material"
-      # androidx.core 1.17+ menuntut compileSdk 37; proyek di compileSdk 36.
-      # Buka lagi manual setelah upgrade AGP + compileSdk siap.
-      - dependency-name: "androidx.core:core"
-      # Versi terbaru activity/lifecycle menuntut minSdk 23 (proyek wajib 21/Android 5+).
-      - dependency-name: "androidx.activity:activity-ktx"
-      - dependency-name: "androidx.lifecycle:lifecycle-livedata-ktx"
-      - dependency-name: "androidx.lifecycle:lifecycle-viewmodel-ktx"
+      # Ignore lama (material, androidx.core, activity-ktx, lifecycle-*-ktx)
+      # dicabut 2026-10-28: alasannya — minSdk 21 dan compileSdk 36 — sudah
+      # tidak berlaku sesudah proyek naik ke minSdk 23 + compileSdk 37
+      # (PR #116, issue #180).
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
