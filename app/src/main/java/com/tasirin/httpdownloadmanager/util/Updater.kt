@@ -20,12 +20,15 @@ data class UpdateInfo(
  *  dicurigai Play Protect): pengguna mengambil versi baru lewat browser dari
  *  halaman rilis resmi, lalu memasang manual. */
 object Updater {
-    // Format asset baru (pendek): tasirin-download-manager-v1.0.<n>.apk.
-    // Kode versi dibaca dari tag rilis (v1.0.<n> -> 100000+n). Format lama
-    // tasirin-download-manager-v1.0.<n>-<code>.apk tetap diterima sebagai
-    // fallback (kode dari nama file) agar riwayat rilis lama tetap terbaca.
+    // Format asset baru (pendek): tasirin-download-manager-v1.<a>.<b>.apk.
+    // Kode versi dibaca dari tag rilis: nomor lari = a*1000+b (skema
+    // rollover keputusan owner 2026-10-28: komponen ketiga tak mencapai
+    // 1000, v1.0.999 lanjut v1.1.0), kode = 100000+nomor lari. Tag lama
+    // v1.0.<n> dengan n>999 tetap terbaca benar lewat rumus yang sama.
+    // Format lama tasirin-download-manager-v1.0.<n>-<code>.apk tetap
+    // diterima sebagai fallback (kode dari nama file).
     private val LEGACY_APK_CODE_RE = Regex("-(\\d+)\\.apk$")
-    private val TAG_RUN_RE = Regex("^v?1\\.0\\.(\\d+)$")
+    private val TAG_RUN_RE = Regex("^v?1\\.(\\d+)\\.(\\d+)$")
     private const val LATEST_API =
         "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest"
     private const val LIST_API =
@@ -103,9 +106,13 @@ object Updater {
         LEGACY_APK_CODE_RE.find(assetName)?.let { match ->
             return match.groupValues.get(1).toIntOrNull() ?: return null
         }
-        val run = TAG_RUN_RE.find(tag.trim())?.groupValues?.get(1)?.toLongOrNull()
-            ?.takeIf { it in 0..20_000_000 }
-            ?: return null
+        val match = TAG_RUN_RE.find(tag.trim()) ?: return null
+        val minor = match.groupValues[1].toLongOrNull() ?: return null
+        val patch = match.groupValues[2].toLongOrNull() ?: return null
+        // Batas sebelum perkalian agar digit raksasa tak meluber Long.
+        if (minor !in 0..20_000 || patch !in 0..20_000_000) return null
+        val run = minor * 1000 + patch
+        if (run !in 0..20_000_000) return null
         return (100000L + run).toInt()
     }
 

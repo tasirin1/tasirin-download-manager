@@ -258,7 +258,9 @@ kuat dan tanpa diskusi:
    `feat`, `fix`, `ui`, `perf`, `refactor`, `docs`, `chore`, `rebrand`
    (contoh: `ui(remote): ...`, `perf(gallery): ...`). Satu commit satu tujuan.
 4. **Jangan ubah `versionName`/`versionCode` manual** — CI mengoper keduanya
-   per build via `-PverName="1.0.<run_number>" -PverCode=<100000 + run_number>`.
+   per build via `-PverName="1.<run/1000>.<run%1000>" -PverCode=<100000 + run_number>`
+   (skema rollover keputusan owner 2026-10-28: komponen ketiga tak mencapai
+   1000 — v1.0.999 lanjut v1.1.0; `versionCode` tetap monoton 100000+run).
    Nilai di `app/build.gradle.kts` (`"1.0"`/`1`) hanya fallback build lokal/debug.
 5. **Jaga kompatibilitas Android 6 (minSdk 23)**: API di atas API 23 harus
    punya fallback/guard (contoh: `RELATIVE_PATH` API 29+, `NetworkCallback`
@@ -369,7 +371,7 @@ kuat dan tanpa diskusi:
   tanpa perlu memantau workflow (ikut aturan 19); push docs-only tidak memicu build.
 - **Push sukses ke `main`** → workflow `build.yml` menjalankan guard, test,
   build/release, lalu membuat release baru `v<versi>` dengan APK
-  `tasirin-download-manager-v<versi>.apk` (`versi = 1.0.<run_number>`,
+  `tasirin-download-manager-v<versi>.apk` (`versi = 1.<run/1000>.<run%1000>`,
   `code = 100000 + run_number`; rilis lama dipertahankan sebagai riwayat).
 - **Dependabot** → update dikelompokkan (`androidx`, `kotlinx`,
   `jvm-libs`, `gradle-tools`, `actions`). PR yang TIDAK menyentuh dependensi Gradle
@@ -463,7 +465,8 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
 - **Pengaturan baru** → `SettingsActivity.kt` + `StoragePrefs.kt`
   (simpan kunci baru di sana) + `remote.html` bila perlu ditampilkan remote.
 - **Self-update APK** → `Updater.kt` — **cek-saja** (format nama asset
-  kode versi dibaca `Updater` dari tag rilis (`v1.0.<n>` → `100000+n`); nama file lawas `…-<code>.apk` tetap diterima sebagai fallback). Jangan kembalikan
+  kode versi dibaca `Updater` dari tag rilis (`v1.<a>.<b>` → `100000 + a*1000 + b`;
+  tag lama `v1.0.<n>` terbaca lewat rumus yang sama); nama file lawas `…-<code>.apk` tetap diterima sebagai fallback). Jangan kembalikan
   unduh-APK-dalam-aplikasi. Izin `REQUEST_INSTALL_PACKAGES` dipakai hanya untuk installer
   dari daftar unduhan (`openApk()`), bukan untuk unduh-pasangan otomatis.
 - **Log server** → `LogActivity.kt` + buffer log (lihat `App.kt`/engine).
@@ -472,7 +475,7 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
 ## Cara cek rilis terbaru & verifikasi build
 
 - Tiap push ke `main` membuat release baru `v<versi>`; asset APK selalu
-  `tasirin-download-manager-v<versi>.apk` dengan `versi = 1.0.<run_number>`,
+  `tasirin-download-manager-v<versi>.apk` dengan `versi = 1.<run/1000>.<run%1000>`,
   `code = 100000 + run_number`.
 - Jangan ubah `versionName`/`versionCode` manual (keduanya dioper CI via `-P`).
 

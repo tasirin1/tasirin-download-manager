@@ -111,7 +111,11 @@ jobs:
         # startup 0-job) — hitung di shell, teruskan via GITHUB_ENV.
         run: |
           echo "VER_CODE=$((100000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
-          echo "VER_NAME=1.0.${{ github.run_number }}" >> "$GITHUB_ENV"
+          # Skema rollover (keputusan owner 2026-10-28): komponen ketiga
+          # TIDAK mencapai 1000 — nomor lari 999 = v1.0.999, berikutnya
+          # v1.1.0, lalu naik terus (minor = lari/1000, patch = sisa).
+          # VER_CODE tetap 100000+lari (monoton, tak berubah maknanya).
+          echo "VER_NAME=1.$(( ${{ github.run_number }} / 1000 )).$(( ${{ github.run_number }} % 1000 ))" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
@@ -292,7 +296,7 @@ jobs:
           if [ -z "$NOTES" ]; then
             NOTES="APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box."
           fi
-          # Tag unik per build (v1.0.<run_number>) — rilis lama dipertahankan
+          # Tag unik per build (v<VER_NAME>) — rilis lama dipertahankan
           # sebagai riwayat; delete hanya untuk idempotensi bila job rerun.
           gh release delete "v${VER}" --yes --cleanup-tag || true
           # --latest hanya bila nomor build ini >= latest saat ini: re-run
@@ -301,8 +305,15 @@ jobs:
           LATEST_ARGS="--latest"
           CURRENT_LATEST=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name' 2>/dev/null || true)
           if [ -n "$CURRENT_LATEST" ]; then
-            CUR_NUM="${CURRENT_LATEST#v1.0.}"
-            case "$CUR_NUM" in *[!0-9]*|"") CUR_NUM=0 ;; esac
+            # Nomor lari latest saat ini dari tag-nya: skema baru
+            # v1.<minor>.<patch> -> minor*1000+patch; tag lama
+            # v1.0.<n> (n bisa >999) terpetakan benar oleh rumus sama.
+            CUR_VER="${CURRENT_LATEST#v}"
+            CUR_MINOR="${CUR_VER#*.}"; CUR_MINOR="${CUR_MINOR%%.*}"
+            CUR_PATCH="${CUR_VER##*.}"
+            case "$CUR_MINOR" in *[!0-9]*|"") CUR_MINOR=0 ;; esac
+            case "$CUR_PATCH" in *[!0-9]*|"") CUR_PATCH=0 ;; esac
+            CUR_NUM=$((CUR_MINOR * 1000 + CUR_PATCH))
             if [ "${{ github.run_number }}" -lt "$CUR_NUM" ]; then
               LATEST_ARGS=""
               echo "Build ${{ github.run_number }} lebih lama dari latest saat ini ($CURRENT_LATEST) - rilis dibuat TANPA --latest."

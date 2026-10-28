@@ -26,6 +26,27 @@ class UpdaterTest {
     }
 
     @Test
+    fun `tag skema rollover dibaca sebagai minor kali 1000 tambah patch`() {
+        // Keputusan owner 2026-10-28: v1.0.999 lanjut v1.1.0, bukan
+        // v1.0.1000+. Nomor lari minor*1000+patch menjaga kode tetap
+        // 100000+lari sehingga urutan rilis lama dan baru menyatu.
+        assertEquals(
+            101545,
+            Updater.codeFromRelease("v1.1.545", "tasirin-download-manager-v1.1.545.apk")
+        )
+        assertEquals(
+            101000,
+            Updater.codeFromRelease("v1.1.0", "tasirin-download-manager-v1.1.0.apk")
+        )
+        // Tag lama ber-patch >999 (terbit sebelum skema rollover)
+        // terpetakan ke kode yang sama dengan tag barunya.
+        assertEquals(
+            101545,
+            Updater.codeFromRelease("v1.0.1545", "tasirin-download-manager-v1.0.1545.apk")
+        )
+    }
+
+    @Test
     fun `tag tanpa awalan v tetap valid`() {
         assertEquals(
             100005,
