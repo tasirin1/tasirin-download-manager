@@ -2053,11 +2053,14 @@ object SocialMediaExtractor {
     private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
         var current = urlStr
         var activeHeaders = headers
-        // Jar per nama -> (nilai, host pemasang), diakumulasi TIAP hop
-        // (#280, pola fetchDrive #239): versi lama hanya membaca
-        // Set-Cookie respons akhir, jadi cookie sesi yang dipasang hop
-        // redirect perantara hilang dari hasil.
-        val cookieJar = LinkedHashMap<String, Pair<String, String>>()
+        // Jar per (nama, host pemasang) -> (nilai, host pemasang),
+        // diakumulasi TIAP hop (#280, pola fetchDrive #239): versi
+        // lama hanya membaca Set-Cookie respons akhir, jadi cookie
+        // sesi yang dipasang hop redirect perantara hilang dari
+        // hasil. Kunci memuat host (#321): nama generik yang sama
+        // (mis. session) dari host kedua tidak boleh menimpa milik
+        // host pertama beserta tag hostnya.
+        val cookieJar = LinkedHashMap<Pair<String, String>, Pair<String, String>>()
         // Deadline total rantai (#307, pola fetchDrive #246): timeout
         // per hop yang dipasang ulang PENUH membuat satu rantai 6 hop
         // bisa 90-120 dtk — jauh melampaui cap tahap pemanggil — dan
@@ -2099,7 +2102,7 @@ object SocialMediaExtractor {
                 }
                 val jarVisible = cookieJar.entries
                     .filter { cookieJarVisible(it.value.second, currentHost) }
-                    .joinToString("; ") { "${it.key}=${it.value.first}" }
+                    .joinToString("; ") { "${it.key.first}=${it.value.first}" }
                 val effectiveCookie = mergeCookiePairs(userCookie, jarVisible)
                 if (effectiveCookie.isNotEmpty()) {
                     sendHeaders["Cookie"] = effectiveCookie
@@ -2117,8 +2120,19 @@ object SocialMediaExtractor {
                         val pair = raw.substringBefore(';')
                         val eq = pair.indexOf('=')
                         if (eq > 0) {
-                            cookieJar[pair.substring(0, eq).trim()] =
-                                pair.substring(eq + 1).trim() to currentHost
+                            val name = pair.substring(0, eq).trim()
+                            val value = pair.substring(eq + 1).trim()
+                            // Set-Cookie penghapusan (nilai kosong /
+                            // Max-Age=0): entri dibuang, bukan disimpan
+                            // lalu terkirim sebagai 'nama=' (#321).
+                            if (value.isEmpty() ||
+                                raw.contains("max-age=0", ignoreCase = true)
+                            ) {
+                                cookieJar.remove(name to currentHost)
+                            } else {
+                                cookieJar[name to currentHost] =
+                                    value to currentHost
+                            }
                         }
                     }
                 if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
@@ -2139,7 +2153,7 @@ object SocialMediaExtractor {
                 // lintas induk tidak (scoping cookieJarVisible #239).
                 val cookies = cookieJar.entries
                     .filter { cookieJarVisible(it.value.second, currentHost) }
-                    .joinToString("; ") { "${it.key}=${it.value.first}" }
+                    .joinToString("; ") { "${it.key.first}=${it.value.first}" }
                 // Baca terbatas: hindari OOM dari body redirect/HTML raksasa.
                 val body = readBodyLimited(conn.inputStream)
                 return HttpResult(body, cookies)
