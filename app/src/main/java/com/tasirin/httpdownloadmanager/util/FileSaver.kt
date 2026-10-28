@@ -779,13 +779,22 @@ class FileSaver(context: Context) {
             // menelan semua kegagalan, jadi pindah yang "berhasil" bisa
             // berarti sumber masih utuh di lokasi lama (ruang dobel
             // diam-diam). Catat log bila sumber ternyata masih ada.
-            val sumberMasihAda = when {
-                !item.filePath.isNullOrEmpty() -> File(item.filePath).exists()
-                !item.contentUri.isNullOrEmpty() -> runCatching {
-                    DocumentFile.fromSingleUri(appContext, item.contentUri.toUri())?.exists() == true
-                }.getOrDefault(false)
-                else -> false
-            }
+            // Kedua field diperiksa (gabungan OR) sejajar cakupan hapus
+            // deleteFiles, dan cabang contentUri memakai query
+            // netral-provider (issue #497): DocumentFile.fromSingleUri
+            // berorientasi DocumentsProvider sehingga exists() untuk
+            // URI MediaStore lazimnya melempar/kosong dan tertelan
+            // menjadi false — log duplikat tak pernah menyala untuk
+            // sumber terbanyak. Query _ID berlaku untuk MediaStore
+            // maupun dokumen SAF.
+            val sumberMasihAda =
+                (!item.filePath.isNullOrEmpty() && File(item.filePath).exists()) ||
+                (!item.contentUri.isNullOrEmpty() && runCatching {
+                    appContext.contentResolver.query(
+                        item.contentUri.toUri(), arrayOf(MediaStore.MediaColumns._ID),
+                        null, null, null
+                    )?.use { it.moveToFirst() } == true
+                }.getOrDefault(false))
             if (sumberMasihAda) {
                 android.util.Log.w("FileSaver", "move(): source still exists after move, duplicate left behind: ${item.fileName}")
             }
