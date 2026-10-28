@@ -856,12 +856,27 @@ internal fun statFsDirForFolderPath(folderPath: String): java.io.File? {
  *  `.part` SELALU ikut — item bersegmen yang jatuh ke single-stream (fallback
  *  saat Range ditolak) menulis ke basis tanpa sufiks, dan tanpa ini progres
  *  unduhan jeda-lama (>2 jam) terhapus sebagai yatim lalu mengulang dari nol.
+ *  Temp HLS ikut dilindungi (issue #409): namanya BUKAN turunan nama item
+ *  (`~<id8><basis>.video.part` dari DownloadEngine.downloadHls) dan sejak
+ *  #385 isinya adalah data resume lintas-restart — tanpa perlindungan ini
+ *  sapuan menghapusnya untuk jeda >2 jam dan resume mulai dari segmen 0.
  *  Murni agar bisa di-unit-test. */
 internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.DownloadItem): Set<String> {
     val base = FileNames.safe(item.fileName)
     return buildSet {
         add("$base.part")
         item.segments.forEach { add("$base.part.${it.index}") }
+        // Turunan tempBase engine: basis tanpa ekstensi .ts/.mp4, prefiks
+        // "~" + 8 char id. FileNames.safe diterapkan pada nama gabungan
+        // persis seperti partialFile di engine.
+        val hlsBase = base.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { base }
+        val tempBase = "~" + item.id.take(8) + hlsBase
+        for (kind in listOf("video", "audio")) {
+            val temp = FileNames.safe("$tempBase.$kind") + ".part"
+            add(temp)
+            add("$temp.segs")
+            add("$temp.spool")
+        }
     }
 }
 

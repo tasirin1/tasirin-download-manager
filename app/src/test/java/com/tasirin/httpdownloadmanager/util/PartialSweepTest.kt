@@ -29,8 +29,16 @@ class PartialSweepTest {
     }
 
     @Test
-    fun `item tanpa segmen hanya basis`() {
-        assertEquals(setOf("video.mp4.part"), protectedPartialNames(item("video.mp4")))
+    fun `item tanpa segmen basis plus temp HLS`() {
+        // Basis + temp resume HLS (#409); tanpa segmen unduhan biasa.
+        assertEquals(
+            setOf(
+                "video.mp4.part",
+                "~1video.video.part", "~1video.video.part.segs", "~1video.video.part.spool",
+                "~1video.audio.part", "~1video.audio.part.segs", "~1video.audio.part.spool"
+            ),
+            protectedPartialNames(item("video.mp4"))
+        )
     }
 
     @Test
@@ -40,5 +48,18 @@ class PartialSweepTest {
         assertTrue(isSweepablePartial("video.mp4.part.merge.123"))
         assertFalse(isSweepablePartial("video.mp4"))
         assertFalse(isSweepablePartial("notes.txt"))
+    }
+
+    @Test
+    fun `temp resume HLS ikut dilindungi`() {
+        // Turunan DownloadEngine.downloadHls: tempBase = "~" + id8 + basis
+        // tanpa ekstensi; id uji "1" sehingga tempBase "~1video".
+        val names = protectedPartialNames(item("video.mp4"))
+        assertTrue(names.contains("~1video.video.part"))
+        assertTrue(names.contains("~1video.video.part.segs"))
+        assertTrue(names.contains("~1video.video.part.spool"))
+        assertTrue(names.contains("~1video.audio.part"))
+        assertTrue(names.contains("~1video.audio.part.segs"))
+        assertTrue(names.contains("~1video.audio.part.spool"))
     }
 }
