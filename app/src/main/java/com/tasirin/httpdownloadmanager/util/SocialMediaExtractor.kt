@@ -708,7 +708,13 @@ object SocialMediaExtractor {
 
         try {
             val data = JSONObject(playerJson)
-            val title = data.optString("title", "YouTube_$videoId")
+            // Judul TIDAK ada di level atas player response — ia di
+            // videoDetails (atau microformat); membaca "title" di level
+            // atas selalu jatuh ke nama generik (issue #433).
+            val title = data.optJSONObject("videoDetails")?.optString("title")?.takeIf { it.isNotBlank() }
+                ?: data.optJSONObject("microformat")?.optJSONObject("playerMicroformatRenderer")
+                    ?.optJSONObject("title")?.optString("simpleText")?.takeIf { it.isNotBlank() }
+                ?: "YouTube_$videoId"
             val streamingData = data.optJSONObject("streamingData") ?: return emptyList()
             // Baca both formats (muxed) AND adaptiveFormats (separate video/audio)
             val muxedFormats = streamingData.optJSONArray("formats")
