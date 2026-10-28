@@ -591,6 +591,30 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `mergeCookiePairs - pasangan user menang, nama baru ditambahkan`() {
+        assertEquals("session=U; NID=1",
+            SocialMediaExtractor.mergeCookiePairs("session=U", "session=J; NID=1"))
+        assertEquals("a=1", SocialMediaExtractor.mergeCookiePairs("", "a=1"))
+        assertEquals("a=1", SocialMediaExtractor.mergeCookiePairs("a=1", ""))
+    }
+
+    @Test
+    fun `cookieJarVisible - hanya host sama atau domain induk sama`() {
+        assertTrue(SocialMediaExtractor.cookieJarVisible(
+            "drive.google.com", "drive.usercontent.google.com"))
+        assertTrue(SocialMediaExtractor.cookieJarVisible(
+            "google.com", "mail.google.com"))
+        assertTrue(SocialMediaExtractor.cookieJarVisible(
+            "EXAMPLE.com", "example.com"))
+        assertFalse(SocialMediaExtractor.cookieJarVisible(
+            "drive.google.com", "evil.com"))
+        assertFalse(SocialMediaExtractor.cookieJarVisible(
+            "google.com", "google.com.evil.com"))
+        assertFalse(SocialMediaExtractor.cookieJarVisible("", "x.com"))
+        assertFalse(SocialMediaExtractor.cookieJarVisible("x.com", ""))
+    }
+
+    @Test
     fun `parseContentDispositionFileName - bentuk quoted, token, dan RFC 5987`() {
         assertEquals("clip final.mp4", SocialMediaExtractor.parseContentDispositionFileName(
             "attachment; filename=\"clip final.mp4\""))

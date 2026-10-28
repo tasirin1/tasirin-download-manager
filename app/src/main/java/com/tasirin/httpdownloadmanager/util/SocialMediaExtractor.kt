@@ -197,16 +197,40 @@ object SocialMediaExtractor {
                 others += line
             }
         }
-        val seen = userPairs
+        val merged = mergeCookiePairs(userPairs.joinToString("; "), extra)
+        return (others + "Cookie: " + merged).joinToString("\n")
+    }
+
+    /** Gabung dua nilai Cookie: pasangan [user] dipertahankan dan
+     *  didahulukan; pasangan [extra] hanya ditambahkan bila namanya belum
+     *  ada. Murni. */
+    internal fun mergeCookiePairs(user: String, extra: String): String {
+        val merged = user.split(';').map { it.trim() }
+            .filter { it.isNotEmpty() }.toMutableList()
+        val seen = merged
             .map { it.substringBefore('=').trim().lowercase(Locale.ROOT) }
             .toMutableSet()
-        val merged = userPairs.toMutableList()
         for (pair in extra.split(';').map { it.trim() }.filter { it.isNotEmpty() }) {
             val name = pair.substringBefore('=').trim().lowercase(Locale.ROOT)
             if (seen.add(name)) merged += pair
         }
-        return (others + "Cookie: " + merged.joinToString("; "))
-            .joinToString("\n")
+        return merged.joinToString("; ")
+    }
+
+    /** Cookie yang dipasang [setHost] boleh dikirim ke [targetHost] hanya
+     *  bila host sama atau berbagi domain induk yang sama (dua label
+     *  terakhir, mis. drive.google.com -> drive.usercontent.google.com).
+     *  Tanpa scoping ini jar fetchDrive mengirim cookie ke host redirect
+     *  mana pun (#239). Aproksimasi sadar: akhiran publik dua lapis
+     *  (co.uk dsb.) dianggap satu induk. Murni. */
+    internal fun cookieJarVisible(setHost: String, targetHost: String): Boolean {
+        val s = setHost.trim().lowercase(Locale.ROOT)
+        val t = targetHost.trim().lowercase(Locale.ROOT)
+        if (s.isEmpty() || t.isEmpty()) return false
+        if (s == t) return true
+        val sd = s.split('.').takeLast(2).joinToString(".")
+        val td = t.split('.').takeLast(2).joinToString(".")
+        return sd == td && sd.contains('.')
     }
 
     fun isSocialMediaUrl(url: String): Boolean {
@@ -1486,17 +1510,36 @@ object SocialMediaExtractor {
     private fun fetchDrive(urlStr: String, headers: Map<String, String>): DriveFetch? {
         var current = urlStr
         var activeHeaders = headers
-        val cookieJar = LinkedHashMap<String, String>()
+        // Jar per nama -> (nilai, host pemasang): cookie hanya dikirim ke
+        // host/domain induk yang sama (#239), bukan ke host redirect mana
+        // pun seperti jar polos sebelumnya.
+        val cookieJar = LinkedHashMap<String, Pair<String, String>>()
         repeat(6) {
             val conn = openTlsConn(current)
             try {
                 conn.connectTimeout = PAGE_TIMEOUT_MS
                 conn.readTimeout = PAGE_TIMEOUT_MS
                 conn.instanceFollowRedirects = false
-                val sendHeaders = LinkedHashMap(activeHeaders)
-                if (cookieJar.isNotEmpty() && !sendHeaders.containsKey("Cookie")) {
-                    sendHeaders["Cookie"] =
-                        cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                val currentHost = runCatching { java.net.URI(current).host }
+                    .getOrNull().orEmpty()
+                // Pisahkan Cookie user (kunci huruf apa pun): cek
+                // containsKey("Cookie") yang peka huruf dulu membuat jar
+                // menimpa cookie: huruf kecil milik user.
+                var userCookie = ""
+                val sendHeaders = LinkedHashMap<String, String>()
+                for ((k, v) in activeHeaders) {
+                    if (k.equals("Cookie", ignoreCase = true)) {
+                        userCookie = v
+                    } else {
+                        sendHeaders[k] = v
+                    }
+                }
+                val jarVisible = cookieJar.entries
+                    .filter { cookieJarVisible(it.value.second, currentHost) }
+                    .joinToString("; ") { "${it.key}=${it.value.first}" }
+                val effectiveCookie = mergeCookiePairs(userCookie, jarVisible)
+                if (effectiveCookie.isNotEmpty()) {
+                    sendHeaders["Cookie"] = effectiveCookie
                 }
                 sendHeaders.forEach { (k, v) -> conn.setRequestProperty(k, v) }
                 if (!sendHeaders.containsKey("User-Agent")) {
@@ -1511,7 +1554,7 @@ object SocialMediaExtractor {
                         val eq = pair.indexOf('=')
                         if (eq > 0) {
                             cookieJar[pair.substring(0, eq).trim()] =
-                                pair.substring(eq + 1).trim()
+                                pair.substring(eq + 1).trim() to currentHost
                         }
                     }
                 if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
@@ -1529,8 +1572,11 @@ object SocialMediaExtractor {
                 if (code !in 200..299) return null
                 val type = conn.contentType.orEmpty()
                 val cd = conn.getHeaderField("Content-Disposition")
-                val cookiesStr =
-                    cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                // Cookie hasil untuk unduhan: hanya yang ter-scope ke host
+                // final (bukan seluruh jar lintas host).
+                val cookiesStr = cookieJar.entries
+                    .filter { cookieJarVisible(it.value.second, currentHost) }
+                    .joinToString("; ") { "${it.key}=${it.value.first}" }
                 val html = if (type.contains("text/html", ignoreCase = true)) {
                     readBodyLimited(conn.inputStream)
                 } else {
