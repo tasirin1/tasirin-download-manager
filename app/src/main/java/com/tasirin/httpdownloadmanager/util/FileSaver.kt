@@ -622,11 +622,20 @@ class FileSaver(context: Context) {
         // protectedPartialNames (sumber yang sama dengan perlindungan
         // sapuan); scratch diturunkan dari tempBase engine yang sama.
         val hlsBase = item.fileName.removeSuffix(".ts").removeSuffix(".mp4").ifBlank { item.fileName }
-        val tempBase = "~" + item.id.take(8) + hlsBase
+        // Basis adaptive BERBEDA dari basis HLS (issue #467):
+        // downloadAdaptiveMuxed membuang .mp4/.webm sedangkan
+        // downloadHls membuang .ts/.mp4 — untuk item .webm (hasil
+        // strategi Piped) basis engine adalah "film" tetapi basis HLS
+        // di sini "film.webm", sehingga scratch adaptive-nya lolos
+        // bila hanya diturunkan dari basis HLS. Turunkan dari keduanya.
+        val adaptiveBase = item.fileName.removeSuffix(".mp4").removeSuffix(".webm").ifBlank { item.fileName }
         val extraNames = buildSet {
             addAll(protectedPartialNames(item))
-            for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
-                add(FileNames.safe("$tempBase.$kind") + ".part")
+            for (base in setOf(hlsBase, adaptiveBase)) {
+                val tempBase = "~" + item.id.take(8) + base
+                for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
+                    add(FileNames.safe("$tempBase.$kind") + ".part")
+                }
             }
         }
         extraNames.forEach { name -> runCatching { File(downloadDir, name).delete() } }
