@@ -135,15 +135,28 @@ def admin_consistency() -> Result:
     try:
         stale = (ROOT / ".github/workflows/stale.yml").read_text(encoding="utf-8")
         issue_days = pr_days = ""
+        issue_msg = pr_msg = ""
         for line in stale.splitlines():
             s = line.strip()
             if s.startswith("days-before-issue-stale:"):
                 issue_days = s.split(":", 1)[1].strip()
             elif s.startswith("days-before-pr-stale:"):
                 pr_days = s.split(":", 1)[1].strip()
-        if issue_days and f"{issue_days} hari" not in stale:
+            elif s.startswith("stale-issue-message:"):
+                issue_msg = s.split(":", 1)[1]
+            elif s.startswith("stale-pr-message:"):
+                pr_msg = s.split(":", 1)[1]
+        # Fail-closed + tepat sasaran (issue #196): baris konfigurasi yang
+        # hilang adalah masalah (dulu cek terlewat diam-diam), dan angka
+        # hari dicari HANYA di dalam pesan stale-nya (dulu di seluruh teks
+        # berkas sehingga bisa cocok di tempat tak terkait).
+        if not issue_days:
+            problems.append("stale.yml: baris days-before-issue-stale hilang")
+        elif f"{issue_days} hari" not in issue_msg:
             problems.append(f"pesan stale issue tidak menyebut {issue_days} hari")
-        if pr_days and f"{pr_days} hari" not in stale:
+        if not pr_days:
+            problems.append("stale.yml: baris days-before-pr-stale hilang")
+        elif f"{pr_days} hari" not in pr_msg:
             problems.append(f"pesan stale PR tidak menyebut {pr_days} hari")
     except OSError as exc:
         problems.append(f"stale.yml tak terbaca: {exc}")
@@ -205,10 +218,18 @@ def admin_consistency() -> Result:
             problems.append(f"AGENTS.md tak menyebut AGP {agp_ver.group(1)}")
         jacoco = _re.search(r'minimum\s*=\s*"0\.(\d+)"', app_build)
         if jacoco:
-            pct = f"8,{jacoco.group(1)[1:]}" if jacoco.group(1).startswith("0") else jacoco.group(1)
-            # Bentuk umum: "0.085" -> "8,5" di dokumen Indonesia.
-            expect = "8,5" if jacoco.group(0).endswith('"0.085"') else None
-            if expect and expect not in agents:
+            # Bentuk umum (issue #196): persen desimal eksak, mis.
+            # "0.085" -> "8,5" di dokumen Indonesia — berlaku untuk
+            # ambang berapa pun, bukan hanya 0.085.
+            digit = jacoco.group(1)
+            skala = 10 ** len(digit)
+            utuh, sisa = divmod(int(digit) * 100, skala)
+            if sisa:
+                pecahan_str = str(sisa).rjust(len(digit), "0").rstrip("0")
+                expect = f"{utuh},{pecahan_str}"
+            else:
+                expect = f"{utuh}"
+            if expect not in agents:
                 problems.append("AGENTS.md ambang JaCoCo tak sinkron dengan app/build.gradle.kts")
     except OSError as exc:
         problems.append(f"cek toolchain tak terbaca: {exc}")
