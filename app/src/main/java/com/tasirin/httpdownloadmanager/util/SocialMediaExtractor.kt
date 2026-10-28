@@ -345,14 +345,19 @@ object SocialMediaExtractor {
         // tikwm.com punya beberapa host; coba www dulu lalu tanpa www sebagai cadangan
         // (salah satu bisa diblokir sesaat oleh ISP atau throttling API).
         val hosts = listOf("https://www.tikwm.com", "https://tikwm.com")
-        var obj: JSONObject? = null
-        for (host in hosts) {
-            val json = httpGet("$host/api/?url=$encoded&hd=1") ?: continue
-            val parsed = runCatching { JSONObject(json) }.getOrNull() ?: continue
-            if (parsed.optInt("code", -1) == 0) {
-                obj = parsed
-                break
+        // Cap tahap (#266): dua host x rantai redirect helper bisa menduduki
+        // thread IO jauh melewati batas total bila keduanya menggantung.
+        val obj = runStageCapped(20_000L) {
+            var found: JSONObject? = null
+            for (host in hosts) {
+                val json = httpGet("$host/api/?url=$encoded&hd=1") ?: continue
+                val parsed = runCatching { JSONObject(json) }.getOrNull() ?: continue
+                if (parsed.optInt("code", -1) == 0) {
+                    found = parsed
+                    break
+                }
             }
+            found
         }
         val data = obj?.optJSONObject("data") ?: return emptyList()
         val title = data.optString("title", "")
@@ -590,13 +595,17 @@ object SocialMediaExtractor {
 
         // Strategi 1: VISIONOS player API — URL stream tanpa n-signature.
         // URL adaptif/HLS dari client ini bisa langsung di-download (tidak 403).
-        val vision = extractYouTubeViaVisionos(videoId, user)
+        // Kedua strategi dibungkus cap tahap (#266): fetch pemblokir tidak
+        // patuh withTimeoutOrNull, jadi tanpa cap satu strategi bisa
+        // menduduki thread IO jauh melewati batas total 60 detik.
+        val vision = runStageCapped(24_000L) { extractYouTubeViaVisionos(videoId, user) }
         if (vision != null) {
             return listOf(vision)
         }
 
         // Strategi 2: halaman WEB (ytInitialPlayerResponse) + fallback Piped/Invidious.
-        return extractYouTubeFromPage(url, videoId, user)
+        return runStageCapped(30_000L) { extractYouTubeFromPage(url, videoId, user) }
+            ?: emptyList()
     }
 
     /** Ekstrak URL non-HLS dari YouTube: halaman WEB langsung + fallback Piped/Invidious.
@@ -606,10 +615,16 @@ object SocialMediaExtractor {
             val videoId = extractYouTubeId(url) ?: return@withContext null
             val user = parseUserHeaders(headers)
             // Strategi 0: coba adaptiveFormats dari VISIONOS (URL langsung tanpa HLS)
-            val visionAdaptive = extractYouTubeViaVisionosAdaptive(videoId, user)
+            // Cap tahap juga di sini (#266): jalur ini tidak punya
+            // withTimeoutOrNull sama sekali, jadi dulu benar-benar tak berbatas.
+            val visionAdaptive = runStageCapped(24_000L) {
+                extractYouTubeViaVisionosAdaptive(videoId, user)
+            }
             if (visionAdaptive != null) return@withContext visionAdaptive
             // Strategi 1: halaman WEB + Piped/Invidious/Cobalt
-            val results = extractYouTubeFromPage(url, videoId, user)
+            val results = runStageCapped(30_000L) {
+                extractYouTubeFromPage(url, videoId, user)
+            } ?: emptyList()
             results.firstOrNull { it.directUrl.startsWith("http") }
         } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
     }
