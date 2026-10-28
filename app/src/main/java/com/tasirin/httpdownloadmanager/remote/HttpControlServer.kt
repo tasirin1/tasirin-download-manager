@@ -2405,7 +2405,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (!dir.isDirectory) return null
         val entries = runCatching { dir.listFiles() }.getOrNull()
             ?.sortedWith(
-                compareBy<File> { it.isFile }.thenComparator { a, b ->
+                // Kelompok folder = isDirectory (bukan !isFile): harus sama
+                // dengan field kind dan predikat kursor keyset, kalau tidak
+                // entri bukan-berkas-bukan-folder (symlink rusak/FIFO)
+                // terurut di kelompok folder tetapi tercatat berkas
+                // (issue #186).
+                compareBy<File> { !it.isDirectory }.thenComparator { a, b ->
                     a.name.compareTo(b.name, ignoreCase = true)
                 }
             ) ?: return null
@@ -2449,10 +2454,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // sama dianggap posisi yang sama (kasus tepi sangat sempit).
             val start = if (after != null) {
                 listing?.second?.indexOfFirst { e ->
-                    val eAfter = if (e.isFile != !afterDir) e.isFile else {
+                    // Kelompok yang sama dengan sortir + kind: folder dulu,
+                    // lalu kelompok berkas (issue #186).
+                    val grupE = if (e.isDirectory) 0 else 1
+                    val grupKursor = if (afterDir) 0 else 1
+                    if (grupE != grupKursor) {
+                        grupE > grupKursor
+                    } else {
                         e.name.compareTo(after, ignoreCase = true) > 0
                     }
-                    eAfter
                 }?.let { if (it < 0) total else it } ?: 0
             } else {
                 offset
