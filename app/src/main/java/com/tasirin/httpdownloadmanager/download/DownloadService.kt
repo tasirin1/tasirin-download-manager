@@ -49,7 +49,7 @@ class DownloadService : Service() {
             StoragePrefs.isServerStartAllowed(this) && !App.httpServer.isAlive
         ) {
             scope.launch(Dispatchers.IO) {
-                runCatching { App.httpServer.startServer() }
+                App.startHttpServer()
             }
         }
         scope.launch(Dispatchers.IO) {
@@ -128,7 +128,7 @@ class DownloadService : Service() {
     override fun onTimeout(startId: Int, fgsType: Int) {
         App.logEvent("SERVICE TIMEOUT: foreground type=$fgsType; pausing work")
         runCatching { App.engine.pauseAll() }
-        runCatching { App.httpServer.stopServer() }
+        App.stopHttpServer()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf(startId)
     }

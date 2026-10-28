@@ -121,11 +121,12 @@ class App : Application() {
             runCatching { if (::httpServer.isInitialized) httpServer.appendLog(message) }
         }
 
-        // Kunci khusus restart server (issue #260): SettingsActivity
+        // Kunci khusus siklus hidup server (issue #260): SettingsActivity
         // memanggil restartHttpServer dari coroutine IO BARU tiap simpan,
         // jadi dua restart bisa berjalan bersamaan dan saling menyela
         // (snapshot dari instance yang sedang dihentikan, dua instance
         // baru berebut port, satu instance bocor tak pernah dihentikan).
+        // Sejak #286 kunci yang sama juga membungkus start/stop langsung.
         private val restartServerLock = Any()
 
         /** Buat ulang server remote dengan port terbaru dari prefs.
@@ -156,6 +157,22 @@ class App : Application() {
                 }
             }
         }
+
+        /** Start server di bawah kunci siklus hidup yang sama (#286):
+         *  start/stop langsung tanpa kunci bisa menyela restart yang
+         *  sedang berjalan — mis. stop penegakan PIN tiba SEBELUM langkah
+         *  start milik restart menukar instance, sehingga server berakhir
+         *  MENYALA walau aksi terakhir pengguna mematikannya. */
+        fun startHttpServer(): Boolean =
+            synchronized(restartServerLock) {
+                runCatching { httpServer.startServer() }.isSuccess
+            }
+
+        /** Stop server di bawah kunci siklus hidup yang sama (#286). */
+        fun stopHttpServer(): Boolean =
+            synchronized(restartServerLock) {
+                runCatching { httpServer.stopServer() }.isSuccess
+            }
 
         fun appendCrash(context: android.content.Context, tag: String, t: Throwable) {
             CrashLog.append(context, tag, t)

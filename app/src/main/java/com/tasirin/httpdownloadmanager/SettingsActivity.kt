@@ -474,9 +474,9 @@ class SettingsActivity : AppCompatActivity() {
             binding.serverSwitch.isEnabled = false
             lifecycleScope.launch {
                 val operation = if (started) {
-                    withContext(Dispatchers.IO) { runCatching { App.httpServer.stopServer() }.isSuccess }
+                    withContext(Dispatchers.IO) { App.stopHttpServer() }
                 } else {
-                    withContext(Dispatchers.IO) { runCatching { App.httpServer.startServer() }.isSuccess }
+                    withContext(Dispatchers.IO) { App.startHttpServer() }
                 }
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     if (!operation) {
@@ -616,7 +616,7 @@ class SettingsActivity : AppCompatActivity() {
                 StoragePrefs.setServerBackgroundEnabled(this, false)
                 StoragePrefs.setServerAutoStartEnabled(this, false)
                 lifecycleScope.launch {
-                    withContext(Dispatchers.IO) { runCatching { App.httpServer.stopServer() } }
+                    withContext(Dispatchers.IO) { App.stopHttpServer() }
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
                         stopServiceIfIdle()
                         renderServer()
@@ -936,7 +936,7 @@ class SettingsActivity : AppCompatActivity() {
                 StoragePrefs.setServerBackgroundEnabled(this, false)
                 StoragePrefs.setServerAutoStartEnabled(this, false)
                 lifecycleScope.launch {
-                    withContext(Dispatchers.IO) { runCatching { App.httpServer.stopServer() } }
+                    withContext(Dispatchers.IO) { App.stopHttpServer() }
                     stopServiceIfIdle()
                     renderServer()
                 }

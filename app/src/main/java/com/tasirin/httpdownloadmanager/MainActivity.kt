@@ -368,7 +368,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             StoragePrefs.isServerStartAllowed(this) && !App.httpServer.isAlive
         ) {
             lifecycleScope.launch(Dispatchers.IO) {
-                runCatching { App.httpServer.startServer() }
+                App.startHttpServer()
             }
         }
         handleIncomingIntent(intent)
