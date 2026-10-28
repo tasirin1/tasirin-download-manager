@@ -1028,7 +1028,10 @@ object SocialMediaExtractor {
                         val ext = if (mime.contains("webm")) "webm" else "mp4"
                         val safeName = sanitizeFileName(title)
                         val quality = s.optString("quality", "Unknown")
-                        options.add(Result(u, "${safeName}.$ext", title, quality, MIME_MP4))
+                        // mimeType harus mime stream itu sendiri: ekstensi
+                        // sudah diturunkan darinya, jadi berkas .webm yang
+                        // tercatat video/mp4 salah label (issue #434).
+                        options.add(Result(u, "${safeName}.$ext", title, quality, mime))
                     }
                 }
                 options
