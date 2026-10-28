@@ -2786,9 +2786,9 @@ class DownloadEngine(appContext: Context) {
             if (!body.contains("#EXT-X-ENDLIST")) {
                 throw IOException("Live HLS not supported (playlist without EXT-X-ENDLIST)")
             }
-            if (isEncryptedHlsPlaylist(body)) {
-                throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
-            }
+            // Cek enkripsi kedua di sini dulu ada dan tak terjangkau
+            // (kode mati, issue #423): gerbang di pintu masuk fungsi
+            // sudah melempar untuk body yang sama.
             val durations = direct.durationsUs
             return HlsPlan(
                 segments, videoSegmentDurationsUs = durations,
