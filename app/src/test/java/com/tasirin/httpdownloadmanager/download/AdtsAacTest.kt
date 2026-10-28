@@ -57,6 +57,23 @@ class AdtsAacTest {
     }
 
     @Test
+    fun `stripId3Stream setara stripId3 dan menghitung byte tertulis`() {
+        val data = id3 + adtsFrame(1, 7, 2, 100) + id3 + adtsFrame(1, 7, 2, 50)
+        val expected = AdtsAac.stripId3(data)
+        val out = java.io.ByteArrayOutputStream()
+        val written = AdtsAac.stripId3Stream(java.io.ByteArrayInputStream(data), out)
+        assertEquals(expected.size.toLong(), written)
+        assertEquals(expected.toList(), out.toByteArray().toList())
+        // Data tanpa tag dan data kosong lolos apa adanya.
+        val plain = adtsFrame(1, 7, 2, 10)
+        val out2 = java.io.ByteArrayOutputStream()
+        assertEquals(plain.size.toLong(), AdtsAac.stripId3Stream(java.io.ByteArrayInputStream(plain), out2))
+        assertEquals(plain.toList(), out2.toByteArray().toList())
+        assertEquals(0L, AdtsAac.stripId3Stream(
+            java.io.ByteArrayInputStream(ByteArray(0)), java.io.ByteArrayOutputStream()))
+    }
+
+    @Test
     fun `data bukan ADTS - null`() {
         assertNull(AdtsAac.parse(ByteArray(4)))
         assertNull(AdtsAac.parse(byteArrayOf(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07)))

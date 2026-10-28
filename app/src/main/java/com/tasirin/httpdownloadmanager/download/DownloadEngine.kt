@@ -44,9 +44,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 import kotlin.coroutines.coroutineContext
+import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
@@ -2132,7 +2133,7 @@ class DownloadEngine(appContext: Context) {
                     // bisa dibaca parser ADTS.
                     downloadSegmentsToFile(
                         item, audioPlan, audioAdts, buffer, throttle, progress,
-                        transform = { AdtsAac.stripId3(it) }
+                        stripId3Segments = true
                     )
                     val stream = AdtsAac.open(audioAdts)
                     if (stream != null && !stream.isEmpty) audioStream = stream
@@ -2232,8 +2233,10 @@ class DownloadEngine(appContext: Context) {
         var estimateTotalBytes = 0L
     }
 
-    /** Unduh daftar segmen ke satu file. Tiap segmen ditulis setelah sukses
-     *  penuh (anti-korup) dan boleh di-transform (mis. strip ID3 audio). */
+    /** Unduh daftar segmen ke satu file. Tiap segmen di-stream dulu ke
+     *  berkas spool dan hanya disalin ke tujuan sesudah sukses penuh
+     *  (anti-korup), tanpa ditampung utuh di RAM (issue #371); segmen
+     *  audio boleh di-strip ID3 secara streaming saat penyalinan. */
     private suspend fun downloadSegmentsToFile(
         item: DownloadItem,
         urls: List<String>,
@@ -2241,49 +2244,60 @@ class DownloadEngine(appContext: Context) {
         buffer: ByteArray,
         throttle: SpeedThrottle,
         progress: HlsProgress,
-        transform: (ByteArray) -> ByteArray = { it },
+        stripId3Segments: Boolean = false,
         fallbackQuery: String = ""
     ) {
-        BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
-            for (url in urls) {
-                coroutineContext.ensureActive()
-                val segBytes = fetchHlsSegmentWithRetry(
-                    item, url, buffer, throttle, progress.downloaded,
-                    fallbackQuery = fallbackQuery,
-                    notify = { segNow -> reportHlsProgress(item, progress, segNow) },
-                    onLength = { declared ->
-                        // Segmen referensi dari header Content-Length (ukuran
-                        // mentah) hanya untuk estimasi sisa; ukuran PASTI segmen
-                        // yang sudah selesai memakai hasil tulis riil di bawah
-                        // supaya konsisten dengan bytesDownloaded (audio di-strip
-                        // ID3 sehingga ukuran tulis bisa lebih kecil).
-                        if (progress.refSegBytes == 0L && declared >= HLS_REF_SEGMENT_MIN) {
-                            progress.refSegBytes = declared
+        val spool = File(target.absoluteFile.parentFile, target.name + ".spool")
+        try {
+            BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
+                for (url in urls) {
+                    coroutineContext.ensureActive()
+                    fetchHlsSegmentWithRetry(
+                        item, url, buffer, throttle, progress.downloaded, spool,
+                        fallbackQuery = fallbackQuery,
+                        notify = { segNow -> reportHlsProgress(item, progress, segNow) },
+                        onLength = { declared ->
+                            // Segmen referensi dari header Content-Length (ukuran
+                            // mentah) hanya untuk estimasi sisa; ukuran PASTI segmen
+                            // yang sudah selesai memakai hasil tulis riil di bawah
+                            // supaya konsisten dengan bytesDownloaded (audio di-strip
+                            // ID3 sehingga ukuran tulis bisa lebih kecil).
+                            if (progress.refSegBytes == 0L && declared >= HLS_REF_SEGMENT_MIN) {
+                                progress.refSegBytes = declared
+                            }
+                        }
+                    )
+                    val written = BufferedInputStream(FileInputStream(spool)).use { segIn ->
+                        if (stripId3Segments) {
+                            AdtsAac.stripId3Stream(segIn, out)
+                        } else {
+                            segIn.copyTo(out, BUFFER_SIZE)
                         }
                     }
-                )
-                val written = transform(segBytes)
-                out.write(written)
-                progress.downloaded += written.size
-                progress.segmentsDone++
-                // Song referensi cadangan: bila header tidak memberi ukuran wajar,
-                // pakai ukuran tulis riil segmen data pertama.
-                if (progress.refSegBytes == 0L && written.size >= HLS_REF_SEGMENT_MIN) {
-                    progress.refSegBytes = written.size.toLong()
+                    spool.delete()
+                    progress.downloaded += written
+                    progress.segmentsDone++
+                    // Song referensi cadangan: bila header tidak memberi ukuran wajar,
+                    // pakai ukuran tulis riil segmen data pertama.
+                    if (progress.refSegBytes == 0L && written >= HLS_REF_SEGMENT_MIN) {
+                        progress.refSegBytes = written
+                    }
+                    if (progress.segmentsDone > 0) {
+                        progress.avgSegBytes = progress.downloaded / progress.segmentsDone
+                    }
+                    // Total mendekati mutlak: jumlah ukuran riil segmen selesai +
+                    // estimasi stabil (refSegBytes x sisa), supaya angka tidak bergoyang.
+                    val known = progress.exactBytes + written
+                    progress.exactBytes = known
+                    val remaining = progress.totalSegments - progress.segmentsDone
+                    progress.exactTotal = known +
+                        (if (remaining > 0 && progress.refSegBytes > 0) {
+                            progress.refSegBytes * remaining
+                        } else 0L)
                 }
-                if (progress.segmentsDone > 0) {
-                    progress.avgSegBytes = progress.downloaded / progress.segmentsDone
-                }
-                // Total mendekati mutlak: jumlah ukuran riil segmen selesai +
-                // estimasi stabil (refSegBytes x sisa), supaya angka tidak bergoyang.
-                val known = progress.exactBytes + written.size
-                progress.exactBytes = known
-                val remaining = progress.totalSegments - progress.segmentsDone
-                progress.exactTotal = known +
-                    (if (remaining > 0 && progress.refSegBytes > 0) {
-                        progress.refSegBytes * remaining
-                    } else 0L)
             }
+        } finally {
+            spool.delete()
         }
     }
 
@@ -2528,16 +2542,17 @@ class DownloadEngine(appContext: Context) {
         buffer: ByteArray,
         throttle: SpeedThrottle,
         committed: Long,
+        spool: File,
         notify: (Long) -> Unit,
         onLength: (Long) -> Unit = {},
         fallbackQuery: String = ""
-    ): ByteArray {
+    ): Long {
         var attempts = 0
         while (true) {
             coroutineContext.ensureActive()
             try {
                 return fetchHlsSegment(
-                    item, url, buffer, throttle, committed, notify, onLength
+                    item, url, buffer, throttle, committed, spool, notify, onLength
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -2550,7 +2565,7 @@ class DownloadEngine(appContext: Context) {
                     App.logEvent("HLS: segment 404/403, retrying with playlist query")
                     return fetchHlsSegment(
                         item, url + fallbackQuery, buffer, throttle,
-                        committed, notify, onLength
+                        committed, spool, notify, onLength
                     )
                 }
                 attempts++
@@ -2559,15 +2574,21 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
+    /** Unduh satu segmen HLS dengan streaming ke berkas spool [spool]
+     *  (bukan ditampung utuh di RAM — issue #371); mengembalikan jumlah
+     *  byte mentah yang terunduh. Berkas tujuan akhir hanya disentuh
+     *  pemanggil sesudah fungsi ini sukses penuh, jadi sifat anti-korup
+     *  per segmen tetap sama seperti saat segmen ditampung di memori. */
     private suspend fun fetchHlsSegment(
         item: DownloadItem,
         url: String,
         buffer: ByteArray,
         throttle: SpeedThrottle,
         committed: Long,
+        spool: File,
         notify: (Long) -> Unit,
         onLength: (Long) -> Unit = {}
-    ): ByteArray {
+    ): Long {
         val segConn = trackOpenedConnection(
             item.id,
             openAuthenticatedConnection(
@@ -2584,20 +2605,21 @@ class DownloadEngine(appContext: Context) {
             // Content-Length header segmen (bila ada) = ukuran pasti segmen ini.
             val declared = segConn.contentLength.toLong().takeIf { it > 0 }
             if (declared != null) onLength(declared)
-            val segBuf = ByteArrayOutputStream()
+            var segBytes = 0L
             val input = segConn.inputStream
             try {
-                var segBytes = 0L
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read == -1) break
-                    segBytes += read
-                    if (segBytes > HLS_SEGMENT_MAX_BYTES) {
-                        throw IOException("HLS segment too large")
+                BufferedOutputStream(FileOutputStream(spool), BUFFER_SIZE).use { segOut ->
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        segBytes += read
+                        if (segBytes > HLS_SEGMENT_MAX_BYTES) {
+                            throw IOException("HLS segment too large")
+                        }
+                        segOut.write(buffer, 0, read)
+                        throttle.sleepIfNeeded { committed + segBytes }
+                        notify(segBytes)
                     }
-                    segBuf.write(buffer, 0, read)
-                    throttle.sleepIfNeeded { committed + segBytes }
-                    notify(segBytes)
                 }
                 // Verifikasi panjang terhadap Content-Length yang dinyatakan:
                 // EOF prematur pada respons chunked bisa tiba tanpa exception
@@ -2613,7 +2635,7 @@ class DownloadEngine(appContext: Context) {
             } finally {
                 runCatching { input.close() }
             }
-            return segBuf.toByteArray()
+            return segBytes
         } finally {
             untrackConnection(item.id, segConn)
         }

@@ -4,6 +4,7 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
+import java.io.OutputStream
 
 /** Parser ADTS AAC murni JVM — dipakai untuk audio HLS YouTube yang berupa
  *  ADTS (bukan MPEG-TS). Menghasilkan csd-0 (AudioSpecificConfig) dan frame
@@ -104,6 +105,57 @@ object AdtsAac {
         }
         out.write(data, runStart, data.size - runStart)
         return out.toByteArray()
+    }
+
+    /** Versi streaming dari [stripId3]: semantik yang sama (tag ID3 di
+     *  posisi mana pun dibuang), tetapi data mengalir lewat jendela
+     *  lihat-depan 10 byte sehingga segmen besar tidak ditampung utuh
+     *  di RAM (issue #371). Mengembalikan jumlah byte yang ditulis. */
+    fun stripId3Stream(input: InputStream, out: OutputStream): Long {
+        var written = 0L
+        val head = ByteArray(10)
+        var headLen = 0
+        fun refill() {
+            while (headLen < 10) {
+                val r = input.read(head, headLen, 10 - headLen)
+                if (r == -1) break
+                headLen += r
+            }
+        }
+        refill()
+        while (headLen > 0) {
+            val tag = if (headLen == 10) id3TagSize(head, 0) else 0
+            if (tag > 0) {
+                // head memuat 10 byte pertama tag; buang sisanya langsung
+                // dari stream, lalu isi ulang jendela dari posisi baru.
+                var remaining = tag - headLen
+                while (remaining > 0) {
+                    val skipped = input.skip(remaining.toLong())
+                    if (skipped > 0) {
+                        remaining -= skipped.toInt()
+                    } else if (input.read() == -1) {
+                        remaining = 0
+                    } else {
+                        remaining--
+                    }
+                }
+                headLen = 0
+                refill()
+            } else {
+                out.write(head[0].toInt())
+                written++
+                System.arraycopy(head, 1, head, 0, headLen - 1)
+                headLen--
+                if (headLen == 9) {
+                    val r = input.read()
+                    if (r != -1) {
+                        head[9] = r.toByte()
+                        headLen = 10
+                    }
+                }
+            }
+        }
+        return written
     }
 
     /** Parse data ADTS (boleh diawali ID3). null bila tidak ada frame AAC. */
