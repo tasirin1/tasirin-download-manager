@@ -748,7 +748,13 @@ class DownloadEngine(appContext: Context) {
                 // Media playlist (single-quality): HLS valid tanpa pilihan
                 // kualitas — daftar kosong, bukan null (null = bukan HLS).
                 if (HlsParser.isMediaPlaylist(body)) return emptyList()
+                // Fallback longgar seperti parseHlsPlan (issue #465):
+                // master berformat STREAM-INF tak umum (kasus YouTube
+                // 2026) yang gagal di parseMaster ketat tetap harus
+                // menawarkan pemilih kualitas di dialog, bukan langsung
+                // antre dengan kualitas bawaan.
                 HlsParser.parseMaster(body, conn.url.toString())
+                    ?: HlsParser.parseMasterLenient(body, conn.url.toString())
             } finally {
                 conn.disconnect()
             }
