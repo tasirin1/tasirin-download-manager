@@ -29,6 +29,7 @@ import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.readBounded
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -86,7 +87,8 @@ class DownloadEngine(appContext: Context) {
         if (current == null || current === it) {
             runCatching { java.net.CookieHandler.setDefault(it) }
         }
-        loadPersistedCookies()
+        // loadPersistedCookies() TIDAK lagi di sini: baca + parse cookie
+        // persisten ikut muatan latar di init (#242), bukan main thread.
     }
 
     /** Buka koneksi; untuk https tambahkan trust anchor CA lama (Android 6-7). */
@@ -185,9 +187,13 @@ class DownloadEngine(appContext: Context) {
     @Volatile
     private var interruptedResumed = false
 
-    private val _items = MutableStateFlow<List<DownloadItem>>(
-        repository.load().sortedByDescending { it.addedAt }
-    )
+    /** Gerbang muatan awal (#242): selesai sesudah antrean + cookie
+     *  persisten terpasang dari latar. Simpan/resume/cleanup menunggu
+     *  gerbang ini agar daftar yang belum utuh tidak menimpa data
+     *  tersimpan atau membersihkan partial milik item yang belum termuat. */
+    private val loadGate = CompletableDeferred<Unit>()
+
+    private val _items = MutableStateFlow<List<DownloadItem>>(emptyList())
     val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
 
     // Progres segmen per item (indeks segmen -> byte): segmen menulis di sini
@@ -205,18 +211,49 @@ class DownloadEngine(appContext: Context) {
     private val throttleTotals = ConcurrentHashMap<String, AtomicLong>()
 
     init {
-        // Rekonsiliasi cadangan .replaced yatim (issue #237): proses yang
-        // mati di jendela verifikasi checksum meninggalkan penggantian
-        // terparkir (pendingReplacements hanya hidup di memori).
-        reconcileOrphanedReplacements()
-        // Migrasi penyimpanan lemah (issue #209): kredensial plaintext
-        // warisan/fallback ditulis ulang terenkripsi SEKARANG saat start,
-        // bukan menunggu persist penuh berikutnya yang entah kapan.
-        if (repository.hasWeakStoredCredentials()) {
-            App.logEvent("STORAGE: weak credential storage found, re-encrypting")
-            flushSave()
+        // Muat antrean + cookie persisten di LATAR (#242): dulu
+        // repository.load() (parse JSON seluruh antrean + dekripsi
+        // Keystore per item) dan loadPersistedCookies() berjalan sinkron
+        // di main thread dari App.onCreate — jank start sebanding ukuran
+        // antrean di perangkat lemah. _items mulai kosong dan terisi
+        // sekali di sini; loadGate menahan simpan/resume/cleanup sampai
+        // muatan pertama terpasang.
+        scope.launch {
+            try {
+                val loaded = runCatching { repository.load() }
+                    .getOrDefault(emptyList())
+                runCatching { loadPersistedCookies() }
+                // Item yang ditambahkan selama jendela muat tidak hilang:
+                // gabungkan yang belum ada di hasil muatan.
+                val extras = _items.value.filter { cur ->
+                    loaded.none { it.id == cur.id }
+                }
+                _items.value = (loaded + extras)
+                    .sortedByDescending { it.addedAt }
+                loadGate.complete(Unit)
+                // Rekonsiliasi cadangan .replaced yatim (issue #237):
+                // proses yang mati di jendela verifikasi checksum
+                // meninggalkan penggantian terparkir (pendingReplacements
+                // hanya hidup di memori).
+                reconcileOrphanedReplacements()
+                // Migrasi penyimpanan lemah (issue #209): kredensial
+                // plaintext warisan/fallback ditulis ulang terenkripsi
+                // SEKARANG saat start, bukan menunggu persist penuh
+                // berikutnya yang entah kapan.
+                if (repository.hasWeakStoredCredentials()) {
+                    App.logEvent(
+                        "STORAGE: weak credential storage found, re-encrypting"
+                    )
+                    flushSave()
+                } else if (extras.isNotEmpty()) {
+                    // Simpan yang teredam gerbang selama jendela muat.
+                    flushSave()
+                }
+            } finally {
+                loadGate.complete(Unit)
+            }
+            startBackgroundLoops()
         }
-        startBackgroundLoops()
     }
 
     private fun startBackgroundLoops() {
@@ -401,6 +438,16 @@ class DownloadEngine(appContext: Context) {
     fun resumeInterrupted() {
         if (interruptedResumed) return
         interruptedResumed = true
+        // Antrean belum termuat (muatan latar #242): tunda sampai gerbang
+        // terbuka agar resume tidak menilai daftar kosong lalu selesai.
+        if (!loadGate.isCompleted) {
+            scope.launch { loadGate.await(); doResumeInterrupted() }
+            return
+        }
+        doResumeInterrupted()
+    }
+
+    private fun doResumeInterrupted() {
         // DOWNLOADING ikut dipulihkan: state ini terpersist saat proses mati
         // mendadak sehingga tanpa ini item zombie macet selamanya (tidak
         // auto-lanjut dan tombol resume menolaknya).
@@ -854,6 +901,13 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun cleanupOrphans() {
+        // Antrean belum termuat (muatan latar #242): tunda — menilai
+        // partial sebagai yatim dari daftar kosong akan menghapus berkas
+        // milik item yang belum sempat termuat.
+        if (!loadGate.isCompleted) {
+            scope.launch { loadGate.await(); cleanupOrphans() }
+            return
+        }
         // Load terdegradasi (blob antrean corrupt): daftar kosong bukan
         // berarti tak ada partial aktif — lewati agar file user tak terhapus.
         if (shouldSkipOrphanCleanup(_items.value.size, repository.hadStoredItems())) {
@@ -3459,6 +3513,11 @@ class DownloadEngine(appContext: Context) {
 
     @Synchronized
     private fun scheduleSave() {
+        // Sebelum muatan pertama terpasang, daftar belum utuh: simpan
+        // sekarang bisa menimpa antrean tersimpan dengan daftar kosong
+        // (#242). Penambahan selama jendela muat disimpan flushSave
+        // penutup muatan.
+        if (!loadGate.isCompleted) return
         saveJob?.cancel()
         saveJob = scope.launch {
             delay(SAVE_DEBOUNCE_MS)
@@ -3471,6 +3530,7 @@ class DownloadEngine(appContext: Context) {
      *  detail segmen, disimpan paling cepat tiap 2 detik selama download aktif. */
     @Synchronized
     private fun scheduleProgressSave() {
+        if (!loadGate.isCompleted) return
         val now = monotonicNow()
         if (now - lastProgressSaveAt < PROGRESS_SAVE_INTERVAL_MS) return
         lastProgressSaveAt = now
@@ -3482,6 +3542,8 @@ class DownloadEngine(appContext: Context) {
 
     @Synchronized
     private fun flushSave() {
+        // Sama seperti scheduleSave: jangan persist daftar belum utuh.
+        if (!loadGate.isCompleted) return
         saveJob?.cancel()
         saveJob = null
         // Sinkron: state pause/cancel/selesai/add tidak boleh hilang bila
