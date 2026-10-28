@@ -653,7 +653,11 @@ object MediaLibrary {
                         true
                     }
                         .filter { it.isFile && isGalleryVideo(it.name) }
-                        .take(GALLERY_MAX_ENTRIES)
+                        // Anggaran sisa global, bukan 3000 penuh per
+                        // sumber (issue #413): gabungan walk bisa
+                        // mematerialkan 3000 x jumlah folder sebelum
+                        // dipangkas di akhir.
+                        .take((GALLERY_MAX_ENTRIES - list.size).coerceAtLeast(0))
                         .forEach { addFile(it) }
                 }
             }
@@ -677,8 +681,9 @@ object MediaLibrary {
         //    video di folder pilihan tetap tampil apa pun isi MediaStore.
         //    Dedupe di bawah memakai filePath, jadi baris MediaStore yang sama
         //    tidak akan dobel (durasi dari MediaStore tetap menang karena
-        //    section 4 lebih dulu). Dibatasi GALLERY_MAX_ENTRIES agar traversal
-        //    berhenti lebih awal pada folder raksasa.
+        //    section 4 lebih dulu). Dibatasi anggaran sisa GALLERY_MAX_ENTRIES
+        //    (issue #413: sebelumnya take penuh PER folder, jadi N folder
+        //    terpilih bisa mematerialkan 3000 x N entri sebelum pangkas akhir).
         if (folderFilterActive) {
             for (folder in allowedFolders) {
                 val dir = File(folder.raw)
@@ -691,7 +696,7 @@ object MediaLibrary {
                         true
                     }
                         .filter { it.isFile && isGalleryVideo(it.name) }
-                        .take(GALLERY_MAX_ENTRIES)
+                        .take((GALLERY_MAX_ENTRIES - list.size).coerceAtLeast(0))
                         .forEach { addFile(it) }
                 }
             }
