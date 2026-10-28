@@ -120,7 +120,7 @@ object HlsParser {
             if (!ln.startsWith("#EXT-X-STREAM-INF:")) continue
             val next = lines.getOrNull(idx + 1)?.trim().orEmpty()
             if (next.isEmpty() || next.startsWith("#")) continue
-            if (!next.startsWith("http") && !next.startsWith("/")) continue
+            if (!next.startsWith("http", ignoreCase = true) && !next.startsWith("/")) continue
             val bw = BANDWIDTH_RE.find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
             // Semantik height SAMA seperti parseMaster (issue #393):
             // dimensi terkecil, agar video portrait 720x1280 tercatat
@@ -175,7 +175,10 @@ object HlsParser {
                 val foreignAbsolute = isForeignAbsoluteUri(line)
                 if (!foreignAbsolute) {
                     val url = resolveUrl(baseUrl, line)
-                    if (url.startsWith("http")) {
+                    // Skema tak peka huruf (RFC 3986): segmen HTTPS://
+                    // kapital sah dan resolveUrl mempertahankannya —
+                    // saringan peka huruf membuangnya diam-diam (issue #463).
+                    if (url.startsWith("http", ignoreCase = true)) {
                         segments.add(url)
                         durations.add(pendingDurationUs ?: 0L)
                     }

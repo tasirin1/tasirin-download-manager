@@ -246,6 +246,23 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseDirectMedia - segmen ber-skema kapital diterima`() {
+        // Skema URI tak peka huruf (RFC 3986): resolveUrl mempertahankan
+        // HTTPS:// apa adanya, jadi saringan penerimaan wajib ignoreCase
+        // juga — kalau tidak segmen sah ini dibuang diam-diam (issue #463).
+        val body = "#EXTM3U\n" +
+            "#EXTINF:4.0,\n" +
+            "HTTPS://cdn.example.com/segK.ts\n" +
+            "#EXTINF:6.0,\n" +
+            "seg2.ts\n"
+        val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/a.m3u8")
+        assertEquals(2, direct.segments.size)
+        assertEquals("HTTPS://cdn.example.com/segK.ts", direct.segments[0])
+        assertEquals(4_000_000L, direct.durationsUs[0])
+        assertEquals(6_000_000L, direct.durationsUs[1])
+    }
+
+    @Test
     fun `parseDirectMedia - tag dan baris kosong bukan segmen`() {
         val body = "#EXTM3U\n\n#EXT-X-VERSION:3\nseg1.ts\n"
         val direct = HlsParser.parseDirectMedia(body, "https://cdn.example.com/a.m3u8")
