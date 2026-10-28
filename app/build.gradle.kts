@@ -25,7 +25,7 @@ android {
         // (tidak ada onBackPressed custom, pakai OnBackPressedDispatcher AndroidX).
         targetSdk = 36
         // Nilai dasar build lokal; CI mengoper -PverName/-PverCode per build
-        // (name 1.0 titik run_number, code 100000 tambah run_number).
+        // (name 1.<run/1000>.<run%1000> skema rollover, code 100000 + run).
         versionCode = (findProperty("verCode") as String?)?.toIntOrNull() ?: 1
         versionName = (findProperty("verName") as String?) ?: "1.0"
     }
