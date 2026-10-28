@@ -34,7 +34,13 @@ class DownloadService : Service() {
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.createChannel(this)
+        // Kegagalan startForeground berkonsekuensi berat di API 31+
+        // (proses dibunuh sistem) — jangan ditelan diam-diam; catat
+        // nama exception-nya saja sebagai jejak diagnosis (issue #205).
         runCatching { startForegroundCompat() }
+            .onFailure {
+                App.logEvent("SERVICE: startForeground gagal (${it.javaClass.simpleName})")
+            }
         App.logEvent("SERVICE STARTED (background downloads)")
         if (StoragePrefs.isBackgroundEnabled(this)) {
             App.engine.resumeInterrupted()
