@@ -255,9 +255,11 @@ class FileSaver(context: Context) {
         }
     }
 
-    /** Klaim dokumen tujuan di folder kustom SAF secara atomik dalam
+    /** Klaim dokumen tujuan di folder/dokumen SAF secara atomik dalam
      *  proses: pilih nama unik + findFile + createFile di dalam kunci
-     *  nama yang sama seperti klaim MediaStore (issue #404). Tanpa
+     *  nama yang sama seperti klaim MediaStore (issue #404; pemakai:
+     *  writeCustomFolder, publishToCustomFolder, move, dan cabang SAF
+     *  organizeByType sejak #410). Tanpa
      *  kunci, dua publish paralel bernama sama sama-sama menilai satu
      *  nama "bebas"; pada provider yang createFile-nya mengembalikan
      *  berkas yang sudah ada, openOutputStream "wt" salah satu men-
@@ -633,9 +635,10 @@ class FileSaver(context: Context) {
     fun move(item: DownloadItem, destTreeUri: Uri): PublishResult? {
         return runCatching {
             val tree = DocumentFile.fromTreeUri(appContext, destTreeUri) ?: return null
-            val unique = uniqueDocumentName(tree, item.fileName)
-            val target = tree.createFile(MimeTypes.forFile(unique), unique)
-                ?: return null
+            // Klaim berkunci seperti publish folder kustom (issue #410):
+            // pola cek-lalu-buat tanpa kunci di sini bisa memilih nama yang
+            // sama dengan publish paralel bernama sama.
+            val (target, _, _) = claimCustomDoc(tree, item.fileName) ?: return null
             try {
                 // Sumber dibaca di dalam try: bila tak bisa dibuka (URI basi /
                 // file hilang / null), target kosong yang terlanjur dibuat
@@ -767,12 +770,11 @@ class FileSaver(context: Context) {
                         val subDir = parent.findFile(sub)
                             ?: parent.createDirectory(sub)
                             ?: return result
-                        // Nama unik seperti cabang filesystem (uniqueTargetFile):
-                        // findFile/createFile nama asli menimpa file senama
-                        // di subfolder (truncate via "wt") lalu sumber dihapus.
-                        val unique = uniqueDocumentName(subDir, fileName)
-                        val target = subDir.findFile(unique)
-                            ?: subDir.createFile(MimeTypes.forFile(unique), unique)
+                        // Klaim berkunci seperti jalur SAF lain (issue
+                        // #410): nama dipilih + dokumen dibuat atomik di
+                        // dalam kunci nama, bukan cek-lalu-buat terpisah
+                        // yang bisa tabrakan dengan klaim paralel senama.
+                        val (target, _, _) = claimCustomDoc(subDir, fileName)
                             ?: return result
                         val input = appContext.contentResolver.openInputStream(uri)
                             ?: run {
