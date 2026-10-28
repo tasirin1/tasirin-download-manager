@@ -39,6 +39,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.core.content.FileProvider
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -214,8 +215,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             App.engine.items.collect { items ->
                 val sizeChanged = items.size != lastItems.size
                 lastItems = items
-                // Auto-open file yang baru selesai (video → player; APK tidak dibuka otomatis)
-                if (StoragePrefs.isAutoOpenComplete(this@MainActivity)) {
+                // Auto-open file yang baru selesai (video → player; APK → installer).
+                // Hanya saat activity di depan (STARTED): collector ini jalan
+                // di lifecycleScope polos sehingga tetap aktif saat STOPPED,
+                // dan startActivity dari latar ditahan sistem di API 29+ /
+                // menyela aplikasi lain di API lama. Transisi selesai tetap
+                // terdeteksi saat activity kembali ke depan karena
+                // lastItemStates tidak diperbarui selama di latar.
+                if (StoragePrefs.isAutoOpenComplete(this@MainActivity) &&
+                    lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                ) {
                     runCatching { autoOpenCompleted(items) }
                 }
                 runCatching {
@@ -1552,6 +1561,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
         // Peta state di-update in-place (bukan associate per emisi): emisi
         // StateFlow tiap tick tak perlu membangun HashMap N-entry baru.
+        // Maksimal SATU berkas dibuka per emisi: sejak gerbang STARTED
+        // (#149), semua unduhan yang selesai selama aplikasi di latar tiba
+        // dalam satu emisi saat pengguna kembali — membuka semuanya
+        // menumpuk player/installer berurutan. Sisanya tetap ditandai
+        // sudah ditangani (tidak menembak di emisi berikutnya) dan bisa
+        // dibuka manual dari daftar (issue #176).
+        var openedThisEmission = false
         for (item in items) {
             val prev = lastItemStates[item.id]
             if (item.state == DownloadState.COMPLETED &&
@@ -1560,8 +1576,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 prev != null && prev != DownloadState.COMPLETED
             ) {
                 autoOpenedIds.add(item.id)
-                runCatching {
-                    autoOpenSingle(item)
+                if (!openedThisEmission) {
+                    openedThisEmission = true
+                    runCatching {
+                        autoOpenSingle(item)
+                    }
                 }
             }
             if (prev != item.state) lastItemStates[item.id] = item.state

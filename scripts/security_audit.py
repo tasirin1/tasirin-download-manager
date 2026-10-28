@@ -15,6 +15,7 @@ Pemakaian:
 
 Suppression per baris:
   ... // audit-ignore: id_aturan
+  // audit-ignore-next: id_aturan   (di baris SEBELUM baris sasaran)
 Gunakan hanya untuk pengecualian yang benar-benar aman dan tulis alasannya
 di komentar/baris terdekat. Tidak ada mekanisme ignore global.
 """
@@ -359,12 +360,20 @@ def scan_text(
 
     for index, line in enumerate(lines):
         previous = lines[index - 1] if index else None
-        next_line = lines[index + 1] if index + 1 < len(lines) else None
-        next_ignore = NEXT_IGNORE_RE.search(next_line) if next_line else None
+        # Konvensi umum (seperti eslint-disable-next-line): marker
+        # audit-ignore-next di baris SEBELUM menekan temuan baris ini.
+        # Semantik lama terbalik (marker di baris SESUDAH yang menekan),
+        # jebakan laten yang membingungkan — diperbaiki di issue #150.
+        prev_next_ignore = NEXT_IGNORE_RE.search(previous) if previous else None
         for rule, pattern in compiled:
             if ignored_on_line(line, previous, rule.rule_id):
                 continue
-            if next_ignore and rule.rule_id in next_ignore.group(1):
+            # Token persis (belah koma + strip) seperti ignored_on_line:
+            # pencocokan substring membuat prosa yang kebetulan memuat id
+            # rule ikut menekan temuan (issue #175).
+            if prev_next_ignore and rule.rule_id in (
+                part.strip() for part in prev_next_ignore.group(1).split(",")
+            ):
                 continue
             match = pattern.search(line)
             if not match:
@@ -454,9 +463,15 @@ def run_self_test() -> int:
             "}",
         ],
         Path("sample.js"): [
-            "const value = eval(userInput);",
             "// audit-ignore-next: js_dynamic_exec",
+            "const value = eval(userInput);",
             "const capability = new Function('a => a');",
+        ],
+        Path("sample2.js"): [
+            # Marker prosa yang hanya MEMUAT id rule sebagai substring
+            # tidak boleh menekan temuan (issue #175).
+            "// audit-ignore-next: bukan_js_dynamic_exec_sama_sekali",
+            "const other = eval(userInput);",
         ],
         Path("sample.txt"): [
             f"GITHUB_TOKEN={github_token}",
@@ -482,7 +497,8 @@ def run_self_test() -> int:
     }
     missing = required - by_rule
     suppressed = any(
-        item["rule_id"] == "js_dynamic_exec" and item["line"] == 1
+        item["rule_id"] == "js_dynamic_exec" and item["line"] == 2
+        and item["path"] == "sample.js"
         for item in findings
     )
     str_leak = [
@@ -490,9 +506,13 @@ def run_self_test() -> int:
         for item in findings
         if item["rule_id"] == "kotlin_empty_catch" and item["path"] == "sample_str.kt"
     ]
-    if missing or suppressed or str_leak:
+    prose_suppressed = not any(
+        item["rule_id"] == "js_dynamic_exec" and item["path"] == "sample2.js"
+        for item in findings
+    )
+    if missing or suppressed or str_leak or prose_suppressed:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0

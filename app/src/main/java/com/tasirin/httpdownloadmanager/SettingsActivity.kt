@@ -381,8 +381,13 @@ class SettingsActivity : AppCompatActivity() {
         var bytes = 0L
         fun deleteIf(f: File) {
             if (!f.isFile) return
-            bytes += f.length()
-            if (f.delete()) files++
+            // Byte hanya dihitung BILA hapus berhasil: angka yang dilaporkan
+            // ke pengguna adalah ruang yang benar-benar dibebaskan.
+            val len = f.length()
+            if (f.delete()) {
+                files++
+                bytes += len
+            }
         }
         // File di disk memakai FileNames.safe(): bandingkan nama safe agar
         // .part AKTIF yang namanya disanitasi (|?:*, >200 char, reserved)

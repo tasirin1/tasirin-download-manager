@@ -2023,6 +2023,9 @@ connReloadBtn.addEventListener('click', function () {
 const THEME_KEY = 'dm_theme';
 let themeMode = 'auto';
 try { themeMode = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) {}
+// Validasi ke himpunan sah: nilai localStorage adalah data tak tepercaya
+// dan themeMode mengalir ke innerHTML tombol tema di applyTheme().
+if (themeMode !== 'auto' && themeMode !== 'light' && themeMode !== 'dark') themeMode = 'auto';
 const themeMq = (window.matchMedia && typeof window.matchMedia === 'function')
   ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 function effectiveTheme() {
@@ -3091,6 +3094,11 @@ const FS_LAST_PATH_KEY = 'fsLastPath';
 let fsItems = [];
 let fsTotal = 0;
 let fsOffset = 0;
+// Kursor keyset halaman File Manager: nama + jenis entri terakhir yang
+// sudah dimuat. Offset posisional bergeser bila isi folder berubah
+// antar-halaman; kursor nama tetap stabil (issue #169).
+let fsAfterName = '';
+let fsAfterDir = false;
 let fsLoadingMore = false;
 let fsLoadSeq = 0;
 const FS_PAGE = 250;
@@ -3429,10 +3437,18 @@ if (fsMenuBackdrop) fsMenuBackdrop.addEventListener('click', function (e) { e.st
 let fsLocationsLoaded = false;
 let fsLocationsLoading = false;
 
+function fsSetAfterCursor() {
+  const last = fsItems[fsItems.length - 1];
+  fsAfterName = last ? String(last.name || '') : '';
+  fsAfterDir = !!(last && last.kind === 'dir');
+}
+
 async function loadFs() {
   const seq = ++fsLoadSeq;
   showFsSkeleton();
   fsOffset = 0;
+  fsAfterName = '';
+  fsAfterDir = false;
   fsTotal = 0;
   try {
     const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
@@ -3452,6 +3468,11 @@ async function loadFs() {
       b.classList.toggle('hidden', !fsPath || serverReadOnly);
     });
     fsItems = data.items || [];
+    // Offset halaman berikutnya mulai sesudah halaman pertama ini; tanpa ini
+    // fsLoadMore meminta offset=0 lagi (halaman pertama dobel, sisa berkas
+    // tidak pernah termuat).
+    fsOffset = fsItems.length;
+    fsSetAfterCursor();
     fsTotal = data.total || fsItems.length;
     fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
     if (fsPath) localStorage.setItem(FS_LAST_PATH_KEY, fsPath);
@@ -3637,13 +3658,17 @@ async function fsLoadMore() {
   }
   try {
     const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath) +
-      '&offset=' + fsOffset + '&limit=' + FS_PAGE, undefined, 20000);
+      (fsAfterName
+        ? '&after=' + encodeURIComponent(fsAfterName) + '&afterDir=' + (fsAfterDir ? '1' : '0')
+        : '&offset=' + fsOffset) +
+      '&limit=' + FS_PAGE, undefined, 20000);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (seq !== fsLoadSeq) return;
     const more = data.items || [];
     fsItems = fsItems.concat(more);
     fsOffset = fsItems.length;
+    fsSetAfterCursor();
     fsTotal = data.total || fsItems.length;
     fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
     more.forEach(function (it) { fsAppendRow(fsList, it); });
@@ -5469,7 +5494,13 @@ function showListSkeleton() {
   }
   box.innerHTML = html + '</div>';
 }
+// Penjaga urutan snapshot (pola sama seperti gallerySeq/fsLoadSeq): tiga
+// sumber (refresh, SSE, polling) bisa selesai tak berurutan; snapshot yang
+// lebih lama tidak boleh menimpa state yang lebih baru.
+let snapSeq = 0;
+let snapApplied = 0;
 async function refresh() {
+  const mySeq = ++snapSeq;
   if (!hasLoadedItems) showListSkeleton();
   try {
     const res = await fetch(API + '/api/downloads');
@@ -5479,6 +5510,8 @@ async function refresh() {
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    if (mySeq <= snapApplied) return;
+    snapApplied = mySeq;
     failCount = 0;
     hasLoadedItems = true;
     statusLine.textContent = '';
@@ -6258,7 +6291,10 @@ async function doActionNow(id, action, extra) {
     }
     refresh();
   } catch (e) {
-    fsMsg('Action failed: ' + e.message, true);
+    // Semua pemanggil doActionNow adalah UI Downloads; fsMsg menulis ke
+    // #fsStatus di dalam #fsView yang hidden di luar route files sehingga
+    // error (terutama delete gagal) tak terlihat sama sekali.
+    showToast('Action failed: ' + e.message, 4000, 'error');
   }
 }
 
@@ -6396,6 +6432,13 @@ function probeSocialQuality() {
     return;
   }
   setPlatformBadge(u);
+  // Opsi milik tautan sebelumnya langsung dikosongkan saat input berubah,
+  // bukan menunggu timer debounce menyala: submit dalam jendela 400 ms
+  // tidak boleh memakai pilihan tautan lama (issue #168). Kedua select
+  // dibangun ulang oleh timer seperti biasa.
+  socialPlatform = '';
+  socialVideoOptions = [];
+  socialPhotoOptions = [];
   socialDebounce = setTimeout(function () {
     var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
     if (isYT) {
@@ -6427,6 +6470,12 @@ function probeSocialQuality() {
     fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        // Respons basi: pengguna sudah mengganti tautan selama probe
+        // berjalan — opsi tautan lama tidak boleh menimpa tautan sekarang.
+        // Bandingkan TOKEN PERTAMA terkini (cara capture u yang sama):
+        // membandingkan seluruh isi kolom membuat input multi-URL tidak
+        // pernah cocok sehingga picker mati total (issue #164).
+        if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
         if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
         socialPlatform = d.platform || 'social';
         var videos = d.videos || [];
@@ -6455,6 +6504,9 @@ function probeSocialQuality() {
         }
       })
       .catch(function () {
+        // Probe basi gagal pun tidak boleh menyembunyikan picker milik
+        // probe tautan yang lebih baru (token pertama, seperti di atas).
+        if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
         document.getElementById('platformBadge').classList.add('hidden');
         qualitySelect.classList.add('hidden');
         photoSelect.classList.add('hidden');
@@ -6523,7 +6575,10 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
   }
   try {
     if (sendAll && socialPhotoOptions.length > 1) {
-      // Download all carousel photos at once
+      // Download all carousel photos at once. Setiap respons WAJIB dicek:
+      // penolakan server yang ditelan diam-diam membuat foto hilang tanpa
+      // pemberitahuan apa pun.
+      var allFailed = 0;
       for (var ci = 0; ci < socialPhotoOptions.length; ci++) {
         var cOpt = socialPhotoOptions[ci];
         if (!cOpt || !cOpt.url) continue;
@@ -6539,12 +6594,15 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         } else {
           allBody.append('headers', document.getElementById('dlHeaders').value.trim());
         }
-        await fetch(API + '/api/add', {
+        var aRes = await fetch(API + '/api/add', {
           method: 'POST',
           body: allBody,
           headers: {'X-Requested-With': 'XMLHttpRequest'}
         });
+        var aData = await aRes.json().catch(function () { return null; });
+        if (!aRes.ok || !aData || !aData.ok) allFailed++;
       }
+      if (allFailed) throw new Error(allFailed + ' of ' + socialPhotoOptions.length + ' photos failed to add');
     } else {
     const res = await fetch(API + '/api/add', {
       method: 'POST',
@@ -6556,7 +6614,10 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
     }
     }
-    // Send additional URLs as separate requests
+    // Send additional URLs as separate requests. Kegagalan URL tambahan
+    // tidak boleh ditelan: URL yang gagal dikembalikan ke kolom agar bisa
+    // dicoba lagi, dan pengguna diberi tahu.
+    var failedExtras = [];
     for (var i = 1; i < urls.length; i++) {
       try {
         var extraBody = new URLSearchParams({url: urls[i]});
@@ -6564,11 +6625,28 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         extraBody.append('priority', document.getElementById('priority').value);
         extraBody.append('path', document.getElementById('storage').value.trim());
         extraBody.append('method', document.getElementById('dlMethod').value);
-        await fetch(API + '/api/add', {
+        var xRes = await fetch(API + '/api/add', {
           method: 'POST', body: extraBody,
           headers: {'X-Requested-With': 'XMLHttpRequest'}
         });
-      } catch (x) {}
+        var xData = await xRes.json().catch(function () { return null; });
+        if (!xRes.ok || !xData || !xData.ok) failedExtras.push(urls[i]);
+      } catch (x) { failedExtras.push(urls[i]); }
+    }
+    if (failedExtras.length) {
+      document.getElementById('url').value = failedExtras.join('\n');
+      // Keadaan sosial milik kiriman lama dibersihkan: kolom kini berisi
+      // URL lain dan submit berikutnya adalah unduhan biasa — tanpa ini,
+      // sendAll/pilihan lama dari carousel sebelumnya ikut terkirim
+      // padahal URL-nya sudah tidak ada di kolom (issue #165).
+      socialPlatform = '';
+      socialVideoOptions = [];
+      socialPhotoOptions = [];
+      document.getElementById('socialQuality').style.display = 'none';
+      document.getElementById('photoSelect').style.display = 'none';
+      refresh();
+      showToast(failedExtras.length + ' additional URL(s) failed — kept in the field for retry.', 4500, 'error');
+      return;
     }
     document.getElementById('url').value = '';
     toggleAddForm(false);
@@ -6609,6 +6687,9 @@ function connectEvents() {
         showConnBanner('Server stopped or port changed. Check the app → Remote (HTTP) for the new address.');
         return;
       }
+      // Push SSE adalah state terbaru menurut definisi: naikkan penanda
+      // agar fetch snapshot yang mulai lebih dulu dibuang saat selesai.
+      snapApplied = ++snapSeq;
       const items = data.items || [];
       lastItems = items;
       if (data.status) applyServerStatus(data.status);
@@ -6664,6 +6745,7 @@ function schedulePoll() {
 }
 
 async function pollSnapshot() {
+  const mySeq = ++snapSeq;
   try {
     const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
     if (!res.ok) {
@@ -6671,6 +6753,8 @@ async function pollSnapshot() {
       throw new Error('HTTP ' + res.status);
     }
     const data = await res.json();
+    if (mySeq <= snapApplied) return;
+    snapApplied = mySeq;
     failCount = 0;
     hasLoadedItems = true;
     statusLine.textContent = '';

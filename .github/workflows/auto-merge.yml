@@ -23,7 +23,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FILES=$(gh pr view ${{ github.event.pull_request.number }} -R ${{ github.repository }} --json files --jq '.files[].path' 2>/dev/null || true)
+          # Gagal-TERTUTUP: kegagalan API / daftar kosong tidak boleh jatuh
+          # ke "bukan dependensi Gradle" lalu auto-merge aktif (issue #152).
+          if ! FILES=$(gh pr view ${{ github.event.pull_request.number }} -R ${{ github.repository }} --json files --jq '.files[].path'); then
+            echo "::error::Gagal membaca daftar file PR - auto-merge dibatalkan."
+            exit 1
+          fi
+          if [ -z "$FILES" ]; then
+            echo "::error::Daftar file PR kosong - auto-merge dibatalkan."
+            exit 1
+          fi
           echo "File berubah di PR:"
           echo "$FILES"
           if echo "$FILES" | grep -qE '^(app/build\.gradle\.kts|build\.gradle\.kts|gradle/|gradle\.properties|settings\.gradle\.kts)'; then

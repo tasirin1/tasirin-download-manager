@@ -289,15 +289,27 @@ object HlsMp4Muxer {
         muxer: MediaMuxer,
         track: Int
     ) {
-        val buffer = ByteBuffer.allocate(1 shl 20)
+        var buffer = ByteBuffer.allocate(1 shl 20)
         val info = MediaCodec.BufferInfo()
         var firstPts = -1L
         var lastPts = -1L
         var drift = 0L
         while (true) {
             buffer.clear()
-            val size = ext.readSampleData(buffer, 0)
+            var size = ext.readSampleData(buffer, 0)
             if (size < 0) break
+            // Sampel lebih besar dari buffer tetap 1 MiB (keyframe besar):
+            // baca ulang dengan buffer lebih besar TANPA advance (sampel
+            // sama), pola yang sama seperti jalur video di berkas ini.
+            // Tanpa jalur ini remux gagal total / track terpotong diam-diam.
+            if (size > buffer.capacity()) {
+                if (size > MAX_MUX_FRAME_BYTES) {
+                    throw IOException("oversized sample $size bytes in writeTrackPts")
+                }
+                buffer = ByteBuffer.allocate(size)
+                size = ext.readSampleData(buffer, 0)
+                if (size < 0) break
+            }
             buffer.position(0)
             buffer.limit(size)
             val pts = ext.sampleTime
