@@ -3490,7 +3490,14 @@ class DownloadEngine(appContext: Context) {
             // Decrypt menoleransi data lama: payload plaintext pra-#204
             // (JSON tanpa prefix Crypto) dikembalikan apa adanya.
             val raw = cookiePrefs.getString("cookies", null) ?: return
-            val arr = JSONArray(Crypto.decrypt(raw))
+            val plain = Crypto.decrypt(raw)
+            if (plain.isEmpty() && Crypto.isEncrypted(raw)) {
+                // Blob v1: tak terdekripsi (kunci Keystore ter-invalidasi
+                // dsb, #221): seluruh cookie persisten hilang — catat agar
+                // tidak lenyap diam-diam tanpa jejak diagnosis.
+                App.logEvent("COOKIES: stored cookies undecryptable, dropped")
+            }
+            val arr = JSONArray(plain)
             val now = System.currentTimeMillis()
             for (i in 0 until arr.length()) {
                 runCatching {
