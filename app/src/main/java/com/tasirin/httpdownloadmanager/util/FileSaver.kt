@@ -890,8 +890,16 @@ class FileSaver(context: Context) {
                                 put(MediaStore.MediaColumns.DISPLAY_NAME, unique)
                             }
                         }
-                        appContext.contentResolver.update(uri, values, null, null)
-                        if (unique != fileName) result.copy(fileName = unique) else result
+                        // Hasil update WAJIB diperiksa (issue #480):
+                        // update yang mengenai 0 baris (URI basi — berkas
+                        // dihapus/dipindah aplikasi lain di antara
+                        // publish dan organize) berarti berkas TIDAK
+                        // berpindah; mengembalikan salinan tujuan akan
+                        // mencatat klaim pindah palsu. Selaras cabang
+                        // rename yang memeriksa update() > 0.
+                        val moved = appContext.contentResolver.update(uri, values, null, null) > 0
+                        if (!moved) result
+                        else if (unique != fileName) result.copy(fileName = unique) else result
                     } else {
                         val doc = DocumentFile.fromSingleUri(appContext, uri) ?: return result
                         val parent = doc.parentFile ?: return result
