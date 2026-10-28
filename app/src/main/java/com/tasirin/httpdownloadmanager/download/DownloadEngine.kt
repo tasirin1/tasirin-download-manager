@@ -2878,6 +2878,13 @@ class DownloadEngine(appContext: Context) {
         if (isEncryptedHlsPlaylist(body)) {
             throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
         }
+        // Playlist byterange tak dikenal pengumpul segmen (issue
+        // #513): URI media yang sama akan diunduh UTUH per segmen lalu
+        // ditempel berulang — berkas korup berstatus COMPLETED. Gagal
+        // cepat, sejajar gerbang enkripsi.
+        if (isByteRangeHlsPlaylist(body)) {
+            throw IOException("Byte-range HLS (EXT-X-BYTERANGE) not supported")
+        }
         if (!body.contains("#EXT-X-STREAM-INF")) {
             // Media playlist langsung (bukan master) — tanpa audio terpisah.
             // Satu lintasan: segmen + durasi #EXTINF dibaca sekaligus agar
@@ -3030,6 +3037,9 @@ class DownloadEngine(appContext: Context) {
         }
         if (isEncryptedHlsPlaylist(body)) {
             throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
+        }
+        if (isByteRangeHlsPlaylist(body)) {
+            throw IOException("Byte-range HLS (EXT-X-BYTERANGE) not supported")
         }
         val result = mutableListOf<Pair<String, Long>>()
         val lines = body.lines()
@@ -4509,6 +4519,12 @@ internal fun isEncryptedHlsPlaylist(body: String): Boolean {
     if (methods.isEmpty()) return true
     return methods.any { it != "NONE" }
 }
+
+/** Playlist HLS byterange memakai #EXT-X-BYTERANGE: tiap "segmen"
+ *  adalah rentang byte dari SATU berkas media yang sama, bukan berkas
+ *  terpisah. Murni agar bisa di-unit-test. */
+internal fun isByteRangeHlsPlaylist(body: String): Boolean =
+    body.contains("#EXT-X-BYTERANGE")
 
 internal fun isSameOrigin(first: String, second: String): Boolean = runCatching {
     val firstUrl = URL(first)

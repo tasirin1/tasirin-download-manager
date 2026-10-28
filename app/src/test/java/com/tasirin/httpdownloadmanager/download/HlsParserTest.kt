@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.download
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -470,5 +471,19 @@ class HlsParserTest {
         assertEquals("https://cdn.example.com/audios/low.m3u8", renditions[0].url)
         assertEquals("https://cdn.example.com/videos/high.m3u8", renditions[1].url)
         assertTrue(!renditions[1].isDefault)
+    }
+
+    @Test
+    fun `isByteRangeHlsPlaylist - mendeteksi tag byterange`() {
+        // Issue #513: gerbang fail-fast di kedua pintu pengumpul segmen
+        // bertumpu pada deteksi ini.
+        assertTrue(
+            isByteRangeHlsPlaylist(
+                "#EXTM3U\n#EXTINF:10,\n#EXT-X-BYTERANGE:1000@0\nseg.ts\n"
+            )
+        )
+        assertFalse(
+            isByteRangeHlsPlaylist("#EXTM3U\n#EXTINF:10,\nseg.ts\n")
+        )
     }
 }
