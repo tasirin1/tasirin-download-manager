@@ -1463,6 +1463,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return jsonResponse(JSONObject().put("ok", false).put("error", "Too many uploads in progress"))
         }
         synchronized(lock.lock) {
+            // Finalisasi ID ini sedang berjalan membaca tmp: chunk baru
+            // (termasuk chunk 0 mulai ulang yang memotong tmp) akan merusak
+            // berkas yang sedang diterbitkan — tolak sampai finalisasi
+            // selesai dan entrinya terhapus (issue #173).
+            if (finalizingUploads.containsKey(id)) {
+                appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: finalization in progress")
+                drainBody(session)
+                return jsonResponse(
+                    JSONObject().put("ok", false).put("error", "Upload is being finalized")
+                )
+            }
             return writeUploadChunk(
                 session, id, name, storage, folderPath,
                 chunkIdx, chunks, length, offset
@@ -1575,7 +1586,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     StoragePrefs.partialStreamSecret(context)
                 )
                 val accepted = synchronized(finalizingGate) {
-                    if (finalizingUploads.size >= MAX_UPLOAD_FINALIZING) {
+                    // ID yang sama tidak boleh finalisasi dua kali: entri
+                    // ditimpa akan membuat dua penyalinan membaca tmp yang
+                    // sama (issue #173).
+                    if (finalizingUploads.size >= MAX_UPLOAD_FINALIZING ||
+                        finalizingUploads.containsKey(id)
+                    ) {
                         false
                     } else {
                         finalizingUploads[id] = finalName
