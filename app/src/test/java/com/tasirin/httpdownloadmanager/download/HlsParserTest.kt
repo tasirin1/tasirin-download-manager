@@ -290,6 +290,19 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMaster - NAME bersufiks Int MAX_VALUE dinaikkan tanpa meluap negatif`() {
+        // Issue #505: "X #2147483647" yang bertabrakan dulu menjadi
+        // "X #-2147483648" karena +1 meluap dalam aritmetika Int.
+        val body = "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,NAME=\"Lagu #2147483647\"\n" +
+            "https://cdn.example.com/videos/a.m3u8\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,NAME=\"Lagu #2147483647\"\n" +
+            "https://cdn.example.com/videos/b.m3u8\n"
+        val variants = HlsParser.parseMaster(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(listOf("Lagu #2147483647", "Lagu #2147483648"), variants.map { it.name })
+    }
+
+    @Test
     fun `parseMasterLenient - fallback absolut saat parseMaster gagal`() {
         val body = "#EXTM3U\n" +
             "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4D401E\",FRAME-RATE=30\n" +

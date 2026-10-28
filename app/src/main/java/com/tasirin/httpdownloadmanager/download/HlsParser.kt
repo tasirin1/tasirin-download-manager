@@ -85,7 +85,12 @@ object HlsParser {
         // bukan "800 kbps #2 #2".
         val m = SUFIKS_LABEL_RE.find(label)
         val dasar = m?.groupValues?.get(1) ?: label
-        var n = (m?.groupValues?.get(2)?.toIntOrNull() ?: 1) + 1
+        // Long, bukan Int (issue #505): sufiks ekor persis Int.MAX_VALUE
+        // dari NAME packager membuat +1 meluap menjadi negatif dalam
+        // aritmetika Int ("X #-2147483648"). Dengan Long, nilai itu
+        // naik wajar ke 2147483648, dan digit di atas rentang Long
+        // jatuh anggun ke penomoran ulang dari 2 seperti sebelumnya.
+        var n = (m?.groupValues?.get(2)?.toLongOrNull() ?: 1L) + 1
         while (terpakai.any { it.name == "$dasar #$n" }) n++
         return "$dasar #$n"
     }
