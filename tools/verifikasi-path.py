@@ -503,58 +503,115 @@ def cek_aturan_repo(gagal, berubah):
     # spoof '// minSdk = 23') tetap terhapus. ISI string dikosongkan
     # (issue #225): teks bersih ini hanya dipakai kunci minSdk, dan
     # string berisi 'minSdk = 23' sebelum penetapan asli dulu menipu
-    # regex kecocokan pertama menjadi false accept.
+    # regex kecocokan pertama menjadi false accept. Sadar TEMPLATE
+    # juga (issue #255): ekspresi ${...} di dalam string adalah kode
+    # yang boleh memuat string bersarang — quote bersarang itu dulu
+    # menutup string luar lebih awal sehingga isi string template
+    # bocor sebagai kode (spoof 'minSdk = 23' di dalam ${ "..." }).
     def strip_komentar(teks):
         out = []
         i, n = 0, len(teks)
-        while i < n:
-            if teks.startswith('"""', i):
-                j = teks.find('"""', i + 3)
-                j = n if j < 0 else j + 3
-                out.append('""')
-                i = j
-            elif teks[i] == "'":
-                # Literal char Kotlin ('a', '\'', '"'): tanpa cabang ini
-                # quote di dalam char membuka string hantu yang menelan
-                # komentar/baris berikutnya (regresi #211, issue #226).
-                # Pola tak cocok (bukan char literal sah) -> char biasa.
-                j = i + 1
-                if j < n and teks[j] == "\\":
+
+        def skip_kutip(i):
+            # Lewati literal char mulai di i (teks[i] == "'"); kembalikan
+            # indeks sesudahnya atau None bila bukan literal char sah.
+            # Tanpa ini quote di dalam char membuka string hantu yang
+            # menelan komentar/baris berikutnya (regresi #211, #226).
+            j = i + 1
+            if j < n and teks[j] == "\\":
+                j += 2
+            elif j < n:
+                j += 1
+            if j < n and teks[j] == "'":
+                return j + 1
+            return None
+
+        def skip_blok(i):
+            # Lewati komentar blok Kotlin BERSARANG (issue #227): hitung
+            # kedalaman, jangan berhenti di */ pertama — sisa
+            # ' minSdk = 23 */' sesudahnya dulu bocor sebagai kode.
+            depth = 1
+            j = i + 2
+            while j < n and depth > 0:
+                if teks.startswith("/*", j):
+                    depth += 1
                     j += 2
-                elif j < n:
+                elif teks.startswith("*/", j):
+                    depth -= 1
+                    j += 2
+                else:
                     j += 1
-                if j < n and teks[j] == "'":
-                    out.append(teks[i:j + 1])
-                    i = j + 1
+            return j
+
+        def skip_template(i):
+            # Lewati ekspresi template ${...}; i tepat sesudah '${'.
+            # Isinya kode: literal/komentar di dalamnya dilewati dengan
+            # aturan yang sama agar '}' di dalamnya tidak menutup
+            # template lebih awal (issue #255).
+            depth = 1
+            while i < n and depth > 0:
+                if teks.startswith('"""', i) or teks[i] == '"':
+                    i = skip_string(i)
+                elif teks[i] == "'":
+                    end = skip_kutip(i)
+                    i = end if end is not None else i + 1
+                elif teks.startswith("//", i):
+                    j = teks.find("\n", i)
+                    i = n if j < 0 else j
+                elif teks.startswith("/*", i):
+                    i = skip_blok(i)
+                elif teks[i] == "{":
+                    depth += 1
+                    i += 1
+                elif teks[i] == "}":
+                    depth -= 1
+                    i += 1
+                else:
+                    i += 1
+            return i
+
+        def skip_string(i):
+            # Lewati string (biasa/raw) mulai di pembukanya; template
+            # ${...} di dalamnya dilewati sebagai kode (skip_template).
+            if teks.startswith('"""', i):
+                j = i + 3
+                while j < n:
+                    if teks.startswith('"""', j):
+                        return j + 3
+                    if teks.startswith("${", j):
+                        j = skip_template(j + 2)
+                    else:
+                        j += 1
+                return n
+            j = i + 1
+            while j < n:
+                if teks[j] == "\\":
+                    j += 2
+                elif teks[j] == '"':
+                    return j + 1
+                elif teks.startswith("${", j):
+                    j = skip_template(j + 2)
+                else:
+                    j += 1
+            return j
+
+        while i < n:
+            if teks.startswith('"""', i) or teks[i] == '"':
+                i = skip_string(i)
+                out.append('""')
+            elif teks[i] == "'":
+                end = skip_kutip(i)
+                if end is not None:
+                    out.append(teks[i:end])
+                    i = end
                 else:
                     out.append(teks[i])
                     i += 1
-            elif teks[i] == '"':
-                j = i + 1
-                while j < n and teks[j] != '"':
-                    j += 2 if teks[j] == "\\" else 1
-                j = min(j + 1, n)
-                out.append('""')
-                i = j
             elif teks.startswith("//", i):
                 j = teks.find("\n", i)
                 i = n if j < 0 else j
             elif teks.startswith("/*", i):
-                # Komentar blok Kotlin BERSARANG (issue #227): hitung
-                # kedalaman, jangan berhenti di */ pertama — sisa
-                # ' minSdk = 23 */' sesudahnya dulu bocor sebagai kode.
-                depth = 1
-                j = i + 2
-                while j < n and depth > 0:
-                    if teks.startswith("/*", j):
-                        depth += 1
-                        j += 2
-                    elif teks.startswith("*/", j):
-                        depth -= 1
-                        j += 2
-                    else:
-                        j += 1
-                i = j
+                i = skip_blok(i)
             else:
                 out.append(teks[i])
                 i += 1
