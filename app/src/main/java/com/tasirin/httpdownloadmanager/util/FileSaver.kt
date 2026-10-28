@@ -723,7 +723,7 @@ class FileSaver(context: Context) {
             // Klaim berkunci seperti publish folder kustom (issue #410):
             // pola cek-lalu-buat tanpa kunci di sini bisa memilih nama yang
             // sama dengan publish paralel bernama sama.
-            val (target, _, createdDoc) = claimCustomDoc(tree, item.fileName) ?: return null
+            val (target, unique, createdDoc) = claimCustomDoc(tree, item.fileName) ?: return null
             try {
                 // Sumber dibaca di dalam try: bila tak bisa dibuka (URI basi /
                 // file hilang / null), target kosong yang terlanjur dibuat
@@ -751,7 +751,11 @@ class FileSaver(context: Context) {
                 throw e
             }
             deleteFiles(item)
-            PublishResult(contentUri = target.uri.toString(), fileName = target.name)
+            // Nama unik HASIL KLAIM (issue #468), bukan target.name:
+            // DocumentFile.getName() nullable dari query DISPLAY_NAME
+            // provider dan bisa null/berbeda, sedangkan komponen kedua
+            // klaim adalah nama otoritatif yang dipilih di dalam kunci.
+            PublishResult(contentUri = target.uri.toString(), fileName = unique)
         }.getOrNull()
     }
 
@@ -883,7 +887,7 @@ class FileSaver(context: Context) {
                         // #410): nama dipilih + dokumen dibuat atomik di
                         // dalam kunci nama, bukan cek-lalu-buat terpisah
                         // yang bisa tabrakan dengan klaim paralel senama.
-                        val (target, _, createdDoc) = claimCustomDoc(subDir, fileName)
+                        val (target, unique, createdDoc) = claimCustomDoc(subDir, fileName)
                             ?: return result
                         val input = appContext.contentResolver.openInputStream(uri)
                             ?: run {
@@ -910,8 +914,11 @@ class FileSaver(context: Context) {
                         appContext.contentResolver.delete(uri, null, null)
                         // Nama hasil klaim ikut dikembalikan: nama unik
                         // bisa beda dari fileName asal dan catatan item
-                        // wajib memakai nama aktual (issue #457).
-                        PublishResult(contentUri = target.uri.toString(), fileName = target.name)
+                        // wajib memakai nama aktual (issue #457). Yang
+                        // dipakai adalah komponen unik klaim itu sendiri
+                        // (issue #468), bukan target.name yang nullable
+                        // dari query DISPLAY_NAME provider.
+                        PublishResult(contentUri = target.uri.toString(), fileName = unique)
                     }
                 }
                 !result.filePath.isNullOrEmpty() -> {
