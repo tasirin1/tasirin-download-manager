@@ -1348,6 +1348,15 @@ class DownloadEngine(appContext: Context) {
                     )
                     if (newId.isNotEmpty()) {
                         updateItem(item.id) { it.copy(monitor = false) }
+                        // Jendela penerus BARU dibuka (issue #528):
+                        // tanda sentuhan #521 yang lebih tua dari
+                        // jendela ini — termasuk tanda dari tindakan
+                        // MENGAKTIFKAN monitor itu sendiri — harus
+                        // gugur; yang dihitung hanya sentuhan SELAMA
+                        // jendela penerus ini berjalan. Tanpa ini
+                        // pemulihan #512/#518/#520 terblokir pada
+                        // kegagalan penerus pertama.
+                        monitorSentuhanPengguna.remove(item.id)
                         scheduleSave()
                     }
                 }
