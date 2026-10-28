@@ -133,12 +133,27 @@ class App : Application() {
         // Sejak #286 kunci yang sama juga membungkus start/stop langsung.
         private val restartServerLock = Any()
 
+        // Penghitung operasi start/restart server yang sedang berjalan
+        // (issue #488): bendera serverStartPending milik DownloadService
+        // hanya menyala untuk start dari onCreate service sendiri,
+        // sedangkan restart dari Settings dan start langsung dari
+        // Activity berjalan di luar service — selama tukar-instance dan
+        // retry bind, httpServer menunjuk instance yang isAlive-nya
+        // false sehingga penilaian kolektor service bisa salah berhenti.
+        // Indikator ini satu sumber kebenaran untuk SEMUA pintu start.
+        private val serverStartOps = java.util.concurrent.atomic.AtomicInteger(0)
+
+        /** True selagi ada start/restart server yang sedang berjalan. */
+        fun serverStartInProgress(): Boolean = serverStartOps.get() > 0
+
         /** Buat ulang server remote dengan port terbaru dari prefs.
          *  NanoHTTPD mengunci port saat konstruksi, jadi ganti port = instance baru.
          *  Server tetap hidup bila sebelumnya hidup. Seluruh rangkaian
          *  snapshot -> stop -> tukar -> restore -> start berjalan di bawah
          *  satu kunci agar restart paralel terserialisasi (#260). */
         fun restartHttpServer(context: Context) {
+            serverStartOps.incrementAndGet()
+            try {
             synchronized(restartServerLock) {
                 val wasAlive = httpServer.isAlive
                 // Ambil SEBELUM stop: stopServer mengosongkan shareTokens sehingga
@@ -160,6 +175,9 @@ class App : Application() {
                     runCatching { httpServer.startServer() }
                 }
             }
+            } finally {
+                serverStartOps.decrementAndGet()
+            }
         }
 
         /** Start server di bawah kunci siklus hidup yang sama (#286):
@@ -167,10 +185,16 @@ class App : Application() {
          *  sedang berjalan — mis. stop penegakan PIN tiba SEBELUM langkah
          *  start milik restart menukar instance, sehingga server berakhir
          *  MENYALA walau aksi terakhir pengguna mematikannya. */
-        fun startHttpServer(): Boolean =
-            synchronized(restartServerLock) {
-                runCatching { httpServer.startServer() }.isSuccess
+        fun startHttpServer(): Boolean {
+            serverStartOps.incrementAndGet()
+            try {
+                return synchronized(restartServerLock) {
+                    runCatching { httpServer.startServer() }.isSuccess
+                }
+            } finally {
+                serverStartOps.decrementAndGet()
             }
+        }
 
         /** Stop server di bawah kunci siklus hidup yang sama (#286). */
         fun stopHttpServer(): Boolean =

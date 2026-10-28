@@ -81,7 +81,7 @@ class DownloadService : Service() {
                     }
                     updateWakeLock(active)
                     val serverActive = StoragePrefs.isServerBackgroundEnabled(this@DownloadService) &&
-                        (App.httpServer.isAlive || serverStartPending)
+                        (App.httpServer.isAlive || serverStartPending || App.serverStartInProgress())
                     if (!active && !serverActive) {
                         NotificationHelper.updateNotification(this@DownloadService, items, serverActive)
                         ServiceCompat.stopForeground(
@@ -141,7 +141,7 @@ class DownloadService : Service() {
             App.engine.items.value.any {
                 it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
             } || (StoragePrefs.isServerBackgroundEnabled(this) &&
-                (App.httpServer.isAlive || serverStartPending))
+                (App.httpServer.isAlive || serverStartPending || App.serverStartInProgress()))
         return if (keepAlive) START_STICKY else START_NOT_STICKY
     }
 
