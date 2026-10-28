@@ -794,8 +794,6 @@ object SocialMediaExtractor {
             // biasanya mengembalikan URL langsung tanpa n-signature.
             val adaptive = streamingData?.optJSONArray("adaptiveFormats")
             if (adaptive != null && adaptive.length() > 0) {
-                // Pilih varian video terbaik (prioritas: 720p/1080p AVC)
-                val candidates = mutableListOf<JSONObject>()
                 val (videoAd, audioAd) = bestAdaptivePair(streamingData)
                 val best = adaptiveFormatByUrl(adaptive, videoAd)
                 if (best != null) {
