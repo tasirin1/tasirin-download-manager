@@ -85,8 +85,11 @@ def daftar_berkas_berubah(rentang):
 
 
 def nama_tak_lacak():
-    out = jalan("git", "ls-files", "--others", "--exclude-standard")
-    return out.splitlines() if out else []
+    # -z: git tidak mengutip nama non-ASCII (core.quotepath menulis
+    # oktal '"Prob\303\251.kt"' sehingga open() gagal dan berkas
+    # terlewati diam-diam dari suntikan diff --semua, issue #213).
+    out = jalan("git", "ls-files", "--others", "--exclude-standard", "-z")
+    return [x for x in out.split("\0") if x] if out else []
 
 
 def baca(path):
