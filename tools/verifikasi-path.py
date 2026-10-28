@@ -858,10 +858,16 @@ def utama():
                 continue
             # Format diff git sungguhan (header + +++): pengurai diff
             # (tambah_kt dkk.) hanya mengakui baris '+' di bawah header
-            # 'diff --git' yang path-nya berakhiran .kt/.java.
+            # 'diff --git' yang path-nya berakhiran .kt/.java. Nama di
+            # header disanitasi dari newline/CR (issue #230): nama berkas
+            # ber-newline memotong header menjadi dua baris sehingga
+            # token terakhir tidak berakhiran .kt dan isi berkas lolos
+            # tak dinilai. Header ini semu — yang penting ekstensinya;
+            # nama asli tetap dipakai cek per-path lewat `berubah`.
+            nama_header = nama.replace("\n", "_").replace("\r", "_")
             diff += (
-                "\ndiff --git a/" + nama + " b/" + nama
-                + "\n+++ b/" + nama + "\n"
+                "\ndiff --git a/" + nama_header + " b/" + nama_header
+                + "\n+++ b/" + nama_header + "\n"
                 + "\n".join("+" + baris for baris in isi.splitlines())
             )
 
