@@ -19,7 +19,16 @@ const blocks = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
 // menggeser indeks dan uji meledak dengan TypeError yang menunjuk
 // fungsi hilang — bukan penyebab sebenarnya. Skrip eksternal
 // berbadan kosong tak akan pernah memuat penanda ini.
-const mainBlock = blocks.find((b) => b[1].includes('function startFsUpload'));
+// Jangkarnya DEFINISI di awal baris, bukan teks penanda di mana pun
+// (issue #627): komentar/dokumentasi yang menyebut nama fungsinya di
+// blok lebih awal dulu bisa membajak find() sehingga blok bootstrap
+// yang tereksekusi dan uji meledak dengan TypeError menyesatkan
+// yang sama seperti pra-#612. Di antara blok yang memuat definisi
+// sungguhan, pilih yang terbesar (blok utama).
+const defRe = /^\s*function startFsUpload\s*\(/m;
+const mainBlock = blocks
+  .filter((b) => defRe.test(b[1]))
+  .sort((a, b) => b[1].length - a[1].length)[0];
 if (!mainBlock) {
   console.error('FAIL: blok <script> utama (memuat startFsUpload) tidak ditemukan di remote.src.html');
   process.exit(1);

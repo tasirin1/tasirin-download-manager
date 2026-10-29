@@ -386,7 +386,12 @@ def check_upload_call(text: str) -> list:
     # "listEl.appendChild is not a function". Pastikan callback (argumen
     # ke-8 = done) SELALU mendahului fsProgressList (argumen ke-9 = listEl).
     problems = []
-    start = text.find("function startFsUpload")
+    # Jangkar pada DEFINISI di awal baris (issue #627): teks penanda
+    # polos bisa dibajak kemunculan lebih awal di komentar sehingga
+    # jangkar bergeser ke sebelum definisi uploadFiles dan guard
+    # menilai daftar parameter definisi (lolos vakum).
+    m_def = re.search(r"(?m)^\s*function startFsUpload\s*\(", text)
+    start = m_def.start() if m_def else -1
     if start < 0:
         # Fail-closed (issue #194): jangkar hilang/berganti nama tidak
         # boleh menonaktifkan guard ini diam-diam.
