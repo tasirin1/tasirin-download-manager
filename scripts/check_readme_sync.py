@@ -51,8 +51,20 @@ def main() -> int:
     if not id_path.exists() or not en_path.exists():
         print("::error::README.md / README.en.md tidak ditemukan.")
         return 1
-    id_levels = headings(id_path)
-    en_levels = headings(en_path)
+    # Baca per berkas dengan vonis bernama (issue #613): README yang
+    # tersimpan non-UTF-8 (Latin-1/UTF-16) dulu menggugurkan guard ini
+    # dengan traceback UnicodeDecodeError mentah — dan pemanggilnya
+    # (cek-cepat) menelan semua kegagalan menjadi pesan 'struktur
+    # heading tidak sinkron' yang salah total.
+    levels: dict[str, list[int]] = {}
+    for label, path in (("README.md", id_path), ("README.en.md", en_path)):
+        try:
+            levels[label] = headings(path)
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"::error::{label} tak terbaca sebagai UTF-8: {exc}")
+            return 1
+    id_levels = levels["README.md"]
+    en_levels = levels["README.en.md"]
     if id_levels != en_levels:
         print("::error::Struktur heading README.md dan README.en.md tidak sinkron.")
         print(f"README.md   : {id_levels}")

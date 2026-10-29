@@ -30,8 +30,11 @@ fi
 # grep mentah di sini dulu ikut menghitung baris contoh di dalam blok
 # berpagar, sehingga vonisnya berlawanan dengan check_readme_sync.py
 # (yang sudah sadar pagar, #527/#534) atas dokumen yang sah.
-if ! python3 scripts/check_readme_sync.py >/dev/null 2>&1; then
-  echo "GAGAL: struktur heading README.md dan README.en.md tidak sinkron (check_readme_sync.py)"; gagal=1;
+# Keluaran skrip DITAMPILKAN (issue #613): menelannya ke /dev/null
+# membuat setiap kegagalan — termasuk README non-UTF-8 — terlabeli
+# 'struktur heading tidak sinkron' yang belum tentu penyebabnya.
+if ! python3 scripts/check_readme_sync.py; then
+  echo "GAGAL: check_readme_sync.py (penyebab pada pesan di atas)"; gagal=1;
 fi
 # 4. Remote web: sumber readable wajib ada + extract.js wajib readable.
 if [ ! -f remote.src.html ]; then echo "GAGAL: remote.src.html hilang"; gagal=1; fi
