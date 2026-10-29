@@ -3607,15 +3607,26 @@ document.getElementById('list').classList.toggle('batch-mode', batchMode);
 document.getElementById('batchToolbar').classList.toggle('show', batchMode);
 updateBatchCount();
 }
+var dlVisibleIds = null;
+function batchHiddenCount() {
+if (!dlVisibleIds) return 0;
+let hidden = 0;
+batchSelected.forEach(function (id) { if (!dlVisibleIds.has(id)) hidden++; });
+return hidden;
+}
 function updateBatchCount() {
-document.getElementById('batchSelCount').textContent = batchSelected.size + ' selected';
+const hidden = batchHiddenCount();
+document.getElementById('batchSelCount').textContent = batchSelected.size + ' selected' +
+(hidden ? ' (' + hidden + ' hidden by filter/search)' : '');
 }
 document.getElementById('batchModeBtn').addEventListener('click', toggleBatchMode);
 document.getElementById('batchCancelBtn').addEventListener('click', toggleBatchMode);
 document.getElementById('batchPauseBtn').addEventListener('click', function () { batchSelected.forEach(function (id) { doAction(id, 'pause'); }); });
 document.getElementById('batchResumeBtn').addEventListener('click', function () { batchSelected.forEach(function (id) { doAction(id, 'resume'); }); });
 document.getElementById('batchDeleteBtn').addEventListener('click', function () {
-showConfirm('Delete selected', 'Delete ' + batchSelected.size + ' item(s)?', 'Delete', function () {
+const hiddenDel = batchHiddenCount();
+showConfirm('Delete selected', 'Delete ' + batchSelected.size + ' item(s)?' +
+(hiddenDel ? ' ' + hiddenDel + ' of them are hidden by the current filter/search.' : ''), 'Delete', function () {
 batchSelected.forEach(function (id) { doAction(id, 'delete'); });
 toggleBatchMode();
 });
@@ -3894,6 +3905,8 @@ if (webFilter === 'ACTIVE') return it.state === 'DOWNLOADING' || it.state === 'P
 if (webFilter === 'COMPLETED') return it.state === 'COMPLETED';
 return it.state === 'FAILED' || it.state === 'CANCELLED';
 });
+dlVisibleIds = new Set(filtered.map(function (it) { return it.id; }));
+updateBatchCount();
 if (!filtered.length) {
 if (items.length && q) {
 list.innerHTML = emptyHtml('search', 'No matching downloads', 'Try a different search.', 'Clear search');
