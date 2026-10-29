@@ -22,9 +22,18 @@ fi
 # -z + tr: tanpa itu git mengutip nama non-ASCII menjadi oktal
 # ("s\303\251cret.jks") sehingga pola ekstensi tak pernah cocok dan
 # keystore bernama non-ASCII lolos gerbang ini (issue #312).
-if git ls-files -z 2>/dev/null | tr '\0' '\n' | grep -E -i -q '\.(apk|aab|dex|zip|jks|keystore|p12|pfx)$|(^|/)keystore$|(^|/)[^/]*keystore[^/]*\.b64$|\.env($|\.)|(^|/)\.envrc$'; then
+# Kegagalan ls-files wajib bernama (issue #663): dulu kegagalannya
+# ditelan 2>/dev/null dan daftar kosong terbaca "tak ada berkas
+# terlarang" — pindai ini no-op senyap di checkout rusak. Daftar
+# ditulis ke berkas temp agar pemisah NUL dari -z utuh (variabel bash
+# tak bisa menyimpan byte NUL).
+tmp_terlacak=$(mktemp)
+if ! git ls-files -z > "$tmp_terlacak" 2>/dev/null; then
+  echo "GAGAL: git ls-files gagal — pindai berkas terlarang tak bisa menilai (fail-closed)"; gagal=1;
+elif tr '\0' '\n' < "$tmp_terlacak" | grep -E -i -q '\.(apk|aab|dex|zip|jks|keystore|p12|pfx)$|(^|/)keystore$|(^|/)[^/]*keystore[^/]*\.b64$|\.env($|\.)|(^|/)\.envrc$'; then
   echo "GAGAL: binary/APK/zip/secret terlacak di repo (jks|keystore|p12|pfx|.env|.envrc dilarang)"; gagal=1;
 fi
+rm -f "$tmp_terlacak"
 # 3. Struktur heading README Indonesia vs Inggris wajib sinkron.
 # Delegasikan ke guard Python yang otoritatif (issue #541): hitungan
 # grep mentah di sini dulu ikut menghitung baris contoh di dalam blok
