@@ -13,11 +13,18 @@ const vm = require('vm');
 const SRC = path.resolve(__dirname, '..', 'remote.src.html');
 const html = fs.readFileSync(SRC, 'utf8');
 const blocks = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
-if (blocks.length < 2) {
-  console.error('FAIL: remote.src.html tidak punya blok <script> utama');
+// Blok utama dipilih dari ISINYA, bukan indeksnya (issue #612): pola
+// di atas menangkap semua tag script termasuk yang beratribut dan
+// eksternal, jadi satu <script src=...> sebelum blok utama akan
+// menggeser indeks dan uji meledak dengan TypeError yang menunjuk
+// fungsi hilang — bukan penyebab sebenarnya. Skrip eksternal
+// berbadan kosong tak akan pernah memuat penanda ini.
+const mainBlock = blocks.find((b) => b[1].includes('function startFsUpload'));
+if (!mainBlock) {
+  console.error('FAIL: blok <script> utama (memuat startFsUpload) tidak ditemukan di remote.src.html');
   process.exit(1);
 }
-const main = blocks[1][1];
+const main = mainBlock[1];
 
 function makeEl(id) {
   return {
