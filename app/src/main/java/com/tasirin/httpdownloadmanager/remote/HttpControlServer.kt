@@ -3156,21 +3156,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 "rename" -> {
                     if (!isNameValid(name)) return false
                     val rel = mediaStoreRelativePath(uri)?.trim('/')
-                    val finalName = if (rel != null) {
-                        // Koleksi dari URI berkas yang di-rename (issue
-                        // #459), BUKAN mime nama BARU: rename tak berpindah
-                        // koleksi, jadi menilai dari ekstensi baru membuat
-                        // cek unik menilai koleksi yang salah — sisa pola
-                        // lama yang ditutup #444 di rename sisi aplikasi.
-                        val collection = MediaLibrary.mediaCollectionForUri(uri)
-                        FileSaver(context).uniqueMediaStoreName(name, rel, collection)
-                    } else {
-                        name
+                    // Klaim nama + update terkunci (issue #658): tanpa kunci, dua
+                    // rename/move paralel ke nama sama sama-sama membaca nama
+                    // bebas lalu sama-sama berhasil update (DISPLAY_NAME kembar).
+                    FileSaver(context).withMediaStoreClaimLock(name) {
+                        val finalName = if (rel != null) {
+                            // Koleksi dari URI berkas yang di-rename (issue
+                            // #459), BUKAN mime nama BARU: rename tak berpindah
+                            // koleksi, jadi menilai dari ekstensi baru membuat
+                            // cek unik menilai koleksi yang salah — sisa pola
+                            // lama yang ditutup #444 di rename sisi aplikasi.
+                            val collection = MediaLibrary.mediaCollectionForUri(uri)
+                            FileSaver(context).uniqueMediaStoreName(name, rel, collection)
+                        } else {
+                            name
+                        }
+                        val values = ContentValues().apply {
+                            put(MediaStore.Downloads.DISPLAY_NAME, finalName)
+                        }
+                        resolver.update(uri, values, null, null) > 0
                     }
-                    val values = ContentValues().apply {
-                        put(MediaStore.Downloads.DISPLAY_NAME, finalName)
-                    }
-                    resolver.update(uri, values, null, null) > 0
                 }
                 "move" -> {
                     if (dest.isBlank()) return false
@@ -3188,23 +3193,28 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val currentName = mediaStoreName(uri)
                     val sameFolder = mediaStoreRelativePath(uri)?.trim('/')
                         ?.equals(relative.trim('/'), ignoreCase = true) == true
-                    val unique = if (sameFolder) {
-                        currentName
-                    } else {
-                        currentName?.let {
-                            FileSaver(context).uniqueMediaStoreName(
-                                it, relative.trim('/'),
-                                MediaLibrary.mediaCollectionForUri(uri)
-                            )
+                    // Klaim nama tujuan + update terkunci (issue #658); nama
+                    // sumber null = tak ada nama diklaim, kunci kosong hanya
+                    // menyerialkan jalur langka itu.
+                    FileSaver(context).withMediaStoreClaimLock(currentName ?: "") {
+                        val unique = if (sameFolder) {
+                            currentName
+                        } else {
+                            currentName?.let {
+                                FileSaver(context).uniqueMediaStoreName(
+                                    it, relative.trim('/'),
+                                    MediaLibrary.mediaCollectionForUri(uri)
+                                )
+                            }
                         }
-                    }
-                    val values = ContentValues().apply {
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, rel)
-                        if (unique != null && unique != currentName) {
-                            put(MediaStore.MediaColumns.DISPLAY_NAME, unique)
+                        val values = ContentValues().apply {
+                            put(MediaStore.MediaColumns.RELATIVE_PATH, rel)
+                            if (unique != null && unique != currentName) {
+                                put(MediaStore.MediaColumns.DISPLAY_NAME, unique)
+                            }
                         }
+                        resolver.update(uri, values, null, null) > 0
                     }
-                    resolver.update(uri, values, null, null) > 0
                 }
                 else -> false
             }

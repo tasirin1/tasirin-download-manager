@@ -741,34 +741,38 @@ class FileSaver(context: Context) {
                     val uri = item.contentUri.toUri()
                     if (Build.VERSION.SDK_INT >= 29 && uri.authority == MediaStore.AUTHORITY) {
                         val rel = mediaRelativePath(uri)?.trim('/')
-                        val finalName = if (rel != null) {
-                            // Cek keunikan di koleksi tempat berkas BENAR-
-                            // BENAR hidup (issue #403): default Downloads
-                            // membuat nama yang sudah dipakai di Movies
-                            // (koleksi Video) dinyatakan bebas, sehingga
-                            // rename menghasilkan dua berkas bernama sama
-                            // persis di folder yang sama. Pola sama seperti
-                            // saveToMediaStore yang meneruskan koleksinya.
-                            // Koleksi dibaca dari URI berkas itu sendiri
-                            // (issue #444): turunan mime nama LAMA (#411)
-                            // masih menyimpang pada rename KEDUA — sesudah
-                            // .mp4 -> .bin, "nama lama" adalah .bin yang
-                            // mime-nya bukan video, padahal berkas tetap
-                            // hidup di koleksi Video (rename tidak
-                            // memindahkan antar-koleksi). URI adalah
-                            // satu-satunya sumber yang selalu benar.
-                            uniqueMediaStoreName(
-                                clean, rel,
-                                MediaLibrary.mediaCollectionForUri(uri)
-                            )
-                        } else {
-                            clean
+                        // Klaim nama + update terkunci (issue #658), kunci yang
+                        // sama dengan saveToMediaStore.
+                        withMediaStoreClaimLock(clean) {
+                            val finalName = if (rel != null) {
+                                // Cek keunikan di koleksi tempat berkas BENAR-
+                                // BENAR hidup (issue #403): default Downloads
+                                // membuat nama yang sudah dipakai di Movies
+                                // (koleksi Video) dinyatakan bebas, sehingga
+                                // rename menghasilkan dua berkas bernama sama
+                                // persis di folder yang sama. Pola sama seperti
+                                // saveToMediaStore yang meneruskan koleksinya.
+                                // Koleksi dibaca dari URI berkas itu sendiri
+                                // (issue #444): turunan mime nama LAMA (#411)
+                                // masih menyimpang pada rename KEDUA — sesudah
+                                // .mp4 -> .bin, "nama lama" adalah .bin yang
+                                // mime-nya bukan video, padahal berkas tetap
+                                // hidup di koleksi Video (rename tidak
+                                // memindahkan antar-koleksi). URI adalah
+                                // satu-satunya sumber yang selalu benar.
+                                uniqueMediaStoreName(
+                                    clean, rel,
+                                    MediaLibrary.mediaCollectionForUri(uri)
+                                )
+                            } else {
+                                clean
+                            }
+                            val values = ContentValues().apply {
+                                put(MediaStore.Downloads.DISPLAY_NAME, finalName)
+                            }
+                            val ok = appContext.contentResolver.update(uri, values, null, null) > 0
+                            if (ok) PublishResult(contentUri = item.contentUri, fileName = finalName) else null
                         }
-                        val values = ContentValues().apply {
-                            put(MediaStore.Downloads.DISPLAY_NAME, finalName)
-                        }
-                        val ok = appContext.contentResolver.update(uri, values, null, null) > 0
-                        if (ok) PublishResult(contentUri = item.contentUri, fileName = finalName) else null
                     } else {
                         val newUri = DocumentsContract.renameDocument(appContext.contentResolver, uri, clean)
                         if (newUri != null) {
@@ -999,26 +1003,29 @@ class FileSaver(context: Context) {
                         // berkumpul di subfolder yang sama karena
                         // MediaStore menoleransi DISPLAY_NAME duplikat —
                         // kelas masalah yang ditutup #403 untuk rename.
-                        val unique = uniqueMediaStoreName(
-                            fileName, targetRel,
-                            MediaLibrary.mediaCollectionForUri(uri)
-                        )
-                        val values = ContentValues().apply {
-                            put(MediaStore.MediaColumns.RELATIVE_PATH, "$targetRel/")
-                            if (unique != fileName) {
-                                put(MediaStore.MediaColumns.DISPLAY_NAME, unique)
+                        // Klaim nama tujuan + update terkunci (issue #658).
+                        withMediaStoreClaimLock(fileName) {
+                            val unique = uniqueMediaStoreName(
+                                fileName, targetRel,
+                                MediaLibrary.mediaCollectionForUri(uri)
+                            )
+                            val values = ContentValues().apply {
+                                put(MediaStore.MediaColumns.RELATIVE_PATH, "$targetRel/")
+                                if (unique != fileName) {
+                                    put(MediaStore.MediaColumns.DISPLAY_NAME, unique)
+                                }
                             }
+                            // Hasil update WAJIB diperiksa (issue #480):
+                            // update yang mengenai 0 baris (URI basi — berkas
+                            // dihapus/dipindah aplikasi lain di antara
+                            // publish dan organize) berarti berkas TIDAK
+                            // berpindah; mengembalikan salinan tujuan akan
+                            // mencatat klaim pindah palsu. Selaras cabang
+                            // rename yang memeriksa update() > 0.
+                            val moved = appContext.contentResolver.update(uri, values, null, null) > 0
+                            if (!moved) result
+                            else if (unique != fileName) result.copy(fileName = unique) else result
                         }
-                        // Hasil update WAJIB diperiksa (issue #480):
-                        // update yang mengenai 0 baris (URI basi — berkas
-                        // dihapus/dipindah aplikasi lain di antara
-                        // publish dan organize) berarti berkas TIDAK
-                        // berpindah; mengembalikan salinan tujuan akan
-                        // mencatat klaim pindah palsu. Selaras cabang
-                        // rename yang memeriksa update() > 0.
-                        val moved = appContext.contentResolver.update(uri, values, null, null) > 0
-                        if (!moved) result
-                        else if (unique != fileName) result.copy(fileName = unique) else result
                     } else {
                         val doc = DocumentFile.fromSingleUri(appContext, uri) ?: return result
                         val parent = doc.parentFile ?: return result
