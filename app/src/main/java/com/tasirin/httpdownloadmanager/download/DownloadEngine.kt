@@ -3517,7 +3517,10 @@ class DownloadEngine(appContext: Context) {
                 autoResume = false,
                 speedBps = 0,
                 etaSeconds = 0,
-                etag = serverEtag,
+                // Respons akhir tanpa ETag tidak menghapus etag yang
+                // sudah terstempel probe (issue #573): monitor perubahan
+                // berbasis etag buta untuk item yang etag-nya terhapus.
+                etag = serverEtag.ifBlank { it.etag },
                 finishedAt = System.currentTimeMillis()
             )
         } ?: item
@@ -3693,7 +3696,9 @@ class DownloadEngine(appContext: Context) {
                 autoResume = false,
                 speedBps = 0,
                 etaSeconds = 0,
-                etag = headers?.etag.orEmpty(),
+                // Sama seperti runSingle (issue #573): headers null
+                // (probe HEAD segmen gagal) tak menghapus etag tersimpan.
+                etag = headers?.etag?.takeIf { e -> e.isNotBlank() } ?: it.etag,
                 finishedAt = System.currentTimeMillis()
             )
         } ?: item
