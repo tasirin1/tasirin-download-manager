@@ -1685,8 +1685,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             tmp.inputStream().use { it.copyTo(out, SERVER_IO_BUF) }
                         }
                         invalidateAfterPublish(published.filePath)
-                        completedUploads[id] = finalName to System.currentTimeMillis()
-                        appendLog("UPLOAD #$id COMPLETED -> $finalName")
+                        // Nama AKTUAL hasil terbit (issue #659): saveToMediaStore
+                        // bisa mengunikkkan nama, jadi completedUploads dan log
+                        // wajib memakai published.fileName — menyimpan finalName
+                        // pra-terbit membuat uploadVerify menjawab nama yang
+                        // salah. Selaras jalur single-shot.
+                        val doneName = published.fileName ?: finalName
+                        completedUploads[id] = doneName to System.currentTimeMillis()
+                        appendLog("UPLOAD #$id COMPLETED -> $doneName")
                     } catch (e: Exception) {
                         // Pesan mentah exception (bisa memuat path absolut
                         // internal) hanya untuk log server; yang disimpan
