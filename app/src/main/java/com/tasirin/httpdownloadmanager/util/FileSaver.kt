@@ -466,6 +466,7 @@ class FileSaver(context: Context) {
 
     fun cleanupOrphanPartials(items: List<DownloadItem>): Long {
         var freed = 0L
+        var deletedInternal = false
         runCatching {
             val expected = buildSet {
                 items.forEach { item ->
@@ -485,7 +486,10 @@ class FileSaver(context: Context) {
                     if (age > 2L * 60 * 60 * 1000) {
                         runCatching {
                             val size = f.length()
-                            if (f.delete()) freed += size
+                            if (f.delete()) {
+                                freed += size
+                                deletedInternal = true
+                            }
                         }
                     }
                 }
@@ -557,6 +561,14 @@ class FileSaver(context: Context) {
                 }
             }
         }
+        // Partial video di downloadDir adalah entri galeri sungguhan
+        // (blok pindai internal memang memuat .part): sapuan yang
+        // menghapusnya wajib menginvalidasi cache pindai, kalau tidak
+        // entri hantu bertahan sampai TTL habis (issue #624, sisa
+        // kelas #595). Sapuan folder tujuan di atas tak terlihat
+        // galeri (staging .part di sana tersaring ekstensi), jadi
+        // hanya penghapusan internal yang memicu invalidasi.
+        if (deletedInternal) MediaLibrary.invalidateScanCache()
         return freed
     }
 
