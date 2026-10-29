@@ -3590,6 +3590,12 @@ toggleBatchMode();
 });
 function render(items) {
 currentItems = items;
+if (batchSelected.size) {
+const aliveSel = new Set(items.map(function (it) { return it.id; }));
+let pruned = false;
+batchSelected.forEach(function (id) { if (!aliveSel.has(id)) { batchSelected.delete(id); pruned = true; } });
+if (pruned) updateBatchCount();
+}
 if (lockedTotalBytes.size > items.length + 32) {
 const alive = new Set(items.map(function (it) { return it.id; }));
 lockedTotalBytes.forEach(function (_, id) { if (!alive.has(id)) lockedTotalBytes.delete(id); });
@@ -3944,6 +3950,7 @@ var cb = document.createElement('input');
 cb.type = 'checkbox';
 cb.className = 'batch-check';
 cb.dataset.id = it.id;
+cb.checked = batchSelected.has(it.id);
 cb.addEventListener('change', function () {
 if (this.checked) batchSelected.add(it.id); else batchSelected.delete(it.id);
 updateBatchCount();

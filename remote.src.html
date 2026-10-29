@@ -5928,6 +5928,17 @@ document.getElementById('batchDeleteBtn').addEventListener('click', function () 
 
 function render(items) {
   currentItems = items;
+  // Pangkas seleksi batch dari id yang sudah hilang (issue #632):
+  // tanpa ini batchSelected menyimpan id hantu selamanya dan hitungan
+  // "N selected" berbohong; beda dengan lockedTotalBytes di bawah,
+  // pemangkasan di sini tanpa ambang karena kebenaran hitungan batch
+  // adalah janji visual ke pengguna, bukan sekadar batas pertumbuhan.
+  if (batchSelected.size) {
+    const aliveSel = new Set(items.map(function (it) { return it.id; }));
+    let pruned = false;
+    batchSelected.forEach(function (id) { if (!aliveSel.has(id)) { batchSelected.delete(id); pruned = true; } });
+    if (pruned) updateBatchCount();
+  }
   // Batasi pertumbuhan lockedTotalBytes: id yang sudah hilang dari daftar dibuang.
   if (lockedTotalBytes.size > items.length + 32) {
     const alive = new Set(items.map(function (it) { return it.id; }));
@@ -6344,6 +6355,11 @@ function rebuildList(items) {
     cb.type = 'checkbox';
     cb.className = 'batch-check';
     cb.dataset.id = it.id;
+    // Pulihkan status centang dari set seleksi (issue #632): tanpa ini
+    // setiap rebuildList (pemicu: transisi state apa pun lewat structSig)
+    // menampilkan semua kotak kosong padahal batchSelected tetap hidup,
+    // sehingga item "hantu" bisa terhapus massal tanpa terlihat terpilih.
+    cb.checked = batchSelected.has(it.id);
     cb.addEventListener('change', function () {
       if (this.checked) batchSelected.add(it.id); else batchSelected.delete(it.id);
       updateBatchCount();
