@@ -575,6 +575,24 @@ class HlsParserTest {
     }
 
     @Test
+    fun `isEncryptedHlsPlaylist - KEYFORMAT dan METHOD di luar tag kunci tak memicu`() {
+        // Issue #577: tag KEYFORMAT/KEYFORMATVERSIONS bukan tag kunci;
+        // playlist tanpa satu pun #EXT-X-KEY tidak terenkripsi.
+        assertFalse(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEYFORMAT=\"identity\"\n#EXT-X-KEYFORMATVERSIONS=\"1\"\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        // Teks METHOD= di judul #EXTINF bukan atribut tag kunci: yang
+        // berlaku hanya METHOD pada baris #EXT-X-KEY itu sendiri.
+        assertFalse(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:METHOD=NONE\n#EXTINF:10,METHOD=AES-128\nseg.ts\n"
+            )
+        )
+    }
+
+    @Test
     fun `isMapHlsPlaylist - mendeteksi tag segmen init fMP4`() {
         // Issue #514: gerbang fail-fast fMP4 bertumpu pada deteksi ini.
         assertTrue(

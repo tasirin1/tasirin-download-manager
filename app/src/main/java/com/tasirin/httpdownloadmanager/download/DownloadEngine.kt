@@ -4771,8 +4771,17 @@ internal val IPV6_LITERAL_RE = Regex(
 /** Playlist HLS terenkripsi bila ada #EXT-X-KEY dengan METHOD selain NONE.
  *  Murni agar bisa di-unit-test. */
 internal fun isEncryptedHlsPlaylist(body: String): Boolean {
-    if (!body.contains("#EXT-X-KEY")) return false
-    val methods = HLS_KEY_METHOD_RE.findAll(body).map { it.groupValues[1].uppercase(Locale.ROOT) }.toList()
+    // Hanya baris tag kunci sungguhan (#EXT-X-KEY:...) yang dinilai
+    // (issue #577): prefiks kasar "#EXT-X-KEY" ikut menyala untuk
+    // #EXT-X-KEYFORMAT/#EXT-X-KEYFORMATVERSIONS, dan findAll atas
+    // seluruh body ikut menghitung teks METHOD= di luar tag kunci
+    // (mis. di judul #EXTINF) — keduanya bisa memvonis playlist tak
+    // terenkripsi sebagai terenkripsi.
+    val keyLines = body.lineSequence().filter { it.startsWith("#EXT-X-KEY:") }.toList()
+    if (keyLines.isEmpty()) return false
+    val methods = keyLines.flatMap { line ->
+        HLS_KEY_METHOD_RE.findAll(line).map { it.groupValues[1].uppercase(Locale.ROOT) }
+    }
     // Tanpa METHOD eksplisit: anggap terenkripsi (fail-closed) daripada
     // mengunduh ciphertext yang dilaporkan sukses.
     if (methods.isEmpty()) return true
