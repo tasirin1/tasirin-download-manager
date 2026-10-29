@@ -3829,6 +3829,16 @@ class DownloadEngine(appContext: Context) {
             }
             ResumeAction.KEEP -> Unit
         }
+        // Segmen yang sudah utuh dilewati tanpa koneksi (issue #630):
+        // memintanya ulang menghasilkan Range tidak valid dan memicu
+        // pembuangan seluruh progres oleh penangan penolakan Range.
+        // Nilai downloaded di sini sudah direkonsiliasi resumeAction:
+        // parsial yang hilang sudah menurunkan hitungan ke 0 sehingga
+        // segmen itu tetap diminta ulang secara sah di bawah.
+        if (isSegmentComplete(segment.start, segment.end, downloaded)) {
+            updateSegment(id, segment.index, downloaded)
+            return
+        }
         coroutineContext.ensureActive()
         val conn = openAuthenticatedConnection(
             item.url, method = "GET",
@@ -4569,6 +4579,14 @@ internal fun cappedSegmentWrite(read: Int, budgetLeft: Long): Int =
  *  tengah jalan = link kedaluwarsa/transien, bukan server tanpa-Range.
  *  Murni agar bisa di-unit-test. */
 internal fun shouldKeepPartialOnRangeReject(keptBytes: Long): Boolean = keptBytes > 0
+
+/** Segmen sudah utuh: byte tercatat (sesudah rekonsiliasi resume) menutup
+ *  seluruh rentang [start, end]. Segmen seperti ini TIDAK boleh diminta
+ *  ulang: Range-nya menjadi bytes=<end+1>-<end> yang tidak valid, server
+ *  patuh menjawab 416, dan penangan penolakan Range membuang seluruh
+ *  progres unduhan (issue #630). Murni agar bisa di-unit-test. */
+internal fun isSegmentComplete(start: Long, end: Long, downloaded: Long): Boolean =
+    downloaded >= end - start + 1
 
 /** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
  *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able

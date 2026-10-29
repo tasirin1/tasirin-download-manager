@@ -24,6 +24,20 @@ class SegmentRangeTest {
     }
 
     @Test
+    fun `segmen utuh dikenali dari hitungan tercatatnya`() {
+        // Rentang [0, 999] panjangnya 1000 byte (issue #630).
+        assertTrue(isSegmentComplete(0, 999, 1000))
+        // Kelebihan catatan (paranoia) tetap utuh.
+        assertTrue(isSegmentComplete(0, 999, 1001))
+        // Kurang satu byte saja belum utuh: Range sisanya masih sah.
+        assertFalse(isSegmentComplete(0, 999, 999))
+        assertFalse(isSegmentComplete(0, 999, 0))
+        // Segmen bergeser: yang dihitung panjang rentang, bukan posisi akhir.
+        assertTrue(isSegmentComplete(1000, 1999, 1000))
+        assertFalse(isSegmentComplete(1000, 1999, 999))
+    }
+
+    @Test
     fun `tulis segmen dibatasi budget`() {
         assertEquals(100, cappedSegmentWrite(100, 1000))
         assertEquals(1000, cappedSegmentWrite(2000, 1000))
