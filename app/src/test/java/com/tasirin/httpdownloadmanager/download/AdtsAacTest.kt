@@ -222,6 +222,41 @@ class AdtsAacTest {
     }
 
     @Test
+    fun `open berhenti anggun pada ekor frame CRC terpotong 7 dan 8 byte`() {
+        // Issue #628: frame CRC (header 9 byte) yang terpotong di
+        // ekor menyisakan kandidat 7-8 byte — buffered < headerLen.
+        // Jalur stream dulu melempar IndexOutOfBoundsException dari
+        // readExact ber-offset negatif; jalur ByteArray berhenti
+        // anggun. Kini keduanya setara: frame sehat sebelumnya utuh.
+        fun crcTail(n: Int): ByteArray {
+            val frameLen = 9 + 20
+            val b = ByteArray(frameLen)
+            b[0] = 0xff.toByte()
+            b[1] = 0xf0.toByte() // protection absent = 0 -> header CRC 9 byte
+            b[2] = ((1 shl 6) or (7 shl 2) or (2 shr 2)).toByte()
+            b[3] = (((2 and 0x03) shl 6) or (frameLen shr 11)).toByte()
+            b[4] = ((frameLen shr 3) and 0xff).toByte()
+            b[5] = ((frameLen and 0x07) shl 5).toByte()
+            return b.copyOf(n)
+        }
+        for (n in listOf(7, 8)) {
+            val data = adtsFrame(1, 7, 2, 20) + crcTail(n)
+            val viaArray = ArrayList<Int>()
+            AdtsAac.parse(data)!!.forEachFrame { viaArray.add(it.size) }
+            assertEquals(listOf(20), viaArray)
+            val tmp = File.createTempFile("adts", ".aac")
+            try {
+                tmp.writeBytes(data)
+                val viaFile = ArrayList<Int>()
+                AdtsAac.open(tmp)!!.forEachFrame { viaFile.add(it.size) }
+                assertEquals(listOf(20), viaFile)
+            } finally {
+                tmp.delete()
+            }
+        }
+    }
+
+    @Test
     fun `open menerima berkas satu frame mungil 9 byte`() {
         val tmp = File.createTempFile("adts", ".aac")
         try {

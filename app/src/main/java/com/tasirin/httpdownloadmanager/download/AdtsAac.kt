@@ -294,6 +294,14 @@ object AdtsAac {
     private fun readFrame(input: PushbackInputStream): Frame? {
         val hdr = ByteArray(10)
         val h = nextHeader(input, hdr) ?: return null
+        // Kandidat lebih pendek dari headernya sendiri (issue #628):
+        // toleransi sisa-akhir #602 bisa memberi buffered 7-8 untuk
+        // frame ber-header 9 byte (CRC) yang terpotong — frame rusak,
+        // bukan frame sah. Tanpa penjaga ini pre negatif dan
+        // readExact melempar IndexOutOfBoundsException (offset < 0),
+        // yang di pemanggil berujung audio dibuang total / remux
+        // gagal, padahal jalur ByteArray berhenti dengan anggun.
+        if (h.buffered < h.headerLen) return null
         val pre = h.buffered - h.headerLen
         val payloadLen = h.frameLen - h.headerLen
         if (payloadLen > MAX_FRAME_BYTES) return null
