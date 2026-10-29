@@ -30,13 +30,20 @@ class BootResumeJobService : JobService() {
             return false
         }
         App.logEvent("BOOT/JOB: autostart download=$downloadAutostart, server=$serverAutostart")
-        runCatching {
+        val started = runCatching {
             val intent = Intent(context, DownloadService::class.java)
             if (Build.VERSION.SDK_INT >= 26) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
             }
+        }
+        if (started.isFailure) {
+            // Kegagalan start wajib berjejak (issue #592): log autostart
+            // di atas ditulis SEBELUM percobaan, jadi tanpa baris ini
+            // log justru menyiratkan autostart berjalan padahal start
+            // ditolak sistem dan autostart mati total.
+            App.logEvent("BOOT/JOB: autostart FAILED: ${started.exceptionOrNull()?.message ?: "unknown error"}")
         }
         jobFinished(params, false)
         return false
