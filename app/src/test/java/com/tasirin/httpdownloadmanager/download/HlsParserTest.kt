@@ -47,6 +47,41 @@ class HlsParserTest {
     }
 
     @Test
+    fun `AVERAGE-BANDWIDTH ditulis lebih dulu - bandwidth puncak yang terbaca`() {
+        val m = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:AVERAGE-BANDWIDTH=200000,BANDWIDTH=800000,RESOLUTION=1280x720
+            https://cdn.example.com/videos/720.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(m, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals(800000L, variants[0].bandwidth)
+    }
+
+    @Test
+    fun `AVERAGE-BANDWIDTH sesudah BANDWIDTH - urutan tak mengubah hasil`() {
+        val m = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=800000,AVERAGE-BANDWIDTH=200000,RESOLUTION=1280x720
+            https://cdn.example.com/videos/720.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(m, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(800000L, variants[0].bandwidth)
+    }
+
+    @Test
+    fun `hanya AVERAGE-BANDWIDTH - bandwidth nol, bukan nilai rata-rata`() {
+        val m = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:AVERAGE-BANDWIDTH=200000,RESOLUTION=640x360
+            https://cdn.example.com/videos/360.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(m, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals(0L, variants[0].bandwidth)
+    }
+
+    @Test
     fun `tag STREAM-INF tanpa URI tidak menelan varian berikut`() {
         val malformed = """
             #EXTM3U

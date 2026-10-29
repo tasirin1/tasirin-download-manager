@@ -23,7 +23,11 @@ data class HlsRendition(
 /** Parser playlist master HLS (m3u8) — murni JVM, bisa diuji unit.
  *  Mengembalikan daftar varian (kualitas), null bila bukan master playlist. */
 object HlsParser {
-    private val BANDWIDTH_RE: Regex = Regex("BANDWIDTH=(\\d+)")
+    // Jangkar batas nama atribut (issue #576): tanpa lookbehind negatif,
+    // find() menangkap BANDWIDTH di dalam AVERAGE-BANDWIDTH lebih dulu
+    // bila packager menulisnya lebih awal, sehingga bandwidth varian
+    // terbaca nilai rata-rata, bukan puncak sesuai spec.
+    private val BANDWIDTH_RE: Regex = Regex("(?<![-\\w])BANDWIDTH=(\\d+)")
     private val RESOLUTION_RE: Regex = Regex("RESOLUTION=(\\d+x\\d+)")
     private val NAME_RE: Regex = Regex("NAME=\"([^\"]+)\"")
     private val AUDIO_RE: Regex = Regex("AUDIO=\"([^\"]+)\"")
