@@ -3757,7 +3757,7 @@ for (let k = 0; k < items.length; k++) {
 const it = items[k];
 const li = rowNodes.get(it.id);
 if (!li || !li.isConnected) continue;
-var needRetry = it.state === 'FAILED';
+var needRetry = it.state === 'FAILED' || it.state === 'CANCELLED';
 var hasRetry = li._hasRetry;
 if (hasRetry === undefined) hasRetry = li._hasRetry = !!li.querySelector('.item-retry');
 var needErr = !!it.error;
@@ -3868,7 +3868,9 @@ li.style.animationDelay = Math.min(idx * 40, 400) + 'ms';
 idx++;
 const err = it.error ? '<div class="err"><span class="err-text">' + escapeHtml(it.error) + '</span>' + (it.state === 'FAILED' ? ' <span class="err-dot">·</span> <span class="err-status">Failed</span>' : '') + '</div>' : '';
 const retry = it.state === 'FAILED'
-? '<button class="item-retry" type="button"><span class="btn-ico">' + UI_ICONS.refresh + '</span> Retry</button>' : '';
+? '<button class="item-retry" type="button"><span class="btn-ico">' + UI_ICONS.refresh + '</span> Retry</button>'
+: (it.state === 'CANCELLED'
+? '<button class="item-retry" type="button"><span class="btn-ico">' + UI_ICONS.play + '</span> Resume</button>' : '');
 const retryBadge = (it.retryCount && it.retryCount > 0)
 ? '<span class="retry-badge" title="Retried \u00d7' + it.retryCount + '">&#x21BB;' + it.retryCount + '</span>' : '';
 const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
