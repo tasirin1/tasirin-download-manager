@@ -42,6 +42,17 @@ class GatePlacementTest {
         return best
     }
 
+    /** Hitung kemunculan [needle] tanpa kompilasi Pattern (pola split boros). */
+    private fun countOccurrences(src: String, needle: String): Int {
+        var count = 0
+        var i = src.indexOf(needle)
+        while (i >= 0) {
+            count++
+            i = src.indexOf(needle, i + needle.length)
+        }
+        return count
+    }
+
     private fun assertGateInside(src: String, funAnchor: String, gateCall: String) {
         val decl = src.indexOf(funAnchor)
         assertTrue("deklarasi $funAnchor tidak ditemukan", decl >= 0)
@@ -62,7 +73,7 @@ class GatePlacementTest {
             "isResumeAlreadyComplete(resumeFrom, item.totalBytes)"
         )
         // Tepat satu titik panggil di seluruh berkas (selain definisinya).
-        assertEquals(2, src.split("isResumeAlreadyComplete(").size - 1)
+        assertEquals(2, countOccurrences(src, "isResumeAlreadyComplete("))
     }
 
     @Test
@@ -73,6 +84,6 @@ class GatePlacementTest {
             "fun downloadSegment(",
             "isSegmentComplete(segment.start, segment.end, downloaded)"
         )
-        assertEquals(2, src.split("isSegmentComplete(").size - 1)
+        assertEquals(2, countOccurrences(src, "isSegmentComplete("))
     }
 }
