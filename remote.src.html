@@ -2380,8 +2380,11 @@ let galleryCache = null; // {items, total, hasMore, at}
   const queue = [];
   function next() {
     if (!queue.length || active >= MAX_CONCURRENT) return;
-    active++;
     const entry = queue.shift();
+    // Cell bisa sudah dibuang windowing galeri saat antre (issue #608):
+    // jangan fetch thumbnail untuk elemen yang tak lagi di DOM.
+    if (!entry.img.isConnected) { next(); return; }
+    active++;
     entry.img.onload = entry.img.onerror = function() { active--; next(); };
     entry.img.src = entry.src;
   }
@@ -2409,6 +2412,13 @@ let galleryCache = null; // {items, total, hasMore, at}
     if (!ob) { window._thumbQueue(img, img.dataset.thumb); return; }
     thumbPending.add(img);
     try { ob.observe(img); } catch (e) { window._thumbQueue(img, img.dataset.thumb); }
+  };
+  // Lepaskan satu thumbnail dari observer + set pending (issue #608):
+  // dipanggil windowing galeri saat cell dibuang, agar elemen yang
+  // sudah terlepas dari DOM tidak tertahan referensinya sampai reset.
+  window._thumbRelease = function(img) {
+    if (thumbObserver) { try { thumbObserver.unobserve(img); } catch (e) {} }
+    thumbPending.delete(img);
   };
   // Buang antrean thumbnail yang belum jalan (cell-nya sudah hancur saat
   // galeri reset/ganti filter): entri antrean belum set src sehingga aman
@@ -2899,6 +2909,10 @@ function trimGalleryTop() {
     h += cells[i].offsetHeight + GAL_ROW_GAP;
   }
   for (let i = 0; i < drop; i++) {
+    const imgs = cells[i].querySelectorAll('img');
+    for (let j = 0; j < imgs.length; j++) {
+      if (window._thumbRelease) window._thumbRelease(imgs[j]);
+    }
     cells[i].remove();
   }
   galTopHidden += drop;

@@ -365,8 +365,9 @@ let active = 0;
 const queue = [];
 function next() {
 if (!queue.length || active >= MAX_CONCURRENT) return;
-active++;
 const entry = queue.shift();
+if (!entry.img.isConnected) { next(); return; }
+active++;
 entry.img.onload = entry.img.onerror = function() { active--; next(); };
 entry.img.src = entry.src;
 }
@@ -394,6 +395,10 @@ const ob = ensureThumbObserver();
 if (!ob) { window._thumbQueue(img, img.dataset.thumb); return; }
 thumbPending.add(img);
 try { ob.observe(img); } catch (e) { window._thumbQueue(img, img.dataset.thumb); }
+};
+window._thumbRelease = function(img) {
+if (thumbObserver) { try { thumbObserver.unobserve(img); } catch (e) {} }
+thumbPending.delete(img);
 };
 window._thumbQueueClear = function() {
 queue.length = 0;
@@ -832,6 +837,10 @@ for (let i = 0; i < drop; i++) {
 h += cells[i].offsetHeight + GAL_ROW_GAP;
 }
 for (let i = 0; i < drop; i++) {
+const imgs = cells[i].querySelectorAll('img');
+for (let j = 0; j < imgs.length; j++) {
+if (window._thumbRelease) window._thumbRelease(imgs[j]);
+}
 cells[i].remove();
 }
 galTopHidden += drop;
