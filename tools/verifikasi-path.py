@@ -1397,14 +1397,29 @@ def utama():
         # campuran sah+hantu hanya melaporkan yang sah — pemanggilan
         # manual per-path bisa 'memverifikasi' berkas yang tak
         # pernah diperiksa.
+        # Pengecualian penghapusan sah (issue #647): path yang tercatat
+        # TERHAPUS terhadap HEAD (status D) bukan "tak ditemukan" —
+        # menyebutnya untuk memverifikasi penghapusannya adalah alur
+        # yang sah. Path seperti itu tetap masuk daftar berubah agar
+        # diff HEAD memuat penghapusannya dan keluarga cek
+        # penghapusan-berdampak (bekas-hapusan, fungsi hilang) tetap
+        # menilainya; hanya vonis "wajib ada" yang dikecualikan.
+        jalur_terhapus = set()
         for j in dict.fromkeys(args.jalur):
             if not os.path.exists(os.path.join(AKAR, j)):
+                status_hapus = jalan(
+                    "git", "diff", "HEAD", "--name-status", "--", j
+                ) or ""
+                if status_hapus.startswith("D"):
+                    jalur_terhapus.add(j)
+                    continue
                 gagal.append(
                     "berkas tak ditemukan: " + j +
                     " — path eksplisit wajib ada (salah ketik?)"
                 )
         berubah = list(dict.fromkeys(
-            j for j in args.jalur if os.path.exists(os.path.join(AKAR, j))
+            j for j in args.jalur
+            if os.path.exists(os.path.join(AKAR, j)) or j in jalur_terhapus
         ))
         # Lawan HEAD, bukan diff unstaged polos (issue #493): perubahan
         # staged murni dulu menghasilkan diff kosong sehingga SELURUH
