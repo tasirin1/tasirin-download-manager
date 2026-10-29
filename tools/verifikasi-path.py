@@ -43,12 +43,17 @@ def muat_bekas_hapusan():
                 baris = baris.strip()
                 if baris and not baris.startswith("#"):
                     nama.add(baris.split()[0])
-    except OSError:
+    except (OSError, UnicodeDecodeError):
+        # UnicodeDecodeError adalah ValueError, bukan OSError (issue
+        # #614): berkas yang ADA tetapi non-UTF-8 dulu lolos dari
+        # except ini dan menggugurkan gerbang dengan traceback saat
+        # import, melewatkan vonis bernama fail-closed di bawah.
         nama = set()
     if not nama:
         raise SystemExit(
-            "GAGAL: tools/bekas-hapusan.txt hilang atau kosong — daftar "
-            "nama terlarang adalah bagian dari gerbang; pulihkan berkasnya."
+            "GAGAL: tools/bekas-hapusan.txt hilang, kosong, atau tak "
+            "terbaca sebagai UTF-8 — daftar nama terlarang adalah "
+            "bagian dari gerbang; pulihkan berkasnya."
         )
     return nama
 
