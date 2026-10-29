@@ -354,7 +354,12 @@ class FileSaver(context: Context) {
         try {
             output.use { writer(it) }
         } catch (e: Exception) {
-            runCatching { target.delete() }
+            // Buang hanya dokumen yang BARU dibuat panggilan ini
+            // (pola #447, issue #645): claimCustomDoc bisa memberi
+            // dokumen yang sudah ada (createdDoc == false) — menghapus
+            // pada gagal tulis akan membuang berkas asing milik
+            // pengguna/aplikasi lain yang kebetulan bernama sama.
+            if (createdDoc) runCatching { target.delete() }
             throw e
         }
         PublishResult(contentUri = target.uri.toString(), fileName = unique)
@@ -386,8 +391,11 @@ class FileSaver(context: Context) {
             }
         } catch (e: Exception) {
             // Salinan gagal di tengah jalan: buang target setengah-tulis agar
-            // tidak jadi file korup yatim (sama seperti writeCustomFolder).
-            runCatching { target.delete() }
+            // tidak jadi file korup yatim (sama seperti writeCustomFolder) —
+            // tetapi hanya bila dokumen itu BARU dibuat panggilan ini
+            // (pola #447, issue #645); dokumen lama milik pihak lain
+            // tidak boleh ikut terhapus.
+            if (createdDoc) runCatching { target.delete() }
             throw e
         }
         partial.delete()
