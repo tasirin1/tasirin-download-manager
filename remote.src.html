@@ -428,14 +428,17 @@
   .head-actions {
  display: flex; align-items: center; gap: 6px; }
 
-  /* Header File Manager: enam tombol bulat tak muat sebaris dengan
-     judul di layar HP, jadi baris tombol dibuat disengaja memenuhi
-     lebar dan tersebar rata — bukan sisa bungkus flex yang
-     menyisakan ruang kosong di kanan judul dan kanan tombol. */
+  /* Header File Manager tanpa judul halaman (judul pindah ke
+     topbar mengikuti tab, permintaan owner): baris tombol bulat
+     kecil 35px rata kanan. */
   #fsView .page-head {
- flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; }
-  #fsView .head-actions {
- justify-content: space-between; }
+ justify-content: flex-end; }
+  #fsView .page-head .more-btn {
+ width: 35px; height: 35px; }
+  #fsView .page-head .more-btn svg {
+ width: 17px; height: 17px; }
+  #fsView .page-head .fs-more-btn {
+ width: 35px; height: 35px; min-width: 35px; min-height: 35px; }
 
   .gal-grid {
  display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 14px 12px; grid-auto-flow: dense; }
@@ -573,6 +576,15 @@
 
   .fs-path {
  display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 8px; margin-bottom: 6px; overflow-x: auto; scrollbar-width: none; }
+
+  /* Baris breadcrumb + hitungan item di ujung kanan (hitungan
+     pindah dari judul halaman yang dihapus). */
+  .fs-pathrow {
+ display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .fs-pathrow .fs-path {
+ flex: 1; min-width: 0; margin-bottom: 0; }
+  .fs-pathrow .count {
+ margin-left: 0; white-space: nowrap; }
 
   .fs-path::-webkit-scrollbar {
  display: none; }
@@ -1681,7 +1693,7 @@
 
 <div class="topbar">
   <div class="topbar-in">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9.2"/><path d="M7.5 9.8 12 14.3l4.5-4.5"/><path d="M5 19h14"/></svg></span><span class="brand-word">Tasirin Download Manager<small>Remote Control</small></span></div>
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9.2"/><path d="M7.5 9.8 12 14.3l4.5-4.5"/><path d="M5 19h14"/></svg></span><span class="brand-word"><span id="brandName">Tasirin Download Manager</span><small>Remote Control</small></span></div>
     <span id="serverChip" class="srv-chip hidden"><i></i><span id="serverChipText">Server</span></span>
     <span id="roChip" class="ro-chip hidden"><i class="ro-dot"></i><span class="ro-txt">Read-only</span></span>
   </div>
@@ -1804,12 +1816,11 @@
 
   <div id="fsView" class="hidden">
   <div class="gal-toolbar page-head">
-    <div><h2>File Manager</h2><span class="page-sub">Manage storage</span><span class="count" id="fsCount"></span></div>
     <div class="more-wrap head-actions">
       <button id="fsHomeBtn" type="button" class="more-btn" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></button>
-      <button id="fsUpBtn" type="button" class="more-btn" title="Up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
       <button id="fsUpFileBtn" type="button" class="more-btn" title="Upload file" aria-label="Upload file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
       <button id="fsUpDirBtn" type="button" class="more-btn" title="Upload folder" aria-label="Upload folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9.5 15 12 12.5 14.5 15"/><line x1="12" y1="12.5" x2="12" y2="17"/></svg></button>
+      <button id="fsMkdirBtn" type="button" class="more-btn" title="New folder" aria-label="New folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg></button>
       <button id="fsSearchBtn" type="button" class="more-btn" title="Search" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></button>
       <span class="fs-more-wrap">
       <button id="fsToolsBtn" class="fs-more-btn" type="button" aria-label="File manager tools" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button>
@@ -1819,7 +1830,6 @@
             <option value="">Location&hellip;</option>
           </select>
         </span>
-        <button id="fsMkdirBtn" type="button">New Folder</button>
         <button id="fsSelectBtn" type="button">Select</button>
         <button id="fsCompactToggle" type="button">Compact</button>
       </div>
@@ -1828,7 +1838,7 @@
     </div>
   </div>
   <div id="fsSticky" class="fs-sticky">
-  <div id="fsPath" class="fs-path"></div>
+  <div class="fs-pathrow"><div id="fsPath" class="fs-path"></div><span class="count" id="fsCount"></span></div>
   <div id="fsSearchRow" class="fs-search-row hidden">
     <input id="fsSearchInput" type="search" placeholder="Search this folder\u2026" aria-label="Search files">
   </div>
@@ -3150,7 +3160,6 @@ const fsList = document.getElementById('fsList');
 const fsPathEl = document.getElementById('fsPath');
 const fsCount = document.getElementById('fsCount');
 const fsStatus = document.getElementById('fsStatus');
-const fsUpBtn = document.getElementById('fsUpBtn');
 const fsSelectBtn = document.getElementById('fsSelectBtn');
 const fsBatch = document.getElementById('fsBatch');
 const fsToolsBtn = document.getElementById('fsToolsBtn');
@@ -3230,6 +3239,11 @@ function applyRoute() {
   const wrap = document.querySelector('.wrap');
   if (wrap) wrap.classList.toggle('gal-wrap', route === 'gallery');
   document.getElementById('fabNewBtn').classList.toggle('hidden', route !== 'downloads');
+  // Judul topbar mengikuti tab aktif (permintaan owner); judul
+  // besar di dalam halaman File Manager sudah dihapus.
+  document.getElementById('brandName').textContent =
+    route === 'gallery' ? 'Tasirin Gallery' :
+    route === 'files' ? 'Tasirin File Manager' : 'Tasirin Download Manager';
   closeMoreMenu();
   closeFsToolsMenu();
   restoringRoute = route;
@@ -3288,10 +3302,6 @@ updateStickyTop();
 
 document.querySelector('.brand').addEventListener('click', function () {
   location.hash = '#/';
-});
-
-fsUpBtn.addEventListener('click', function () {
-  fsNavigate(parentFsPath(fsPath));
 });
 
 document.getElementById('fsHomeBtn').addEventListener('click', function () {
@@ -3501,8 +3511,7 @@ async function loadFs() {
     if (seq !== fsLoadSeq) return;
     fsStatus.textContent = '';
     renderFsCrumbs(fsPath);
-    // Up & Home hanya berguna saat berada di dalam folder; sembunyi di root.
-    fsUpBtn.classList.toggle('hidden', !fsPath);
+    // Home hanya berguna saat berada di dalam folder; sembunyi di root.
     document.getElementById('fsHomeBtn').classList.toggle('hidden', !fsPath);
     fsToolsBtn.classList.toggle('hidden', !fsPath);
     fsSelectBtn.classList.toggle('hidden', !fsPath || serverReadOnly);

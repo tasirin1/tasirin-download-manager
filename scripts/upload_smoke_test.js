@@ -199,10 +199,11 @@ fsExpect(vm.runInContext('fsPath', sandbox) === '', 'Back kembali ke root storag
 fireWindow('popstate');
 fsExpect(vm.runInContext('fsPath', sandbox) === '', 'Back di root tidak mengubah folder');
 
-// Tombol Up & Home
+// Tombol Home (tombol Up dihapus atas keputusan owner — ikonnya
+// tertukar dengan Upload File; naik folder lewat breadcrumb/back,
+// helper parentFsPath-nya tetap dijaga di sini).
 vm.runInContext('fsPath = "f:/sdcard/Download"; fsBackStack.length = 0;', sandbox);
-fireEl(elements['fsUpBtn'], 'click');
-fsExpect(vm.runInContext('fsPath', sandbox) === 'f:/sdcard', 'tombol Up naik 1 folder');
+fsExpect(sandbox.parentFsPath('f:/sdcard/Download') === 'f:/sdcard', 'parentFsPath naik 1 folder');
 fireEl(elements['fsHomeBtn'], 'click');
 fsExpect(vm.runInContext('fsPath', sandbox) === '', 'tombol Home kembali ke root');
 
