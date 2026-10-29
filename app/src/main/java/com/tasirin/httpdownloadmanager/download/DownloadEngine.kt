@@ -4789,8 +4789,13 @@ internal fun isEncryptedHlsPlaylist(body: String): Boolean {
     val keyLines = body.lineSequence().map { it.trim() }
         .filter { it.startsWith("#EXT-X-KEY:") }.toList()
     if (keyLines.isEmpty()) return false
+    // Regex METHOD berjalan atas baris yang isi kutipnya dikosongkan
+    // (issue #600): teks METHOD= di dalam URI terkutip pada baris yang
+    // sama (mis. query string kunci ?METHOD=NONE) bukan atribut METHOD
+    // sungguhan — membacanya menggugurkan jalur fail-closed di bawah.
     val methods = keyLines.flatMap { line ->
-        HLS_KEY_METHOD_RE.findAll(line).map { it.groupValues[1].uppercase(Locale.ROOT) }
+        HLS_KEY_METHOD_RE.findAll(HlsParser.tanpaNilaiKutip(line))
+            .map { it.groupValues[1].uppercase(Locale.ROOT) }
     }
     // Tanpa METHOD eksplisit: anggap terenkripsi (fail-closed) daripada
     // mengunduh ciphertext yang dilaporkan sukses.

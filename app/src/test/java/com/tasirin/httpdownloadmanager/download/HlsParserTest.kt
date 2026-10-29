@@ -609,6 +609,19 @@ class HlsParserTest {
                 "#EXTM3U\n\t#EXT-X-KEY:METHOD=NONE\n#EXTINF:10,\nseg.ts\n"
             )
         )
+        // METHOD=NONE di dalam URI terkutip bukan atribut (issue #600):
+        // baris tanpa METHOD sungguhan wajib fail-closed.
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:URI=\"https://x.example/key?METHOD=NONE\"\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        // METHOD=NONE sungguhan tetap lolos walau URI memuat METHOD lain.
+        assertFalse(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:METHOD=NONE,URI=\"https://x.example/key?METHOD=AES-128\"\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
     }
 
     @Test
