@@ -2556,6 +2556,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         invalidateGalleryCache()
         filePath?.let {
             fsMediaCache.clear()
+            // Statistik folder ikut dibuang (issue #611): corong ini
+            // adalah finalisasi terbit upload, tetapi fsStatsCache
+            // hanya dibuang corong mutasi File Manager (#586) —
+            // statistik induk dan penjaga ukuran ZIP membaca angka
+            // pra-upload sampai TTL 10 dtk.
+            fsStatsCache.clear()
             invalidateFsListingCache()
             videoDurations.invalidate()
             MediaLibrary.notifyMediaChanged(context, it)
