@@ -742,6 +742,13 @@ class FileSaver(context: Context) {
                             val actual = runCatching {
                                 DocumentFile.fromSingleUri(appContext, newUri)?.name
                             }.getOrNull()?.takeIf { it.isNotBlank() } ?: clean
+                            // Rename SAF mengganti URI dokumen itu
+                            // sendiri: scanCache galeri yang memuat URI
+                            // lama bisa gagal diputar, bukan sekadar nama
+                            // basi (issue #594, kelas #569 yang belum
+                            // tertutup untuk rename). Cabang MediaStore
+                            // tertolong ContentObserver; cabang SAF tidak.
+                            MediaLibrary.invalidateScanCache()
                             PublishResult(contentUri = newUri.toString(), fileName = actual)
                         } else null
                     }
