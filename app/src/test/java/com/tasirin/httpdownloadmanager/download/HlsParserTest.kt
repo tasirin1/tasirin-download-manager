@@ -638,6 +638,38 @@ class HlsParserTest {
                 "#EXTM3U\n#EXT-X-KEY:METHOD=NONE,URI=\"https://x.example/key?METHOD=AES-128\"\n#EXTINF:10,\nseg.ts\n"
             )
         )
+        // URI terkutip TAK DITUTUP + METHOD=NONE sesudahnya (issue
+        // #617): baris berkutip tak seimbang dibaca apa adanya, jadi
+        // METHOD asli terlihat dan playlist tak terenkripsi ini tidak
+        // ditolak sebagai positif palsu.
+        assertFalse(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:URI=\"key.bin,METHOD=NONE\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        // Simetrisnya: METHOD=AES-128 sesudah kutip ganjil tetap
+        // tertangkap sebagai terenkripsi.
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:URI=\"key.bin,METHOD=AES-128\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+    }
+
+    @Test
+    fun `parseMaster - nilai terkutip tak ditutup tidak menutupi atribut asli`() {
+        // Issue #617: NAME tak ditutup (baris terpotong) — BANDWIDTH
+        // dan RESOLUTION asli sesudahnya wajib tetap terbaca karena
+        // baris berkutip tak seimbang tidak di-mask.
+        val variants = parseMaster(
+            "#EXTM3U\n" +
+                "#EXT-X-STREAM-INF:NAME=\"promo,BANDWIDTH=800000,RESOLUTION=1280x720\n" +
+                "v.m3u8\n",
+            "https://cdn.example.com/master.m3u8"
+        )
+        assertEquals(1, variants.size)
+        assertEquals(800000L, variants[0].bandwidth)
+        assertEquals(720, variants[0].height)
     }
 
     @Test

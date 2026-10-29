@@ -48,6 +48,17 @@ object HlsParser {
      *  regex nilai terkutip (NAME/AUDIO/CODECS/URI) tetap membaca baris
      *  asli. */
     internal fun tanpaNilaiKutip(line: String): String {
+        // Baris berkutip TAK SEIMBANG dikembalikan apa adanya (issue
+        // #617): satu kutip ganjil (nilai tak ditutup — playlist
+        // terpotong/packager cacat) akan membalik sisa baris menjadi
+        // 'di dalam kutip' dan menutupi atribut ASLI sesudahnya
+        // (METHOD/BANDWIDTH/DEFAULT hilang), membalikkan arah
+        // degradasi pra-#598 untuk input cacat. Per RFC 8216 nilai
+        // terkutip memang tak boleh memuat '"' dan HLS tak punya
+        // escape, jadi hitungan ganjil selalu berarti baris rusak;
+        // untuk baris rusak, membaca apa adanya lebih jujur daripada
+        // menutupi. Baris sah (genap) ter-mask persis seperti semula.
+        if (line.count { it == '"' } % 2 != 0) return line
         val sb = StringBuilder(line.length)
         var dalamKutip = false
         for (c in line) {
