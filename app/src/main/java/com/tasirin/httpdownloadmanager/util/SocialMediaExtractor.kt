@@ -100,8 +100,8 @@ object SocialMediaExtractor {
         Regex("https?://[^\"]*scontent[^\"]*\\.(?:jpg|jpeg|png|webp)[^\"]*")
     private val IG_FILE_ID_RE = Regex("/(\\d+_\\d+_\\d+)_[a-z0-9]+\\.(?:jpg|jpeg|png|webp)")
     private val IG_VIDEO_URL_RE = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+\\.mp4[^\"]*)\"")
-    private val IG_CONTEXT_JSON_RE = Regex("contextJSON\\s*=\\s*\"(.+?)\"")
-    private val IG_TOKEN_RE = Regex("\"token\"\\s*:\\s*\"(.+?)\"")
+    private val IG_CONTEXT_JSON_RE = Regex("contextJSON\\s*=\\s*\"")
+    private val IG_TOKEN_RE = Regex("\"token\"\\s*:\\s*\"")
     private val YT_PLAYER_RESP_RE =
         Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*(?:var\s|</script)""")
     private val YT_PLAYER_RESP_LAX_RE = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""")
@@ -548,6 +548,23 @@ object SocialMediaExtractor {
         return unescapePlayer(match.groupValues[1])
     }
 
+    /** Pindai isi string JS ter-escape mulai dari [from] (tepat sesudah
+     *  kutip pembuka) sampai kutip penutup TAK ter-escape pertama; null
+     *  bila string tak berujung. Pola yang sama dengan pemindai format 1
+     *  di extractContextJson — regex tangkap seperti (.+?)" tidak bisa
+     *  dipakai di sini karena berhenti di kutip ter-escape pertama
+     *  (issue #635). internal agar bisa di-unit-test. */
+    internal fun scanEscapedJsString(html: String, from: Int): String? {
+        var i = from
+        while (i < html.length) {
+            val c = html[i]
+            if (c == '\\' && i + 1 < html.length) { i += 2; continue }
+            if (c == '"') return html.substring(from, i)
+            i++
+        }
+        return null
+    }
+
     private fun extractContextJson(html: String): JSONObject? {
         // Format 1 (embed page): contextJSON":"{escaped JSON}"
         val embedKey = "contextJSON\":\""
@@ -581,7 +598,11 @@ object SocialMediaExtractor {
             IG_TOKEN_RE,
         )) {
             val match = pattern.find(html) ?: continue
-            val token = unescapeJsToken(match.groupValues[1])
+            // Regex hanya MELACAK kutip pembuka; isi token dipindai
+            // sadar-escape (issue #635) — tangkapan regex berhenti di
+            // kutip ter-escape pertama dan tak pernah lolos parse JSON.
+            val raw = scanEscapedJsString(html, match.range.last + 1) ?: continue
+            val token = unescapeJsToken(raw)
             try {
                 val obj = JSONObject(token)
                 val gql = obj.optJSONObject("gql_data")

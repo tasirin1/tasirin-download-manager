@@ -1,7 +1,9 @@
 package com.tasirin.httpdownloadmanager.util
 
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -408,6 +410,23 @@ class SocialMediaExtractorTest {
             SocialMediaExtractor.unescapeJsToken("{\\\"a\\\":\\\"b\\/c\\\"}")
         )
         assertEquals("", SocialMediaExtractor.unescapeJsToken(""))
+    }
+
+    @Test
+    fun `scanEscapedJsString - berhenti di kutip tak ter-escape`() {
+        // Bentuk format 2: contextJSON = "{...JSON ter-escape...}".
+        // Ekspektasi dibuktikan port 1:1 sebelum uji ditulis.
+        val html = "contextJSON = \"{\\\"gql_data\\\":{\\\"x\\\":1}}\""
+        val start = html.indexOf("= \"") + 3
+        val raw = SocialMediaExtractor.scanEscapedJsString(html, start)
+        assertEquals("{\\\"gql_data\\\":{\\\"x\\\":1}}", raw)
+        // Token hasil pindai lolos unescape + parse JSON sungguhan.
+        val obj = JSONObject(SocialMediaExtractor.unescapeJsToken(raw!!))
+        assertEquals(1, obj.getJSONObject("gql_data").getInt("x"))
+        // String tak berujung -> null, bukan potongan paksa.
+        assertNull(SocialMediaExtractor.scanEscapedJsString("\"{\\\"a", 1))
+        // Kutip sesudah backslash ganda tetap penutup (semantik JS).
+        assertEquals("a\\\\", SocialMediaExtractor.scanEscapedJsString("\"a\\\\\"b\"", 1))
     }
 
     @Test
