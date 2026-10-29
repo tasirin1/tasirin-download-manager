@@ -5811,17 +5811,25 @@ function attachSwipe(li) {
   li.appendChild(actL);
   li.appendChild(actR);
   li.appendChild(wrap);
-  // Label panel kiri mengikuti state TERKINI (issue #585): panel
-  // dibangun sekali saat baris dibuat dengan teks 'Pause', padahal
-  // aksi lepas-sentuh adalah resume untuk semua state selain
-  // DOWNLOADING — panel menjanjikan aksi yang salah.
+  // Label panel kiri mengikuti state TERKINI (issue #585) dan hanya
+  // menawarkan aksi yang benar-benar diterima engine (issue #605):
+  // pause untuk DOWNLOADING, resume untuk PAUSED/FAILED/CANCELLED.
+  // State lain (PENDING/COMPLETED) tak punya aksi kiri — panel
+  // dikosongkan dan geser kiri dinonaktifkan, bukan menjanjikan
+  // Resume yang pasti ditolak engine dan berakhir toast gagal.
   function refreshSwipeLeft() {
     var it = currentItems.find(function (x) { return x.id === li.dataset.id; });
-    var isDl = !!it && it.state === 'DOWNLOADING';
-    var want = isDl ? 'pause' : 'resume';
+    var want = null;
+    if (it && it.state === 'DOWNLOADING') want = 'pause';
+    else if (it && (it.state === 'PAUSED' || it.state === 'FAILED' || it.state === 'CANCELLED')) want = 'resume';
+    li._swipeLeftOp = want;
     if (actL._side === want) return;
     actL._side = want;
-    actL.innerHTML = '<span class="act-in">' + (isDl ? UI_ICONS.pause + ' <span>Pause</span>' : UI_ICONS.play + ' <span>Resume</span>') + '</span>';
+    actL.innerHTML = want === 'pause'
+      ? '<span class="act-in">' + UI_ICONS.pause + ' <span>Pause</span></span>'
+      : want === 'resume'
+        ? '<span class="act-in">' + UI_ICONS.play + ' <span>Resume</span></span>'
+        : '';
   }
   function setSide(c) {
     if (c < 0) {
@@ -5867,6 +5875,7 @@ function attachSwipe(li) {
   li.addEventListener('touchmove', function (e) {
     var t = e.touches[0];
     var ddx = t.clientX - sx;
+    if (ddx < 0 && !li._swipeLeftOp) ddx = 0;
     var ddy = t.clientY - sy;
     if (!swiping) {
       if (Math.abs(ddy) > Math.abs(ddx) || Math.abs(ddx) < 10) return;
@@ -5884,7 +5893,8 @@ function attachSwipe(li) {
     resetVisual();
     if (released < -TH) {
       var it = currentItems.find(function (x) { return x.id === itemId; });
-      if (it) doAction(itemId, it.state === 'DOWNLOADING' ? 'pause' : 'resume');
+      if (it && it.state === 'DOWNLOADING') doAction(itemId, 'pause');
+      else if (it && (it.state === 'PAUSED' || it.state === 'FAILED' || it.state === 'CANCELLED')) doAction(itemId, 'resume');
     } else if (released > TH) {
       showConfirm('Delete', 'Delete this download?', 'Delete', function () { doAction(itemId, 'delete'); });
     }
