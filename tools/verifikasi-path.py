@@ -1462,6 +1462,20 @@ def utama():
             a, b = re.split(r"\.\.+", args.rentang, maxsplit=1)
             diff = jalan("git", "diff", a + "..." + b) or ""
     else:
+        # Sumber daftar perubahan wajib hidup (issue #646): jalan()
+        # mengembalikan None untuk SEMUA kegagalan git, dan rantai
+        # `or ""` di bawah mengubahnya menjadi daftar + diff kosong —
+        # tanpa cek ini repo tanpa .git (atau git mati) menjawab
+        # "LOLOS (0 berkas diperiksa)" padahal tak satu pun cek
+        # berbasis diff berjalan. Fail-closed seperti #182/#625.
+        # Mode --semua dikecualikan: sumber daftarnya jalan_repo
+        # (pindai berkas), bukan git.
+        if not args.semua and jalan("git", "rev-parse", "--git-dir") is None:
+            gagal.append(
+                "git tidak berfungsi di repo ini (rev-parse gagal)"
+                " — sumber daftar perubahan mati, gerbang tidak bisa"
+                " menilai dalam mode diff (fail-closed)."
+            )
         hulu = jalan("git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
         if hulu:
             diff = jalan("git", "diff", hulu.strip() + "...HEAD") or ""
