@@ -1315,6 +1315,10 @@ def cek_uji_baru(peringatan, diff):
 
 def cek_remote_dm(gagal):
     src = baca("remote.src.html")
+    if not src:
+        # Hilang/kosong tak boleh melewatkan seluruh cek diam-diam
+        # (issue #616): vonis bernama, bukan LOLOS semu.
+        gagal.append("remote.src.html hilang atau kosong — cek remote tak bisa berjalan")
     if src:
         defs = re.findall(r"function\s+fmtDate\b|fmtDate\s*=\s*function|const\s+fmtDate\s*=|let\s+fmtDate\s*=", src)
         if len(defs) > 1:
@@ -1330,7 +1334,10 @@ def cek_remote_dm(gagal):
         elif baris and max(len(b) for b in baris) > 5000:
             gagal.append("assets/extract.js ada baris >5000 karakter (risiko flag satu-baris) — pecah readable")
     except OSError:
-        pass
+        # Hilang/tak terbaca adalah vonis, bukan lolos diam-diam
+        # (issue #616): extract.js dimuat WebExtractActivity saat
+        # runtime — ketiadaannya tak boleh tak terlihat gerbang ini.
+        gagal.append("assets/extract.js hilang atau tak terbaca (dimuat WebExtractActivity saat runtime)")
 
 
 def cek_pola_berisiko(gagal, peringatan, diff, berubah=()):
