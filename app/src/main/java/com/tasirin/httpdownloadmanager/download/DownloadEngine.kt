@@ -3270,45 +3270,18 @@ class DownloadEngine(appContext: Context) {
         if (isMapHlsPlaylist(body)) {
             throw IOException("Fragmented MP4 HLS (EXT-X-MAP) not supported")
         }
-        val result = mutableListOf<Pair<String, Long>>()
-        val lines = body.lines()
-        var i = 0
-        while (i < lines.size) {
-            val line = lines[i].trim()
-            if (line.startsWith("#EXTINF:")) {
-                // Format: #EXTINF:<durasi>, atau #EXTINF:<durasi>, ...
-                val dur = line.substringAfter(":").substringBefore(",").trim()
-                    .toDoubleOrNull() ?: 0.0
-                // URI segmen adalah baris non-kosong non-tag BERIKUTNYA
-                // (issue #387): asumsi lama "tepat di baris sesudahnya"
-                // membuat baris kosong/tag di tengah (mis.
-                // #EXT-X-PROGRAM-DATE-TIME dari sebagian CDN) melewatkan
-                // segmen asli — dan untuk baris kosong, resolveUrl
-                // mengembalikan URL playlist itu sendiri sehingga playlist
-                // terunduh sebagai segmen. Durasi hanya dicatat berpasangan
-                // dengan URI yang benar-benar ditemukan.
-                var j = i + 1
-                while (j < lines.size) {
-                    val next = lines[j].trim()
-                    if (next.isNotEmpty() && !next.startsWith("#")) break
-                    j++
-                }
-                if (j < lines.size) {
-                    val url = HlsParser.resolveUrl(playlistUrl, lines[j].trim())
-                    // Predikat bersama HlsParser.isHttpUrl (issue #477):
-                    // awalan "http" saja menerima skema mirip-http
-                    // tanpa "//" (http:seg.ts, httpx://) yang lolos
-                    // pass-through resolveUrl sebagai segmen gadungan.
-                    if (HlsParser.isHttpUrl(url)) {
-                        result.add(url to hlsSegmentDurationUs(dur))
-                    }
-                    i = j + 1; continue
-                }
-                i = j; continue
-            }
-            i++
-        }
-        return if (result.isEmpty()) null else result
+        // Pemasangan EXTINF diserahkan ke parser murni yang sama
+        // dengan jalur langsung (issue #578): dulu fungsi ini hanya
+        // memasangkan dari EXTINF (segmen tanpa EXTINF terbuang
+        // diam-diam; EXTINF ganda dimenangkan yang pertama), sedangkan
+        // parseDirectMedia menerima semua segmen (tanpa EXTINF = durasi
+        // 0; EXTINF ganda = yang terakhir menang) — playlist yang sama
+        // bisa menghasilkan daftar segmen berbeda antar-tahap. Kini
+        // satu semantik berlaku di semua tahap: semua segmen terunduh,
+        // durasi mengikuti EXTINF terakhir sebelum segmennya.
+        val direct = HlsParser.parseDirectMedia(body, playlistUrl)
+        if (direct.segments.isEmpty()) return null
+        return direct.segments.zip(direct.durationsUs)
     }
 
     private fun mediaSegments(
