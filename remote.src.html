@@ -6252,7 +6252,7 @@ function rebuildList(items) {
     li._sub = li.querySelector('.item-sub');
     // Flag kehadiran node aksi/error: updateRows tiap tick 1 dtk tak perlu
     // querySelector per baris lagi (hadirnya hanya berubah saat rebuild).
-    li._hasRetry = it.state === 'FAILED';
+    li._hasRetry = it.state === 'FAILED' || it.state === 'CANCELLED';
     li._hasErr = !!it.error;
     const menuBtn = li.querySelector('.item-menu-btn');
     if (menuBtn) {

@@ -1024,6 +1024,7 @@
 - **Fix cookie fallback** - `fallbackConn` di DownloadEngine sekarang menerapkan cookie dari CookieManager ke koneksi fallback (situs yang butuh session cookie).
 - **Fix thread-safe prefs** - `cachedPrefs` di StoragePrefs ditambah `@Volatile` supaya aman diakses dari multiple thread di Android 5.
 - **fix(engine): jalur jatuh-tembus segmen kini memakai item segar dari store** -- Sesudah invalidateChangedResume mengosongkan segmen + totalBytes, jalur jatuh-tembus memanggil runSegmented dengan snapshot lama yang tata segmennya basi: cabang pembuatan segmen (satu-satunya penulis totalBytes) terlewati, totalBytes tetap 0, dan verifySize (hanya melempar bila total > 0) menjadi buta — berkas yang membesar di server bisa terbit terpotong sebagai COMPLETED. Item kini dibaca ulang dari store sebelum runSegmented, sejajar jalur resume segmen yang benar (issue #563).
+- **fix(remote): stempel _hasRetry diselaraskan dengan needRetry untuk CANCELLED** -- Commit b2d9b06 membuat updateRows menuntut tombol aksi untuk FAILED dan CANCELLED, dan rebuildList menggambarnya, tetapi stempel kehadiran tombol tetap FAILED-saja: baris CANCELLED selalu dinilai tak cocok sehingga updateRows memanggil rebuildList penuh di setiap tick snapshot (jalur cepat patch mati, daftar berkedip dan dibangun ulang terus selama ada item batal). Stempel kini FAILED || CANCELLED, sejajar needRetry (issue #564).
 
 
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
