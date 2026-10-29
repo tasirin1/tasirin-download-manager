@@ -136,7 +136,12 @@ def agents_md_completeness() -> Result:
     agents = ROOT / "AGENTS.md"
     if not agents.is_file():
         return Result("AGENTS.md exists", False, 0.0, "AGENTS.md tidak ditemukan")
-    content = agents.read_text(encoding="utf-8")
+    try:
+        content = agents.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        # Berkas non-UTF8 adalah problem bernama, bukan traceback yang
+        # menggugurkan seluruh lari (issue #571, kelas saudara #562).
+        return Result("AGENTS.md exists", False, 0.0, f"AGENTS.md tak terbaca: {exc}")
     required_sections = [
         "Pola bug yang pernah terjadi",
         "Best practices untuk AI",
@@ -182,7 +187,7 @@ def admin_consistency() -> Result:
             problems.append("stale.yml: baris days-before-pr-stale hilang")
         elif f"{pr_days} hari" not in pr_msg:
             problems.append(f"pesan stale PR tidak menyebut {pr_days} hari")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         problems.append(f"stale.yml tak terbaca: {exc}")
     try:
         owners = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
@@ -201,7 +206,7 @@ def admin_consistency() -> Result:
                     problems.append(f"CODEOWNERS:{lineno} awalan tak ada: {prefix}")
             elif not (ROOT / path).exists():
                 problems.append(f"CODEOWNERS:{lineno} path tak ada: {path}")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         problems.append(f"CODEOWNERS tak terbaca: {exc}")
     try:
         import yaml as _yaml
@@ -251,7 +256,7 @@ def admin_consistency() -> Result:
                 continue
             if not (ROOT / clean).exists():
                 problems.append(f"labeler path tak ada: {path}")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         problems.append(f"labeler.yml tak terbaca: {exc}")
     except ImportError:
         problems.append("modul yaml tak tersedia untuk validasi labeler")
@@ -305,7 +310,7 @@ def admin_consistency() -> Result:
             # "8,5%", jadi yang dicari bentuk ber-% nya.
             if expect + "%" not in agents:
                 problems.append("AGENTS.md ambang JaCoCo tak sinkron dengan app/build.gradle.kts")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         problems.append(f"cek toolchain tak terbaca: {exc}")
     if problems:
         return Result("admin konsisten", False, 0.0, "; ".join(problems))
