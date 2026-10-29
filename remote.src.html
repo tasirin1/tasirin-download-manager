@@ -428,11 +428,12 @@
   .head-actions {
  display: flex; align-items: center; gap: 6px; }
 
-  /* Header File Manager tanpa judul halaman (judul pindah ke
-     topbar mengikuti tab, permintaan owner): baris tombol bulat
-     kecil 35px rata kanan. */
+  /* Baris tombol File Manager (judul halaman dihapus, judul
+     pindah ke topbar mengikuti tab): blok .page-head kini duduk
+     di bawah breadcrumb lengket — tombol bulat kecil 35px rata
+     kanan, ikut tergulir bersama halaman (permintaan owner). */
   #fsView .page-head {
- justify-content: flex-end; }
+ justify-content: flex-end; padding-top: 0; padding-bottom: 0; }
   #fsView .page-head .more-btn {
  width: 35px; height: 35px; }
   #fsView .page-head .more-btn svg {
@@ -1815,6 +1816,12 @@
   </div>
 
   <div id="fsView" class="hidden">
+  <div id="fsSticky" class="fs-sticky">
+  <div class="fs-pathrow"><div id="fsPath" class="fs-path"></div><span class="count" id="fsCount"></span></div>
+  <div id="fsSearchRow" class="fs-search-row hidden">
+    <input id="fsSearchInput" type="search" placeholder="Search this folder\u2026" aria-label="Search files">
+  </div>
+  </div>
   <div class="gal-toolbar page-head">
     <div class="more-wrap head-actions">
       <button id="fsHomeBtn" type="button" class="more-btn" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></button>
@@ -1836,12 +1843,6 @@
       <div id="fsMenuBackdrop" class="menu-backdrop"></div>
     </span>
     </div>
-  </div>
-  <div id="fsSticky" class="fs-sticky">
-  <div class="fs-pathrow"><div id="fsPath" class="fs-path"></div><span class="count" id="fsCount"></span></div>
-  <div id="fsSearchRow" class="fs-search-row hidden">
-    <input id="fsSearchInput" type="search" placeholder="Search this folder\u2026" aria-label="Search files">
-  </div>
   </div>
   <input id="fsUploadFile" type="file" class="hidden" multiple>
   <input id="fsUploadDir" type="file" class="hidden" webkitdirectory multiple>
