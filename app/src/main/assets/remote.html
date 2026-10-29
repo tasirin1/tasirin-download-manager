@@ -2141,6 +2141,7 @@ const moveModal = document.getElementById('moveModal');
 let moveItems = [];
 let movePath = '';
 let movePickSeq = 0;
+const MOVE_PICK_MAX = 5000;
 function openMovePicker(items) {
 moveItems = items;
 const label = items.length === 1
@@ -2200,12 +2201,30 @@ pathEl.innerHTML = '';
 list.innerHTML = '<div class="move-empty">Loading\u2026</div>';
 renderMoveCrumbs(movePath, pathEl);
 try {
-const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(movePath) + '&offset=0&limit=250', undefined, 20000);
+const dirs = [];
+let offset = 0;
+let truncated = false;
+while (true) {
+const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(movePath) + '&offset=' + offset + '&limit=250', undefined, 20000);
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
 if (seq !== movePickSeq) return;
 const items = data.items || [];
-renderMoveFolders(movePath ? items.filter(function (it) { return it.kind === 'dir'; }) : items, list);
+items.forEach(function (it) {
+if (!movePath || it.kind === 'dir') dirs.push(it);
+});
+offset += items.length;
+const total = data.total || offset;
+if (!items.length || offset >= total) break;
+if (offset >= MOVE_PICK_MAX) { truncated = true; break; }
+}
+renderMoveFolders(dirs, list);
+if (truncated) {
+const note = document.createElement('div');
+note.className = 'move-empty';
+note.textContent = 'Too many entries \u2014 open a subfolder to narrow the list';
+list.appendChild(note);
+}
 } catch (e) {
 if (seq !== movePickSeq) return;
 list.innerHTML = '<div class="move-empty">Failed to load: ' + escapeHtml(String(e)) + '</div>';
