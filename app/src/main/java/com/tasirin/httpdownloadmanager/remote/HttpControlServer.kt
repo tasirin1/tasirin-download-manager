@@ -3278,6 +3278,25 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return if (gone) MsMoveOutcome.MOVED else MsMoveOutcome.MOVED_SOURCE_LEFT
     }
 
+    /** Klaim berkas target secara atomik dengan createNewFile (pola yang
+     *  sama dengan FileSaver.uniqueTargetFile): berkas klaim kosong TIDAK
+     *  dihapus — pemanggil menimpanya via outputStream, jadi klaim berlaku
+     *  sampai tulis selesai tanpa jendela cek-lalu-pakai. Null = direktori
+     *  tak bisa ditulisi atau 1000 tabrakan nama. */
+    private fun claimFileTarget(dir: File, fileName: String): File? {
+        var candidate = File(dir, fileName)
+        repeat(1000) {
+            if (!candidate.exists()) {
+                if (runCatching { candidate.createNewFile() }.getOrDefault(false)) {
+                    return candidate
+                }
+                if (!candidate.exists()) return null
+            }
+            candidate = File(dir, FileNames.unique(candidate.name) { File(dir, it).exists() })
+        }
+        return null
+    }
+
     private fun moveMediaToFile(uri: Uri, dest: String): Boolean {
         if (!isFsPathAllowed(dest)) return false
         val dir = File(dest)
@@ -3291,9 +3310,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // paralel bernama sama sama-sama menilai nama itu bebas, menulis
         // menimpa target yang sama (byte tercampur), lalu menghapus
         // kedua sumbernya — satu berkas korup/hilang tanpa error.
+        // Klaimnya sendiri ATOMIK via createNewFile (issue #649): gerbang
+        // hanya menyerialkan aksi server, sedangkan jalur terbit upload
+        // (FileSaver.saveStream) berada di luar gerbang — cek exists()
+        // saja menyisakan jendela di mana penerbit mengklaim nama yang
+        // sama lebih dulu, lalu outputStream() di sini menimpa inode yang
+        // sama dan byte kedua penulis tercampur.
         val target = synchronized(fsModifyGate) {
-            val claimed = FileNames.unique(FileNames.safe(sourceName)) { File(dir, it).exists() }
-                .let { File(dir, it) }
+            val claimed = claimFileTarget(dir, FileNames.safe(sourceName)) ?: return false
             val written = runCatching {
                 val input = resolver.openInputStream(uri) ?: return false
                 input.use { src -> claimed.outputStream().use { dst -> src.copyTo(dst, SERVER_IO_BUF) } }

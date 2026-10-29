@@ -1111,6 +1111,7 @@
 
 
 - **fix(engine): progres per-segmen ikut dipersist berkala** -- progres ringan `encodeProgress` kini memuat larik `s` (downloaded per index segmen) dan `overlayProgress` menerapkannya monoton per segmen dengan jepit ke panjang segmennya, sehingga proses yang mati di tengah attempt segmen tidak lagi membuang progres satu attempt saat resume; komentar progres di engine diluruskan + uji codec (issue #648).
+- **fix(remote): klaim target moveMediaToFile kini atomik via createNewFile** -- gerbang `fsModifyGate` dari #644 hanya menyerialkan aksi server; jalur terbit upload FileSaver di luar gerbang masih bisa mengklaim nama yang sama di sela cek `exists()` dan `outputStream()` sehingga byte tercampur dan sumber MediaStore terhapus. Klaim kini membuat berkas kosong lebih dulu (helper `claimFileTarget`, pola `FileSaver.uniqueTargetFile`) dan hanya menimpa berkas milik klaim itu sendiri (issue #649).
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 ### Fixed
 - **Seek zen mode** — Sembunyikan tombol modal dan daftar video berikutnya selama dua-tap lompatan durasi.
