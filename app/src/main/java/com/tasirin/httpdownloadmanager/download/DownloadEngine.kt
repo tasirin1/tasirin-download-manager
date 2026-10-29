@@ -3012,7 +3012,16 @@ class DownloadEngine(appContext: Context) {
                                 } else 0L
                                 lastHlsCheckBytes = segBytes
                                 lastHlsCheckAt = now
-                                health.check(now, committed + segBytes, declared ?: 0L, speed)
+                                // Satuan WAJIB per-segmen seperti
+                                // downloadSegment (issue #596): committed
+                                // adalah penghitung kumulatif pelaporan,
+                                // sedangkan declared adalah Content-Length
+                                // segmen INI — mengumpan jumlahnya membuat
+                                // gerbang downloaded >= total di watchdog
+                                // selalu benar sejak segmen ke-2 (dan pada
+                                // resume), sehingga watchdog tak pernah
+                                // menilai apa pun.
+                                health.check(now, segBytes, declared ?: 0L, speed)
                             }
                         }
                     }
