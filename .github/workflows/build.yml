@@ -327,17 +327,31 @@ jobs:
             MAPPING_ARGS="app/build/outputs/mapping/release/mapping.txt"
           fi
           # Tag unik per build (v<VER_NAME>) -- rilis lama dipertahankan
-          # sebagai riwayat; delete hanya untuk idempotensi bila job
-          # rerun. Delete ditaruh SESESAAT sebelum create (issue #355):
-          # sebelumnya delete duduk jauh di atas (sebelum hitung catatan
-          # + panggilan API penjaga latest) sehingga pembatalan run oleh
-          # push baru (concurrency cancel-in-progress) di jendela itu
-          # menghapus rilis versi ini permanen tanpa pengganti.
-          gh release delete "v${VER}" --yes --cleanup-tag || true
-          gh release create "v${VER}" "$OUT" $MAPPING_ARGS \
-            --title "Tasirin Download Manager v${VER} (build ${CODE})" \
-            --notes "$NOTES" \
-            $LATEST_ARGS
+          # sebagai riwayat. Upsert TANPA delete (issue #589): pasangan
+          # delete->create warisan #355 tetap menyisakan jendela yang
+          # bisa dimakan pembatalan run oleh push baru (concurrency
+          # cancel-in-progress) di antara keduanya — rilis versi ini
+          # hilang permanen tanpa pengganti. Kini: rilis yang sudah ada
+          # (job rerun) cukup diunggahi ulang asetnya (--clobber) dan
+          # disegarkan judul/catatan/latest-nya; yang belum ada dibuat.
+          # Tak ada operasi destruktif atas rilis itu sendiri, jadi
+          # pembatalan di tengah hanya meninggalkan rilis lama utuh
+          # yang diperbaiki run berikutnya (audit di bawah memverifikasi
+          # aset sesudahnya). Bendera --latest untuk edit hanya diteruskan
+          # bila memang dimaksudkan: mengosongkannya berarti latest
+          # tak berubah, yang tepat untuk rerun.
+          if gh release view "v${VER}" > /dev/null 2>&1; then
+            gh release upload "v${VER}" "$OUT" $MAPPING_ARGS --clobber
+            gh release edit "v${VER}" \
+              --title "Tasirin Download Manager v${VER} (build ${CODE})" \
+              --notes "$NOTES" \
+              $LATEST_ARGS
+          else
+            gh release create "v${VER}" "$OUT" $MAPPING_ARGS \
+              --title "Tasirin Download Manager v${VER} (build ${CODE})" \
+              --notes "$NOTES" \
+              $LATEST_ARGS
+          fi
 
           echo "--- Audit rilis v${VER} ---"
           EXPECTED_APK="$OUT"
