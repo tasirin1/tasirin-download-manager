@@ -6,6 +6,7 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.PushbackInputStream
 
 /** Parser ADTS AAC murni JVM — dipakai untuk audio HLS YouTube yang berupa
  *  ADTS (bukan MPEG-TS). Menghasilkan csd-0 (AudioSpecificConfig) dan frame
@@ -221,7 +222,9 @@ object AdtsAac {
      *  dibaca ulang tiap iterasi, tidak pernah dipegang penuh di RAM. null
      *  bila tidak ada frame AAC (bukan ADTS / terpotong). */
     fun open(file: File): Stream? {
-        val input = BufferedInputStream(FileInputStream(file))
+        // Pushback: readFrame mengembalikan kelebihan byte jendela
+        // kandidat milik frame berikutnya (issue #619).
+        val input = PushbackInputStream(BufferedInputStream(FileInputStream(file)), 16)
         try {
             val first = readFrame(input) ?: return null
             val h = first.header
@@ -278,7 +281,7 @@ object AdtsAac {
     /** Iterasi frame dari file — membuka stream baru per iterasi dan membaca
      *  satu frame pada satu waktu. */
     private fun fileFrames(file: File): Sequence<ByteArray> = sequence {
-        BufferedInputStream(FileInputStream(file)).use { input ->
+        PushbackInputStream(BufferedInputStream(FileInputStream(file)), 16).use { input ->
             while (true) {
                 val frame = readFrame(input) ?: break
                 yield(frame.payload)
@@ -288,15 +291,28 @@ object AdtsAac {
 
     /** Baca satu frame ADTS utuh (payload tanpa header) dari stream; lewati
      *  tag ID3 yang mungkin menyela aliran. null saat EOF / data rusak. */
-    private fun readFrame(input: InputStream): Frame? {
+    private fun readFrame(input: PushbackInputStream): Frame? {
         val hdr = ByteArray(10)
         val h = nextHeader(input, hdr) ?: return null
         val pre = h.buffered - h.headerLen
         val payloadLen = h.frameLen - h.headerLen
-        if (payloadLen < pre || payloadLen > MAX_FRAME_BYTES) return null
+        if (payloadLen > MAX_FRAME_BYTES) return null
+        // Frame lebih pendek dari jendela kandidat (issue #619):
+        // kelebihan byte di hdr adalah AWAL frame berikutnya yang
+        // sudah terlanjur terbaca. Dulu keadaan ini mengembalikan
+        // null sehingga iterasi berkas berhenti total — satu frame
+        // mungil (payload <= 2 byte) di TENGAH aliran membuang
+        // seluruh audio sesudahnya diam-diam, padahal jalur
+        // ByteArray melanjutkannya. Kembalikan kelebihannya ke
+        // aliran (pushback) dan bentuk payload dari bagian yang
+        // memang milik frame ini.
+        if (payloadLen < pre) {
+            input.unread(hdr, h.headerLen + payloadLen, pre - payloadLen)
+        }
+        val fromHdr = minOf(pre, payloadLen)
         val payload = ByteArray(payloadLen)
-        if (pre > 0) System.arraycopy(hdr, h.headerLen, payload, 0, pre)
-        if (!readExact(input, payload, pre, payloadLen - pre)) return null
+        if (fromHdr > 0) System.arraycopy(hdr, h.headerLen, payload, 0, fromHdr)
+        if (!readExact(input, payload, fromHdr, payloadLen - fromHdr)) return null
         return Frame(h, payload)
     }
 

@@ -185,6 +185,43 @@ class AdtsAacTest {
     }
 
     @Test
+    fun `open setara parse untuk frame mungil di tengah aliran`() {
+        // Frame mungil (payload 1 byte) di TENGAH berkas: kandidat 10
+        // byte memuat byte frame berikutnya; dulu readFrame menyerah
+        // dan seluruh audio sesudahnya hilang (issue #619). Pushback
+        // membuat jalur File setara jalur ByteArray.
+        val data = adtsFrame(1, 7, 2, 20) + adtsFrame(1, 7, 2, 1) + adtsFrame(1, 7, 2, 20)
+        val viaArray = ArrayList<Int>()
+        AdtsAac.parse(data)!!.forEachFrame { viaArray.add(it.size) }
+        assertEquals(listOf(20, 1, 20), viaArray)
+        val tmp = File.createTempFile("adts", ".aac")
+        try {
+            tmp.writeBytes(data)
+            val viaFile = ArrayList<Int>()
+            AdtsAac.open(tmp)!!.forEachFrame { viaFile.add(it.size) }
+            assertEquals(listOf(20, 1, 20), viaFile)
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    @Test
+    fun `open setara parse untuk dua frame mungil berurutan`() {
+        // Pushback harus rantai: sisa frame pertama adalah kandidat
+        // frame kedua yang juga mungil.
+        val data = adtsFrame(1, 7, 2, 1) + adtsFrame(1, 7, 2, 2) + adtsFrame(1, 7, 2, 20)
+        val tmp = File.createTempFile("adts", ".aac")
+        try {
+            tmp.writeBytes(data)
+            val viaFile = ArrayList<Int>()
+            AdtsAac.open(tmp)!!.forEachFrame { viaFile.add(it.size) }
+            assertEquals(listOf(1, 2, 20), viaFile)
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    @Test
     fun `open menerima berkas satu frame mungil 9 byte`() {
         val tmp = File.createTempFile("adts", ".aac")
         try {
