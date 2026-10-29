@@ -75,6 +75,14 @@ def jalan(*args):
     return hasil.stdout if hasil.returncode == 0 else None
 
 
+def git_hidup():
+    """True bila git menjawab rev-parse di repo ini. jalan() mengembalikan
+    None untuk SEMUA kegagalan git, jadi tanpa cek ini repo tanpa .git
+    (atau git mati) mengubah diff kosong menjadi vonis LOLOS semu
+    (issue #646; mode jalur ikut ditutup issue #661)."""
+    return jalan("git", "rev-parse", "--git-dir") is not None
+
+
 def jalan_output(*args):
     """Seperti jalan() tetapi stdout dikembalikan apa adanya walau
     returncode bukan nol (None hanya bila perintah gagal dijalankan).
@@ -1386,6 +1394,16 @@ def utama():
     peringatan = []
     diff = ""
     if args.jalur:
+        # Gerbang kesehatan git yang sama dengan mode default (issue
+        # #661): mode jalur sangat bergantung diff (pengecualian hapus
+        # #647 + seluruh keluarga cek berbasis diff), jadi git mati tak
+        # boleh mengosongkannya diam-diam menjadi LOLOS.
+        if not git_hidup():
+            gagal.append(
+                "git tidak berfungsi di repo ini (rev-parse gagal)"
+                " — mode jalur bergantung diff, gerbang tidak bisa"
+                " menilai (fail-closed)."
+            )
         # Dedupe menjaga urutan pertama (issue #500): jalur yang disebut
         # dua kali dulu dinilai dua kali — peringatan per-baris dari cek
         # berbasis diff berduplikat (termasuk suntikan #496) dan
@@ -1485,7 +1503,7 @@ def utama():
         # berbasis diff berjalan. Fail-closed seperti #182/#625.
         # Mode --semua dikecualikan: sumber daftarnya jalan_repo
         # (pindai berkas), bukan git.
-        if not args.semua and jalan("git", "rev-parse", "--git-dir") is None:
+        if not args.semua and not git_hidup():
             gagal.append(
                 "git tidak berfungsi di repo ini (rev-parse gagal)"
                 " — sumber daftar perubahan mati, gerbang tidak bisa"
