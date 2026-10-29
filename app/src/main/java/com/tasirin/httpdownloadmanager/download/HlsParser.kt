@@ -39,6 +39,27 @@ object HlsParser {
     private val MEDIA_GROUP_RE: Regex = Regex("GROUP-ID=\"([^\"]+)\"")
     private val MEDIA_URI_RE: Regex = Regex("URI=\"([^\"]+)\"")
     private val LANGUAGE_RE: Regex = Regex("LANGUAGE=\"([^\"]+)\"")
+    /** Baris atribut dengan isi nilai terkutip dikosongkan (issue #598):
+     *  regex atribut TAK terkutip (BANDWIDTH/RESOLUTION/FRAME-RATE/TYPE)
+     *  buta-kutip — teks NAME="BANDWIDTH=999" menang atas atribut asli
+     *  karena find() mengambil kecocokan pertama di mana pun, dan teks
+     *  di dalam kutip bisa mengarang atribut yang tak ada. Sesudah
+     *  pengosongan hanya atribut sungguhan di luar kutip yang terbaca;
+     *  regex nilai terkutip (NAME/AUDIO/CODECS/URI) tetap membaca baris
+     *  asli. */
+    internal fun tanpaNilaiKutip(line: String): String {
+        val sb = StringBuilder(line.length)
+        var dalamKutip = false
+        for (c in line) {
+            when {
+                c == '"' -> { dalamKutip = !dalamKutip; sb.append(c) }
+                dalamKutip -> sb.append(' ')
+                else -> sb.append(c)
+            }
+        }
+        return sb.toString()
+    }
+
     // Prefiks skema URI (RFC 3986): ALPHA *(ALPHA/DIGIT/+/-/.) lalu ":".
     // Himpunan karakternya tak memuat "/", jadi kecocokan menjamin titik
     // dua berada di segmen pertama — skema tanpa "//" (data:, urn:,
@@ -116,20 +137,21 @@ object HlsParser {
                 if (next.isNotEmpty() && !next.startsWith("#") && !isForeignAbsoluteUri(next)) {
                     // Guard contains dulu: regex find 6x per baris varian boros
                     // bila atributnya tidak ada di baris tersebut.
+                    val polos = tanpaNilaiKutip(line)
                     val bandwidth = if (line.contains("BANDWIDTH")) BANDWIDTH_RE
-                        .find(line)?.groupValues?.get(1)?.toLongOrNull() else null
+                        .find(polos)?.groupValues?.get(1)?.toLongOrNull() else null
                     val res = if (line.contains("RESOLUTION")) RESOLUTION_RE
-                        .find(line)?.groupValues?.get(1) else null
+                        .find(polos)?.groupValues?.get(1) else null
                     val name = if (line.contains("NAME=")) NAME_RE
                         .find(line)?.groupValues?.get(1) else null
                     val audioGroup = if (line.contains("AUDIO")) AUDIO_RE
                         .find(line)?.groupValues?.get(1) else null
                     val frameRate = if (line.contains("FRAME-RATE")) FRAME_RATE_RE
-                        .find(line)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0 else 0
+                        .find(polos)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0 else 0
                     // Guard contains seperti regex lain di atas: baris varian
                     // tanpa RESOLUTION/CODECS tak perlu membayar find().
                     val height = if (line.contains("RESOLUTION")) RESOLUTION_HEIGHT_RE
-                        .find(line)?.groupValues?.let { g ->
+                        .find(polos)?.groupValues?.let { g ->
                             // Label kualitas = dimensi terkecil: video portrait
                             // 720x1280 tetap "720p" (sesuai HlsParserTest).
                             val w = g[1].toIntOrNull()
@@ -186,18 +208,19 @@ object HlsParser {
             // yang sah, sehingga master tak umum ber-URI relatif gagal
             // total di fallback ini padahal parseMaster menerimanya.
             if (isForeignAbsoluteUri(next)) continue
-            val bw = BANDWIDTH_RE.find(ln)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            val polosLn = tanpaNilaiKutip(ln)
+            val bw = BANDWIDTH_RE.find(polosLn)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
             // Semantik height SAMA seperti parseMaster (issue #393):
             // dimensi terkecil, agar video portrait 720x1280 tercatat
             // 720 — bukan tinggi mentah 1280 yang mengacaukan peringkat
             // kedekatan resolusi dan label.
-            val h = RESOLUTION_HEIGHT_RE.find(ln)?.groupValues?.let { g ->
+            val h = RESOLUTION_HEIGHT_RE.find(polosLn)?.groupValues?.let { g ->
                 val w = g[1].toIntOrNull()
                 val hh = g[2].toIntOrNull()
                 if (w != null && hh != null) minOf(w, hh) else 0
             } ?: 0
             val codecs = CODECS_RE.find(ln)?.groupValues?.get(1).orEmpty()
-            val fps = FRAME_RATE_RE.find(ln)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
+            val fps = FRAME_RATE_RE.find(polosLn)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
             // Label tanpa RESOLUTION (issue #476): "$h p" memburuk jadi
             // "0 p" untuk semua varian master tak umum (yang justru
             // terjangkau dialog berkat #465) — tak bisa dibedakan dan
@@ -277,13 +300,14 @@ object HlsParser {
             val line = raw.trim()
             if (!line.startsWith("#EXT-X-MEDIA")) continue
             val attrs = line.substringAfter(":")
-            if (MEDIA_TYPE_RE.find(attrs)?.groupValues?.get(1) != "AUDIO") continue
+            val polosAttrs = tanpaNilaiKutip(attrs)
+            if (MEDIA_TYPE_RE.find(polosAttrs)?.groupValues?.get(1) != "AUDIO") continue
             val groupId = MEDIA_GROUP_RE.find(attrs)?.groupValues?.get(1) ?: continue
             val uri = MEDIA_URI_RE.find(attrs)?.groupValues?.get(1) ?: continue
             if (isForeignAbsoluteUri(uri)) continue
             val language = LANGUAGE_RE.find(attrs)?.groupValues?.get(1).orEmpty()
             val name = NAME_RE.find(attrs)?.groupValues?.get(1).orEmpty()
-            renditions.add(HlsRendition(groupId, resolveUrl(baseUrl, uri), attrs.contains("DEFAULT=YES"), language, name))
+            renditions.add(HlsRendition(groupId, resolveUrl(baseUrl, uri), polosAttrs.contains("DEFAULT=YES"), language, name))
         }
         return renditions
     }

@@ -70,6 +70,30 @@ class HlsParserTest {
     }
 
     @Test
+    fun `BANDWIDTH di dalam NAME terkutip sebelum atribut asli - atribut asli yang terbaca`() {
+        val m = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:NAME="BANDWIDTH=999",BANDWIDTH=800000,RESOLUTION=1280x720
+            https://cdn.example.com/videos/720.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(m, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals(800000L, variants[0].bandwidth)
+    }
+
+    @Test
+    fun `BANDWIDTH hanya di dalam NAME terkutip - bandwidth nol`() {
+        val m = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:NAME="promo BANDWIDTH=555 sale",RESOLUTION=640x360
+            https://cdn.example.com/videos/360.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMaster(m, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals(0L, variants[0].bandwidth)
+    }
+
+    @Test
     fun `hanya AVERAGE-BANDWIDTH - bandwidth nol, bukan nilai rata-rata`() {
         val m = """
             #EXTM3U
