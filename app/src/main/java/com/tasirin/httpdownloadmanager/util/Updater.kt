@@ -68,6 +68,13 @@ object Updater {
 
     /** APK terbaik dalam satu objek rilis (tag + assets). Murni agar bisa di-unit-test. */
     internal fun bestFromRelease(release: JSONObject): UpdateInfo? {
+        // Prerelease/draft tidak pernah ditawarkan sebagai update
+        // (issue #637): daftar rilis GitHub memuat prerelease, berbeda
+        // dari endpoint /releases/latest yang melompatinya — tanpa
+        // saringan ini prerelease uji berkode lebih tinggi menang atas
+        // rilis stabil di bestFromReleasesList dan ditawarkan ke semua
+        // pengguna.
+        if (release.optBoolean("prerelease") || release.optBoolean("draft")) return null
         val tag = release.optString("tag_name")
         val page = release.optString("html_url")
         val assets = release.optJSONArray("assets") ?: return null

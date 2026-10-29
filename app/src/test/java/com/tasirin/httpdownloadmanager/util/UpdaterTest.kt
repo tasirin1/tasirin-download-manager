@@ -109,6 +109,22 @@ class UpdaterTest {
     }
 
     @Test
+    fun `prerelease berkode lebih tinggi tidak pernah menang atas rilis stabil`() {
+        fun rel(tag: String, pre: Boolean) = org.json.JSONObject()
+            .put("tag_name", tag).put("html_url", "https://example.com/" + tag)
+            .put("prerelease", pre)
+            .put("assets", org.json.JSONArray().put(org.json.JSONObject()
+                .put("name", "tasirin-download-manager-" + tag + ".apk")
+                .put("browser_download_url", "https://example.com/" + tag + ".apk")
+                .put("size", 1)))
+        // Prerelease tunggal -> null (issue #637).
+        assertNull(Updater.bestFromRelease(rel("v1.0.99", true)))
+        // Campuran: yang stabil menang walau kodenya lebih rendah.
+        val arr = org.json.JSONArray().put(rel("v1.0.99", true)).put(rel("v1.0.9", false))
+        assertEquals(100009, Updater.bestFromReleasesList(arr)!!.versionCode)
+    }
+
+    @Test
     fun `tag rusak dan nama tanpa kode menghasilkan null`() {
         assertNull(Updater.codeFromRelease("release-foo", "tasirin-download-manager-v1.0.1191.apk"))
         assertNull(Updater.codeFromRelease("release-foo", "mapping.txt"))
