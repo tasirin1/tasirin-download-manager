@@ -666,7 +666,7 @@ class HlsParserTest {
                 "#EXT-X-STREAM-INF:NAME=\"promo,BANDWIDTH=800000,RESOLUTION=1280x720\n" +
                 "v.m3u8\n",
             "https://cdn.example.com/master.m3u8"
-        )
+        )!!
         assertEquals(1, variants.size)
         assertEquals(800000L, variants[0].bandwidth)
         assertEquals(720, variants[0].height)
