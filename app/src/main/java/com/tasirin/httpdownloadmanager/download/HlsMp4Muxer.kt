@@ -225,7 +225,11 @@ object HlsMp4Muxer {
         // audio (frame-count × 1024/sampleRate). Hasil: video lancar tanpa
         // stutter maupun desync.
         val totalUs = segmentDurationsUs.sum().coerceAtLeast(1L)
-        val stepUs = (totalUs / videoFrameCount).coerceAtLeast(1L)
+        // PTS dihitung per frame dari total (issue #653), BUKAN mengalikan
+        // langkah yang sudah terpotong: stepUs = totalUs / frameCount
+        // membuang sisa bagi sehingga timeline video selalu lebih pendek
+        // dari total EXTINF (sampai ~0,3 dtk pada video 2 jam/60fps) dan
+        // desync terhadap audio yang kini eksak per frame (#638).
         var frameIndex = 0L
         while (true) {
             buffer.clear()
@@ -260,7 +264,7 @@ object HlsMp4Muxer {
             }
             buffer.position(0)
             buffer.limit(size)
-            val pts = frameIndex * stepUs
+            val pts = frameIndex * totalUs / videoFrameCount
             val flags = if (ext.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
                 MediaCodec.BUFFER_FLAG_KEY_FRAME
             } else {
