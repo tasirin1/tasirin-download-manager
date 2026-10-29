@@ -4781,7 +4781,13 @@ internal fun isEncryptedHlsPlaylist(body: String): Boolean {
     // seluruh body ikut menghitung teks METHOD= di luar tag kunci
     // (mis. di judul #EXTINF) — keduanya bisa memvonis playlist tak
     // terenkripsi sebagai terenkripsi.
-    val keyLines = body.lineSequence().filter { it.startsWith("#EXT-X-KEY:") }.toList()
+    // Baris di-trim lebih dulu (issue #599): parser HLS lain di repo
+    // men-trim tiap baris, jadi playlist berindentasi sah di semua
+    // tahap — tanpa trim, tag kunci ber-spasi/tab di depan lolos dari
+    // gerbang ini dan ciphertext terunduh sebagai konten biasa
+    // (fail-open, regresi relatif contains pra-#577).
+    val keyLines = body.lineSequence().map { it.trim() }
+        .filter { it.startsWith("#EXT-X-KEY:") }.toList()
     if (keyLines.isEmpty()) return false
     val methods = keyLines.flatMap { line ->
         HLS_KEY_METHOD_RE.findAll(line).map { it.groupValues[1].uppercase(Locale.ROOT) }

@@ -596,6 +596,19 @@ class HlsParserTest {
                 "#EXTM3U\n#EXT-X-KEY:URI=\"key.bin\",METHOD=AES-128\n#EXTINF:10,\nseg.ts\n"
             )
         )
+        // Tag kunci berindentasi spasi tetap tertangkap (issue #599):
+        // parser lain men-trim baris, jadi gerbang tak boleh fail-open.
+        assertTrue(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n  #EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+        // Tag kunci berindentasi tab dengan METHOD=NONE tetap lolos sah.
+        assertFalse(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n\t#EXT-X-KEY:METHOD=NONE\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
     }
 
     @Test
