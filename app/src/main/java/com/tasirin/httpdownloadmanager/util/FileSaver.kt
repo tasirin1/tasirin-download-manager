@@ -57,6 +57,14 @@ class FileSaver(context: Context) {
     private fun mergeLockFor(key: String): Any =
         MERGE_LOCKS[(key.hashCode() and Int.MAX_VALUE) % MERGE_LOCKS.size]
 
+    /** Jalankan [block] sambil memegang kunci klaim nama MediaStore
+     *  untuk [fileName] — kunci striped statis yang sama dengan yang
+     *  dipakai saveToMediaStore, supaya klaim nama dari jalur lain
+     *  (mis. pindah berkas server) ikut terserialisasi terhadap
+     *  terbitan unduhan (issue #644). */
+    internal fun <T> withMediaStoreClaimLock(fileName: String, block: () -> T): T =
+        synchronized(mergeLockFor(FileNames.safe(fileName))) { block() }
+
     fun mergeSegments(fileName: String, segmentCount: Int): File =
         synchronized(mergeLockFor(FileNames.safe(fileName))) {
         val target = partialFile(fileName)
@@ -257,7 +265,7 @@ class FileSaver(context: Context) {
         // membuat dua publish paralel bernama sama mendapat DISPLAY_NAME kembar
         // (MediaStore tak menolak nama duplikat). Pola sama seperti klaim
         // createNewFile di uniqueTargetFile untuk path filesystem.
-        val (uri, unique, values) = synchronized(mergeLockFor(FileNames.safe(fileName))) {
+        val (uri, unique, values) = withMediaStoreClaimLock(fileName) {
             val unique = uniqueMediaStoreName(fileName, relativePath, collection)
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, unique)

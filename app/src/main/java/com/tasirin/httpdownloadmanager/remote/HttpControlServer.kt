@@ -3231,13 +3231,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val resolver = context.contentResolver
         val mime = MimeTypes.forFile(file.name)
         val collection = MediaLibrary.mediaCollectionFor(rel, mime)
-        val name = FileSaver(context).uniqueMediaStoreName(file.name, rel, collection)
-        val values = ContentValues().apply {
-            put(MediaStore.Downloads.DISPLAY_NAME, name)
-            put(MediaStore.Downloads.MIME_TYPE, mime)
-            put(MediaStore.Downloads.RELATIVE_PATH, "$rel/")
-        }
-        val uri = resolver.insert(collection, values) ?: return MsMoveOutcome.FAILED
+        // Klaim nama + insert di dalam kunci klaim yang sama dengan
+        // FileSaver.saveToMediaStore (issue #644): tanpa itu klaim
+        // paralel bernama sama menghasilkan DISPLAY_NAME kembar di
+        // folder tujuan (MediaStore tak menolak nama duplikat).
+        val nameSaver = FileSaver(context)
+        val uri = nameSaver.withMediaStoreClaimLock(file.name) {
+            val claimedName = nameSaver.uniqueMediaStoreName(file.name, rel, collection)
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, claimedName)
+                put(MediaStore.Downloads.MIME_TYPE, mime)
+                put(MediaStore.Downloads.RELATIVE_PATH, "$rel/")
+            }
+            resolver.insert(collection, values)
+        } ?: return MsMoveOutcome.FAILED
         // Wajib return@runCatching, BUKAN return fungsi (#268): runCatching
         // itu inline, jadi return polos keluar dari moveFileToMediaStore
         // dan melewati resolver.delete di bawah — entri MediaStore yang
@@ -3278,18 +3285,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val sourceName = mediaStoreName(uri) ?: return false
         // DISPLAY_NAME dari provider tak boleh dipercaya mentah: separator
         // di dalamnya membuat File(dir, name) lolos keluar folder tujuan.
-        val target = FileNames.unique(FileNames.safe(sourceName)) { File(dir, it).exists() }
-            .let { File(dir, it) }
         val resolver = context.contentResolver
-        val written = runCatching {
-            val input = resolver.openInputStream(uri) ?: return false
-            input.use { src -> target.outputStream().use { dst -> src.copyTo(dst, SERVER_IO_BUF) } }
-            true
-        }.getOrDefault(false)
-        // Salin gagal: target kosong/setengah wajib dibuang (yatim di folder user).
-        if (!written) {
-            runCatching { target.delete() }
-            return false
+        // Klaim nama + salin di dalam gerbang yang sama dengan pindah/
+        // rename filesystem (issue #644): tanpa serialisasi, dua pindah
+        // paralel bernama sama sama-sama menilai nama itu bebas, menulis
+        // menimpa target yang sama (byte tercampur), lalu menghapus
+        // kedua sumbernya — satu berkas korup/hilang tanpa error.
+        val target = synchronized(fsModifyGate) {
+            val claimed = FileNames.unique(FileNames.safe(sourceName)) { File(dir, it).exists() }
+                .let { File(dir, it) }
+            val written = runCatching {
+                val input = resolver.openInputStream(uri) ?: return false
+                input.use { src -> claimed.outputStream().use { dst -> src.copyTo(dst, SERVER_IO_BUF) } }
+                true
+            }.getOrDefault(false)
+            // Salin gagal: target kosong/setengah wajib dibuang (yatim di folder user).
+            if (!written) {
+                runCatching { claimed.delete() }
+                return false
+            }
+            claimed
         }
         val gone = resolver.delete(uri, null, null) > 0
         if (!gone) {
