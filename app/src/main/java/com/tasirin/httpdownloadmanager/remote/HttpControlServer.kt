@@ -2384,6 +2384,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  video lama selamanya. */
     private fun invalidateFsMediaCache() {
         fsMediaCache.clear()
+        // Statistik subtree ikut dibuang (issue #586): corong ini adalah
+        // titik invalidasi semua mutasi File Manager, tetapi fsStatsCache
+        // dulu hanya menua lewat TTL 10 dtk/prune 60 dtk sehingga listing
+        // induk dan penjaga ukuran ZIP membaca jumlah/ukuran basi
+        // sesudah hapus/pindah folder.
+        fsStatsCache.clear()
         invalidateZipCache()
         videoDurations.invalidate()
     }
