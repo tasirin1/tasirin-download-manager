@@ -1978,7 +1978,7 @@ acts.push({icon: 'share', label: 'Share', op: 'share'});
 acts.push({icon: 'rename', label: 'Rename', op: 'rename'});
 }
 if (it.state === 'DOWNLOADING') acts.push({icon: 'pause', label: 'Pause', op: 'pause'});
-if (it.state === 'PAUSED' || it.state === 'FAILED') acts.push({icon: 'play', label: 'Resume', op: 'resume'});
+if (it.state === 'PAUSED' || it.state === 'FAILED' || it.state === 'CANCELLED') acts.push({icon: 'play', label: 'Resume', op: 'resume'});
 if (it.state === 'PENDING' || it.state === 'PAUSED' || it.state === 'FAILED' || it.state === 'DOWNLOADING') {
 acts.push({icon: 'speed', label: 'Speed & Priority', op: 'limit'});
 }
