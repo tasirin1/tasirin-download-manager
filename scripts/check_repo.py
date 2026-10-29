@@ -281,13 +281,20 @@ def admin_consistency() -> Result:
         # (distribusi -all.zip, kutip tunggal TOML) mematikan cek
         # sinkron versi selamanya tanpa satu pun pesan, sejajar
         # perlakuan stale yang fail-closed sejak #196.
+        # Konteks nama perkakas wajib (issue #588, pola yang sama
+        # dengan konteks persen JaCoCo #214): substring versi polos
+        # lolos oleh penyebutan insidental di mana saja dalam dokumen
+        # (kedua string versi saat ini hanya muncul 1x, di kalimat
+        # sejarah) — yang dibuktikan cek ini adalah pernyataan
+        # toolchain-nya, jadi versi wajib menempel pada nama
+        # perkakasnya ("Gradle X.Y.Z" / "AGP X.Y.Z").
         if gradle_ver is None:
             problems.append("pola versi Gradle tak ditemukan di gradle-wrapper.properties")
-        elif gradle_ver.group(1) not in agents:
+        elif not _re.search(r"Gradle\s+" + _re.escape(gradle_ver.group(1)) + r"\b", agents):
             problems.append(f"AGENTS.md tak menyebut Gradle {gradle_ver.group(1)}")
         if agp_ver is None:
             problems.append("pola versi AGP tak ditemukan di libs.versions.toml")
-        elif agp_ver.group(1) not in agents:
+        elif not _re.search(r"AGP\s+" + _re.escape(agp_ver.group(1)) + r"\b", agents):
             problems.append(f"AGENTS.md tak menyebut AGP {agp_ver.group(1)}")
         jacoco = _re.search(r'minimum\s*=\s*"0\.(\d+)"', app_build)
         if jacoco is None:
