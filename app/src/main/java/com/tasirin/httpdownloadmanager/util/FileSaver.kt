@@ -350,7 +350,13 @@ class FileSaver(context: Context) {
             throw e
         }
         PublishResult(contentUri = target.uri.toString(), fileName = unique)
-    }.getOrNull()
+    }.getOrNull().also {
+        // Jalur SAF tak melewati MediaStore/notifyMediaChanged, jadi
+        // scanCache galeri wajib diinvalidasi eksplisit (issue #569):
+        // tanpa ini berkas SAF baru tak tampil di galeri sampai TTL
+        // cache (30/600 dtk) habis.
+        if (it != null) MediaLibrary.invalidateScanCache()
+    }
 
     private fun publishToCustomFolder(
         partial: File,
@@ -378,7 +384,10 @@ class FileSaver(context: Context) {
         }
         partial.delete()
         PublishResult(contentUri = target.uri.toString(), fileName = unique)
-    }.getOrNull()
+    }.getOrNull().also {
+        // Sama seperti writeCustomFolder (issue #569).
+        if (it != null) MediaLibrary.invalidateScanCache()
+    }
 
     private fun publishToTextFolder(
         partial: File,
@@ -831,7 +840,11 @@ class FileSaver(context: Context) {
             // provider dan bisa null/berbeda, sedangkan komponen kedua
             // klaim adalah nama otoritatif yang dipilih di dalam kunci.
             PublishResult(contentUri = target.uri.toString(), fileName = unique)
-        }.getOrNull()
+        }.getOrNull().also {
+            // Sama seperti writeCustomFolder (issue #569): pindah ke/dari
+            // SAF mengubah isi pohon yang dipindai galeri.
+            if (it != null) MediaLibrary.invalidateScanCache()
+        }
     }
 
     private fun uniqueTargetFile(file: File): File {
@@ -1012,7 +1025,9 @@ class FileSaver(context: Context) {
                         // dipakai adalah komponen unik klaim itu sendiri
                         // (issue #468), bukan target.name yang nullable
                         // dari query DISPLAY_NAME provider.
+                        // Sama seperti writeCustomFolder (issue #569).
                         PublishResult(contentUri = target.uri.toString(), fileName = unique)
+                            .also { MediaLibrary.invalidateScanCache() }
                     }
                 }
                 !result.filePath.isNullOrEmpty() -> {
