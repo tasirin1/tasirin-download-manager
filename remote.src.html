@@ -4438,6 +4438,13 @@ async function movePickOpen(path) {
       items.forEach(function (it) {
         if (!movePath || it.kind === 'dir') dirs.push(it);
       });
+      // Folder selalu terurut sebelum berkas di listing server, jadi
+      // sesudah entri non-folder pertama muncul, semua folder tujuan
+      // sudah terkumpul — halaman berkas berikutnya pasti dibuang
+      // (issue #655). Tanpa ini folder berisi ribuan berkas memicu
+      // belasan request sia-sia dan catatan "Too many entries" bisa
+      // muncul walau daftar foldernya sebenarnya sudah lengkap.
+      if (movePath && items.some(function (it) { return it.kind !== 'dir'; })) break;
       offset += items.length;
       const total = data.total || offset;
       if (!items.length || offset >= total) break;

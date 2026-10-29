@@ -2213,6 +2213,7 @@ const items = data.items || [];
 items.forEach(function (it) {
 if (!movePath || it.kind === 'dir') dirs.push(it);
 });
+if (movePath && items.some(function (it) { return it.kind !== 'dir'; })) break;
 offset += items.length;
 const total = data.total || offset;
 if (!items.length || offset >= total) break;
