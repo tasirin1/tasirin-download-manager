@@ -2239,7 +2239,13 @@ class DownloadEngine(appContext: Context) {
         coroutineContext.ensureActive()
 
         if (useSegments) {
-            runSegmented(item, saver, throttle, segmentedTotal, probeHeaders)
+            // Item segar dari store (issue #563): invalidateChangedResume
+            // pada probe di atas bisa sudah mengosongkan segmen + totalBytes;
+            // snapshot item masih membawa tata segmen lama sehingga
+            // runSegmented akan melewatkan cabang pembuatan segmen
+            // (satu-satunya penulis totalBytes) dan verifySize jadi buta.
+            val freshItem = _items.value.find { it.id == item.id } ?: item
+            runSegmented(freshItem, saver, throttle, segmentedTotal, probeHeaders)
             return
         }
 
