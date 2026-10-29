@@ -2857,6 +2857,11 @@ class DownloadEngine(appContext: Context) {
         finalName: String
     ) {
         speedTracker.reset(item.id)
+        // Entri retry/sampel kecepatan item yang selesai ikut dibuang
+        // (issue #574): dulu hanya dibersihkan di jalur jeda/batal/
+        // gagal, sehingga menetap seumur proses untuk item COMPLETED.
+        retryAttempts.remove(item.id)
+        lastSpeedSample.remove(item.id)
         // Ukuran final dari berkas terbit sebenarnya bila terukur
         // (issue #348): jumlah byte segmen MPEG-TS bukan ukuran MP4
         // hasil remux (beda header MP4 dan padding TS), jadi memakai
@@ -3505,6 +3510,9 @@ class DownloadEngine(appContext: Context) {
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
+        // Sama seperti finishHls (issue #574).
+        retryAttempts.remove(item.id)
+        lastSpeedSample.remove(item.id)
         val serverEtag = conn.getHeaderField("ETag").orEmpty()
         val finishedSingle = updateItem(item.id) {
             it.copy(
@@ -3684,6 +3692,9 @@ class DownloadEngine(appContext: Context) {
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
+        // Sama seperti finishHls (issue #574).
+        retryAttempts.remove(item.id)
+        lastSpeedSample.remove(item.id)
         val finishedMulti = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
