@@ -24,7 +24,7 @@ class FormatsTest {
 
     @Test
     fun `speed - tepat di bawah ambang naik satuan`() {
-        assertEquals("1.00 MB/s", Formats.speed(1048575))
+        assertEquals("1.0 MB/s", Formats.speed(1048575))
         assertEquals("1.00 GB/s", Formats.speed(1073741824))
     }
 
@@ -32,7 +32,7 @@ class FormatsTest {
     fun `speed - satuan dasar`() {
         assertEquals("512 B/s", Formats.speed(512))
         assertEquals("1.0 KB/s", Formats.speed(1024))
-        assertEquals("2.50 MB/s", Formats.speed(2621440))
+        assertEquals("2.5 MB/s", Formats.speed(2621440))
     }
 
     @Test

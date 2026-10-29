@@ -37,7 +37,11 @@ object Formats {
         val kb = bps / 1024.0
         if (kb < 1023.95) return oneDecimal(kb) + " KB/s"
         val mb = kb / 1024.0
-        if (mb < 1023.995) return twoDecimals(mb) + " MB/s"
+        // Skema desimal sama dengan bytes() (issue #603): KB/MB satu
+        // desimal, GB ke atas dua desimal — sebelumnya MB di sini dua
+        // desimal sehingga besaran yang sama tampil beda gaya antara
+        // label ukuran dan label kecepatan.
+        if (mb < 1023.95) return oneDecimal(mb) + " MB/s"
         return twoDecimals(mb / 1024.0) + " GB/s"
     }
 
