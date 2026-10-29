@@ -5800,6 +5800,18 @@ function attachSwipe(li) {
   li.appendChild(actL);
   li.appendChild(actR);
   li.appendChild(wrap);
+  // Label panel kiri mengikuti state TERKINI (issue #585): panel
+  // dibangun sekali saat baris dibuat dengan teks 'Pause', padahal
+  // aksi lepas-sentuh adalah resume untuk semua state selain
+  // DOWNLOADING — panel menjanjikan aksi yang salah.
+  function refreshSwipeLeft() {
+    var it = currentItems.find(function (x) { return x.id === li.dataset.id; });
+    var isDl = !!it && it.state === 'DOWNLOADING';
+    var want = isDl ? 'pause' : 'resume';
+    if (actL._side === want) return;
+    actL._side = want;
+    actL.innerHTML = '<span class="act-in">' + (isDl ? UI_ICONS.pause + ' <span>Pause</span>' : UI_ICONS.play + ' <span>Resume</span>') + '</span>';
+  }
   function setSide(c) {
     if (c < 0) {
       li.classList.add('swiping-l'); li.classList.remove('swiping-r');
@@ -5827,6 +5839,7 @@ function attachSwipe(li) {
   }
   li.addEventListener('touchstart', function (e) {
     sx = e.touches[0].clientX; sy = e.touches[0].clientY; dx = 0; swiping = false;
+    refreshSwipeLeft();
     if (retTimer) { clearTimeout(retTimer); retTimer = null; }
     var open = document.querySelectorAll('li.item.swiping-l, li.item.swiping-r');
     for (var i = 0; i < open.length; i++) {
