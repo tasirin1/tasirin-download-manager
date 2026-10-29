@@ -236,7 +236,7 @@ dlSearchRow.classList.add('hidden');
 if (dlSearchQuery) {
 dlSearchQuery = '';
 dlSearchInput.value = '';
-refresh();
+render(lastItems);
 }
 }
 dlSearchBtn.addEventListener('click', function () {
@@ -249,7 +249,8 @@ const v = this.value;
 clearTimeout(dlSearchTimer);
 dlSearchTimer = setTimeout(function () {
 dlSearchQuery = v.trim();
-refresh();
+if (hasLoadedItems) render(lastItems);
+else refresh();
 }, 220);
 });
 document.addEventListener('keydown', function (e) {
@@ -3881,7 +3882,7 @@ const cta = list.querySelector('.cta button');
 if (cta) cta.addEventListener('click', function () {
 dlSearchInput.value = '';
 dlSearchQuery = '';
-refresh();
+render(lastItems);
 });
 } else if (items.length) {
 list.innerHTML = emptyHtml('search', 'No items in this filter', 'Try selecting another filter.');

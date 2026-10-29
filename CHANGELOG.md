@@ -1101,6 +1101,7 @@
 - **fix(hls): PTS audio remux dihitung per indeks frame, bukan akumulasi langkah terpotong** -- writeAacFrames kini menghitung PTS sebagai frameIndex x 1024 x 1.000.000 / sampleRate (rumus yang sama dengan AdtsAac.durationUs): stepUs terpotong yang ditambahkan berulang sebelumnya menggeser audio sekitar 0,15 detik per jam pada 44,1 kHz (issue #638).
 - **fix(remote): fmt() web kini punya jenjang TB** -- Ukuran dan kapasitas >= 1 TB tidak lagi tampil sebagai 1024.00 GB ke atas di tab Files/galeri remote web; cabang GB menjadi jenjang ber-syarat seperti KB/MB dan TB menjadi jenjang teratas (issue #639).
 - **fix(remote): handler scroll chrome disatukan di belakang rAF dan elemen statis di-cache** -- Tiga listener scroll global (to-top, shrink header, sembunyi chrome) kini satu listener berpenjaga requestAnimationFrame mengikuti pola scroll galeri, dan elemen statisnya dicari sekali di awal: sebelumnya setiap event scroll menjalankan getElementById/querySelector berulang (issue #640).
+- **fix(remote): pencarian Downloads kini menyaring lokal tanpa fetch snapshot** -- Handler input pencarian (debounce 220 ms), tombol tutup pencarian, dan CTA Clear search kini me-render dari lastItems di memori: sebelumnya ketiganya memanggil refresh() yang mengunduh + mem-parse snapshot penuh per jeda ketik padahal penyaringan murni sisi klien dan query sudah termasuk structSig (issue #641).
 
 
 ## [v1.0 — 2026-08-24] — Audit keep-alive body

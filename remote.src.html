@@ -2243,7 +2243,7 @@ function closeDlSearch() {
   if (dlSearchQuery) {
     dlSearchQuery = '';
     dlSearchInput.value = '';
-    refresh();
+    render(lastItems);
   }
 }
 dlSearchBtn.addEventListener('click', function () {
@@ -2256,7 +2256,14 @@ dlSearchInput.addEventListener('input', function () {
   clearTimeout(dlSearchTimer);
   dlSearchTimer = setTimeout(function () {
     dlSearchQuery = v.trim();
-    refresh();
+    // Penyaringan murni sisi klien atas data di memori (issue #641):
+    // render lokal dari lastItems, BUKAN refresh() yang mengunduh
+    // snapshot penuh per jeda ketik. dlSearchQuery sudah termasuk
+    // structSig sehingga hasil render identik; snapshot berkala/SSE
+    // tetap menerapkan query yang sama. Sebelum muatan pertama
+    // selesai, tetap refresh() agar skeleton/fetch awal berjalan.
+    if (hasLoadedItems) render(lastItems);
+    else refresh();
   }, 220);
 });
 // Pintasan keyboard desktop (bukan TV): n = add, / = cari, Esc = tutup cari.
@@ -6280,7 +6287,7 @@ function rebuildList(items) {
       if (cta) cta.addEventListener('click', function () {
         dlSearchInput.value = '';
         dlSearchQuery = '';
-        refresh();
+        render(lastItems);
       });
     } else if (items.length) {
       list.innerHTML = emptyHtml('search', 'No items in this filter', 'Try selecting another filter.');
