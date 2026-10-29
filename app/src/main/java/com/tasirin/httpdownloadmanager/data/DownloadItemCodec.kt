@@ -170,20 +170,29 @@ object DownloadItemCodec {
         }.getOrDefault(emptyList())
     }
 
-    /** Progres kompak (id -> bytes/total) untuk persistensi berkala tanpa
-     *  membangun JSON besar; dipakai DownloadRepository.saveProgress. */
+    /** Progres kompak (id -> bytes/total + downloaded per segmen) untuk
+     *  persistensi berkala tanpa membangun JSON besar; dipakai
+     *  DownloadRepository.saveProgress. Rincian segmen ("s", larik menurut
+     *  index segmen) wajib ikut (issue #648): tanpa itu proses yang mati di
+     *  tengah attempt segmen hanya memulihkan total byte, dan resume
+     *  membuang progres segmen satu attempt walau berkas parsialnya utuh. */
     fun encodeProgress(items: List<DownloadItem>): String {
         val o = JSONObject()
         items.forEach { item ->
             if (item.state == DownloadState.DOWNLOADING || item.state == DownloadState.PENDING ||
                 (item.bytesDownloaded > 0 && item.state == DownloadState.PAUSED)
             ) {
-                o.put(
-                    item.id,
-                    JSONObject()
-                        .put("b", item.bytesDownloaded)
-                        .put("t", item.totalBytes)
-                )
+                val entry = JSONObject()
+                    .put("b", item.bytesDownloaded)
+                    .put("t", item.totalBytes)
+                if (item.segments.isNotEmpty()) {
+                    val perIndex = LongArray(item.segments.maxOf { it.index } + 1)
+                    item.segments.forEach { seg -> perIndex[seg.index] = seg.downloaded }
+                    val segArr = JSONArray()
+                    perIndex.forEach { segArr.put(it) }
+                    entry.put("s", segArr)
+                }
+                o.put(item.id, entry)
             }
         }
         return o.toString()
@@ -204,8 +213,26 @@ object DownloadItemCodec {
             // (mis. setelah reset resume) tidak boleh membuat persen >100%.
             val nt = maxOf(t, item.totalBytes)
             val nb = maxOf(b, item.bytesDownloaded).let { if (nt > 0) minOf(it, nt) else it }
-            if (nb != item.bytesDownloaded || nt != item.totalBytes) {
-                item.copy(bytesDownloaded = nb, totalBytes = nt)
+            // Segmen: monoton per index seperti byte, dijepit ke panjang
+            // segmennya sendiri — progres dari segmentasi lama yang lebih
+            // besar tak boleh membuat segmen tampak melebihi ukurannya
+            // (resumeAction tetap mendamaikan ulang terhadap berkas nyata).
+            val segArr = p.optJSONArray("s")
+            val nsegs = if (segArr != null && item.segments.isNotEmpty()) {
+                item.segments.map { seg ->
+                    if (seg.index in 0 until segArr.length()) {
+                        val cap = seg.end - seg.start + 1
+                        val sv = minOf(segArr.optLong(seg.index, seg.downloaded), cap)
+                        if (sv > seg.downloaded) seg.copy(downloaded = sv) else seg
+                    } else {
+                        seg
+                    }
+                }
+            } else {
+                item.segments
+            }
+            if (nb != item.bytesDownloaded || nt != item.totalBytes || nsegs != item.segments) {
+                item.copy(bytesDownloaded = nb, totalBytes = nt, segments = nsegs)
             } else {
                 item
             }

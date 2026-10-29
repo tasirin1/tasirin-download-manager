@@ -170,6 +170,61 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `encodeProgress - segmen ikut tersimpan menurut index`() {
+        val item = DownloadItem(
+            id = "a", url = "https://a/x", fileName = "a", state = DownloadState.DOWNLOADING,
+            bytesDownloaded = 140, totalBytes = 200,
+            segments = listOf(
+                DownloadSegment(0, 0, 99, 40),
+                DownloadSegment(1, 100, 199, 100)
+            )
+        )
+        val o = JSONObject(DownloadItemCodec.encodeProgress(listOf(item)))
+        val segArr = o.getJSONObject("a").getJSONArray("s")
+        assertEquals(40L, segArr.getLong(0))
+        assertEquals(100L, segArr.getLong(1))
+    }
+
+    @Test
+    fun `overlayProgress - segmen diterapkan monoton dan dijepit panjang segmen`() {
+        val items = listOf(
+            DownloadItem(
+                id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED,
+                bytesDownloaded = 110, totalBytes = 200,
+                segments = listOf(
+                    DownloadSegment(0, 0, 99, 10),
+                    DownloadSegment(1, 100, 199, 100)
+                )
+            )
+        )
+        // s[0]=80 menaikkan 10 -> 80; s[1]=500 dijepit ke panjang segmen (100).
+        val raw = "{\"a\":{\"b\":180,\"t\":200,\"s\":[80,500]}}"
+        val out = DownloadItemCodec.overlayProgress(items, raw)
+        assertEquals(80L, out[0].segments[0].downloaded)
+        assertEquals(100L, out[0].segments[1].downloaded)
+        // Nilai segmen lebih kecil diabaikan (tidak mundur).
+        val raw2 = "{\"a\":{\"b\":180,\"t\":200,\"s\":[5,90]}}"
+        val out2 = DownloadItemCodec.overlayProgress(items, raw2)
+        assertEquals(10L, out2[0].segments[0].downloaded)
+        assertEquals(100L, out2[0].segments[1].downloaded)
+    }
+
+    @Test
+    fun `overlayProgress - format lama tanpa segmen tidak menyentuh segmen`() {
+        val items = listOf(
+            DownloadItem(
+                id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED,
+                bytesDownloaded = 10, totalBytes = 200,
+                segments = listOf(DownloadSegment(0, 0, 199, 10))
+            )
+        )
+        val raw = "{\"a\":{\"b\":90,\"t\":200}}"
+        val out = DownloadItemCodec.overlayProgress(items, raw)
+        assertEquals(90L, out[0].bytesDownloaded)
+        assertEquals(10L, out[0].segments[0].downloaded)
+    }
+
+    @Test
     fun `overlayProgress - nilai lebih besar diterapkan, lebih kecil diabaikan`() {
         val items = listOf(
             DownloadItem(id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED, bytesDownloaded = 10, totalBytes = 100),

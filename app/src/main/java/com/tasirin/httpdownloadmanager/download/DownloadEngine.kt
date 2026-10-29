@@ -4385,8 +4385,9 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    /** Progres ringan: JSON kecil (id -> bytes/total) tanpa enkripsi dan tanpa
-     *  detail segmen, disimpan paling cepat tiap 2 detik selama download aktif. */
+    /** Progres ringan: JSON kecil (id -> bytes/total + downloaded per segmen,
+     *  issue #648) tanpa enkripsi, disimpan paling cepat tiap 2 detik selama
+     *  download aktif. */
     @Synchronized
     private fun scheduleProgressSave() {
         if (!loadGate.isCompleted) return

@@ -1110,6 +1110,7 @@
 - **fix(tools): verifikasi-path mengecualikan path eksplisit yang sah terhapus dari vonis wajib ada** -- Path yang tercatat terhapus terhadap HEAD (git diff --name-status berstatus D) kini tetap masuk penilaian lewat diff penghapusannya (cek bekas-hapusan/fungsi hilang tetap berjalan) tanpa vonis berkas tak ditemukan: sebelumnya memverifikasi penghapusan berkas dengan menyebut path-nya tidak pernah bisa lolos dan pesannya menyesatkan (sisa tepi #625) (issue #647).
 
 
+- **fix(engine): progres per-segmen ikut dipersist berkala** -- progres ringan `encodeProgress` kini memuat larik `s` (downloaded per index segmen) dan `overlayProgress` menerapkannya monoton per segmen dengan jepit ke panjang segmennya, sehingga proses yang mati di tengah attempt segmen tidak lagi membuang progres satu attempt saat resume; komentar progres di engine diluruskan + uji codec (issue #648).
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 ### Fixed
 - **Seek zen mode** — Sembunyikan tombol modal dan daftar video berikutnya selama dua-tap lompatan durasi.
