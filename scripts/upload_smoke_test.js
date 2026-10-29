@@ -160,13 +160,6 @@ function fsExpect(cond, label) {
   }
 }
 
-fsExpect(sandbox.parentFsPath('f:/sdcard/Download/APK') === 'f:/sdcard/Download', 'parentFsPath naik 1 level (f:)');
-fsExpect(sandbox.parentFsPath('f:/sdcard') === '', 'parentFsPath dari f:/sdcard ke root');
-fsExpect(sandbox.parentFsPath('f:') === '', 'parentFsPath f: -> kosong');
-fsExpect(sandbox.parentFsPath('') === '', 'parentFsPath kosong -> kosong');
-fsExpect(sandbox.parentFsPath('m:a/b/c') === 'm:a/b', 'parentFsPath naik 1 level (m:)');
-fsExpect(sandbox.parentFsPath('m:a') === '', 'parentFsPath m: level 1 -> kosong');
-
 const parts = sandbox.fsCrumbParts('f:/sdcard/Download/APK');
 fsExpect(parts.length === 4, 'fsCrumbParts menghasilkan 4 bagian');
 fsExpect(parts[0].path === '' && parts[parts.length - 1].label === 'APK', 'fsCrumbParts root + label terakhir');
@@ -200,10 +193,10 @@ fireWindow('popstate');
 fsExpect(vm.runInContext('fsPath', sandbox) === '', 'Back di root tidak mengubah folder');
 
 // Tombol Home (tombol Up dihapus atas keputusan owner — ikonnya
-// tertukar dengan Upload File; naik folder lewat breadcrumb/back,
-// helper parentFsPath-nya tetap dijaga di sini).
+// tertukar dengan Upload File; naik folder lewat breadcrumb/back.
+// Helper parentFsPath ikut dihapus pada issue #583: pemanggil
+// terakhirnya adalah tombol Up itu, jadi tak ada pengguna nyata).
 vm.runInContext('fsPath = "f:/sdcard/Download"; fsBackStack.length = 0;', sandbox);
-fsExpect(sandbox.parentFsPath('f:/sdcard/Download') === 'f:/sdcard', 'parentFsPath naik 1 folder');
 fireEl(elements['fsHomeBtn'], 'click');
 fsExpect(vm.runInContext('fsPath', sandbox) === '', 'tombol Home kembali ke root');
 
