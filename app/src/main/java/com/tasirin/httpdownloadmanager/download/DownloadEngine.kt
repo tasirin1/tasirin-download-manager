@@ -2966,6 +2966,14 @@ class DownloadEngine(appContext: Context) {
             val declared = segConn.contentLength.toLong().takeIf { it > 0 }
             if (declared != null) onLength(declared)
             var segBytes = 0L
+            // Watchdog macet/lambat seperti jalur lain (issue #575):
+            // pola sama persis downloadSegment di bawah.
+            val health = DownloadHealthWatchdog(
+                if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
+            )
+            var hlsIters = 0
+            var lastHlsCheckBytes = 0L
+            var lastHlsCheckAt = monotonicNow()
             val input = segConn.inputStream
             try {
                 BufferedOutputStream(FileOutputStream(spool), BUFFER_SIZE).use { segOut ->
@@ -2975,8 +2983,7 @@ class DownloadEngine(appContext: Context) {
                         if (read == -1) break
                         // Guard zero-read seperti runSingle/downloadSegment
                         // (issue #389): tanpa ini stream yang mengembalikan
-                        // 0 beruntun membuat loop busy-spin selamanya —
-                        // jalur HLS tak punya watchdog stall.
+                        // 0 beruntun membuat loop busy-spin selamanya.
                         if (read == 0) {
                             if (++zeroStreak >= MAX_ZERO_READS) {
                                 throw IOException("HLS segment stalled (zero reads)")
@@ -2991,6 +2998,23 @@ class DownloadEngine(appContext: Context) {
                         segOut.write(buffer, 0, read)
                         throttle.sleepIfNeeded { committed + segBytes }
                         notify(segBytes)
+                        // Cek kesehatan tiap 8 chunk, maks 1x/detik
+                        // (issue #575): koneksi yang meneteskan byte
+                        // jarang-jarang lolos dari guard zero-read dan
+                        // read-timeout per-baca, jadi tanpa ini unduhan
+                        // HLS bisa menggantung jauh melewati vonis
+                        // 20-30 detik jalur lain.
+                        if ((hlsIters++ and 7) == 0) {
+                            val now = monotonicNow()
+                            if (now - lastHlsCheckAt >= 1000) {
+                                val speed = if (now > lastHlsCheckAt) {
+                                    ((segBytes - lastHlsCheckBytes) * 1000L) / (now - lastHlsCheckAt)
+                                } else 0L
+                                lastHlsCheckBytes = segBytes
+                                lastHlsCheckAt = now
+                                health.check(now, committed + segBytes, declared ?: 0L, speed)
+                            }
+                        }
                     }
                 }
                 // Verifikasi panjang terhadap Content-Length yang dinyatakan:
