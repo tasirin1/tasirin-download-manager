@@ -3875,11 +3875,24 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         /** Executor khusus probe sosmed (statis per proses): ekstraksi di
          *  worker HTTP dibatasi 20 dtk (lihat future.get di bawah) agar request
          *  paralel tak menghabiskan pool NanoHTTPD. Statis agar ganti port
-         *  (instance baru) tak membocorkan satu thread per ganti port. */
+         *  (instance baru) tak membocorkan thread per ganti port.
+         *  Pool 3 thread + antrean TERBATAS (issue #631): dulu satu thread +
+         *  antrean tak terbatas — satu ekstraksi menggantung (anggaran
+         *  ekstraktor 60 dtk) membuat semua probe berikutnya timeout 20 dtk
+         *  SEBELUM mulai (jam tunggunya berjalan sejak submit) dan tugas
+         *  yatim menumpuk tanpa batas. Kini probe berjalan paralel, dan
+         *  saat jenuh submit melempar RejectedExecutionException yang
+         *  ditangkap pemanggil sebagai hasil kosong untuk request itu
+         *  saja — gagal cepat, tanpa menumpuk tugas yatim. */
+        private const val PROBE_THREADS = 3
+        private const val PROBE_QUEUE_MAX = 8
         private val probeExecutor: java.util.concurrent.ExecutorService by lazy {
-            java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-                Thread(r, "probe-social").apply { isDaemon = true }
-            }
+            java.util.concurrent.ThreadPoolExecutor(
+                PROBE_THREADS, PROBE_THREADS,
+                0L, java.util.concurrent.TimeUnit.MILLISECONDS,
+                java.util.concurrent.ArrayBlockingQueue(PROBE_QUEUE_MAX),
+                { r -> Thread(r, "probe-social").apply { isDaemon = true } }
+            )
         }
 
         private const val FS_MEDIA_CACHE_MAX_FILES = 2_000
