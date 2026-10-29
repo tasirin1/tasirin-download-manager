@@ -48,23 +48,30 @@ object HlsParser {
      *  regex nilai terkutip (NAME/AUDIO/CODECS/URI) tetap membaca baris
      *  asli. */
     internal fun tanpaNilaiKutip(line: String): String {
-        // Baris berkutip TAK SEIMBANG dikembalikan apa adanya (issue
-        // #617): satu kutip ganjil (nilai tak ditutup — playlist
-        // terpotong/packager cacat) akan membalik sisa baris menjadi
-        // 'di dalam kutip' dan menutupi atribut ASLI sesudahnya
-        // (METHOD/BANDWIDTH/DEFAULT hilang), membalikkan arah
-        // degradasi pra-#598 untuk input cacat. Per RFC 8216 nilai
-        // terkutip memang tak boleh memuat '"' dan HLS tak punya
-        // escape, jadi hitungan ganjil selalu berarti baris rusak;
-        // untuk baris rusak, membaca apa adanya lebih jujur daripada
-        // menutupi. Baris sah (genap) ter-mask persis seperti semula.
-        if (line.count { it == '"' } % 2 != 0) return line
+        // Masking HIBRIDA per pasangan (issue #629, menyempurnakan
+        // #617): hanya rentang kutip yang BERPASANGAN yang dikosongkan.
+        // Kutip pembuka tanpa penutup (nilai tak ditutup — playlist
+        // terpotong/packager cacat) membiarkan sisa baris apa adanya
+        // agar atribut asli sesudahnya tetap terbaca (kasus #617),
+        // sedangkan pasangan sah di depannya tetap ter-mask sehingga
+        // atribut hantu di dalamnya tidak hidup lagi (kasus campuran
+        // #629, yang pada aturan total-ganjil #617 ikut terbaca).
+        // Per RFC 8216 nilai terkutip memang tak boleh memuat '"'
+        // dan HLS tak punya escape, jadi kutip ganjil selalu berarti
+        // baris rusak; untuk baris rusak, degradasi per pasangan ini
+        // mengungguli kedua perilaku lama pada semua kasus dikenal.
+        // Baris berkutip genap ter-mask persis seperti semula
+        // (terbukti setara byte-per-byte lewat sapu eksak port).
+        val kutip = line.indices.filter { line[it] == '"' }
+        if (kutip.isEmpty()) return line
+        val batas = if (kutip.size % 2 == 0) line.length else kutip.last()
         val sb = StringBuilder(line.length)
         var dalamKutip = false
-        for (c in line) {
+        for (i in line.indices) {
+            val c = line[i]
             when {
-                c == '"' -> { dalamKutip = !dalamKutip; sb.append(c) }
-                dalamKutip -> sb.append(' ')
+                c == '"' && i < batas -> { dalamKutip = !dalamKutip; sb.append(c) }
+                dalamKutip && i < batas -> sb.append(' ')
                 else -> sb.append(c)
             }
         }

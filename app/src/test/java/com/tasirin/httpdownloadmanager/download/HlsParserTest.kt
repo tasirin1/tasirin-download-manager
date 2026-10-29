@@ -673,6 +673,24 @@ class HlsParserTest {
     }
 
     @Test
+    fun `tanpaNilaiKutip - campuran pasangan sah dan kutip liar ter-mask per pasangan`() {
+        // Issue #629: pasangan kutip sah berisi atribut hantu tetap
+        // ter-mask walau ada kutip liar tak berpasangan di ekor;
+        // ekor sesudah kutip liar dibaca apa adanya (#617).
+        assertEquals(
+            "NAME=\"             \",BANDWIDTH=500000,CODECS=\"xyz",
+            HlsParser.tanpaNilaiKutip("NAME=\"BANDWIDTH=1\",BANDWIDTH=500000,CODECS=\"xyz")
+        )
+        // Kunci campuran: METHOD hantu di dalam URI terkutip sah
+        // tetap tertutup; METHOD=NONE asli yang berlaku.
+        assertFalse(
+            isEncryptedHlsPlaylist(
+                "#EXTM3U\n#EXT-X-KEY:URI=\"a,METHOD=AES-128\",METHOD=NONE,KEYFORMAT=\"id\n#EXTINF:10,\nseg.ts\n"
+            )
+        )
+    }
+
+    @Test
     fun `tanpaNilaiKutip - kontrak masking langsung`() {
         // Issue #620: kontrak helper dikunci langsung, bukan hanya
         // tak langsung lewat parseMaster — isi kutip menjadi spasi,
