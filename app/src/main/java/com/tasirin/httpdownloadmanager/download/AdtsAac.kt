@@ -99,8 +99,22 @@ object AdtsAac {
             val tag = id3TagSize(data, pos)
             if (tag > 0) {
                 out.write(data, runStart, pos - runStart)
-                pos += tag
-                runStart = pos
+                // Tag terpotong di ekor data (issue #634): header
+                // menyatakan total yang melewati sisa data. Versi
+                // stream membuang sisa tag ini (skipRemaining lalu
+                // EOF) — samakan: lompat ke ujung dan selesai. Tanpa
+                // jepit ini pos melewati ujung dan tulis akhir di
+                // bawah berpanjang negatif (IndexOutOfBoundsException).
+                // id3TagSize sendiri TIDAK diubah: jalur stream
+                // bergantung pada total terdeklarasi yang melewati
+                // potongan buffer di tangannya.
+                if (tag > data.size - pos) {
+                    runStart = data.size
+                    pos = data.size
+                } else {
+                    pos += tag
+                    runStart = pos
+                }
             } else {
                 pos++
             }

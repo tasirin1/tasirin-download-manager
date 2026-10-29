@@ -58,6 +58,26 @@ class AdtsAacTest {
     }
 
     @Test
+    fun `stripId3 membuang tag ID3 ekor terpotong tanpa melempar`() {
+        // Header menyatakan badan 100 byte; data hanya menyediakan 10
+        // byte sesudahnya (issue #634). Ekspektasi dibuktikan port 1:1:
+        // sisa tag dibuang seperti versi stream, ADTS utuh tersisa.
+        val frame = adtsFrame(1, 7, 2, 100)
+        val truncatedTag = ByteArray(20)
+        System.arraycopy(id3, 0, truncatedTag, 0, id3.size)
+        truncatedTag[9] = 100
+        for (i in 10 until truncatedTag.size) truncatedTag[i] = 0x55
+        val data = frame + truncatedTag
+        val clean = AdtsAac.stripId3(data)
+        assertEquals(frame.toList(), clean.toList())
+        val out = java.io.ByteArrayOutputStream()
+        AdtsAac.stripId3Stream(java.io.ByteArrayInputStream(data), out)
+        assertEquals(frame.toList(), out.toByteArray().toList())
+        // Tag terpotong yang berdiri sendiri -> kosong, bukan eksepsi.
+        assertEquals(0, AdtsAac.stripId3(truncatedTag).size)
+    }
+
+    @Test
     fun `stripId3Stream setara stripId3 dan menghitung byte tertulis`() {
         val data = id3 + adtsFrame(1, 7, 2, 100) + id3 + adtsFrame(1, 7, 2, 50)
         val expected = AdtsAac.stripId3(data)
