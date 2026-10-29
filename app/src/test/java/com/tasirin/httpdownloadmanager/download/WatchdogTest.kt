@@ -65,6 +65,32 @@ class WatchdogTest {
         w.check(100_000L, 0L, 0L, 0L)
     }
 
+    @Test fun melewatiTotalLaluMacet_divonisStall() {
+        // Issue #618: total dinyatakan 100_000 tetapi 150_000 byte
+        // terkirim (server under-declare, ditoleransi #170) lalu
+        // koneksi macet total — vonis macet wajib tetap hidup dengan
+        // memperlakukan total sebagai tak diketahui.
+        val w = DownloadHealthWatchdog(0)
+        w.check(1_000L, 150_000L, 100_000L, 0L)
+        assertThrows(IOException::class.java) {
+            w.check(31_000L, 150_000L, 100_000L, 0L)
+        }
+    }
+
+    @Test fun melewatiTotalLambatBergerak_tidakDivonisLambat() {
+        // Mode total-tak-diketahui tak punya vonis lambat: byte yang
+        // melewati total tetapi terus bergerak tak boleh divonis.
+        val w = DownloadHealthWatchdog(0)
+        var downloaded = 150_000L
+        var t = 0L
+        while (t <= 120_000L) {
+            w.check(t, downloaded, 100_000L, 1500L)
+            downloaded += 150L
+            t += 1_000L
+        }
+    }
+
+
     @Test fun totalNolBergerak_tidakDivonisLambat() {
         // HLS/unknown-length bersifat burst: byte bergerak tak boleh kena
         // vonis lambat 20 detik seperti total diketahui.

@@ -4940,7 +4940,16 @@ internal class DownloadHealthWatchdog(limitKbps: Int) {
     private var slowSince = 0L
 
     fun check(now: Long, downloaded: Long, total: Long, speed: Long) {
-        if (total > 0 && downloaded >= total) return
+        if (total > 0 && downloaded == total) return
+        // Total terbukti salah (issue #618): server menyatakan
+        // Content-Length LEBIH KECIL dari isi sebenarnya (kelebihan
+        // byte ditoleransi by-design, kebijakan #170) — begitu byte
+        // melewati total, gerbang lama mematikan SEMUA vonis untuk
+        // sisa aliran, jadi koneksi yang kemudian macet total hanya
+        // dibatasi read-timeout socket. Perlakukan sebagai total tak
+        // diketahui (mode macet-saja di bawah): vonis macet hidup
+        // lagi, vonis lambat tetap mati karena totalnya tak dipercaya.
+        val totalEfektif = if (total > 0 && downloaded > total) 0L else total
         if (downloaded != lastBytes) {
             lastBytes = downloaded
             lastAt = now
@@ -4950,7 +4959,7 @@ internal class DownloadHealthWatchdog(limitKbps: Int) {
             // yang boleh divonis hanya byte yang macet total.
             slowSince = 0L
         }
-        if (total <= 0) {
+        if (totalEfektif <= 0) {
             // Total tak diketahui (HLS/unknown-length): hanya vonis macet
             // total (speed nol), bukan vonis lambat — kecepatan segmen HLS
             // memang burst sehingga ambang 2 KB/s memberi vonis palsu.
