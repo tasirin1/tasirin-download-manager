@@ -85,8 +85,9 @@ class DownloadRepository(context: Context) {
         return out
     }
 
-    /** Simpan progres kompak (id -> bytes/total) tanpa enkripsi & tanpa detail
-     *  segmen; dipanggil berkala selama download aktif. Commit sinkron (bukan
+    /** Simpan progres kompak (id -> bytes/total + downloaded per segmen pada
+     *  larik `s`, sejak issue #648) tanpa enkripsi; dipanggil berkala selama
+     *  download aktif. Commit sinkron (bukan
      *  apply): apply async bisa mendarat SETELAH commit snapshot penuh
      *  (persistItems + remove KEY_PROGRESS) sehingga progres basi menimpa
      *  data segar saat load. Dipanggil dari thread IO engine, bukan main. */
