@@ -2273,6 +2273,22 @@ class DownloadEngine(appContext: Context) {
         // Offset resume dihitung dulu (sekaligus truncate/selaraskan file
         // parsial): header Range harus sudah terpasang saat koneksi dibuka.
         val resumeFrom = prepareResumeOffset(item, saver)
+        // Berkas sudah utuh menurut catatan (issue #650): membuka koneksi
+        // dengan Range bytes=<total>- hanya memancing 416 yang divonis
+        // FAILED terminal oleh penangan Range-reject, padahal yang tersisa
+        // hanya verifikasi + terbitkan — lewati koneksi sepenuhnya, pola
+        // yang sama dengan gerbang segmen utuh #630.
+        if (isResumeAlreadyComplete(resumeFrom, item.totalBytes)) {
+            App.logEvent(
+                "DOWNLOAD ${item.fileName}: partial already complete " +
+                    "(${Formats.bytes(resumeFrom)}) - finalizing without connection"
+            )
+            finishSingle(
+                item, saver, saver.partialFile(item.fileName), item.fileName,
+                resumeFrom, item.totalBytes, ""
+            )
+            return
+        }
         val conn = openAuthenticatedConnection(
             item.url, method = if (item.method == "POST") "POST" else "GET",
             username = item.username,
@@ -3524,6 +3540,30 @@ class DownloadEngine(appContext: Context) {
             runCatching { output.close() }
         }
 
+        finishSingle(item, saver, partialFile, fileName, downloaded, total, conn.getHeaderField("ETag").orEmpty())
+        } catch (e: IOException) {
+            if (!coroutineContext.isActive) throw CancellationException()
+            throw e
+        } finally {
+            untrackConnection(item.id, conn)
+        }
+    }
+
+
+    /** Finalisasi unduhan single-stream: verifikasi ukuran -> terbitkan ->
+     *  checksum -> tandai COMPLETED. Dipakai runSingle sesudah streaming dan
+     *  jalur berkas-sudah-utuh issue #650 (parsial lengkap dari catatan:
+     *  koneksi dilewati agar server tak menjawab 416 yang divonis FAILED
+     *  terminal oleh penangan Range-reject). */
+    private suspend fun finishSingle(
+        item: DownloadItem,
+        saver: FileSaver,
+        partialFile: File,
+        fileName: String,
+        downloaded: Long,
+        total: Long,
+        serverEtag: String
+    ) {
         ensureItemPresent(item.id, partialFile)
         verifySize(downloaded, total, fileName)
 
@@ -3541,7 +3581,6 @@ class DownloadEngine(appContext: Context) {
         // Sama seperti finishHls (issue #574).
         retryAttempts.remove(item.id)
         lastSpeedSample.remove(item.id)
-        val serverEtag = conn.getHeaderField("ETag").orEmpty()
         val finishedSingle = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
@@ -3564,12 +3603,6 @@ class DownloadEngine(appContext: Context) {
         persistCookies()
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
         NotificationHelper.notifyItemFinished(context, finishedSingle)
-        } catch (e: IOException) {
-            if (!coroutineContext.isActive) throw CancellationException()
-            throw e
-        } finally {
-            untrackConnection(item.id, conn)
-        }
     }
 
     private suspend fun runSegmented(
@@ -4586,6 +4619,12 @@ internal fun shouldKeepPartialOnRangeReject(keptBytes: Long): Boolean = keptByte
  *  ulang: Range-nya menjadi bytes=<end+1>-<end> yang tidak valid, server
  *  patuh menjawab 416, dan penangan penolakan Range membuang seluruh
  *  progres unduhan (issue #630). Murni agar bisa di-unit-test. */
+/** True bila catatan resume single-stream sudah mencapai total yang
+ *  diketahui (issue #650): koneksi Range untuk berkas utuh hanya memancing
+ *  416 terminal, jadi pemanggil melewati koneksi dan langsung finalisasi. */
+internal fun isResumeAlreadyComplete(resumeFrom: Long, totalBytes: Long): Boolean =
+    totalBytes > 0 && resumeFrom >= totalBytes
+
 internal fun isSegmentComplete(start: Long, end: Long, downloaded: Long): Boolean =
     downloaded >= end - start + 1
 

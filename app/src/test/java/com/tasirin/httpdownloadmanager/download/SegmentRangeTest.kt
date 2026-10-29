@@ -38,6 +38,18 @@ class SegmentRangeTest {
     }
 
     @Test
+    fun `resume single-stream sudah utuh - total diketahui dan catatan mencapai total`() {
+        // Pas di total dan melebihi total (catatan basi) sama-sama utuh.
+        assertTrue(isResumeAlreadyComplete(1000, 1000))
+        assertTrue(isResumeAlreadyComplete(1001, 1000))
+        // Kurang dari total -> tetap unduh; total tak diketahui -> tetap unduh.
+        assertFalse(isResumeAlreadyComplete(999, 1000))
+        assertFalse(isResumeAlreadyComplete(0, 1000))
+        assertFalse(isResumeAlreadyComplete(1000, 0))
+        assertFalse(isResumeAlreadyComplete(1000, -1))
+    }
+
+    @Test
     fun `tulis segmen dibatasi budget`() {
         assertEquals(100, cappedSegmentWrite(100, 1000))
         assertEquals(1000, cappedSegmentWrite(2000, 1000))
