@@ -250,7 +250,10 @@ object AdtsAac {
         val sfIndex: Int,
         val channels: Int,
         val frameLen: Int,
-        val headerLen: Int
+        val headerLen: Int,
+        // Byte awal frame yang sudah terbaca ke penyangga kandidat
+        // (jalur stream; < 10 hanya pada sisa akhir aliran, issue #602).
+        val buffered: Int = 10
     )
 
     private class Frame(val header: Header, val payload: ByteArray)
@@ -288,7 +291,7 @@ object AdtsAac {
     private fun readFrame(input: InputStream): Frame? {
         val hdr = ByteArray(10)
         val h = nextHeader(input, hdr) ?: return null
-        val pre = 10 - h.headerLen
+        val pre = h.buffered - h.headerLen
         val payloadLen = h.frameLen - h.headerLen
         if (payloadLen < pre || payloadLen > MAX_FRAME_BYTES) return null
         val payload = ByteArray(payloadLen)
@@ -302,9 +305,28 @@ object AdtsAac {
      *  syncword tidak valid. */
     private fun nextHeader(input: InputStream, hdr: ByteArray): Header? {
         while (true) {
-            if (!readExact(input, hdr, 0, 10)) return null
+            // Baca SAMPAI 10 byte kandidat, tetapi toleran terhadap sisa
+            // akhir aliran yang lebih pendek (issue #602): frame terakhir
+            // berukuran total < 10 byte (header 7 + payload <= 2) tetap
+            // frame sah yang diterima jalur ByteArray — jalur File tak
+            // boleh membuangnya hanya karena kandidatnya tidak penuh.
+            // Parse header ADTS hanya membutuhkan 7 byte pertama.
+            var got = 0
+            var zeroStreak = 0
+            while (got < 10) {
+                val n = input.read(hdr, got, 10 - got)
+                if (n < 0) break
+                if (n == 0) {
+                    if (++zeroStreak >= MAX_ZERO_READS) return null
+                    continue
+                }
+                zeroStreak = 0
+                got += n
+            }
+            if (got < 7) return null
             // Tag ID3 (10 byte) bisa menyela aliran ADTS gabungan segmen.
             if (hdr[0] == 0x49.toByte() && hdr[1] == 0x44.toByte() && hdr[2] == 0x33.toByte()) {
+                if (got < 10) return null
                 var size = 0
                 var validSyncsafe = true
                 for (i in 0 until 4) {
@@ -334,7 +356,7 @@ object AdtsAac {
                 ((hdr[5].toInt() and 0xFF) shr 5)
             val headerLen = if (protectionAbsent == 1) 7 else 9
             if (frameLen < headerLen) return null
-            return Header(profile, sfIndex, channels, frameLen, headerLen)
+            return Header(profile, sfIndex, channels, frameLen, headerLen, buffered = got)
         }
     }
 

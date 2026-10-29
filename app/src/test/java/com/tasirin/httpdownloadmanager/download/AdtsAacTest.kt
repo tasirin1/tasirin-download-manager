@@ -163,6 +163,42 @@ class AdtsAacTest {
     }
 
     @Test
+    fun `open setara parse untuk frame terakhir mungil di bawah 10 byte`() {
+        // Frame terakhir 9 byte (header 7 + payload 2): jalur ByteArray
+        // menerimanya; jalur File dulu membuangnya karena kandidat
+        // header dibaca tepat 10 byte (issue #602).
+        val data = adtsFrame(1, 7, 2, 20) + adtsFrame(1, 7, 2, 2)
+        val viaArray = ArrayList<Int>()
+        AdtsAac.parse(data)!!.forEachFrame { viaArray.add(it.size) }
+        assertEquals(listOf(20, 2), viaArray)
+        val tmp = File.createTempFile("adts", ".aac")
+        try {
+            tmp.writeBytes(data)
+            val stream = AdtsAac.open(tmp)!!
+            assertEquals(2, stream.frameCount)
+            val viaFile = ArrayList<Int>()
+            stream.forEachFrame { viaFile.add(it.size) }
+            assertEquals(listOf(20, 2), viaFile)
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    @Test
+    fun `open menerima berkas satu frame mungil 9 byte`() {
+        val tmp = File.createTempFile("adts", ".aac")
+        try {
+            tmp.writeBytes(adtsFrame(1, 7, 2, 2))
+            val stream = AdtsAac.open(tmp)!!
+            val sizes = ArrayList<Int>()
+            stream.forEachFrame { sizes.add(it.size) }
+            assertEquals(listOf(2), sizes)
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    @Test
     fun `open file non ADTS - null`() {
         val tmp = File.createTempFile("adts", ".aac")
         try {
