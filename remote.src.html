@@ -6023,6 +6023,10 @@ function getLockedTotal(it) {
   return it.bytesDownloaded;
 }
 let rowNodes = new Map();
+// Penanda daftar pernah dibangun (issue #606): hasil filter kosong
+// memang menyisakan rowNodes kosong, jadi ukuran Map tak bisa
+// membedakan 'belum pernah dibangun' dari 'dibangun tetapi kosong'.
+let rowsBuiltOnce = false;
 function rowMetaText(it) {
   const done = it.state === 'COMPLETED';
   if (done) {
@@ -6136,7 +6140,7 @@ function patchRowSub(li, it) {
 }
 
 function updateRows(items) {
-  if (!rowNodes.size || !rowNodes.values().next().value.isConnected) {
+  if (!rowsBuiltOnce || (rowNodes.size && !rowNodes.values().next().value.isConnected)) {
     rebuildList(items);
     return;
   }
@@ -6209,6 +6213,7 @@ function armPauseOverlay(ov, wrap) {
 }
 
 function rebuildList(items) {
+  rowsBuiltOnce = true;
   lastRowSig = {};
   rowNodes = new Map();
   const list = dlList;
