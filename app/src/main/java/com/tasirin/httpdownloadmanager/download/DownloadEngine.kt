@@ -1869,6 +1869,15 @@ class DownloadEngine(appContext: Context) {
         ) {
             val next = allMirrors.first()
             App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} (switching to mirror: $next)")
+            // Ketidakpercayaan pada byte host asal ditegakkan SEKARANG
+            // (issue #572): dulu ia digantungkan ke probe mirror lewat
+            // aturan provenans shouldInvalidateResume, tetapi gerbang
+            // fungsi itu pulang false lebih dulu bila mirror tidak
+            // mengirim ETag — byte lama lalu terpakai buta terhadap
+            // resource mirror. Buang state parsial di tempat, persis
+            // efek invalidateChangedResume.
+            fileSaver.partialFiles(item).forEach { runCatching { it.delete() } }
+            clearSegProgress(id)
             updateItem(id) {
                 it.copy(
                     url = next,
@@ -1876,10 +1885,15 @@ class DownloadEngine(appContext: Context) {
                     state = DownloadState.PENDING,
                     error = null,
                     autoResume = true,
+                    bytesDownloaded = 0,
+                    totalBytes = 0,
+                    segments = emptyList(),
+                    speedBps = 0,
+                    etaSeconds = 0,
                     // Etag host asal tak berlaku di host baru (issue
-                    // #552): kosongkan agar probe mirror berikutnya
-                    // yang ber-etag memicu perbandingan segar lewat
-                    // aturan provenans shouldInvalidateResume.
+                    // #552): kosongkan; byte parsial host asal sudah
+                    // dibuang di atas (issue #572) sehingga resume di
+                    // mirror selalu mulai segar.
                     etag = ""
                 )
             }
