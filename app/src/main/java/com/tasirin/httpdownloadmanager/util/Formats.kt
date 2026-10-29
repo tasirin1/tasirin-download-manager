@@ -15,6 +15,14 @@ object Formats {
         return "" + r / 100 + "." + dec / 10 + dec % 10
     }
 
+    // Varian jenjang TERATAS (issue #621): jenjang itu tak punya
+    // penerus untuk dipromosikan, jadi nilai tepat di bawah 1024
+    // yang pembulatannya mencapai 1024.00 ditahan di 1023.99 —
+    // kelas #603 yang tersisa di langit-langit. Nilai yang sungguh
+    // >= 1024 di jenjang teratas tampil apa adanya.
+    private fun twoDecimalsTop(v: Double): String =
+        if (v >= 1023.995 && v < 1024.0) "1023.99" else twoDecimals(v)
+
     private fun pad2(n: Long): String = if (n < 10) "0$n" else n.toString()
 
     // Ambang promosi satuan (issue #579): nilai yang pembulatannya
@@ -29,7 +37,9 @@ object Formats {
         if (mb < 1023.95) return oneDecimal(mb) + " MB"
         val gb = mb / 1024.0
         if (gb < 1023.995) return twoDecimals(gb) + " GB"
-        return twoDecimals(gb / 1024.0) + " TB"
+        val tb = gb / 1024.0
+        if (tb < 1023.995) return twoDecimals(tb) + " TB"
+        return twoDecimalsTop(tb / 1024.0) + " PB"
     }
 
     fun speed(bps: Long): String {
@@ -42,7 +52,9 @@ object Formats {
         // desimal sehingga besaran yang sama tampil beda gaya antara
         // label ukuran dan label kecepatan.
         if (mb < 1023.95) return oneDecimal(mb) + " MB/s"
-        return twoDecimals(mb / 1024.0) + " GB/s"
+        val gb = mb / 1024.0
+        if (gb < 1023.995) return twoDecimals(gb) + " GB/s"
+        return twoDecimalsTop(gb / 1024.0) + " TB/s"
     }
 
     /** Durasi video/gambar -> "m:ss" atau "h:mm:ss" (0 -> "0:00"). */

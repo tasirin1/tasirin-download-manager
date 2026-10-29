@@ -23,6 +23,18 @@ class FormatsTest {
     }
 
     @Test
+    fun `bytes dan speed - jenjang teratas tak mencetak 1024_00`() {
+        // Issue #621: titik temuan audit — jenjang terminal dulu
+        // membulat ke "1024.00 TB"/"1024.00 GB/s"; kini naik ke
+        // PB / TB/s, dan pita tepat di bawah 1024 pada jenjang
+        // teratas ditahan di 1023.99.
+        assertEquals("1.00 PB", Formats.bytes(1125894409284608L))
+        assertEquals("1023.99 PB", Formats.bytes(1152915875107325113L))
+        assertEquals("1.00 TB/s", Formats.speed(1099506259067L))
+        assertEquals("1023.99 TB/s", Formats.speed(1125894409285484L))
+    }
+
+    @Test
     fun `speed - tepat di bawah ambang naik satuan`() {
         assertEquals("1.0 MB/s", Formats.speed(1048575))
         assertEquals("1.00 GB/s", Formats.speed(1073741824))
