@@ -678,7 +678,7 @@ class HlsParserTest {
         // ter-mask walau ada kutip liar tak berpasangan di ekor;
         // ekor sesudah kutip liar dibaca apa adanya (#617).
         assertEquals(
-            "NAME=\"             \",BANDWIDTH=500000,CODECS=\"xyz",
+            "NAME=\"           \",BANDWIDTH=500000,CODECS=\"xyz",
             HlsParser.tanpaNilaiKutip("NAME=\"BANDWIDTH=1\",BANDWIDTH=500000,CODECS=\"xyz")
         )
         // Kunci campuran: METHOD hantu di dalam URI terkutip sah
