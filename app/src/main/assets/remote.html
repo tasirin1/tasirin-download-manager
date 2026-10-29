@@ -3917,6 +3917,9 @@ e.stopPropagation();
 openItemSheet(it);
 });
 }
+li.addEventListener('click', function (e) {
+if (e.detail === 0) openItemSheet(it);
+});
 const retryBtn = li.querySelector('.item-retry');
 if (retryBtn) {
 retryBtn.addEventListener('click', function (e) {

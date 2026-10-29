@@ -6312,6 +6312,15 @@ function rebuildList(items) {
         openItemSheet(it);
       });
     }
+    // Aktivasi keyboard (issue #609): handler global menerjemahkan
+    // Enter/Space pada elemen tabindex=0 menjadi click, tetapi baris
+    // tak punya listener klik sendiri sehingga fokus keyboard/D-pad
+    // berhenti di jalan buntu. Klik keyboard ber-detail 0; klik
+    // tetikus/sentuh ber-detail >= 1 dan sengaja diabaikan di sini
+    // agar tak bertabrakan dengan gestur geser.
+    li.addEventListener('click', function (e) {
+      if (e.detail === 0) openItemSheet(it);
+    });
     const retryBtn = li.querySelector('.item-retry');
     if (retryBtn) {
       retryBtn.addEventListener('click', function (e) {
