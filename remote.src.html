@@ -2168,36 +2168,52 @@ function onNewDownloadClick() {
 }
 document.getElementById('fabNewBtn').addEventListener('click', onNewDownloadClick);
 const toTopBtn = document.getElementById('toTopBtn');
+// Elemen statis chrome di-cache sekali (issue #640): sebelumnya
+// updateScrollShrink/updateChromeHide menjalankan getElementById +
+// querySelector pada SETIAP event scroll.
+const dlPageHeadEl = document.getElementById('dlPageHead');
+const galToolbarEl = document.querySelector('#galleryView .gal-toolbar');
+const fsToolbarEl = document.querySelector('#fsView .gal-toolbar');
+const fabNewBtnEl = document.getElementById('fabNewBtn');
+const tabbarEl = document.getElementById('tabbar');
 function updateToTop() {
   toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600);
 }
 function updateScrollShrink() {
   const y = window.scrollY || 0;
   const sh = y > 80;
-  const ph = document.getElementById('dlPageHead');
-  if (ph) ph.classList.toggle('shrink', sh);
-  const gt = document.querySelector('#galleryView .gal-toolbar');
-  if (gt) gt.classList.toggle('shrink', sh);
-  const ft = document.querySelector('#fsView .gal-toolbar');
-  if (ft) ft.classList.toggle('shrink', sh);
+  if (dlPageHeadEl) dlPageHeadEl.classList.toggle('shrink', sh);
+  if (galToolbarEl) galToolbarEl.classList.toggle('shrink', sh);
+  if (fsToolbarEl) fsToolbarEl.classList.toggle('shrink', sh);
 }
-window.addEventListener('scroll', updateToTop, {passive: true});
-window.addEventListener('scroll', updateScrollShrink, {passive: true});
 // FAB + tabbar auto-hide saat scroll ke bawah, muncul lagi saat scroll ke atas.
 let lastChromeY = window.scrollY || 0;
 function updateChromeHide() {
   const y = window.scrollY || 0;
-  const fab = document.getElementById('fabNewBtn');
-  if (fab) fab.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
-  const tb = document.getElementById('tabbar');
-  if (tb) {
-    const keyFocused = !!(tb.contains && tb.contains(document.activeElement));
+  if (fabNewBtnEl) fabNewBtnEl.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
+  if (tabbarEl) {
+    const keyFocused = !!(tabbarEl.contains && tabbarEl.contains(document.activeElement));
     const hide = !keyFocused && y > 260 && y > lastChromeY + 8;
-    tb.classList.toggle('tab-hide', hide);
+    tabbarEl.classList.toggle('tab-hide', hide);
   }
   lastChromeY = y;
 }
-window.addEventListener('scroll', updateChromeHide, {passive: true});
+// Satu listener scroll untuk ketiga updater chrome, di belakang
+// penjaga rAF seperti pola scroll galeri (issue #640): event scroll
+// mentah bisa datang jauh lebih sering daripada frame layar.
+let chromeScrollTick = false;
+window.addEventListener('scroll', function () {
+  if (chromeScrollTick) return;
+  chromeScrollTick = true;
+  function run() {
+    chromeScrollTick = false;
+    updateToTop();
+    updateScrollShrink();
+    updateChromeHide();
+  }
+  if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(run);
+  else run();
+}, {passive: true});
 // Navigasi keyboard (D-pad TV) selalu memunculkan tabbar.
 document.addEventListener('keydown', function () {
   var tb = document.getElementById('tabbar');
