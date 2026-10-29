@@ -4152,6 +4152,12 @@ fsSheet.addEventListener('click', function (e) {
 
 const itemSheet = document.getElementById('itemSheet');
 function openItemSheet(it) {
+  // Objek dari closure baris bisa basi (issue #593): structSig dan
+  // penjaga baris tidak memuat speedLimitKbps/priority, jadi perubahan
+  // kedua field itu tak mengganti closure — sheet membaca nilai lama
+  // dan tombol prioritas cepat ikut mengirim speedLimitKbps lama,
+  // menghapus batas yang baru dipasang. Segarkan dari snapshot hidup.
+  it = currentItems.find(function (x) { return x.id === it.id; }) || it;
   document.getElementById('itemSheetTitle').innerHTML = socialFavicon(it.url) + ' ' + escapeHtml(it.fileName) + ' ' + fileTypeBadge(it.fileName);
   const list = document.getElementById('itemSheetList');
   list.innerHTML = '';

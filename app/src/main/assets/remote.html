@@ -1954,6 +1954,7 @@ if (e.target === fsSheet) closeFsSheet();
 });
 const itemSheet = document.getElementById('itemSheet');
 function openItemSheet(it) {
+it = currentItems.find(function (x) { return x.id === it.id; }) || it;
 document.getElementById('itemSheetTitle').innerHTML = socialFavicon(it.url) + ' ' + escapeHtml(it.fileName) + ' ' + fileTypeBadge(it.fileName);
 const list = document.getElementById('itemSheetList');
 list.innerHTML = '';
