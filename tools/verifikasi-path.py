@@ -208,6 +208,11 @@ def cek_xml(gagal):
             ET.parse(os.path.join(AKAR, path))
         except ET.ParseError:
             buruk.append("%s (rusak)" % path)
+        except OSError:
+            # Manifest hilang/ter-rename adalah vonis bernama, bukan
+            # traceback FileNotFoundError yang menggugurkan gerbang
+            # (issue #587, kelas yang sama dengan #562/#571).
+            buruk.append("%s (hilang)" % path)
     if buruk:
         gagal.append("XML rusak: " + ", ".join(buruk))
 
@@ -240,7 +245,9 @@ def namespace_aplikasi():
 def cek_manifest(gagal):
     try:
         pohon = ET.parse(os.path.join(AKAR, "app/src/main/AndroidManifest.xml"))
-    except ET.ParseError:
+    except (ET.ParseError, OSError):
+        # Rusak sudah divonis cek_xml; hilang divonis cek_xml juga
+        # ("(hilang)") — di sini cukup berhenti agar tak traceback.
         return
     ns = namespace_aplikasi()
     for el in pohon.getroot().iter():
