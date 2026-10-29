@@ -14,7 +14,16 @@ def main():
     if not files:
         print("::warning::Laporan JaCoCo tidak ditemukan")
         return 0
-    root = ET.parse(files[0]).getroot()
+    # Laporan RUSAK melunak seperti laporan absen (issue #615):
+    # docstring skrip ini menjanjikan langkah CI tak gagal keras,
+    # tetapi ParseError/int() non-numerik dulu meledak sebagai
+    # traceback dan memerahkan langkah Coverage — padahal verifikasi
+    # ambang sungguhan sudah selesai di Gradle sebelumnya.
+    try:
+        root = ET.parse(files[0]).getroot()
+    except ET.ParseError as exc:
+        print(f"::warning::Laporan JaCoCo rusak (tak ter-parse): {exc}")
+        return 0
     summary = []
     for ctype in ("LINE", "BRANCH", "INSTRUCTION", "METHOD"):
         covered = missed = 0
@@ -24,8 +33,12 @@ def main():
         # cakupan sejati (9/10)); persen kebetulan mirip, hitungannya salah.
         for counter in root.findall("counter"):
             if counter.get("type") == ctype:
-                covered += int(counter.get("covered", 0))
-                missed += int(counter.get("missed", 0))
+                try:
+                    covered += int(counter.get("covered", 0))
+                    missed += int(counter.get("missed", 0))
+                except (TypeError, ValueError):
+                    print(f"::warning::Counter JaCoCo {ctype} tak numerik; ringkasan dilewati")
+                    return 0
         if covered + missed:
             line = f"- {ctype}: {covered / (covered + missed):.1%} ({covered}/{covered + missed})"
             summary.append(line)
