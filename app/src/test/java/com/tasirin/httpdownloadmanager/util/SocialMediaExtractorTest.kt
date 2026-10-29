@@ -464,6 +464,32 @@ class SocialMediaExtractorTest {
         assertNull(SocialMediaExtractor.extractContextJson("\"token\": \"a1b2c3d4\""))
     }
 
+    /** Bangun cuplikan format 1 (embed) dari JSON polos: escape seperti halaman. */
+    private fun embedSnippet(json: String): String =
+        "\"contextJSON\":\"" + json.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+    @Test
+    fun `extractContextJson - format 1 mencoba kemunculan berikutnya bila yang pertama gagal`() {
+        // Ekspektasi dibuktikan port 1:1 sebelum uji ditulis (issue #666):
+        // perilaku lama (kemunculan pertama saja) menghasilkan null untuk
+        // tiga kasus pertama; iterasi semua kemunculan menemukan medianya.
+        val validGql = """{"gql_data":{"shortcode_media":{"id":"55"}}}"""
+        val validCtx = """{"context":{"media":{"id":"77"}}}"""
+        // Blob rusak lebih dulu, payload asli kedua.
+        val htmlA = embedSnippet("{bukan json") + " filler " + embedSnippet(validGql)
+        assertEquals("55", SocialMediaExtractor.extractContextJson(htmlA)?.getString("id"))
+        // Blob valid tapi tanpa media lebih dulu, varian context kedua.
+        val htmlB = embedSnippet("""{"gql_data":{}}""") + " x " + embedSnippet(validCtx)
+        assertEquals("77", SocialMediaExtractor.extractContextJson(htmlB)?.getString("id"))
+        // Token kosong lebih dulu tidak menggantungkan loop.
+        val htmlC = "\"contextJSON\":\"\" y " + embedSnippet(validGql)
+        assertEquals("55", SocialMediaExtractor.extractContextJson(htmlC)?.getString("id"))
+        // Kontrol: kemunculan tunggal tetap ditemukan seperti sebelumnya.
+        assertEquals("55", SocialMediaExtractor.extractContextJson(embedSnippet(validGql))?.getString("id"))
+        // Semua kemunculan gagal -> null.
+        assertNull(SocialMediaExtractor.extractContextJson(embedSnippet("{rusak")))
+    }
+
     @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))

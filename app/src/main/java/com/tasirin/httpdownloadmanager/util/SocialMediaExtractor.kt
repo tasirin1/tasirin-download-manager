@@ -569,8 +569,13 @@ object SocialMediaExtractor {
     internal fun extractContextJson(html: String): JSONObject? {
         // Format 1 (embed page): contextJSON":"{escaped JSON}"
         val embedKey = "contextJSON\":\""
-        val embedIdx = html.indexOf(embedKey)
-        if (embedIdx >= 0) {
+        // Semua kemunculan dicoba (issue #666): kemunculan pertama yang
+        // rusak/decoy tidak lagi membatalkan seluruh format 1 — pola yang
+        // sama dengan iterasi findAll format 2/3 pada issue #652.
+        var searchFrom = 0
+        while (true) {
+            val embedIdx = html.indexOf(embedKey, searchFrom)
+            if (embedIdx < 0) break
             val start = embedIdx + embedKey.length
             var i = start
             while (i < html.length) {
@@ -591,6 +596,9 @@ object SocialMediaExtractor {
                     if (ctxMedia != null) return ctxMedia
                 } catch (_: Exception) { /* lanjut */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (kandidat media tak ter-parse: lanjut ke kandidat berikut)
             }
+            // Maju melewati kemunculan ini; token kosong (i == start)
+            // pun tetap harus memajukan kursor agar loop berhenti.
+            searchFrom = if (i > start) i else start + 1
         }
         // Format 2: contextJSON = "..." (JS assignment)
         // Format 3: "token": "..."
