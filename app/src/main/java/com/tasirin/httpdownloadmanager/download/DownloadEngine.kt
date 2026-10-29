@@ -3103,6 +3103,7 @@ class DownloadEngine(appContext: Context) {
             }
             val videoSegments = videoSegs.map { it.first }
             val videoDurations = videoSegs.map { it.second }
+            var audioFailedFatally: IOException? = null
             val audioSegments = candidate.audioGroupId?.let { group ->
                 val groupRenditions = audioRenditions.filter { it.groupId == group }
                 // Jika user memilih bahasa audio spesifik, prioritaskan rendition
@@ -3134,9 +3135,10 @@ class DownloadEngine(appContext: Context) {
                         // (terenkripsi/live/byterange/MAP) dulu tertelan
                         // runCatching di sini sehingga campuran video
                         // bersih + audio terenkripsi terbit bisu
-                        // COMPLETED tanpa pesan. Catat dan lempar bila
-                        // tak ada rendition yang berhasil, sejajar
-                        // fatalError jalur video; kegagalan jaringan/
+                        // COMPLETED tanpa pesan. Catat bila tak ada
+                        // rendition yang berhasil; kandidat digugurkan dan
+                        // alasannya dilempar sesudah loop kandidat (issue
+                        // #565), sejajar fatalError jalur video; kegagalan jaringan/
                         // 404 per-rendition tetap degradasi seperti dulu.
                         if (audioFatal == null &&
                             e.message?.contains("not supported") == true
@@ -3150,8 +3152,19 @@ class DownloadEngine(appContext: Context) {
                         break
                     }
                 }
-                if (audioResult == null && audioFatal != null) throw audioFatal
+                if (audioResult == null && audioFatal != null) {
+                    audioFailedFatally = audioFatal
+                }
                 audioResult
+            }
+            if (audioSegments == null && audioFailedFatally != null) {
+                // Grup audio kandidat ini gugur fatal (issue #565): jangan
+                // batalkan seluruh rencana — catat alasannya dan beri
+                // kandidat berikutnya kesempatan, persis pola fatalError
+                // jalur video; lemparan terjadi sesudah loop bila semua
+                // kandidat gagal.
+                if (fatalError == null) fatalError = audioFailedFatally
+                continue
             }
             App.logEvent(
                 "HLS plan: ${candidate.codecs} ${candidate.bandwidth/1000}kbps ${candidate.frameRate}fps, " +
