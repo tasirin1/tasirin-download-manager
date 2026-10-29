@@ -76,11 +76,19 @@ def jalan(*args):
 
 
 def git_hidup():
-    """True bila git menjawab rev-parse di repo ini. jalan() mengembalikan
-    None untuk SEMUA kegagalan git, jadi tanpa cek ini repo tanpa .git
-    (atau git mati) mengubah diff kosong menjadi vonis LOLOS semu
-    (issue #646; mode jalur ikut ditutup issue #661)."""
-    return jalan("git", "rev-parse", "--git-dir") is not None
+    """True bila git menjawab rev-parse di repo ini DAN HEAD terbaca.
+    jalan() mengembalikan None untuk SEMUA kegagalan git, jadi tanpa cek
+    ini repo tanpa .git (atau git mati) mengubah diff kosong menjadi
+    vonis LOLOS semu (issue #646; mode jalur ikut ditutup issue #661).
+    --git-dir saja terlalu dangkal (issue #662): ia sukses walau HEAD
+    korup dan semua diff gagal, sehingga gerbang menilai index melawan
+    pohon kosong dan memberi diagnosis palsu ke berkas tak disentuh —
+    HEAD wajib ikut terverifikasi agar vonisnya jujur "git tidak
+    berfungsi"."""
+    return (
+        jalan("git", "rev-parse", "--git-dir") is not None
+        and jalan("git", "rev-parse", "--verify", "HEAD") is not None
+    )
 
 
 def jalan_output(*args):
