@@ -337,8 +337,10 @@ class GalleryActivity : AppCompatActivity() {
                     val direct = BitmapFactory.decodeFile(thumb.absolutePath)
                         ?: return@withContext null
                     ensureActive()
+                    // scaleDown me-recycle sumbernya sendiri bila
+                    // membuat salinan (issue #591): recycle pemanggil
+                    // di sini adalah recycle kedua atas bitmap yang sama.
                     val tiny = scaleDown(direct, req)
-                    if (tiny !== direct) direct.recycle()
                     synchronized(cacheLock) { cache.put(cacheKey, tiny) }
                     return@withContext tiny
                 }
@@ -356,8 +358,8 @@ class GalleryActivity : AppCompatActivity() {
                     BitmapFactory.Options().apply { inSampleSize = sample }
                 ) ?: return@withContext null
                 ensureActive()
+                // Sama seperti di atas (issue #591).
                 val bitmap = scaleDown(decoded, req)
-                if (bitmap !== decoded) decoded.recycle()
                 synchronized(cacheLock) { cache.put(cacheKey, bitmap) }
                 bitmap
             }
