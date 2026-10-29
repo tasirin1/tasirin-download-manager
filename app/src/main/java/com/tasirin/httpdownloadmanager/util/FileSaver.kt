@@ -1055,6 +1055,14 @@ class FileSaver(context: Context) {
                     if (!subDir.isDirectory && !subDir.mkdirs()) return result
                     val target = uniqueTargetFile(File(subDir, file.name))
                     if (file.renameTo(target)) {
+                        // Berkas berpindah folder: tanpa notify, baris
+                        // MediaStore tetap menunjuk path lama (entri
+                        // tertapis keterbacaan galeri) dan scanCache
+                        // menyajikan posisi pra-pindah (issue #610).
+                        // Sejajar rename() cabang polos yang menotify
+                        // path lama + baru; notifyMediaChanged juga
+                        // mengosongkan scanCache.
+                        MediaLibrary.notifyMediaChanged(appContext, file.absolutePath, target.absolutePath)
                         PublishResult(filePath = target.absolutePath, fileName = target.name)
                     } else {
                         // Klaim kosong uniqueTargetFile tertinggal bila rename
