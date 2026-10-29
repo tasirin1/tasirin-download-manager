@@ -2727,6 +2727,17 @@ class DownloadEngine(appContext: Context) {
                     runCatching { input.close() }
                 }
             }
+            // Verifikasi panjang terhadap Content-Length (issue #651),
+            // pola yang sama dengan fetchHlsSegment (#170): EOF prematur
+            // pada respons chunked bisa tiba tanpa exception sehingga
+            // berkas terpotong lolos sebagai sukses — audio adaptive cukup
+            // >= 1000 byte untuk ikut ter-remux dan terbit COMPLETED.
+            // Hanya kekurangan byte yang digagalkan; kelebihan ditoleransi
+            // karena klaim Content-Length bisa basi (gzip/proxy).
+            val writtenBytes = target.length()
+            if (total > 0 && writtenBytes < total) {
+                throw IOException("adaptive file truncated: got $writtenBytes of $total bytes")
+            }
             progress.downloaded += target.length()
             return target.length() > 0L
         } finally {
