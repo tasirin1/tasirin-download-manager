@@ -27,7 +27,10 @@ fi
 # terlarang" — pindai ini no-op senyap di checkout rusak. Daftar
 # ditulis ke berkas temp agar pemisah NUL dari -z utuh (variabel bash
 # tak bisa menyimpan byte NUL).
-tmp_terlacak=$(mktemp)
+# Kegagalan mktemp sendiri wajib bernama (issue #670): assignment polos
+# di bawah set -e membunuh skrip seketika dengan pesan mentah mktemp
+# dan tanpa satu pun cek berjalan.
+tmp_terlacak=$(mktemp) || { echo "GAGAL: mktemp gagal membuat berkas temp (periksa TMPDIR) — pindai berkas terlarang tak bisa menilai (fail-closed)"; exit 1; }
 if ! git ls-files -z > "$tmp_terlacak" 2>/dev/null; then
   echo "GAGAL: git ls-files gagal — pindai berkas terlarang tak bisa menilai (fail-closed)"; gagal=1;
 elif tr '\0' '\n' < "$tmp_terlacak" | grep -E -i -q '\.(apk|aab|dex|zip|jks|keystore|p12|pfx)$|(^|/)keystore$|(^|/)[^/]*keystore[^/]*\.b64$|\.env($|\.)|(^|/)\.envrc$'; then
