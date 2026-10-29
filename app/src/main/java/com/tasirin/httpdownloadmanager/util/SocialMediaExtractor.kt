@@ -930,84 +930,84 @@ object SocialMediaExtractor {
         }.getOrNull()
     }
 
+/** Cari objek format adaptive berdasarkan URL (untuk mengambil mime/quality
+ *  dari hasil `bestAdaptivePair`). */
+    private fun adaptiveFormatByUrl(adaptive: JSONArray?, url: String): JSONObject? {
+        if (adaptive == null || url.isEmpty()) return null
+        for (i in 0 until adaptive.length()) {
+            val fmt = adaptive.optJSONObject(i) ?: continue
+            if (fmt.optString("url", "") == url) return fmt
+        }
+        return null
+    }
+
 /** Pilih pasangan video+audio adaptive terbaik dari streamingData VISIONOS
  *  (URL langsung, tanpa n-transform). Prioritas video: MP4/AVC (bisa diremux
  *  ke MP4 mulus), lalu MP4 lain, lalu WebM. Prioritas audio: MP4/M4A AAC
  *  (itag 140, lalu 139), lalu audio MP4 lain. Audio WebM (opus) dikembalikan
  *  kosong karena muxer MP4 tidak menerima opus. */
-/** Cari objek format adaptive berdasarkan URL (untuk mengambil mime/quality
- *  dari hasil `bestAdaptivePair`). */
-    private fun adaptiveFormatByUrl(adaptive: JSONArray?, url: String): JSONObject? {
-    if (adaptive == null || url.isEmpty()) return null
-    for (i in 0 until adaptive.length()) {
-        val fmt = adaptive.optJSONObject(i) ?: continue
-        if (fmt.optString("url", "") == url) return fmt
-    }
-    return null
-}
-
     internal fun bestAdaptivePair(streamingData: JSONObject?): Pair<String, String> {
-    val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return "" to ""
-    var videoUrl = ""
-    var audioUrl = ""
-    var videoRank = Int.MAX_VALUE
-    var videoHeight = -1
-    var videoBitrate = -1
-    var audioRank = Int.MAX_VALUE
-    var audioBitrate = -1
-    for (i in 0 until adaptive.length()) {
-        val fmt = adaptive.optJSONObject(i) ?: continue
-        val mime = fmt.optString("mimeType", "")
-        val url = fmt.optString("url", "")
-        if (!url.startsWith("http")) continue
-        when {
-            mime.contains("video/") -> {
-                val rank = when {
-                    mime.contains("mp4") && mime.contains("avc1") -> 0
-                    mime.contains("mp4") -> 1
-                    else -> 2
+        val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return "" to ""
+        var videoUrl = ""
+        var audioUrl = ""
+        var videoRank = Int.MAX_VALUE
+        var videoHeight = -1
+        var videoBitrate = -1
+        var audioRank = Int.MAX_VALUE
+        var audioBitrate = -1
+        for (i in 0 until adaptive.length()) {
+            val fmt = adaptive.optJSONObject(i) ?: continue
+            val mime = fmt.optString("mimeType", "")
+            val url = fmt.optString("url", "")
+            if (!url.startsWith("http")) continue
+            when {
+                mime.contains("video/") -> {
+                    val rank = when {
+                        mime.contains("mp4") && mime.contains("avc1") -> 0
+                        mime.contains("mp4") -> 1
+                        else -> 2
+                    }
+                    // Seri peringkat codec dimenangkan kualitas tertinggi
+                    // (issue #388): sebelumnya format PERTAMA per peringkat
+                    // yang menang, dan adaptiveFormats terurut itag menaik
+                    // sehingga cadangan VISIONOS berisi 144p walau 720p/1080p
+                    // AVC tersedia. Kelas codec tetap utama (kompatibilitas
+                    // remux), height lalu bitrate menjadi penentu dalam kelas.
+                    val height = fmt.optInt("height", 0)
+                    val bitrate = fmt.optInt("bitrate", 0)
+                    if (rank < videoRank ||
+                        (rank == videoRank && (height > videoHeight ||
+                            (height == videoHeight && bitrate > videoBitrate)))
+                    ) {
+                        videoRank = rank
+                        videoHeight = height
+                        videoBitrate = bitrate
+                        videoUrl = url
+                    }
                 }
-                // Seri peringkat codec dimenangkan kualitas tertinggi
-                // (issue #388): sebelumnya format PERTAMA per peringkat
-                // yang menang, dan adaptiveFormats terurut itag menaik
-                // sehingga cadangan VISIONOS berisi 144p walau 720p/1080p
-                // AVC tersedia. Kelas codec tetap utama (kompatibilitas
-                // remux), height lalu bitrate menjadi penentu dalam kelas.
-                val height = fmt.optInt("height", 0)
-                val bitrate = fmt.optInt("bitrate", 0)
-                if (rank < videoRank ||
-                    (rank == videoRank && (height > videoHeight ||
-                        (height == videoHeight && bitrate > videoBitrate)))
-                ) {
-                    videoRank = rank
-                    videoHeight = height
-                    videoBitrate = bitrate
-                    videoUrl = url
-                }
-            }
-            mime.contains("audio/mp4") -> {
-                val itag = fmt.optInt("itag", 0)
-                val rank = when (itag) {
-                    140 -> 0
-                    139 -> 1
-                    else -> 2
-                }
-                // Seri peringkat itag dimenangkan bitrate tertinggi
-                // (issue #421, menyelaraskan sisi audio dengan #388):
-                // semua audio di luar 139/140 berbagi peringkat 2,
-                // sehingga tanpa tie-break ini pemenang ditentukan
-                // urutan array, bukan kualitas.
-                val bitrate = fmt.optInt("bitrate", 0)
-                if (rank < audioRank || (rank == audioRank && bitrate > audioBitrate)) {
-                    audioRank = rank
-                    audioBitrate = bitrate
-                    audioUrl = url
+                mime.contains("audio/mp4") -> {
+                    val itag = fmt.optInt("itag", 0)
+                    val rank = when (itag) {
+                        140 -> 0
+                        139 -> 1
+                        else -> 2
+                    }
+                    // Seri peringkat itag dimenangkan bitrate tertinggi
+                    // (issue #421, menyelaraskan sisi audio dengan #388):
+                    // semua audio di luar 139/140 berbagi peringkat 2,
+                    // sehingga tanpa tie-break ini pemenang ditentukan
+                    // urutan array, bukan kualitas.
+                    val bitrate = fmt.optInt("bitrate", 0)
+                    if (rank < audioRank || (rank == audioRank && bitrate > audioBitrate)) {
+                        audioRank = rank
+                        audioBitrate = bitrate
+                        audioUrl = url
+                    }
                 }
             }
         }
+        return videoUrl to audioUrl
     }
-    return videoUrl to audioUrl
-}
 
     private fun isUrlForbidden(item: Result): Boolean {
         return runCatching {
