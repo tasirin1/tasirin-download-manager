@@ -139,8 +139,12 @@ class App : Application() {
          *  penyelesaian unduhan biasa wajib membuang ketiganya — galeri
          *  saja membuat listing media dan ZIP folder menyajikan keadaan
          *  pra-selesai sampai TTL masing-masing berakhir. */
-        fun invalidateServerDownloadCaches() {
-            runCatching { if (::httpServer.isInitialized) httpServer.invalidateDownloadCaches() }
+        fun invalidateServerDownloadCaches(publishedFilePath: String?) {
+            runCatching {
+                if (::httpServer.isInitialized) {
+                    httpServer.invalidateDownloadCachesFor(publishedFilePath)
+                }
+            }
         }
 
         // Kunci khusus siklus hidup server (issue #260): SettingsActivity

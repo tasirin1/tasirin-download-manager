@@ -1634,7 +1634,7 @@ class DownloadEngine(appContext: Context) {
         // Listing media + ZIP ikut dibuang (issue #660): keduanya hanya
         // terinvalidasi finalisasi upload, jadi unduhan biasa yang
         // selesai tak muncul di sana sampai TTL berakhir.
-        App.invalidateServerDownloadCaches()
+        App.invalidateServerDownloadCaches(result.filePath)
         return result
     }
 

@@ -2379,16 +2379,42 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         galleryCache = null
     }
 
-    /** Bagian tak-berpath dari invalidateAfterPublish (issue #660):
-     *  galeri + listing media + ZIP. Penyelesaian unduhan biasa di engine
+    /** Bagian invalidasi cache dari invalidateAfterPublish (issue #660):
+     *  galeri + listing media + ZIP (ZIP terarah sejak issue #668).
+     *  Penyelesaian unduhan biasa di engine
      *  ikut membuangnya lewat App.invalidateServerDownloadCaches — dulu
      *  publishItem hanya membuang galeri (#558), jadi berkas unduhan yang
      *  baru selesai tak muncul di listing media (TTL 15 dtk) dan ZIP
      *  folder (TTL 60 dtk) sampai cache menua sendiri. */
-    internal fun invalidateDownloadCaches() {
+    internal fun invalidateDownloadCachesFor(publishedFilePath: String?) {
         invalidateGalleryCache()
         fsMediaCache.clear()
-        invalidateZipCache()
+        invalidateZipCacheFor(publishedFilePath)
+    }
+
+    /** Buang entri ZIP folder berkas terbit dan leluhurnya saja (issue
+     *  #668): kunci cache berbentuk "fs:" + raw dan raw berkas biasa
+     *  adalah "f:" + path absolut folder (lihat fsZip), jadi folder ZIP
+     *  bisa dibandingkan langsung dengan folder berkas terbit. Kunci
+     *  "m:" (MediaStore) raw-nya URI media, bukan folder — tak disentuh
+     *  jalur terarah ini; terbitan MediaStore sendiri ber-path null dan
+     *  jatuh ke invalidasi global. */
+    private fun invalidateZipCacheFor(publishedFilePath: String?) {
+        val dir = publishedFilePath?.let { File(it).parentFile?.absolutePath }
+        if (dir == null) {
+            invalidateZipCache()
+            return
+        }
+        val doomed = zipCache.entries.filter { (key, _) ->
+            val raw = key.removePrefix("fs:")
+            if (!raw.startsWith(FS_PREFIX)) return@filter false
+            val folder = raw.removePrefix(FS_PREFIX).trimEnd('/')
+            folder.isNotEmpty() && (folder == dir || dir.startsWith("$folder/"))
+        }
+        doomed.forEach { (key, entry) ->
+            zipCache.remove(key)
+            runCatching { entry.second.delete() }
+        }
     }
 
     /** Hapus cache MediaStore setelah perubahan file; cache kecil dan event
@@ -2571,12 +2597,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  #558, #643) sehingga terbitan MediaStore ber-filePath null pun
      *  ikut membuangnya; sisanya khusus terbitan ber-path. */
     private fun invalidateAfterPublish(filePath: String?) {
-        // Cache listing media (TTL 15 dtk) + ZIP (TTL 60 dtk) tak
-        // bergantung path (issue #643): dulu keduanya di dalam
+        // Cache listing media (TTL 15 dtk) tak bergantung path dan ZIP
+        // (TTL 60 dtk) kini terarah ke folder terbit (issue #668),
+        // jatuh ke global hanya bila path null: dulu keduanya di dalam
         // filePath?.let sehingga terbitan MediaStore tidak pernah
         // membuangnya — berkas baru tak muncul di listing folder
-        // media dan ZIP folder media basi sampai TTL habis.
-        invalidateDownloadCaches()
+        // media dan ZIP folder media basi sampai TTL habis (issue #643).
+        invalidateDownloadCachesFor(filePath)
         filePath?.let {
             // Statistik folder ikut dibuang (issue #611): corong ini
             // adalah finalisasi terbit upload, tetapi fsStatsCache
@@ -2584,7 +2611,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // statistik induk dan penjaga ukuran ZIP membaca angka
             // pra-upload sampai TTL 10 dtk.
             fsStatsCache.clear()
-            invalidateFsListingCache()
+            // Hanya cache listing yang dibuang di sini (issue #668):
+            // invalidateFsListingCache ikut membuang SEMUA cache ZIP,
+            // padahal ZIP corong terbit ini sudah terarah di atas.
+            fsFileListingCache = null
             videoDurations.invalidate()
             MediaLibrary.notifyMediaChanged(context, it)
         }
