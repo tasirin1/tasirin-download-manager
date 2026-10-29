@@ -715,7 +715,14 @@ class DownloadEngine(appContext: Context) {
         }
         // Batch delete: satu loop, bukan N kali filter list
         failed.forEach { fileSaver.deleteFiles(it) }
-        updateTransformed { daftar -> daftar.filterNot { it.state == DownloadState.FAILED } }
+        // Transformasi sejajar seleksi di atas (issue #566): dulu hanya
+        // FAILED yang terhapus dari daftar, sehingga item CANCELLED
+        // tertinggal selamanya padahal berkas parsialnya sudah dibersihkan.
+        updateTransformed { daftar ->
+            daftar.filterNot {
+                it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED
+            }
+        }
         // Penerus monitor yang ikut terhapus massal (issue #530):
         // hidupkan lagi pemantauan pendahulunya, sama seperti
         // cancel/remove per item (#520) — membersihkan daftar gagal
