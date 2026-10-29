@@ -3345,7 +3345,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val target = synchronized(fsModifyGate) {
             val claimed = claimFileTarget(dir, FileNames.safe(sourceName)) ?: return false
             val written = runCatching {
-                val input = resolver.openInputStream(uri) ?: return false
+                // return@runCatching, BUKAN return polos (issue #667): return
+                // polos adalah return non-lokal dari fungsi ini (runCatching
+                // inline) sehingga melewati penghapusan berkas klaim di
+                // bawah — sejak #649 klaim dibuat lebih dulu via
+                // createNewFile, stream null akan meninggalkan berkas kosong
+                // yatim di folder tujuan. Pola yang sama dengan #268.
+                val input = resolver.openInputStream(uri) ?: return@runCatching false
                 input.use { src -> claimed.outputStream().use { dst -> src.copyTo(dst, SERVER_IO_BUF) } }
                 true
             }.getOrDefault(false)
