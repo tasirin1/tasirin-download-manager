@@ -449,6 +449,22 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseDirectMedia - EXTINF segmen terbuang tak menempel ke segmen polos berikutnya`() {
+        // Kasus pembeda kontrak durasi (issue #601): EXTINF dikonsumsi
+        // baris URI berikutnya apa pun nasibnya, jadi segmen polos
+        // sesudah segmen asing yang dibuang mendapat durasi 0 — bukan
+        // 5 detik milik segmen yang dibuang.
+        val b = "#EXTM3U\n" +
+            "#EXT-X-TARGETDURATION:10\n" +
+            "#EXTINF:5,\n" +
+            "ftp://cdn.example.com/seg-asing.ts\n" +
+            "seg-polos.ts\n"
+        val direct = HlsParser.parseDirectMedia(b, "https://cdn.example.com/videos/media.m3u8")
+        assertEquals(listOf("https://cdn.example.com/videos/seg-polos.ts"), direct.segments)
+        assertEquals(listOf(0L), direct.durationsUs)
+    }
+
+    @Test
     fun `parseDirectMedia - segmen ber-skema kapital diterima`() {
         // Skema URI tak peka huruf (RFC 3986): resolveUrl mempertahankan
         // HTTPS:// apa adanya, jadi saringan penerimaan wajib ignoreCase

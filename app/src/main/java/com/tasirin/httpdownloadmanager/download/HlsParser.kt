@@ -253,13 +253,15 @@ object HlsParser {
     fun parseDirectMedia(body: String, baseUrl: String): DirectMedia {
         val segments = mutableListOf<String>()
         val durations = mutableListOf<Long>()
-        // Durasi dipasangkan ke segmen BERIKUTNYA yang diterima (issue
-        // #394): sebelumnya kedua daftar dibangun independen — EXTINF
-        // yang segmennya terbuang (URI non-http) tetap terhitung dan
-        // menggeser indeks durasi terhadap segmen, padahal konsumen
-        // remux membaca durationsUs sejajar indeks segmen. Kini setiap
-        // segmen yang diterima selalu mendapat tepat satu durasi
-        // (EXTINF tertunda, atau 0 bila tak ada).
+        // Pasangan durasi (issue #394, diluruskan #601): EXTINF tertunda
+        // dikonsumsi oleh baris URI BERIKUTNYA apa pun nasibnya — diterima
+        // maupun dibuang (skema asing). Jadi segmen yang diterima selalu
+        // mendapat tepat satu durasi: EXTINF yang persis mendahuluinya,
+        // atau 0 bila EXTINF terakhir justru mendahului segmen yang
+        // dibuang. Kedua daftar dengan begitu selalu sejajar indeks,
+        // yang dibaca konsumen remux. (Rumusan lama 'segmen berikutnya
+        // yang diterima' menyiratkan durasi melompati segmen terbuang —
+        // bukan perilaku kode maupun uji.)
         var pendingDurationUs: Long? = null
         for (raw in body.lines()) {
             val line = raw.trim()
