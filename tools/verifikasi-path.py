@@ -1391,6 +1391,18 @@ def utama():
         # berbasis diff berduplikat (termasuk suntikan #496) dan
         # penghitung "berkas diperiksa" mengganda, walau vonis akhir
         # sama. Satu penyebutan cukup.
+        # Path yang disebut tetapi TIDAK ADA wajib divonis, bukan
+        # dibuang diam-diam (issue #625): dulu gerbang menjawab
+        # 'LOLOS (0 berkas diperiksa)' untuk path salah ketik, dan
+        # campuran sah+hantu hanya melaporkan yang sah — pemanggilan
+        # manual per-path bisa 'memverifikasi' berkas yang tak
+        # pernah diperiksa.
+        for j in dict.fromkeys(args.jalur):
+            if not os.path.exists(os.path.join(AKAR, j)):
+                gagal.append(
+                    "berkas tak ditemukan: " + j +
+                    " — path eksplisit wajib ada (salah ketik?)"
+                )
         berubah = list(dict.fromkeys(
             j for j in args.jalur if os.path.exists(os.path.join(AKAR, j))
         ))
