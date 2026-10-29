@@ -2548,14 +2548,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Invalidasi sesudah berkas baru terbit ke folder terlayani (dipakai
      *  finalisasi upload chunk DAN single-shot — #250 menyamakan keduanya):
-     *  tanpa ini ZIP/listing/galeri basi sampai TTL. Cache berkas hanya
-     *  untuk terbitan ber-path; snapshot galeri tak bergantung path
-     *  (issue #558) sehingga terbitan MediaStore ber-filePath null pun
-     *  ikut membuangnya. */
+     *  tanpa ini ZIP/listing/galeri basi sampai TTL. Snapshot galeri,
+     *  cache listing media, dan cache ZIP tak bergantung path (issue
+     *  #558, #643) sehingga terbitan MediaStore ber-filePath null pun
+     *  ikut membuangnya; sisanya khusus terbitan ber-path. */
     private fun invalidateAfterPublish(filePath: String?) {
         invalidateGalleryCache()
+        // Cache listing media (TTL 15 dtk) + ZIP (TTL 60 dtk) tak
+        // bergantung path (issue #643): dulu keduanya di dalam
+        // filePath?.let sehingga terbitan MediaStore tidak pernah
+        // membuangnya — berkas baru tak muncul di listing folder
+        // media dan ZIP folder media basi sampai TTL habis.
+        fsMediaCache.clear()
+        invalidateZipCache()
         filePath?.let {
-            fsMediaCache.clear()
             // Statistik folder ikut dibuang (issue #611): corong ini
             // adalah finalisasi terbit upload, tetapi fsStatsCache
             // hanya dibuang corong mutasi File Manager (#586) —
