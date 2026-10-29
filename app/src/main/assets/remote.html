@@ -2205,8 +2205,15 @@ try {
 const dirs = [];
 let offset = 0;
 let truncated = false;
+const useCursor = !!movePath && !movePath.startsWith('m:');
+let afterName = null;
+let afterDir = false;
 while (true) {
-const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(movePath) + '&offset=' + offset + '&limit=250', undefined, 20000);
+const pageUrl = API + '/api/fs?path=' + encodeURIComponent(movePath) +
+(useCursor && afterName !== null
+? '&after=' + encodeURIComponent(afterName) + '&afterDir=' + (afterDir ? '1' : '0')
+: '&offset=' + offset) + '&limit=250';
+const res = await fetchTimeout(pageUrl, undefined, 20000);
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
 if (seq !== movePickSeq) return;
@@ -2214,6 +2221,11 @@ const items = data.items || [];
 items.forEach(function (it) {
 if (!movePath || it.kind === 'dir') dirs.push(it);
 });
+if (useCursor && items.length) {
+const lastIt = items[items.length - 1];
+afterName = lastIt.name;
+afterDir = lastIt.kind === 'dir';
+}
 if (movePath && items.some(function (it) { return it.kind !== 'dir'; })) break;
 offset += items.length;
 const total = data.total || offset;
