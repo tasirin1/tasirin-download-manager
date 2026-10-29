@@ -5697,8 +5697,13 @@ function updateToolbar(items) {
   let completed = 0;
   items.forEach(function (it) {
     if (it.state === 'DOWNLOADING' || it.state === 'PENDING') active++;
-    if (it.state === 'PAUSED' || it.state === 'FAILED') pausedOrFailed++;
-    if (it.state === 'FAILED') failed++;
+    if (it.state === 'PAUSED' || it.state === 'FAILED' || it.state === 'CANCELLED') pausedOrFailed++;
+    // Ember Failed disatukan FAILED + CANCELLED (issue #568, permukaan
+    // keempat #556): sejajar predikat filter web, engine, dan toolbar
+    // native — dulu FAILED-murni sehingga chip Failed tak menghitung
+    // item batal yang ditampilkannya dan tombol Retry failed hilang
+    // untuk daftar cancelled-only.
+    if (it.state === 'FAILED' || it.state === 'CANCELLED') failed++;
     if (it.state === 'COMPLETED') completed++;
     if (lockedTotalBytes.has(it.id) && (it.state === 'COMPLETED' || it.state === 'FAILED' || it.state === 'CANCELLED')) lockedTotalBytes.delete(it.id);
   });
@@ -5710,7 +5715,11 @@ function updateToolbar(items) {
   if (sep1) {
     sep1.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
   }
-  var total = active + pausedOrFailed + failed + completed;
+  // Total 'All' = jumlah item persis (issue #568): rumus jumlah ember
+  // lama menghitung FAILED dua kali (ia anggota pausedOrFailed sekaligus
+  // failed) dan membuang CANCELLED sama sekali, sampai daftar yang hanya
+  // berisi CANCELLED menghasilkan total 0 dan bar filter disembunyikan.
+  var total = items.length;
   var fAll = document.getElementById('fAll');
   var fActive = document.getElementById('fActive');
   var fDone = document.getElementById('fDone');

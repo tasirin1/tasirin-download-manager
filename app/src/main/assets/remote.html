@@ -3377,8 +3377,8 @@ let failed = 0;
 let completed = 0;
 items.forEach(function (it) {
 if (it.state === 'DOWNLOADING' || it.state === 'PENDING') active++;
-if (it.state === 'PAUSED' || it.state === 'FAILED') pausedOrFailed++;
-if (it.state === 'FAILED') failed++;
+if (it.state === 'PAUSED' || it.state === 'FAILED' || it.state === 'CANCELLED') pausedOrFailed++;
+if (it.state === 'FAILED' || it.state === 'CANCELLED') failed++;
 if (it.state === 'COMPLETED') completed++;
 if (lockedTotalBytes.has(it.id) && (it.state === 'COMPLETED' || it.state === 'FAILED' || it.state === 'CANCELLED')) lockedTotalBytes.delete(it.id);
 });
@@ -3390,7 +3390,7 @@ const sep1 = moreMenu ? moreMenu.querySelector('.sep') : null;
 if (sep1) {
 sep1.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
 }
-var total = active + pausedOrFailed + failed + completed;
+var total = items.length;
 var fAll = document.getElementById('fAll');
 var fActive = document.getElementById('fActive');
 var fDone = document.getElementById('fDone');
