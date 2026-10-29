@@ -15,6 +15,20 @@ class FormatsTest {
     }
 
     @Test
+    fun `bytes - tepat di bawah ambang naik satuan, dan ada TB`() {
+        // Issue #579: 1048575 byte dulu tampil "1024.0 KB".
+        assertEquals("1.0 MB", Formats.bytes(1048575))
+        assertEquals("1.00 GB", Formats.bytes(1073741823))
+        assertEquals("5.00 TB", Formats.bytes(5497558138880L))
+    }
+
+    @Test
+    fun `speed - tepat di bawah ambang naik satuan`() {
+        assertEquals("1.00 MB/s", Formats.speed(1048575))
+        assertEquals("1.00 GB/s", Formats.speed(1073741824))
+    }
+
+    @Test
     fun `speed - satuan dasar`() {
         assertEquals("512 B/s", Formats.speed(512))
         assertEquals("1.0 KB/s", Formats.speed(1024))

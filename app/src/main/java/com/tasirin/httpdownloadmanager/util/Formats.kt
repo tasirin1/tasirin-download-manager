@@ -17,20 +17,28 @@ object Formats {
 
     private fun pad2(n: Long): String = if (n < 10) "0$n" else n.toString()
 
+    // Ambang promosi satuan (issue #579): nilai yang pembulatannya
+    // mencapai 1024.0/1024.00 harus naik satuan, bukan tampil sebagai
+    // "1024.0 KB" tepat di bawah ambang. oneDecimal mencapai 1024.0
+    // mulai 1023.95; twoDecimals mencapai 1024.00 mulai 1023.995.
     fun bytes(bytes: Long): String {
         if (bytes < 1024) return "$bytes B"
         val kb = bytes / 1024.0
-        if (kb < 1024) return oneDecimal(kb) + " KB"
+        if (kb < 1023.95) return oneDecimal(kb) + " KB"
         val mb = kb / 1024.0
-        if (mb < 1024) return oneDecimal(mb) + " MB"
-        return twoDecimals(mb / 1024.0) + " GB"
+        if (mb < 1023.95) return oneDecimal(mb) + " MB"
+        val gb = mb / 1024.0
+        if (gb < 1023.995) return twoDecimals(gb) + " GB"
+        return twoDecimals(gb / 1024.0) + " TB"
     }
 
     fun speed(bps: Long): String {
         if (bps < 1024) return "$bps B/s"
         val kb = bps / 1024.0
-        if (kb < 1024) return oneDecimal(kb) + " KB/s"
-        return twoDecimals(kb / 1024.0) + " MB/s"
+        if (kb < 1023.95) return oneDecimal(kb) + " KB/s"
+        val mb = kb / 1024.0
+        if (mb < 1023.995) return twoDecimals(mb) + " MB/s"
+        return twoDecimals(mb / 1024.0) + " GB/s"
     }
 
     /** Durasi video/gambar -> "m:ss" atau "h:mm:ss" (0 -> "0:00"). */
