@@ -3141,43 +3141,50 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
                     return true
                 }
-                // renameTo gagal lintas volume: salin dulu baru hapus sumber.
-                // Direktori disalin rekursif (sebelumnya langsung false).
-                // Symlink direktori bersarang yang lepas ke luar root wajib
-                // ditolak dulu: copyRecursively akan membaca isi target luar
-                // dan deleteRecursively pada sumber menghapusnya — pola #159
-                // yang di jalur fallback ini belum dijaga (issue #172).
-                if (file.isDirectory &&
-                    ServerSecurity.hasEscapingSymlink(file, canonicalFsRoots())
-                ) {
-                    return false
-                }
-                runCatching {
-                    try {
-                        if (file.isDirectory) {
-                            file.copyRecursively(target, overwrite = false)
-                            if (!file.deleteRecursively()) throw java.io.IOException("Failed to remove source")
-                        } else {
-                            file.copyTo(target, overwrite = false)
-                            if (!file.delete()) throw java.io.IOException("Failed to remove source")
-                        }
-                    } catch (e: kotlin.io.FileAlreadyExistsException) {
-                        // Target muncul di sela cek (bukan hasil salinan
-                        // operasi ini) — jangan pernah dihapus (issue #177).
-                        // Kelasnya kotlin.io (yang dilempar copyTo/
-                        // copyRecursively); java.io tidak punya kelas ini
-                        // sehingga build gagal compile sejak 4e71cb8.
-                        throw e
-                    } catch (e: Exception) {
-                        // Salin separuh jalan jangan tertinggal sebagai data ganda.
-                        runCatching { if (target.isDirectory) target.deleteRecursively() else target.delete() }
-                        throw e
+                // Seluruh fallback kini di dalam fsModifyGate (issue #669):
+                // dulu hanya renameTo yang digerbang, jadi dua move
+                // paralel atas sumber yang sama ke tujuan yang sama
+                // lintas volume bisa saling menghapus hasil salinan
+                // lewat catch pembersihan di bawah.
+                synchronized(fsModifyGate) {
+                    // renameTo gagal lintas volume: salin dulu baru hapus sumber.
+                    // Direktori disalin rekursif (sebelumnya langsung false).
+                    // Symlink direktori bersarang yang lepas ke luar root wajib
+                    // ditolak dulu: copyRecursively akan membaca isi target luar
+                    // dan deleteRecursively pada sumber menghapusnya — pola #159
+                    // yang di jalur fallback ini belum dijaga (issue #172).
+                    if (file.isDirectory &&
+                        ServerSecurity.hasEscapingSymlink(file, canonicalFsRoots())
+                    ) {
+                        return false
                     }
-                    invalidateFsMediaCache()
-                    invalidateGalleryCache()
-                    MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
-                    true
-                }.getOrDefault(false)
+                    runCatching {
+                        try {
+                            if (file.isDirectory) {
+                                file.copyRecursively(target, overwrite = false)
+                                if (!file.deleteRecursively()) throw java.io.IOException("Failed to remove source")
+                            } else {
+                                file.copyTo(target, overwrite = false)
+                                if (!file.delete()) throw java.io.IOException("Failed to remove source")
+                            }
+                        } catch (e: kotlin.io.FileAlreadyExistsException) {
+                            // Target muncul di sela cek (bukan hasil salinan
+                            // operasi ini) — jangan pernah dihapus (issue #177).
+                            // Kelasnya kotlin.io (yang dilempar copyTo/
+                            // copyRecursively); java.io tidak punya kelas ini
+                            // sehingga build gagal compile sejak 4e71cb8.
+                            throw e
+                        } catch (e: Exception) {
+                            // Salin separuh jalan jangan tertinggal sebagai data ganda.
+                            runCatching { if (target.isDirectory) target.deleteRecursively() else target.delete() }
+                            throw e
+                        }
+                        invalidateFsMediaCache()
+                        invalidateGalleryCache()
+                        MediaLibrary.notifyMediaChanged(context, file.absolutePath, target.absolutePath)
+                        true
+                    }.getOrDefault(false)
+                }
             }
             "mkdir" -> {
                 if (!isNameValid(name)) return false
