@@ -683,6 +683,17 @@ class FileSaver(context: Context) {
         if (!item.filePath.isNullOrEmpty()) {
             runCatching { File(item.filePath).delete() }
         }
+        // Berkas yang terlihat galeri ikut terhapus di atas (issue #595):
+        // tanpa invalidasi, blok galeri dari walk filesystem (SAF/folder
+        // teks/internal — tak tertapis keterbacaan, tak teramati observer)
+        // menyajikan entri hantu sampai TTL scanCache habis (30 dtk,
+        // 600 dtk mode fallback). Untuk path polos, notifyMediaChanged
+        // juga membuang baris MediaStore-nya lewat pemindaian; URI
+        // MediaStore murni tertolong invalidasi + ContentObserver.
+        if (!item.contentUri.isNullOrEmpty() || !item.filePath.isNullOrEmpty()) {
+            MediaLibrary.invalidateScanCache()
+            item.filePath?.let { MediaLibrary.notifyMediaChanged(appContext, it) }
+        }
     }
 
     /** Rename file di disk/MediaStore. Kembalikan PublishResult berisi
