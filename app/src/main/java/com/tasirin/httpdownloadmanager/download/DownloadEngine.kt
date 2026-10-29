@@ -2665,6 +2665,17 @@ class DownloadEngine(appContext: Context) {
                 try {
                     var bytes = 0L
                     var zeroStreak = 0
+                    // Watchdog macet/lambat seperti tiga jalur streaming
+                    // lain (issue #597): tanpa ini, koneksi yang menetes
+                    // di berkas adaptive (bisa ratusan MB untuk muxing)
+                    // tak pernah divonis — hanya guard zero-read dan
+                    // read-timeout per-baca yang membatasi.
+                    val health = DownloadHealthWatchdog(
+                        if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
+                    )
+                    var adaptiveIters = 0
+                    var lastAdaptiveCheckBytes = 0L
+                    var lastAdaptiveCheckAt = monotonicNow()
                     while (true) {
                         val read = input.read(buffer)
                         if (read == -1) break
@@ -2684,6 +2695,17 @@ class DownloadEngine(appContext: Context) {
                         out.write(buffer, 0, read)
                         throttle.sleepIfNeeded { progress.downloaded + bytes }
                         reportHlsProgress(item, progress, bytes, total)
+                        if ((adaptiveIters++ and 7) == 0) {
+                            val now = monotonicNow()
+                            if (now - lastAdaptiveCheckAt >= 1000) {
+                                val speed = if (now > lastAdaptiveCheckAt) {
+                                    ((bytes - lastAdaptiveCheckBytes) * 1000L) / (now - lastAdaptiveCheckAt)
+                                } else 0L
+                                lastAdaptiveCheckBytes = bytes
+                                lastAdaptiveCheckAt = now
+                                health.check(now, bytes, total, speed)
+                            }
+                        }
                     }
                 } finally {
                     runCatching { input.close() }
