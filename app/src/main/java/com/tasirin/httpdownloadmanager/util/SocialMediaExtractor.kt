@@ -565,7 +565,8 @@ object SocialMediaExtractor {
         return null
     }
 
-    private fun extractContextJson(html: String): JSONObject? {
+    // internal agar bisa di-unit-test (pola yang sama dengan scanEscapedJsString).
+    internal fun extractContextJson(html: String): JSONObject? {
         // Format 1 (embed page): contextJSON":"{escaped JSON}"
         val embedKey = "contextJSON\":\""
         val embedIdx = html.indexOf(embedKey)
@@ -597,25 +598,30 @@ object SocialMediaExtractor {
             IG_CONTEXT_JSON_RE,
             IG_TOKEN_RE,
         )) {
-            val match = pattern.find(html) ?: continue
-            // Regex hanya MELACAK kutip pembuka; isi token dipindai
-            // sadar-escape (issue #635) — tangkapan regex berhenti di
-            // kutip ter-escape pertama dan tak pernah lolos parse JSON.
-            val raw = scanEscapedJsString(html, match.range.last + 1) ?: continue
-            val token = unescapeJsToken(raw)
-            try {
-                val obj = JSONObject(token)
-                val gql = obj.optJSONObject("gql_data")
-                if (gql != null) {
-                    val media = gql.optJSONObject("shortcode_media")
-                    if (media != null) return media
-                }
-                val context = obj.optJSONObject("context")
-                if (context != null) {
-                    val media = context.optJSONObject("media")
-                    if (media != null) return media
-                }
-            } catch (_: Exception) { /* lanjut */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (kandidat media tak ter-parse: lanjut ke kandidat berikut)
+            // SEMUA kecocokan per pola dicoba (issue #652): field token /
+            // contextJSON polos yang muncul lebih dulu di halaman tak
+            // boleh membuat token asli di kecocokan berikutnya tak
+            // terjangkau — dulu hanya kecocokan pertama yang dicoba.
+            for (match in pattern.findAll(html)) {
+                // Regex hanya MELACAK kutip pembuka; isi token dipindai
+                // sadar-escape (issue #635) — tangkapan regex berhenti di
+                // kutip ter-escape pertama dan tak pernah lolos parse JSON.
+                val raw = scanEscapedJsString(html, match.range.last + 1) ?: continue
+                val token = unescapeJsToken(raw)
+                try {
+                    val obj = JSONObject(token)
+                    val gql = obj.optJSONObject("gql_data")
+                    if (gql != null) {
+                        val media = gql.optJSONObject("shortcode_media")
+                        if (media != null) return media
+                    }
+                    val context = obj.optJSONObject("context")
+                    if (context != null) {
+                        val media = context.optJSONObject("media")
+                        if (media != null) return media
+                    }
+                } catch (_: Exception) { /* lanjut */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (kandidat media tak ter-parse: lanjut ke kandidat berikut)
+            }
         }
         return null
     }

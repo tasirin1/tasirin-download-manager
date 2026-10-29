@@ -447,6 +447,24 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `extractContextJson - kecocokan locator kedua dicoba bila yang pertama bukan JSON`() {
+        // Ekspektasi dibuktikan port 1:1 sebelum uji ditulis (issue #652):
+        // perilaku lama (kecocokan pertama saja) menghasilkan null untuk
+        // dua kasus pertama; iterasi semua kecocokan menemukan medianya.
+        // "token" polos lebih dulu, token asli (format 3) di kecocokan kedua.
+        val htmlA = "\"token\": \"a1b2c3d4\" x \"token\": \"{\\\"gql_data\\\":{\\\"shortcode_media\\\":{\\\"id\\\":\\\"42\\\"}}}\""
+        assertEquals("42", SocialMediaExtractor.extractContextJson(htmlA)?.getString("id"))
+        // contextJSON polos lebih dulu, assignment asli (format 2) kedua.
+        val htmlB = "contextJSON = \"bukan json\"; contextJSON = \"{\\\"context\\\":{\\\"media\\\":{\\\"id\\\":\\\"7\\\"}}}\""
+        assertEquals("7", SocialMediaExtractor.extractContextJson(htmlB)?.getString("id"))
+        // Kontrol: token tunggal tetap ditemukan seperti sebelumnya.
+        val htmlC = "\"token\": \"{\\\"gql_data\\\":{\\\"shortcode_media\\\":{\\\"id\\\":\\\"9\\\"}}}\""
+        assertEquals("9", SocialMediaExtractor.extractContextJson(htmlC)?.getString("id"))
+        // Tak ada token yang parse -> null, bukan potongan paksa.
+        assertNull(SocialMediaExtractor.extractContextJson("\"token\": \"a1b2c3d4\""))
+    }
+
+    @Test
     fun `isSocialMediaUrl - URL kosong dan bukan HTTP`() {
         assertFalse(SocialMediaExtractor.isSocialMediaUrl(""))
         assertFalse(SocialMediaExtractor.isSocialMediaUrl("ftp://youtube.com/watch"))
