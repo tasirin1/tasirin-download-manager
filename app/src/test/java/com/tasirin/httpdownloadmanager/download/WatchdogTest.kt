@@ -72,8 +72,10 @@ class WatchdogTest {
         // memperlakukan total sebagai tak diketahui.
         val w = DownloadHealthWatchdog(0)
         w.check(1_000L, 150_000L, 100_000L, 0L)
-        assertThrows(IOException::class.java) {
+        try {
             w.check(31_000L, 150_000L, 100_000L, 0L)
+            fail("harus melempar IOException saat byte macet 30 detik sesudah melewati total")
+        } catch (_: IOException) { // audit-ignore: kotlin_empty_catch (pola uji: tangkapan IOException adalah jalur sukses yang diharapkan)
         }
     }
 

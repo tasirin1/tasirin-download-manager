@@ -661,7 +661,7 @@ class HlsParserTest {
         // Issue #617: NAME tak ditutup (baris terpotong) — BANDWIDTH
         // dan RESOLUTION asli sesudahnya wajib tetap terbaca karena
         // baris berkutip tak seimbang tidak di-mask.
-        val variants = parseMaster(
+        val variants = HlsParser.parseMaster(
             "#EXTM3U\n" +
                 "#EXT-X-STREAM-INF:NAME=\"promo,BANDWIDTH=800000,RESOLUTION=1280x720\n" +
                 "v.m3u8\n",
