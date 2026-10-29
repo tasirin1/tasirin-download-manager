@@ -3948,6 +3948,7 @@ cb.addEventListener('change', function () {
 if (this.checked) batchSelected.add(it.id); else batchSelected.delete(it.id);
 updateBatchCount();
 });
+cb.addEventListener('click', function (e) { e.stopPropagation(); });
 li.appendChild(cb);
 }
 applyCompact();

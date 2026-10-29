@@ -6346,6 +6346,12 @@ function rebuildList(items) {
       if (this.checked) batchSelected.add(it.id); else batchSelected.delete(it.id);
       updateBatchCount();
     });
+    // Samakan dengan ketiga tombol anak baris (issue #623): klik
+    // jangan menggelembung ke <li>. Klik aktivasi keyboard pada
+    // checkbox terfokus ber-detail 0 — tanpa penjaga ini listener
+    // baris dari #609 membacanya sebagai klik baris dan membuka
+    // sheet item di atas aksi memilih yang sebenarnya.
+    cb.addEventListener('click', function (e) { e.stopPropagation(); });
     li.appendChild(cb);
   }
   applyCompact();
