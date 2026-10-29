@@ -1222,6 +1222,7 @@ return (up === 'f:' || up === 'm:') ? '' : up;
 function fsMsg(text, isErr) {
 fsStatus.textContent = text || '';
 fsStatus.style.color = isErr ? 'var(--red)' : 'var(--green)';
+if (isErr && text) showToast(text, 3500, 'error');
 }
 function fsCrumbParts(p) {
 if (!p) return [];

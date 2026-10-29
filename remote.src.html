@@ -3320,6 +3320,11 @@ function parentFsPath(p) {
 function fsMsg(text, isErr) {
   fsStatus.textContent = text || '';
   fsStatus.style.color = isErr ? 'var(--red)' : 'var(--green)';
+  // Error dicerminkan ke toast global: baris status fs berada di
+  // atas halaman files — saat pengguna tergulir jauh ke bawah atau
+  // sebuah sheet/dialog sedang terbuka, kegagalan aksi tak terlihat
+  // di layar sama sekali. Pesan sukses tetap cukup di baris status.
+  if (isErr && text) showToast(text, 3500, 'error');
 }
 
 function fsCrumbParts(p) {
