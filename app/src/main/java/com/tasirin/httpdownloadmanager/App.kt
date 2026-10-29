@@ -135,6 +135,14 @@ class App : Application() {
             runCatching { if (::httpServer.isInitialized) httpServer.invalidateGalleryCache() }
         }
 
+        /** Buang cache galeri + listing media + ZIP server (issue #660):
+         *  penyelesaian unduhan biasa wajib membuang ketiganya — galeri
+         *  saja membuat listing media dan ZIP folder menyajikan keadaan
+         *  pra-selesai sampai TTL masing-masing berakhir. */
+        fun invalidateServerDownloadCaches() {
+            runCatching { if (::httpServer.isInitialized) httpServer.invalidateDownloadCaches() }
+        }
+
         // Kunci khusus siklus hidup server (issue #260): SettingsActivity
         // memanggil restartHttpServer dari coroutine IO BARU tiap simpan,
         // jadi dua restart bisa berjalan bersamaan dan saling menyela

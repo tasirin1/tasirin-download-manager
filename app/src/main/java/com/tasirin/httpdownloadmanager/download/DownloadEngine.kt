@@ -1631,7 +1631,10 @@ class DownloadEngine(appContext: Context) {
         // Buang snapshot galeri server (issue #558): publishItem
         // adalah corong terbit semua jalur unduhan, dan galleryCache
         // server tak tersentuh notifikasi FileSaver/MediaLibrary.
-        App.invalidateServerGalleryCache()
+        // Listing media + ZIP ikut dibuang (issue #660): keduanya hanya
+        // terinvalidasi finalisasi upload, jadi unduhan biasa yang
+        // selesai tak muncul di sana sampai TTL berakhir.
+        App.invalidateServerDownloadCaches()
         return result
     }
 

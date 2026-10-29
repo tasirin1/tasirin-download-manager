@@ -2379,6 +2379,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         galleryCache = null
     }
 
+    /** Bagian tak-berpath dari invalidateAfterPublish (issue #660):
+     *  galeri + listing media + ZIP. Penyelesaian unduhan biasa di engine
+     *  ikut membuangnya lewat App.invalidateServerDownloadCaches — dulu
+     *  publishItem hanya membuang galeri (#558), jadi berkas unduhan yang
+     *  baru selesai tak muncul di listing media (TTL 15 dtk) dan ZIP
+     *  folder (TTL 60 dtk) sampai cache menua sendiri. */
+    internal fun invalidateDownloadCaches() {
+        invalidateGalleryCache()
+        fsMediaCache.clear()
+        invalidateZipCache()
+    }
+
     /** Hapus cache MediaStore setelah perubahan file; cache kecil dan event
      *  jarang, sementara pemetaan path fisik ke key relatif rawan salah.
      *  Cache durasi video ikut dibuang lewat corong yang sama (#325):
@@ -2559,14 +2571,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  #558, #643) sehingga terbitan MediaStore ber-filePath null pun
      *  ikut membuangnya; sisanya khusus terbitan ber-path. */
     private fun invalidateAfterPublish(filePath: String?) {
-        invalidateGalleryCache()
         // Cache listing media (TTL 15 dtk) + ZIP (TTL 60 dtk) tak
         // bergantung path (issue #643): dulu keduanya di dalam
         // filePath?.let sehingga terbitan MediaStore tidak pernah
         // membuangnya — berkas baru tak muncul di listing folder
         // media dan ZIP folder media basi sampai TTL habis.
-        fsMediaCache.clear()
-        invalidateZipCache()
+        invalidateDownloadCaches()
         filePath?.let {
             // Statistik folder ikut dibuang (issue #611): corong ini
             // adalah finalisasi terbit upload, tetapi fsStatsCache
