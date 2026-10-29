@@ -3792,16 +3792,20 @@ updateToolbar(items);
 function armPauseOverlay(ov, wrap) {
 if (!ov || !wrap) return;
 if (!window.matchMedia || !window.matchMedia('(hover: none)').matches) return;
-var t = null;
-function show(restart) {
-ov.classList.add('o-shown');
-if (t) clearTimeout(t);
-if (restart !== false) t = setTimeout(function () { ov.classList.remove('o-shown'); }, 2000);
+var st = wrap._pauseArm;
+if (!st) {
+st = wrap._pauseArm = { t: null, lastTouch: 0, show: null };
+st.show = function (restart) {
+var cur = wrap.querySelector('.pause-overlay');
+if (!cur) return;
+cur.classList.add('o-shown');
+if (st.t) clearTimeout(st.t);
+if (restart !== false) st.t = setTimeout(function () { cur.classList.remove('o-shown'); }, 2000);
+};
+wrap.addEventListener('touchstart', function () { st.lastTouch = Date.now(); st.show(true); }, {passive: true});
+wrap.addEventListener('pointerdown', function () { if (Date.now() - st.lastTouch < 700) return; st.show(true); });
 }
-var lastTouch = 0;
-wrap.addEventListener('touchstart', function () { lastTouch = Date.now(); show(true); }, {passive: true});
-wrap.addEventListener('pointerdown', function () { if (Date.now() - lastTouch < 700) return; show(true); });
-show(true);
+st.show(true);
 }
 function rebuildList(items) {
 lastRowSig = {};
