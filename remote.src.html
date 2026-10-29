@@ -351,7 +351,10 @@
   .fill {
  height: 100%; background: linear-gradient(90deg, #ffa94d, var(--accent)); width: 0; border-radius: 999px; transition: width .6s cubic-bezier(.4,0,.2,1); position: relative; overflow: hidden; }
 
-  .fill::after {
+  /* Shimmer hanya pada bar yang sedang mengunduh: dulu ::after ini
+     beranimasi tanpa henti di SEMUA bar (termasuk jeda/selesai),
+     memaksa repaint terus-menerus saat daftar digulir di HP lemah. */
+  .bar.downloading .fill::after {
  content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); animation: shimmer 1.8s ease-in-out infinite; }
 
   @keyframes shimmer {
@@ -1345,7 +1348,7 @@
   .gal-size{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fs-row.compact{padding:7px 10px}.fs-row.compact .fs-ico{width:30px;height:30px;border-radius:9px}.fs-row.compact .fs-ico svg{width:15px;height:15px}.fs-row.compact .fs-name{font-size:12px}.fs-row.compact .fs-meta{font-size:10.5px;margin-top:1px}
   .toast {
- position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 300; max-width: min(92vw, 420px); padding: 9px 14px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+ position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 300; max-width: min(92vw, 420px); padding: 9px 14px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; }
 
   .toast-close {
  flex: 0 0 auto; width: 20px; height: 20px; margin-left: 6px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff; font-size: 13px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; pointer-events: auto; }
@@ -1625,6 +1628,13 @@
   @media (min-width: 601px) and (hover: hover) {
     }
 .thumb-broken{visibility:hidden}
+  /* Hormati preferensi gerak minim: matikan animasi berulang yang
+     paling mahal dilukis (shimmer bar progres + masuknya toast). */
+  @media (prefers-reduced-motion: reduce) {
+    .bar.downloading .fill::after { animation: none; }
+    .toast { animation: none; }
+    .fill { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -2964,7 +2974,7 @@ function renderGalleryCell(it, frag) {
     '<div class="gal-thumb" style="padding-top:' + ratio + '%">' +
       '<span class="gal-check' + (selOn ? ' on' : '') + '">' + (selOn ? '\u2713' : '') + '</span>' +
       '<div class="ext">' + escapeHtml(ext) + '</div>' +
-      '<img loading="lazy" data-thumb="' + thumb + '" alt="' + escapeHtml(it.name) + '" onerror="this.classList.add(\'thumb-broken\');this.removeAttribute(\'src\');">' +
+      '<img loading="lazy" decoding="async" data-thumb="' + thumb + '" alt="' + escapeHtml(it.name) + '" onerror="this.classList.add(\'thumb-broken\');this.removeAttribute(\'src\');">' +
       (it.isVideo ? '<div class="gal-play"><span></span></div>' : '') +
       (it.isVideo ? '<div class="gal-badge">' + (it.durationMs > 0 ? mmFmtTime(it.durationMs / 1000) : escapeHtml(ext)) + '</div>' : '') +
       (resume > 0 ? '<div class="gal-resume">Resume from ' + mmFmtTime(resume) + '</div>' : '') +
@@ -6072,6 +6082,23 @@ function updateRows(items) {
       rebuildList(items);
       break;
     }
+    // Penjaga numerik murah: mayoritas baris pada snapshot sibuk
+    // adalah item diam yang field progresnya tak berubah. Bandingkan
+    // angka mentah dulu; baris yang lolos penjaga ini pasti lolos
+    // tanda tangan string di bawah juga (field struktural — state,
+    // error, nama, url — sudah digerbang structSig di render()),
+    // jadi pembangunan string + patch DOM bisa dilewati seluruhnya.
+    var pv = li._pv;
+    if (pv && pv[0] === it.bytesDownloaded && pv[1] === it.totalBytes &&
+        pv[2] === it.progress && pv[3] === it.speedBps &&
+        pv[4] === it.etaSeconds && pv[5] === (it.retryCount || 0) &&
+        pv[6] === (it.checksumVerified ? 1 : 0) &&
+        pv[7] === (it.progressPercentOverride || -1)) {
+      continue;
+    }
+    li._pv = [it.bytesDownloaded, it.totalBytes, it.progress, it.speedBps,
+      it.etaSeconds, it.retryCount || 0, it.checksumVerified ? 1 : 0,
+      it.progressPercentOverride || -1];
     const sig = it.state + '|' + it.bytesDownloaded + '|' + it.totalBytes + '|' + it.progress + '|' + it.speedBps + '|' +
       it.etaSeconds + '|' + (it.error || '') + '|' + (it.retryCount || 0) + '|' + (it.checksumVerified ? 1 : 0) + '|' + it.fileName + '|' + it.url;
     if (lastRowSig[it.id] === sig) continue;
