@@ -673,6 +673,58 @@ class HlsParserTest {
     }
 
     @Test
+    fun `tanpaNilaiKutip - kontrak masking langsung`() {
+        // Issue #620: kontrak helper dikunci langsung, bukan hanya
+        // tak langsung lewat parseMaster — isi kutip menjadi spasi,
+        // tanda kutip dan panjang baris dipertahankan.
+        assertEquals(
+            "NAME=\"             \",BANDWIDTH=800000",
+            HlsParser.tanpaNilaiKutip("NAME=\"BANDWIDTH=999\",BANDWIDTH=800000")
+        )
+        // Tanpa kutip: baris kembali apa adanya.
+        assertEquals(
+            "BANDWIDTH=800000",
+            HlsParser.tanpaNilaiKutip("BANDWIDTH=800000")
+        )
+        // Kutip tak seimbang: baris rusak dikembalikan utuh (#617).
+        assertEquals(
+            "NAME=\"promo,BANDWIDTH=800000",
+            HlsParser.tanpaNilaiKutip("NAME=\"promo,BANDWIDTH=800000")
+        )
+    }
+
+    @Test
+    fun `parseAudioRenditions - DEFAULT di dalam NAME terkutip bukan default`() {
+        // Issue #620: teks DEFAULT=YES sebagai isi NAME tak boleh
+        // menandai rendisi sebagai default; yang berlaku hanya
+        // atribut DEFAULT sungguhan di luar kutip.
+        val body = """
+            #EXTM3U
+            #EXT-X-MEDIA:URI="audio.m3u8",TYPE=AUDIO,GROUP-ID="aud",NAME="DEFAULT=YES",DEFAULT=NO
+            #EXT-X-STREAM-INF:BANDWIDTH=800000,AUDIO="aud"
+            v.m3u8
+        """.trimIndent()
+        val renditions = HlsParser.parseAudioRenditions(body, "https://cdn.example.com/videos/master.m3u8")
+        assertEquals(1, renditions.size)
+        assertFalse(renditions[0].isDefault)
+    }
+
+    @Test
+    fun `parseMasterLenient - atribut hantu di dalam NAME terkutip diabaikan`() {
+        // Issue #620: jalur lenient memakai masking yang sama —
+        // BANDWIDTH=1 di dalam NAME bukan atribut; yang terbaca
+        // BANDWIDTH asli di luar kutip.
+        val body = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:NAME="BANDWIDTH=1",BANDWIDTH=500000
+            v.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMasterLenient(body, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals(1, variants.size)
+        assertEquals(500000L, variants[0].bandwidth)
+    }
+
+    @Test
     fun `isEncryptedHlsPlaylist - KEYFORMAT dan METHOD di luar tag kunci tak memicu`() {
         // Issue #577: tag KEYFORMAT/KEYFORMATVERSIONS bukan tag kunci;
         // playlist tanpa satu pun #EXT-X-KEY tidak terenkripsi.
