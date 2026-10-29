@@ -1437,8 +1437,15 @@ object SocialMediaExtractor {
             val braceEnd = html.indexOf('}', afterUrl).takeIf { it >= 0 } ?: html.length
             val nextVideo = html.indexOf("\"videoUrl\"", afterUrl)
             val segmentEnd = if (nextVideo >= 0) minOf(braceEnd, nextVideo) else braceEnd
-            val qualityMatch = PH_MEDIA_QUALITY_RE.find(html, afterUrl)
-                ?.takeIf { it.range.first < segmentEnd }
+            // Cari HANYA di irisan segmen (issue #636): find(html,
+            // afterUrl) tanpa batas memindai sisa dokumen untuk tiap
+            // kandidat tanpa quality — kuadratik pada HTML besar.
+            // Jendela penerimaan tak berubah (dulu disaring takeIf
+            // range.first < segmentEnd); kini jendela yang sama menjadi
+            // batas pindai itu sendiri.
+            val qualityMatch = PH_MEDIA_QUALITY_RE.find(
+                html.substring(afterUrl, segmentEnd)
+            )
             if (qualityMatch != null) {
                 addCandidate(
                     match.groupValues.getOrNull(1),

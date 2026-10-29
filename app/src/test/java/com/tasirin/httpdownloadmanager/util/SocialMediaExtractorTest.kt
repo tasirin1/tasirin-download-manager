@@ -334,6 +334,23 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parsePornhubPage - ratusan videoUrl tanpa quality tidak mencuri quality objek lain`() {
+        // Kunci semantik jendela segmen (issue #636): quality hanya
+        // boleh dari irisan objek pemilik videoUrl itu sendiri.
+        val sb = StringBuilder("{\"mediaDefinitions\":[")
+        for (i in 0 until 500) {
+            sb.append("{\"videoUrl\":\"https://cdn.ph.com/n$i.mp4\",\"format\":\"mp4\"},")
+        }
+        sb.append("{\"videoUrl\":\"https://cdn.ph.com/last.mp4\",\"quality\":\"720\"}]}")
+        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
+            sb.toString() + "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(1, opts.size)
+        assertTrue(opts[0].directUrl.endsWith("last.mp4"))
+        assertEquals("HD", opts[0].quality)
+    }
+
+    @Test
     fun `parsePornhubPage - cookie diteruskan ke hasil`() {
         val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
             "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":\"480\"}]}" +
