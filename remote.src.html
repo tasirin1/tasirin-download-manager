@@ -3335,19 +3335,6 @@ function fsNavigate(path) {
   loadFs();
 }
 
-function parentFsPath(p) {
-  if (!p) return '';
-  if (p.startsWith('m:')) {
-    const rel = p.slice(2);
-    const idx = rel.lastIndexOf('/');
-    if (idx < 0) return '';
-    return 'm:' + rel.slice(0, idx);
-  }
-  const idx = p.lastIndexOf('/');
-  const up = idx > 0 ? p.slice(0, idx) : '';
-  return (up === 'f:' || up === 'm:') ? '' : up;
-}
-
 function fsMsg(text, isErr) {
   fsStatus.textContent = text || '';
   fsStatus.style.color = isErr ? 'var(--red)' : 'var(--green)';
