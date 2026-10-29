@@ -428,10 +428,13 @@
 
   /* Baris tombol File Manager (judul halaman dihapus, judul
      pindah ke topbar mengikuti tab): blok .page-head kini duduk
-     di bawah breadcrumb lengket — tombol bulat kecil 35px rata
-     kanan, ikut tergulir bersama halaman (permintaan owner). */
+     di bawah breadcrumb lengket — hitungan item di kiri (pindah
+     dari ujung breadcrumb, permintaan owner), tombol bulat kecil
+     35px rata kanan, ikut tergulir bersama halaman. */
   #fsView .page-head {
- justify-content: flex-end; padding-top: 0; padding-bottom: 0; }
+ justify-content: space-between; padding-top: 0; padding-bottom: 0; }
+  #fsView .page-head .count {
+ margin-left: 0; font-size: 13px; color: var(--ink); white-space: nowrap; }
   #fsView .page-head .more-btn {
  width: 35px; height: 35px; }
   #fsView .page-head .more-btn svg {
@@ -564,14 +567,12 @@
   .fs-path {
  display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 8px; margin-bottom: 6px; overflow-x: auto; scrollbar-width: none; }
 
-  /* Baris breadcrumb + hitungan item di ujung kanan (hitungan
-     pindah dari judul halaman yang dihapus). */
+  /* Baris breadcrumb (hitungan item kini di kiri baris tombol
+     di bawahnya, bukan lagi di ujung baris ini). */
   .fs-pathrow {
  display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .fs-pathrow .fs-path {
  flex: 1; min-width: 0; margin-bottom: 0; }
-  .fs-pathrow .count {
- margin-left: 0; white-space: nowrap; }
 
   .fs-path::-webkit-scrollbar {
  display: none; }
@@ -1795,12 +1796,13 @@
 
   <div id="fsView" class="hidden">
   <div id="fsSticky" class="fs-sticky">
-  <div class="fs-pathrow"><div id="fsPath" class="fs-path"></div><span class="count" id="fsCount"></span></div>
+  <div class="fs-pathrow"><div id="fsPath" class="fs-path"></div></div>
   <div id="fsSearchRow" class="fs-search-row hidden">
     <input id="fsSearchInput" type="search" placeholder="Search this folder\u2026" aria-label="Search files">
   </div>
   </div>
   <div class="gal-toolbar page-head">
+    <span class="count" id="fsCount"></span>
     <div class="more-wrap head-actions">
       <button id="fsHomeBtn" type="button" class="more-btn" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></button>
       <button id="fsUpFileBtn" type="button" class="more-btn" title="Upload file" aria-label="Upload file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
