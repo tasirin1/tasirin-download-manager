@@ -1131,3 +1131,4 @@
 - **Progress slider** — Perbesar area geser, pertegas posisi putar, dan tambahkan gaya Firefox tanpa mengubah perilaku pemutar.
 
 > Entri lama (2026-08-22 dan sebelumnya) diarsipkan di `CHANGELOG.archive.md`.
+- **ui(remote): tombol Upload File/Folder dan Search terlihat di File Manager** -- Ketiga aksi itu keluar dari menu titik tiga menjadi baris tombol berbentuk pil (ikon + label, tinggi 44px) di bawah jalur folder, tetap menempel saat daftar digulir: Upload File/Folder memicu pemilih bawaan browser persis seperti cabang menu lama (folder tujuan wajib terbuka, tombol upload bersembunyi di mode read-only), dan tombol Search adalah tombol lama yang dipindah tempat (perilaku buka/tutup baris pencarian tak berubah). Menu titik tiga kini hanya berisi Location, New Folder, Select, dan Compact (tanpa issue, permintaan langsung owner).
