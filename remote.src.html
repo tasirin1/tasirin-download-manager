@@ -4369,6 +4369,11 @@ function openMovePicker(items) {
 function closeMovePicker() {
   moveModal.classList.add('hidden');
   moveItems = [];
+  // Batalkan loop paginasi yang sedang berjalan (issue #656): tanpa
+  // menaikkan nomor urut, pemeriksaan seq di movePickOpen tetap lolos
+  // dan request halaman berikutnya terus berjalan di latar walau
+  // picker sudah ditutup.
+  movePickSeq++;
 }
 
 function renderMoveCrumbs(p, el) {

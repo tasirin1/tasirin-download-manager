@@ -1118,6 +1118,7 @@
 - **fix(hls): PTS video writeAll dihitung per frame dari total EXTINF** -- langkah `stepUs` terpotong yang membuang sisa `totalUs mod frameCount` (timeline video memendek sampai ~0,3 dtk pada 2 jam/60fps, desync vs audio) diganti `frameIndex * totalUs / videoFrameCount`, pola eksak yang sama dengan sisi audio #638 (issue #653).
 - **fix(remote): seleksi batch Downloads yang tersembunyi filter/pencarian ditandai eksplisit** -- hitungan bar batch kini menampilkan "(N hidden by filter/search)" dan dialog Delete selected menyebut berapa item terpilih yang sedang tersembunyi, karena aksi massal tetap bekerja atas seluruh seleksi walau barisnya tidak tampil (sibling #632) (issue #654).
 - **fix(remote): move picker berhenti memuat sesudah blok folder selesai** -- listing server selalu menempatkan folder sebelum berkas, jadi loop paginasi kini berhenti di halaman pertama yang memuat entri non-folder untuk path non-root; folder berisi ribuan berkas tidak lagi memicu belasan request yang pasti dibuang dan catatan "Too many entries" tidak lagi muncul saat daftar folder sebenarnya lengkap (issue #655).
+- **fix(remote): menutup move picker kini membatalkan loop paginasinya** -- `closeMovePicker` menaikkan `movePickSeq` sehingga iterasi paginasi #642 berhenti di pemeriksaan urutan berikutnya, bukan terus meminta halaman di latar sampai batas 5.000 sesudah picker ditutup (issue #656).
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 ### Fixed
 - **Seek zen mode** — Sembunyikan tombol modal dan daftar video berikutnya selama dua-tap lompatan durasi.
