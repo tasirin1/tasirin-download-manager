@@ -438,17 +438,28 @@ def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--check":
         problems = []
 
-        if OUT.exists() and OUT.read_text(encoding="utf-8") != minified:
+        # OUT hilang wajib vonis bernama (issue #626): dulu
+        # perbandingan sinkron melewatkannya diam-diam dan
+        # node_check/scan_remote membacanya tanpa penjaga sehingga
+        # gerbang mati traceback FileNotFoundError — kelas gerbang
+        # yang tak membedakan berkas hilang dari rusak.
+        if not OUT.exists():
+            problems.append(
+                f"{OUT.name} hilang — aset terbit wajib ada dan ter-commit "
+                "berpasangan dengan remote.src.html; bangkitkan dengan: "
+                "python3 scripts/prepare_remote.py"
+            )
+        elif OUT.read_text(encoding="utf-8") != minified:
             problems.append(
                 f"{OUT.name} TIDAK sinkron dengan remote.src.html — "
                 "jalankan: python3 scripts/prepare_remote.py lalu commit keduanya."
             )
 
-        js_errors = node_check()
+        js_errors = node_check() if OUT.exists() else []
         if js_errors:
             problems.append("node --check gagal: " + " | ".join(js_errors))
 
-        remote_hits = scan_remote()
+        remote_hits = scan_remote() if OUT.exists() else []
         if remote_hits:
             problems.append(
                 "remote.html memuat kata Indonesia: "
