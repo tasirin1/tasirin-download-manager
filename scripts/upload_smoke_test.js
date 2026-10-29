@@ -12,7 +12,7 @@ const vm = require('vm');
 
 const SRC = path.resolve(__dirname, '..', 'remote.src.html');
 const html = fs.readFileSync(SRC, 'utf8');
-const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+const blocks = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
 if (blocks.length < 2) {
   console.error('FAIL: remote.src.html tidak punya blok <script> utama');
   process.exit(1);

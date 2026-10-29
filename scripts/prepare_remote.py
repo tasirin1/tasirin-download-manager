@@ -94,20 +94,20 @@ def minify_html(html: str) -> str:
 
     def shield_script(match):
         block = match.group(0)
-        inner = re.match(r"<script>(.*)</script>", block, re.S)
+        inner = re.match(r"(<script[^>]*>)(.*)</script>", block, re.S)
         if inner:
-            block = "<script>" + minify_js(inner.group(1)) + "</script>"
+            block = inner.group(1) + minify_js(inner.group(2)) + "</script>"
         scripts.append(block)
         return "\x01%d\x01" % (len(scripts) - 1)
 
     # Blok <script> dijaga utuh: minifier tidak boleh menyentuh isi JS
     # (string JS bisa mengandung "> <" yang harus tetap utuh).
-    html = re.sub(r"<script>.*?</script>", shield_script, html, flags=re.S)
+    html = re.sub(r"<script[^>]*>.*?</script>", shield_script, html, flags=re.S)
 
     def css_repl(match):
-        return "<style>" + minify_css(match.group(1)) + "</style>"
+        return match.group(1) + minify_css(match.group(2)) + "</style>"
 
-    html = re.sub(r"<style>(.*?)</style>", css_repl, html, flags=re.S)
+    html = re.sub(r"(<style[^>]*>)(.*?)</style>", css_repl, html, flags=re.S)
     html = re.sub(r">\s+<", "><", html)
 
     def unshield(match):
@@ -284,7 +284,7 @@ def strip_comments(text: str) -> str:
     def bersihkan(match):
         return _buang_komentar_js_src(match.group(0))
 
-    return re.sub(r"<script>.*?</script>", bersihkan, text, flags=re.S)
+    return re.sub(r"<script[^>]*>.*?</script>", bersihkan, text, flags=re.S)
 
 
 def scan_remote() -> list:
@@ -345,7 +345,7 @@ def scan_kotlin() -> list:
 def node_check() -> list:
     errors = []
     html = OUT.read_text(encoding="utf-8")
-    scripts = re.findall(r"<script>(.*?)</script>", html, re.S)
+    scripts = re.findall(r"<script[^>]*>(.*?)</script>", html, re.S)
     for i, script in enumerate(scripts):
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
             f.write(script)
