@@ -560,16 +560,7 @@
   .fs-sticky {
  position: sticky; top: 0; z-index: 25; background: var(--bg); padding: 6px 0 8px; margin: -6px 0 2px; }
 
-  /* Baris tombol aksi terlihat File Manager (Upload File/Folder +
-     Search di luar menu titik tiga, permintaan owner). */
-  .fs-action-row {
- display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
-  .fs-act-btn {
- display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--primary); font-size: 13px; font-weight: 700; cursor: pointer; }
-  .fs-act-btn .btn-ico {
- width: 16px; height: 16px; display: inline-flex; }
-  .fs-act-btn .btn-ico svg {
- width: 16px; height: 16px; }
+
 
   .fs-path {
  display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 8px; margin-bottom: 6px; overflow-x: auto; scrollbar-width: none; }
@@ -1808,6 +1799,9 @@
     <div class="more-wrap head-actions">
       <button id="fsHomeBtn" type="button" class="more-btn" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></button>
       <button id="fsUpBtn" type="button" class="more-btn" title="Up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
+      <button id="fsUpFileBtn" type="button" class="more-btn" title="Upload file" aria-label="Upload file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
+      <button id="fsUpDirBtn" type="button" class="more-btn" title="Upload folder" aria-label="Upload folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9.5 15 12 12.5 14.5 15"/><line x1="12" y1="12.5" x2="12" y2="17"/></svg></button>
+      <button id="fsSearchBtn" type="button" class="more-btn" title="Search" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></button>
       <span class="fs-more-wrap">
       <button id="fsToolsBtn" class="fs-more-btn" type="button" aria-label="File manager tools" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button>
       <div id="fsToolsMenu" class="fs-tools-menu hidden">
@@ -1828,11 +1822,6 @@
   <div id="fsPath" class="fs-path"></div>
   <div id="fsSearchRow" class="fs-search-row hidden">
     <input id="fsSearchInput" type="search" placeholder="Search this folder\u2026" aria-label="Search files">
-  </div>
-  <div id="fsActionRow" class="fs-action-row hidden">
-    <button id="fsUpFileBtn" type="button" class="fs-act-btn"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span> Upload File</button>
-    <button id="fsUpDirBtn" type="button" class="fs-act-btn"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9.5 15 12 12.5 14.5 15"/><line x1="12" y1="12.5" x2="12" y2="17"/></svg></span> Upload Folder</button>
-    <button id="fsSearchBtn" type="button" class="fs-act-btn"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></span> Search</button>
   </div>
   </div>
   <input id="fsUploadFile" type="file" class="hidden" multiple>
@@ -3161,7 +3150,6 @@ const fsLocation = document.getElementById('fsLocation');
 const fsMkdirBtn = document.getElementById('fsMkdirBtn');
 const fsUploadFile = document.getElementById('fsUploadFile');
 const fsUploadDir = document.getElementById('fsUploadDir');
-const fsActionRow = document.getElementById('fsActionRow');
 const fsUpFileBtn = document.getElementById('fsUpFileBtn');
 const fsUpDirBtn = document.getElementById('fsUpDirBtn');
 let fsLocations = [];
@@ -3456,7 +3444,7 @@ fsToolsMenu.addEventListener('click', function (e) {
   if (e.target.closest('.fs-loc-wrap')) return;
   closeFsToolsMenu();
 });
-// Tombol Upload terlihat di baris aksi (di luar menu titik tiga):
+// Tombol Upload bulat di header (berdampingan dengan titik tiga):
 // meniru persis cabang data-up lama — folder tujuan wajib terbuka
 // dulu, lalu pemilih berkas/folder bawaan browser yang dibuka.
 function fsTriggerUpload(dir) {
@@ -3510,11 +3498,12 @@ async function loadFs() {
     fsToolsBtn.classList.toggle('hidden', !fsPath);
     fsSelectBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
     fsMkdirBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
-    // Baris tombol aksi terlihat: tampil hanya saat folder terbuka;
-    // tombol upload ikut bersembunyi di mode read-only, Search tetap.
-    fsActionRow.classList.toggle('hidden', !fsPath);
-    fsUpFileBtn.classList.toggle('hidden', serverReadOnly);
-    fsUpDirBtn.classList.toggle('hidden', serverReadOnly);
+    // Tombol bulat header (Upload File/Folder + Search di samping
+    // titik tiga): tampil hanya saat folder terbuka, mengikuti pola
+    // Home/Up; tombol upload ikut bersembunyi di mode read-only.
+    fsUpFileBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
+    fsUpDirBtn.classList.toggle('hidden', !fsPath || serverReadOnly);
+    fsSearchBtn.classList.toggle('hidden', !fsPath);
     fsItems = data.items || [];
     // Offset halaman berikutnya mulai sesudah halaman pertama ini; tanpa ini
     // fsLoadMore meminta offset=0 lagi (halaman pertama dobel, sisa berkas
