@@ -758,12 +758,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun logout(): Response {
-        // Logout merotasi secret sesi = mutasi state, jadi ikut
-        // ditahan mode read-only (issue #694).
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
-        appendLog("LOGOUT")
-        StoragePrefs.rotateServerSessionSecret(context)
-        synchronized(sessionSecretLock) { cachedSessionSecret = null }
+        // Mode read-only (issue #706): secret bersama TIDAK dirotasi
+        // (itu mutasi global yang ditahan #694), tetapi sesi pemanggil
+        // ini tetap diakhiri lewat penghapusan cookie di bawah — kunci
+        // idle otomatis klien bergantung padanya; tanpa ini, arahan ke
+        // / sesudah "logout" yang ditolak langsung menyajikan halaman
+        // penuh lagi dan kunci idle menjadi no-op.
+        val readOnly = StoragePrefs.isServerReadOnly(context)
+        appendLog(if (readOnly) "LOGOUT (read-only: sesi lokal saja)" else "LOGOUT")
+        if (!readOnly) {
+            StoragePrefs.rotateServerSessionSecret(context)
+            synchronized(sessionSecretLock) { cachedSessionSecret = null }
+        }
         val r = newFixedLengthResponse(
             Response.Status.REDIRECT,
             "text/html",
