@@ -1836,7 +1836,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }.getOrNull()
             val base = if (canon != null) "fs:" + FS_PREFIX + canon else "fs:" + raw
             base + "|s:" + memoizedZipStamp(base) {
-                ZipCreator.zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
+                // Cap dihitung dari ejaan KANONIK yang sama dengan
+                // kunci (issue #980): path mentah klien bisa memuat
+                // varian /../ yang path absolut lipatannya berbeda
+                // untuk folder yang sama.
+                ZipCreator.zipFsSourceStamp(
+                    if (canon != null) File(canon) else File(raw.removePrefix(FS_PREFIX))
+                )
             }
         }
         val (input, total) = openZipStream(key) {

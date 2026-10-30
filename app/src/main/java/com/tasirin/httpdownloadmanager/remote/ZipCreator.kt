@@ -400,7 +400,13 @@ object ZipCreator {
             val dir = stack.removeLast()
             val canon = runCatching { dir.canonicalPath }.getOrNull() ?: dir.absolutePath
             if (!seen.add(canon)) continue
-            val children = dir.listFiles() ?: continue
+            // Anak diurutkan lebih dulu (issue #980): listFiles tak
+            // menjamin urutan dan lipatan hash peka-urutan — tanpa ini
+            // cap folder yang diam bisa berdenyut antarpermintaan.
+            // Pola pengurutan yang sama dengan zipFile.
+            val children = dir.listFiles()?.sortedWith(
+                Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
+            ) ?: continue
             for (child in children) {
                 if (count >= ZIP_STAMP_MAX_ENTRIES) {
                     truncated = true
