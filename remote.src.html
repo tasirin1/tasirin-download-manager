@@ -2885,6 +2885,7 @@ function mmSeekUI() {
 }
 
 function closeMedia() {
+  var wasOpen = mediaModal.classList.contains('open');
   saveVideoPos(mmCurrentToken);
   mmPlayer.style.setProperty('--mm-aspect', '56.25%');
   mmPlayer.style.filter = '';
@@ -2911,6 +2912,10 @@ function closeMedia() {
     try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {}
   }
   mmPopGuard();
+  // Kembalikan fokus ke sel pemicu (issue #975), berpasangan dengan
+  // push di openMedia; hanya bila modal memang terbuka agar tumpukan
+  // fokus permukaan lain tak ikut terkuras.
+  if (wasOpen) popReturnFocus();
 }
 
 document.getElementById('mmBack').addEventListener('click', closeMedia);
@@ -5684,7 +5689,19 @@ function openMedia(it, src, playlist) {
   }
   renderRelated(it);
   mediaModal.classList.add('open');
-  if (!modalAlreadyOpen) mmPushGuard();
+  if (!modalAlreadyOpen) {
+    mmPushGuard();
+    // Fokus wajib lepas dari sel pemicu (issue #975): sel adalah
+    // [tabindex], jadi penjaga handler tombol media menolak semua
+    // tombol pemutar dan Space/Enter malah mengklik ulang sel di
+    // balik modal (video termuat ulang). Simpan fokus untuk
+    // dikembalikan saat tutup (#947), lalu blur ke body agar
+    // tombol media dinilai dari body.
+    pushReturnFocus();
+    if (document.activeElement && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
+  }
   document.body.style.overflow = 'hidden';
 }
 

@@ -654,6 +654,7 @@ mmPaintSeek(ratio);
 mmTime.textContent = mmFmtTime(t) + ' / ' + mmFmtTime(d);
 }
 function closeMedia() {
+var wasOpen = mediaModal.classList.contains('open');
 saveVideoPos(mmCurrentToken);
 mmPlayer.style.setProperty('--mm-aspect', '56.25%');
 mmPlayer.style.filter = '';
@@ -680,6 +681,7 @@ if (document.fullscreenElement || document.webkitFullscreenElement) {
 try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {}
 }
 mmPopGuard();
+if (wasOpen) popReturnFocus();
 }
 document.getElementById('mmBack').addEventListener('click', closeMedia);
 document.getElementById('mmPlayerBack').addEventListener('click', closeMedia);
@@ -3091,7 +3093,13 @@ p.catch(function () { mmShowCtrl(); });
 }
 renderRelated(it);
 mediaModal.classList.add('open');
-if (!modalAlreadyOpen) mmPushGuard();
+if (!modalAlreadyOpen) {
+mmPushGuard();
+pushReturnFocus();
+if (document.activeElement && document.activeElement.blur) {
+document.activeElement.blur();
+}
+}
 document.body.style.overflow = 'hidden';
 }
 function renderRelated(current) {
