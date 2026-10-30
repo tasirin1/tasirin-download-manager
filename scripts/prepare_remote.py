@@ -20,6 +20,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "remote.src.html"
 OUT = ROOT / "app" / "src" / "main" / "assets" / "remote.html"
+VALUES_DIR = ROOT / "app" / "src" / "main" / "res" / "values"
+JAVA_DIR = ROOT / "app" / "src" / "main" / "java"
 
 # Kata Indonesia yang tidak boleh muncul di string UI (guard i18n).
 BANNED_ID = [
@@ -312,7 +314,7 @@ def scan_remote() -> list:
 
 def scan_xml() -> list:
     hits = []
-    for xml_path in sorted((ROOT / "app" / "src" / "main" / "res" / "values").glob("*.xml")):
+    for xml_path in sorted(VALUES_DIR.glob("*.xml")):
         text = xml_path.read_text(encoding="utf-8")
         text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
         for m in re.finditer(r"<string[^>]*>(.*?)</string>|<item>(.*?)</item>", text, re.S):
@@ -332,7 +334,7 @@ def scan_kotlin() -> list:
         r'"""[\s\S]*?"""|/\*.*?\*/|//[^\n]*|\'(?:[^\'\\\n]|\\.)*\''
         r'|"((?:[^"\\]|\\.)*)"', re.S
     )
-    for path in sorted((ROOT / "app" / "src" / "main" / "java").rglob("*.kt")):
+    for path in sorted(JAVA_DIR.rglob("*.kt")):
         src = path.read_text(encoding="utf-8")
         for m in token_re.finditer(src):
             lit = m.group(1)
@@ -470,6 +472,19 @@ def main() -> int:
                 "remote.html memuat kata Indonesia: "
                 + ", ".join(sorted({w for w, _ in remote_hits}))
             )
+        # Direktori sumber pindaian hilang wajib vonis bernama (issue
+        # #687): glob atas direktori yang tak ada menghasilkan daftar
+        # kosong yang terbaca "0 kata terlarang" sehingga gerbang lolos
+        # hampa — kelas yang sama dengan OUT hilang (#626), sisi sumber.
+        for scan_dir in (VALUES_DIR, JAVA_DIR):
+            if not scan_dir.is_dir():
+                problems.append(
+                    "direktori sumber pindaian hilang: "
+                    + str(scan_dir.relative_to(ROOT))
+                    + " — pindaian bahasa tidak menilai satu berkas pun; "
+                    "kembalikan direktorinya atau perbarui jalur pindaian "
+                    "di prepare_remote.py"
+                )
         xml_hits = scan_xml()
         if xml_hits:
             problems.append("values/*.xml memuat kata Indonesia: " + ", ".join(xml_hits))
