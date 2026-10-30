@@ -4505,16 +4505,35 @@ class DownloadEngine(appContext: Context) {
         // Token pertama yang sudah utuh (panjang sah sendirian) selalu
         // menang: gabungan hanya untuk hex yang memang terpotong
         // kelompok, bukan untuk menelan nama berkas hex sesudah hash
-        // yang sudah lengkap (issue #927).
-        if (labeledAlgo == null && tokens.size > 1 &&
-            tokens[0].length != 32 && tokens[0].length != 40 &&
-            tokens[0].length != 64
-        ) {
-            val joined = tokens.joinToString("")
-            if ((joined.length == 32 || joined.length == 40 || joined.length == 64) &&
-                joined.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
-            ) {
-                candidate = joined
+        // yang sudah lengkap (issue #927). Berlabel pun gabungan
+        // diizinkan, dengan syarat panjang gabungan persis panjang
+        // algoritma labelnya (issue #928).
+        if (tokens.size > 1) {
+            val labeledLen = when (labeledAlgo) {
+                "MD5" -> 32
+                "SHA-1" -> 40
+                "SHA-256" -> 64
+                else -> null
+            }
+            val joinWanted = if (labeledLen != null) {
+                candidate.length != labeledLen
+            } else {
+                candidate.length != 32 && candidate.length != 40 &&
+                    candidate.length != 64
+            }
+            if (joinWanted) {
+                val joined = tokens.joinToString("")
+                val lenOk = if (labeledLen != null) {
+                    joined.length == labeledLen
+                } else {
+                    joined.length == 32 || joined.length == 40 ||
+                        joined.length == 64
+                }
+                if (lenOk &&
+                    joined.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
+                ) {
+                    candidate = joined
+                }
             }
         }
         // Tanpa label: tebak algoritma dari panjang hex polos
