@@ -887,6 +887,11 @@ const cells = galleryGrid.querySelectorAll('.gal-cell');
 if (cells.length <= GAL_MAX_CELLS) return;
 let h = 0;
 const drop = cells.length - GAL_MAX_CELLS;
+const active = document.activeElement;
+const focusDropped = !!(active && active.classList &&
+active.classList.contains('gal-cell') &&
+Array.prototype.indexOf.call(cells, active) >= 0 &&
+Array.prototype.indexOf.call(cells, active) < drop);
 for (let i = 0; i < drop; i++) {
 h += cells[i].offsetHeight + GAL_ROW_GAP;
 }
@@ -899,6 +904,10 @@ cells[i].remove();
 }
 galTopHidden += drop;
 galleryGrid.style.paddingTop = (galTopPad() + h) + 'px';
+if (focusDropped) {
+const survivor = galleryGrid.querySelector('.gal-cell');
+if (survivor) survivor.focus({ preventScroll: true });
+}
 }
 function restoreGalleryTop() {
 if (galTopHidden <= 0) return;

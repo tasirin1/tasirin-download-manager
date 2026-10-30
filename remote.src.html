@@ -3158,6 +3158,14 @@ function trimGalleryTop() {
   if (cells.length <= GAL_MAX_CELLS) return;
   let h = 0;
   const drop = cells.length - GAL_MAX_CELLS;
+  // Sel terfokus yang ikut dibuang menyeret fokus ke body diam-diam
+  // (issue #985): catat posisinya agar fokus dipindah ke sel pertama
+  // yang bertahan sesudah pemangkasan.
+  const active = document.activeElement;
+  const focusDropped = !!(active && active.classList &&
+    active.classList.contains('gal-cell') &&
+    Array.prototype.indexOf.call(cells, active) >= 0 &&
+    Array.prototype.indexOf.call(cells, active) < drop);
   // Baca dulu semuanya, hapus belakangan: baca-tulis selang-seling memaksa
   // reflow sinkron per cell (layout thrash) sehingga scroll jank di WebView tua.
   for (let i = 0; i < drop; i++) {
@@ -3172,6 +3180,10 @@ function trimGalleryTop() {
   }
   galTopHidden += drop;
   galleryGrid.style.paddingTop = (galTopPad() + h) + 'px';
+  if (focusDropped) {
+    const survivor = galleryGrid.querySelector('.gal-cell');
+    if (survivor) survivor.focus({ preventScroll: true });
+  }
 }
 function restoreGalleryTop() {
   if (galTopHidden <= 0) return;
