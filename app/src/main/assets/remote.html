@@ -3977,7 +3977,7 @@ nameEl.innerHTML = (dlPinned.has(it.id) ? '<span class="pin-indicator">' + UI_IC
 }
 const errBox = li._err || (li._err = li.querySelector('.err'));
 if (errBox) {
-const errText = errBox.querySelector('.err-text');
+const errText = errBox._errText || (errBox._errText = errBox.querySelector('.err-text'));
 if (errText) {
 if (errText.textContent !== (it.error || '')) errText.textContent = it.error || '';
 } else if (errBox.textContent !== it.error) {

@@ -6725,7 +6725,10 @@ function patchRowSub(li, it) {
     // sufiks tak terhapus patch pertama sesudah rebuild (issue #567).
     // Dulu penjaga membandingkan textContent utuh terhadap error polos
     // sehingga untuk FAILED ia selalu menembak dan meratakan span-nya.
-    const errText = errBox.querySelector('.err-text');
+    // Di-cache pada kotak error (issue #1020): node lain di fungsi ini
+    // semua ter-cache; kotak .err hanya dibuat saat rebuild baris, jadi
+    // cache-nya tak bisa basi selama baris hidup.
+    const errText = errBox._errText || (errBox._errText = errBox.querySelector('.err-text'));
     if (errText) {
       if (errText.textContent !== (it.error || '')) errText.textContent = it.error || '';
     } else if (errBox.textContent !== it.error) {
