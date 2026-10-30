@@ -336,6 +336,13 @@ object SocialMediaExtractor {
     fun isHentaiHavenUrl(url: String): Boolean =
         HH_HOST_RE.containsMatchIn(url.lowercase(Locale.ROOT))
 
+    /** True bila URL adalah halaman YouTube — host ketat memakai
+     *  YT_HOST_RE yang sama dengan penentu isSocialMediaUrl dan
+     *  dispatch extract, agar server (socialOptions) dan ekstraktor
+     *  tak pernah berbeda vonis (issue #828). */
+    fun isYouTubeUrl(url: String): Boolean =
+        YT_HOST_RE.containsMatchIn(url.lowercase(Locale.ROOT))
+
     /** Ekstrak URL terbaik (satu opsi). */
     suspend fun extract(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
         // Batas keras total seperti extractAll: rantai fallback (page/API

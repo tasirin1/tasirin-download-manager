@@ -1141,7 +1141,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (url.isEmpty()) {
             return jsonResponse(JSONObject().put("ok", false).put("error", "empty url"))
         }
-        val isYouTube = url.contains("youtube.com/") || url.contains("youtu.be/")
+        // Berbasis host (issue #828, kembaran #818 di sisi web):
+        // substring atas URL utuh salah mengklasifikasikan tautan
+        // sosmed lain yang path/query-nya memuat youtube.com/.
+        val isYouTube = SocialMediaExtractor.isYouTubeUrl(url)
         if (isYouTube) {
             // YouTube: daftar resolusi tetap (sesuai native app)
             val arr = JSONArray()
