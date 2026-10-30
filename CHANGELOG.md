@@ -666,6 +666,7 @@
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **docs(ui): perbaiki empat komentar salah fakta yang lolos #697 (issue #713)** -- Komentar tema di MainActivity ("tema terang" -> gelap), induk tema di themes.xml (bukan DayNight melainkan Theme.AppCompat.NoActionBar + MODE_NIGHT_YES), kompat splash (Android 6+/minSdk 23, bukan 5+), dan cakupan signature lama WebExtract (hanya API 23) kini sesuai fakta kode.
 - **fix(ui): sorotan pencarian Log kini terbaca, merah ERROR ikut palet (issue #712)** -- Kecocokan pencarian kini berpasangan latar kuning pucat + teks gelap #212121 (sebelumnya teks nyaris putih tema di atasnya, kontras +/-1,2:1); baris ERROR/FAILED memakai merah palet gelap #F87171 alih-alih `Color.RED` mentah.
 - **docs(ui): hapus komentar grup yatim sisa #696 di colors.xml (issue #711)** -- Komentar "Lingkaran ikon tipe file" yang grupnya sudah terhapus kini dibuang; tak lagi melayang mengesankan ada grup color yang hilang.
 - **refactor(ui): hapus ids.xml berisi id mati progress_animator (issue #710)** -- Satu-satunya isi `values/ids.xml` adalah id sisa animasi progres ObjectAnimator lama tanpa satu pun referensi; berkas dihapus seluruhnya.

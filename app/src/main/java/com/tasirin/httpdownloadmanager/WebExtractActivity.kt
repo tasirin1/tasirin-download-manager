@@ -127,7 +127,7 @@ class WebExtractActivity : AppCompatActivity() {
                 return host.lowercase(Locale.ROOT).endsWith("." + allowedHostLower)
             }
 
-            // Signature lama melayani API 21-23; versi request melayani 24+.
+            // Signature lama hanya terpanggil di API 23 (minSdk 23); versi request melayani 24+.
             // Blokir navigasi keluar host (iklan/redirect): ekstraksi cukup
             // membaca DOM halaman awal, tak perlu menjelajah situs lain.
             @Suppress("DEPRECATION")

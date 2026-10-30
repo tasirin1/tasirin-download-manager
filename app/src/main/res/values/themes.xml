@@ -1,7 +1,7 @@
 <resources>
     <!-- Tema AppCompat murni (tanpa library material): APK lebih kecil.
          Tema GELAP menyeluruh (keputusan owner 2026-10-30, menyusul desain
-         ulang layar utama): induk DayNight + MODE_NIGHT_YES dipaksa di App
+         ulang layar utama): induk Theme.AppCompat.NoActionBar + MODE_NIGHT_YES dipaksa di App
          agar dialog, menu titik tiga, dan semua layar ikut gelap. -->
     <style name="Theme.HttpDownloadManager" parent="Theme.AppCompat.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
@@ -73,7 +73,7 @@
     </style>
 
     <!-- Splash klasik tanpa library core-splashscreen: windowBackground
-         langsung dari tema (kompat Android 5+). -->
+         langsung dari tema (kompat Android 6+, minSdk 23). -->
     <style name="Theme.HttpDownloadManager.Splash" parent="Theme.HttpDownloadManager">
         <item name="android:windowBackground">@drawable/splash_bg</item>
     </style>

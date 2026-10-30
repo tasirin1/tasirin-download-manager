@@ -210,7 +210,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Splash klasik: tema splash dari manifest untuk window awal, lalu
-        // pindah ke tema terang sebelum konten digambar (lihat themes.xml).
+        // pindah ke tema aplikasi (gelap) sebelum konten digambar (lihat themes.xml).
         setTheme(R.style.Theme_HttpDownloadManager)
         super.onCreate(savedInstanceState)
         pendingMoveId = savedInstanceState?.getString(STATE_PENDING_MOVE_ID)
