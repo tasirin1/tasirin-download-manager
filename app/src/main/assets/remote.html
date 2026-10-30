@@ -4175,6 +4175,7 @@ showToast('Action failed: ' + e.message, 4000, 'error');
 }
 const shareModal = document.getElementById('shareModal');
 let currentShareToken = '';
+let shareViewSeq = 0;
 let shareItemSeq = 0;
 async function shareItem(id) {
 const seq = ++shareItemSeq;
@@ -4192,6 +4193,7 @@ showConfirm('Failed to create link', (data && data.error) || 'File not found.', 
 return;
 }
 currentShareToken = data.token;
+shareViewSeq++;
 const url = location.origin + '/share/' + data.token;
 document.getElementById('shareText').textContent =
 'Link valid for ' + data.expiresInHours + ' hours. Anyone with this link can download the file without a PIN.';
@@ -4210,6 +4212,7 @@ showConfirm('Failed to create link', String(e), 'OK', function () {}, { danger: 
 }
 }
 function closeShare() {
+shareViewSeq++;
 shareModal.classList.add('hidden');
 }
 document.getElementById('shareClose').addEventListener('click', closeShare);
@@ -4238,17 +4241,19 @@ let shareRevoking = false;
 const shareListRevoking = new Set();
 document.getElementById('shareRevoke').addEventListener('click', async function () {
 if (!currentShareToken || shareRevoking) return;
+const revokedToken = currentShareToken;
+const viewSeq = shareViewSeq;
 shareRevoking = true;
 try {
 const res = await fetchTimeout(API + '/api/share_revoke', {
 method: 'POST',
-body: new URLSearchParams({token: currentShareToken}),
+body: new URLSearchParams({token: revokedToken}),
 headers: {'X-Requested-With': 'XMLHttpRequest'}
 }, 15000);
 const data = await res.json();
 if (data && data.ok) {
-currentShareToken = '';
-closeShare();
+if (currentShareToken === revokedToken) currentShareToken = '';
+if (shareViewSeq === viewSeq) closeShare();
 showToast('Link revoked', 2500);
 } else {
 showToast('Failed to revoke link', 3000, 'error');
@@ -4325,6 +4330,7 @@ shareListRevoking.delete(sid);
 refreshShareList();
 }
 function openShareManager() {
+shareViewSeq++;
 currentShareToken = '';
 document.getElementById('shareText').textContent =
 'Share links stay valid until they expire or are revoked.';

@@ -6892,6 +6892,11 @@ async function doActionNow(id, action, extra) {
 
 const shareModal = document.getElementById('shareModal');
 let currentShareToken = '';
+// Generasi tampilan modal share (issue #894): bertambah tiap
+// permukaan #shareModal berganti (share sesi tampil, manager dibuka,
+// modal ditutup). Penyelesaian async menangkap nilainya agar tidak
+// bertindak atas tampilan yang sudah bukan miliknya.
+let shareViewSeq = 0;
 // Penjaga urut shareItem (meniru shareListSeq): dua Share beruntun untuk
 // item berbeda tak boleh saling menimpa modal — respons yang selesai
 // terakhir belum tentu milik klik terakhir (issue #680).
@@ -6912,6 +6917,7 @@ async function shareItem(id) {
       return;
     }
     currentShareToken = data.token;
+    shareViewSeq++;
     const url = location.origin + '/share/' + data.token;
     document.getElementById('shareText').textContent =
       'Link valid for ' + data.expiresInHours + ' hours. Anyone with this link can download the file without a PIN.';
@@ -6930,6 +6936,7 @@ async function shareItem(id) {
   }
 }
 function closeShare() {
+  shareViewSeq++;
   shareModal.classList.add('hidden');
 }
 document.getElementById('shareClose').addEventListener('click', closeShare);
@@ -6972,17 +6979,22 @@ let shareRevoking = false;
 const shareListRevoking = new Set();
 document.getElementById('shareRevoke').addEventListener('click', async function () {
   if (!currentShareToken || shareRevoking) return;
+  const revokedToken = currentShareToken;
+  const viewSeq = shareViewSeq;
   shareRevoking = true;
   try {
     const res = await fetchTimeout(API + '/api/share_revoke', {
       method: 'POST',
-      body: new URLSearchParams({token: currentShareToken}),
+      body: new URLSearchParams({token: revokedToken}),
       headers: {'X-Requested-With': 'XMLHttpRequest'}
     }, 15000);
     const data = await res.json();
     if (data && data.ok) {
-      currentShareToken = '';
-      closeShare();
+      if (currentShareToken === revokedToken) currentShareToken = '';
+      // Tutup hanya bila tampilan modal masih milik share sesi ini
+      // (issue #894): manager yang dibuka pengguna di sela POST
+      // tidak boleh tertutup dari hadapannya.
+      if (shareViewSeq === viewSeq) closeShare();
       showToast('Link revoked', 2500);
     } else {
       showToast('Failed to revoke link', 3000, 'error');
@@ -7067,6 +7079,7 @@ async function revokeShareSid(sid) {
   refreshShareList();
 }
 function openShareManager() {
+  shareViewSeq++;
   currentShareToken = '';
   document.getElementById('shareText').textContent =
     'Share links stay valid until they expire or are revoked.';
