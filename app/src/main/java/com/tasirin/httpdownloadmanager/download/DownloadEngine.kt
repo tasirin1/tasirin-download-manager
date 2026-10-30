@@ -4479,9 +4479,7 @@ class DownloadEngine(appContext: Context) {
         // dengan spasi di sekitar titik dua ikut diterima — label
         // 'SHA-256: <hex>' itulah yang ditampilkan banyak situs, dan
         // sebelumnya gugur diam-diam menjadi "tanpa checksum".
-        val labelMatch = Regex(
-            "^(md5|sha-?1|sha-?256)\\s*:\\s*", RegexOption.IGNORE_CASE
-        ).find(clean)
+        val labelMatch = CHECKSUM_LABEL_RE.find(clean)
         val labeledAlgo: String?
         val rest0: String
         if (labelMatch != null) {
@@ -4501,10 +4499,17 @@ class DownloadEngine(appContext: Context) {
         // '<hex> *file.zip', issue #925; pola yang sama dengan
         // sidecarChecksum #347). Hex berkelompok-spasi diterima hanya
         // bila SEMUA token hex dan gabungannya berpanjang sah.
-        val tokens = rest0.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val tokens = rest0.trim().split(WHITESPACE_RE).filter { it.isNotEmpty() }
         if (tokens.isEmpty()) return null
         var candidate = tokens[0]
-        if (labeledAlgo == null && tokens.size > 1) {
+        // Token pertama yang sudah utuh (panjang sah sendirian) selalu
+        // menang: gabungan hanya untuk hex yang memang terpotong
+        // kelompok, bukan untuk menelan nama berkas hex sesudah hash
+        // yang sudah lengkap (issue #927).
+        if (labeledAlgo == null && tokens.size > 1 &&
+            tokens[0].length != 32 && tokens[0].length != 40 &&
+            tokens[0].length != 64
+        ) {
             val joined = tokens.joinToString("")
             if ((joined.length == 32 || joined.length == 40 || joined.length == 64) &&
                 joined.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
@@ -4910,6 +4915,11 @@ class DownloadEngine(appContext: Context) {
     }
 
     companion object {
+        // Dikompilasi sekali: parseChecksum dipanggil per verifikasi
+        // (advis gerbang pola-boros atas Regex per-panggil, putaran 62).
+        private val CHECKSUM_LABEL_RE =
+            Regex("^(md5|sha-?1|sha-?256)\\s*:\\s*", RegexOption.IGNORE_CASE)
+        private val WHITESPACE_RE = Regex("\\s+")
         private val CONTENT_DISPOSITION_STAR = Regex("filename\\*=([^;]+)")
         private val DEFAULT_NAME_FORMAT: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
             SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
