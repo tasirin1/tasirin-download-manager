@@ -85,15 +85,26 @@ class App : Application() {
                 .build()
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    networkUp = true
+                    // Himpunan network tersedia (issue #954): callback
+                    // jalur request (API 23) bersifat per-network, jadi
+                    // keadaan naik/turun wajib agregat himpunan, bukan
+                    // event terakhir.
+                    synchronized(availableNetworks) {
+                        availableNetworks.add(network)
+                        networkUp = true
+                    }
                     runCatching { engine.resumeAutoPaused() }
                 }
 
                 override fun onLost(network: Network) {
                     // Bendera konektivitas untuk gerbang failover mirror
-                    // engine (issue #952). Default network callback hanya
-                    // menembak onLost bila tak ada jaringan bawaan lain.
-                    networkUp = false
+                    // engine (issue #952): turun hanya bila himpunan
+                    // kosong — network lain yang masih hidup menahan
+                    // networkUp tetap true (issue #954).
+                    synchronized(availableNetworks) {
+                        availableNetworks.remove(network)
+                        networkUp = availableNetworks.isNotEmpty()
+                    }
                 }
             }
             networkCallback = callback
@@ -126,6 +137,12 @@ class App : Application() {
         @Volatile
         var networkUp: Boolean = true
             private set
+
+        // Network yang saat ini tersedia menurut callback (issue #954):
+        // registrasi mengulang onAvailable untuk network yang sudah
+        // hidup, jadi himpunan terisi sendiri sejak awal; semua akses
+        // disinkronkan pada himpunan ini.
+        private val availableNetworks = mutableSetOf<Network>()
         const val CRASH_LOG_FILE = "crash.log"
         private const val THUMB_CLEANUP_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
         // StaticFieldLeak: sengaja ditahan — kedua objek menyimpan Application
