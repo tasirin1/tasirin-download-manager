@@ -7044,7 +7044,11 @@ function probeSocialQuality() {
   socialVideoOptions = [];
   socialPhotoOptions = [];
   socialDebounce = setTimeout(function () {
-    var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
+    // Berbasis host (issue #818, pola #784): substring atas URL utuh
+    // salah mengklasifikasikan tautan sosial lain yang path/query-nya
+    // memuat teks youtube.com/ sebagai YouTube.
+    var _sosh = socialHost(u);
+    var isYT = !!_sosh && (socialHostMatches(_sosh, 'youtube.com') || _sosh === 'youtu.be');
     if (isYT) {
       // YouTube: static resolution list (no photos)
       socialPlatform = 'youtube';

@@ -4362,7 +4362,8 @@ socialPlatform = '';
 socialVideoOptions = [];
 socialPhotoOptions = [];
 socialDebounce = setTimeout(function () {
-var isYT = u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1;
+var _sosh = socialHost(u);
+var isYT = !!_sosh && (socialHostMatches(_sosh, 'youtube.com') || _sosh === 'youtu.be');
 if (isYT) {
 socialPlatform = 'youtube';
 socialVideoOptions = [
