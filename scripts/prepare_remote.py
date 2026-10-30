@@ -561,7 +561,19 @@ def main() -> int:
         )
         return 0
 
-    OUT.write_text(minified, encoding="utf-8")
+    try:
+        OUT.write_text(minified, encoding="utf-8")
+    except OSError as exc:
+        # Direktori assets hilang/ter-rename di clone lokal (issue
+        # #758): vonis bernama + petunjuk, bukan traceback mentah —
+        # sejajar penjaga baca SRC (BerkasTakTerbaca) dan mode --check
+        # untuk kasus remote.html yang hilang.
+        print(
+            f"ERROR: gagal menulis {OUT.relative_to(ROOT)} "
+            f"({exc.__class__.__name__}: {exc}). "
+            "Periksa direktori app/src/main/assets ada."
+        )
+        return 1
     print(
         f"OK: {SRC.name} -> {OUT.name} "
         f"({len(src_text.encode('utf-8'))} -> {len(minified.encode('utf-8'))} bytes)."
