@@ -1139,6 +1139,7 @@
 - **fix(remote): hapus geser per baris unduhan cukup satu konfirmasi** -- gestur geser kini memanggil doAction langsung; konfirmasi pembungkus tambahan yang tidak menyebut penghapusan berkas di perangkat dihapus, sehingga pengguna cukup menyetujui satu dialog yang lengkap (issue #672).
 - **fix(remote): teks konfirmasi hapus File Manager sesuai jenis item** -- kalimat "folder beserta isinya" kini hanya tampil untuk folder (hapus tunggal) atau bila seleksi batch memuat folder; berkas biasa tidak lagi diperingatkan seolah folder (issue #673).
 - **fix(download): invalidasi cache ZIP diulang sesudah relokasi organize** -- organizeIfEnabled kini menginvalidasi ulang dengan path final bila auto-sort memindahkan berkas terbit ke subfolder jenis; ZIP subfolder tujuan (keturunan folder terbit) sebelumnya lolos dari invalidasi terarah #668 dan menyajikan isi basi sampai 60 detik (issue #674).
+- **fix(remote): kunci cache ZIP dikanonikkan dan ZIP satu-berkas ikut terinvalidasi** -- fsZip kini membangun kunci dari canonicalPath sehingga ejaan varian klien berbagi satu entri dan cocok dengan invalidasi terarah #668; invalidateZipCacheFor juga mencocokkan kunci yang sama persis dengan path berkas terbit agar ZIP satu-berkas pengganti ikut terbuang (issue #675).
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 ### Fixed
 - **Seek zen mode** — Sembunyikan tombol modal dan daftar video berikutnya selama dua-tap lompatan durasi.

@@ -1753,7 +1753,19 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             raw.startsWith(MS_PREFIX) -> raw.removePrefix(MS_PREFIX).trim('/').substringAfterLast('/')
             else -> File(raw.removePrefix(FS_PREFIX)).name
         }.ifEmpty { "folder" }
-        val key = "fs:" + raw
+        // Kunci cache memakai path KANONIK untuk berkas biasa: izin sudah
+        // menilai path kanonik, jadi ejaan varian dari klien (//, /../,
+        // beda huruf) harus berbagi satu entri dan cocok dengan
+        // perbandingan invalidasi terarah — kunci mentah membuat entri
+        // varian lolos terbuang dan ZIP basi tersaji (issue #675).
+        val key = if (raw.startsWith(MS_PREFIX)) {
+            "fs:" + raw
+        } else {
+            val canon = runCatching {
+                File(raw.removePrefix(FS_PREFIX)).canonicalPath
+            }.getOrNull()
+            if (canon != null) "fs:" + FS_PREFIX + canon else "fs:" + raw
+        }
         val (input, total) = openZipStream(key) {
             createTempZip { zos ->
                 if (raw.startsWith(MS_PREFIX)) {
@@ -2409,7 +2421,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val raw = key.removePrefix("fs:")
             if (!raw.startsWith(FS_PREFIX)) return@filter false
             val folder = raw.removePrefix(FS_PREFIX).trimEnd('/')
-            folder.isNotEmpty() && (folder == dir || dir.startsWith("$folder/"))
+            // folder == publishedFilePath menangkap ZIP SATU-BERKAS: kunci
+            // ZIP berkas adalah path berkas itu sendiri, yang tak pernah
+            // sama dengan folder induknya (issue #675).
+            folder.isNotEmpty() && (folder == dir || folder == publishedFilePath ||
+                dir.startsWith("$folder/"))
         }
         doomed.forEach { (key, entry) ->
             zipCache.remove(key)
