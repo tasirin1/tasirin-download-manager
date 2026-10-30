@@ -3484,6 +3484,8 @@ function renderFsCrumbs(p) {
       fsNavigate(decodeURIComponent(chip.dataset.path));
     });
   });
+  // Chip folder aktif wajib terlihat: gulir bar ke ujung (issue #775).
+  fsPathEl.scrollLeft = fsPathEl.scrollWidth;
 }
 
 async function loadFsLocations() {

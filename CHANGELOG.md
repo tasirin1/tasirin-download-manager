@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): breadcrumb Files kini menggulir ke chip folder aktif** -- Jalur bersarang bernama panjang bisa meluber melewati lebar layar dan chip folder saat ini tersembunyi di luar sisi kanan; `renderFsCrumbs` kini menggulir bar ke ujung setiap render (issue #775).
 - **fix(remote): lencana durasi & Resume galeri tidak lagi bisa tumpang tindih** -- Keduanya absolut di dasar thumbnail yang sama tanpa batas lebar sehingga di sel sempit (durasi format jam + "Resume from …") bisa bersentuhan; kini masing-masing dibatasi separuh lebar sel dengan elipsis (issue #774).
 - **fix(remote): petak ikon mode compact Files kini benar-benar 30x30 persegi** -- Aturan compact hanya menyetel `width`/`height` sehingga `flex-basis: 38px` dari aturan dasar menang dan petak menjadi 38x30 pipih; kini `flex-basis: 30px` ikut disetel (pola yang sama dengan compact Downloads #764) (issue #773).
 - **fix(remote): ikon APK di Files kini robot Android hijau seperti halaman utama & Downloads** -- Cabang APK `fsIconFor` sebelumnya glyph ponsel goresan indigo di petak biru; kini SVG petak gradasi hijau Android + robot putih yang sama persis dengan daftar unduhan (gradien `apkTileGfs`), latar petak Files transparan di kedua tema (issue #772).

@@ -1267,6 +1267,7 @@ chip.addEventListener('click', function () {
 fsNavigate(decodeURIComponent(chip.dataset.path));
 });
 });
+fsPathEl.scrollLeft = fsPathEl.scrollWidth;
 }
 async function loadFsLocations() {
 if (fsLocationsLoaded || fsLocationsLoading) return;
