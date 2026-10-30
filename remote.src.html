@@ -4201,7 +4201,7 @@ async function fsDownloadUrl(url) {
   var finalUrl = url;
   if (url.indexOf('/api/fs_zip') >= 0 || url.indexOf('/api/media_zip') >= 0) {
     try {
-      const r = await fetch(API + '/api/zip_token', {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      const r = await fetchTimeout(API + '/api/zip_token', {headers: {'X-Requested-With': 'XMLHttpRequest'}}, 15000);
       if (r.ok) {
         const d = await r.json();
         if (d && d.ok && d.zt) {
@@ -4505,11 +4505,11 @@ async function postFsAction(params) {
   try {
     const body = new URLSearchParams();
     Object.entries(params).forEach(function (e) { body.append(e[0], e[1]); });
-    const res = await fetch(API + '/api/fs_action', {
+    const res = await fetchTimeout(API + '/api/fs_action', {
       method: 'POST',
       body,
       headers: {'X-Requested-With': 'XMLHttpRequest'}
-    });
+    }, 15000);
     const data = await res.json().catch(function () { return null; });
     if (!res.ok || !data || !data.ok) {
       const message = (data && data.error) ? data.error : ('HTTP ' + res.status);
@@ -6741,11 +6741,11 @@ async function doActionNow(id, action, extra) {
     if (extra) {
       Object.entries(extra).forEach(function (e) { body.append(e[0], e[1]); });
     }
-    const res = await fetch(API + '/api/action', {
+    const res = await fetchTimeout(API + '/api/action', {
       method: 'POST',
       body,
       headers: {'X-Requested-With': 'XMLHttpRequest'}
-    });
+    }, 15000);
     const data = await res.json().catch(function () { return null; });
     if (!res.ok || !data || !data.ok) {
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
@@ -6769,11 +6769,11 @@ async function shareItem(id) {
   const seq = ++shareItemSeq;
   const body = new URLSearchParams({id: id});
   try {
-    const res = await fetch(API + '/api/share', {
+    const res = await fetchTimeout(API + '/api/share', {
       method: 'POST',
       body,
       headers: {'X-Requested-With': 'XMLHttpRequest'}
-    });
+    }, 15000);
     const data = await res.json();
     if (seq !== shareItemSeq) return;
     if (!data || !data.ok) {
@@ -6831,11 +6831,11 @@ document.getElementById('shareCopy').addEventListener('click', function () {
 document.getElementById('shareRevoke').addEventListener('click', async function () {
   if (!currentShareToken) return;
   try {
-    const res = await fetch(API + '/api/share_revoke', {
+    const res = await fetchTimeout(API + '/api/share_revoke', {
       method: 'POST',
       body: new URLSearchParams({token: currentShareToken}),
       headers: {'X-Requested-With': 'XMLHttpRequest'}
-    });
+    }, 15000);
     const data = await res.json();
     if (data && data.ok) {
       currentShareToken = '';
@@ -6864,7 +6864,7 @@ async function refreshShareList() {
   box.textContent = '';
   let data = null;
   try {
-    const res = await fetch(API + '/api/shares');
+    const res = await fetchTimeout(API + '/api/shares', undefined, 15000);
     data = await res.json();
   } catch (e) {}
   // Respons basi tidak boleh menimpa daftar yang lebih baru (#269,
@@ -6901,11 +6901,11 @@ async function refreshShareList() {
 }
 async function revokeShareSid(sid) {
   try {
-    const res = await fetch(API + '/api/share_revoke_id', {
+    const res = await fetchTimeout(API + '/api/share_revoke_id', {
       method: 'POST',
       body: new URLSearchParams({sid: sid}),
       headers: {'X-Requested-With': 'XMLHttpRequest'}
-    });
+    }, 15000);
     const data = await res.json();
     if (data && data.ok) {
       showToast('Link revoked', 2500);
@@ -7209,21 +7209,21 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         } else {
           allBody.append('headers', document.getElementById('dlHeaders').value.trim());
         }
-        var aRes = await fetch(API + '/api/add', {
+        var aRes = await fetchTimeout(API + '/api/add', {
           method: 'POST',
           body: allBody,
           headers: {'X-Requested-With': 'XMLHttpRequest'}
-        });
+        }, 15000);
         var aData = await aRes.json().catch(function () { return null; });
         if (!aRes.ok || !aData || !aData.ok) allFailed++;
       }
       if (allFailed) throw new Error(allFailed + ' of ' + socialPhotoOptions.length + ' photos failed to add');
     } else {
-    const res = await fetch(API + '/api/add', {
+    const res = await fetchTimeout(API + '/api/add', {
       method: 'POST',
       body,
       headers: {'X-Requested-With': 'XMLHttpRequest'}
-    });
+    }, 15000);
     const data = await res.json().catch(function () { return null; });
     if (!res.ok || !data || !data.ok) {
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
@@ -7240,10 +7240,10 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         extraBody.append('priority', document.getElementById('priority').value);
         extraBody.append('path', document.getElementById('storage').value.trim());
         extraBody.append('method', document.getElementById('dlMethod').value);
-        var xRes = await fetch(API + '/api/add', {
+        var xRes = await fetchTimeout(API + '/api/add', {
           method: 'POST', body: extraBody,
           headers: {'X-Requested-With': 'XMLHttpRequest'}
-        });
+        }, 15000);
         var xData = await xRes.json().catch(function () { return null; });
         if (!xRes.ok || !xData || !xData.ok) failedExtras.push(urls[i]);
       } catch (x) { failedExtras.push(urls[i]); }
