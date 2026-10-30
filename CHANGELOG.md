@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): pesan stall zero-read HLS/adaptive kini cocok klasifikasi lambat** -- 'HLS segment stalled (zero reads)' dan 'adaptive file stalled (zero reads)' tidak memuat frasa 'connection stalled'/'speed too low', sehingga slowRejected timpang antarjalur (stall jalur utama bisa failover/tergerbang, dua pesan ini tidak). isSlowError kini juga menerima pola 'stalled (zero reads)' (issue #971).
+
 - **perf(remote): cap sumber ZIP kini dimemo 3 detik agar tak dibayar per sub-request Range** -- cap #961 dihitung saat membangun kunci (sebelum lookup cache), sehingga jalan kaki stat folder sampai 8192 entri dan iterasi kursor folder media dibayar berulang pada cache-hit maupun tiap sub-request Range unduhan ZIP yang sama. Kini cap dimemo per kunci dasar/token dengan TTL 3 detik: ledakan sub-request terlipat menjadi satu hitungan, dengan harga terbatas berupa jendela basi tambahan maksimal 3 detik (issue #970).
 
 - **fix(download): kegagalan stall/lambat dan DNS kini berakhir PAUSED menunggu jaringan, bukan FAILED terminal** -- isNetworkError sebelumnya tidak mencakup pesan watchdog ('Connection stalled', 'Speed too low') maupun frasa DNS 'Unable to resolve host', sehingga sesudah retry habis kegagalan transien itu jatuh ke FAILED dengan autoResume mati dan tak pernah dihidupkan lagi oleh NetworkCallback. Klasifikasi kini ikut menerima isSlowError/isConnectError, yang sekaligus memberi stall segmen HLS pengulangan level segmen (issue #969).

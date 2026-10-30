@@ -2133,7 +2133,12 @@ class DownloadEngine(appContext: Context) {
     private fun isSlowError(message: String?): Boolean {
         if (message.isNullOrEmpty()) return false
         return message.contains("speed too low", ignoreCase = true) ||
-            message.contains("connection stalled", ignoreCase = true)
+            message.contains("connection stalled", ignoreCase = true) ||
+            // Varian zero-read tulisan tangan di jalur HLS/adaptive
+            // (issue #971): "HLS segment stalled (zero reads)" dan
+            // "adaptive file stalled (zero reads)" tidak memuat frasa
+            // di atas, jadi klasifikasinya timpang antarjalur.
+            message.contains("stalled (zero reads)", ignoreCase = true)
     }
 
     private fun isConnectError(message: String?): Boolean {
