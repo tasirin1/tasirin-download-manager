@@ -1905,6 +1905,9 @@ if (r.ok) {
 const d = await r.json();
 if (d && d.ok && d.zt) {
 finalUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'zt=' + encodeURIComponent(d.zt);
+} else if (d && d.ok === false) {
+mmShowToast(d.error || 'ZIP download is not available right now', 3000);
+return;
 }
 }
 } catch (e) {}

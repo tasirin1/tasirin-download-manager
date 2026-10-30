@@ -4303,6 +4303,13 @@ async function fsDownloadUrl(url) {
         const d = await r.json();
         if (d && d.ok && d.zt) {
           finalUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'zt=' + encodeURIComponent(d.zt);
+        } else if (d && d.ok === false) {
+          // Penolakan eksplisit server (issue #909, mis. kuota token
+          // ZIP penuh sejak #899): suarakan pesannya dan JANGAN klik
+          // anchor tanpa token — GET itu pasti dijawab 403 senyap.
+          // Kegagalan jaringan/HTTP tetap jatuh ke fallback di bawah.
+          mmShowToast(d.error || 'ZIP download is not available right now', 3000);
+          return;
         }
       }
     } catch (e) {}
