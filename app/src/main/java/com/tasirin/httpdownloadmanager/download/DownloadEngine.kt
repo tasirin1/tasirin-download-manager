@@ -4237,6 +4237,19 @@ class DownloadEngine(appContext: Context) {
                         } else 0L
                         lastSegBytes = downloaded
                         lastSegAt = now
+                        // Penjaga ruang berjalan yang sama dengan jalur
+                        // single-stream (#781): jalur segmen sebelumnya
+                        // hanya bertumpu pada pra-cek awal attempt,
+                        // sehingga ENOSPC di tengah unduhan tampil
+                        // sebagai pesan OS mentah dan volume bisa
+                        // terdorong ke 0 byte (issue #926). Baca gagal
+                        // (freeBytesOrNull null) = lewati cek tick ini.
+                        val freeNow = saver.freeBytesOrNull()
+                        if (freeNow != null && freeNow < MIN_FREE_BYTES) {
+                            throw IOException(
+                                "Storage almost full (free ${Formats.bytes(freeNow)})"
+                            )
+                        }
                         health.check(now, downloaded, segTotal, speed)
                         // Progres ke penyangga; updateItem nyata dilakukan flush.
                         recordSegmentProgress(id, segment.index, downloaded, item.segments.size)
