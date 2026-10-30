@@ -3268,6 +3268,13 @@ document.getElementById('galBatchAll').addEventListener('click', async function 
     btn.textContent = 'Loading...';
     let guard = 0;
     while (galleryHasMore && guard++ < 500) {
+      // Pemuatan sentinel yang sedang berjalan membuat loadGallery
+      // kembali seketika tanpa memuat apa pun (guard sibuk): loop akan
+      // menilai 'tak ada kemajuan' dan berhenti bisu dengan pilihan
+      // parsial. Tunggu pemuatan itu reda dulu (issue #860).
+      while (galleryLoading) {
+        await new Promise(function (r) { setTimeout(r, 100); });
+      }
       const before = galleryItems.length;
       await loadGallery(false);
       if (galleryItems.length === before) break;

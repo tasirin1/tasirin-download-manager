@@ -1019,6 +1019,9 @@ btn.disabled = true;
 btn.textContent = 'Loading...';
 let guard = 0;
 while (galleryHasMore && guard++ < 500) {
+while (galleryLoading) {
+await new Promise(function (r) { setTimeout(r, 100); });
+}
 const before = galleryItems.length;
 await loadGallery(false);
 if (galleryItems.length === before) break;
