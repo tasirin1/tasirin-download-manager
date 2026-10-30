@@ -511,10 +511,15 @@ class FileSaver(context: Context) {
         // di tengah tulis tak lagi meninggalkan dokumen terpotong bernama
         // final. Nama unik diputuskan di dalam kunci nama yang sama
         // seperti claimCustomDoc, tanpa membuat dokumen final lebih dulu.
-        val unique = synchronized(mergeLockFor(FileNames.safe(fileName))) {
-            uniqueDocumentName(tree, fileName)
+        // Pembuatan dokumen staging ikut di DALAM kunci (issue #750,
+        // pola claimCustomDoc yang menahan kunci melewati createFile):
+        // kunci yang dilepas di antaranya membiarkan dua tulis paralel
+        // bernama sama sama-sama membuat/memakai staging yang sama.
+        var unique = ""
+        val stagingDoc = synchronized(mergeLockFor(FileNames.safe(fileName))) {
+            unique = uniqueDocumentName(tree, fileName)
+            tree.createFile(MimeTypes.forFile(unique), "$unique.part")
         }
-        val stagingDoc = tree.createFile(MimeTypes.forFile(unique), "$unique.part")
         var staged: PublishResult? = null
         if (stagingDoc != null) {
             val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
