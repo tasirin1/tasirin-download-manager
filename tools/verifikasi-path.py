@@ -350,6 +350,15 @@ def _basis_rentang_hapus():
     kandidat.append("origin/HEAD")
     for ref in kandidat:
         if jalan("git", "rev-parse", "--verify", "--quiet", ref):
+            # Ref yang MEMUAT HEAD (remote-tracking berada di depan
+            # riwayat lokal) membuat rentang tiga-titik kosong
+            # secara konstruksi (issue #834): cakupan tak boleh
+            # menyempit di bawah cadangan HEAD~1 milik pemanggil,
+            # jadi ref seperti itu dilewati.
+            mb = jalan("git", "merge-base", ref, "HEAD")
+            kepala = jalan("git", "rev-parse", "HEAD")
+            if mb and kepala and mb.strip() == kepala.strip():
+                continue
             return ref
     return None
 
