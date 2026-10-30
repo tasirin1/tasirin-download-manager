@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): geser-kanan Delete kini digerbang state terminal seperti menu** -- panel kanan sebelumnya dibangun dan ditawarkan untuk semua state, sehingga item yang sedang diunduh pun menampilkan konfirmasi hapus resmi lalu ditolak toast 'Item changed' yang menyesatkan. Panel kini mengikuti pola panel kiri (#605): label dan geseran hanya aktif untuk COMPLETED/FAILED/CANCELLED, dan pelepasan geser memverifikasi state sekali lagi (issue #1008).
+
 - **fix(web): kirim ulang carousel hanya mengirim foto yang gagal** -- mode 'Select photo: All' sebelumnya meng-POST ulang seluruh carousel sesudah gagal parsial (form tetap terbuka), dan server tak punya dedupe, jadi foto yang sudah berhasil masuk daftar dua kali. Kini URL yang sudah berhasil dicatat per tanda tangan carousel (probe baru meresetnya sendiri) dan dilewati pada kirim ulang (issue #1007).
 
 - **fix(web): sisa toast kegagalan/penolakan kini bertipe error** -- lima situs mmShowToast yang tertinggal dari #996 ('Another operation is already running' di dua tempat, penolakan folder MediaStore, item ZIP yang dilewati, dan 'Move cancelled' yang tak konsisten dengan 'Move failed' di fungsi yang sama) kini mengoper tipe error ke toast global (issue #1006).
