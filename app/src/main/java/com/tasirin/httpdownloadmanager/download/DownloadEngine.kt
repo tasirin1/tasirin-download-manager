@@ -2604,6 +2604,13 @@ class DownloadEngine(appContext: Context) {
                 runCatching { sidecar.delete() }
             }
         }
+        // Baseline batas kecepatan mengikuti byte yang sudah di disk
+        // (issue #686): tanpa reset ini byte resume terhitung sebagai
+        // unduhan instan dan limiter "menagih utang" sebesar ukuran
+        // resume di awal kelanjutan — pola yang sama seperti jalur
+        // single-stream dan segmented yang memanggil throttle.reset
+        // sesudah resume ditetapkan.
+        throttle.reset(progress.downloaded)
         try {
             BufferedOutputStream(FileOutputStream(target, startIndex > 0), BUFFER_SIZE).use { out ->
                 for (index in startIndex until urls.size) {
