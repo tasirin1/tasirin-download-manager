@@ -3960,7 +3960,7 @@ if (hlsOverrideOf(it) >= 0) {
 return fmt(it.bytesDownloaded);
 }
 var locked = getLockedTotal(it);
-return locked > 0
+return it.totalBytes > 0
 ? fmt(it.bytesDownloaded) + ' / ' + fmt(locked)
 : fmt(it.bytesDownloaded);
 }

@@ -6702,7 +6702,11 @@ function rowMetaText(it) {
     return fmt(it.bytesDownloaded);
   }
   var locked = getLockedTotal(it);
-  return locked > 0
+  // Bentuk 'X / Y' hanya bila total memang diketahui (issue #1016):
+  // getLockedTotal jatuh ke bytesDownloaded untuk total tak diketahui,
+  // jadi gerbang locked > 0 menampilkan 'X / X' — total palsu yang
+  // tumbuh bersama progres. Sejajarkan dengan gerbang rowSubHtml.
+  return it.totalBytes > 0
     ? fmt(it.bytesDownloaded) + ' / ' + fmt(locked)
     : fmt(it.bytesDownloaded);
 }
