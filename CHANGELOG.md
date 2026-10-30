@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(ui): toast kegagalan Move tak lagi menampilkan literal '%1$s'** -- string storage_picker_error memuat placeholder format, tetapi satu-satunya pemanggilnya memakai Toast.makeText ber-resource-id yang tidak melakukan substitusi, jadi pengguna melihat 'Failed to use folder: %1$s'. String kini tanpa placeholder (issue #1012).
+
 - **fix(ui): galeri native tak lagi menampilkan 'No videos found yet.' selama scan awal** -- kolektor engine memproses emisi pertamanya jauh sebelum scan MediaStore selesai dan updateList menilai daftar yang masih kosong sebagai galeri kosong. Kini emptyView hanya tampil bila scan pertama sudah terpasang, sejajar gerbang muatan awal MainActivity (#978) (issue #1011).
 
 - **fix(ui): dialog Limit & Priority membaca nilai terkini saat Simpan** -- fallback kecepatan Custom dan prioritas sebelumnya memakai snapshot saat dialog dibuka, sehingga perubahan dari remote web (limit_priority) yang tiba selagi dialog terbuka tertimpa diam-diam saat pengguna menekan Save walau field itu tak disentuhnya. Fallback kini dibaca segar dari engine (issue #1010).
