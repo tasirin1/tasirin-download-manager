@@ -10,7 +10,7 @@ import androidx.core.view.WindowInsetsCompat
 
 /** Android 15 (targetSdk 36) memaksa edge-to-edge: konten digambar di bawah
  *  status/navigation bar. Panggil setelah setContentView dengan root view;
- *  padding root otomatis menyesuaikan insets system bar (aman Android 5+). */
+ *  padding root otomatis menyesuaikan insets system bar (aman Android 6+). */
 fun ComponentActivity.applyEdgeToEdge(root: View, darkBars: Boolean = true) {
     // Semua layar kini bertema gelap (keputusan owner 2026-10-30):
     // default ikon status/nav bar TERANG. darkBars = false hanya bila ada
