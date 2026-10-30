@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **perf(remote): drain lipatan dangkal cap ZIP memakai seleksi terbatas anggaran** -- direktori terantre yang anaknya jauh melampaui sisa anggaran sebelumnya tetap dibayar listFiles + sortir penuh O(N log N) sebelum satu pun anak dilipat. Kini anak di atas anggaran dipilih dengan heap terbatas (yang terkecil menurut urutan nama, seri case-insensitive dipecah case-sensitive agar seleksi deterministik penuh); hasil lipatan setara awalan sortir penuh dan biaya terikat anggaran (issue #993).
+
 - **fix(remote): cap per-token mediaZip kini dihitung dari path kanonik** -- situs token sebelumnya menghitung cap dari path mentah hasil decode, tak konsisten dengan fsZip yang dikanonikkan pada #980, sehingga folder yang sama berejaan varian menghasilkan cap berbeda dan entri cache ganda. Kini File dikanonikkan lebih dulu bila berhasil (issue #992).
 
 - **test(remote): komposisi cap folder ZIP kini terkunci uji paritas + terpotong + hapus** -- uji #979 sebelumnya swa-referensi sehingga perubahan basis/urutan lipat/plafon/flag terpotong tak membuat CI merah. Kini berkas uji memuat implementasi acuan yang dibekukan dan membandingkannya dengan produksi atas pohon yang sama (nilai emas mentah tak bisa dipakai karena path folder sementara berbeda tiap mesin), ditambah deteksi hapus berkas dan kasus terpotong 8200 entri berflag 't' (issue #991).

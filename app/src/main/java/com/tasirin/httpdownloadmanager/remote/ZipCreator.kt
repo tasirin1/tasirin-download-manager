@@ -436,12 +436,40 @@ object ZipCreator {
                 hash = zipStampFold(hash, queued.length().toString())
                 hash = zipStampFold(hash, queued.lastModified().toString())
                 if (shallowBudget > 0) {
-                    val kids = queued.listFiles()?.sortedWith(
-                        Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-                    )
-                    if (kids != null) {
+                    val kidArr = queued.listFiles()
+                    if (kidArr != null) {
+                        // Seleksi terbatas mengikuti sisa anggaran
+                        // (issue #993): anak jauh melampaui anggaran
+                        // jangan disortir penuh — cukup ambil yang
+                        // terkecil menurut urutan nama (hasil lipatan
+                        // identik dengan awalan sortir penuh, biaya
+                        // terikat anggaran, bukan ukuran direktori).
+                        val kids: List<File> = if (kidArr.size <= shallowBudget) {
+                            kidArr.sortedWith(
+                                Comparator { a, b ->
+                                    a.name.compareTo(b.name, ignoreCase = true)
+                                }
+                            )
+                        } else {
+                            val order = Comparator<File> { a, b ->
+                                val c = a.name.compareTo(b.name, ignoreCase = true)
+                                if (c != 0) c else a.name.compareTo(b.name)
+                            }
+                            val heap = java.util.PriorityQueue<File>(
+                                shallowBudget, order.reversed()
+                            )
+                            for (kid in kidArr) {
+                                val top = heap.peek()
+                                if (heap.size < shallowBudget) {
+                                    heap.add(kid)
+                                } else if (top != null && order.compare(kid, top) < 0) {
+                                    heap.poll()
+                                    heap.add(kid)
+                                }
+                            }
+                            heap.sortedWith(order)
+                        }
                         for (kid in kids) {
-                            if (shallowBudget <= 0) break
                             shallowBudget--
                             hash = zipStampFold(hash, kid.absolutePath)
                             hash = zipStampFold(hash, kid.length().toString())
