@@ -31,6 +31,19 @@ private const val THUMB_FAILURE_TTL_MS = 30L * 60 * 1000
  *  TTL mencegah file rusak "mengunci" thumbnail selamanya bila sudah diperbaiki. */
 private val thumbFailures = ConcurrentHashMap<String, Long>()
 
+/** Inode sumber yang menghasilkan thumbnail di slot path-saja (issue #735):
+ *  kunci slot itu cuma path, jadi tanpa identitas fisik, thumbnail berkas
+ *  lama bisa tersaji untuk berkas BARU di path yang sama selama jendela
+ *  bertumbuhnya. Inode stabil selama satu berkas bertumbuh dan selalu
+ *  berubah saat berkas diganti (publish rename = inode baru). */
+private val thumbSlotInodes = ConcurrentHashMap<String, Long>()
+
+/** Nomor inode berkas sumber untuk raw "f:"; null bila tak bisa dibaca —
+ *  pemanggil jatuh ke perilaku lama (sajikan slot apa adanya). */
+private fun thumbFileInode(raw: String): Long? = runCatching {
+    android.system.Os.stat(raw.substring(2)).st_ino
+}.getOrNull()
+
 /** true bila kegagalan thumbnail masih dalam masa TTL (belum perlu dicoba lagi). */
 internal fun isThumbFailureFresh(
     storedAt: Long,
@@ -130,11 +143,15 @@ internal fun getOrCreateThumb(
     // cache dan meninggalkan satu .jpg yatim per cap. Selama mtime
     // masih dalam jendela bertumbuh, kunci jatuh ke path saja (satu
     // slot stabil); sesudah berkas diam, kunci bercap berlaku lagi dan
-    // thumbnail dibuat ulang sekali dari isi final.
+    // thumbnail dibuat ulang sekali dari isi final. Slot path-saja itu
+    // dijaga inode (issue #735): berkas yang DIGANTI di path yang sama
+    // berinode baru, jadi thumbnail berkas lama di slot tidak tersaji
+    // untuknya — slot dibuat ulang sekali untuk inode baru.
     val stamp = thumbSourceStamp(ctx, raw)
-    val effectiveStamp =
-        if (raw.startsWith("f:") && isThumbStampGrowing(stamp, System.currentTimeMillis())) "" else stamp
+    val growing = raw.startsWith("f:") && isThumbStampGrowing(stamp, System.currentTimeMillis())
+    val effectiveStamp = if (growing) "" else stamp
     val key = if (effectiveStamp.isEmpty()) sha256Hex(raw) else sha256Hex("$raw|$effectiveStamp")
+    val slotInode: Long? = if (growing) thumbFileInode(raw) else null
     thumbFailures[key]?.let { at ->
         if (isThumbFailureFresh(at, System.currentTimeMillis())) return null
     }
@@ -143,7 +160,13 @@ internal fun getOrCreateThumb(
     val cached = File(dir, "$key.jpg")
     val lock = thumbLockFor(key)
     return synchronized(lock) {
-        if (cached.isFile && cached.length() > 0) {
+        // Slot path-saja basi bila inode sumbernya bukan yang menghasilkan
+        // isi slot (issue #735): catatan hilang (proses baru) juga dianggap
+        // basi — dibuat ulang sekali lebih aman daripada menyajikan
+        // thumbnail berkas lain. slotInode null = stat gagal, sajikan
+        // seperti perilaku lama.
+        val slotStale = growing && slotInode != null && thumbSlotInodes[key] != slotInode
+        if (cached.isFile && cached.length() > 0 && !slotStale) {
             cached
         } else {
             val bmp = generateThumb(ctx, raw, isFsPathAllowed, isMediaUriAllowed)
@@ -163,6 +186,10 @@ internal fun getOrCreateThumb(
                     return@synchronized null
                 }
             thumbFailures.remove(key)
+            if (growing && slotInode != null) {
+                thumbSlotInodes[key] = slotInode
+                if (thumbSlotInodes.size > 1024) thumbSlotInodes.clear()
+            }
             runCatching {
                 // Tulis via staging lalu rename: gagal di tengah tak boleh
                 // menyisakan file setengah jadi yang dikira cache valid.
