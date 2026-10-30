@@ -1202,6 +1202,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         } catch (_: Exception) { emptyList() }
     }
 
+    /** Probe durasi galeri dengan batas waktu (issue #783): probe MMR
+     *  sinkron di thread HTTP bisa menggantung tanpa batas pada berkas
+     *  rusak/storage lambat. Pola probeSocialOptionsBlocking: jalankan di
+     *  probeExecutor bersama dan tunggu hanya sisa anggaran request;
+     *  timeout atau pool jenuh = 0 untuk item ini (kegagalan dicatat
+     *  pemanggil sehingga shouldProbe menahan probe ulang dekat). */
+    private fun probeGalleryDuration(token: String, deadlineNanos: Long): Long {
+        val remainingMs = (deadlineNanos - System.nanoTime()) / 1_000_000
+        if (remainingMs <= 0) return 0L
+        return try {
+            val future = probeExecutor.submit<Long> { videoDurations.probeDurationMs(token) }
+            try {
+                future.get(remainingMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+            } catch (_: java.util.concurrent.TimeoutException) {
+                future.cancel(true)
+                0L
+            }
+        } catch (_: Exception) { 0L }
+    }
+
     private fun handleUpload(session: IHTTPSession): Response {
         if (StoragePrefs.isServerReadOnly(context)) {
             return readOnlyDenied().closeConnection()
@@ -2375,6 +2395,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         var extracted = 0
         var matched = 0
         var pageCount = 0
+        // Anggaran probe durasi bersama seluruh request (issue #783):
+        // item yang probenya tak kebagian anggaran dilewati tanpa dicatat
+        // gagal, agar throttle shouldProbe tak menghukum berkas sehat.
+        val probeDeadline = System.nanoTime() + GALLERY_PROBE_BUDGET_MS * 1_000_000L
         val scan = scannedGallery(scanLimit)
         for (e in scan.items) {
             if (q.isNotEmpty() && e.name.indexOf(q, ignoreCase = true) < 0) continue
@@ -2393,14 +2417,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val dKey = ServerVideoDurations.keyFor(e.token, e.modified, e.size)
                     var d = videoDurations.of(dKey)
                     if (d <= 0 && e.durationMs > 0) d = e.durationMs
-                    if (d <= 0 && extracted < 20 && videoDurations.shouldProbe(dKey)) {
+                    if (d <= 0 && extracted < 20 && System.nanoTime() < probeDeadline && videoDurations.shouldProbe(dKey)) {
                         // Generasi ditangkap SEBELUM probe lambat:
                         // invalidate yang mendarat di tengah probe
                         // membuat hasil ini basi — jangan tulis lagi
                         // ke cache, lihat #326. Tampilan request ini tetap
                         // memakai d apa adanya.
                         val gen = videoDurations.currentGeneration()
-                        d = videoDurations.probeDurationMs(e.token)
+                        d = probeGalleryDuration(e.token, probeDeadline)
                         if (d > 0) {
                             videoDurations.cacheDurationIfCurrent(dKey, d, gen)
                         } else {
@@ -4123,6 +4147,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
          *  saja — gagal cepat, tanpa menumpuk tugas yatim. */
         private const val PROBE_THREADS = 3
         private const val PROBE_QUEUE_MAX = 8
+        // Anggaran total probe durasi MMR per request galeri (issue #783).
+        private const val GALLERY_PROBE_BUDGET_MS = 3_000L
         private val probeExecutor: java.util.concurrent.ExecutorService by lazy {
             java.util.concurrent.ThreadPoolExecutor(
                 PROBE_THREADS, PROBE_THREADS,
