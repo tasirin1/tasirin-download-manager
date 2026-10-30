@@ -16,7 +16,7 @@ fun ComponentActivity.applyEdgeToEdge(root: View, darkBars: Boolean = false) {
     // supaya kontras walau mode gelap sistem aktif. darkBars = true untuk
     // layar berlatar gelap (ikon terang) — dipakai layar utama tema gelap.
     val barStyle = if (darkBars) {
-        SystemBarStyle.dark(Color.TRANSPARENT, Color.TRANSPARENT)
+        SystemBarStyle.dark(Color.TRANSPARENT)
     } else {
         SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
     }
