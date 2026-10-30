@@ -38,6 +38,7 @@ class LogActivity : AppCompatActivity() {
     private companion object {
         private const val EXPORT_TIME_PATTERN = "yyyy-MM-dd HH:mm:ss"
         private const val EXPORT_STAMP_PATTERN = "yyyyMMdd-HHmmss"
+        private const val SEARCH_DEBOUNCE_MS = 250L
     }
     private var logAutoScroll = false
     private var logSearch = ""
@@ -74,11 +75,20 @@ class LogActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 logSearch = s?.toString().orEmpty()
-                refreshLog()
+                // Debounce (issue #803): refresh per ketikan membangun
+                // ulang sorotan atas seluruh log (s.d. +/-120 KB) di main
+                // thread; tunda sampai ada jeda mengetik 250 ms.
+                binding.logSearch.removeCallbacks(searchRefresh)
+                binding.logSearch.postDelayed(searchRefresh, SEARCH_DEBOUNCE_MS)
             }
         })
 
         refreshLog()
+    }
+
+    // Refresh pencarian yang ditunda debounce (issue #803).
+    private val searchRefresh = Runnable {
+        if (!isDestroyed && !isFinishing) refreshLog()
     }
 
     // Backoff saat log sepi: refreshLog() early-return bila versi sama,
