@@ -4,7 +4,7 @@
 Memastikan penghapusan kode tak merusak acuan dan aturan repo tetap
 ditaati, tanpa toolchain Android (hanya baca kode + git diff + parse XML).
 Diadaptasi untuk repo ini: Kotlin (.kt), remote.src.html, keputusan historis
-(QR/zxing, values-night, SpeedChartView, endpoint mati).
+(QR/zxing, QrCode, SpeedChartView, endpoint mati).
 
 Pakai:
     python3 tools/verifikasi-path.py                 # kerja lokal + belum push
@@ -797,7 +797,6 @@ TERLARANG_KEMBALI = [
     ("QrEncoder", "QrEncoder.kt dihapus — jangan hidupkan kembali tanpa diskusi"),
     ("/api/qr", "endpoint /api/qr dihapus — jangan hidupkan kembali"),
     ("/api/status", "endpoint /api/status dihapus — status cukup snapshotJson/SSE"),
-    ("values-night", "tema gelap native dihapus — app selalu terang"),
     ("SpeedChartView", "widget grafik kecepatan dihapus — kecepatan cukup teks"),
     ("renderSpeedTotal", "bilah status remote dihapus 2026-08-13 — pakai applyServerStatus"),
     ("refreshStatus", "bilah status remote dihapus 2026-08-13 — pakai applyServerStatus"),
@@ -1068,8 +1067,6 @@ def cek_aturan_repo(gagal, berubah):
         gagal.append("minSdk %s != 23 (aturan: tetap Android 6+, keputusan owner 2026-10-28)" % nilai_minsdk)
     for path in berubah:
         rendah = path.lower()
-        if "values-night" in rendah:
-            gagal.append("Larangan historis: values-night (%s) — app selalu terang" % path)
         nama = rendah.rsplit("/", 1)[-1]
         if rendah.endswith((".apk", ".aab", ".dex", ".jks", ".keystore",
                             ".p12", ".pfx", ".zip")) or nama == "keystore":
@@ -1098,8 +1095,6 @@ def cek_aturan_repo(gagal, berubah):
 def cek_larangan_hidup_lagi(gagal, diff):
     for path, isi in tambah_kt(diff):
         for kunci, alasan in TERLARANG_KEMBALI:
-            if kunci in ("values-night",):
-                continue
             if kunci in isi:
                 gagal.append("Larangan historis dilanggar di %s (%s): %s — %s"
                              % (path, kunci, isi.strip()[:70], alasan))
