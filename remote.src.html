@@ -1163,6 +1163,13 @@
   .cm-overlay {
  position: fixed; inset: 0; z-index: 90; background: rgba(8,12,22,.5); display: flex; align-items: center; justify-content: center; padding: 22px; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
 
+  /* Kunci gulir badan selama ada modal/sheet terbuka: tanpa ini halaman
+     di belakang ikut bergeser saat area scrim disentuh dan posisi gulir
+     pengguna hilang (issue #779). Peramban tanpa :has() mengabaikannya
+     dengan aman; pemutar media tetap memakai kunci inline-nya sendiri. */
+  body:has(.cm-overlay:not(.hidden)), body:has(.sheet:not(.hidden)) {
+ overflow: hidden; }
+
   .cm-box {
  width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); max-height: calc(100vh - 44px); max-height: calc(100dvh - 44px); overflow-y: auto; }
 

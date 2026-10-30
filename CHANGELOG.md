@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): halaman di belakang modal/sheet tidak lagi bisa digulir** -- Sebelumnya hanya pemutar media yang mengunci gulir badan; kini `body:has(.cm-overlay:not(.hidden)), body:has(.sheet:not(.hidden)) { overflow: hidden; }` mengunci gulir selama dialog/sheet apa pun terbuka (peramban tanpa `:has()` mengabaikannya dengan aman) (issue #779).
 - **fix(remote): tombol modal Share kini membungkus dua baris** -- Empat tombol (Copy/Open/Revoke link/Close) sebelumnya berdesakan sebaris dalam kotak 340px sehingga "Revoke link" terlipat; baris tombol khusus modal Share kini `flex-wrap` dengan basis 34% (dua tombol per baris) (issue #778).
 - **fix(remote): ikon folder dialog Move kini SVG, bukan emoji** -- Baris folder tujuan sebelumnya memakai emoji 📁 (satu-satunya ikon emoji di keluarga dialog, tanpa aturan CSS sama sekali) sehingga tampil beda gaya/warna per perangkat; kini glyph folder SVG yang sama dengan ikon folder Files + aturan `.mv-ico` (issue #777).
 - **fix(remote): tombol konfirmasi tidak lagi selalu merah danger** -- `#confirmYes` sebelumnya ber-class `danger` tetap sehingga aksi jinak (Clear completed) tampil destruktif dan alert gagal-share punya OK merah + Cancel ganda; `showConfirm` kini menerima opsi `{ danger: false }` (tombol `.primary`) dan `{ hideCancel: true }` untuk alert satu keputusan (issue #776).
