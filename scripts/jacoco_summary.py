@@ -24,6 +24,13 @@ def main():
     except ET.ParseError as exc:
         print(f"::warning::Laporan JaCoCo rusak (tak ter-parse): {exc}")
         return 0
+    except OSError as exc:
+        # Laporan lenyap/tak terbaca di antara glob dan parse (symlink
+        # putus, rotasi): kelas yang sama dengan ParseError di atas
+        # (issue #724, sejajar #716) — warning + exit 0, bukan traceback
+        # yang memerahkan langkah Coverage.
+        print(f"::warning::Laporan JaCoCo tak terbaca: {exc}")
+        return 0
     summary = []
     for ctype in ("LINE", "BRANCH", "INSTRUCTION", "METHOD"):
         covered = missed = 0
