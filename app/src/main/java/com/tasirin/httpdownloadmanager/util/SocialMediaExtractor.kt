@@ -50,6 +50,14 @@ object SocialMediaExtractor {
     // gelombang paralel HEAD (connect+read 6+6 dtk) plus margin.
     private const val FORBIDDEN_PROBE_BUDGET_MS = 15_000L
 
+    // Anggaran tahap halaman YouTube (issue #824): WAJIB sama dengan
+    // runStageCapped(30_000L) di kedua pemanggil extractYouTubeFromPage.
+    // Dari cap itu disisakan cadangan untuk rantai fallback
+    // Piped/Invidious/Cobalt; di bawah MIN, probe dilewati sama sekali.
+    private const val STAGE_CAP_MS = 30_000L
+    private const val FALLBACK_RESERVE_MS = 8_000L
+    private const val MIN_PROBE_BUDGET_MS = 2_000L
+
     /** Timeout HTTP halaman/API per request (dipakai 5+ situs, satu tempat). */
     private const val PAGE_TIMEOUT_MS = 20000
 
@@ -727,6 +735,9 @@ object SocialMediaExtractor {
         videoId: String,
         user: Map<String, String> = emptyMap()
     ): List<Result> {
+        // Awal tahap untuk anggaran probe #824: kedua pemanggil
+        // membungkus fungsi ini dengan runStageCapped(30_000L).
+        val stageStartNanos = System.nanoTime()
         val httpResult = httpGetWithCookies(
             "https://www.youtube.com/watch?v=$videoId",
             mapOf(
@@ -807,8 +818,21 @@ object SocialMediaExtractor {
             // fall back to Piped instances which return pre-resolved download URLs.
             // Probe SEMUA opsi, bukan hanya yang pertama (issue #805):
             // opsi ber-URL 403 disaring keluar; fallback hanya berjalan
-            // bila tak ada opsi sehat tersisa.
-            val alive = filterForbidden(options)
+            // bila tak ada opsi sehat tersisa. Anggaran probe menyadari
+            // SISA tahap (issue #824): cap tahap 30 dtk dikurangi waktu
+            // yang sudah terbakar fetch halaman dan cadangan rantai
+            // fallback — anggaran tetap 15 dtk bisa membuat total
+            // melewati cap dan runStageCapped membuang seluruh hasil
+            // tahap termasuk opsi sehat. Sisa terlalu kecil = jangan
+            // probe sama sekali; opsi apa adanya lebih baik daripada
+            // tahap yang dibuang.
+            val elapsedMs = (System.nanoTime() - stageStartNanos) / 1_000_000
+            val probeBudgetMs = minOf(
+                FORBIDDEN_PROBE_BUDGET_MS,
+                STAGE_CAP_MS - elapsedMs - FALLBACK_RESERVE_MS
+            )
+            val alive = if (probeBudgetMs < MIN_PROBE_BUDGET_MS) options
+                else filterForbidden(options, probeBudgetMs)
             if (alive.isEmpty()) {
                 val piped = extractYouTubeViaPiped(videoId)
                 if (piped.isNotEmpty()) {
@@ -1059,8 +1083,11 @@ object SocialMediaExtractor {
      *  Probe HEAD berjalan paralel di stageExecutor dengan anggaran
      *  tunggu bersama; opsi yang probenya gagal/timeout/tertunda
      *  DIPERTAHANKAN — hanya 403 yang terbukti yang dibuang (sejalan
-     *  isUrlForbidden yang getOrDefault false). */
-    private fun filterForbidden(options: List<Result>): List<Result> {
+     *  isUrlForbidden yang getOrDefault false). [budgetMs] dihitung
+     *  pemanggil dari SISA waktu tahapnya (issue #824), bukan konstanta
+     *  buta: tahap halaman dicap 30 dtk oleh runStageCapped dan fetch
+     *  halaman sendiri bisa memakan belasan detik. */
+    private fun filterForbidden(options: List<Result>, budgetMs: Long): List<Result> {
         if (options.isEmpty()) return options
         val futures = options.map { opt ->
             try {
@@ -1069,7 +1096,7 @@ object SocialMediaExtractor {
                 null
             }
         }
-        val deadline = System.nanoTime() + FORBIDDEN_PROBE_BUDGET_MS * 1_000_000L
+        val deadline = System.nanoTime() + budgetMs * 1_000_000L
         return options.filterIndexed { i, _ ->
             val f = futures[i] ?: return@filterIndexed true
             val remaining = deadline - System.nanoTime()
