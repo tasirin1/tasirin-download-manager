@@ -661,7 +661,15 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun wireServerChecks() {
         binding.checkServerAutostart.setOnClickListener {
-            StoragePrefs.setServerAutoStartEnabled(this, !StoragePrefs.isServerAutoStartEnabled(this))
+            val next = !StoragePrefs.isServerAutoStartEnabled(this)
+            StoragePrefs.setServerAutoStartEnabled(this, next)
+            // Autostart hanya bermakna bila server boleh berjalan di
+            // latar: semua situs start bergerbang pref background
+            // (issue #914). Mencentang autostart ikut mengaktifkan
+            // background agar toggle ini tidak mati senyap; mematikan
+            // autostart tidak menyentuh background (server tetap boleh
+            // berjalan, hanya tidak mulai otomatis sesudah boot).
+            if (next) StoragePrefs.setServerBackgroundEnabled(this, true)
             renderChecks()
         }
         binding.checkPinEnforced.setOnClickListener {
