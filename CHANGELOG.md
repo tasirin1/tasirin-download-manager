@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): tipe error diteruskan mmShowToast ke toast global** -- penerusan sebelumnya membuang tipe sehingga semua kegagalan yang lewat helper pemutar (ZIP gagal/terlalu besar, Move/Delete gagal, refresh gagal) tampil sebagai toast info biru saat modal media tertutup. mmShowToast kini menerima tipe opsional dan 12 situs pemanggil kegagalan mengoper tipe error (issue #996).
+
 - **fix(web): toast pemutar disembunyikan saat media dibuka/ditutup** -- toast kegagalan video sebelumnya hanya mati oleh timernya sendiri (sampai 2600 ms), jadi membuka video lain yang sehat dalam jendela itu mewarisi tulisan kegagalan video lama. openMedia dan closeMedia kini menyembunyikan toast dan membatalkan timernya (issue #995).
 
 - **fix(web): override persen HLS bernilai 0 tak lagi tertelan pola || -1** -- di JavaScript 0 || -1 bernilai -1, padahal 0 adalah nilai sah selama segmen pertama HLS, sehingga baris unduhan menampilkan total estimasi sebagai total pasti dan kehilangan kelas bergaris HLS selama jendela itu. Tujuh situs kini memakai helper pemeriksaan numerik yang membedakan 0 dari ketiadaan (issue #994).

@@ -2785,13 +2785,15 @@ function showToast(text, ms, type) {
   armToastRing(dur);
   toastEl._t = setTimeout(function () { toastEl.classList.add('hidden'); }, dur);
 }
-function mmShowToast(text, ms) {
+function mmShowToast(text, ms, type) {
   // Toast pemutar hanya relevan saat player terbuka; di luar itu tampilkan
   // toast global agar pesan galeri/fs (mis. "ZIP too large") benar-benar
   // terlihat (sebelumnya tersembunyi di dalam #mediaModal yang display:none).
+  // Tipe diteruskan ke toast global (issue #996): tanpa ini semua
+  // kegagalan yang lewat sini tampil sebagai info biru.
   const modal = document.getElementById('mediaModal');
   if (!modal || !modal.classList.contains('open')) {
-    showToast(text, ms);
+    showToast(text, ms, type);
     return;
   }
   mmToast.textContent = text;
@@ -3106,7 +3108,7 @@ async function loadGalleryRequest(reset) {
       } else if (galleryCacheFresh()) {
         // Jaringan bermasalah tapi masih ada salinan terakhir: pakai cache
         // sambil memberi tahu supaya pengguna tahu datanya bisa basi.
-        mmShowToast('Failed to refresh — showing cached gallery', 3000);
+        mmShowToast('Failed to refresh — showing cached gallery', 3000, 'error');
         setGalleryStatus('');
         renderGalleryReset(galleryCache.items, galleryCache.total, galleryCache.hasMore);
       } else {
@@ -3470,7 +3472,7 @@ document.getElementById('galBatchZip').addEventListener('click', function () {
   var total = 0;
   galSelected.forEach(function (it) { total += it.size || 0; });
   if (total > 200 * 1024 * 1024) {
-    mmShowToast('ZIP too large (' + (total / 1024 / 1024).toFixed(0) + ' MB). Select fewer files.', 3000);
+    mmShowToast('ZIP too large (' + (total / 1024 / 1024).toFixed(0) + ' MB). Select fewer files.', 3000, 'error');
     return;
   }
   var tokens = Array.from(galSelected, function (it) { return it.token; }).join(',');
@@ -4369,7 +4371,7 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
         return {action: 'delete', path: it.path};
       });
       if (res.done) mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items'), 2500);
-      if (res.failed) mmShowToast('Delete failed \u2014 check the status message', 3000);
+      if (res.failed) mmShowToast('Delete failed \u2014 check the status message', 3000, 'error');
       exitFsSelect();
     })();
   });
@@ -4396,11 +4398,11 @@ document.getElementById('fsBatchDownload').addEventListener('click', function ()
     else { paths.push(it.path); total += it.totalSize || 0; if (it.sizeTruncated) unknownSize = true; }
   });
   if (unknownSize) {
-    mmShowToast('A selected folder is too large to measure exactly. Select fewer files.', 3000);
+    mmShowToast('A selected folder is too large to measure exactly. Select fewer files.', 3000, 'error');
     return;
   }
   if (total > 200 * 1024 * 1024) {
-    mmShowToast('ZIP too large (' + (total / 1024 / 1024).toFixed(0) + ' MB). Select fewer files.', 3000);
+    mmShowToast('ZIP too large (' + (total / 1024 / 1024).toFixed(0) + ' MB). Select fewer files.', 3000, 'error');
     return;
   }
   let url = API + '/api/media_zip?';
@@ -4450,7 +4452,7 @@ async function fsDownloadUrl(url) {
           // ZIP penuh sejak #899): suarakan pesannya dan JANGAN klik
           // anchor tanpa token — GET itu pasti dijawab 403 senyap.
           // Kegagalan jaringan/HTTP tetap jatuh ke fallback di bawah.
-          mmShowToast(d.error || 'ZIP download is not available right now', 3000);
+          mmShowToast(d.error || 'ZIP download is not available right now', 3000, 'error');
           return;
         }
       }
@@ -4540,7 +4542,7 @@ async function downloadZipWithProgress(url, label) {
       updateFsTask('Cancelled', 4);
     } else if (!fallbackAnchor) {
       updateFsTask('Failed \u2014 ' + (e && e.message ? e.message : e), 4);
-      mmShowToast('ZIP download failed', 3000);
+      mmShowToast('ZIP download failed', 3000, 'error');
     }
   }
   if (fallbackAnchor) {
@@ -4969,11 +4971,11 @@ async function moveHere() {
   const dest = movePath;
   for (const it of moveItems) {
     if (dest === it.path) {
-      mmShowToast('Can\'t move a folder into itself', 3000);
+      mmShowToast('Can\'t move a folder into itself', 3000, 'error');
       return;
     }
     if (it.kind === 'dir' && dest.indexOf(it.path + '/') === 0) {
-      mmShowToast('Can\'t move a folder into its own subfolder', 3000);
+      mmShowToast('Can\'t move a folder into its own subfolder', 3000, 'error');
       return;
     }
   }
@@ -4991,7 +4993,7 @@ async function moveHere() {
   const count = res.done;
   closeMovePicker();
   if (res.failed) {
-    mmShowToast('Move failed \u2014 check the status message', 3000);
+    mmShowToast('Move failed \u2014 check the status message', 3000, 'error');
   } else if (res.cancelled) {
     mmShowToast('Move cancelled \u2014 ' + count + (count === 1 ? ' item' : ' items') + ' moved', 3000);
   } else {
@@ -5016,7 +5018,7 @@ document.getElementById('moveNewFolder').addEventListener('click', function () {
     postFsAction({action: 'mkdir', path: movePath, name: name}).then(function () {
       movePickOpen(movePath);
     }).catch(function (e) {
-      mmShowToast('Failed: ' + e.message, 3000);
+      mmShowToast('Failed: ' + e.message, 3000, 'error');
     });
   });
 });
@@ -5102,7 +5104,7 @@ async function runFsActions(title, verbDone, items, makeParams) {
     // melapor 0 ("nothing moved") padahal sebagian item sudah berhasil.
     out.done = done;
     out.failed = true;
-    mmShowToast('Failed: ' + e.message, 3000);
+    mmShowToast('Failed: ' + e.message, 3000, 'error');
   }
   const doneLabel = out.done + (out.done === 1 ? ' item ' + verbDone : ' items ' + verbDone);
   const leftNote = leftCount
