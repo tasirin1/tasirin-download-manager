@@ -1989,6 +1989,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (child.isDirectory) stack.add(child)
             }
         }
+        if (truncated) {
+            // Subpohon yang tak sempat dibuka tetap dilipat dangkal
+            // (issue #972): path+ukuran+mtime direktori yang masih
+            // terantre menangkap perubahan struktural di sana tanpa
+            // biaya membukanya satu per satu.
+            while (stack.isNotEmpty()) {
+                val queued = stack.removeLast()
+                hash = zipStampFold(hash, queued.absolutePath)
+                hash = zipStampFold(hash, queued.length().toString())
+                hash = zipStampFold(hash, queued.lastModified().toString())
+            }
+        }
         return "d" + count + ":" + hash + ":" + (if (truncated) "t" else "c") +
             ":" + root.lastModified()
     }

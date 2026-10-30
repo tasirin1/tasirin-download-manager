@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): cap folder ZIP melipat direktori terantre saat jalan kaki terpotong** -- zipFsSourceStamp sebelumnya berhenti melipat sama sekali sesudah plafon 8192 entri, sehingga perubahan struktural di subpohon yang belum dibuka tak terlihat oleh cap sampai TTL cache. Kini direktori yang masih terantre di stack dilipat dangkal (path, ukuran, mtime) tanpa dibuka (issue #972).
+
 - **fix(download): pesan stall zero-read HLS/adaptive kini cocok klasifikasi lambat** -- 'HLS segment stalled (zero reads)' dan 'adaptive file stalled (zero reads)' tidak memuat frasa 'connection stalled'/'speed too low', sehingga slowRejected timpang antarjalur (stall jalur utama bisa failover/tergerbang, dua pesan ini tidak). isSlowError kini juga menerima pola 'stalled (zero reads)' (issue #971).
 
 - **perf(remote): cap sumber ZIP kini dimemo 3 detik agar tak dibayar per sub-request Range** -- cap #961 dihitung saat membangun kunci (sebelum lookup cache), sehingga jalan kaki stat folder sampai 8192 entri dan iterasi kursor folder media dibayar berulang pada cache-hit maupun tiap sub-request Range unduhan ZIP yang sama. Kini cap dimemo per kunci dasar/token dengan TTL 3 detik: ledakan sub-request terlipat menjadi satu hitungan, dengan harga terbatas berupa jendela basi tambahan maksimal 3 detik (issue #970).
