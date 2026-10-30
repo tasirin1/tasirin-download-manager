@@ -2976,12 +2976,12 @@ class DownloadEngine(appContext: Context) {
                 totalBytesEstimated = false,
                 finishedAt = System.currentTimeMillis()
             )
-        } ?: item
+        }
         flushSave()
         // Cookie sesi dari unduhan HLS ikut dipersists (issue #391):
         // sebelumnya hanya jalur single-stream yang memanggil ini.
         persistCookies()
-        NotificationHelper.notifyItemFinished(context, finishedHls)
+        if (finishedHls != null) NotificationHelper.notifyItemFinished(context, finishedHls)
     }
 
     /** Unduh satu segmen HLS dengan retry sekali untuk error jaringan sementara
@@ -3695,11 +3695,11 @@ class DownloadEngine(appContext: Context) {
                 etag = serverEtag.ifBlank { it.etag },
                 finishedAt = System.currentTimeMillis()
             )
-        } ?: item
+        }
         flushSave()
         persistCookies()
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
-        NotificationHelper.notifyItemFinished(context, finishedSingle)
+        if (finishedSingle != null) NotificationHelper.notifyItemFinished(context, finishedSingle)
     }
 
     private suspend fun runSegmented(
@@ -3870,13 +3870,13 @@ class DownloadEngine(appContext: Context) {
                 etag = headers?.etag?.takeIf { e -> e.isNotBlank() } ?: it.etag,
                 finishedAt = System.currentTimeMillis()
             )
-        } ?: item
+        }
         flushSave()
         // Cookie sesi dari unduhan multi-segmen ikut dipersists (issue #391).
         persistCookies()
         clearSegProgress(item.id)
         App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
-        NotificationHelper.notifyItemFinished(context, finishedMulti)
+        if (finishedMulti != null) NotificationHelper.notifyItemFinished(context, finishedMulti)
     }
 
     /** Minta URL CDN segar saat link kedaluwarsa di tengah unduhan:
