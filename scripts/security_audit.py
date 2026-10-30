@@ -322,18 +322,30 @@ def repository_files(root: Path) -> list[Path]:
     import subprocess
 
     if (root / ".git").exists():
-        result = subprocess.run(
-            # --cached + --others --exclude-standard: berkas terlacak
-            # DAN belum terlacak sama-sama terpindai (#292). Tanpa
-            # --cached, --others HANYA mendaftar berkas untracked
-            # sehingga audit memindai 0 berkas terlacak di pohon bersih
-            # dan lolos hampa (#302).
-            ["git", "ls-files", "-z", "--cached", "--others",
-             "--exclude-standard"],
-            cwd=root,
-            check=True,
-            capture_output=True,
-        )
+        try:
+            result = subprocess.run(
+                # --cached + --others --exclude-standard: berkas terlacak
+                # DAN belum terlacak sama-sama terpindai (#292). Tanpa
+                # --cached, --others HANYA mendaftar berkas untracked
+                # sehingga audit memindai 0 berkas terlacak di pohon bersih
+                # dan lolos hampa (#302).
+                ["git", "ls-files", "-z", "--cached", "--others",
+                 "--exclude-standard"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
+        except (subprocess.CalledProcessError, OSError) as exc:
+            # .git ada tetapi ls-files gagal (checkout korup/setengah
+            # tersalin, git hilang dari PATH): berhenti bernama
+            # fail-closed (issue #723), jangan traceback mentah dan
+            # jangan jatuh senyap ke rglob yang dasar pindainya beda —
+            # kelas git_hidup verifikasi-path (#646/#661/#662).
+            raise SystemExit(
+                "ERROR: git ls-files gagal (" + type(exc).__name__ + ") — "
+                "audit berhenti (fail-closed): perbaiki checkout .git "
+                "atau ketersediaan git."
+            ) from exc
         names = result.stdout.decode("utf-8", "surrogateescape").split("\0")
         candidates = [root / name for name in names if name]
     else:
