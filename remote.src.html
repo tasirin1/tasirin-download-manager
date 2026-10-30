@@ -7045,7 +7045,7 @@ function setPlatformBadge(u) {
 let socialDebounce = null;
 function probeSocialQuality() {
   clearTimeout(socialDebounce);
-  var u = document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '';
+  var u = document.getElementById('url').value.trim().split(/\s+/)[0] || '';
   if (!u || !isSocialUrl(u)) {
     document.getElementById('platformBadge').classList.add('hidden');
     qualitySelect.classList.add('hidden');
@@ -7109,7 +7109,7 @@ function probeSocialQuality() {
         // Bandingkan TOKEN PERTAMA terkini (cara capture u yang sama):
         // membandingkan seluruh isi kolom membuat input multi-URL tidak
         // pernah cocok sehingga picker mati total (issue #164).
-        if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
+        if ((document.getElementById('url').value.trim().split(/\s+/)[0] || '') !== u) return;
         if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
         socialPlatform = d.platform || 'social';
         var videos = d.videos || [];
@@ -7140,7 +7140,7 @@ function probeSocialQuality() {
       .catch(function () {
         // Probe basi gagal pun tidak boleh menyembunyikan picker milik
         // probe tautan yang lebih baru (token pertama, seperti di atas).
-        if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;
+        if ((document.getElementById('url').value.trim().split(/\s+/)[0] || '') !== u) return;
         document.getElementById('platformBadge').classList.add('hidden');
         qualitySelect.classList.add('hidden');
         photoSelect.classList.add('hidden');
@@ -7156,7 +7156,10 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
   e.preventDefault();
   const rawUrl = document.getElementById('url').value.trim();
   if (!rawUrl) return;
-  const urls = rawUrl.split(/[\s,]+/).filter(function (u) {
+  // Pemisah hanya whitespace (issue #848): koma adalah karakter sah
+  // di dalam URL (CDN bergaya c_fill,w_800 atau query ?a=1,2) —
+  // memecah pada koma memotong URL sah diam-diam.
+  const urls = rawUrl.split(/\s+/).filter(function (u) {
     return u.indexOf('http://') === 0 || u.indexOf('https://') === 0;
   });
   if (!urls.length) { showToast('No valid URLs found.', 3000, 'error'); return; }
