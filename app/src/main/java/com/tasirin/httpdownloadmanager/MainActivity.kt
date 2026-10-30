@@ -312,6 +312,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
                 ) {
                     runCatching { autoOpenCompleted(items) }
+                } else if (!StoragePrefs.isAutoOpenComplete(this@MainActivity)) {
+                    // Konsumsi transisi saat pref MATI (issue #1001):
+                    // samakan peta state tanpa membuka apa pun, agar
+                    // penyelesaian yang terjadi selama pengguna
+                    // memilih tidak-auto-open tidak membuka sendiri
+                    // sesudah pref dinyalakan lagi. Jalur STOPPED
+                    // dengan pref menyala tidak masuk sini — tangkapan
+                    // #149 saat kembali ke depan memang disengaja.
+                    for (item in items) {
+                        if (lastItemStates[item.id] != item.state) {
+                            lastItemStates[item.id] = item.state
+                        }
+                    }
                 }
                 runCatching {
                     // Rebuild daftar dibatasi 400ms sekali kecuali jumlah item berubah;

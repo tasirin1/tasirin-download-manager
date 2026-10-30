@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(ui): penyelesaian saat auto-open mati tak lagi membuka sendiri sesudah pref dinyalakan lagi** -- peta transisi auto-open hanya diperbarui saat pref menyala, jadi item yang selesai selama pengguna memilih tidak-auto-open tetap tercatat berstatus lama dan dinilai 'baru selesai' pada emisi pertama sesudah pref dinyalakan. Kolektor kini mengonsumsi transisi (menyamakan peta state tanpa membuka) selama pref mati; tangkapan saat kembali dari latar dengan pref menyala tidak berubah (issue #1001).
+
 - **fix(ui): spinner Custom di Settings membaca nilai pref segar, bukan tangkapan saat layar dibuka** -- empat listener (kecepatan, segmen, timeout koneksi, timeout baca) menulis balik variabel yang ditangkap sekali saat halaman dibuka; bila nilai berubah dari remote web selama Settings terbuka, memilih ulang baris Custom menimpa nilai baru dengan nilai basi secara diam-diam. Cabang Custom kini membaca pref saat seleksi terjadi (issue #1000).
 
 - **fix(download): kegagalan Move berkas selesai kini memberi tahu pengguna** -- FileSaver.move menelan semua kegagalan menjadi null, engine mengabaikannya (bertipe Unit), dan picker menilai keberhasilan dari runCatching atas panggilan yang tak pernah melempar, jadi toast error adalah kode mati dan pemindahan yang gagal (izin SAF dicabut, folder tujuan hilang) berlalu senyap. DownloadEngine.move kini mengembalikan Boolean dan picker menampilkannya (issue #999).
