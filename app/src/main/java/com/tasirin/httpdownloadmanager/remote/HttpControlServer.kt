@@ -526,6 +526,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // terakhir menghentikan penyegaran lock, jadi finalisasi berkas
         // besar yang lambat bisa tampak "yatim" padahal tmp-nya sedang
         // disalin — menghapusnya menggagalkan upload yang sudah lengkap.
+        // Umur berkas ikut disyaratkan (issue #737): lock TIDAK terbawa
+        // lintas restart instance, jadi sesudah restart semua upload yang
+        // sedang berjalan tampak "tanpa lock" — tanpa syarat mtime, tick
+        // pertama instance baru menghapus tmp milik upload yang kliennya
+        // hanya macet beberapa menit dan progres giganya hangus. Syarat
+        // diam > retensi sesi menyelaraskan umur tmp dengan umur lock
+        // (#252): sesi yang masih boleh dilanjutkan tak boleh kehilangan
+        // tmp-nya.
         runCatching {
             context.cacheDir.listFiles()?.forEach { f ->
                 if (f.isFile && f.name.startsWith("up_") &&
@@ -535,6 +543,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     val lock = uploadLocks[id]
                     if ((lock == null ||
                             now - lock.lastUse.get() > UPLOAD_IDLE_RETENTION_MS) &&
+                        now - f.lastModified() > UPLOAD_IDLE_RETENTION_MS &&
                         !finalizingUploads.containsKey(id)
                     ) {
                         f.delete()
