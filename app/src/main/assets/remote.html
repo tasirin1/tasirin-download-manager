@@ -3641,7 +3641,7 @@ document.getElementById('batchDeleteBtn').addEventListener('click', function () 
 const hiddenDel = batchHiddenCount();
 showConfirm('Delete selected', 'Delete ' + batchSelected.size + ' item(s)?' +
 (hiddenDel ? ' ' + hiddenDel + ' of them are hidden by the current filter/search.' : ''), 'Delete', function () {
-batchSelected.forEach(function (id) { doAction(id, 'delete'); });
+batchSelected.forEach(function (id) { doActionNow(id, 'delete'); });
 toggleBatchMode();
 });
 });

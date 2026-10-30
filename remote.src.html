@@ -6020,7 +6020,11 @@ document.getElementById('batchDeleteBtn').addEventListener('click', function () 
   const hiddenDel = batchHiddenCount();
   showConfirm('Delete selected', 'Delete ' + batchSelected.size + ' item(s)?' +
     (hiddenDel ? ' ' + hiddenDel + ' of them are hidden by the current filter/search.' : ''), 'Delete', function () {
-    batchSelected.forEach(function (id) { doAction(id, 'delete'); });
+    // Langsung doActionNow, BUKAN doAction: konfirmasi batch di atas sudah
+    // cukup. doAction menyisipkan konfirmasi per item lewat showConfirm
+    // singleton, jadi N panggilan sinkron saling menimpa dan hanya item
+    // terakhir yang terhapus (issue #671).
+    batchSelected.forEach(function (id) { doActionNow(id, 'delete'); });
     toggleBatchMode();
   });
 });
