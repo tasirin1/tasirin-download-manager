@@ -1145,6 +1145,7 @@
 - **fix(remote): tombol utama dialog input tidak lagi bergaya danger** -- inputYes kini memakai kelas primary berwarna aksen dan aturan CSS .cm-row .primary ditambahkan; merah .danger hanya untuk konfirmasi destruktif, sehingga Rename, Create Folder, dan Speed & Priority tidak lagi tampil seperti aksi berbahaya (issue #678).
 - **fix(remote): pesan hasil aksi File Manager tidak lagi terhapus oleh loadFs yang lebih dulu mulai** -- generasi pesan fsMsgGen ditambahkan: fsMsg menaikkannya dan loadFs hanya mengosongkan baris status bila tak ada pesan yang dipasang sesudah ia mulai; pesan sukses upload kini bertahan alih-alih berkedip lalu hilang (issue #679).
 - **fix(remote): shareItem berpenjaga urut agar modal share tak menampilkan tautan item yang salah** -- nomor urut shareItemSeq ditambahkan meniru pola shareListSeq; respons (sukses maupun gagal) dari permintaan Share yang sudah disusul permintaan lain diabaikan (issue #680).
+- **fix(remote): invalidateZipCacheFor membandingkan dalam ejaan kanonik di kedua sisi** -- path berkas terbit kini dikanonikkan (canonicalPath) sebelum dibandingkan dengan kunci cache ZIP yang sudah kanonik sejak #675; folder unduhan bertujuan ejaan alias seperti /sdcard tidak lagi lolos invalidasi terarah (issue #681).
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 ### Fixed
 - **Seek zen mode** — Sembunyikan tombol modal dan daftar video berikutnya selama dua-tap lompatan durasi.

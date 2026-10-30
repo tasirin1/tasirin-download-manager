@@ -2417,7 +2417,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  jalur terarah ini; terbitan MediaStore sendiri ber-path null dan
      *  jatuh ke invalidasi global. */
     private fun invalidateZipCacheFor(publishedFilePath: String?) {
-        val dir = publishedFilePath?.let { File(it).parentFile?.absolutePath }
+        // Bandingkan dalam ejaan KANONIK di kedua sisi: kunci cache sudah
+        // kanonik sejak #675, jadi path terbit pun dikanonikkan di sini —
+        // folder ketikan alias (mis. /sdcard/... sebagai alias
+        // /storage/emulated/0/...) kalau tidak tak pernah cocok dengan
+        // kuncinya dan ZIP folder itu lolos terbuang (issue #681).
+        val canonPath = publishedFilePath?.let {
+            runCatching { File(it).canonicalPath }.getOrNull() ?: it
+        }
+        val dir = canonPath?.let { File(it).parentFile?.absolutePath }
         if (dir == null) {
             invalidateZipCache()
             return
@@ -2429,7 +2437,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // folder == publishedFilePath menangkap ZIP SATU-BERKAS: kunci
             // ZIP berkas adalah path berkas itu sendiri, yang tak pernah
             // sama dengan folder induknya (issue #675).
-            folder.isNotEmpty() && (folder == dir || folder == publishedFilePath ||
+            folder.isNotEmpty() && (folder == dir || folder == canonPath ||
                 dir.startsWith("$folder/"))
         }
         doomed.forEach { (key, entry) ->
