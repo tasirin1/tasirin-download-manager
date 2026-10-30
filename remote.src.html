@@ -1151,7 +1151,12 @@
  position: fixed; inset: 0; z-index: 90; background: rgba(8,12,22,.5); display: flex; align-items: center; justify-content: center; padding: 22px; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
 
   .cm-box {
- width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); }
+ width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); max-height: calc(100vh - 44px); max-height: calc(100dvh - 44px); overflow-y: auto; }
+
+  /* Daftar tautan share aktif bisa panjang: gulir di dalam kotak modal
+     supaya judul dan tombol Close selalu terjangkau (issue #760). */
+  #shareList {
+ max-height: 34vh; overflow-y: auto; }
 
   .cm-title {
  font-size: 16.5px; font-weight: 800; margin-bottom: 6px; }
@@ -1240,7 +1245,7 @@
  position: fixed; inset: 0; z-index: 85; background: rgba(8,12,22,.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: flex-end; justify-content: center; }
 
   .sheet-box {
- width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -12px 32px rgba(0,0,0,.18); }
+ width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -12px 32px rgba(0,0,0,.18); max-height: 88vh; max-height: 88dvh; overflow-y: auto; }
 
   .sheet:not(.hidden) {
  animation: sheetFade .18s ease; }
