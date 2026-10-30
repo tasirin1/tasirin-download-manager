@@ -20,8 +20,6 @@
     <color name="primary_container">#1E2A4A</color>
     <color name="primary_container_pressed">#27365E</color>
 
-    <!-- Lingkaran ikon tipe file (item download). -->
-
     <!-- Settings: badge server & section accent -->
     <color name="badge_on_text">#34D399</color>
     <color name="badge_off_text">#F87171</color>

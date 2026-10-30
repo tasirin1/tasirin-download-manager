@@ -666,6 +666,7 @@
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **docs(ui): hapus komentar grup yatim sisa #696 di colors.xml (issue #711)** -- Komentar "Lingkaran ikon tipe file" yang grupnya sudah terhapus kini dibuang; tak lagi melayang mengesankan ada grup color yang hilang.
 - **refactor(ui): hapus ids.xml berisi id mati progress_animator (issue #710)** -- Satu-satunya isi `values/ids.xml` adalah id sisa animasi progres ObjectAnimator lama tanpa satu pun referensi; berkas dihapus seluruhnya.
 - **fix(remote): badge jumlah retry kini punya gaya CSS (issue #709)** -- Definisi `.retry-badge` ditambahkan (chip amber selaras keluarga `.f-type`, termasuk varian tema gelap); sebelumnya span dirender tanpa aturan apa pun dan tampil sebagai teks polos tak selaras di kartu unduhan.
 - **fix(remote): tombol pilih Galeri tidak lagi kehilangan ikonnya (issue #708)** -- `galSetSelectMode` dan reset galeri kini menukar `innerHTML` tombol (ikon tutup saat mode pilih, ikon asli `GAL_SELECT_ICON` saat normal) beserta `title`, bukan `textContent` yang menghapus SVG secara permanen dan menyisakan teks terpotong di tombol bulat.
