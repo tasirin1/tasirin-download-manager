@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pil hitungan header seksi tema gelap: gradasi biru ke sian. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:endColor="#06B6D4"
+        android:startColor="#2563EB"
+        android:type="linear" />
+    <corners android:radius="999dp" />
+</shape>

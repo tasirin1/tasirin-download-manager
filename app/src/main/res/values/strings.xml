@@ -7,7 +7,6 @@
     <string name="summary_active">Active</string>
     <string name="summary_done">Done</string>
     <string name="summary_attention">Attention</string>
-    <string name="app_version_subtitle">v%1$s</string>
     <string name="url_hint_multi">URL (multiple allowed, one per line)</string>
     <string name="section_authenticate">Authentication (optional)</string>
     <string name="section_file">File (optional)</string>

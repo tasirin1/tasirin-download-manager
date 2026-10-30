@@ -3,13 +3,13 @@
     <!-- Badan sticky header -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/window_bg" />
+            <solid android:color="#E60D1738" />
         </shape>
     </item>
     <!-- Garis bawah tipis -->
     <item android:bottom="1dp">
         <shape android:shape="rectangle">
-            <solid android:color="@color/line" />
+            <solid android:color="@color/home_glass_stroke" />
         </shape>
     </item>
 </layer-list>

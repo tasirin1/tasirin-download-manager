@@ -12,10 +12,10 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_status_card"
+        android:background="@drawable/bg_home_glass"
         android:minHeight="72dp"
         android:orientation="vertical"
-        android:padding="14dp">
+        android:padding="16dp">
 
         <!-- Baris 1: ikon + nama + badge status (full-bleed kanan) -->
         <LinearLayout
@@ -26,15 +26,15 @@
 
             <FrameLayout
                 android:id="@+id/file_icon_circle"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_marginEnd="12dp"
-                android:background="@drawable/bg_icon_circle">
+                android:background="@drawable/bg_home_tile_generic">
 
                 <ImageView
                     android:id="@+id/file_icon"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
                     android:layout_gravity="center"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_file_generic" />
@@ -49,7 +49,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:singleLine="true"
                 android:textAppearance="?android:attr/textAppearanceMedium"
-                android:textColor="@color/text_primary" />
+                android:textColor="@color/home_text" />
 
             <TextView
                 android:id="@+id/status_badge"
@@ -83,7 +83,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="@color/text_secondary"
+                android:textColor="@color/home_text_secondary"
                 android:textSize="12sp"
                 tools:text="4 MB / ≈6 MB" />
 
@@ -95,7 +95,7 @@
                 android:gravity="end"
                 android:maxLines="1"
                 android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="@color/accent"
+                android:textColor="@color/home_stat_active"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 tools:text="2.1 MB/s · ETA 00:12"
@@ -110,8 +110,7 @@
             android:layout_height="8dp"
             android:layout_marginTop="10dp"
             android:max="100"
-            android:progressDrawable="@drawable/bg_progress_rounded"
-            android:progressBackgroundTint="@color/line" />
+            android:progressDrawable="@drawable/bg_progress_rounded" />
 
         <!-- Baris error (gagal / pending dengan pesan) -->
         <TextView
@@ -122,7 +121,7 @@
             android:ellipsize="end"
             android:maxLines="2"
             android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/status_off"
+            android:textColor="@color/home_error"
             android:textSize="12sp"
             android:visibility="gone" />
 
@@ -134,7 +133,7 @@
             android:layout_marginTop="6dp"
             android:text="@string/checksum_ok"
             android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/status_on"
+            android:textColor="@color/home_prog_done"
             android:textSize="12sp"
             android:visibility="gone" />
 
@@ -144,7 +143,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/home_text_secondary"
             android:textSize="12sp"
             android:visibility="gone" />
 
@@ -160,6 +159,7 @@
             <Button
                 android:id="@+id/btn_quick_primary"
                 style="@style/AppButton"
+                android:background="@drawable/bg_home_btn_primary"
                 android:layout_width="0dp"
                 android:layout_height="40dp"
                 android:layout_weight="1"
@@ -171,6 +171,8 @@
             <Button
                 android:id="@+id/btn_quick_secondary"
                 style="@style/TvOutlinedButton"
+                android:background="@drawable/bg_home_btn_ghost"
+                android:textColor="@color/home_ghost_text"
                 android:layout_width="0dp"
                 android:layout_height="40dp"
                 android:layout_marginStart="8dp"

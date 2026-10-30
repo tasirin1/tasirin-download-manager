@@ -15,6 +15,12 @@
     android:paddingLeft="10dp"
     android:paddingRight="10dp">
 
+    <View
+        android:id="@+id/section_dot"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:background="@drawable/bg_home_dot" />
+
     <ImageView
         android:id="@+id/section_chevron"
         android:layout_width="16dp"
@@ -28,9 +34,9 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_weight="1"
-        android:textColor="@color/text_secondary"
+        android:textColor="@color/home_text"
         android:letterSpacing="0.04"
-        android:textSize="12sp"
+        android:textSize="15sp"
         android:textStyle="bold"
         tools:text="Active" />
 
@@ -39,13 +45,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:background="@drawable/bg_badge_pill"
-        android:backgroundTint="@color/chip_pressed"
+        android:background="@drawable/bg_home_count_pill"
         android:paddingLeft="10dp"
         android:paddingTop="2dp"
         android:paddingRight="10dp"
         android:paddingBottom="2dp"
-        android:textColor="@color/primary"
+        android:textColor="@color/white"
         android:textSize="12sp"
         android:textStyle="normal"
         tools:text="3" />

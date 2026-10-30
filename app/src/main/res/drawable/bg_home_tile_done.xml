@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Petak ikon mini segmen statistik done (strip ringkasan). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:endColor="@color/tile_done_end"
+        android:startColor="@color/tile_done_start"
+        android:type="linear" />
+    <corners android:radius="8dp" />
+</shape>

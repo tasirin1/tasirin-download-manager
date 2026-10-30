@@ -47,10 +47,10 @@ class DownloadAdapter(private val listener: Listener) :
     }
 
     private fun progressColor(state: DownloadState): Int = when (state) {
-        DownloadState.PENDING, DownloadState.DOWNLOADING -> R.color.primary
-        DownloadState.COMPLETED -> R.color.status_on
-        DownloadState.FAILED -> R.color.status_off
-        DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.text_secondary
+        DownloadState.PENDING, DownloadState.DOWNLOADING -> R.color.home_prog_active
+        DownloadState.COMPLETED -> R.color.home_prog_done
+        DownloadState.FAILED -> R.color.home_prog_failed
+        DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.home_prog_idle
     }
 
     override fun getItemViewType(position: Int): Int =
@@ -93,6 +93,8 @@ class DownloadAdapter(private val listener: Listener) :
         b.textSectionTitle.text = row.title
         b.textSectionCount.text = row.count.toString()
         val chevron = if (row.collapsed) R.drawable.ic_chevron else R.drawable.ic_chevron_up
+        b.sectionDot.backgroundTintList = cachedTint(b.root.context, sectionDotColor(row.key))
+        b.sectionChevron.imageTintList = cachedTint(b.root.context, R.color.home_text_secondary)
         b.sectionChevron.setImageResource(chevron)
         b.sectionChevron.visibility = if (row.count > 0) View.VISIBLE else View.INVISIBLE
         b.sectionHeaderRoot.setOnClickListener { holder.bindToggle?.invoke() }
@@ -130,10 +132,12 @@ class DownloadAdapter(private val listener: Listener) :
         // Satu lookup mime per bind (sebelumnya 2x via fileIconRes + circle).
         val mime = MimeTypes.forFile(item.fileName)
         b.fileIcon.setImageResource(fileIconRes(mime))
-        // cachedTint (bukan valueOf baru): bind penuh tiap recycle-scroll
-        // tak mengalokasi 3 ColorStateList per baris.
-        b.fileIcon.imageTintList = cachedTint(ctx, R.color.text_primary)
-        b.fileIconCircle.backgroundTintList = cachedTint(ctx, fileIconCircleColor(mime))
+        // Ikon putih di atas petak gradasi; khusus APK tint dimatikan karena
+        // vektor robot Android membawa dua warnanya sendiri.
+        b.fileIcon.imageTintList =
+            if (mime == "application/vnd.android.package-archive") null
+            else cachedTint(ctx, R.color.white)
+        b.fileIconCircle.setBackgroundResource(fileTileRes(mime))
         setTextIfChanged(b.statusBadge, badgeText(item, ctx))
         b.statusBadge.backgroundTintList = cachedTint(ctx, badgeBgColor(item.state))
         b.statusBadge.setTextColor(cachedColor(ctx, badgeTextColor(item.state)))
@@ -278,14 +282,18 @@ class DownloadAdapter(private val listener: Listener) :
         }
     }
 
-    /** 7. Softer badge background for failed/cancelled: use red-bg tint. */
+    /** Warna latar badge status tema gelap: Completed hijau solid,
+     *  gagal/batal merah gelap lembut, aktif biru utama, jeda abu. */
     private fun badgeBgColor(state: DownloadState): Int = when (state) {
-        DownloadState.FAILED, DownloadState.CANCELLED -> R.color.status_off_soft
-        else -> progressColor(state)
+        DownloadState.COMPLETED -> R.color.home_badge_done_bg
+        DownloadState.FAILED, DownloadState.CANCELLED -> R.color.home_badge_failed_bg
+        DownloadState.DOWNLOADING, DownloadState.PENDING -> R.color.primary
+        DownloadState.PAUSED -> R.color.text_secondary
     }
 
     private fun badgeTextColor(state: DownloadState): Int = when (state) {
-        DownloadState.FAILED, DownloadState.CANCELLED -> R.color.status_off
+        DownloadState.COMPLETED -> R.color.home_badge_done_text
+        DownloadState.FAILED, DownloadState.CANCELLED -> R.color.home_badge_failed_text
         else -> R.color.white
     }
 
@@ -295,28 +303,37 @@ class DownloadAdapter(private val listener: Listener) :
         if (bar.progress != to) bar.progress = to
     }
 
-    /** Warna lingkaran ikon per tipe file (lembut, kontras dengan ikon gelap). */
-    private fun fileIconCircleColor(mime: String): Int {
+    /** Petak gradasi ikon per tipe file (tema gelap layar utama). */
+    private fun fileTileRes(mime: String): Int {
         return when {
-            mime.startsWith("video") -> R.color.icon_circle_video
-            mime.startsWith("audio") -> R.color.icon_circle_audio
-            mime.startsWith("image") -> R.color.icon_circle_image
-            mime == "application/pdf" -> R.color.icon_circle_pdf
-            mime == "application/vnd.android.package-archive" -> R.color.icon_circle_apk
+            mime.startsWith("video") -> R.drawable.bg_home_tile_video
+            mime.startsWith("audio") -> R.drawable.bg_home_tile_audio
+            mime.startsWith("image") -> R.drawable.bg_home_tile_image
+            mime == "application/vnd.android.package-archive" -> R.drawable.bg_home_tile_apk
+            mime == "application/pdf" || mime.startsWith("text") -> R.drawable.bg_home_tile_doc
             mime == "application/zip" ||
                 mime == "application/x-rar-compressed" ||
-                mime == "application/x-7z-compressed" -> R.color.icon_circle_archive
-            else -> R.color.icon_circle_generic
+                mime == "application/x-7z-compressed" -> R.drawable.bg_home_tile_archive
+            else -> R.drawable.bg_home_tile_generic
         }
+    }
+
+    /** Warna titik penanda header seksi (kunci = nama resource seksi). */
+    private fun sectionDotColor(key: String): Int = when (key) {
+        "section_paused" -> R.color.home_dot_paused
+        "section_completed" -> R.color.home_prog_done
+        "section_failed" -> R.color.home_prog_failed
+        else -> R.color.home_prog_active
     }
 
     /** Pilih ikon tipe file berdasarkan mime (satu lookup per bind). */
     private fun fileIconRes(mime: String): Int {
         return when {
+            mime == "application/vnd.android.package-archive" -> R.drawable.ic_file_apk
             mime.startsWith("video") -> R.drawable.ic_file_video
             mime.startsWith("audio") -> R.drawable.ic_file_audio
             mime.startsWith("image") -> R.drawable.ic_file_image
-            mime == "application/pdf" -> R.drawable.ic_file_pdf
+            mime == "application/pdf" || mime.startsWith("text") -> R.drawable.ic_file_doc
             mime == "application/zip" ||
                 mime == "application/x-rar-compressed" ||
                 mime == "application/x-7z-compressed" -> R.drawable.ic_file_archive

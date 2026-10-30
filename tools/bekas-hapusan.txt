@@ -26,3 +26,4 @@ cacheDuration
 recordProbeFailure
 isInGalleryFolders
 inSelectedFolders
+fileIconCircleColor

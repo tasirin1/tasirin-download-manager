@@ -4,164 +4,160 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@drawable/bg_home_gradient"
     android:orientation="vertical">
 
-    <!-- Toolbar: gradien halus primary → primary_dark + subtitle versi. -->
+    <!-- Topbar ramping: logo ikon launcher + judul satu baris, tanpa
+         teks versi/build; latar transparan di atas gradasi navy root. -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         style="@style/Toolbar.Theme.HttpDownloadManager"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
+        android:layout_height="56dp"
+        android:background="@android:color/transparent"
         android:elevation="0dp"
-        app:subtitle="@string/app_name"
-        app:subtitleTextColor="@color/white"
-        app:subtitleTextAppearance="@style/TextAppearance.AppCompat.Caption"
-        app:title="@string/app_name" />
+        app:navigationIcon="@drawable/ic_topbar_logo"
+        app:title="@string/app_name"
+        app:titleTextAppearance="@style/HomeToolbarTitle"
+        app:titleTextColor="@color/white" />
 
-    <!-- Kartu ringkasan: 3 kolom statistik (Active / Done / Attention). -->
+    <!-- Strip statistik ramping: 3 segmen sebaris (Active / Done / Attention). -->
     <LinearLayout
         android:id="@+id/summary_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:layout_marginBottom="2dp"
-        android:background="@drawable/bg_summary_tonal"
+        android:background="@drawable/bg_home_glass_strip"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingVertical="10dp"
+        android:paddingHorizontal="4dp"
+        android:paddingVertical="8dp"
         android:visibility="gone">
 
-        <!-- Kolom Active -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="horizontal">
 
             <FrameLayout
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginBottom="2dp"
-                android:background="@drawable/bg_icon_circle"
-                android:backgroundTint="@color/white">
+                android:layout_width="23dp"
+                android:layout_height="23dp"
+                android:background="@drawable/bg_home_tile_active">
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
                     android:layout_gravity="center"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_download_section"
-                    app:tint="@color/primary" />
+                    app:tint="@color/white" />
             </FrameLayout>
 
             <TextView
                 android:id="@+id/text_summary_active"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/primary"
-                android:textSize="28sp"
+                android:layout_marginStart="7dp"
+                android:textColor="@color/home_stat_active"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                tools:text="2" />
+                tools:text="1" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginStart="6dp"
+                android:letterSpacing="0.12"
                 android:text="@string/summary_active"
                 android:textAllCaps="true"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
+                android:textColor="@color/home_text_secondary"
+                android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Divider vertikal tipis -->
         <View
             android:layout_width="1dp"
-            android:layout_height="32dp"
-            android:background="@color/line" />
-
-        <!-- Kolom Done -->
+            android:layout_height="24dp"
+            android:background="@color/home_glass_stroke" />
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="horizontal">
 
             <FrameLayout
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginBottom="2dp"
-                android:background="@drawable/bg_icon_circle"
-                android:backgroundTint="@color/white">
+                android:layout_width="23dp"
+                android:layout_height="23dp"
+                android:background="@drawable/bg_home_tile_done">
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
                     android:layout_gravity="center"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_check"
-                    app:tint="@color/status_on" />
+                    app:tint="@color/white" />
             </FrameLayout>
 
             <TextView
                 android:id="@+id/text_summary_done"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/status_on"
-                android:textSize="28sp"
+                android:layout_marginStart="7dp"
+                android:textColor="@color/home_stat_done"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                tools:text="5" />
+                tools:text="1" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginStart="6dp"
+                android:letterSpacing="0.12"
                 android:text="@string/summary_done"
                 android:textAllCaps="true"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
+                android:textColor="@color/home_text_secondary"
+                android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Divider vertikal tipis -->
         <View
             android:layout_width="1dp"
-            android:layout_height="32dp"
-            android:background="@color/line" />
-
-        <!-- Kolom Attention (failed + paused) -->
+            android:layout_height="24dp"
+            android:background="@color/home_glass_stroke" />
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="horizontal">
 
             <FrameLayout
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginBottom="2dp"
-                android:background="@drawable/bg_icon_circle"
-                android:backgroundTint="@color/white">
+                android:layout_width="23dp"
+                android:layout_height="23dp"
+                android:background="@drawable/bg_home_tile_attention">
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
                     android:layout_gravity="center"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_alert"
-                    app:tint="@color/status_off" />
+                    app:tint="@color/white" />
             </FrameLayout>
 
             <TextView
                 android:id="@+id/text_summary_attention"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/status_off"
-                android:textSize="28sp"
+                android:layout_marginStart="7dp"
+                android:textColor="@color/home_stat_attention"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 tools:text="1" />
 
@@ -169,11 +165,12 @@
                 android:id="@+id/text_summary_attention_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginStart="6dp"
+                android:letterSpacing="0.12"
                 android:text="@string/summary_attention"
                 android:textAllCaps="true"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
+                android:textColor="@color/home_text_secondary"
+                android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
@@ -203,7 +200,7 @@
             android:paddingTop="6dp"
             android:paddingEnd="18dp"
             android:paddingBottom="6dp"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/home_text"
             android:textSize="13sp"
             android:textStyle="bold"
             android:visibility="gone"
@@ -240,7 +237,7 @@
                 android:layout_marginTop="16dp"
                 android:gravity="center"
                 android:text="@string/empty_hint"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/home_text"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -250,7 +247,7 @@
                 android:layout_marginTop="4dp"
                 android:gravity="center"
                 android:text="@string/empty_subtitle"
-                android:textColor="@color/text_secondary"
+                android:textColor="@color/home_text_secondary"
                 android:textSize="14sp" />
 
             <Button
@@ -259,7 +256,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:background="@drawable/bg_btn_accent"
+                android:background="@drawable/bg_home_btn_primary"
                 android:minHeight="40dp"
                 android:paddingHorizontal="24dp"
                 android:text="@string/add_download"
@@ -275,6 +272,8 @@
                 <Button
                     android:id="@+id/empty_paste_button"
                     style="@style/TvOutlinedButton"
+                    android:background="@drawable/bg_home_btn_ghost"
+                    android:textColor="@color/home_ghost_text"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -286,6 +285,8 @@
                 <Button
                     android:id="@+id/empty_remote_button"
                     style="@style/TvOutlinedButton"
+                    android:background="@drawable/bg_home_btn_ghost"
+                    android:textColor="@color/home_ghost_text"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
@@ -301,16 +302,17 @@
         <LinearLayout
             android:id="@+id/fab_add"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
+            android:layout_height="48dp"
             android:layout_gravity="bottom|end"
             android:layout_margin="16dp"
-            android:background="@drawable/bg_fab_pill"
+            android:background="@drawable/bg_home_fab"
+            android:elevation="8dp"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="14dp"
-            android:paddingEnd="16dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="20dp">
 
             <ImageView
                 android:layout_width="20dp"
@@ -325,7 +327,7 @@
                 android:layout_marginStart="8dp"
                 android:text="@string/fab_add_label"
                 android:textColor="@color/white"
-                android:textSize="13sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </FrameLayout>

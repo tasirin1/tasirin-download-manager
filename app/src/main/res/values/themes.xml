@@ -30,6 +30,13 @@
         <item name="android:colorControlNormal">@color/white</item>
     </style>
 
+    <!-- Judul topbar ramping layar utama: satu baris 19sp tebal. -->
+    <style name="HomeToolbarTitle" parent="TextAppearance.AppCompat.Widget.ActionBar.Title">
+        <item name="android:textSize">19sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
     <!-- Tombol terisi (primary). -->
     <style name="AppButton" parent="Widget.AppCompat.Button">
         <item name="android:stateListAnimator">@null</item>

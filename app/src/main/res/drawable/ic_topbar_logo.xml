@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo topbar = ikon launcher aplikasi: petak biru #1565C0 bersudut
+     bulat + lingkaran putih berisi panah unduh + garis aksen oranye
+     (gambar yang sama dengan ic_launcher_foreground di atas latarnya). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="38dp" android:height="38dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="@color/ic_launcher_background"
+        android:pathData="M25,4 h58 a21,21 0 0 1 21,21 v58 a21,21 0 0 1 -21,21 h-58 a21,21 0 0 1 -21,-21 v-58 a21,21 0 0 1 21,-21 z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:pathData="M77,52 a23,23 0 1 1 -46,0 a23,23 0 1 1 46,0 z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M48,40 h12 v16 h-12 z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M40,56 h28 l-14,14 z" />
+    <path android:fillColor="@color/accent"
+        android:pathData="M42,79 h24 v3 h-24 z" />
+</vector>

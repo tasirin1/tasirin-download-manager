@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tombol utama kartu unduhan tema gelap: gradasi biru ke sian; fokus D-pad = ring aksen. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="#2563EB" android:endColor="#06B6D4" android:type="linear" />
+            <stroke android:width="3dp" android:color="@color/accent" /><corners android:radius="999dp" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="#1D4ED8" android:endColor="#0284C7" android:type="linear" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="#2563EB" android:endColor="#06B6D4" android:type="linear" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
+</selector>

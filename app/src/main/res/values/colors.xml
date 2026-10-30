@@ -39,4 +39,51 @@
     <color name="section_accent_download">#2E7D32</color>
     <color name="section_accent_storage">#F57C00</color>
     <color name="section_accent_other">#7B1FA2</color>
+    <!-- Tema gelap layar utama (desain persetujuan owner 2026-10-30):
+         latar navy gradasi, kartu kaca, petak ikon gradasi per jenis berkas.
+         Hanya dipakai layar utama; layar lain tetap tema terang. -->
+    <color name="home_bg_top">#1B2A5E</color>
+    <color name="home_bg_mid">#0D1738</color>
+    <color name="home_bg_bottom">#0A0F24</color>
+    <color name="home_glass_fill">#14FFFFFF</color>
+    <color name="home_glass_stroke">#2EFFFFFF</color>
+    <color name="home_text">#EAF0FF</color>
+    <color name="home_text_secondary">#93A5CC</color>
+    <color name="home_ghost_text">#BFE0FF</color>
+    <color name="home_stat_active">#7DD3FC</color>
+    <color name="home_stat_done">#34D399</color>
+    <color name="home_stat_attention">#FCA5A5</color>
+    <color name="home_error">#FCA5A5</color>
+    <color name="home_prog_active">#38BDF8</color>
+    <color name="home_prog_done">#34D399</color>
+    <color name="home_prog_failed">#F87171</color>
+    <color name="home_prog_idle">#94A3B8</color>
+    <color name="home_prog_track">#26FFFFFF</color>
+    <color name="home_badge_done_bg">#34D399</color>
+    <color name="home_badge_done_text">#052E1B</color>
+    <color name="home_badge_failed_bg">#5B2126</color>
+    <color name="home_badge_failed_text">#FCA5A5</color>
+    <color name="home_dot_paused">#FBBF24</color>
+
+    <!-- Pasangan gradasi petak ikon per jenis berkas + segmen statistik. -->
+    <color name="tile_apk_start">#3DDC84</color>
+    <color name="tile_apk_end">#00B248</color>
+    <color name="tile_video_start">#8B5CF6</color>
+    <color name="tile_video_end">#EC4899</color>
+    <color name="tile_audio_start">#EC4899</color>
+    <color name="tile_audio_end">#F43F5E</color>
+    <color name="tile_image_start">#06B6D4</color>
+    <color name="tile_image_end">#0EA5E9</color>
+    <color name="tile_archive_start">#F59E0B</color>
+    <color name="tile_archive_end">#F97316</color>
+    <color name="tile_doc_start">#3B82F6</color>
+    <color name="tile_doc_end">#6366F1</color>
+    <color name="tile_generic_start">#64748B</color>
+    <color name="tile_generic_end">#475569</color>
+    <color name="tile_active_start">#2563EB</color>
+    <color name="tile_active_end">#38BDF8</color>
+    <color name="tile_done_start">#059669</color>
+    <color name="tile_done_end">#34D399</color>
+    <color name="tile_attention_start">#DC2626</color>
+    <color name="tile_attention_end">#FB7185</color>
 </resources>

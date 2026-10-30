@@ -217,17 +217,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         try {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        applyEdgeToEdge(binding.root)
+        applyEdgeToEdge(binding.root, darkBars = true)
         setSupportActionBar(binding.toolbar)
         val overflowColor = ContextCompat.getColor(this, R.color.white)
         binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
             ?.apply { setTint(overflowColor) }
-        // Subtitle toolbar: versi app (contoh "v1.0 · build 100995").
-        val pkgInfo = runCatching { packageManager.packageInfoCompat(packageName) }.getOrNull()
-        binding.toolbar.subtitle = getString(
-            R.string.app_version_subtitle,
-            (pkgInfo?.versionName ?: "1.0") + " · build " + (pkgInfo?.versionCodeCompat() ?: 0L)
-        )
+        // Topbar ramping tanpa teks versi/build (desain persetujuan owner
+        // 2026-10-30); versi tetap tampil di dialog About.
 
         adapter = DownloadAdapter(this)
         listLayoutManager = LinearLayoutManager(this)
