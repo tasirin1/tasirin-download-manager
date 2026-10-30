@@ -509,12 +509,20 @@ class SettingsActivity : AppCompatActivity() {
             }
             binding.serverSwitch.isEnabled = false
             lifecycleScope.launch {
+                // Operasi + seluruh konsekuensi pref-nya satu rangkaian
+                // yang tak boleh putus di tengah (issue #901): operasi
+                // berjalan NonCancellable di IO, lalu penulisan pref di
+                // bawah berjalan sinkron di Main TANPA hop withContext
+                // terpisah (pola #840) — hop itu adalah titik suspensi
+                // yang membatalkan konsekuensi tepat sesudah server
+                // sudah start/stop, meninggalkan pref lama yang
+                // menghidupkan lagi server pada start dingin berikutnya.
                 val operation = if (started) {
-                    withContext(Dispatchers.IO) { App.stopHttpServer() }
+                    withContext(NonCancellable + Dispatchers.IO) { App.stopHttpServer() }
                 } else {
-                    withContext(Dispatchers.IO) { App.startHttpServer() }
+                    withContext(NonCancellable + Dispatchers.IO) { App.startHttpServer() }
                 }
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                run {
                     if (!operation) {
                         if (started) {
                             Toast.makeText(
