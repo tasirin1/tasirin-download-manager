@@ -540,7 +540,7 @@ jangan digabung dengan PR fitur lain.
    `remote.src.html` (bukan `remote.html`). Untuk keamanan: baca
    `ServerSecurity.kt` + unit test-nya.
 2. **Jangan sentuh yang sudah stabil** — kalau kode sudah benar dan teruji
-   (mis. `ServerSecurity.isPathAllowed`, `PinHash`), jangan refactor tanpa
+   (mis. `ServerSecurity.isPathAllowedFast`, `PinHash`), jangan refactor tanpa
    alasan kuat. Refactor yang tidak perlu meningkatkan risiko regresi.
 3. **Pertahankan minSdk 23** — Android 6 adalah lantai dukungan (keputusan
    owner 2026-10-28). Jangan gunakan API yang hanya tersedia di API 24+
