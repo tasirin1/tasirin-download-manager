@@ -3668,6 +3668,16 @@ class DownloadEngine(appContext: Context) {
                 if (now - lastNotify >= 1000) {
                     lastNotify = now
                     coroutineContext.ensureActive()
+                    // Penjaga ruang berjalan (issue #781): jalur single-stream
+                    // dulunya satu-satunya jalur streaming tanpa anggaran —
+                    // respons chunked melewati cek pra-unduh (total=0) dan
+                    // overrun ditoleransi verifySize, jadi loop menulis
+                    // sampai disk benar-benar habis. Pola pra-terbang HLS:
+                    // berhenti begitu ruang volume partial menyentuh cadangan.
+                    val freeNow = saver.freeBytes()
+                    if (freeNow < MIN_FREE_BYTES) {
+                        throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
+                    }
                     val (speed, eta) = speedTracker.sample(item.id, downloaded, total)
                     health.check(now, downloaded, total, speed)
                     // Progress tick: updateItem buat copy baru supaya StateFlow
