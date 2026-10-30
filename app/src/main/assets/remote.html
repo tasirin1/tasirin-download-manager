@@ -2076,6 +2076,31 @@ if (a.danger) b.className = 'danger';
 b.innerHTML = (a.icon ? '<span class="btn-ico">' + (UI_ICONS[a.icon] || '') + '</span>' : '') + '<span>' + escapeHtml(a.label) + '</span>';
 b.addEventListener('click', function () {
 closeItemSheet();
+const fresh = currentItems.find(function (x) { return x.id === it.id; });
+if (!fresh) {
+showToast('Item is no longer available', 3000, 'error');
+return;
+}
+const opKey = a.op || 'open';
+const allowedStates = {
+open: ['COMPLETED'],
+share: ['COMPLETED'],
+rename: ['COMPLETED'],
+pause: ['DOWNLOADING'],
+resume: ['PAUSED', 'FAILED', 'CANCELLED'],
+limit: ['PENDING', 'PAUSED', 'FAILED', 'DOWNLOADING'],
+priority_high: ['DOWNLOADING', 'PENDING', 'PAUSED'],
+priority_normal: ['DOWNLOADING', 'PENDING', 'PAUSED'],
+priority_low: ['DOWNLOADING', 'PENDING', 'PAUSED'],
+cancel: ['DOWNLOADING', 'PENDING', 'PAUSED'],
+delete: ['COMPLETED', 'FAILED', 'CANCELLED'],
+pin: ['COMPLETED', 'DOWNLOADING', 'PENDING', 'PAUSED', 'FAILED', 'CANCELLED']
+};
+if (allowedStates[opKey] && allowedStates[opKey].indexOf(fresh.state) < 0) {
+showToast('Item changed — reopen the menu for current actions', 3000, 'error');
+return;
+}
+it = fresh;
 if (a.stream) { window.open(a.stream, '_blank', 'noopener,noreferrer'); return; }
 if (a.dl) { fsDownloadUrl(a.dl); return; }
 if (a.op === 'rename') {
