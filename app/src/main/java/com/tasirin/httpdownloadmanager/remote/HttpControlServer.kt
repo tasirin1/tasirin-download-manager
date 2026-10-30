@@ -1859,6 +1859,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Nilai = Triple(createdAt, file, size): ukuran disimpan saat insert agar
     // prune tak perlu file.length() (stat syscall) per entri per pembuatan ZIP.
     private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Triple<Long, File, Long>>()
+
+    // Kunci cache ZIP yang pembuatannya sedang berjalan (issue #885):
+    // hitungannya sudah ditulis pembuat tetapi entrinya belum tersimpan.
+    private val zipInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     // Pasangan (entri tertulis, item terlewat) per kunci cache ZIP
     // (issue #864/#874): cache hit tidak menjalankan pembuatnya, jadi
     // hitungan aktual disimpan di sini — ditulis dari dalam lambda
@@ -1913,18 +1917,27 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 zipCache.remove(key)
                 runCatching { file.delete() }
             }
-            val file = create() ?: return null
+            // Tandai sedang-dibuat (issue #885): retainAll hitungan di
+            // mediaZip mempertahankan kunci yang entrinya belum sempat
+            // tersimpan di zipCache selama pembuatan berjalan.
+            zipInFlight.add(key)
+            val file = create() ?: run {
+                zipInFlight.remove(key)
+                return null
+            }
             // Satu stat saja: dipakai untuk guard ukuran dan disimpan agar
             // prune berikutnya tak perlu stat ulang tiap entri cache.
             val size = file.length()
             if (size > ZIP_CACHE_MAX_BYTES) {
                 runCatching { file.delete() }
+                zipInFlight.remove(key)
                 return null
             }
             // Browser dapat membuka beberapa request Range sekaligus. Kunci per
             // key benar-benar mencegah ZIP yang sama dibuat dua kali; cukup 8
             // strip lock agar map kunci tidak tumbuh tanpa batas.
             zipCache[key] = Triple(now, file, size)
+            zipInFlight.remove(key)
             pruneZipCache(now, key)
             return file
         }
@@ -2060,7 +2073,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 // dibatasi ke kunci yang cachenya hidup (+ kunci ini)
                 // agar tak tumbuh sendiri.
                 zipWrittenCounts[key] = r.entriesWritten to r.skippedItems
-                zipWrittenCounts.keys.retainAll(zipCache.keys + key)
+                zipWrittenCounts.keys.retainAll(zipCache.keys + zipInFlight + key)
             }
             created
         } ?: return notFound()
