@@ -792,8 +792,14 @@ def cek_definisi_baru(peringatan, diff):
 def cek_pengingat_changelog(peringatan, berubah):
     if not berubah or "CHANGELOG.md" in berubah:
         return
-    if any(b.startswith(("app/src/main/", "remote.src.html",
-                          "app/build.gradle.kts", "scripts/", "tools/"))
+    # Cakupan disamakan dengan guard keras check_changelog (issue
+    # #717): dulu gradle/, .github/, .githooks/, build.gradle.kts, dan
+    # settings.gradle.kts lolos tanpa pengingat lokal walau CI menolak.
+    awalan_kode = ("app/src/main/", "scripts/", "tools/", "gradle/",
+                   ".github/", ".githooks/")
+    berkas_kode = ("remote.src.html", "app/build.gradle.kts",
+                   "build.gradle.kts", "settings.gradle.kts")
+    if any(b.startswith(awalan_kode) or b in berkas_kode
            for b in berubah):
         peringatan.append("Kode aplikasi berubah tanpa CHANGELOG.md — catat per rilis (aturan repo)")
 

@@ -191,8 +191,9 @@ def main():
                   "pada rentang ini authored dependabot[bot] (PR bot murni, "
                   "termasuk yang di-merge manual).")
             return 0
-        print("::error::Perubahan kode (app/src/main, remote.src.html, "
-              "app/build.gradle.kts, scripts/) wajib menyertakan update CHANGELOG.md")
+        print("::error::Perubahan kode (app/src/main/, remote.src.html, "
+              "berkas Gradle, scripts/, tools/, gradle/, .github/, "
+              ".githooks/) wajib menyertakan update CHANGELOG.md")
         print("\n".join(needs))
         return 1
     print("Guard CHANGELOG: OK")
