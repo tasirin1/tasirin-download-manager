@@ -20,10 +20,12 @@ data class UpdateInfo(
  *  dicurigai Play Protect): pengguna mengambil versi baru lewat browser dari
  *  halaman rilis resmi, lalu memasang manual. */
 object Updater {
-    // Format asset baru (pendek): tasirin-download-manager-v1.<a>.<b>.apk.
+    // Format asset baru (pendek): tasirin-download-manager-v<X>.<a>.<b>.apk.
     // Kode versi dibaca dari tag rilis: nomor lari = a*1000+b (skema
     // rollover keputusan owner 2026-10-28: komponen ketiga tak mencapai
-    // 1000, v1.0.999 lanjut v1.1.0), kode = 100000+nomor lari. Tag lama
+    // 1000, v1.0.999 lanjut v1.1.0). Untuk mayor X=1, kode =
+    // 100000+nomor lari; mayor X>=2 dipetakan ke pita X*100jt+lari
+    // yang selalu di atas seluruh kode 1.x (issue #889). Tag lama
     // v1.0.<n> dengan n>999 tetap terbaca benar lewat rumus yang sama.
     // Format lama tasirin-download-manager-v1.0.<n>-<code>.apk tetap
     // diterima sebagai fallback (kode dari nama file).
