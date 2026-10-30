@@ -207,14 +207,57 @@
   .wrap.gal-wrap {
  max-width: 1200px; }
 
-  .seg {
- display: flex; gap: 2px; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0 2px; margin-bottom: 16px; flex-wrap: wrap; }
+  /* Strip kategori unduhan: meniru strip ringkasan Active/Done/Attention
+     layar utama aplikasi (permintaan owner) — petak gradasi per ember
+     (warna tile_* native), angka besar + label kecil, pemisah tipis.
+     Ketuk sel = saring; ketuk sel terpilih sekali lagi = kembali ke semua. */
+  .cat-strip {
+ display: flex; align-items: stretch; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 7px 6px; margin-bottom: 16px; box-shadow: var(--shadow); }
 
-  .seg button {
- border: 0; background: transparent; min-height: 36px; padding: 7px 10px; border-radius: 0; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all .15s ease; }
+  :root[data-theme="dark"] .cat-strip {
+ background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03)); border-color: rgba(255,255,255,.09); box-shadow: none; }
 
-  .seg button.on {
- background: transparent; color: var(--ink); box-shadow: inset 0 -2.5px 0 var(--primary); }
+  .cat-cell {
+ flex: 1; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); cursor: pointer; text-align: left; transition: all .15s ease; min-width: 0; }
+
+  .cat-cell.on {
+ background: var(--bg-soft); box-shadow: inset 0 0 0 1px var(--line); }
+
+  :root[data-theme="dark"] .cat-cell.on {
+ background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+
+  .cat-div {
+ width: 1px; background: var(--line); margin: 5px 0; flex: 0 0 auto; }
+
+  :root[data-theme="dark"] .cat-div {
+ background: rgba(255,255,255,.09); }
+
+  .cat-tile {
+ width: 27px; height: 27px; border-radius: 8px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+
+  .cat-tile svg {
+ width: 15px; height: 15px; display: block; }
+
+  .cat-tile.t-active {
+ background: linear-gradient(135deg, #2563EB, #38BDF8); }
+
+  .cat-tile.t-done {
+ background: linear-gradient(135deg, #059669, #34D399); }
+
+  .cat-tile.t-attention {
+ background: linear-gradient(135deg, #DC2626, #FB7185); }
+
+  .cat-txt {
+ display: flex; flex-direction: column; min-width: 0; }
+
+  .cat-num {
+ font-size: 17px; font-weight: 800; line-height: 1.05; }
+
+  .cat-lbl {
+ font-size: 11px; font-weight: 600; color: var(--muted); line-height: 1.15; }
+
+  .cat-cell.on .cat-lbl {
+ color: var(--ink); }
 
   form {
  display: flex; flex-direction: column; gap: 10px; }
@@ -1425,7 +1468,6 @@
  transform: scale(.985); }
 
 
-  .fcount{font-size:11px;font-weight:700;margin-left:5px;color:var(--muted);line-height:1.5}.seg button.on .fcount{color:var(--primary)}
   .page-head{transition:padding .2s ease}.page-head.shrink h2{font-size:15px;transition:font-size .2s ease}.page-head.shrink{padding:2px 0 6px}
   .gal-toolbar{transition:gap .2s ease}.gal-toolbar.shrink{gap:6px;padding:0}.gal-toolbar.shrink h2{font-size:15px}.gal-toolbar.shrink .page-sub{font-size:10.5px}
   .social-favicon{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:2px;flex:0 0 auto}
@@ -1469,10 +1511,8 @@
   :root[data-theme="dark"] #filtersSticky {
  background: transparent; }
 
-  #filtersSticky .seg {
- margin-bottom: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 0 2px; scroll-padding: 0 2px; }
-  #filtersSticky .seg::-webkit-scrollbar { display: none; }
-  #filtersSticky .seg button { flex: 0 0 auto; white-space: nowrap; display: inline-flex; align-items: center; }
+  #filtersSticky .cat-strip {
+ margin-bottom: 0; }
 
   .empty {
  padding: 64px 16px; text-align: center; color: var(--muted); display: flex; flex-direction: column; align-items: center; }
@@ -1668,12 +1708,11 @@
  display: flex; }
 
 
-    .seg {
- width: 100%; }
+    .cat-cell {
+ padding: 6px; gap: 6px; }
 
-    .seg button {
- flex: 1; padding: 7px 6px; font-size: 12.5px; }
-    #filtersSticky .seg button { flex: 0 0 auto; padding: 7px 10px; }
+    .cat-num {
+ font-size: 16px; }
 
     input, select {
  font-size: 16px; padding: 12px; }
@@ -1786,12 +1825,21 @@
 
 <div class="wrap">
   <div id="filtersSticky">
-    <div class="seg" id="downloadsFilters">
-      <button id="webFilterAll" type="button" class="on">All<span class="fcount" id="fAll"></span></button>
-      <button id="webFilterActive" type="button">Active<span class="fcount" id="fActive"></span></button>
-      <button id="webFilterCompleted" type="button">Completed<span class="fcount" id="fDone"></span></button>
-      <button id="webFilterFailed" type="button">Failed<span class="fcount" id="fFail"></span></button>
-      <button id="webFilterNew" type="button">New<span class="fcount" id="fNew"></span></button>
+    <div class="cat-strip" id="downloadsFilters">
+      <button id="webFilterActive" type="button" class="cat-cell">
+        <span class="cat-tile t-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5"/><path d="M4 19h16"/></svg></span>
+        <span class="cat-txt"><span class="cat-num" id="fActive">0</span><span class="cat-lbl">Active</span></span>
+      </button>
+      <span class="cat-div"></span>
+      <button id="webFilterDone" type="button" class="cat-cell">
+        <span class="cat-tile t-done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 6.5"/></svg></span>
+        <span class="cat-txt"><span class="cat-num" id="fDone">0</span><span class="cat-lbl">Done</span></span>
+      </button>
+      <span class="cat-div"></span>
+      <button id="webFilterAttention" type="button" class="cat-cell">
+        <span class="cat-tile t-attention"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 4.1L2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z"/><path d="M12 9.5V14M12 17.2h.01"/></svg></span>
+        <span class="cat-txt"><span class="cat-num" id="fAttention">0</span><span class="cat-lbl">Attention</span></span>
+      </button>
     </div>
   </div>
   <div class="page-head" id="dlPageHead">
@@ -2215,24 +2263,31 @@ let failCount = 0;
 let currentItems = [];
 let webFilter = 'ALL';
 try { webFilter = localStorage.getItem('dl_filter') || 'ALL'; } catch (e) {}
+// Migrasi ember lama ke strip Active/Done/Attention: Completed -> Done,
+// Failed -> Attention (kini termasuk Paused), New -> All.
+if (webFilter === 'COMPLETED') webFilter = 'DONE';
+else if (webFilter === 'FAILED') webFilter = 'ATTENTION';
+else if (webFilter === 'NEW') webFilter = 'ALL';
 let dlPinned = new Set();
 try { const _pv = localStorage.getItem('dl_pinned'); if (_pv) { const _arr = JSON.parse(_pv); dlPinned = new Set(Array.isArray(_arr) ? _arr.filter(function (x) { return typeof x === 'string'; }) : []); } } catch (_e) {}
-const WEB_FILTERS = {ALL:'webFilterAll', ACTIVE:'webFilterActive', COMPLETED:'webFilterCompleted', FAILED:'webFilterFailed', NEW:'webFilterNew'};
-if (!WEB_FILTERS[webFilter]) webFilter = 'ALL';
+const WEB_FILTERS = {ACTIVE:'webFilterActive', DONE:'webFilterDone', ATTENTION:'webFilterAttention'};
+if (!WEB_FILTERS[webFilter] && webFilter !== 'ALL') webFilter = 'ALL';
+function syncFilterCells() {
+  Object.entries(WEB_FILTERS).forEach(function (f) {
+    document.getElementById(f[1]).classList.toggle('on', f[0] === webFilter);
+  });
+}
 Object.entries(WEB_FILTERS).forEach(function (e) {
   document.getElementById(e[1]).addEventListener('click', function () {
-    webFilter = e[0];
+    // Ketuk sel terpilih sekali lagi = kembali menampilkan semua.
+    webFilter = (webFilter === e[0]) ? 'ALL' : e[0];
     try { localStorage.setItem('dl_filter', webFilter); } catch (err) {}
-    Object.entries(WEB_FILTERS).forEach(function (f) {
-      document.getElementById(f[1]).classList.toggle('on', f[0] === webFilter);
-    });
+    syncFilterCells();
     refresh();
   });
 });
-// Sinkronkan tombol filter dengan nilai tersimpan saat halaman dimuat.
-Object.entries(WEB_FILTERS).forEach(function (f) {
-  document.getElementById(f[1]).classList.toggle('on', f[0] === webFilter);
-});
+// Sinkronkan sel strip dengan nilai tersimpan saat halaman dimuat.
+syncFilterCells();
 
 const addForm = document.getElementById('addForm');
 const addSheet = document.getElementById('addSheet');
@@ -5919,40 +5974,21 @@ function updateToolbar(items) {
   if (sep1) {
     sep1.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
   }
-  // Total 'All' = jumlah item persis (issue #568): rumus jumlah ember
-  // lama menghitung FAILED dua kali (ia anggota pausedOrFailed sekaligus
-  // failed) dan membuang CANCELLED sama sekali, sampai daftar yang hanya
-  // berisi CANCELLED menghasilkan total 0 dan bar filter disembunyikan.
+  // Hitungan strip kategori: Active/Done/Attention sejajar predikat
+  // saringannya. Attention = pausedOrFailed (PAUSED + FAILED + CANCELLED,
+  // meniru ringkasan native; ember Failed lama #568 termasuk di dalamnya).
+  // Angka selalu ditampilkan (termasuk 0) seperti strip aplikasi.
   var total = items.length;
-  var fAll = document.getElementById('fAll');
   var fActive = document.getElementById('fActive');
   var fDone = document.getElementById('fDone');
-  var fFail = document.getElementById('fFail');
-  var fNew = document.getElementById('fNew');
-  if (fAll) fAll.textContent = total ? ' ' + total : '';
-  if (fActive) fActive.textContent = active ? ' ' + active : '';
-  if (fDone) fDone.textContent = completed ? ' ' + completed : '';
-  if (fFail) fFail.textContent = failed ? ' ' + failed : '';
-  var newCount = items.filter(function (it) { return (Date.now() - (it.addedAt || 0)) < 60000; }).length;
-  if (fNew) fNew.textContent = newCount ? ' ' + newCount : '';
-  // Bar filter menyempit: sembunyi penuh saat daftar kosong, atau sembunyikan
-  // chip yang kosong bila hanya satu filter yang punya item (kecuali filter aktif).
+  var fAttention = document.getElementById('fAttention');
+  if (fActive) fActive.textContent = active;
+  if (fDone) fDone.textContent = completed;
+  if (fAttention) fAttention.textContent = pausedOrFailed;
+  // Strip sembunyi penuh saat daftar kosong (total = jumlah item persis,
+  // pelajaran #568) atau di luar halaman unduhan.
   var fSticky = document.getElementById('filtersSticky');
   if (fSticky) fSticky.classList.toggle('hidden', total === 0 || currentRoute() !== 'downloads');
-  var fBtnId = {fActive: 'webFilterActive', fDone: 'webFilterCompleted', fFail: 'webFilterFailed', fNew: 'webFilterNew'};
-  var keys = ['fActive', 'fDone', 'fFail', 'fNew'];
-  var counts = {fActive: active, fDone: completed, fFail: failed, fNew: newCount};
-  var onlyOne = [active > 0, completed > 0, failed > 0, newCount > 0].filter(Boolean).length <= 1;
-  keys.forEach(function (k) {
-    var btn = document.getElementById(fBtnId[k]);
-    if (!btn) return;
-    if (!onlyOne) { btn.classList.remove('hidden'); return; }
-    var isCur = (webFilter === 'ACTIVE' && k === 'fActive') ||
-      (webFilter === 'COMPLETED' && k === 'fDone') ||
-      (webFilter === 'FAILED' && k === 'fFail') ||
-      (webFilter === 'NEW' && k === 'fNew');
-    btn.classList.toggle('hidden', counts[k] === 0 && !isCur);
-  });
   const badge = document.getElementById('navDlBadge');
   if (badge) {
     badge.textContent = active;
@@ -6493,10 +6529,9 @@ function rebuildList(items) {
   const filtered = items.filter(function (it) {
     if (q && it.fileName && it.fileName.toLowerCase().indexOf(q) < 0) return false;
     if (webFilter === 'ALL') return true;
-    if (webFilter === 'NEW') return (Date.now() - (it.addedAt || 0)) < 60000;
     if (webFilter === 'ACTIVE') return it.state === 'DOWNLOADING' || it.state === 'PENDING';
-    if (webFilter === 'COMPLETED') return it.state === 'COMPLETED';
-    return it.state === 'FAILED' || it.state === 'CANCELLED';
+    if (webFilter === 'DONE') return it.state === 'COMPLETED';
+    return it.state === 'FAILED' || it.state === 'CANCELLED' || it.state === 'PAUSED';
   });
   // Rekam himpunan tampil untuk penanda seleksi tersembunyi (#654), lalu
   // segarkan hitungan batch: ganti filter/pencarian mengubah berapa
