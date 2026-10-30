@@ -5,8 +5,11 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 /** Stream respons SSE: antrean terbatas + heartbeat tiap [TIMEOUT_SECONDS] detik
- *  agar koneksi tidak diputus proxy; menutup diri bila antrean penuh. */
-internal class SseStream : InputStream() {
+ *  agar koneksi tidak diputus proxy; menutup diri bila antrean penuh.
+ *  [authorizedSecret] adalah secret sesi saat koneksi diotorisasi: pump
+ *  mencabut stream yang secret tangkapannya tak lagi sama dengan secret
+ *  kini (logout / ganti PIN me-rotate secret, issue #731). */
+internal class SseStream(val authorizedSecret: String = "") : InputStream() {
     private companion object {
         /** Waktu tunggu polling (detik): harus lebih besar dari interval pump
          *  di HttpControlServer (1 dtk) supaya data selalu ada sebelum timeout. */

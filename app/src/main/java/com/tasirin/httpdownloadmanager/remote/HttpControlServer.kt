@@ -3636,7 +3636,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // koneksi; tanpa batas, klien di LAN bisa menguras thread/memori.
         // Semua subsistem lain di server ini sudah dibatasi (issue #162).
         // Klien resmi jatuh ke polling berkala bila SSE ditolak.
-        val stream = SseStream()
+        val stream = SseStream(StoragePrefs.serverSessionSecret(context))
         synchronized(sseClients) {
             if (sseClients.size >= MAX_SSE_CLIENTS) {
                 return jsonResponse(JSONObject().put("ok", false).put("error", "Too many event streams"))
@@ -3711,6 +3711,27 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         if (pruneTick) {
                             runCatching { pruneCompletedUploads() }
                             runCatching { pruneFsStats() }
+                        }
+                        // Cabut stream yang secret sesinya sudah tak berlaku
+                        // (issue #731): pinOk hanya memeriksa saat koneksi
+                        // dibuka, jadi rotasi secret (logout / ganti PIN)
+                        // tak pernah mencapai stream yang sudah terbuka dan
+                        // klien lama terus menerima snapshot unduhan. Secret
+                        // kini dibandingkan tiap tick; stream yang secret
+                        // tangkapannya berbeda ditutup dan dibuang. Baca
+                        // prefs yang gagal menunda pencabutan ke tick
+                        // berikutnya, bukan membunuh pump.
+                        val currentSecret = runCatching {
+                            StoragePrefs.serverSessionSecret(context)
+                        }.getOrNull()
+                        if (currentSecret != null) {
+                            val revoked = sseClients.filter {
+                                it.authorizedSecret != currentSecret
+                            }
+                            if (revoked.isNotEmpty()) {
+                                revoked.forEach { it.closeStream() }
+                                sseClients.removeAll(revoked)
+                            }
                         }
                         if (sseClients.isEmpty()) {
                             delay(1_000)
