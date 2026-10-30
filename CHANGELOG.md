@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): tutup sisa celah balapan wake lock — field volatile + cek destroyed tepat sebelum acquire** -- cek di pintu updateWakeLock dan acquire tidak atomik, jadi kolektor yang ter-preempt di sela-selanya masih bisa meng-acquire lock sesudah onDestroy tuntas. Kini field wakeLock @Volatile dan destroyed diperiksa sekali lagi tepat sebelum acquire (issue #989).
+
 - **fix(download): veto 'connection refused' didahulukan di isNetworkError** -- pesan refused sungguhan di Android berbentuk komposit yang memuat frasa positif 'failed to connect' ('... ECONNREFUSED (Connection refused)'), sehingga tanpa veto yang diperiksa sebelum pencocokan positif apa pun, niat #976 kalah dan server mati permanen tetap berakhir PAUSED abadi. Kini pesan bermuatan refused tidak pernah terklasifikasi error jaringan di sini (issue #988).
 
 - **fix(download): tiga frasa transien kembali terklasifikasi sebagai error jaringan** -- 'connect timed out' (tak memuat substring 'timeout', ikut tersapu penyaringan #976), 'connection reset' (putus di tengah aliran), dan 'broken pipe' sebelumnya lolos dari semua klasifier sehingga item berakhir FAILED terminal dan segmen HLS kehilangan retry level-segmen, padahal ketiganya kegagalan jaringan sesaat yang seharusnya PAUSED (issue #987).

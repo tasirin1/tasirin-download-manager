@@ -27,6 +27,9 @@ class DownloadService : Service() {
     // ID item yang terakhir terlihat aktif — dipakai mendeteksi item selesai/
     // mulai agar refresh notifikasi tidak ter-skip throttle (anti progress nyangkut).
     private var lastActiveIds: Set<String> = emptySet()
+    // @Volatile (issue #989): field ini dibaca/ditulis lintas thread
+    // main (onDestroy) dan thread IO kolektor tanpa kunci.
+    @Volatile
     private var wakeLock: PowerManager.WakeLock? = null
 
     // Penanda hancur untuk balapan lepas wake lock (issue #982):
@@ -213,7 +216,13 @@ class DownloadService : Service() {
                     .apply { setReferenceCounted(false) }
             }
             val lock = wakeLock
-            if (lock != null && runCatching { !lock.isHeld }.getOrDefault(true)) {
+            // Periksa destroyed sekali lagi tepat sebelum acquire
+            // (issue #989): cek di pintu fungsi dan acquire tidak
+            // atomik — onDestroy bisa tuntas di sela-selanya dan
+            // lock yang ter-acquire sesudah itu tak berpemilik.
+            if (lock != null && !destroyed &&
+                runCatching { !lock.isHeld }.getOrDefault(true)
+            ) {
                 runCatching { lock.acquire(WAKELOCK_TIMEOUT_MS) }
             }
         } else {
