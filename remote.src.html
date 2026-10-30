@@ -6960,7 +6960,12 @@ document.getElementById('shareCopy').addEventListener('click', function () {
 // Penjaga re-entry revoke (issue #880): ketuk ganda mengirim dua
 // POST untuk token yang sama — sukses pertama lalu diikuti toast
 // gagal dari respons kedua atas token yang sudah tercabut.
+// Bendera TERPISAH per jalur (issue #888): tombol sesi dan baris
+// daftar menargetkan token berbeda dan hidup bersamaan dalam satu
+// modal — satu bendera bersama menelan ketukan sah di kontrol
+// saudara tanpa umpan balik apa pun.
 let shareRevoking = false;
+let shareListRevoking = false;
 document.getElementById('shareRevoke').addEventListener('click', async function () {
   if (!currentShareToken || shareRevoking) return;
   shareRevoking = true;
@@ -7036,8 +7041,8 @@ async function refreshShareList() {
   });
 }
 async function revokeShareSid(sid) {
-  if (shareRevoking) return;
-  shareRevoking = true;
+  if (shareListRevoking) return;
+  shareListRevoking = true;
   try {
     const res = await fetchTimeout(API + '/api/share_revoke_id', {
       method: 'POST',
@@ -7053,7 +7058,7 @@ async function revokeShareSid(sid) {
   } catch (e) {
     showToast('Failed to revoke link', 3000, 'error');
   } finally {
-    shareRevoking = false;
+    shareListRevoking = false;
   }
   refreshShareList();
 }
