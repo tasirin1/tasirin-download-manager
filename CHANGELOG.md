@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): favicon HentaiHaven kini tampil di kartu unduhan** -- Kelas CSS `.social-favicon.p-hentaihaven` sudah ada tetapi `socialFavicon()` tak punya cabang untuk host-nya sehingga unduhan HentaiHaven tampil polos; cabang `hentaihaven.xxx` kini ditambahkan (issue #765).
 - **fix(remote): petak ikon mode compact Downloads kini benar-benar 32x32 persegi** -- Aturan compact hanya menyetel `width`/`height` sehingga `flex-basis: 36px` dari aturan dasar menang dan ikon menjadi 36x32 pipih + baris sub geser 4px dari nama; kini `flex-basis: 32px` ikut disetel dan indent sub (40px) segaris lagi (issue #764).
 - **fix(remote): lencana jenis berkas tidak lagi hilang untuk nama berkas panjang** -- Lencana `.f-type` sebelumnya anak inline terakhir di dalam kotak nama yang ter-clamp 2 baris sehingga terpotong untuk nama panjang; teks nama kini dibungkus span `.name-txt` yang memikul clamp di dalam baris flex, lencana selalu tampil di sampingnya (rebuild + patch diselaraskan) (issue #763).
 - **fix(remote): toolbar batch Downloads kini menghormati safe-area inset bawah** -- `.batch-toolbar` adalah satu-satunya bar bawah tanpa `env(safe-area-inset-bottom)` sehingga tombolnya mepet zona gestur Android; padding bawahnya kini `calc(10px + env(safe-area-inset-bottom))` sejajar 9 bar bawah lain (issue #762).
