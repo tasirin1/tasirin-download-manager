@@ -210,11 +210,16 @@ class ServerVideoDurations(
     fun save() {
         val snapshot = synchronized(lock) {
             val c = cacheLocked()
-            c.length() to c.toString()
+            Triple(generation, c.length(), c.toString())
         }
         synchronized(FILE_LOCK) {
+            // Penjaga generasi (issue #837): invalidate() yang mendarat
+            // di celah potret -> tulis menaikkan generasi dan sudah
+            // menghapus berkas; potret basi tak boleh menghidupkan
+            // lagi berkas itu (pola expectedGeneration berkas ini).
+            if (synchronized(lock) { generation } != snapshot.first) return
             runCatching {
-                if (snapshot.first == 0) {
+                if (snapshot.second == 0) {
                     file.delete()
                     return@runCatching
                 }
@@ -222,7 +227,7 @@ class ServerVideoDurations(
                 // meninggalkan JSON setengah jadi yang merusak cache berikutnya.
                 val staging = File(file.parentFile, file.name + ".tmp")
                 try {
-                    staging.writeText(snapshot.second)
+                    staging.writeText(snapshot.third)
                     if (!staging.renameTo(file)) {
                         runCatching { file.delete() }
                         if (!staging.renameTo(file) || !file.isFile) {
