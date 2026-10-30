@@ -331,23 +331,10 @@
   .icon svg {
  width: 30px; height: 30px; }
 
-  /* Latar lembut per keadaan pada .icon dihapus atas permintaan owner:
-     ikon berkas tidak lagi tampak terbungkus pil, logonya berdiri sendiri. */
-  .icon.i-done {
- background: transparent; }
-
-  .icon.i-fail {
- background: transparent; }
-
-  .icon.i-paused {
- background: transparent; }
  .icon-wrap { position: relative; }
  .icon-wrap .pause-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(0,0,0,.5); color: #fff; font-size: 15px; opacity: 0; transition: opacity .15s ease; cursor: pointer; pointer-events: none; }
  .icon-wrap:hover .pause-overlay { opacity: 1; pointer-events: auto; }
  .icon-wrap .pause-overlay.o-shown { opacity: 1; pointer-events: auto; }
-
-  .icon.i-active {
- background: transparent; }
 
   .item-body {
  flex: 1; min-width: 0; }
@@ -6268,13 +6255,6 @@ function rowSubHtml(it) {
     '</div>';
 }
 
-function iconStateCls(s) {
-  if (s === 'COMPLETED') return 'i-done';
-  if (s === 'FAILED' || s === 'CANCELLED') return 'i-fail';
-  if (s === 'PAUSED' || s === 'PENDING') return 'i-paused';
-  return 'i-active';
-}
-
 const ITEM_STATE_CLS = {
   PENDING: 'st-paused', DOWNLOADING: 'st-active', PAUSED: 'st-paused',
   COMPLETED: 'st-done', FAILED: 'st-fail', CANCELLED: 'st-fail'
@@ -6589,7 +6569,7 @@ function rebuildList(items) {
       ? '<span class="retry-badge" title="Retried \u00d7' + it.retryCount + '">&#x21BB;' + it.retryCount + '</span>' : '';
     const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
     li.innerHTML =
-      '<div class="item-top"><div class="icon-wrap"><div class="icon ' + iconStateCls(it.state) + '">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div>' + ((it.state === 'DOWNLOADING' || it.state === 'PAUSED') ? '<div class="pause-overlay" data-action="' + (it.state === 'DOWNLOADING' ? 'pause' : 'resume') + '" title="' + (it.state === 'DOWNLOADING' ? 'Pause' : 'Resume') + '">' + (it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play) + '</div>' : '') + '</div><div class="item-body">' +
+      '<div class="item-top"><div class="icon-wrap"><div class="icon">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div>' + ((it.state === 'DOWNLOADING' || it.state === 'PAUSED') ? '<div class="pause-overlay" data-action="' + (it.state === 'DOWNLOADING' ? 'pause' : 'resume') + '" title="' + (it.state === 'DOWNLOADING' ? 'Pause' : 'Resume') + '">' + (it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play) + '</div>' : '') + '</div><div class="item-body">' +
       '<div class="name">' + (dlPinned.has(it.id) ? '<span class="pin-indicator">' + UI_ICONS.checksq + ' Pinned</span>' : '') + '<span class="name-txt">' + escapeHtml(it.fileName) + '</span>' + fileTypeBadge(it.fileName) + '</div>' + okBadge + retryBadge + err +
       (retry ? '<div class="err-actions">' + retry + '</div>' : '') +
       '</div>' +
