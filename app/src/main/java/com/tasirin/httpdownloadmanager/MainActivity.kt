@@ -502,8 +502,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             Intent.ACTION_VIEW -> intent.data?.toString()
             else -> null
         } ?: return
-        val url = extractUrls(raw).firstOrNull() ?: return
-        showAddDialog(url)
+        if (extractUrls(raw).isEmpty()) return
+        // Teruskan teks UTUH seperti jalur clipboard (issue #907):
+        // submit dialog mengekstrak semua URL dari teks input, jadi
+        // mengambil firstOrNull di sini membuang tautan ke-2 dan
+        // seterusnya dari share multi-URL secara diam-diam.
+        showAddDialog(raw)
     }
 
     @SuppressLint("InflateParams") // Inflate dialog dengan root null adalah pola standar.
