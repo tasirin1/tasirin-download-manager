@@ -1127,6 +1127,11 @@
   .cm-row .danger {
  background: var(--red); color: #fff; }
 
+  /* Tombol utama dialog input (rename/folder/prioritas): aksi jinak, jadi
+     warna aksen — merah .danger khusus konfirmasi destruktif (issue #678). */
+  .cm-row .primary {
+ background: var(--accent); color: #fff; }
+
   .cm-box input.cm-input {
  margin-bottom: 6px; }
 
@@ -1949,7 +1954,7 @@
     <div class="cm-text" id="inputHint"></div>
     <div class="cm-row">
       <button id="inputNo" type="button" class="btn-ghost">Cancel</button>
-      <button id="inputYes" type="button" class="danger">OK</button>
+      <button id="inputYes" type="button" class="primary">OK</button>
     </div>
   </div>
 </div>
