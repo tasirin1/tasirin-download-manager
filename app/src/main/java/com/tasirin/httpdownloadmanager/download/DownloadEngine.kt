@@ -2181,7 +2181,14 @@ class DownloadEngine(appContext: Context) {
             // jaringan transien: pesan "HLS segment truncated" dari
             // fetchHlsSegment wajib lolos klasifikasi ini agar retry segmen
             // benar-benar berjalan (issue #167).
-            message.contains("truncated", ignoreCase = true)
+            message.contains("truncated", ignoreCase = true) ||
+            // Stall/lambat dan sisa frasa connect (issue #969):
+            // klasifikasi ini menentukan PAUSED-vs-FAILED terminal dan
+            // retry level segmen — kegagalan jaringan menetes (watchdog
+            // stall) dan DNS ("Unable to resolve host") sebelumnya
+            // lolos dari keduanya dan berakhir FAILED permanen walau
+            // sifatnya transien jaringan yang sama.
+            isSlowError(message) || isConnectError(message)
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
