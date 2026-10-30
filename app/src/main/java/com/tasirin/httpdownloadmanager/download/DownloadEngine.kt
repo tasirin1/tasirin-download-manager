@@ -1289,13 +1289,17 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun setMonitor(id: String, enabled: Boolean) {
-        val item = _items.value.find { it.id == id } ?: return
+        if (_items.value.none { it.id == id }) return
         // Catat sentuhan eksplisit (issue #521): bila item ini sedang
         // menjadi pendahulu penerus yang berjalan, pemulihan otomatis
         // tidak boleh membatalkan keputusan terakhir pengguna ini.
         if (monitorSentuhanPengguna.size >= 256) monitorSentuhanPengguna.clear()
         monitorSentuhanPengguna.add(id)
-        updateItem(id) { it.copy(monitor = enabled && item.state == DownloadState.COMPLETED) }
+        // Status dinilai dari item segar di dalam transform (pola
+        // #220), bukan snapshot sebelum pemanggilan: status yang
+        // berubah di antaranya membuat flag gagal terpasang pada item
+        // yang baru COMPLETED (issue #882).
+        updateItem(id) { it.copy(monitor = enabled && it.state == DownloadState.COMPLETED) }
         scheduleSave()
     }
 
