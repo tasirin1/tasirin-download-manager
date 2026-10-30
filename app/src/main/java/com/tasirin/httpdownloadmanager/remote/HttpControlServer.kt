@@ -1947,16 +1947,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return stamp
     }
 
-    /** Satu langkah lipat hash FNV-1a 64 untuk cap sumber ZIP. */
-    private fun zipStampFold(hash: Long, text: String): Long {
-        var h = hash
-        for (ch in text) {
-            h = h xor ch.code.toLong()
-            h *= 1099511628211L
-        }
-        return h
-    }
-
     /** Cap isi sumber ZIP filesystem (issue #961): berkas tunggal =
      *  ukuran+mtime; folder = lipatan (path, ukuran, mtime) seluruh isi
      *  yang terjangkau jalan kaki rekursif terbatas, dengan himpunan
@@ -1983,9 +1973,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     break
                 }
                 count++
-                hash = zipStampFold(hash, child.absolutePath)
-                hash = zipStampFold(hash, child.length().toString())
-                hash = zipStampFold(hash, child.lastModified().toString())
+                hash = ZipCreator.zipStampFold(hash, child.absolutePath)
+                hash = ZipCreator.zipStampFold(hash, child.length().toString())
+                hash = ZipCreator.zipStampFold(hash, child.lastModified().toString())
                 if (child.isDirectory) stack.add(child)
             }
         }
@@ -1996,9 +1986,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // biaya membukanya satu per satu.
             while (stack.isNotEmpty()) {
                 val queued = stack.removeLast()
-                hash = zipStampFold(hash, queued.absolutePath)
-                hash = zipStampFold(hash, queued.length().toString())
-                hash = zipStampFold(hash, queued.lastModified().toString())
+                hash = ZipCreator.zipStampFold(hash, queued.absolutePath)
+                hash = ZipCreator.zipStampFold(hash, queued.length().toString())
+                hash = ZipCreator.zipStampFold(hash, queued.lastModified().toString())
             }
         }
         return "d" + count + ":" + hash + ":" + (if (truncated) "t" else "c") +

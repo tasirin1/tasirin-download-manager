@@ -165,4 +165,29 @@ class ZipCreatorTest {
         assertEquals("bad_name.txt", ZipCreator.safeEntryPath("bad\u0000name.txt"))
         assertEquals("", ZipCreator.safeEntryPath(".."))
     }
+
+    @Test
+    fun `stamp fold matches fnv1a reference vectors`() {
+        // Basis FNV-1a 64 yang dipakai zipFsSourceStamp; nilai harapan
+        // dibuktikan port Python 1:1 dari implementasi Kotlin (issue #973).
+        val basis = -3750763034362895579L
+        assertEquals(basis, ZipCreator.zipStampFold(basis, ""))
+        assertEquals(-5808556873153909620L, ZipCreator.zipStampFold(basis, "a"))
+        assertEquals(-1792535898324117685L, ZipCreator.zipStampFold(basis, "abc"))
+        assertEquals(
+            -1676209753061295567L,
+            ZipCreator.zipStampFold(basis, "/storage/emulated/0/Download")
+        )
+        assertEquals(-1912366794928059912L, ZipCreator.zipStampFold(basis, "12345"))
+    }
+
+    @Test
+    fun `stamp fold is order sensitive and chains like concatenation`() {
+        val basis = -3750763034362895579L
+        val chained = ZipCreator.zipStampFold(ZipCreator.zipStampFold(basis, "ab"), "c")
+        assertEquals(ZipCreator.zipStampFold(basis, "abc"), chained)
+        val reversed = ZipCreator.zipStampFold(ZipCreator.zipStampFold(basis, "c"), "ab")
+        assertEquals(-728750701741308783L, reversed)
+        assertTrue(chained != reversed)
+    }
 }

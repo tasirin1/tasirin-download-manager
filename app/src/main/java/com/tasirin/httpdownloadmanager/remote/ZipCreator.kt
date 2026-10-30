@@ -379,6 +379,18 @@ object ZipCreator {
     internal fun tokenDirRootName(dirName: String, used: MutableMap<String, Int>): String =
         uniqueZipName(safeEntryPath(dirName).ifEmpty { "folder" }, used)
 
+    /** Satu langkah lipat hash FNV-1a 64 untuk cap sumber ZIP
+     *  (issue #961); di sini — bukan di HttpControlServer — agar
+     *  terjangkau uji JVM (issue #973). Murni: tanpa I/O/Android. */
+    internal fun zipStampFold(hash: Long, text: String): Long {
+        var h = hash
+        for (ch in text) {
+            h = h xor ch.code.toLong()
+            h *= 1099511628211L
+        }
+        return h
+    }
+
     internal fun uniqueZipName(base: String, used: MutableMap<String, Int>): String {
         val count = used.getOrDefault(base, 0)
         used[base] = count + 1
