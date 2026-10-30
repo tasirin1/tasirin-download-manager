@@ -38,6 +38,21 @@ class SegmentRangeTest {
     }
 
     @Test
+    fun `panjang segmen terbuka jenuh, tidak membungkus`() {
+        // Segmen terbuka [0, Long.MAX_VALUE] dari parseSegments (keluarga
+        // #748/#789): panjang sebenarnya MAX+1, dijenuhkan ke MAX —
+        // hitungan polos end - start + 1 membungkus ke Long.MIN_VALUE
+        // dan segmen divonis tuntas tanpa satu byte pun (issue #812).
+        // Nilai harapan dibuktikan dengan port Python 1:1.
+        assertEquals(Long.MAX_VALUE, segmentLength(0, Long.MAX_VALUE))
+        assertEquals(Long.MAX_VALUE - 4, segmentLength(5, Long.MAX_VALUE))
+        assertEquals(10L, segmentLength(10, 19))
+        assertEquals(1L, segmentLength(0, 0))
+        assertTrue(isSegmentComplete(0, Long.MAX_VALUE, Long.MAX_VALUE))
+        assertFalse(isSegmentComplete(0, Long.MAX_VALUE, Long.MAX_VALUE - 1))
+    }
+
+    @Test
     fun `resume single-stream sudah utuh - total diketahui dan catatan mencapai total`() {
         // Pas di total dan melebihi total (catatan basi) sama-sama utuh.
         assertTrue(isResumeAlreadyComplete(1000, 1000))

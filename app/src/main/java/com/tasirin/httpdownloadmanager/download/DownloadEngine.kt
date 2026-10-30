@@ -4109,7 +4109,7 @@ class DownloadEngine(appContext: Context) {
             // Sisa byte yang boleh ditulis untuk segmen ini; server nakal yang
             // mengabaikan batas akhir Range tak boleh menumpuk byte ekstra ke
             // file parsial (merge korup lolos verifySize yang membolehkan overrun).
-            var budget = (segment.end - segment.start + 1) - downloaded
+            var budget = segmentLength(segment.start, segment.end) - downloaded
             try {
                 while (true) {
                     val read = input.read(buffer)
@@ -4139,7 +4139,7 @@ class DownloadEngine(appContext: Context) {
                     if (now - lastNotify >= 1000) {
                         lastNotify = now
                         coroutineContext.ensureActive()
-                        val segTotal = segment.end - segment.start + 1
+                        val segTotal = segmentLength(segment.start, segment.end)
                         val speed = if (now > lastSegAt) {
                             ((downloaded - lastSegBytes) * 1000L) / (now - lastSegAt)
                         } else 0L
@@ -4156,7 +4156,7 @@ class DownloadEngine(appContext: Context) {
                 runCatching { input.close() }
                 runCatching { output.close() }
             }
-            if (downloaded < (segment.end - segment.start + 1)) {
+            if (downloaded < segmentLength(segment.start, segment.end)) {
                 throw IOException("Segment ${segment.index} incomplete")
             }
             updateSegment(id, segment.index, downloaded)
@@ -4824,8 +4824,18 @@ internal fun shouldKeepPartialOnRangeReject(keptBytes: Long): Boolean = keptByte
 internal fun isResumeAlreadyComplete(resumeFrom: Long, totalBytes: Long): Boolean =
     totalBytes > 0 && resumeFrom >= totalBytes
 
+/** Panjang segmen [start, end] inklusif, JENUH di Long.MAX_VALUE
+ *  (issue #812): `end - start + 1` polos membungkus ke Long.MIN_VALUE
+ *  untuk segmen terbuka ber-end Long.MAX_VALUE (yang memang diterima
+ *  parseSegments) — segmen divonis tuntas tanpa diunduh, atau budget
+ *  tulis jadi negatif. Pola jenuh yang sama dengan codec (#748/#789). */
+internal fun segmentLength(start: Long, end: Long): Long {
+    val len = end - start
+    return if (len == Long.MAX_VALUE) Long.MAX_VALUE else len + 1
+}
+
 internal fun isSegmentComplete(start: Long, end: Long, downloaded: Long): Boolean =
-    downloaded >= end - start + 1
+    downloaded >= segmentLength(start, end)
 
 /** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
  *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able
