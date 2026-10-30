@@ -1031,6 +1031,10 @@ await loadGallery(false);
 if (galleryItems.length === before) break;
 }
 btn.disabled = false;
+if (!galSelectMode) {
+btn.textContent = 'Select all';
+return;
+}
 }
 galSelected.clear();
 if (!allSel) galleryItems.forEach(function (it) { galSelected.add(it); });

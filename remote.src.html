@@ -3287,6 +3287,14 @@ document.getElementById('galBatchAll').addEventListener('click', async function 
       if (galleryItems.length === before) break;
     }
     btn.disabled = false;
+    // Mode pilih bisa dimatikan selama menunggu (tombol Cancel, toggle
+    // header, atau reset yang memaksa keluar): ekor handler tidak
+    // boleh membangkitkan bilah batch di luar mode pilih (issue #868).
+    // Label tombol dipulihkan updateGalBatch pada masuk mode berikutnya.
+    if (!galSelectMode) {
+      btn.textContent = 'Select all';
+      return;
+    }
   }
   galSelected.clear();
   if (!allSel) galleryItems.forEach(function (it) { galSelected.add(it); });
