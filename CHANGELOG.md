@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **test(remote): acuan paritas cap disamakan dengan produksi #993 + uji drain dangkal sungguhan** -- implementasi acuan beku masih memakai sortir penuh pra-#993, dan tak satu pun uji memicu drain dangkal (uji terpotong lama menaruh semua berkas di akar sehingga tumpukan kosong saat plafon tercapai). Acuan kini menyalin seleksi heap produksi, dan uji baru memakai pohon terpotong dengan dua direktori terantre berisi anak (termasuk pasangan nama seri ignoreCase) yang benar-benar dilipat dangkal (issue #1004).
+
 - **fix(download): balapan wake lock ditutup tuntas dengan monitor bersama** -- cek, pembuatan, dan acquire di updateWakeLock serta seluruh teardown onDestroy kini berjalan di bawah monitor wakeLockGuard yang sama, sehingga acquire tidak bisa lagi menyela di sela cek dan teardown (sisa check-then-act dari #982/#989). Bendera destroyed dan cek ganda tetap dipertahankan sebagai lapis dalam (issue #1003).
 
 - **fix(download): pola umum 'timed out' dan 'connection abort' kini terklasifikasi jaringan** -- #987 menambahkan frasa persis 'connect timed out', sehingga 'Read timed out', 'Connection timed out', pesan sintetis repo 'Playlist fetch timed out', dan 'Software caused connection abort' (ECONNABORTED) masih lolos ke FAILED terminal. Kini pola umumnya ikut dicakup (issue #1002).

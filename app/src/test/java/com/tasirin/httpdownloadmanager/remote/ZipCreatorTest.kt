@@ -268,12 +268,34 @@ class ZipCreatorTest {
                 hash = ZipCreator.zipStampFold(hash, queued.length().toString())
                 hash = ZipCreator.zipStampFold(hash, queued.lastModified().toString())
                 if (shallowBudget > 0) {
-                    val kids = queued.listFiles()?.sortedWith(
-                        Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-                    )
-                    if (kids != null) {
+                    val kidArr = queued.listFiles()
+                    if (kidArr != null) {
+                        val kids: List<java.io.File> = if (kidArr.size <= shallowBudget) {
+                            kidArr.sortedWith(
+                                Comparator { a, b ->
+                                    a.name.compareTo(b.name, ignoreCase = true)
+                                }
+                            )
+                        } else {
+                            val order = Comparator<java.io.File> { a, b ->
+                                val c = a.name.compareTo(b.name, ignoreCase = true)
+                                if (c != 0) c else a.name.compareTo(b.name)
+                            }
+                            val heap = java.util.PriorityQueue<java.io.File>(
+                                shallowBudget, order.reversed()
+                            )
+                            for (kid in kidArr) {
+                                val top = heap.peek()
+                                if (heap.size < shallowBudget) {
+                                    heap.add(kid)
+                                } else if (top != null && order.compare(kid, top) < 0) {
+                                    heap.poll()
+                                    heap.add(kid)
+                                }
+                            }
+                            heap.sortedWith(order)
+                        }
                         for (kid in kids) {
-                            if (shallowBudget <= 0) break
                             shallowBudget--
                             hash = ZipCreator.zipStampFold(hash, kid.absolutePath)
                             hash = ZipCreator.zipStampFold(hash, kid.length().toString())
@@ -303,6 +325,34 @@ class ZipCreatorTest {
         val after = ZipCreator.zipFsSourceStamp(dir)
         assertTrue(before != after)
         assertEquals(referenceFsStamp(dir), after)
+    }
+
+    @Test
+    fun `fs stamp parity holds through the shallow drain with queued folders`() {
+        // Pohon terpotong DENGAN direktori terantre (issue #1004):
+        // uji terpotong lama menaruh semua berkas di akar sehingga
+        // tumpukan kosong saat plafon tercapai dan drain dangkal
+        // (#972/#981/#993) nol iterasi. Di sini folder besar bernama
+        // paling akhir menurut urutan sortir diproses lebih dulu
+        // (tumpukan LIFO), menghabiskan plafon selagi dua folder
+        // lain masih terantre untuk dilipat dangkal.
+        val dir = temp.newFolder("drained")
+        val qa = java.io.File(dir, "a-queued")
+        assertTrue(qa.mkdir())
+        for (i in 1..40) java.io.File(qa, "qa" + i + ".bin").createNewFile()
+        // Pasangan seri ignoreCase di dalam direktori terantre:
+        // urutan lipatannya harus sama di produksi dan acuan.
+        java.io.File(qa, "A.txt").writeText("upper")
+        java.io.File(qa, "a.txt").writeText("lower")
+        val qb = java.io.File(dir, "b-queued")
+        assertTrue(qb.mkdir())
+        for (i in 1..40) java.io.File(qb, "qb" + i + ".bin").createNewFile()
+        val big = java.io.File(dir, "z-big")
+        assertTrue(big.mkdir())
+        for (i in 1..8300) java.io.File(big, "z" + i + ".bin").createNewFile()
+        val stamp = ZipCreator.zipFsSourceStamp(dir)
+        assertTrue(stamp.contains(":t:"))
+        assertEquals(referenceFsStamp(dir), stamp)
     }
 
     @Test
