@@ -5,7 +5,12 @@ set -euo pipefail
 gagal=0
 if rg --version >/dev/null 2>&1; then ADA_RG=1; else ADA_RG=0; fi
 # 1. Path vektor harus 0.x (lint InvalidVectorPath menggagalkan build).
-if [ "$ADA_RG" = 1 ] && rg --pcre2 -n '' app/src/main/res/drawable >/dev/null 2>&1; then
+# Direktori hilang WAJIB vonis (issue #726, kelas #687): tanpa cek ini
+# rantai if/elif di bawah jatuh senyap ke cabang yang tak menemukan
+# apa pun dan gerbang hijau tanpa menilai satu berkas pun.
+if [ ! -d app/src/main/res/drawable ]; then
+  echo "GAGAL: direktori app/src/main/res/drawable hilang — cek path vektor tak bisa berjalan"; gagal=1;
+elif [ "$ADA_RG" = 1 ] && rg --pcre2 -n '' app/src/main/res/drawable >/dev/null 2>&1; then
   if rg -n --pcre2 '(?<![0-9])\.-?[0-9]' app/src/main/res/drawable 2>/dev/null | grep -q .; then
     echo "GAGAL: path vektor tanpa nol depan (pakai 0.9 bukan .9)"; gagal=1;
   fi
