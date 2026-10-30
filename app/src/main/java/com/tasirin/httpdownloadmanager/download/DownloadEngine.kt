@@ -2193,7 +2193,12 @@ class DownloadEngine(appContext: Context) {
             App.logEvent("SOCIAL: extracting direct URL from $host ...")
             val result = SocialMediaExtractor.extract(item.url, item.headers)
             if (result != null && result.directUrl != item.url) {
-                App.logEvent("SOCIAL: extracted direct URL from $host → ${result.directUrl.take(80)}...")
+                // URL direct bertanda tangan TIDAK dicatat (issue #951):
+                // log server bisa diekspor ke TXT publik dan kebijakan
+                // repo menyamakan URL bertanda tangan dengan rahasia di
+                // log (LOG_SECRET_RE). Host hasil ekstraksi cukup.
+                val directHost = runCatching { java.net.URL(result.directUrl).host }.getOrDefault("?")
+                App.logEvent("SOCIAL: extracted direct URL from $host → $directHost")
                 App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.length} chars")
                 // Simpan URL sosial media original untuk SEMUA hasil ekstraksi
                 // (bukan cuma HLS): URL CDN langsung bertanda-tangan (mis.
@@ -2231,7 +2236,9 @@ class DownloadEngine(appContext: Context) {
                         App.logEvent("HLS: download failed (${e.message?.take(50)}), trying non-HLS fallback")
                         val fallback = SocialMediaExtractor.extractNonHlsYouTube(item.url, item.headers)
                         if (fallback != null && fallback.directUrl != item.url && !fallback.isHls) {
-                            App.logEvent("SOCIAL: non-HLS fallback: ${fallback.directUrl.take(80)}")
+                            // Sama seperti di atas (issue #951): catat host saja.
+                            val fbHost = runCatching { java.net.URL(fallback.directUrl).host }.getOrDefault("?")
+                            App.logEvent("SOCIAL: non-HLS fallback: $fbHost")
                             val fbName = if (!item.nameIsCustom) sanitizeFileName(fallback.fileName ?: item.fileName)
                             else item.fileName
                             val fbHeaders = if (fallback.cookies.isNotEmpty()) {

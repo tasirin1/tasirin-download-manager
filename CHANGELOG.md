@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): URL direct bertanda tangan tidak lagi ditulis ke log server** -- dua baris logEvent ekstraksi sosial sebelumnya menginterpolasi 80 karakter pertama URL direct hasil ekstraksi; buffer log hanya disanitasi newline (tanpa redaksi rahasia) dan bisa diekspor ke berkas TXT di folder Download publik, melanggar kebijakan repo yang menyamakan URL bertanda tangan dengan rahasia di log. Kini yang dicatat hanya host tujuannya (issue #951).
+
 - **fix(ui): sorotan baris gagal di halaman Log tidak lagi terlewat untuk pesan berhuru kecil** -- gerbang cepat highlightLog memakai contains peka huruf besar untuk 'ERROR'/'FAILED' padahal pencocok per barisnya memakai ignoreCase, sehingga sesi yang kegagalan satu-satunya berhuru kecil ('download failed', 'APK VIEW failed') tampil tanpa satu pun baris merah. Gerbang kini ignoreCase, sejajar pencocoknya (issue #950).
 
 - **fix(ui): item CANCELLED kini bisa dilanjutkan dari ketukan baris dan menu tekan-lama** -- onTap sebelumnya memetakan CANCELLED ke else tanpa aksi dan tanpa sinyal, dan menu tekan-lama hanya menawarkan Resume untuk PAUSED/FAILED — padahal engine.resume() menerima CANCELLED (mulai ulang dari nol) dan tombol Retry baris serta geser kanan sudah memetakannya. Ini sisa ketidaksejajaran #555; kini kedua permukaan sejajar (issue #949).
