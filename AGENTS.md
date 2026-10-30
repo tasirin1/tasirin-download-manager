@@ -159,7 +159,9 @@ kuat dan tanpa diskusi:
   permintaan owner (2026-09-29): izin `REQUEST_INSTALL_PACKAGES` ada lagi di manifest,
   ketuk item APK menembak installer via `openApk()` (3 fallback intent) dan auto-open APK
   aktif lagi. JANGAN kembalikan alur unduh-APK-dalam-aplikasi tanpa diskusi.
-- **Tema gelap native** (`values-night`) — dihapus; app selalu tema terang.
+- **Tema gelap native** — keputusan "app selalu tema terang" DICABUT owner
+  2026-10-30: app kini tema gelap MENYELURUH (palet token digelapkan +
+  `MODE_NIGHT_YES` dipaksa di `App`); `values-night` tetap tidak dipakai.
 - **Bilah status remote web** (`#deviceStatus`, `renderStatus`,
   `refreshStatus`, `renderSpeedTotal`) — dihapus 2026-08-13; info redundan
   dengan File Manager. Status penting (`readOnly`, port berubah, versi)

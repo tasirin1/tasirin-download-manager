@@ -1,7 +1,9 @@
 <resources>
     <!-- Tema AppCompat murni (tanpa library material): APK lebih kecil.
-         Satu tema terang saja — values-night dihapus (lihat CHANGELOG). -->
-    <style name="Theme.HttpDownloadManager" parent="Theme.AppCompat.Light.NoActionBar">
+         Tema GELAP menyeluruh (keputusan owner 2026-10-30, menyusul desain
+         ulang layar utama): induk DayNight + MODE_NIGHT_YES dipaksa di App
+         agar dialog, menu titik tiga, dan semua layar ikut gelap. -->
+    <style name="Theme.HttpDownloadManager" parent="Theme.AppCompat.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary_dark</item>
         <item name="colorAccent">@color/accent</item>
@@ -17,9 +19,9 @@
         <item name="colorControlHighlight">@color/accent</item>
     </style>
 
-    <!-- Toolbar berwarna primary dengan teks putih. -->
+    <!-- Toolbar navy tema gelap dengan teks putih. -->
     <style name="Toolbar.Theme.HttpDownloadManager" parent="Widget.AppCompat.Toolbar">
-        <item name="android:background">@color/primary</item>
+        <item name="android:background">@color/home_bg_mid</item>
         <item name="android:minHeight">?attr/actionBarSize</item>
         <item name="titleTextColor">@color/white</item>
         <item name="android:textColorPrimary">@color/white</item>

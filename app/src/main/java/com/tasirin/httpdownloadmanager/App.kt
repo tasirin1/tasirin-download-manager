@@ -8,6 +8,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
+import androidx.appcompat.app.AppCompatDelegate
 import com.tasirin.httpdownloadmanager.download.DownloadEngine
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.CrashLog
@@ -20,6 +21,10 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Tema gelap menyeluruh (keputusan owner 2026-10-30): paksa mode
+        // malam AppCompat agar dialog/menu/kontrol bawaan ikut gelap di
+        // semua perangkat, apa pun mode sistemnya.
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         installCrashLogger()
         SocialMediaExtractor.init(this)
         httpServer = HttpControlServer(this)

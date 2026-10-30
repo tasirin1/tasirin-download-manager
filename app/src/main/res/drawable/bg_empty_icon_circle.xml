@@ -12,7 +12,7 @@
     <item android:bottom="2dp">
         <shape android:shape="oval">
             <solid android:color="@color/primary_container" />
-            <stroke android:width="2dp" android:color="@color/white" />
+            <stroke android:width="2dp" android:color="@color/home_glass_stroke" />
         </shape>
     </item>
 </layer-list>
