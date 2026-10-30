@@ -1931,27 +1931,29 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
             // Tandai sedang-dibuat (issue #885): retainAll hitungan di
             // mediaZip mempertahankan kunci yang entrinya belum sempat
-            // tersimpan di zipCache selama pembuatan berjalan.
+            // tersimpan di zipCache selama pembuatan berjalan. Penanda
+            // dilepas di finally (issue #891): jalan keluar pengecualian
+            // dari create() sebelumnya bocor karena hanya tertutup
+            // sifat penelan-total createTempZip milik pemanggil.
             zipInFlight.add(key)
-            val file = create() ?: run {
+            try {
+                val file = create() ?: return null
+                // Satu stat saja: dipakai untuk guard ukuran dan disimpan agar
+                // prune berikutnya tak perlu stat ulang tiap entri cache.
+                val size = file.length()
+                if (size > ZIP_CACHE_MAX_BYTES) {
+                    runCatching { file.delete() }
+                    return null
+                }
+                // Browser dapat membuka beberapa request Range sekaligus. Kunci per
+                // key benar-benar mencegah ZIP yang sama dibuat dua kali; cukup 8
+                // strip lock agar map kunci tidak tumbuh tanpa batas.
+                zipCache[key] = Triple(now, file, size)
+                pruneZipCache(now, key)
+                return file
+            } finally {
                 zipInFlight.remove(key)
-                return null
             }
-            // Satu stat saja: dipakai untuk guard ukuran dan disimpan agar
-            // prune berikutnya tak perlu stat ulang tiap entri cache.
-            val size = file.length()
-            if (size > ZIP_CACHE_MAX_BYTES) {
-                runCatching { file.delete() }
-                zipInFlight.remove(key)
-                return null
-            }
-            // Browser dapat membuka beberapa request Range sekaligus. Kunci per
-            // key benar-benar mencegah ZIP yang sama dibuat dua kali; cukup 8
-            // strip lock agar map kunci tidak tumbuh tanpa batas.
-            zipCache[key] = Triple(now, file, size)
-            zipInFlight.remove(key)
-            pruneZipCache(now, key)
-            return file
         }
     }
 
