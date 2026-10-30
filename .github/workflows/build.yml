@@ -423,11 +423,15 @@ jobs:
             # kosong = tidak bisa dinilai: blok peringatan ini dilewati
             # tanpa cabang sehat maupun warning.
             PREV_HAS_APK=$(gh release view "$PREV" --json assets --jq '[.assets[] | select(.name | endswith(".apk"))] | length' || true)
-            if [ "$PREV_IS_DRAFT" = "true" ]; then
+            if [ -z "$PREV_IS_DRAFT" ] || [ -z "$PREV_HAS_APK" ]; then
+              # Salah satu bacaan gh kosong = tidak bisa dinilai (pola
+              # #862, diperluas issue #883): tanpa cabang ini status
+              # draft yang gagal dibaca jatuh ke penilaian aset dan
+              # draft beraset lengkap kembali divonis 'sehat'.
+              echo "Rilis sebelumnya ($PREV) tidak bisa dinilai; cek yatim dilewati."
+            elif [ "$PREV_IS_DRAFT" = "true" ]; then
               echo "::warning::Rilis sebelumnya $PREV masih DRAFT dan tidak pernah terbit (kemungkinan yatim akibat run gagal di tengah publish, issue #870) — terbitkan atau hapus manual."
               echo "⚠️ Rilis $PREV masih DRAFT, tidak terbit (yatim publish gagal, issue #870)." >> "$GITHUB_STEP_SUMMARY"
-            elif [ -z "$PREV_HAS_APK" ]; then
-              echo "Rilis sebelumnya ($PREV) tidak bisa dinilai; cek yatim dilewati."
             elif [ "$PREV_HAS_APK" = "0" ]; then
               echo "::warning::Rilis sebelumnya $PREV tanpa aset APK (kemungkinan yatim akibat run terbatalkan di tengah publish, issue #855) — periksa/hapus manual."
               echo "⚠️ Rilis $PREV tanpa aset APK (yatim pembatalan publish, issue #855)." >> "$GITHUB_STEP_SUMMARY"
