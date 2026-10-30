@@ -136,6 +136,10 @@ RULES = [
         "Operating-system command runs through a shell",
         r"\bsubprocess\.\w+\s*\([^;\n]*shell\s*=\s*True|\bRuntime\.getRuntime\(\)\.exec\s*\(",
         frozenset({"python", "kotlin", "java"}),
+        # Lintasan multi-baris yang sama seperti aturan sink lain
+        # (issue #689): shell=True hasil bungkus formatter luput dari
+        # pola per baris karena [^;\n]* berhenti di newline.
+        multiline=True,
     ),
     Rule(
         "js_dynamic_exec",
