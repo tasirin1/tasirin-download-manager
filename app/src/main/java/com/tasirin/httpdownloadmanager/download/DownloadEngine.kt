@@ -1998,7 +1998,12 @@ class DownloadEngine(appContext: Context) {
         // menghabiskan mirror satu per satu. Lewati cabang ini dan
         // biarkan retry biasa (partial utuh) yang bekerja; NetworkCallback
         // melanjutkan unduhan saat koneksi pulih.
-        val outageLocal = isConnectError(message) && !App.networkUp
+        // Klasifikasi lambat/macet ikut ditahan (issue #959): pesan
+        // stall dari watchdog tak memuat substring connect mana pun,
+        // tetapi pada jaringan menetes ia bisa tiba saat bendera
+        // konektivitas sudah turun — menahannya di sini tak mengubah
+        // perilaku apa pun saat jaringan perangkat naik.
+        val outageLocal = (isConnectError(message) || slowRejected) && !App.networkUp
         if (allMirrors.isNotEmpty() && !outageLocal && (rangeRejected || slowRejected || isConnectError(message) ||
                 isHttpMirrorFailoverError(message))
         ) {
