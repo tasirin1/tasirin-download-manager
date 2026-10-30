@@ -3226,9 +3226,17 @@ class DownloadEngine(appContext: Context) {
             // playlist sah (connect + 2x read timeout, min 30 dtk); timeout
             // dihitung sebagai kandidat gagal, sama seperti fetch error.
             val fetchTimeoutMs = (connectTimeoutMs + 2L * readTimeoutMs).coerceAtLeast(30_000L)
+            // Satu deadline BERSAMA untuk semua get() (issue #811):
+            // batas penuh yang dihitung ulang per future membuat total
+            // tunggu kasus patologis menjadi PENJUMLAHAN timeout
+            // (kandidat menggantung bergantian), bukan maksimum seperti
+            // yang dijanjikan komentar desain fungsi ini.
+            val deadlineNanos = System.nanoTime() + fetchTimeoutMs * 1_000_000L
             return futures.map { future ->
+                val remainingMs = (deadlineNanos - System.nanoTime()) / 1_000_000
                 try {
-                    Result.success(future.get(fetchTimeoutMs, TimeUnit.MILLISECONDS))
+                    if (remainingMs <= 0L) throw TimeoutException()
+                    Result.success(future.get(remainingMs, TimeUnit.MILLISECONDS))
                 } catch (e: TimeoutException) {
                     future.cancel(true)
                     Result.failure(IOException("Playlist fetch timed out"))
@@ -3240,8 +3248,12 @@ class DownloadEngine(appContext: Context) {
                 }
             }
         } finally {
-            // shutdownNow: interupsi pekerja yang masih berjalan agar
-            // attempt yang sudah ditinggalkan tak terus memakai jaringan.
+            // shutdownNow menginterupsi pekerja yang masih berjalan.
+            // Jujur soal batasnya (issue #811): baca soket blocking
+            // HttpURLConnection TIDAK menanggapi interupsi, jadi pekerja
+            // yang sedang membaca tetap tertahan sampai read timeout
+            // soketnya sendiri — interupsi hanya membebaskan pekerja
+            // yang sedang menunggu/sleep, bukan yang sedang membaca.
             pool.shutdownNow()
         }
     }
