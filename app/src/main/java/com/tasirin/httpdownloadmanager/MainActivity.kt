@@ -1510,7 +1510,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     override fun onTap(item: DownloadItem) {
         when (item.state) {
             DownloadState.DOWNLOADING, DownloadState.PENDING -> App.engine.pause(item.id)
-            DownloadState.PAUSED, DownloadState.FAILED -> App.engine.resume(item.id)
+            // CANCELLED ikut resume (issue #949): engine.resume menerima
+            // CANCELLED (mulai ulang dari nol) dan tombol baris + geser
+            // kanan sudah memetakannya — ketukan baris tidak boleh jadi
+            // jalan buntu senyap (sisa ketidaksejajaran #555).
+            DownloadState.PAUSED, DownloadState.FAILED, DownloadState.CANCELLED ->
+                App.engine.resume(item.id)
             DownloadState.COMPLETED -> openDownload(item)
             else -> Unit
         }
@@ -1521,7 +1526,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         if (item.state == DownloadState.DOWNLOADING || item.state == DownloadState.PENDING) {
             options.add(getString(R.string.pause) to { App.engine.pause(item.id) })
         }
-        if (item.state == DownloadState.PAUSED || item.state == DownloadState.FAILED) {
+        if (item.state == DownloadState.PAUSED || item.state == DownloadState.FAILED ||
+            item.state == DownloadState.CANCELLED
+        ) {
             options.add(getString(R.string.resume) to { App.engine.resume(item.id) })
         }
         if (item.state == DownloadState.COMPLETED) {
