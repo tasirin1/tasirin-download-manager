@@ -253,8 +253,12 @@ class LogActivity : AppCompatActivity() {
     /** Sorot baris GAGAL/ERROR merah dan kata kunci pencarian kuning. */
     private fun highlightLog(text: String): CharSequence {
         val q = logSearch.trim()
-        if (q.isEmpty() && !text.contains("ERROR") &&
-            !text.contains("FAILED")
+        // Gerbang wajib sepeka pencocok barisnya (issue #950): pencocok
+        // di lineContains memakai ignoreCase, jadi gerbang peka huruf
+        // membuat baris 'failed' berhuru kecil tak pernah tersorot bila
+        // buffer tak memuat satu pun token kapital.
+        if (q.isEmpty() && !text.contains("ERROR", ignoreCase = true) &&
+            !text.contains("FAILED", ignoreCase = true)
         ) {
             return text
         }
