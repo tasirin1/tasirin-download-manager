@@ -3023,6 +3023,19 @@ async function loadGalleryRequest(reset) {
         const rb = galleryGrid.querySelector('.cta button');
         if (rb) rb.addEventListener('click', function () { loadGallery(true); });
       }
+    } else {
+      // Halaman lanjutan gagal (issue #852): jangan diam. Pengguna
+      // yang sudah di dasar halaman (atau navigasi fokus TV tanpa
+      // scroll) tak akan memicu sentinel lagi, jadi beri status yang
+      // bisa diketuk untuk mencoba ulang; scroll berikutnya pun
+      // tetap memicu lewat sentinel seperti sebelumnya.
+      galleryStatus.textContent = 'Failed to load more. Tap to retry.';
+      galleryStatus.style.cursor = 'pointer';
+      galleryStatus.onclick = function () {
+        galleryStatus.textContent = '';
+        galleryStatus.onclick = null;
+        loadGallery(false);
+      };
     }
   }
 }

@@ -805,6 +805,14 @@ galleryGrid.innerHTML = emptyHtml('warn', 'Failed to load gallery', String(e), '
 const rb = galleryGrid.querySelector('.cta button');
 if (rb) rb.addEventListener('click', function () { loadGallery(true); });
 }
+} else {
+galleryStatus.textContent = 'Failed to load more. Tap to retry.';
+galleryStatus.style.cursor = 'pointer';
+galleryStatus.onclick = function () {
+galleryStatus.textContent = '';
+galleryStatus.onclick = null;
+loadGallery(false);
+};
 }
 }
 }
