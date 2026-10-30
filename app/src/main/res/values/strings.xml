@@ -177,6 +177,8 @@
     <string name="settings_port_label">Remote server port</string>
     <string name="settings_port_hint">Port (1024–65535)</string>
     <string name="settings_speed_custom">Custom: %1$d KB/s</string>
+    <string name="settings_custom_plain">Custom: %1$d</string>
+    <string name="settings_custom_seconds">Custom: %1$d s</string>
     <string name="settings_port_invalid">Invalid port (1024–65535)</string>
     <string name="server_start">Start server</string>
     <string name="server_stop">Stop server</string>

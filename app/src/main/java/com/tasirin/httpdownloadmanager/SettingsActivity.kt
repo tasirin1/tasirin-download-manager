@@ -842,42 +842,75 @@ class SettingsActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        val segmentOptions = resources.getStringArray(R.array.segment_options)
         val segmentValues = intArrayOf(1, 2, 4, 6, 8)
-        setupSpinner(this, binding.spinnerSegments, segmentOptions.toList())
+        val currentSegments = StoragePrefs.segmentCount(this)
+        val segmentOptions = resources.getStringArray(R.array.segment_options).toMutableList()
+        // Nilai tersimpan di luar daftar (issue #904): rentang pref
+        // (1-8) lebih lebar dari daftar spinner, jadi nilai warisan
+        // seperti 3 tak terwakili — tampilkan sebagai opsi Custom
+        // (pola spinner speed #506). Tanpa ini indexOf -1 diruntuhkan
+        // ke indeks 0 dan callback awal spinner menimpa nilai asli
+        // hanya karena halaman Pengaturan dibuka.
+        if (currentSegments !in segmentValues) {
+            segmentOptions.add(getString(R.string.settings_custom_plain, currentSegments))
+        }
+        setupSpinner(this, binding.spinnerSegments, segmentOptions)
         binding.spinnerSegments.setSelection(
-            segmentValues.indexOf(StoragePrefs.segmentCount(this)).coerceAtLeast(0)
+            if (currentSegments in segmentValues) segmentValues.indexOf(currentSegments)
+            else segmentOptions.size - 1
         )
         binding.spinnerSegments.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                StoragePrefs.setSegmentCount(this@SettingsActivity, segmentValues[position])
+                StoragePrefs.setSegmentCount(
+                    this@SettingsActivity,
+                    if (position in segmentValues.indices) segmentValues[position] else currentSegments
+                )
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        val connectOptions = resources.getStringArray(R.array.connect_timeout_options)
         val connectValues = intArrayOf(5, 10, 15, 30, 60)
-        setupSpinner(this, binding.spinnerConnectTimeout, connectOptions.toList())
+        val currentConnect = StoragePrefs.getConnectTimeoutSec(this)
+        val connectOptions = resources.getStringArray(R.array.connect_timeout_options).toMutableList()
+        // Opsi Custom untuk nilai di luar daftar (issue #904, pola
+        // yang sama seperti spinner segmen di atas).
+        if (currentConnect !in connectValues) {
+            connectOptions.add(getString(R.string.settings_custom_seconds, currentConnect))
+        }
+        setupSpinner(this, binding.spinnerConnectTimeout, connectOptions)
         binding.spinnerConnectTimeout.setSelection(
-            connectValues.indexOf(StoragePrefs.getConnectTimeoutSec(this)).coerceAtLeast(0)
+            if (currentConnect in connectValues) connectValues.indexOf(currentConnect)
+            else connectOptions.size - 1
         )
         binding.spinnerConnectTimeout.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                StoragePrefs.setConnectTimeoutSec(this@SettingsActivity, connectValues[position])
+                StoragePrefs.setConnectTimeoutSec(
+                    this@SettingsActivity,
+                    if (position in connectValues.indices) connectValues[position] else currentConnect
+                )
                 runCatching { App.engine.refreshTimeouts() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        val readOptions = resources.getStringArray(R.array.read_timeout_options)
         val readValues = intArrayOf(10, 15, 30, 60, 120)
-        setupSpinner(this, binding.spinnerReadTimeout, readOptions.toList())
+        val currentRead = StoragePrefs.getReadTimeoutSec(this)
+        val readOptions = resources.getStringArray(R.array.read_timeout_options).toMutableList()
+        // Opsi Custom untuk nilai di luar daftar (issue #904).
+        if (currentRead !in readValues) {
+            readOptions.add(getString(R.string.settings_custom_seconds, currentRead))
+        }
+        setupSpinner(this, binding.spinnerReadTimeout, readOptions)
         binding.spinnerReadTimeout.setSelection(
-            readValues.indexOf(StoragePrefs.getReadTimeoutSec(this)).coerceAtLeast(0)
+            if (currentRead in readValues) readValues.indexOf(currentRead)
+            else readOptions.size - 1
         )
         binding.spinnerReadTimeout.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                StoragePrefs.setReadTimeoutSec(this@SettingsActivity, readValues[position])
+                StoragePrefs.setReadTimeoutSec(
+                    this@SettingsActivity,
+                    if (position in readValues.indices) readValues[position] else currentRead
+                )
                 runCatching { App.engine.refreshTimeouts() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
