@@ -4567,6 +4567,7 @@ let sseFailCount = 0;
 let lastSseAt = 0;
 let sseGaveUp = false;
 let sseSilentReconnects = 0;
+let sseOutageSeen = false;
 let lastForcedReconnectAt = 0;
 function connectEvents() {
 if (sse) { try { sse.close(); } catch (e) {} }
@@ -4636,9 +4637,10 @@ failCount = 0;
 hasLoadedItems = true;
 statusLine.textContent = '';
 hideConnBanner();
-if ((sseGaveUp || !sse) && typeof EventSource !== 'undefined') {
+if ((sseGaveUp || !sse) && sseOutageSeen && typeof EventSource !== 'undefined') {
 sseGaveUp = false;
 sseSilentReconnects = 0;
+sseOutageSeen = false;
 connectEvents();
 }
 if (data.status) applyServerStatus(data.status);
@@ -4651,6 +4653,7 @@ updateToolbar(items);
 }
 } catch (e) {
 failCount++;
+sseOutageSeen = true;
 if (failCount > 2) {
 statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
 }

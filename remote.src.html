@@ -7283,6 +7283,10 @@ let sseFailCount = 0;
 let lastSseAt = 0;
 let sseGaveUp = false;
 let sseSilentReconnects = 0;
+// Bukti server benar-benar putus sejak SSE terakhir hidup: snapshot yang
+// GAGAL (pollSnapshot catch). Hanya bukti ini yang boleh menghidupkan
+// lagi SSE yang give-up lewat snapshot sukses (issue #785).
+let sseOutageSeen = false;
 let lastForcedReconnectAt = 0;
 function connectEvents() {
   if (sse) { try { sse.close(); } catch (e) {} }
@@ -7372,12 +7376,16 @@ async function pollSnapshot() {
     hasLoadedItems = true;
     statusLine.textContent = '';
     hideConnBanner();
-    // Snapshot sukses = server terjangkau: hidupkan lagi SSE yang sempat
-    // give-up (putus lama). Aman dari storm: reconnect hanya saat server
-    // terbukti hidup, bukan saat gagal.
-    if ((sseGaveUp || !sse) && typeof EventSource !== 'undefined') {
+    // Snapshot sukses menghidupkan lagi SSE yang give-up HANYA bila
+    // server terbukti sempat putus (ada snapshot gagal sejak itu,
+    // sseOutageSeen). Give-up karena SSE diam padahal polling sehat
+    // (buffer WebView/proxy) TIDAK dihidupkan lagi di sini (issue #785):
+    // siklus give-up -> snapshot sukses -> reconnect -> diam lagi akan
+    // berulang selamanya dan membatalkan perlindungan reconnect-storm.
+    if ((sseGaveUp || !sse) && sseOutageSeen && typeof EventSource !== 'undefined') {
       sseGaveUp = false;
       sseSilentReconnects = 0;
+      sseOutageSeen = false;
       connectEvents();
     }
     if (data.status) applyServerStatus(data.status);
@@ -7390,6 +7398,10 @@ async function pollSnapshot() {
     }
   } catch (e) {
     failCount++;
+    // Server tak terjangkau lewat polling juga: catat sebagai bukti
+    // putus agar snapshot sukses berikutnya boleh menghidupkan SSE
+    // yang give-up (issue #785).
+    sseOutageSeen = true;
     if (failCount > 2) {
       statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
     }
