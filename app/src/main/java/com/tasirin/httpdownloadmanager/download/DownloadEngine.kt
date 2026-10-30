@@ -124,6 +124,13 @@ class DownloadEngine(appContext: Context) {
     private val pendingReplacements =
         ConcurrentHashMap<String, PendingReplacement>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
+
+    // Throttle attempt yang sedang berjalan per item (issue #747):
+    // setLimitAndPriority mendorong batas baru ke throttle aktif agar
+    // perubahan limit per-item berlaku langsung di tengah unduhan.
+    // Entri dicabut berpasangan-nilai dari invokeOnCompletion job
+    // attempt yang mendaftarkannya.
+    private val activeThrottles = ConcurrentHashMap<String, SpeedThrottle>()
     // Set concurrent via newSetFromMap (bukan ConcurrentHashMap.newKeySet):
     // newKeySet/KeySetView butuh API 24 — di Android 6 (minSdk 23) lempar
     // NoSuchMethodError saat engine dibangun (crash tiap startup); Set polos
@@ -1238,6 +1245,18 @@ class DownloadEngine(appContext: Context) {
 
     fun setLimitAndPriority(id: String, speedLimitKbps: Int, priority: Int) {
         updateItem(id) { it.copy(speedLimitKbps = speedLimitKbps, priority = priority) }
+        // Dorong batas baru ke throttle attempt yang sedang berjalan
+        // (issue #747): tanpa ini limit per-item baru berlaku sesudah
+        // attempt berikutnya — tak seperti limit global yang langsung
+        // berlaku. Bila limit per-item dikosongkan, throttle kembali ke
+        // mode global (limiter bersama mengikuti prefs saat ini).
+        activeThrottles[id]?.let { throttle ->
+            if (speedLimitKbps > 0) {
+                throttle.updateLimit(speedLimitKbps, null)
+            } else {
+                throttle.updateLimit(StoragePrefs.speedLimitKbps(context), globalRateLimiter())
+            }
+        }
     }
 
     fun setMonitor(id: String, enabled: Boolean) {
@@ -2204,6 +2223,10 @@ class DownloadEngine(appContext: Context) {
         } else {
             SpeedThrottle(limit, globalRateLimiter())
         }
+        // Daftarkan throttle attempt ini (issue #747); dicabut
+        // berpasangan-nilai saat job attempt ini selesai.
+        activeThrottles[item.id] = throttle
+        coroutineContext[Job]?.invokeOnCompletion { activeThrottles.remove(item.id, throttle) }
 
         if (item.segments.isNotEmpty()) {
             // Verifikasi identitas resource dulu (issue #543): jalur
@@ -2367,6 +2390,10 @@ class DownloadEngine(appContext: Context) {
         } else {
             SpeedThrottle(limit, globalRateLimiter())
         }
+        // Daftarkan throttle attempt ini (issue #747); dicabut
+        // berpasangan-nilai saat job attempt ini selesai.
+        activeThrottles[item.id] = throttle
+        coroutineContext[Job]?.invokeOnCompletion { activeThrottles.remove(item.id, throttle) }
 
         val baseName = buangSufiksEkstensi(outName, ".ts", ".mp4").ifBlank { outName }
         // Nama temp WAJIB unik per item: baseName membuang ekstensi sehingga
@@ -2859,6 +2886,10 @@ class DownloadEngine(appContext: Context) {
         } else {
             SpeedThrottle(limit, globalRateLimiter())
         }
+        // Daftarkan throttle attempt ini (issue #747); dicabut
+        // berpasangan-nilai saat job attempt ini selesai.
+        activeThrottles[item.id] = throttle
+        coroutineContext[Job]?.invokeOnCompletion { activeThrottles.remove(item.id, throttle) }
         try {
             val videoOk = downloadAdaptiveFile(item, adaptiveVideoUrl, videoMp4, buffer, throttle, progress)
             if (!videoOk) throw IOException("adaptive video download failed")
@@ -5050,9 +5081,23 @@ data class UrlProbe(
 private const val MAX_THROTTLE_SLEEP_MS = 2_000L
 
 private class SpeedThrottle(
-    private val limitKbps: Int,
-    private val shared: GlobalRateLimiter?
+    limitKbps: Int,
+    shared: GlobalRateLimiter?
 ) {
+    // Volatile + bisa diganti di tengah attempt (issue #747): perubahan
+    // limit per-item harus berlaku langsung ke unduhan yang sedang jalan,
+    // seperti limit global lewat GlobalRateLimiter.setLimit.
+    @Volatile private var limitKbps: Int = limitKbps
+    @Volatile private var shared: GlobalRateLimiter? = shared
+
+    /** Terapkan batas baru di tengah attempt. Mode per-item (shared
+     *  null) dan mode global (shared terisi) bisa bertukar mengikuti
+     *  nilai limit per-item terbaru, jadi keduanya diganti bersama. */
+    fun updateLimit(kbps: Int, newShared: GlobalRateLimiter?) {
+        limitKbps = kbps
+        shared = newShared
+    }
+
     private val lock = Any()
     private var startTime = monotonicNow()
     private var startBytes = 0L
