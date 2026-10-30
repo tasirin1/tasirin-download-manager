@@ -2261,10 +2261,6 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && moreMenuOpen) closeMoreMenu();
 });
 if (menuBackdrop) menuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeMoreMenu(); });
-document.addEventListener('keydown', function (e) {
-  const _tag = (e.target && e.target.tagName) || '';
-  if (_tag === 'INPUT' || _tag === 'TEXTAREA' || _tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
-});
 
 let failCount = 0;
 let currentItems = [];
