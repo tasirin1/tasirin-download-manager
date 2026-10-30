@@ -1183,6 +1183,14 @@
   .cm-row button {
  flex: 1; padding: 12px; border-radius: var(--radius-sm); border: 0; font-size: 14px; font-weight: 700; cursor: pointer; }
 
+  /* Modal Share memuat 4 tombol: bungkus dua baris supaya label panjang
+     ("Revoke link") tidak terlipat sempit di kotak 340px (issue #778). */
+  #shareModal .cm-row {
+ flex-wrap: wrap; }
+
+  #shareModal .cm-row button {
+ flex: 1 1 34%; }
+
   .cm-row .btn-ghost {
  background: var(--bg-soft); color: var(--ink); }
 
