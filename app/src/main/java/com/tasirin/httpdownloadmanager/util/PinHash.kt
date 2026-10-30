@@ -7,8 +7,9 @@ import javax.crypto.spec.PBEKeySpec
 /** Hash PIN memakai PBKDF2 agar nilai disk tidak cepat di-brute-force. */
 object PinHash {
 
-    // Varian SHA-1 tersedia di seluruh minSdk 21; kekuatan datang dari salt
-    // acak dan iterasi tinggi, bukan memakai API yang tidak ada di Android 6.
+    // Varian SHA-1 tersedia di semua versi yang didukung aplikasi
+    // (minSdk 23); kekuatan datang dari salt acak dan iterasi tinggi,
+    // bukan memakai API yang lebih baru dari lantai itu.
     private const val ALGORITHM = "PBKDF2WithHmacSHA1"
     private const val KEY_LENGTH_BITS = 256
     private const val SALT_BYTES = 16
