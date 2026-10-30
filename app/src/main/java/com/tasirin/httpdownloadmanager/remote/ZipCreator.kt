@@ -235,6 +235,15 @@ object ZipCreator {
                         val dirSeen = mutableSetOf(canon)
                         val dirUsed = mutableMapOf<String, Int>()
                         var dirWritten = 0
+                        // Folder kosong tetap menulis entri foldernya
+                        // sendiri (issue #962), sejajar zipFile: tanpa
+                        // ini token folder kosong menghasilkan ZIP
+                        // 0-entri yang tersaji sebagai sukses.
+                        if (children.isEmpty() && budget.tryTake()) {
+                            zos.putNextEntry(ZipEntry("$root/"))
+                            zos.closeEntry()
+                            dirWritten = 1
+                        }
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
                         ).forEach { child ->

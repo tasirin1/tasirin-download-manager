@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): token folder kosong kini menghasilkan entri folder di ZIP, bukan arsip 0-entri** -- cabang folder zipTokens sebelumnya hanya mengiterasi anak, sehingga folder kosong tak menulis entri apa pun dan token tunggal folder kosong menghasilkan ZIP 22 byte yang tersaji sebagai unduhan sukses. Kini folder kosong menulis entri direktorinya sendiri (tergerbang budget entri), sejajar perilaku zipFile (issue #962).
+
 - **fix(remote): kunci cache ZIP kini memuat cap isi sumber** -- kunci sebelumnya hanya path/daftar token, sehingga perubahan berkas dari luar aplikasi (aplikasi Files lain, USB, penulis lain di folder yang sama) tidak membatalkan cache dan ZIP basi tersaji sampai 60 detik. Kini kunci fsZip menempelkan cap stat sumber (jalan kaki rekursif terbatas ukuran+mtime untuk filesystem; agregat jumlah/jumlah ukuran/mtime terbesar MediaStore untuk folder media), kunci mediaZip menempelkan cap per token, dan parser invalidasi terarah memotong segmen cap sebelum menafsirkan kunci sebagai path (issue #961).
 
 - **fix(download): niat terakhir pengguna menang pada antrean aksi tertunda muatan awal** -- deferUntilLoaded sebelumnya membuang pendaftaran ulang kunci yang masih mengantre, sehingga pola ketuk Jeda-Lanjut-Jeda pada notifikasi selama cold start berakhir Lanjut (berlawanan dengan ketukan terakhir). Kini entri lama berkunci sama dibuang dan pendaftaran baru masuk di ekor antrean; penggabungan panggilan identik beruntun tetap terjaga (issue #960).
