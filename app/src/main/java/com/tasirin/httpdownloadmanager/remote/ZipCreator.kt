@@ -191,13 +191,21 @@ object ZipCreator {
                     // canon + izin sudah diverifikasi di atas untuk File yang
                     // sama: tanpa resolusi canonical dan cek izin kedua.
                     name = f.name
-                    input = if (f.isFile) f.inputStream() else null
+                    // Gagal MEMBUKA sumber = token terlewat (issue #857):
+                    // berkas yang hilang di antara listing dan buka tak
+                    // boleh membunuh seluruh batch. Yang menggagalkan
+                    // ZIP hanya gagal MENYALIN di tengah (issue #846).
+                    input = if (f.isFile) {
+                        runCatching { f.inputStream() }.getOrNull()
+                    } else null
                 } else {
                     if (!raw.startsWith("u:")) return@forEach
                     val uri = raw.removePrefix("u:").toUri()
                     if (!isUriAllowed(uri)) return@forEach
                     name = displayNameFor(context, uri)
-                    input = context.contentResolver.openInputStream(uri)
+                    input = runCatching {
+                        context.contentResolver.openInputStream(uri)
+                    }.getOrNull()
                 }
                 if (input == null) {
                     return@runCatching
