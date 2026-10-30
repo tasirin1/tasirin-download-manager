@@ -28,7 +28,7 @@ object Updater {
     // Format lama tasirin-download-manager-v1.0.<n>-<code>.apk tetap
     // diterima sebagai fallback (kode dari nama file).
     private val LEGACY_APK_CODE_RE = Regex("-(\\d+)\\.apk$")
-    private val TAG_RUN_RE = Regex("^v?1\\.(\\d+)\\.(\\d+)$")
+    private val TAG_RUN_RE = Regex("^v?(\\d+)\\.(\\d+)\\.(\\d+)$")
     private const val LATEST_API =
         "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest"
     private const val LIST_API =
@@ -114,13 +114,25 @@ object Updater {
             return match.groupValues.get(1).toIntOrNull() ?: return null
         }
         val match = TAG_RUN_RE.find(tag.trim()) ?: return null
-        val minor = match.groupValues[1].toLongOrNull() ?: return null
-        val patch = match.groupValues[2].toLongOrNull() ?: return null
+        val major = match.groupValues[1].toLongOrNull() ?: return null
+        val minor = match.groupValues[2].toLongOrNull() ?: return null
+        val patch = match.groupValues[3].toLongOrNull() ?: return null
         // Batas sebelum perkalian agar digit raksasa tak meluber Long.
-        if (minor !in 0..20_000 || patch !in 0..20_000_000) return null
+        if (major !in 1..20 || minor !in 0..20_000 || patch !in 0..20_000_000) return null
         val run = minor * 1000 + patch
         if (run !in 0..20_000_000) return null
-        return (100000L + run).toInt()
+        // Mayor 1 mempertahankan pemetaan warisan persis (100000+lari,
+        // kode maksimum 20100000). Mayor >= 2 mendapat pita sendiri di
+        // major*100jt+lari — selalu di atas seluruh kode 1.x yang
+        // mungkin terbit, jadi rilis mayor baru tak pernah kalah
+        // urutan dari 1.x (issue #889; sebelumnya regex mengunci
+        // mayor '1' sehingga v2.x ditolak total dan tak pernah
+        // ditawarkan).
+        return if (major == 1L) {
+            (100000L + run).toInt()
+        } else {
+            (major * 100_000_000L + run).toInt()
+        }
     }
 
     private fun get(context: Context, url: String): String? = runCatching {

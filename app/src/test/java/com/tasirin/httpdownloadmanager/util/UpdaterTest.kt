@@ -47,6 +47,37 @@ class UpdaterTest {
     }
 
     @Test
+    fun `tag mayor di atas satu terbaca dan selalu di atas kode satu x`() {
+        // Issue #889: regex lama mengunci mayor '1' sehingga rilis
+        // v2.x ditolak total dan tak pernah ditawarkan. Mayor >= 2
+        // kini dipetakan ke pita major*100jt+lari.
+        assertEquals(
+            200000000,
+            Updater.codeFromRelease("v2.0.0", "tasirin-download-manager-v2.0.0.apk")
+        )
+        assertEquals(
+            200001005,
+            Updater.codeFromRelease("v2.1.5", "tasirin-download-manager-v2.1.5.apk")
+        )
+        // Pita mayor 2 di atas kode 1.x maksimum yang mungkin terbit
+        // (minor 20000 + patch 20000000 -> lari 20000000 -> 20100000).
+        assertEquals(
+            20100000,
+            Updater.codeFromRelease("v1.20000.0", "tasirin-download-manager-v1.20000.0.apk")
+        )
+    }
+
+    @Test
+    fun `tag mayor nol dan mayor raksasa ditolak`() {
+        assertNull(
+            Updater.codeFromRelease("v0.9.9", "tasirin-download-manager-v0.9.9.apk")
+        )
+        assertNull(
+            Updater.codeFromRelease("v21.0.0", "tasirin-download-manager-v21.0.0.apk")
+        )
+    }
+
+    @Test
     fun `tag tanpa awalan v tetap valid`() {
         assertEquals(
             100005,
