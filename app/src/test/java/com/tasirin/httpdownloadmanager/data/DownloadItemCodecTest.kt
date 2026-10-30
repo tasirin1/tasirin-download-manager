@@ -210,6 +210,24 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `overlayProgress - segmen ber-end Long MAX tidak meluap cap`() {
+        // Issue #789: cap end-start+1 polos membungkus ke Long.MIN_VALUE
+        // untuk end ekstrem sehingga progres segmen tak pernah diterapkan.
+        // Cap jenuh (seperti parseSegments #748) membuat s=500 diterapkan.
+        // Ekspektasi dibuktikan port Python 1:1 sebelum ditulis.
+        val items = listOf(
+            DownloadItem(
+                id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED,
+                bytesDownloaded = 10, totalBytes = 200,
+                segments = listOf(DownloadSegment(0, 0, Long.MAX_VALUE, 10))
+            )
+        )
+        val raw = "{\"a\":{\"b\":10,\"t\":200,\"s\":[500]}}"
+        val out = DownloadItemCodec.overlayProgress(items, raw)
+        assertEquals(500L, out[0].segments[0].downloaded)
+    }
+
+    @Test
     fun `overlayProgress - format lama tanpa segmen tidak menyentuh segmen`() {
         val items = listOf(
             DownloadItem(

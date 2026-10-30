@@ -250,7 +250,12 @@ object DownloadItemCodec {
             val nsegs = if (segArr != null && item.segments.isNotEmpty()) {
                 item.segments.map { seg ->
                     if (seg.index in 0 until segArr.length()) {
-                        val cap = seg.end - seg.start + 1
+                        // Panjang segmen inklusif dihitung jenuh seperti
+                        // parseSegments (issue #748): end = Long.MAX_VALUE
+                        // membuat +1 polos membungkus ke Long.MIN_VALUE
+                        // dan minOf menghasilkan nilai negatif (issue #789).
+                        val segLen = seg.end - seg.start
+                        val cap = if (segLen == Long.MAX_VALUE) Long.MAX_VALUE else segLen + 1
                         val sv = minOf(segArr.optLong(seg.index, seg.downloaded), cap)
                         if (sv > seg.downloaded) seg.copy(downloaded = sv) else seg
                     } else {
