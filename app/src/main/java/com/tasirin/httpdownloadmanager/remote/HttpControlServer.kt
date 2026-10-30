@@ -2128,7 +2128,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (!file.exists() || !file.isFile || canon == null || !isFsPathAllowed(canon)) {
                 return notFound()
             }
-            stream = FileInputStream(file)
+            // Open terbungkus (issue #827): berkas terhapus di antara
+            // cek dan open dulu lolos sebagai 500 + CrashLog, bukan 404.
+            stream = try { FileInputStream(file) } catch (_: Exception) { return notFound() }
             total = file.length()
         } else if (!item.contentUri.isNullOrEmpty()) {
             val uri = item.contentUri.toUri()
@@ -2334,7 +2336,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 // untuk byte versi baru bila berkas ditimpa di antara
                 // stat dan open — berkas galeri bisa sedang ditulis
                 // aplikasi lain, tak seperti berkas unduhan COMPLETED.
-                val stream = FileInputStream(file)
+                // Open-nya sendiri terbungkus (issue #827): terhapus di
+                // antara cek isFile dan open = 404, bukan 500.
+                val stream = try { FileInputStream(file) } catch (_: Exception) { return notFound() }
                 total = try {
                     stream.channel.size()
                 } catch (_: Exception) {
@@ -4023,7 +4027,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (!file.exists() || !file.isFile || canon == null || !isFsPathAllowed(canon)) {
                 return notFound()
             }
-            input = FileInputStream(file)
+            // Open terbungkus (issue #827): berkas terhapus di antara
+            // cek dan open dulu lolos sebagai 500 + CrashLog, bukan 404.
+            input = try { FileInputStream(file) } catch (_: Exception) { return notFound() }
             total = file.length()
         } else if (!item.contentUri.isNullOrEmpty()) {
             val uri = item.contentUri.toUri()
