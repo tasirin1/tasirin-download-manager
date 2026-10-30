@@ -1783,11 +1783,18 @@ class DownloadEngine(appContext: Context) {
         result: FileSaver.PublishResult,
         fileName: String
     ): FileSaver.PublishResult {
-        return if (StoragePrefs.isAutoSortEnabled(context)) {
-            saver.organizeByType(result, fileName)
-        } else {
-            result
+        if (!StoragePrefs.isAutoSortEnabled(context)) return result
+        val organized = saver.organizeByType(result, fileName)
+        // Relokasi ke subfolder jenis terjadi SESUDAH invalidasi ZIP
+        // terarah publishItem (#668): ZIP subfolder tujuan adalah
+        // keturunan folder terbit, bukan leluhur, jadi tak ikut terbuang
+        // dan menyajikan isi basi sampai TTL-nya habis. Invalidasi ulang
+        // dengan path final menutup celah itu (issue #674).
+        val newPath = organized.filePath
+        if (newPath != null && newPath != result.filePath) {
+            App.invalidateServerDownloadCaches(newPath)
         }
+        return organized
     }
 
     // Penerus monitor yang berakhir FAILED terminal: hidupkan lagi
