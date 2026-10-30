@@ -58,9 +58,12 @@ if [ -f "$ex" ]; then
 else
   echo "GAGAL: $ex hilang"; gagal=1;
 fi
-# 5. fmtDate wajib SATU definisi di remote.src.html (hoisting menimpa).
+# 5. fmtDate wajib TEPAT SATU definisi di remote.src.html (issue #725):
+# nol definisi sama mematikannya dengan ganda (hoisting menimpa), dan
+# jumlah dihitung per KEMUNCULAN (grep -o), bukan per baris — dua
+# definisi sebaris dulu terbaca n=1 oleh grep -c.
 if [ -f remote.src.html ]; then
-  n=$(grep -c -E 'function[[:space:]]+fmtDate|fmtDate[[:space:]]*=[[:space:]]*function|(const|let)[[:space:]]+fmtDate[[:space:]]*=' remote.src.html || true)
-  if [ "${n:-0}" -gt 1 ]; then echo "GAGAL: fmtDate terdefinisi $n kali di remote.src.html (wajib 1)"; gagal=1; fi
+  n=$(grep -o -E 'function[[:space:]]+fmtDate|fmtDate[[:space:]]*=[[:space:]]*function|(const|let)[[:space:]]+fmtDate[[:space:]]*=' remote.src.html | wc -l)
+  if [ "${n:-0}" -ne 1 ]; then echo "GAGAL: fmtDate terdefinisi $n kali di remote.src.html (wajib tepat 1)"; gagal=1; fi
 fi
 exit $gagal

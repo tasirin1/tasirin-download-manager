@@ -1345,8 +1345,11 @@ def cek_remote_dm(gagal):
         gagal.append("remote.src.html hilang atau kosong — cek remote tak bisa berjalan")
     if src:
         defs = re.findall(r"function\s+fmtDate\b|fmtDate\s*=\s*function|const\s+fmtDate\s*=|let\s+fmtDate\s*=", src)
-        if len(defs) > 1:
-            gagal.append("remote.src.html: fmtDate terdefinisi %d× (wajib SATU — hoisting menimpa)" % len(defs))
+        if len(defs) != 1:
+            # Tepat satu (issue #725): nol definisi dulu lolos karena
+            # hanya >1 yang digagalkan — padahal fmtDate hilang memecah
+            # seluruh format tanggal remote saat runtime.
+            gagal.append("remote.src.html: fmtDate terdefinisi %d× (wajib tepat SATU — hoisting menimpa; nol berarti hilang)" % len(defs))
         if "tabDownloads" in src and not re.search(r"tabDownloads.{0,400}?(addEventListener|onclick|\.click)", src, re.S):
             gagal.append("remote.src.html: tabDownloads tanpa handler klik (pola tabGallery/tabFiles)")
     ex = os.path.join(AKAR, "app", "src", "main", "assets", "extract.js")
