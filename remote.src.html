@@ -6938,7 +6938,11 @@ async function doActionNow(id, action, extra, quiet) {
     }, 15000);
     const data = await res.json().catch(function () { return null; });
     if (!res.ok || !data || !data.ok) {
-      throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
+      // Respons server diterima tetapi aksi ditolak: tandai asalnya
+      // agar mode quiet bisa membedakannya dari gagal jaringan (#919).
+      const err = new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
+      err.fromServer = true;
+      throw err;
     }
     refresh();
     return true;
@@ -6948,10 +6952,12 @@ async function doActionNow(id, action, extra, quiet) {
     // error (terutama delete gagal) tak terlihat sama sekali.
     // Mode quiet (batch, issue #917): jangan menulis toast per item —
     // penelepon mengumpulkan hasil dan melaporkan satu ringkasan.
+    // Nilai balik quiet membedakan sebab gagal (#919): 'state' = server
+    // menjawab dan menolak, 'net' = permintaan tak sampai ke server.
     if (!quiet) {
       showToast('Action failed: ' + e.message, 4000, 'error');
     }
-    return false;
+    return quiet ? (e.fromServer ? 'state' : 'net') : false;
   }
 }
 // Aksi batch Downloads (issue #917): tembak semua id dalam mode senyap,
@@ -6962,9 +6968,14 @@ async function batchRun(action, doneVerb) {
   const ids = Array.from(batchSelected);
   if (!ids.length) return;
   const results = await Promise.all(ids.map(function (id) { return doActionNow(id, action, null, true); }));
-  const okCount = results.filter(Boolean).length;
+  const okCount = results.filter(function (r) { return r === true; }).length;
+  const netCount = results.filter(function (r) { return r === 'net'; }).length;
   if (okCount === ids.length) {
     showToast(doneVerb + ' ' + okCount + ' item(s)', 2500);
+  } else if (netCount > 0 && okCount + netCount === ids.length) {
+    // Semua kegagalan adalah transport (#919): jangan salahkan
+    // eligibility item untuk koneksi yang putus.
+    showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest could not be reached (connection problem)', 4000, 'error');
   } else {
     showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest were not eligible', 4000, 'error');
   }
