@@ -106,6 +106,22 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `decode - id duplikat hanya entri pertama yang dipertahankan`() {
+        // Issue #942: duplikat dari blob korup/asing akan membeku di
+        // engine (first-match per id) dan remove-nya yatim berkas.
+        val raw = """
+            [{"id":"1","url":"https://a/x","fileName":"x","state":"PAUSED","bytesDownloaded":5,"totalBytes":10},
+             {"id":"1","url":"https://a/x2","fileName":"x2","state":"COMPLETED","bytesDownloaded":10,"totalBytes":10},
+             {"id":"2","url":"https://a/y","fileName":"y","state":"COMPLETED","bytesDownloaded":10,"totalBytes":10}]
+        """.trimIndent()
+        val decoded = DownloadItemCodec.decode(raw)
+        assertEquals(2, decoded.size)
+        assertEquals("x", decoded[0].fileName)
+        assertEquals(5L, decoded[0].bytesDownloaded)
+        assertEquals("2", decoded[1].id)
+    }
+
+    @Test
     fun `decode - entry null di tengah tidak menghapus daftar`() {
         val raw = """
             [{"id":"1","url":"https://a/x","fileName":"x","state":"COMPLETED","bytesDownloaded":1,"totalBytes":1},

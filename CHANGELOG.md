@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(data): item ber-id duplikat dari blob tersimpan kini didedupe saat decode** -- DownloadItemCodec.decode mempertahankan entri pertama per id dan melewati duplikatnya; sebelumnya duplikat kedua membeku permanen di engine (penilaian per-id bersifat first-match) dan remove(id) menghapus kedua entri dari daftar tetapi hanya berkas entri pertama, menyisakan berkas parsial yatim. Dikunci uji DownloadItemCodecTest (issue #942).
+
 - **fix(util): potongan nama jalur char tak lagi membelah pasangan surrogate** -- kedua titik potong di FileNames.safe kini mundur satu satuan bila akan membelah emoji (helper safeCut), menyamai kesadaran pasangan yang sudah dimiliki jalur byte; sebelumnya nama terbit bisa memuat surrogate yatim yang menjadi '?' di disk. Dikunci uji FileNamesTest (issue #941).
 - **fix(remote): prune cache durasi kini menegakkan anggaran byte, bukan hanya jumlah entri** -- cache 2000 entri berpath dalam terserialisasi melewati plafon muat 512KB cacheLocked() sehingga seluruh cache dibuang di tiap start dingin lalu ditulis lagi sama besarnya (amnesia permanen); prune kini juga membuang entri tertua sampai perkiraan serialisasi konservatif (panjang kunci + 24 per entri) di bawah anggaran 448KB. Dikunci uji ServerVideoDurationsTest (issue #940).
 

@@ -82,8 +82,17 @@ object DownloadItemCodec {
      *  sama) tak perlu parse ulang blob besar yang sama berkali-kali. */
     fun decode(arr: JSONArray, coerceActiveToPaused: Boolean = true): List<DownloadItem> {
         val items = mutableListOf<DownloadItem>()
+        val seenIds = HashSet<String>()
         for (i in 0 until arr.length()) {
-            parseItem(arr.optJSONObject(i), coerceActiveToPaused)?.let { items.add(it) }
+            val item = parseItem(arr.optJSONObject(i), coerceActiveToPaused) ?: continue
+            // Id duplikat dari blob korup/asing (issue #942): engine
+            // menilai per-id dengan first-match, jadi duplikat kedua
+            // akan membeku permanen dan remove(id) menghapus daftarnya
+            // tanpa menghapus berkasnya. Pertahankan entri pertama per
+            // id — konsisten semantik engine — dan lewati sisanya,
+            // sejajar postur defensif codec (#733/#748).
+            if (!seenIds.add(item.id)) continue
+            items.add(item)
         }
         return items
     }
