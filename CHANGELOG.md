@@ -1147,6 +1147,7 @@
 - **fix(remote): shareItem berpenjaga urut agar modal share tak menampilkan tautan item yang salah** -- nomor urut shareItemSeq ditambahkan meniru pola shareListSeq; respons (sukses maupun gagal) dari permintaan Share yang sudah disusul permintaan lain diabaikan (issue #680).
 - **fix(remote): invalidateZipCacheFor membandingkan dalam ejaan kanonik di kedua sisi** -- path berkas terbit kini dikanonikkan (canonicalPath) sebelum dibandingkan dengan kunci cache ZIP yang sudah kanonik sejak #675; folder unduhan bertujuan ejaan alias seperti /sdcard tidak lagi lolos invalidasi terarah (issue #681).
 - **fix(remote): invalidateFsRootsCache menghapus cache ZIP per entri dengan CAS** -- pola values + clear() menyeluruh diganti remove(key, entry) per entri dengan penghapusan berkas hanya bila CAS berhasil, selaras invalidateZipCache pasca-#676; entri segar dari zipCached tidak lagi terbuang dan berkasnya tidak yatim saat akar FS berubah (issue #682).
+- **fix(remote): sapuan TTL pruneZipCache mengumpulkan entri kedaluwarsa lalu menghapus per entri dengan CAS** -- pola entries.removeIf dengan penghapusan berkas di dalam predikat diganti filter + remove(key, value), selaras loop eviksi ukuran di fungsi yang sama; entri pengganti dari zipCached tidak bisa ikut jatuh (issue #683).
 ## [v1.0 — 2026-08-24] — Audit keep-alive body
 ### Fixed
 - **Seek zen mode** — Sembunyikan tombol modal dan daftar video berikutnya selama dua-tap lompatan durasi.

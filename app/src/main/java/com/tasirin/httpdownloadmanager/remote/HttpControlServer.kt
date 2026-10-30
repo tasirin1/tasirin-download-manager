@@ -1862,10 +1862,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     private fun pruneZipCache(now: Long, keepKey: String) {
         synchronized(zipEvictionLock) {
-            zipCache.entries.removeIf { (_, value) ->
-                val expired = now - value.first >= ZIP_CACHE_TTL_MS
-                if (expired) runCatching { value.second.delete() }
-                expired
+            // Kumpulkan dulu, lalu CAS per entri seperti loop eviksi
+            // ukuran di bawah: pola removeIf lama menghapus berkas di
+            // dalam predikat, sebelum remove iteratornya sendiri
+            // berjalan, sehingga entri yang diganti zipCached di sela
+            // itu bisa ikut jatuh dan berkas barunya yatim (issue #683).
+            val expiredEntries = zipCache.entries.filter { (_, value) ->
+                now - value.first >= ZIP_CACHE_TTL_MS
+            }
+            expiredEntries.forEach { (key, value) ->
+                if (zipCache.remove(key, value)) {
+                    runCatching { value.second.delete() }
+                }
             }
             // Ukuran dari nilai tersimpan: tanpa stat disk per entri (sebelumnya
             // sumOf { length() } + length() per eviksi = 2N syscall per prune).
