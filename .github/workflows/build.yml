@@ -363,9 +363,15 @@ jobs:
           # tak berubah, yang tepat untuk rerun.
           if gh release view "v${VER}" > /dev/null 2>&1; then
             gh release upload "v${VER}" "$OUT" $MAPPING_ARGS --clobber
+            # --draft=false WAJIB di jalur exists (issue #871): rilis
+            # yang ditemukan bisa berupa DRAFT sisa create yang mati
+            # di tengah publish; edit tanpa bendera ini tidak mengubah
+            # status draft sehingga re-run hijau pun rilisnya tetap
+            # tak terlihat publik. Untuk rilis terbit ia no-op aman.
             gh release edit "v${VER}" \
               --title "Tasirin Download Manager v${VER} (build ${CODE})" \
               --notes "$NOTES" \
+              --draft=false \
               $LATEST_ARGS
           else
             gh release create "v${VER}" "$OUT" $MAPPING_ARGS \
