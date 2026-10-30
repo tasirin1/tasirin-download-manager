@@ -3172,6 +3172,11 @@ let fsAfterName = '';
 let fsAfterDir = false;
 let fsLoadingMore = false;
 let fsLoadSeq = 0;
+// Generasi pesan status FS: fsMsg menaikkannya, loadFs hanya mengosongkan
+// baris status bila tak ada pesan yang dipasang sesudah ia mulai — muatan
+// ulang yang dimulai lebih dulu tak boleh menghapus pesan hasil aksi yang
+// selesai di tengahnya (issue #679).
+let fsMsgGen = 0;
 const FS_PAGE = 250;
 const FS_MAX_SCROLL_POSITIONS = 128;
 let fsScrollPos = {};
@@ -3358,6 +3363,7 @@ function fsNavigate(path) {
 }
 
 function fsMsg(text, isErr) {
+  fsMsgGen++;
   fsStatus.textContent = text || '';
   fsStatus.style.color = isErr ? 'var(--red)' : 'var(--green)';
   // Error dicerminkan ke toast global: baris status fs berada di
@@ -3508,6 +3514,7 @@ function fsSetAfterCursor() {
 
 async function loadFs() {
   const seq = ++fsLoadSeq;
+  const msgGenAtStart = fsMsgGen;
   showFsSkeleton();
   fsOffset = 0;
   fsAfterName = '';
@@ -3519,7 +3526,7 @@ async function loadFs() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (seq !== fsLoadSeq) return;
-    fsStatus.textContent = '';
+    if (fsMsgGen === msgGenAtStart) fsStatus.textContent = '';
     renderFsCrumbs(fsPath);
     // Home hanya berguna saat berada di dalam folder; sembunyi di root.
     document.getElementById('fsHomeBtn').classList.toggle('hidden', !fsPath);

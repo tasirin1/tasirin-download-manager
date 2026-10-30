@@ -1066,6 +1066,7 @@ let fsAfterName = '';
 let fsAfterDir = false;
 let fsLoadingMore = false;
 let fsLoadSeq = 0;
+let fsMsgGen = 0;
 const FS_PAGE = 250;
 const FS_MAX_SCROLL_POSITIONS = 128;
 let fsScrollPos = {};
@@ -1229,6 +1230,7 @@ fsPath = path;
 loadFs();
 }
 function fsMsg(text, isErr) {
+fsMsgGen++;
 fsStatus.textContent = text || '';
 fsStatus.style.color = isErr ? 'var(--red)' : 'var(--green)';
 if (isErr && text) showToast(text, 3500, 'error');
@@ -1357,6 +1359,7 @@ fsAfterDir = !!(last && last.kind === 'dir');
 }
 async function loadFs() {
 const seq = ++fsLoadSeq;
+const msgGenAtStart = fsMsgGen;
 showFsSkeleton();
 fsOffset = 0;
 fsAfterName = '';
@@ -1368,7 +1371,7 @@ const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
 if (seq !== fsLoadSeq) return;
-fsStatus.textContent = '';
+if (fsMsgGen === msgGenAtStart) fsStatus.textContent = '';
 renderFsCrumbs(fsPath);
 document.getElementById('fsHomeBtn').classList.toggle('hidden', !fsPath);
 fsToolsBtn.classList.toggle('hidden', !fsPath);
