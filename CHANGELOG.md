@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): ikon berkas audio di Files kini glyph musik, bukan jam** -- Cabang audio `fsIconFor` sebelumnya menggambar wajah jam berjarum (terbaca "terbaru/durasi") padahal semua varian lain semantik; kini memakai glyph not musik bergaya goresan yang sama dengan varian lain (issue #771).
 - **fix(remote): pencarian Files tanpa hasil kini menampilkan pesan** -- Menyaring dengan kata yang tak cocok sebelumnya menyisakan daftar kosong hampa (tak beda dari folder rusak) plus tombol Load more melayang; kini tampil pesan "No files match your search." dan tombol disembunyikan selama keadaan itu (issue #770).
 - **fix(remote): tombol Load more Files selalu kembali ke ujung daftar** -- Baris halaman berikutnya ditambahkan via `appendChild` sesudah posisi tombol sehingga tombol tertinggal di tengah daftar; `fsUpdateLoadMore` kini memindah tombol yang sudah ada ke ujung setiap dipanggil (issue #769).
 - **fix(remote): lencana retry & tanda checksum tidak lagi basi di baris yang di-patch** -- Keduanya hanya dibuat saat rebuild tetapi `structSig` tidak memuat `retryCount`/`checksumVerified`, dan `patchRowSub` tidak menulis ulang lencananya; kedua nilai kini ikut tanda tangan struktural (pola pin #604) sehingga perubahannya memicu rebuild (issue #768).
