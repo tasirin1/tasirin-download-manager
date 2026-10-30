@@ -45,6 +45,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tasirin.httpdownloadmanager.data.DownloadItem
+import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
@@ -375,12 +376,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 App.startHttpServer()
             }
         }
-        // Intent peluncur hanya diproses pada pembuatan segar: sesudah
-        // proses mati, sistem membuat ulang activity dengan intent SEND
-        // yang asal, sehingga tanpa penjaga ini dialog tambah URL lama
-        // muncul lagi dari Recents (issue #845). Intent baru untuk
-        // instance yang hidup tetap lewat onNewIntent.
-        if (savedInstanceState == null) handleIncomingIntent(intent)
+        // Intent peluncur diproses pada pembuatan segar; pada pembuatan
+        // ulang sesudah proses mati hanya bila sidiknya berbeda dari
+        // intent terakhir yang ditangani (issue #845 + #854): redeliver
+        // intent lama dari record task terlewat, tetapi share BARU yang
+        // tiba lewat restore task (savedInstanceState != null) tetap
+        // tertangani. Instance hidup tetap lewat onNewIntent.
+        val intentSig = incomingIntentSig(intent)
+        if (savedInstanceState == null || (intentSig != null && intentSig != lastIntentSig())) {
+            handleIncomingIntent(intent)
+            if (intentSig != null) storeIntentSig(intentSig)
+        }
         } catch (t: Throwable) {
             // Error level-VM (memori habis, linkage rusak) jangan ditelan:
             // biarkan crash agar laporan sistem jujur; Exception biasa tetap
@@ -449,6 +455,32 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingIntent(intent)
+        // Catat sebagai tertangani agar redeliver-nya lewat pembuatan
+        // ulang sesudah proses mati dikenali sebagai konsumsi (issue #854).
+        incomingIntentSig(intent)?.let { storeIntentSig(it) }
+    }
+
+    /** Sidik stabil isi intent peluncur yang bisa ditangani (share,
+     *  view, pintasan tambah); null untuk intent yang memang no-op. */
+    private fun incomingIntentSig(intent: Intent?): String? {
+        if (intent == null) return null
+        val raw = when {
+            intent.getBooleanExtra(EXTRA_ADD_DOWNLOAD, false) -> "add"
+            intent.action == Intent.ACTION_SEND ->
+                "send:" + intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+            intent.action == Intent.ACTION_VIEW ->
+                "view:" + intent.data?.toString().orEmpty()
+            else -> return null
+        }
+        return Hex.sha256Hex(raw)
+    }
+
+    private fun lastIntentSig(): String? =
+        getSharedPreferences(PREFS_INTENT, MODE_PRIVATE).getString(KEY_INTENT_SIG, null)
+
+    private fun storeIntentSig(sig: String) {
+        getSharedPreferences(PREFS_INTENT, MODE_PRIVATE).edit()
+            .putString(KEY_INTENT_SIG, sig).apply()
     }
 
     private fun requestPermissionsIfNeeded() {
@@ -2023,6 +2055,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 .distinct()
                 .toList()
         private const val EXTRA_ADD_DOWNLOAD = "com.tasirin.httpdownloadmanager.ADD_DOWNLOAD"
+        private const val PREFS_INTENT = "main_intent"
+        private const val KEY_INTENT_SIG = "last_intent_sig"
         private val PRIORITY_VALUES = intArrayOf(-1, 0, 1)
     }
 }
