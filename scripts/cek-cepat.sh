@@ -70,8 +70,11 @@ fi
 # (issue #730): grep tanpa hasil keluar 1, dan di bawah set -euo
 # pipefail status itu membunuh assignment sebelum baris GAGAL di
 # bawah tercetak — gerbang gagal dalam diam persis pada kasus nol.
+# Pola definisi `function` wajib berbatas kata (\b, issue #757, pola
+# yang sama seperti verifikasi-path): tanpa itu ganti nama definisi
+# menjadi fmtDateMati tetap terhitung 1 dan lolos dari lapisan ini.
 if [ -f remote.src.html ]; then
-  n=$(grep -o -E 'function[[:space:]]+fmtDate|fmtDate[[:space:]]*=[[:space:]]*function|(const|let)[[:space:]]+fmtDate[[:space:]]*=' remote.src.html | wc -l || true)
+  n=$(grep -o -E 'function[[:space:]]+fmtDate\b|fmtDate[[:space:]]*=[[:space:]]*function|(const|let)[[:space:]]+fmtDate[[:space:]]*=' remote.src.html | wc -l || true)
   if [ "${n:-0}" -ne 1 ]; then echo "GAGAL: fmtDate terdefinisi $n kali di remote.src.html (wajib tepat 1)"; gagal=1; fi
 fi
 exit $gagal
