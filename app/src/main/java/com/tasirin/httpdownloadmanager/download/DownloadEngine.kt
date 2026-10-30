@@ -1968,8 +1968,15 @@ class DownloadEngine(appContext: Context) {
         }
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
         // Bila host GitHub tak terjangkau, buat mirror proxy otomatis.
+        // Item berkredensial/header kustom TIDAK mendapat auto-mirror
+        // (issue #948): sesudah switch, item.url adalah URL proxy dan
+        // anchor auth ikut berpindah ke sana, jadi username/password +
+        // seluruh header kustom (Authorization/Cookie) akan terkirim ke
+        // operator proxy publik yang tidak pernah dipilih pengguna.
+        // Mirror manual tetap jalan: host-nya dipilih pengguna sendiri.
         val autoMirrors = if (item.mirrors.isEmpty() &&
-            (isConnectError(message) || isSlowError(message)) && isGitHubUrl(item.url)
+            (isConnectError(message) || isSlowError(message)) && isGitHubUrl(item.url) &&
+            item.username.isEmpty() && item.password.isEmpty() && item.headers.isBlank()
         ) {
             githubMirrors(item.url)
         } else {
