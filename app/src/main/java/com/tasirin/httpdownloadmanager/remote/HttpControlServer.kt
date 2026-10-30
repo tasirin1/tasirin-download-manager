@@ -2325,9 +2325,19 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             raw.startsWith("f:") -> {
                 val file = File(raw.substring(2))
                 if (!file.isFile || !isFsPathAllowed(file.absolutePath)) return notFound()
-                total = file.length()
-                val range = parseRange(rangeHeader, total)
+                // Total dari FD yang dibuka (issue #815, pola #792):
+                // stat path lebih dulu bisa memberi total versi lama
+                // untuk byte versi baru bila berkas ditimpa di antara
+                // stat dan open — berkas galeri bisa sedang ditulis
+                // aplikasi lain, tak seperti berkas unduhan COMPLETED.
                 val stream = FileInputStream(file)
+                total = try {
+                    stream.channel.size()
+                } catch (_: Exception) {
+                    runCatching { stream.close() }
+                    return notFound()
+                }
+                val range = parseRange(rangeHeader, total)
                 val seekTo = range?.first ?: 0L
                 if (seekTo > 0) {
                     val positioned = runCatching { stream.channel.position(seekTo); true }.getOrDefault(false)
