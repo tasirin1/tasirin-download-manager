@@ -2176,6 +2176,13 @@ class DownloadEngine(appContext: Context) {
 
     private fun isNetworkError(message: String?): Boolean {
         if (message.isNullOrBlank()) return false
+        // Veto refused (issue #988): pesan refused sungguhan di
+        // Android berbentuk komposit ("failed to connect to ...
+        // ECONNREFUSED (Connection refused)") yang MEMUAT frasa
+        // positif "failed to connect" — tanpa veto yang didahulukan
+        // ini, niat #976 (refused = FAILED terminal) kalah oleh
+        // pencocokan substring dan item berakhir PAUSED abadi.
+        if (message.contains("connection refused", ignoreCase = true)) return false
         return message.contains("unknownhost", ignoreCase = true) ||
             message.contains("timeout", ignoreCase = true) ||
             message.contains("failed to connect", ignoreCase = true) ||
