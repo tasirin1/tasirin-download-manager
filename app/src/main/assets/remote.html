@@ -3626,6 +3626,22 @@ else if (FILE_ICON_DOC.indexOf(ext) >= 0) { cls = 't-doc'; label = ext.toUpperCa
 if (!cls || label.length > 6) return '';
 return '<span class="f-type ' + cls + '">' + escapeHtml(label) + '</span>';
 }
+let toolbarEls = null;
+function getToolbarEls() {
+if (toolbarEls) return toolbarEls;
+toolbarEls = {
+pauseAll: document.getElementById('pauseAllBtn'),
+resumeAll: document.getElementById('resumeAllBtn'),
+retryFailed: document.getElementById('retryFailedBtn'),
+clearCompleted: document.getElementById('clearCompletedBtn'),
+fActive: document.getElementById('fActive'),
+fDone: document.getElementById('fDone'),
+fAttention: document.getElementById('fAttention'),
+fSticky: document.getElementById('filtersSticky'),
+badge: document.getElementById('navDlBadge')
+};
+return toolbarEls;
+}
 function updateToolbar(items) {
 let active = 0;
 let pausedOrFailed = 0;
@@ -3638,27 +3654,23 @@ if (it.state === 'FAILED' || it.state === 'CANCELLED') failed++;
 if (it.state === 'COMPLETED') completed++;
 if (lockedTotalBytes.has(it.id) && (it.state === 'COMPLETED' || it.state === 'FAILED' || it.state === 'CANCELLED')) lockedTotalBytes.delete(it.id);
 });
-document.getElementById('pauseAllBtn').classList.toggle('hidden', active === 0);
-document.getElementById('resumeAllBtn').classList.toggle('hidden', pausedOrFailed === 0);
-document.getElementById('retryFailedBtn').classList.toggle('hidden', failed === 0);
-document.getElementById('clearCompletedBtn').classList.toggle('hidden', completed === 0);
+const els = getToolbarEls();
+els.pauseAll.classList.toggle('hidden', active === 0);
+els.resumeAll.classList.toggle('hidden', pausedOrFailed === 0);
+els.retryFailed.classList.toggle('hidden', failed === 0);
+els.clearCompleted.classList.toggle('hidden', completed === 0);
 const sep1 = moreMenu ? moreMenu.querySelector('.sep') : null;
 if (sep1) {
 sep1.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
 }
 var total = items.length;
-var fActive = document.getElementById('fActive');
-var fDone = document.getElementById('fDone');
-var fAttention = document.getElementById('fAttention');
-if (fActive) fActive.textContent = active;
-if (fDone) fDone.textContent = completed;
-if (fAttention) fAttention.textContent = pausedOrFailed;
-var fSticky = document.getElementById('filtersSticky');
-if (fSticky) fSticky.classList.toggle('hidden', total === 0 || currentRoute() !== 'downloads');
-const badge = document.getElementById('navDlBadge');
-if (badge) {
-badge.textContent = active;
-badge.classList.toggle('hidden', active === 0);
+if (els.fActive && els.fActive.textContent !== '' + active) els.fActive.textContent = active;
+if (els.fDone && els.fDone.textContent !== '' + completed) els.fDone.textContent = completed;
+if (els.fAttention && els.fAttention.textContent !== '' + pausedOrFailed) els.fAttention.textContent = pausedOrFailed;
+if (els.fSticky) els.fSticky.classList.toggle('hidden', total === 0 || currentRoute() !== 'downloads');
+if (els.badge) {
+if (els.badge.textContent !== '' + active) els.badge.textContent = active;
+els.badge.classList.toggle('hidden', active === 0);
 }
 }
 let lastStructSig = '';

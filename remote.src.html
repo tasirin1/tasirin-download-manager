@@ -6276,6 +6276,26 @@ function fileTypeBadge(name) {
   return '<span class="f-type ' + cls + '">' + escapeHtml(label) + '</span>';
 }
 
+// Referensi elemen toolbar statis (issue #1021): node halaman ini tak
+// pernah diganti seumur dokumen, jadi getElementById per siklus patch
+// hanya membuang kerja; di-cache sekali secara malas.
+let toolbarEls = null;
+function getToolbarEls() {
+  if (toolbarEls) return toolbarEls;
+  toolbarEls = {
+    pauseAll: document.getElementById('pauseAllBtn'),
+    resumeAll: document.getElementById('resumeAllBtn'),
+    retryFailed: document.getElementById('retryFailedBtn'),
+    clearCompleted: document.getElementById('clearCompletedBtn'),
+    fActive: document.getElementById('fActive'),
+    fDone: document.getElementById('fDone'),
+    fAttention: document.getElementById('fAttention'),
+    fSticky: document.getElementById('filtersSticky'),
+    badge: document.getElementById('navDlBadge')
+  };
+  return toolbarEls;
+}
+
 function updateToolbar(items) {
   let active = 0;
   let pausedOrFailed = 0;
@@ -6293,10 +6313,11 @@ function updateToolbar(items) {
     if (it.state === 'COMPLETED') completed++;
     if (lockedTotalBytes.has(it.id) && (it.state === 'COMPLETED' || it.state === 'FAILED' || it.state === 'CANCELLED')) lockedTotalBytes.delete(it.id);
   });
-  document.getElementById('pauseAllBtn').classList.toggle('hidden', active === 0);
-  document.getElementById('resumeAllBtn').classList.toggle('hidden', pausedOrFailed === 0);
-  document.getElementById('retryFailedBtn').classList.toggle('hidden', failed === 0);
-  document.getElementById('clearCompletedBtn').classList.toggle('hidden', completed === 0);
+  const els = getToolbarEls();
+  els.pauseAll.classList.toggle('hidden', active === 0);
+  els.resumeAll.classList.toggle('hidden', pausedOrFailed === 0);
+  els.retryFailed.classList.toggle('hidden', failed === 0);
+  els.clearCompleted.classList.toggle('hidden', completed === 0);
   const sep1 = moreMenu ? moreMenu.querySelector('.sep') : null;
   if (sep1) {
     sep1.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
@@ -6305,21 +6326,17 @@ function updateToolbar(items) {
   // saringannya. Attention = pausedOrFailed (PAUSED + FAILED + CANCELLED,
   // meniru ringkasan native; ember Failed lama #568 termasuk di dalamnya).
   // Angka selalu ditampilkan (termasuk 0) seperti strip aplikasi.
+  // Tulisan digerbang nilai tampil saat ini (issue #1021).
   var total = items.length;
-  var fActive = document.getElementById('fActive');
-  var fDone = document.getElementById('fDone');
-  var fAttention = document.getElementById('fAttention');
-  if (fActive) fActive.textContent = active;
-  if (fDone) fDone.textContent = completed;
-  if (fAttention) fAttention.textContent = pausedOrFailed;
+  if (els.fActive && els.fActive.textContent !== '' + active) els.fActive.textContent = active;
+  if (els.fDone && els.fDone.textContent !== '' + completed) els.fDone.textContent = completed;
+  if (els.fAttention && els.fAttention.textContent !== '' + pausedOrFailed) els.fAttention.textContent = pausedOrFailed;
   // Strip sembunyi penuh saat daftar kosong (total = jumlah item persis,
   // pelajaran #568) atau di luar halaman unduhan.
-  var fSticky = document.getElementById('filtersSticky');
-  if (fSticky) fSticky.classList.toggle('hidden', total === 0 || currentRoute() !== 'downloads');
-  const badge = document.getElementById('navDlBadge');
-  if (badge) {
-    badge.textContent = active;
-    badge.classList.toggle('hidden', active === 0);
+  if (els.fSticky) els.fSticky.classList.toggle('hidden', total === 0 || currentRoute() !== 'downloads');
+  if (els.badge) {
+    if (els.badge.textContent !== '' + active) els.badge.textContent = active;
+    els.badge.classList.toggle('hidden', active === 0);
   }
 }
 
