@@ -2424,8 +2424,10 @@ dlSearchInput.addEventListener('input', function () {
 // Escape menutup lapisan teratas yang tampil (issue #932), lewat
 // jalur tutup yang sama dengan tombol Cancel/backdrop tiap
 // permukaan; untuk dialog konfirmasi Escape berarti batal (No).
-// Urutan mengikuti tumpukan visual, modal paling atas lebih dulu.
-// mediaModal dan menu-menu punya handler Escape sendiri.
+// Urutan: menu dropdown paling dulu (paling ringan, issue #937),
+// lalu sheet/modal menurut tumpukan visual. Kedua menu TIDAK punya
+// handler Escape sendiri — otoritasnya tunggal di sini (issue
+// #937); hanya mediaModal yang menangani Escape sendiri.
 function closeTopOverlay() {
   function shown(id) {
     const el = document.getElementById(id);

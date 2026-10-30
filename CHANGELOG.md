@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **docs(web): luruskan komentar header closeTopOverlay yang basi sejak #937** -- komentar sebelumnya mengklaim menu-menu punya handler Escape sendiri dan modal ditutup paling dulu; sejak #937 kedua menu justru ditangani otoritas tunggal ini dan ditutup paling dulu, sedangkan hanya mediaModal yang menangani Escape sendiri. Komentar kini sesuai urutan nyata agar pemelihara tidak menghidupkan lagi listener per-menu (issue #967).
+
 - **fix(app): kegagalan registrasi NetworkCallback kini tercatat di log** -- registerNetworkCallback sebelumnya membungkus seluruh pendaftarannya dalam runCatching tanpa penanganan gagal, sehingga kegagalan total (anomali platform) membuat bendera konektivitas macet di nilai awal dan auto-resume mati seumur proses tanpa satu baris jejak pun. Kini kegagalan dicatat lewat logEvent (issue #966).
 
 - **fix(web): tombol Select File Manager hidup lagi — reset seleksi #957 dipindah ke pemicu muat-ulang** -- penempatan reset di dalam loadFs pada #957 membatalkan mode pilih yang baru dinyalakan handler tombol Select (ia memanggil loadFs untuk menggambar ulang), sehingga tombol itu mati total pada setiap muat sukses. Reset kini dilakukan secara sinkron sebelum fetch oleh pemicu yang memang mengganti konteks daftar (popstate/Back, selesai membuat folder, selesai upload), yang sekaligus menutup celah jalur-gagal di mana seleksi bertahan di atas tampilan error (issue #964, #965).
