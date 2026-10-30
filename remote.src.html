@@ -332,9 +332,6 @@
  width: 30px; height: 30px; }
 
  .icon-wrap { position: relative; }
- .icon-wrap .pause-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(0,0,0,.5); color: #fff; font-size: 15px; opacity: 0; transition: opacity .15s ease; cursor: pointer; pointer-events: none; }
- .icon-wrap:hover .pause-overlay { opacity: 1; pointer-events: auto; }
- .icon-wrap .pause-overlay.o-shown { opacity: 1; pointer-events: auto; }
 
   .item-body {
  flex: 1; min-width: 0; }
@@ -1551,7 +1548,6 @@
   .toast-close svg { width: 12px; height: 12px; }
   .sheet-close svg { width: 15px; height: 15px; }
   .tab .tab-ico svg { width: 19px; height: 19px; }
-  .pause-overlay svg { width: 18px; height: 18px; }
   #mmBack svg, #mmPlayerTop button svg { width: 18px; height: 18px; }
   .swipe-action { display: none; align-items: center; justify-content: center; gap: 6px; }
   .swipe-action .act-in { display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -6771,39 +6767,6 @@ function patchRowSub(li, it) {
       barEl._barCls = wantCls;
     }
   }
-  // Update pause/resume overlay based on state
-  // Cache icon-wrap + overlay di node: 2 querySelector per baris per tick
-  // hanya membuang CPU (pola li._sub/li._name di atas). isConnected menjaga
-  // bila node diganti di luar patch (aman walau rebuild selalu buat li baru).
-  var iconWrap = (li._iconWrap && li._iconWrap.isConnected) ? li._iconWrap : (li._iconWrap = li.querySelector('.icon-wrap'));
-  if (iconWrap) {
-    var existingOv = (li._ov && li._ov.isConnected) ? li._ov : (li._ov = iconWrap.querySelector('.pause-overlay'));
-    var needsOv = it.state === 'DOWNLOADING' || it.state === 'PAUSED';
-    if (needsOv && !existingOv) {
-      var ov = document.createElement('div');
-      ov.className = 'pause-overlay';
-      ov._act = it.state === 'DOWNLOADING' ? 'pause' : 'resume';
-      ov.setAttribute('data-action', ov._act);
-      ov.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
-      ov.innerHTML = it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play;
-      ov.addEventListener('click', function (e) { e.stopPropagation(); doAction(it.id, ov.getAttribute('data-action')); });
-      iconWrap.appendChild(ov);
-      li._ov = ov;
-      armPauseOverlay(ov, iconWrap);
-    } else if (needsOv && existingOv) {
-      // Guard innerHTML: rebuild ikon tiap tick membuat flicker + GC.
-      var action = it.state === 'DOWNLOADING' ? 'pause' : 'resume';
-      if (existingOv._act !== action) {
-        existingOv._act = action;
-        existingOv.setAttribute('data-action', action);
-        existingOv.setAttribute('title', it.state === 'DOWNLOADING' ? 'Pause' : 'Resume');
-        existingOv.innerHTML = it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play;
-      }
-    } else if (!needsOv && existingOv) {
-      existingOv.remove();
-      if (li._ov === existingOv) li._ov = null;
-    }
-  }
 }
 
 function updateRows(items) {
@@ -6854,31 +6817,6 @@ function updateRows(items) {
     patchRowSub(li, it);
   }
   updateToolbar(items);
-}
-
-function armPauseOverlay(ov, wrap) {
-  if (!ov || !wrap) return;
-  // Auto-hide overlay hanya relevan di perangkat touch (hover tidak tersedia).
-  if (!window.matchMedia || !window.matchMedia('(hover: none)').matches) return;
-  // Listener dipasang SEKALI per .icon-wrap (issue #582): overlay dibuat
-  // ulang tiap transisi state, jadi handler menyelesaikan overlay yang
-  // hidup saat kejadian, bukan menutup atas node yang sudah terlepas —
-  // dulu tiap pembuatan ulang menumpuk sepasang listener mati di wrap
-  // yang persisten seumur baris.
-  var st = wrap._pauseArm;
-  if (!st) {
-    st = wrap._pauseArm = { t: null, lastTouch: 0, show: null };
-    st.show = function (restart) {
-      var cur = wrap.querySelector('.pause-overlay');
-      if (!cur) return;
-      cur.classList.add('o-shown');
-      if (st.t) clearTimeout(st.t);
-      if (restart !== false) st.t = setTimeout(function () { cur.classList.remove('o-shown'); }, 2000);
-    };
-    wrap.addEventListener('touchstart', function () { st.lastTouch = Date.now(); st.show(true); }, {passive: true});
-    wrap.addEventListener('pointerdown', function () { if (Date.now() - st.lastTouch < 700) return; st.show(true); });
-  }
-  st.show(true);
 }
 
 function rebuildList(items) {
@@ -6968,7 +6906,7 @@ function rebuildList(items) {
       ? '<span class="retry-badge" title="Retried \u00d7' + it.retryCount + '">&#x21BB;' + it.retryCount + '</span>' : '';
     const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
     li.innerHTML =
-      '<div class="item-top"><div class="icon-wrap"><div class="icon">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div>' + ((it.state === 'DOWNLOADING' || it.state === 'PAUSED') ? '<div class="pause-overlay" data-action="' + (it.state === 'DOWNLOADING' ? 'pause' : 'resume') + '" title="' + (it.state === 'DOWNLOADING' ? 'Pause' : 'Resume') + '">' + (it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play) + '</div>' : '') + '</div><div class="item-body">' +
+      '<div class="item-top"><div class="icon-wrap"><div class="icon">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div></div><div class="item-body">' +
       '<div class="name">' + (dlPinned.has(it.id) ? '<span class="pin-indicator">' + UI_ICONS.checksq + ' Pinned</span>' : '') + '<span class="name-txt">' + escapeHtml(it.fileName) + '</span>' + fileTypeBadge(it.fileName) + '</div>' + okBadge + retryBadge + err +
       (retry ? '<div class="err-actions">' + retry + '</div>' : '') +
       '</div>' +
@@ -7002,14 +6940,6 @@ function rebuildList(items) {
         e.stopPropagation();
         doAction(it.id, 'resume');
       });
-    }
-    const pauseOv = li.querySelector('.pause-overlay');
-    if (pauseOv) {
-      pauseOv.addEventListener('click', function (e) {
-        e.stopPropagation();
-        doAction(it.id, pauseOv.getAttribute('data-action'));
-      });
-      armPauseOverlay(pauseOv, li.querySelector('.icon-wrap'));
     }
     if (compactMode) li.classList.add('compact');
     if (batchMode) li.classList.add('batch-mode');
