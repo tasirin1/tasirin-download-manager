@@ -1861,7 +1861,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Triple<Long, File, Long>>()
     // Pasangan (entri tertulis, item terlewat) per kunci cache ZIP
     // (issue #864/#874): cache hit tidak menjalankan pembuatnya, jadi
-    // hitungan aktual disimpan di sini.
+    // hitungan aktual disimpan di sini — ditulis dari dalam lambda
+    // pembuat (di bawah kunci cache) dan dibatasi ke kunci yang
+    // cachenya hidup (issue #875/#876).
     private val zipWrittenCounts = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Int>>()
     private val zipLocks = Array(8) { Any() }
     private val zipEvictionLock = Any()
@@ -2047,22 +2049,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val tokens = (requestedTokens.filter(::isMediaTokenAllowed) + pathTokens).distinct()
         if (tokens.isEmpty()) return notFound()
         val key = "tokens:" + tokens.sorted().joinToString(",")
-        var freshResult: ZipCreator.ZipTokensResult? = null
         val (input, total) = openZipStream(key) {
-            createTempZip { zos ->
-                freshResult = ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
+            val created = createTempZip { zos ->
+                val r = ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
+                // Hitungan ditulis DI DALAM lambda pembuat (issue
+                // #875/#876): lambda ini berjalan di dalam kunci
+                // zipCached, jadi tulisan tak bisa ditimpa tulisan
+                // basi dari permintaan yang lebih lambat, dan umurnya
+                // terikat pembuatan entri cache itu sendiri. Peta
+                // dibatasi ke kunci yang cachenya hidup (+ kunci ini)
+                // agar tak tumbuh sendiri.
+                zipWrittenCounts[key] = r.entriesWritten to r.skippedItems
+                zipWrittenCounts.keys.retainAll(zipCache.keys + key)
             }
+            created
         } ?: return notFound()
         // Hitungan aktual arsip (issue #864, diperdalam #874): entri
         // yang sungguh tertulis + item terlewat sampai granularitas
-        // anak folder. Pada pembuatan segar nilainya dari zipTokens
-        // barusan; pada cache hit nilainya disimpan di peta pendamping
-        // berkunci cache yang sama. Tanpa keduanya (tak seharusnya
-        // terjadi) jatuh ke perkiraan dari jumlah token yang diminta.
-        freshResult?.let { r ->
-            if (zipWrittenCounts.size > 256) zipWrittenCounts.clear()
-            zipWrittenCounts[key] = r.entriesWritten to r.skippedItems
-        }
+        // anak folder, dibaca dari peta pendamping berkunci cache yang
+        // sama. Tanpa catatan (tak seharusnya terjadi) jatuh ke
+        // perkiraan dari jumlah token yang diminta.
         val counts = zipWrittenCounts[key]
         val written = counts?.first ?: tokens.size
         val skippedInZip = counts?.second ?: (tokens.size - written)
