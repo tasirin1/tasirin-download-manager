@@ -1617,8 +1617,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .show()
     }
 
-    /** Ringkasan ringkas: "3 active · 5 done · 1 failed", dihitung dalam SATU
-     *  iterasi daftar (bukan beberapa pass terpisah). */
     /** Hash murah field yang tampil di daftar + status lipatan section. */
     private fun progressSig(items: List<com.tasirin.httpdownloadmanager.data.DownloadItem>): Int {
         var h = items.size * 31 +
@@ -1651,6 +1649,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         return h
     }
 
+    /** Ringkasan ringkas: "3 active · 5 done · 1 failed", dihitung dalam SATU
+     *  iterasi daftar (bukan beberapa pass terpisah). */
     private fun updateToolbar(items: List<DownloadItem>) {
         var active = 0
         var paused = 0
@@ -1749,7 +1749,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .show()
     }
 
-    /** Ekspor log error (crash + error server) ke file .txt di folder Download. */
     /** Set yang sudah di-set COMPLETED supaya tidak auto-open berulang. */
     private val autoOpenedIds = mutableSetOf<String>()
     /** State tiap item pada emisi sebelumnya: hanya transisi menuju COMPLETED

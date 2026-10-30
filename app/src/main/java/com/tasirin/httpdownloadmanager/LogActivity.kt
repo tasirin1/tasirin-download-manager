@@ -106,6 +106,7 @@ class LogActivity : AppCompatActivity() {
         super.onStop()
     }
 
+    /** Ekspor log error (crash + error server) ke file .txt di folder Download. */
     private fun exportLogTxt() {
         binding.logExport.isEnabled = false
         lifecycleScope.launch {
