@@ -2027,7 +2027,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun mediaZip(session: IHTTPSession): Response {
         val requestedTokens = session.param("tokens").orEmpty()
             .split(",").filter { it.isNotBlank() }.distinct()
-        val paths = session.param("paths").orEmpty().split(",").filter { it.isNotBlank() }
+        // Path tiba sebagai parameter berulang (issue #849): format
+        // lama join/split koma ambigu untuk nama folder berkoma.
+        val paths = session.parameters["paths"].orEmpty().filter { it.isNotBlank() }
         if (requestedTokens.size + paths.size > MAX_MEDIA_ZIP_TOKENS) return notFound()
         // Satu distinct di akhir (bukan distinct-clear-addAll): requestedTokens
         // sudah distinct, path sah ditambah lalu didedup sekali jalan.
@@ -2047,7 +2049,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
         } ?: return notFound()
         appendLog("ZIP MEDIA: ${tokens.size} file (${Formats.bytes(total)})")
-        return streamMedia(
+        val response = streamMedia(
             name = "gallery-${tokens.size}-files.zip",
             mime = "application/zip",
             input = input,
@@ -2055,6 +2057,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
         )
+        // Path pilihan yang gugur validasi (hilang/tak diizinkan) tidak
+        // boleh hilang diam-diam: klien menampilkannya dari header ini
+        // (issue #849).
+        val skippedPaths = paths.size - pathTokens.size
+        if (skippedPaths > 0) response.addHeader("X-Zip-Skipped", skippedPaths.toString())
+        return response
     }
 
 

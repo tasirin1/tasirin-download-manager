@@ -1828,7 +1828,7 @@ return;
 }
 let url = API + '/api/media_zip?';
 if (tokens.length) url += 'tokens=' + encodeURIComponent(tokens.join(','));
-if (paths.length) url += (tokens.length ? '&' : '') + 'paths=' + encodeURIComponent(paths.join(','));
+if (paths.length) url += (tokens.length ? '&' : '') + paths.map(function (p) { return 'paths=' + encodeURIComponent(p); }).join('&');
 downloadZipWithProgress(url, 'Downloading ZIP');
 exitFsSelect();
 });
@@ -1887,6 +1887,8 @@ let fallbackAnchor = false;
 try {
 const res = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ac ? ac.signal : undefined});
 if (!res.ok) throw new Error('HTTP ' + res.status);
+const zipSkipped = Number(res.headers.get('X-Zip-Skipped')) || 0;
+if (zipSkipped > 0) mmShowToast(zipSkipped + ' selected item(s) skipped (missing or not allowed).', 3500);
 const len = Number(res.headers.get('Content-Length')) || 0;
 let fileName = '';
 const cd = res.headers.get('Content-Disposition') || '';
