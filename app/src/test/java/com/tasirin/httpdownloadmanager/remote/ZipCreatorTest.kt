@@ -246,7 +246,10 @@ class ZipCreatorTest {
             val canon = runCatching { dir.canonicalPath }.getOrNull() ?: dir.absolutePath
             if (!seen.add(canon)) continue
             val children = dir.listFiles()?.sortedWith(
-                Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
+                Comparator { a, b ->
+                    val c = a.name.compareTo(b.name, ignoreCase = true)
+                    if (c != 0) c else a.name.compareTo(b.name)
+                }
             ) ?: continue
             for (child in children) {
                 if (count >= 8192) {
@@ -273,7 +276,8 @@ class ZipCreatorTest {
                         val kids: List<java.io.File> = if (kidArr.size <= shallowBudget) {
                             kidArr.sortedWith(
                                 Comparator { a, b ->
-                                    a.name.compareTo(b.name, ignoreCase = true)
+                                    val c = a.name.compareTo(b.name, ignoreCase = true)
+                                    if (c != 0) c else a.name.compareTo(b.name)
                                 }
                             )
                         } else {

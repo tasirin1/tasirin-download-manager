@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): urutan lipatan cap memakai urutan total (seri nama dipecah case-sensitive)** -- komparator sortir jalan kaki cap sebelumnya hanya ignoreCase, jadi pasangan nama seri (A.txt/a.txt) mengikuti urutan listFiles() yang tak dijamin API dan cap folder diam bisa berdenyut antarpermintaan (cache ZIP terbangun ulang percuma). Traversal utama dan kedua cabang drain kini memakai satu komparator urutan total yang sama; acuan uji diperbarui pada commit yang sama (issue #1005).
+
 - **test(remote): acuan paritas cap disamakan dengan produksi #993 + uji drain dangkal sungguhan** -- implementasi acuan beku masih memakai sortir penuh pra-#993, dan tak satu pun uji memicu drain dangkal (uji terpotong lama menaruh semua berkas di akar sehingga tumpukan kosong saat plafon tercapai). Acuan kini menyalin seleksi heap produksi, dan uji baru memakai pohon terpotong dengan dua direktori terantre berisi anak (termasuk pasangan nama seri ignoreCase) yang benar-benar dilipat dangkal (issue #1004).
 
 - **fix(download): balapan wake lock ditutup tuntas dengan monitor bersama** -- cek, pembuatan, dan acquire di updateWakeLock serta seluruh teardown onDestroy kini berjalan di bawah monitor wakeLockGuard yang sama, sehingga acquire tidak bisa lagi menyela di sela cek dan teardown (sisa check-then-act dari #982/#989). Bendera destroyed dan cek ganda tetap dipertahankan sebagai lapis dalam (issue #1003).

@@ -387,6 +387,15 @@ object ZipCreator {
      *  kanonik anti-putaran symlink seperti zipFile. Jalan kaki stat
      *  murni (tanpa baca isi) — jauh lebih murah daripada membuat ZIP,
      *  dan pada cache-hit ia menggantikan pembuatan ulang itu. */
+    // Urutan total nama untuk semua sortir jalan kaki cap
+    // (issue #1005): ignoreCase, seri dipecah case-sensitive —
+    // tanpa pemecah seri, pasangan A.txt/a.txt mengikuti urutan
+    // listFiles() yang tak dijamin API dan cap bisa berdenyut.
+    private val stampNameOrder = Comparator<File> { a, b ->
+        val c = a.name.compareTo(b.name, ignoreCase = true)
+        if (c != 0) c else a.name.compareTo(b.name)
+    }
+
     internal fun zipFsSourceStamp(root: File): String {
         if (root.isFile) return "f" + root.length() + ":" + root.lastModified()
         if (!root.isDirectory) return "none"
@@ -404,9 +413,7 @@ object ZipCreator {
             // menjamin urutan dan lipatan hash peka-urutan — tanpa ini
             // cap folder yang diam bisa berdenyut antarpermintaan.
             // Pola pengurutan yang sama dengan zipFile.
-            val children = dir.listFiles()?.sortedWith(
-                Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-            ) ?: continue
+            val children = dir.listFiles()?.sortedWith(stampNameOrder) ?: continue
             for (child in children) {
                 if (count >= ZIP_STAMP_MAX_ENTRIES) {
                     truncated = true
@@ -445,16 +452,9 @@ object ZipCreator {
                         // identik dengan awalan sortir penuh, biaya
                         // terikat anggaran, bukan ukuran direktori).
                         val kids: List<File> = if (kidArr.size <= shallowBudget) {
-                            kidArr.sortedWith(
-                                Comparator { a, b ->
-                                    a.name.compareTo(b.name, ignoreCase = true)
-                                }
-                            )
+                            kidArr.sortedWith(stampNameOrder)
                         } else {
-                            val order = Comparator<File> { a, b ->
-                                val c = a.name.compareTo(b.name, ignoreCase = true)
-                                if (c != 0) c else a.name.compareTo(b.name)
-                            }
+                            val order = stampNameOrder
                             val heap = java.util.PriorityQueue<File>(
                                 shallowBudget, order.reversed()
                             )
