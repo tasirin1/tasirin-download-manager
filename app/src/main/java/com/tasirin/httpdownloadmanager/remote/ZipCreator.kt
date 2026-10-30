@@ -125,7 +125,13 @@ object ZipCreator {
             children.sortedWith(
                 Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
             ).forEach { child ->
-                if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
+                // Anak sesudah plafon tak pernah dikunjungi rekursi:
+                // hitung sebagai terlewat agar ekor budget tak hilang
+                // dari laporan (issue #884).
+                if (budget.count >= MAX_ZIP_ENTRIES) {
+                    skipped++
+                    return@forEach
+                }
                 val (w, s) = zipFile(zos, child, entryPath, depth + 1, seen, budget, usedNames, isFileAllowed)
                 written += w
                 skipped += s
@@ -173,12 +179,17 @@ object ZipCreator {
         val budget = ZipBudget()
         var entriesWritten = 0
         var skippedItems = 0
-        tokens.forEach { token ->
-            if (budget.count >= MAX_ZIP_ENTRIES) return ZipTokensResult(entriesWritten, skippedItems)
+        tokens.forEachIndexed { index, token ->
+            if (budget.count >= MAX_ZIP_ENTRIES) {
+                // Token sisa sesudah plafon tak pernah dikunjungi:
+                // hitung semuanya sebagai terlewat (issue #884).
+                skippedItems += tokens.size - index
+                return ZipTokensResult(entriesWritten, skippedItems)
+            }
             val raw = MediaLibrary.decodeToken(token)
             if (raw == null) {
                 skippedItems++
-                return@forEach
+                return@forEachIndexed
             }
             // Galat I/O di dalam blok (baca sumber putus, listFiles gagal)
             // TIDAK ditelan runCatching ini: ia dilempar ulang sesudah
@@ -193,7 +204,7 @@ object ZipCreator {
                     val canon = runCatching { f.canonicalPath }.getOrNull()
                     if (canon == null || !isFileAllowed(canon)) {
                         skippedItems++
-                        return@forEach
+                        return@forEachIndexed
                     }
                     if (f.isDirectory) {
                         // Nama folder mentah tak boleh jadi prefix entri: folder
@@ -223,7 +234,14 @@ object ZipCreator {
                         var dirWritten = 0
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
-                        ).forEach { child -> if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
+                        ).forEach { child ->
+                            // Anak sesudah plafon: terlewat, dihitung
+                            // (issue #884); label kembali ke loop anak
+                            // ini, bukan loop token.
+                            if (budget.count >= MAX_ZIP_ENTRIES) {
+                                skippedItems++
+                                return@forEach
+                            }
                             val (w, s) = zipFile(zos, child, root, depth = 1, seen = dirSeen, isFileAllowed = isFileAllowed, budget = budget, usedNames = dirUsed)
                             dirWritten += w
                             skippedItems += s
@@ -248,12 +266,12 @@ object ZipCreator {
                 } else {
                     if (!raw.startsWith("u:")) {
                         skippedItems++
-                        return@forEach
+                        return@forEachIndexed
                     }
                     val uri = raw.removePrefix("u:").toUri()
                     if (!isUriAllowed(uri)) {
                         skippedItems++
-                        return@forEach
+                        return@forEachIndexed
                     }
                     name = displayNameFor(context, uri)
                     input = runCatching {
@@ -272,7 +290,7 @@ object ZipCreator {
                 if (!budget.tryTake()) {
                     runCatching { input.close() }
                     skippedItems++
-                    return@forEach
+                    return@forEachIndexed
                 }
                 val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
                 // Tanpa runCatching: salinan yang putus harus menggagalkan
