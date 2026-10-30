@@ -36,6 +36,11 @@ class DownloadService : Service() {
     // kolektor di thread IO memeriksa ini sebelum acquire.
     @Volatile
     private var destroyed = false
+
+    // Monitor bersama updateWakeLock <-> onDestroy (issue #1003):
+    // cek-acquire dan teardown berjalan atomik satu sama lain,
+    // menutup sisa celah check-then-act #989 secara tuntas.
+    private val wakeLockGuard = Any()
     // Start server latar sedang berjalan di coroutine terpisah (issue
     // #474): selama bendera ini menyala, kolektor dan onStartCommand
     // tidak boleh menilai server "mati" hanya karena bind belum
@@ -182,12 +187,16 @@ class DownloadService : Service() {
         // (lepas dulu, batal kemudian) memberi celah bagi kolektor
         // yang sedang memproses emisi untuk meng-acquire lock baru
         // sesudah pelepasan — lock tanpa pemilik sampai timeout.
-        destroyed = true
-        scope.cancel()
-        val lock = wakeLock
-        wakeLock = null
-        if (lock != null && runCatching { lock.isHeld }.getOrDefault(false)) {
-            runCatching { lock.release() }
+        // Seluruhnya di bawah monitor yang sama dengan
+        // updateWakeLock (issue #1003) agar tak bisa disela acquire.
+        synchronized(wakeLockGuard) {
+            destroyed = true
+            scope.cancel()
+            val lock = wakeLock
+            wakeLock = null
+            if (lock != null && runCatching { lock.isHeld }.getOrDefault(false)) {
+                runCatching { lock.release() }
+            }
         }
         super.onDestroy()
     }
@@ -206,32 +215,36 @@ class DownloadService : Service() {
     // adalah desain sengaja — bukan kebocoran.
     @SuppressLint("Wakelock")
     private fun updateWakeLock(active: Boolean) {
-        // Service yang sedang dihancurkan tak boleh acquire lagi
-        // (issue #982): tak ada pemilik yang akan melepasnya.
-        if (active && destroyed) return
-        if (active) {
-            if (wakeLock == null) {
-                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "httpdm:download")
-                    .apply { setReferenceCounted(false) }
-            }
-            val lock = wakeLock
-            // Periksa destroyed sekali lagi tepat sebelum acquire
-            // (issue #989): cek di pintu fungsi dan acquire tidak
-            // atomik — onDestroy bisa tuntas di sela-selanya dan
-            // lock yang ter-acquire sesudah itu tak berpemilik.
-            if (lock != null && !destroyed &&
-                runCatching { !lock.isHeld }.getOrDefault(true)
-            ) {
-                runCatching { lock.acquire(WAKELOCK_TIMEOUT_MS) }
-            }
-        } else {
-            val lock = wakeLock
-            wakeLock = null
-            // Cek isHeld: release lock yang sudah kedaluwarsa/dilepas
-            // melempar RuntimeException yang hanya berisik di log.
-            if (lock != null && runCatching { lock.isHeld }.getOrDefault(false)) {
-                runCatching { lock.release() }
+        // Di bawah monitor yang sama dengan onDestroy (issue #1003):
+        // cek + buat + acquire tak bisa disela teardown.
+        synchronized(wakeLockGuard) {
+            // Service yang sedang dihancurkan tak boleh acquire lagi
+            // (issue #982): tak ada pemilik yang akan melepasnya.
+            if (active && destroyed) return
+            if (active) {
+                if (wakeLock == null) {
+                    val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "httpdm:download")
+                        .apply { setReferenceCounted(false) }
+                }
+                val lock = wakeLock
+                // Periksa destroyed sekali lagi tepat sebelum acquire
+                // (issue #989): cek di pintu fungsi dan acquire tidak
+                // atomik — onDestroy bisa tuntas di sela-selanya dan
+                // lock yang ter-acquire sesudah itu tak berpemilik.
+                if (lock != null && !destroyed &&
+                    runCatching { !lock.isHeld }.getOrDefault(true)
+                ) {
+                    runCatching { lock.acquire(WAKELOCK_TIMEOUT_MS) }
+                }
+            } else {
+                val lock = wakeLock
+                wakeLock = null
+                // Cek isHeld: release lock yang sudah kedaluwarsa/dilepas
+                // melempar RuntimeException yang hanya berisik di log.
+                if (lock != null && runCatching { lock.isHeld }.getOrDefault(false)) {
+                    runCatching { lock.release() }
+                }
             }
         }
     }

@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): balapan wake lock ditutup tuntas dengan monitor bersama** -- cek, pembuatan, dan acquire di updateWakeLock serta seluruh teardown onDestroy kini berjalan di bawah monitor wakeLockGuard yang sama, sehingga acquire tidak bisa lagi menyela di sela cek dan teardown (sisa check-then-act dari #982/#989). Bendera destroyed dan cek ganda tetap dipertahankan sebagai lapis dalam (issue #1003).
+
 - **fix(download): pola umum 'timed out' dan 'connection abort' kini terklasifikasi jaringan** -- #987 menambahkan frasa persis 'connect timed out', sehingga 'Read timed out', 'Connection timed out', pesan sintetis repo 'Playlist fetch timed out', dan 'Software caused connection abort' (ECONNABORTED) masih lolos ke FAILED terminal. Kini pola umumnya ikut dicakup (issue #1002).
 
 - **fix(ui): penyelesaian saat auto-open mati tak lagi membuka sendiri sesudah pref dinyalakan lagi** -- peta transisi auto-open hanya diperbarui saat pref menyala, jadi item yang selesai selama pengguna memilih tidak-auto-open tetap tercatat berstatus lama dan dinilai 'baru selesai' pada emisi pertama sesudah pref dinyalakan. Kolektor kini mengonsumsi transisi (menyamakan peta state tanpa membuka) selama pref mati; tangkapan saat kembali dari latar dengan pref menyala tidak berubah (issue #1001).
