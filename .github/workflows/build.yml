@@ -435,3 +435,14 @@ jobs:
               echo "Rilis sebelumnya $PREV sehat ($PREV_HAS_APK aset APK)."
             fi
           fi
+          # Inventaris draft menyeluruh (issue #872): penilaian di atas
+          # hanya menyentuh satu pendahulu, sedangkan draft yatim dari
+          # kegagalan transien menumpuk diam-diam tanpa mekanisme
+          # pembersih di repo. Daftarkan SEMUA draft yang ada di
+          # ringkasan langkah agar penumpukannya terlihat; penghapusan
+          # tetap keputusan manual, tidak otomatis.
+          ALL_DRAFTS=$(gh release list --limit 50 --json tagName,isDraft --jq '[.[] | select(.isDraft) | .tagName] | join(", ")' || true)
+          if [ -n "$ALL_DRAFTS" ]; then
+            echo "Draft yang ada saat ini: $ALL_DRAFTS"
+            echo "📝 Draft terdaftar: $ALL_DRAFTS" >> "$GITHUB_STEP_SUMMARY"
+          fi
