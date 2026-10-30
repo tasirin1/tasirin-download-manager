@@ -3806,6 +3806,11 @@ async function loadFs() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (seq !== fsLoadSeq) return;
+    // Muat-ulang penuh membatalkan seleksi (issue #957): fsItems diganti
+    // objek baru sehingga seleksi lama yatim — bilah batch akan
+    // menindak berkas yang tidak terlihat lagi (pada popstate bahkan
+    // lintas folder). Sejajar semantik reset galeri.
+    if (fsSelectMode) resetFsSelection();
     if (fsMsgGen === msgGenAtStart) fsStatus.textContent = '';
     renderFsCrumbs(fsPath);
     // Home hanya berguna saat berada di dalam folder; sembunyi di root.

@@ -1439,6 +1439,7 @@ const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
 if (seq !== fsLoadSeq) return;
+if (fsSelectMode) resetFsSelection();
 if (fsMsgGen === msgGenAtStart) fsStatus.textContent = '';
 renderFsCrumbs(fsPath);
 document.getElementById('fsHomeBtn').classList.toggle('hidden', !fsPath);
