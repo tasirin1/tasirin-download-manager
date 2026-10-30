@@ -1127,6 +1127,18 @@ class DownloadEngine(appContext: Context) {
     }
 
     fun retryFailed() {
+        // Aksi massal wajib menunggu muatan awal (#264, issue #863):
+        // retryFailed adalah satu-satunya yang belum bergerbang —
+        // ketukan dari halaman remote tepat sesudah proses restart
+        // menilai daftar kosong dan hilang diam-diam.
+        if (!loadGate.isCompleted) {
+            deferUntilLoaded("retryFailed") { doRetryFailed() }
+            return
+        }
+        doRetryFailed()
+    }
+
+    private fun doRetryFailed() {
         // Batch: satu salinan daftar + satu emisi StateFlow, bukan N kali
         // updateItem saat pengguna menekan Retry Failed (sama seperti pauseAll).
         // CANCELLED ikut (issue #556): grup seksi "Failed" di daftar
