@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): kirim ulang carousel hanya mengirim foto yang gagal** -- mode 'Select photo: All' sebelumnya meng-POST ulang seluruh carousel sesudah gagal parsial (form tetap terbuka), dan server tak punya dedupe, jadi foto yang sudah berhasil masuk daftar dua kali. Kini URL yang sudah berhasil dicatat per tanda tangan carousel (probe baru meresetnya sendiri) dan dilewati pada kirim ulang (issue #1007).
+
 - **fix(web): sisa toast kegagalan/penolakan kini bertipe error** -- lima situs mmShowToast yang tertinggal dari #996 ('Another operation is already running' di dua tempat, penolakan folder MediaStore, item ZIP yang dilewati, dan 'Move cancelled' yang tak konsisten dengan 'Move failed' di fungsi yang sama) kini mengoper tipe error ke toast global (issue #1006).
 
 - **fix(remote): urutan lipatan cap memakai urutan total (seri nama dipecah case-sensitive)** -- komparator sortir jalan kaki cap sebelumnya hanya ignoreCase, jadi pasangan nama seri (A.txt/a.txt) mengikuti urutan listFiles() yang tak dijamin API dan cap folder diam bisa berdenyut antarpermintaan (cache ZIP terbangun ulang percuma). Traversal utama dan kedua cabang drain kini memakai satu komparator urutan total yang sama; acuan uji diperbarui pada commit yang sama (issue #1005).

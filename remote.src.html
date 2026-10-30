@@ -7434,6 +7434,11 @@ const photoSelect = document.getElementById('photoSelect');
 let socialPlatform = '';  // 'youtube' | 'social' | ''
 let socialVideoOptions = [];  // [{label, url, ...}]
 let socialPhotoOptions = [];  // [{label, url, ...}]
+// Jejak foto carousel yang sudah berhasil ditambahkan (issue
+// #1007): kunci tanda tangan isi carousel, jadi probe baru
+// meresetnya sendiri tanpa menyentuh semua situs reset opsi.
+let socialPhotoAddedSig = '';
+let socialPhotoAddedUrls = new Set();
 
 // Host persis atau subdomain sah dari domain (issue #784): pencocokan
 // substring atas URL utuh sebelumnya membuat domain mirip
@@ -7687,9 +7692,20 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
       // penolakan server yang ditelan diam-diam membuat foto hilang tanpa
       // pemberitahuan apa pun.
       var allFailed = 0;
+      var photoSig = socialPhotoOptions.map(function (o) { return o && o.url; }).join('\n');
+      if (photoSig !== socialPhotoAddedSig) {
+        socialPhotoAddedSig = photoSig;
+        socialPhotoAddedUrls = new Set();
+      }
+      var attempted = 0;
       for (var ci = 0; ci < socialPhotoOptions.length; ci++) {
         var cOpt = socialPhotoOptions[ci];
         if (!cOpt || !cOpt.url) continue;
+        // Lewati yang sudah masuk daftar (issue #1007): kirim
+        // ulang sesudah gagal parsial hanya mengirim yang gagal,
+        // bukan menggandakan yang sudah berhasil.
+        if (socialPhotoAddedUrls.has(cOpt.url)) continue;
+        attempted++;
         var allBody = new URLSearchParams({url: cOpt.url});
         if (cOpt.fileName) allBody.append('name', cOpt.fileName);
         allBody.append('speedLimitKbps', document.getElementById('speed').value);
@@ -7713,8 +7729,9 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         }, 15000);
         var aData = await aRes.json().catch(function () { return null; });
         if (!aRes.ok || !aData || !aData.ok) allFailed++;
+        else socialPhotoAddedUrls.add(cOpt.url);
       }
-      if (allFailed) throw new Error(allFailed + ' of ' + socialPhotoOptions.length + ' photos failed to add');
+      if (allFailed) throw new Error(allFailed + ' of ' + attempted + ' photos failed to add');
     } else {
     const res = await fetchTimeout(API + '/api/add', {
       method: 'POST',

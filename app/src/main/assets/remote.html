@@ -4557,6 +4557,8 @@ const photoSelect = document.getElementById('photoSelect');
 let socialPlatform = '';  // 'youtube' | 'social' | ''
 let socialVideoOptions = [];  // [{label, url, ...}]
 let socialPhotoOptions = [];  // [{label, url, ...}]
+let socialPhotoAddedSig = '';
+let socialPhotoAddedUrls = new Set();
 function socialHostMatches(h, domain) {
 return h === domain || h.endsWith('.' + domain);
 }
@@ -4760,9 +4762,17 @@ body.set('headers', merged);
 try {
 if (sendAll && socialPhotoOptions.length > 1) {
 var allFailed = 0;
+var photoSig = socialPhotoOptions.map(function (o) { return o && o.url; }).join('\n');
+if (photoSig !== socialPhotoAddedSig) {
+socialPhotoAddedSig = photoSig;
+socialPhotoAddedUrls = new Set();
+}
+var attempted = 0;
 for (var ci = 0; ci < socialPhotoOptions.length; ci++) {
 var cOpt = socialPhotoOptions[ci];
 if (!cOpt || !cOpt.url) continue;
+if (socialPhotoAddedUrls.has(cOpt.url)) continue;
+attempted++;
 var allBody = new URLSearchParams({url: cOpt.url});
 if (cOpt.fileName) allBody.append('name', cOpt.fileName);
 allBody.append('speedLimitKbps', document.getElementById('speed').value);
@@ -4783,8 +4793,9 @@ headers: {'X-Requested-With': 'XMLHttpRequest'}
 }, 15000);
 var aData = await aRes.json().catch(function () { return null; });
 if (!aRes.ok || !aData || !aData.ok) allFailed++;
+else socialPhotoAddedUrls.add(cOpt.url);
 }
-if (allFailed) throw new Error(allFailed + ' of ' + socialPhotoOptions.length + ' photos failed to add');
+if (allFailed) throw new Error(allFailed + ' of ' + attempted + ' photos failed to add');
 } else {
 const res = await fetchTimeout(API + '/api/add', {
 method: 'POST',
