@@ -217,18 +217,9 @@ class ServerSecurityTest {
         val luar = File(tmp.root, "lain.txt").absolutePath
         val roots = listOf(r)
         val canonical = ServerSecurity.canonicalRootPaths(roots)
-        assertEquals(
-            ServerSecurity.isPathAllowed(dalam, roots),
-            ServerSecurity.isPathAllowedFast(dalam, canonical)
-        )
-        assertEquals(
-            ServerSecurity.isPathAllowed(luar, roots),
-            ServerSecurity.isPathAllowedFast(luar, canonical)
-        )
-        assertEquals(
-            ServerSecurity.isBrowseableAncestor(tmp.root.absolutePath, roots),
-            ServerSecurity.isBrowseableAncestorFast(tmp.root.absolutePath, canonical)
-        )
+        // Wrapper isPathAllowed/isBrowseableAncestor dihapus pada issue
+        // #1017 (tak pernah dipanggil produksi); uji semantiknya kini
+        // langsung atas varian Fast di test-test khusus di bawah.
         assertEquals(
             ServerSecurity.isRemoteDestinationAllowed("f:$dalam", roots),
             ServerSecurity.isRemoteDestinationAllowedFast("f:$dalam", canonical)
@@ -253,34 +244,34 @@ class ServerSecurityTest {
     fun isPathAllowed_diDalamRoot_true() {
         val r = root()
         val child = File(r, "sub/file.txt")
-        assertTrue(ServerSecurity.isPathAllowed(child.absolutePath, listOf(r)))
+        assertTrue(ServerSecurity.isPathAllowedFast(child.absolutePath, ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
     fun isPathAllowed_rootItuSendiri_true() {
         val r = root()
-        assertTrue(ServerSecurity.isPathAllowed(r.absolutePath, listOf(r)))
+        assertTrue(ServerSecurity.isPathAllowedFast(r.absolutePath, ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
     fun isPathAllowed_siblingDiLuarRoot_false() {
         val r = root()
         val sibling = tmp.newFolder("lain")
-        assertFalse(ServerSecurity.isPathAllowed(sibling.absolutePath, listOf(r)))
+        assertFalse(ServerSecurity.isPathAllowedFast(sibling.absolutePath, ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
     fun isPathAllowed_parentTraversal_false() {
         val r = root()
         val luar = File(r.parentFile, "rahasia.txt")
-        assertFalse(ServerSecurity.isPathAllowed(luar.absolutePath, listOf(r)))
+        assertFalse(ServerSecurity.isPathAllowedFast(luar.absolutePath, ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
     fun isPathAllowed_pathKosong_false() {
         val r = root()
-        assertFalse(ServerSecurity.isPathAllowed("", listOf(r)))
-        assertFalse(ServerSecurity.isPathAllowed("   ", listOf(r)))
+        assertFalse(ServerSecurity.isPathAllowedFast("", ServerSecurity.canonicalRootPaths(listOf(r))))
+        assertFalse(ServerSecurity.isPathAllowedFast("   ", ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
@@ -288,7 +279,7 @@ class ServerSecurityTest {
         // root "storage/emulated/0" tidak boleh mengizinkan "storage/emulated/01".
         val base = tmp.newFolder("emulated", "0")
         val mirip = File(base.parentFile, "01/isi.txt")
-        assertFalse(ServerSecurity.isPathAllowed(mirip.absolutePath, listOf(base)))
+        assertFalse(ServerSecurity.isPathAllowedFast(mirip.absolutePath, ServerSecurity.canonicalRootPaths(listOf(base))))
     }
 
     @Test
@@ -384,28 +375,28 @@ class ServerSecurityTest {
     fun isBrowseableAncestor_indukDariRoot_true() {
         val r = root()
         val induk = r.parentFile ?: return
-        assertTrue(ServerSecurity.isBrowseableAncestor(induk.absolutePath, listOf(r)))
+        assertTrue(ServerSecurity.isBrowseableAncestorFast(induk.absolutePath, ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
     fun isBrowseableAncestor_rootItuSendiri_false() {
         val r = root()
-        // Root itu sendiri bukan "induk strict" — isPathAllowed yang menangani.
-        assertFalse(ServerSecurity.isBrowseableAncestor(r.absolutePath, listOf(r)))
+        // Root itu sendiri bukan "induk strict" — isPathAllowedFast yang menangani.
+        assertFalse(ServerSecurity.isBrowseableAncestorFast(r.absolutePath, ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
     fun isBrowseableAncestor_pathLuar_false() {
         val r = root()
         val luar = tmp.newFolder("lain")
-        assertFalse(ServerSecurity.isBrowseableAncestor(luar.absolutePath, listOf(r)))
+        assertFalse(ServerSecurity.isBrowseableAncestorFast(luar.absolutePath, ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
     fun isBrowseableAncestor_pathKosong_false() {
         val r = root()
-        assertFalse(ServerSecurity.isBrowseableAncestor("", listOf(r)))
-        assertFalse(ServerSecurity.isBrowseableAncestor("   ", listOf(r)))
+        assertFalse(ServerSecurity.isBrowseableAncestorFast("", ServerSecurity.canonicalRootPaths(listOf(r))))
+        assertFalse(ServerSecurity.isBrowseableAncestorFast("   ", ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test
@@ -414,14 +405,14 @@ class ServerSecurityTest {
         // Induk dua tingkat: /tmp/.../root/sub — naik ke /tmp harus terdeteksi.
         val sub = File(r, "sub")
         val indukJauh = r.parentFile?.parentFile ?: return
-        assertTrue(ServerSecurity.isBrowseableAncestor(indukJauh.absolutePath, listOf(sub)))
+        assertTrue(ServerSecurity.isBrowseableAncestorFast(indukJauh.absolutePath, ServerSecurity.canonicalRootPaths(listOf(sub))))
     }
 
     @Test
     fun isBrowseableAncestor_prefixMiripBukanInduk_false() {
         val r = root()
         val mirip = File(r.parentFile, r.name + "x")
-        assertFalse(ServerSecurity.isBrowseableAncestor(mirip.absolutePath, listOf(r)))
+        assertFalse(ServerSecurity.isBrowseableAncestorFast(mirip.absolutePath, ServerSecurity.canonicalRootPaths(listOf(r))))
     }
 
     @Test

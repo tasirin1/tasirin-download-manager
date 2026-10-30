@@ -181,9 +181,12 @@ object ServerSecurity {
     fun canonicalRootPaths(roots: List<File>): List<String> =
         roots.mapNotNull { runCatching { it.canonicalFile.absolutePath }.getOrNull() }.distinct()
 
-    /** Varian cepat isPathAllowed dengan root yang sudah di-canonical:
-     *  semantik identik (target tetap di-canonical per panggilan — satu path),
-     *  hemat canonicalize N root per panggilan. Murni agar bisa di-unit-test. */
+    /** Path dalam jangkauan root yang diizinkan (menangkal path
+     *  traversal), dengan root yang sudah di-canonical lewat
+     *  [canonicalRootPaths]: hemat canonicalize N root per panggilan
+     *  (target tetap di-canonical per panggilan — satu path). Wrapper
+     *  varian List<File> dihapus pada issue #1017 karena tak pernah
+     *  dipanggil produksi. Murni agar bisa di-unit-test. */
     fun isPathAllowedFast(path: String, canonicalRoots: List<String>): Boolean {
         if (path.isBlank()) return false
         val target = runCatching { File(path).canonicalFile.absolutePath }.getOrNull()
@@ -191,15 +194,11 @@ object ServerSecurity {
         return canonicalRoots.any { rp -> target == rp || target.startsWith(rp + File.separator) }
     }
 
-    /** Path dalam jangkauan root yang diizinkan (menangkal path traversal). */
-    fun isPathAllowed(path: String, roots: List<File>): Boolean =
-        isPathAllowedFast(path, canonicalRootPaths(roots))
-
     /** True bila [canonicalTarget] PERSIS salah satu root yang diizinkan.
      *  Root itu sendiri adalah batas wilayah, bukan isi yang boleh
      *  dimanipulasi: tanpa penjaga ini satu panggilan delete bisa menghapus
      *  utuh root (folder unduhan, atau /storage/emulated/0 saat Full access)
-     *  karena isPathAllowed menerima target == root. Murni, bisa diuji. */
+     *  karena isPathAllowedFast menerima target == root. Murni, bisa diuji. */
     fun isAllowedRootItself(canonicalTarget: String, canonicalRoots: List<String>): Boolean =
         canonicalRoots.any { it == canonicalTarget }
 
@@ -232,11 +231,9 @@ object ServerSecurity {
     /** Path adalah induk (strict) dari salah satu root? Dipakai untuk listing
      *  browse-only di File Manager: folder di atas root (mis. /storage di atas
      *  /storage/emulated/0/Download) boleh dilihat isinya, tapi aksi tulis
-     *  tetap hanya untuk path yang lolos [isPathAllowed]. */
-    fun isBrowseableAncestor(path: String, roots: List<File>): Boolean =
-        isBrowseableAncestorFast(path, canonicalRootPaths(roots))
-
-    /** Varian cepat isBrowseableAncestor (root sudah di-canonical). */
+     *  tetap hanya untuk path yang lolos [isPathAllowedFast]. Root sudah
+     *  di-canonical lewat [canonicalRootPaths]; wrapper varian List<File>
+     *  dihapus pada issue #1017 karena tak pernah dipanggil produksi. */
     fun isBrowseableAncestorFast(path: String, canonicalRoots: List<String>): Boolean {
         if (path.isBlank()) return false
         val target = runCatching { File(path).canonicalFile.absolutePath }.getOrNull()
@@ -252,7 +249,7 @@ object ServerSecurity {
      * produksi, jadi uji atas fungsi ini bisa hijau pada logika yang tak
      * pernah dipakai. Ekuivalensi kedua cek segmen dibuktikan menyeluruh
      * (port Python: 364 kasus string, 0 beda); pola delegasi yang sama
-     * dengan isPathAllowed. */
+     * seperti wrapper isPathAllowed dulu (dihapus pada issue #1017). */
     fun isRemoteDestinationAllowed(path: String, roots: List<File>): Boolean =
         isRemoteDestinationAllowedFast(path, canonicalRootPaths(roots))
 
