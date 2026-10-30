@@ -2799,6 +2799,13 @@ function mmShowToast(text, ms) {
   clearTimeout(mmToast._t);
   mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, ms || 700);
 }
+function mmHideToast() {
+  // Toast basi tak boleh menyambut media berikutnya (issue #995):
+  // pesan kegagalan video sebelumnya hanya mati oleh timernya
+  // sendiri, jadi pembukaan ulang yang cepat mewarisinya.
+  clearTimeout(mmToast._t);
+  mmToast.classList.add('hidden');
+}
 
 function mmShowCtrl() {
   mmCtrl.classList.remove('hide');
@@ -2886,6 +2893,7 @@ function mmSeekUI() {
 
 function closeMedia() {
   var wasOpen = mediaModal.classList.contains('open');
+  mmHideToast();
   saveVideoPos(mmCurrentToken);
   mmPlayer.style.setProperty('--mm-aspect', '56.25%');
   mmPlayer.style.filter = '';
@@ -5700,6 +5708,7 @@ function openMedia(it, src, playlist) {
     saveVideoPos(mmCurrentToken);
   }
   mmCurrentToken = it.token;
+  mmHideToast();
   mmLastSave = 0;
   mmPlayer.style.setProperty('--mm-aspect', '56.25%');
   mmEnded = false;

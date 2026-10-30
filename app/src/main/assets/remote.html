@@ -576,6 +576,10 @@ mmToast.classList.remove('hidden');
 clearTimeout(mmToast._t);
 mmToast._t = setTimeout(function () { mmToast.classList.add('hidden'); }, ms || 700);
 }
+function mmHideToast() {
+clearTimeout(mmToast._t);
+mmToast.classList.add('hidden');
+}
 function mmShowCtrl() {
 mmCtrl.classList.remove('hide');
 mmOverlayTitle.classList.remove('hide');
@@ -655,6 +659,7 @@ mmTime.textContent = mmFmtTime(t) + ' / ' + mmFmtTime(d);
 }
 function closeMedia() {
 var wasOpen = mediaModal.classList.contains('open');
+mmHideToast();
 saveVideoPos(mmCurrentToken);
 mmPlayer.style.setProperty('--mm-aspect', '56.25%');
 mmPlayer.style.filter = '';
@@ -3091,6 +3096,7 @@ if (mmCurrentToken && mmCurrentToken !== it.token) {
 saveVideoPos(mmCurrentToken);
 }
 mmCurrentToken = it.token;
+mmHideToast();
 mmLastSave = 0;
 mmPlayer.style.setProperty('--mm-aspect', '56.25%');
 mmEnded = false;

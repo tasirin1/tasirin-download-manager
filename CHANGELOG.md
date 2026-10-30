@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): toast pemutar disembunyikan saat media dibuka/ditutup** -- toast kegagalan video sebelumnya hanya mati oleh timernya sendiri (sampai 2600 ms), jadi membuka video lain yang sehat dalam jendela itu mewarisi tulisan kegagalan video lama. openMedia dan closeMedia kini menyembunyikan toast dan membatalkan timernya (issue #995).
+
 - **fix(web): override persen HLS bernilai 0 tak lagi tertelan pola || -1** -- di JavaScript 0 || -1 bernilai -1, padahal 0 adalah nilai sah selama segmen pertama HLS, sehingga baris unduhan menampilkan total estimasi sebagai total pasti dan kehilangan kelas bergaris HLS selama jendela itu. Tujuh situs kini memakai helper pemeriksaan numerik yang membedakan 0 dari ketiadaan (issue #994).
 
 - **perf(remote): drain lipatan dangkal cap ZIP memakai seleksi terbatas anggaran** -- direktori terantre yang anaknya jauh melampaui sisa anggaran sebelumnya tetap dibayar listFiles + sortir penuh O(N log N) sebelum satu pun anak dilipat. Kini anak di atas anggaran dipilih dengan heap terbatas (yang terkecil menurut urutan nama, seri case-insensitive dipecah case-sensitive agar seleksi deterministik penuh); hasil lipatan setara awalan sortir penuh dan biaya terikat anggaran (issue #993).
