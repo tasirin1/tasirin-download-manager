@@ -66,6 +66,8 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicLong
 
 import java.net.HttpCookie
@@ -3217,9 +3219,19 @@ class DownloadEngine(appContext: Context) {
         val pool = Executors.newFixedThreadPool(minOf(4, urls.size))
         try {
             val futures = urls.map { url -> pool.submit(Callable { fetch(url) }) }
+            // Tiap get() berbatas waktu (issue #788): fungsi ini non-suspend
+            // sehingga pause/cancel coroutine tak menjangkaunya — fetch yang
+            // menggantung (server menetes tanpa selesai) dulu menahan
+            // perencanaan tanpa batas. Batasnya longgar terhadap satu fetch
+            // playlist sah (connect + 2x read timeout, min 30 dtk); timeout
+            // dihitung sebagai kandidat gagal, sama seperti fetch error.
+            val fetchTimeoutMs = (connectTimeoutMs + 2L * readTimeoutMs).coerceAtLeast(30_000L)
             return futures.map { future ->
                 try {
-                    Result.success(future.get())
+                    Result.success(future.get(fetchTimeoutMs, TimeUnit.MILLISECONDS))
+                } catch (e: TimeoutException) {
+                    future.cancel(true)
+                    Result.failure(IOException("Playlist fetch timed out"))
                 } catch (e: ExecutionException) {
                     Result.failure(e.cause ?: e)
                 } catch (e: InterruptedException) {
@@ -3228,7 +3240,9 @@ class DownloadEngine(appContext: Context) {
                 }
             }
         } finally {
-            pool.shutdown()
+            // shutdownNow: interupsi pekerja yang masih berjalan agar
+            // attempt yang sudah ditinggalkan tak terus memakai jaringan.
+            pool.shutdownNow()
         }
     }
 
