@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **test(remote): zipFsSourceStamp dipindah ke ZipCreator dan diuji perilaku capnya** -- logika jalan kaki cap (urutan lipat, plafon, lipatan dangkal) sebelumnya tertanam private di kelas server ber-Context padahal hanya bergantung java.io.File. Kini internal di ZipCreator dengan uji folder sementara: format cap berkas tunggal, folder kosong, determinisme pada pohon diam, dan deteksi perubahan isi/tambah/ganti-nama (issue #979).
+
 - **fix(ui): emptyView daftar utama tak lagi berkedip palsu saat start dingin** -- emisi pertama kolektor selalu daftar kosong selama muatan awal engine (parse + dekripsi antrean) berjalan, dan MainActivity langsung menilainya sebagai 'tidak ada unduhan'. Kini emptyView hanya tampil bila daftar kosong DAN muatan awal selesai; karena antrean sungguh kosong tidak memicu emisi baru saat gerbang muat selesai (StateFlow menahan nilai sama), penilaian ulang digantung eksplisit pada awaitInitialLoad (issue #978).
 
 - **fix(ui): progressSig kini memuat limit kecepatan dan prioritas** -- dua field itu sebelumnya tak ikut hash gerbang submitList, sehingga perubahan limit/prioritas pada item diam (termasuk dari remote web) tidak pernah sampai ke salinan adapter; dialog Limit & Priority lalu menampilkan nilai lama dan tombol Save bisa menimpa nilai baru dengan nilai lama secara diam-diam. Kelas yang sama dengan #316 (issue #977).

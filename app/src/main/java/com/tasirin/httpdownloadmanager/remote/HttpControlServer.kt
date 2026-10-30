@@ -1836,7 +1836,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }.getOrNull()
             val base = if (canon != null) "fs:" + FS_PREFIX + canon else "fs:" + raw
             base + "|s:" + memoizedZipStamp(base) {
-                zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
+                ZipCreator.zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
             }
         }
         val (input, total) = openZipStream(key) {
@@ -1945,54 +1945,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (zipStampMemo.size > 64) zipStampMemo.clear()
         zipStampMemo[id] = now to stamp
         return stamp
-    }
-
-    /** Cap isi sumber ZIP filesystem (issue #961): berkas tunggal =
-     *  ukuran+mtime; folder = lipatan (path, ukuran, mtime) seluruh isi
-     *  yang terjangkau jalan kaki rekursif terbatas, dengan himpunan
-     *  kanonik anti-putaran symlink seperti zipFile. Jalan kaki stat
-     *  murni (tanpa baca isi) — jauh lebih murah daripada membuat ZIP,
-     *  dan pada cache-hit ia menggantikan pembuatan ulang itu. */
-    private fun zipFsSourceStamp(root: File): String {
-        if (root.isFile) return "f" + root.length() + ":" + root.lastModified()
-        if (!root.isDirectory) return "none"
-        var hash = -3750763034362895579L
-        var count = 0
-        var truncated = false
-        val seen = mutableSetOf<String>()
-        val stack = ArrayDeque<File>()
-        stack.add(root)
-        while (stack.isNotEmpty() && !truncated) {
-            val dir = stack.removeLast()
-            val canon = runCatching { dir.canonicalPath }.getOrNull() ?: dir.absolutePath
-            if (!seen.add(canon)) continue
-            val children = dir.listFiles() ?: continue
-            for (child in children) {
-                if (count >= ZIP_STAMP_MAX_ENTRIES) {
-                    truncated = true
-                    break
-                }
-                count++
-                hash = ZipCreator.zipStampFold(hash, child.absolutePath)
-                hash = ZipCreator.zipStampFold(hash, child.length().toString())
-                hash = ZipCreator.zipStampFold(hash, child.lastModified().toString())
-                if (child.isDirectory) stack.add(child)
-            }
-        }
-        if (truncated) {
-            // Subpohon yang tak sempat dibuka tetap dilipat dangkal
-            // (issue #972): path+ukuran+mtime direktori yang masih
-            // terantre menangkap perubahan struktural di sana tanpa
-            // biaya membukanya satu per satu.
-            while (stack.isNotEmpty()) {
-                val queued = stack.removeLast()
-                hash = ZipCreator.zipStampFold(hash, queued.absolutePath)
-                hash = ZipCreator.zipStampFold(hash, queued.length().toString())
-                hash = ZipCreator.zipStampFold(hash, queued.lastModified().toString())
-            }
-        }
-        return "d" + count + ":" + hash + ":" + (if (truncated) "t" else "c") +
-            ":" + root.lastModified()
     }
 
     /** Cap sumber satu URI media (issue #961): SIZE + DATE_MODIFIED
@@ -2238,7 +2190,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 val raw = MediaLibrary.decodeToken(token)
                 when {
                     raw != null && raw.startsWith(FS_PREFIX) ->
-                        zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
+                        ZipCreator.zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
                     raw != null && raw.startsWith("u:") ->
                         zipUriSourceStamp(raw.removePrefix("u:").toUri())
                     else -> "x"
@@ -4484,7 +4436,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // Ukuran chunk protokol upload klien (remote.src.html UPLOAD_CHUNK = 2MB).
         // Offset kini wajib eksplisit dari klien; konstanta dihapus agar tak unused.
         private const val ZIP_CACHE_TTL_MS = 60_000L
-        private const val ZIP_STAMP_MAX_ENTRIES = 8192
         private const val ZIP_STAMP_MEMO_TTL_MS = 3_000L
         private const val ZIP_CACHE_MAX = 8
         private const val ZIP_CACHE_MAX_BYTES = 256L * 1024 * 1024

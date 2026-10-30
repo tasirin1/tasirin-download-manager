@@ -379,6 +379,58 @@ object ZipCreator {
     internal fun tokenDirRootName(dirName: String, used: MutableMap<String, Int>): String =
         uniqueZipName(safeEntryPath(dirName).ifEmpty { "folder" }, used)
 
+    /** Cap isi sumber ZIP filesystem (issue #961; dipindah dari
+     *  HttpControlServer pada issue #979 agar terjangkau uji JVM —
+     *  fungsi ini hanya bergantung java.io.File): berkas tunggal =
+     *  ukuran+mtime; folder = lipatan (path, ukuran, mtime) seluruh isi
+     *  yang terjangkau jalan kaki rekursif terbatas, dengan himpunan
+     *  kanonik anti-putaran symlink seperti zipFile. Jalan kaki stat
+     *  murni (tanpa baca isi) — jauh lebih murah daripada membuat ZIP,
+     *  dan pada cache-hit ia menggantikan pembuatan ulang itu. */
+    internal fun zipFsSourceStamp(root: File): String {
+        if (root.isFile) return "f" + root.length() + ":" + root.lastModified()
+        if (!root.isDirectory) return "none"
+        var hash = -3750763034362895579L
+        var count = 0
+        var truncated = false
+        val seen = mutableSetOf<String>()
+        val stack = ArrayDeque<File>()
+        stack.add(root)
+        while (stack.isNotEmpty() && !truncated) {
+            val dir = stack.removeLast()
+            val canon = runCatching { dir.canonicalPath }.getOrNull() ?: dir.absolutePath
+            if (!seen.add(canon)) continue
+            val children = dir.listFiles() ?: continue
+            for (child in children) {
+                if (count >= ZIP_STAMP_MAX_ENTRIES) {
+                    truncated = true
+                    break
+                }
+                count++
+                hash = zipStampFold(hash, child.absolutePath)
+                hash = zipStampFold(hash, child.length().toString())
+                hash = zipStampFold(hash, child.lastModified().toString())
+                if (child.isDirectory) stack.add(child)
+            }
+        }
+        if (truncated) {
+            // Subpohon yang tak sempat dibuka tetap dilipat dangkal
+            // (issue #972): path+ukuran+mtime direktori yang masih
+            // terantre menangkap perubahan struktural di sana tanpa
+            // biaya membukanya satu per satu.
+            while (stack.isNotEmpty()) {
+                val queued = stack.removeLast()
+                hash = zipStampFold(hash, queued.absolutePath)
+                hash = zipStampFold(hash, queued.length().toString())
+                hash = zipStampFold(hash, queued.lastModified().toString())
+            }
+        }
+        return "d" + count + ":" + hash + ":" + (if (truncated) "t" else "c") +
+            ":" + root.lastModified()
+    }
+
+    private const val ZIP_STAMP_MAX_ENTRIES = 8192
+
     /** Satu langkah lipat hash FNV-1a 64 untuk cap sumber ZIP
      *  (issue #961); di sini — bukan di HttpControlServer — agar
      *  terjangkau uji JVM (issue #973). Murni: tanpa I/O/Android. */

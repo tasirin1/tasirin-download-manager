@@ -182,6 +182,50 @@ class ZipCreatorTest {
     }
 
     @Test
+    fun `fs stamp of single file is length and mtime`() {
+        val f = temp.newFile("one.bin")
+        f.writeBytes(ByteArray(7))
+        assertTrue(f.setLastModified(1700000000000L))
+        assertEquals("f7:1700000000000", ZipCreator.zipFsSourceStamp(f))
+        assertEquals(
+            "none",
+            ZipCreator.zipFsSourceStamp(java.io.File(f.parentFile, "missing.bin"))
+        )
+    }
+
+    @Test
+    fun `fs stamp of empty folder has zero count and complete flag`() {
+        val dir = temp.newFolder("empty")
+        assertTrue(dir.setLastModified(1700000000000L))
+        val stamp = ZipCreator.zipFsSourceStamp(dir)
+        assertTrue(stamp.startsWith("d0:"))
+        assertTrue(stamp.endsWith(":c:1700000000000"))
+    }
+
+    @Test
+    fun `fs stamp is deterministic and detects content add and rename changes`() {
+        val dir = temp.newFolder("tree")
+        val a = java.io.File(dir, "a.txt")
+        a.writeText("alpha")
+        val sub = java.io.File(dir, "sub")
+        assertTrue(sub.mkdir())
+        java.io.File(sub, "b.txt").writeText("beta")
+        val first = ZipCreator.zipFsSourceStamp(dir)
+        assertEquals(first, ZipCreator.zipFsSourceStamp(dir))
+        // Perubahan isi (panjang berubah) menggerakkan cap.
+        a.writeText("alpha-longer")
+        val afterEdit = ZipCreator.zipFsSourceStamp(dir)
+        assertTrue(first != afterEdit)
+        // Penambahan berkas menggerakkan cap.
+        java.io.File(dir, "c.txt").writeText("gamma")
+        val afterAdd = ZipCreator.zipFsSourceStamp(dir)
+        assertTrue(afterEdit != afterAdd)
+        // Ganti nama menggerakkan cap (path ikut dilipat).
+        assertTrue(a.renameTo(java.io.File(dir, "a-renamed.txt")))
+        assertTrue(afterAdd != ZipCreator.zipFsSourceStamp(dir))
+    }
+
+    @Test
     fun `stamp fold is order sensitive and chains like concatenation`() {
         val basis = -3750763034362895579L
         val chained = ZipCreator.zipStampFold(ZipCreator.zipStampFold(basis, "ab"), "c")
