@@ -3220,6 +3220,14 @@ var GAL_SELECT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 function galSetSelectMode(on) {
   galSelectMode = on;
   galSelectSession++;
+  if (on) {
+    // Sesi baru memiliki tombol Select all sejak awal (issue #887):
+    // handler sesi lama bisa meninggalkannya disabled atau berlabel
+    // 'Loading...' — setel ulang ke keadaan awal sesi (seleksi
+    // kosong = 'Select all', aktif).
+    var allBtn = document.getElementById('galBatchAll');
+    if (allBtn) { allBtn.disabled = false; allBtn.textContent = 'Select all'; }
+  }
   galSelected.clear();
   var gsBtn = document.getElementById("galSelectBtn");
   gsBtn.innerHTML = on ? UI_ICONS.close : GAL_SELECT_ICON;
@@ -3305,10 +3313,11 @@ document.getElementById('galBatchAll').addEventListener('click', async function 
     // Ekor hanya berlaku untuk sesi yang sama (issue #868 + #878):
     // mode yang dimatikan lalu dinyalakan lagi selama menunggu adalah
     // sesi BARU dengan seleksi manualnya sendiri — handler lama tak
-    // boleh menimpanya. Label tombol dipulihkan updateGalBatch pada
-    // interaksi berikutnya di sesi baru.
+    // boleh menimpanya, termasuk LABEL tombolnya (issue #887): sesi
+    // baru bisa sudah memasang 'Cancel all' yang benar lewat
+    // updateGalBatch. Kepemilikan tombol dikembalikan jalur sesi:
+    // galSetSelectMode(true) menyetel ulang disabled + label.
     if (galSelectSession !== session || !galSelectMode) {
-      btn.textContent = 'Select all';
       return;
     }
   }
