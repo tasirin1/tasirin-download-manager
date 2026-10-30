@@ -2213,7 +2213,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     "image/jpeg",
                     FileInputStream(thumb),
                     thumb.length()
-                ).also { it.addHeader("Cache-Control", "public, max-age=86400") }
+                // max-age pendek (issue #755): URL thumbnail adalah
+                // fungsi murni path, jadi cache peramban 24 jam
+                // mengalahkan invalidasi sisi server (#399/#735) saat
+                // berkas di path yang sama diganti isinya — galeri
+                // menampilkan thumbnail lama sampai sehari. 300 detik
+                // tetap menghemat request dalam satu sesi telusur.
+                ).also { it.addHeader("Cache-Control", "public, max-age=300") }
             }
         } ?: notFound()
     }
