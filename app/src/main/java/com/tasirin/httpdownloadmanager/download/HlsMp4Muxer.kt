@@ -314,7 +314,11 @@ object HlsMp4Muxer {
     ) {
         var buffer = ByteBuffer.allocate(1 shl 20)
         val info = MediaCodec.BufferInfo()
-        var firstPts = -1L
+        // Penanda boolean terpisah (issue #944): sampleTime sah bisa -1,
+        // jadi sentinel -1 pada firstPts menelan sampel pertama dan
+        // menjadikan sampel kedua basis — menghasilkan PTS-sama.
+        var hasFirstPts = false
+        var firstPts = 0L
         var lastPts = -1L
         var drift = 0L
         while (true) {
@@ -336,9 +340,14 @@ object HlsMp4Muxer {
             buffer.position(0)
             buffer.limit(size)
             val pts = ext.sampleTime
-            if (firstPts < 0) firstPts = pts
+            if (!hasFirstPts) {
+                firstPts = pts
+                hasFirstPts = true
+            }
             var normalized = pts - firstPts + drift
-            if (lastPts >= 0 && normalized < lastPts) {
+            // Kontrak "selalu naik" (issue #944): kesamaan juga dinaikkan
+            // — sebelumnya dua sampel ber-PTS identik lolos apa adanya.
+            if (lastPts >= 0 && normalized <= lastPts) {
                 drift += lastPts - normalized + 1
                 normalized = lastPts + 1
             }

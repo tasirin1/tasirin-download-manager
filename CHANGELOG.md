@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): normalisasi PTS muxer kini benar-benar selalu naik** -- writeTrackPts sebelumnya hanya menaikkan timestamp yang MENURUN; dua sampel berurutan ber-PTS identik lolos apa adanya ke MediaMuxer, melanggar kontrak fungsi itu sendiri, dan sentinel firstPts=-1 bertabrakan dengan sampleTime sah -1 sehingga sampel kedua menjadi basis dan ikut ternormalisasi ke 0. Kini kesamaan juga dinaikkan (lastPts+1) dan sampel pertama ditandai boolean terpisah (issue #944).
+
 - **fix(web): sorotan seret-lepas di File Manager kini hanya menyala untuk seretan berkas** -- handler dragover daftar berkas sebelumnya memasang kelas .fs-drag dan preventDefault untuk SEMUA seretan termasuk teks/URL dari tab lain, padahal drop-nya pasti diabaikan diam-diam; kini sorotan hanya muncul bila dataTransfer.types memuat 'Files' (issue #943).
 
 - **fix(data): item ber-id duplikat dari blob tersimpan kini didedupe saat decode** -- DownloadItemCodec.decode mempertahankan entri pertama per id dan melewati duplikatnya; sebelumnya duplikat kedua membeku permanen di engine (penilaian per-id bersifat first-match) dan remove(id) menghapus kedua entri dari daftar tetapi hanya berkas entri pertama, menyisakan berkas parsial yatim. Dikunci uji DownloadItemCodecTest (issue #942).
