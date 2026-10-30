@@ -9,7 +9,9 @@ import java.io.File
 /** Uji lompatan skip ChainInputStream (issue #1018): skip kini melompat
  *  per segmen (indeks + posisi channel), bukan membaca-buang byte.
  *  Isi tiap segmen adalah byte berurutan yang khas agar posisi akhir
- *  sesudah skip dapat dibuktikan dari byte yang terbaca. */
+ *  sesudah skip dapat dibuktikan dari byte yang terbaca. Dua uji
+ *  terakhir mengunci interaksi segmen yang menyusut sesudah konstruktor
+ *  (snapshot panjang beku #232; issue #1027). */
 class ChainInputStreamTest {
 
     @get:Rule
@@ -105,6 +107,40 @@ class ChainInputStreamTest {
             assertEquals(60, sisa.size)
             assertEquals(90, sisa[0].toInt() and 0xFF)
             assertEquals(149, sisa[sisa.size - 1].toInt() and 0xFF)
+        }
+    }
+
+    /** Segmen pertama dipotong menjadi 30 byte SESUDAH stream dibangun
+     *  (panjang snapshot tetap 100): baca harus menyeberang ke segmen
+     *  kedua tepat sesudah byte fisik terakhir (semantik #232: segmen
+     *  yang read-nya -1 dianggap habis). Harapan dibuktikan dulu lewat
+     *  simulasi pread atas berkas nyata: total 80 byte = 0..29 + 100..149. */
+    @Test
+    fun baca_segmenMenyusut_menyeberangKeSegmenBerikutnya() {
+        val f1 = seg("a.part", ByteArray(100) { it.toByte() })
+        val f2 = seg("b.part", ByteArray(50) { (100 + it).toByte() })
+        ChainInputStream(listOf(f1, f2)).use { s ->
+            java.io.RandomAccessFile(f1, "rw").use { it.setLength(30) }
+            val semua = s.readBytes()
+            assertEquals(80, semua.size)
+            assertEquals(29, semua[29].toInt() and 0xFF)
+            assertEquals(100, semua[30].toInt() and 0xFF)
+            assertEquals(149, semua[semua.size - 1].toInt() and 0xFF)
+        }
+    }
+
+    /** Skip atas segmen yang menyusut tetap memakai panjang snapshot:
+     *  skip(120) melaporkan 120 penuh dan mendarat di segmen kedua
+     *  offset 20 (byte 120), walau segmen pertama kini hanya 30 byte
+     *  secara fisik. */
+    @Test
+    fun skip_segmenMenyusut_mendaratDiOffsetSnapshot() {
+        val f1 = seg("a.part", ByteArray(100) { it.toByte() })
+        val f2 = seg("b.part", ByteArray(50) { (100 + it).toByte() })
+        ChainInputStream(listOf(f1, f2)).use { s ->
+            java.io.RandomAccessFile(f1, "rw").use { it.setLength(30) }
+            assertEquals(120L, s.skip(120))
+            assertEquals(120, s.read())
         }
     }
 }
