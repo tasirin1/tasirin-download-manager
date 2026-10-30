@@ -404,8 +404,16 @@ jobs:
           # langkah agar terlihat (bukan error: run ini sendiri sehat).
           PREV=$(gh release list --limit 5 --json tagName --jq '.[].tagName' | grep -v -x "v${VER}" | head -n 1 || true)
           if [ -n "$PREV" ]; then
-            PREV_HAS_APK=$(gh release view "$PREV" --json assets --jq '[.assets[] | select(.name | endswith(".apk"))] | length')
-            if [ "$PREV_HAS_APK" = "0" ]; then
+            # `|| true` WAJIB (pelajaran #786, issue #862): tanpa itu
+            # kegagalan sesaat gh release view (rilis pendahulu terhapus
+            # di antara list dan view, API berkedip) membunuh langkah
+            # publish yang sudah sehat di bawah bash -eo pipefail. Hasil
+            # kosong = tidak bisa dinilai: blok peringatan ini dilewati
+            # tanpa cabang sehat maupun warning.
+            PREV_HAS_APK=$(gh release view "$PREV" --json assets --jq '[.assets[] | select(.name | endswith(".apk"))] | length' || true)
+            if [ -z "$PREV_HAS_APK" ]; then
+              echo "Rilis sebelumnya ($PREV) tidak bisa dinilai; cek yatim dilewati."
+            elif [ "$PREV_HAS_APK" = "0" ]; then
               echo "::warning::Rilis sebelumnya $PREV tanpa aset APK (kemungkinan yatim akibat run terbatalkan di tengah publish, issue #855) — periksa/hapus manual."
               echo "⚠️ Rilis $PREV tanpa aset APK (yatim pembatalan publish, issue #855)." >> "$GITHUB_STEP_SUMMARY"
             else
