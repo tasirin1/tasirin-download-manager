@@ -1870,8 +1870,13 @@ class DownloadEngine(appContext: Context) {
         // YouTube CDN (googlevideo.com) menolak URL yang butuh n-signature dengan
         // HTTP 403 permanen — retry tidak akan pernah berhasil, jadi gagalkan
         // segera dengan pesan yang jelas (mirror/URL lain juga sia-sia).
+        // Klasifikasi berbasis host (issue #843): substring atas URL
+        // utuh menggagalkan permanen URL asing yang query-nya memuat
+        // string itu padahal 403-nya bisa sesaat.
+        val itemHost = urlHostOf(item.url)
         val ytSignatureBlocked = message?.contains("HTTP 403") == true &&
-            (item.url.contains("googlevideo.com") || item.url.contains("youtube.com"))
+            (itemHost == "googlevideo.com" || itemHost.endsWith(".googlevideo.com") ||
+                SocialMediaExtractor.isYouTubeUrl(item.url))
         if (ytSignatureBlocked) {
             retryAttempts.remove(id)
             App.logEvent(
@@ -4932,6 +4937,14 @@ internal fun redirectTarget(base: String, location: String?): String? {
         target.toString()
     }.getOrNull()
 }
+
+/** Host URL ternormalisasi (huruf kecil, tanpa titik akhir); "" bila
+ *  tak ter-parse. Dasar klasifikasi platform berbasis host di engine
+ *  (issue #843/#844) — jangan kembali ke substring atas URL utuh. */
+internal fun urlHostOf(url: String): String =
+    runCatching {
+        java.net.URL(url).host?.trim()?.trimEnd('.')?.lowercase(Locale.ROOT) ?: ""
+    }.getOrDefault("")
 
 /** Host literal yang tidak boleh dituju redirect: loopback, unspecified,
  *  dan metadata cloud. Bukan blokir DNS umum agar unduhan LAN (NAS
