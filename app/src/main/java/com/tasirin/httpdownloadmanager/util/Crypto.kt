@@ -29,13 +29,21 @@ object Crypto {
     @Volatile var encryptFallbackUsed: Boolean = false
         private set
 
+    /** Kunci pasangan set/konsumsi sinyal fallback (issue #691). */
+    private val fallbackLock = Any()
+
     /** Konsumsi sinyal fallback: kembalikan nilai saat ini lalu reset.
      *  Setter properti di atas sengaja private — pemanggil (engine saat
      *  flushSave) memakai ini agar kejadian fallback tercatat sekali. */
     fun consumeEncryptFallbackUsed(): Boolean {
-        val was = encryptFallbackUsed
-        if (was) encryptFallbackUsed = false
-        return was
+        // Baca-lalu-reset wajib atomik (issue #691): tanpa kunci, set
+        // dari fallbackPlain bisa jatuh di sela baca dan reset lalu
+        // hilang, atau dua pengonsumsi sama-sama membaca true.
+        synchronized(fallbackLock) {
+            val was = encryptFallbackUsed
+            if (was) encryptFallbackUsed = false
+            return was
+        }
     }
 
     /** Enkripsi nilai dengan kunci Android Keystore (AES-GCM).
@@ -59,7 +67,7 @@ object Crypto {
     }
 
     private fun fallbackPlain(plain: String): String {
-        encryptFallbackUsed = true
+        synchronized(fallbackLock) { encryptFallbackUsed = true }
         runCatching {
             android.util.Log.e("Crypto", "encrypt failed twice, storing plaintext temporarily")
         }
