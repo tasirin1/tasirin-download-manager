@@ -6771,7 +6771,15 @@ function escapeHtml(s) {
 
 const confirmModal = document.getElementById('confirmModal');
 let confirmCb = null;
+// Antrean dialog konfirmasi (issue #879): modal adalah singleton —
+// panggilan ASINKRON (alert gagal share dari fetch yang baru kembali)
+// tidak boleh menimpa dialog yang sedang dibaca pengguna.
+const confirmQueue = [];
 function showConfirm(title, text, yesLabel, cb, opts) {
+  if (!confirmModal.classList.contains('hidden')) {
+    confirmQueue.push([title, text, yesLabel, cb, opts]);
+    return;
+  }
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmText').textContent = text;
   const yesBtn = document.getElementById('confirmYes');
@@ -6790,6 +6798,8 @@ function showConfirm(title, text, yesLabel, cb, opts) {
 function hideConfirm() {
   confirmModal.classList.add('hidden');
   confirmCb = null;
+  const next = confirmQueue.shift();
+  if (next) showConfirm(next[0], next[1], next[2], next[3], next[4]);
 }
 document.getElementById('confirmNo').addEventListener('click', hideConfirm);
 document.getElementById('confirmYes').addEventListener('click', function () {

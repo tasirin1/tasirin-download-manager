@@ -4076,7 +4076,12 @@ return String(s).replace(/[&<>"']/g, function (c) { return HTML_ENT[c]; });
 }
 const confirmModal = document.getElementById('confirmModal');
 let confirmCb = null;
+const confirmQueue = [];
 function showConfirm(title, text, yesLabel, cb, opts) {
+if (!confirmModal.classList.contains('hidden')) {
+confirmQueue.push([title, text, yesLabel, cb, opts]);
+return;
+}
 document.getElementById('confirmTitle').textContent = title;
 document.getElementById('confirmText').textContent = text;
 const yesBtn = document.getElementById('confirmYes');
@@ -4090,6 +4095,8 @@ document.getElementById('confirmYes').focus();
 function hideConfirm() {
 confirmModal.classList.add('hidden');
 confirmCb = null;
+const next = confirmQueue.shift();
+if (next) showConfirm(next[0], next[1], next[2], next[3], next[4]);
 }
 document.getElementById('confirmNo').addEventListener('click', hideConfirm);
 document.getElementById('confirmYes').addEventListener('click', function () {
