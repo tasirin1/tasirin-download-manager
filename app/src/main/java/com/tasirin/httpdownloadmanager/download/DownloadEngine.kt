@@ -136,9 +136,12 @@ class DownloadEngine(appContext: Context) {
     // Set concurrent via newSetFromMap (bukan ConcurrentHashMap.newKeySet):
     // newKeySet/KeySetView butuh API 24 — di Android 6 (minSdk 23) lempar
     // NoSuchMethodError saat engine dibangun (crash tiap startup); Set polos
-    // aman di semua API. Berlaku untuk pendingRetries & failedHlsUrls.
-    private val pendingRetries: MutableSet<String> =
-        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    // aman di semua API. Berlaku untuk failedHlsUrls.
+    // Penanda retry tertunda membawa TOKEN GENERASI per jadwal (issue
+    // #865): job tunda hanya boleh bertindak bila tokennya masih yang
+    // terdaftar — job basi tak boleh mencabut penanda jadwal lebih baru.
+    private val pendingRetryTokens = ConcurrentHashMap<String, Long>()
+    private val retryTokenSeq = java.util.concurrent.atomic.AtomicLong(0)
     /** URL HLS yang sudah gagal (media playlist 403/404) — jangan retry; re-extract dari YouTube URL. */
     private val failedHlsUrls: MutableSet<String> =
         Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
@@ -548,7 +551,7 @@ class DownloadEngine(appContext: Context) {
         if (target.state != DownloadState.DOWNLOADING && target.state != DownloadState.PENDING) return false
         App.logEvent("DOWNLOAD PAUSED: ${target.fileName}")
         retryAttempts.remove(id)
-        pendingRetries.remove(id)
+        pendingRetryTokens.remove(id)
         speedTracker.reset(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
@@ -573,7 +576,7 @@ class DownloadEngine(appContext: Context) {
         ) return false
         App.logEvent("DOWNLOAD RESUMED: ${item.fileName}")
         retryAttempts.remove(id)
-        pendingRetries.remove(id)
+        pendingRetryTokens.remove(id)
         clearSegProgress(id)
         updateItem(id) { it.copy(state = DownloadState.PENDING, autoResume = true) }
         attemptStart(id)
@@ -635,7 +638,7 @@ class DownloadEngine(appContext: Context) {
         // State CANCELLED dipertahankan di enum untuk item lama yang tersimpan.
         App.logEvent("DOWNLOAD CANCELLED: ${target.fileName}")
         retryAttempts.remove(id)
-        pendingRetries.remove(id)
+        pendingRetryTokens.remove(id)
         originalSocialUrls.remove(id)
         speedTracker.reset(id)
         clearSegProgress(id)
@@ -662,7 +665,7 @@ class DownloadEngine(appContext: Context) {
         val item = _items.value.find { it.id == id } ?: return false
         App.logEvent("DOWNLOAD DELETED: ${item.fileName}")
         retryAttempts.remove(id)
-        pendingRetries.remove(id)
+        pendingRetryTokens.remove(id)
         originalSocialUrls.remove(id)
         speedTracker.reset(id)
         clearSegProgress(id)
@@ -693,7 +696,7 @@ class DownloadEngine(appContext: Context) {
         val removed = _items.value.filter { it.state == DownloadState.COMPLETED }
         removed.forEach {
             retryAttempts.remove(it.id)
-            pendingRetries.remove(it.id)
+            pendingRetryTokens.remove(it.id)
             originalSocialUrls.remove(it.id)
             speedTracker.reset(it.id)
             clearSegProgress(it.id)
@@ -716,7 +719,7 @@ class DownloadEngine(appContext: Context) {
         }
         failed.forEach { item ->
             retryAttempts.remove(item.id)
-            pendingRetries.remove(item.id)
+            pendingRetryTokens.remove(item.id)
             originalSocialUrls.remove(item.id)
             speedTracker.reset(item.id)
             clearSegProgress(item.id)
@@ -1006,7 +1009,7 @@ class DownloadEngine(appContext: Context) {
         targets.forEach { item ->
             App.logEvent("DOWNLOAD PAUSED: ${item.fileName}")
             retryAttempts.remove(item.id)
-            pendingRetries.remove(item.id)
+            pendingRetryTokens.remove(item.id)
             speedTracker.reset(item.id)
             jobs.remove(item.id)?.cancel()
             disconnectActive(item.id)
@@ -1060,7 +1063,7 @@ class DownloadEngine(appContext: Context) {
         val ids = targets.map { it.id }.toSet()
         targets.forEach { item ->
             retryAttempts.remove(item.id)
-            pendingRetries.remove(item.id)
+            pendingRetryTokens.remove(item.id)
             clearSegProgress(item.id)
         }
         updateTransformed { daftar ->
@@ -1151,7 +1154,7 @@ class DownloadEngine(appContext: Context) {
         val idSet = ids.toSet()
         ids.forEach { id ->
             retryAttempts.remove(id)
-            pendingRetries.remove(id)
+            pendingRetryTokens.remove(id)
         }
         updateTransformed { daftar ->
             daftar.map { item ->
@@ -1195,7 +1198,7 @@ class DownloadEngine(appContext: Context) {
         val idSet = ids.toSet()
         ids.forEach { id ->
             retryAttempts.remove(id)
-            pendingRetries.remove(id)
+            pendingRetryTokens.remove(id)
             clearSegProgress(id)
         }
         updateTransformed { daftar ->
@@ -1528,7 +1531,7 @@ class DownloadEngine(appContext: Context) {
         StorageCleanup.runIfLow(context, _items.value)
         for (item in pending) {
             if (active >= max) break
-            if (pendingRetries.contains(item.id)) continue
+            if (pendingRetryTokens.containsKey(item.id)) continue
             if (launchItem(item)) active++
         }
     }
@@ -2015,11 +2018,15 @@ class DownloadEngine(appContext: Context) {
             val retryInfo = "Failed (attempt $attempts/$maxRetries) — retrying in ${Formats.eta(backoff / 1000)}"
             App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} ($retryInfo)")
             updateItem(id) { it.copy(state = DownloadState.PENDING, error = retryInfo) }
-            pendingRetries.add(id)
+            val retryToken = retryTokenSeq.incrementAndGet()
+            pendingRetryTokens[id] = retryToken
             scope.launch {
                 delay(backoff)
-                pendingRetries.remove(id)
-                if (_items.value.find { it.id == id }?.state == DownloadState.PENDING) {
+                // remove(id, token) atomik: hanya bertindak bila jadwal
+                // ini masih yang terdaftar (issue #865).
+                if (pendingRetryTokens.remove(id, retryToken) &&
+                    _items.value.find { it.id == id }?.state == DownloadState.PENDING
+                ) {
                     updateItem(id) { it.copy(error = null) }
                     attemptStart(id)
                 }
