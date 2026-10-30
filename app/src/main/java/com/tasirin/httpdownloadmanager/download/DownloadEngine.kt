@@ -2222,7 +2222,14 @@ class DownloadEngine(appContext: Context) {
             // sesaat yang harus berakhir PAUSED, bukan FAILED.
             message.contains("connect timed out", ignoreCase = true) ||
             message.contains("connection reset", ignoreCase = true) ||
-            message.contains("broken pipe", ignoreCase = true)
+            message.contains("broken pipe", ignoreCase = true) ||
+            // Pola umum saudara frasa di atas (issue #1002): "timed
+            // out" telanjang mencakup Read/Connection timed out dan
+            // pesan sintetis repo ("Playlist fetch timed out") yang
+            // tak memuat "timeout"; "connection abort" adalah pesan
+            // baku ECONNABORTED, pasangan reset dari sisi penerima.
+            message.contains("timed out", ignoreCase = true) ||
+            message.contains("connection abort", ignoreCase = true)
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
