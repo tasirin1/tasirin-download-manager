@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): menu dropdown masuk penjaga pintasan dan otoritas Escape tunggal** -- moreMenu/fsToolsMenu kini termasuk overlayOpen (pintasan n dan / tertahan selama menu terbuka) dan menjadi lapisan pertama yang ditutup closeTopOverlay; listener Escape pribadi kedua menu dicabut agar satu tekanan Escape menutup tepat satu lapisan, bukan dua sekaligus (issue #937).
 - **fix(remote): kirim-semua carousel kini ikut mengirim postBody** -- allBody pada loop send-all sebelumnya hanya memuat headers; pada mode itu body utama tak pernah dikirim sehingga sesi POST kehilangan bodinya untuk semua foto. Kini postBody disertakan persis seperti body utama dan loop URL tambahan #929 (issue #936).
 
 - **fix(ui): toast 'Moved up/down' tak lagi tampil untuk perpindahan no-op** -- moveUp/moveDown engine kini mengembalikan Boolean (false saat item sudah di tepi daftar) dan MainActivity hanya menampilkan toast bila benar berpindah; sebelumnya ketukan pada item teratas/terbawah tetap mengklaim berhasil (issue #935).

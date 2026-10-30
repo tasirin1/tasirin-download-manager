@@ -108,9 +108,6 @@ moreMenu.addEventListener('click', closeMoreMenu);
 document.addEventListener('click', function (e) {
 if (moreMenuOpen && !moreMenu.contains(e.target) && e.target !== moreBtn) closeMoreMenu();
 });
-document.addEventListener('keydown', function (e) {
-if (e.key === 'Escape' && moreMenuOpen) closeMoreMenu();
-});
 if (menuBackdrop) menuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeMoreMenu(); });
 let failCount = 0;
 let currentItems = [];
@@ -250,6 +247,8 @@ function shown(id) {
 const el = document.getElementById(id);
 return el && !el.classList.contains('hidden');
 }
+if (moreMenuOpen) { closeMoreMenu(); return true; }
+if (fsToolsMenuOpen) { closeFsToolsMenu(); return true; }
 if (shown('confirmModal')) { hideConfirm(); return true; }
 if (shown('inputModal')) { hideInput(); return true; }
 if (shown('moveModal')) { closeMovePicker(); return true; }
@@ -270,7 +269,7 @@ if (typing) return;
 if (e.ctrlKey || e.metaKey || e.altKey) return;
 const es = document.getElementById('addSheet');
 const sheetOpen = es && !es.classList.contains('hidden');
-const overlayOpen = ['confirmModal', 'inputModal', 'moveModal', 'shareModal', 'itemSheet', 'fsSheet'].some(function (id) {
+const overlayOpen = moreMenuOpen || fsToolsMenuOpen || ['confirmModal', 'inputModal', 'moveModal', 'shareModal', 'itemSheet', 'fsSheet'].some(function (id) {
 const el = document.getElementById(id);
 return el && !el.classList.contains('hidden');
 }) || (function () { const mm = document.getElementById('mediaModal'); return mm && mm.classList.contains('open'); })();
@@ -1403,9 +1402,6 @@ fsUpFileBtn.addEventListener('click', function () { fsTriggerUpload(false); });
 fsUpDirBtn.addEventListener('click', function () { fsTriggerUpload(true); });
 document.addEventListener('click', function (e) {
 if (fsToolsMenuOpen && !fsToolsMenu.contains(e.target) && e.target !== fsToolsBtn) closeFsToolsMenu();
-});
-document.addEventListener('keydown', function (e) {
-if (e.key === 'Escape' && fsToolsMenuOpen) closeFsToolsMenu();
 });
 if (fsMenuBackdrop) fsMenuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeFsToolsMenu(); });
 let fsLocationsLoaded = false;

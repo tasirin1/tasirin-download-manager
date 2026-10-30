@@ -2244,9 +2244,9 @@ moreMenu.addEventListener('click', closeMoreMenu);
 document.addEventListener('click', function (e) {
   if (moreMenuOpen && !moreMenu.contains(e.target) && e.target !== moreBtn) closeMoreMenu();
 });
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape' && moreMenuOpen) closeMoreMenu();
-});
+// Escape untuk menu ini ditangani otoritas tunggal closeTopOverlay
+// (issue #937): listener pribadi di sini menutup menu DAN membiarkan
+// handler pintasan menutup lapisan kedua pada tekanan yang sama.
 if (menuBackdrop) menuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeMoreMenu(); });
 
 let failCount = 0;
@@ -2412,6 +2412,10 @@ function closeTopOverlay() {
     const el = document.getElementById(id);
     return el && !el.classList.contains('hidden');
   }
+  // Menu dropdown adalah lapisan paling ringan dan paling akhir
+  // dibuka: ditutup paling dulu (issue #937).
+  if (moreMenuOpen) { closeMoreMenu(); return true; }
+  if (fsToolsMenuOpen) { closeFsToolsMenu(); return true; }
   if (shown('confirmModal')) { hideConfirm(); return true; }
   if (shown('inputModal')) { hideInput(); return true; }
   if (shown('moveModal')) { closeMovePicker(); return true; }
@@ -2439,7 +2443,7 @@ document.addEventListener('keydown', function (e) {
   // #931): tanpa ini, menekan n atau / saat dialog konfirmasi
   // terbuka membuka permukaan DI BAWAH scrim dan memindahkan fokus
   // ke belakangnya — merusak invariant fokus dialog teratas (#761).
-  const overlayOpen = ['confirmModal', 'inputModal', 'moveModal', 'shareModal', 'itemSheet', 'fsSheet'].some(function (id) {
+  const overlayOpen = moreMenuOpen || fsToolsMenuOpen || ['confirmModal', 'inputModal', 'moveModal', 'shareModal', 'itemSheet', 'fsSheet'].some(function (id) {
     const el = document.getElementById(id);
     return el && !el.classList.contains('hidden');
   }) || (function () { const mm = document.getElementById('mediaModal'); return mm && mm.classList.contains('open'); })();
@@ -3747,9 +3751,8 @@ fsUpDirBtn.addEventListener('click', function () { fsTriggerUpload(true); });
 document.addEventListener('click', function (e) {
   if (fsToolsMenuOpen && !fsToolsMenu.contains(e.target) && e.target !== fsToolsBtn) closeFsToolsMenu();
 });
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape' && fsToolsMenuOpen) closeFsToolsMenu();
-});
+// Escape untuk menu ini ditangani otoritas tunggal closeTopOverlay
+// (issue #937), sama seperti moreMenu.
 if (fsMenuBackdrop) fsMenuBackdrop.addEventListener('click', function (e) { e.stopPropagation(); closeFsToolsMenu(); });
 
 // Lokasi storage hanya perlu dimuat sekali saat masuk File Manager; tanpa
