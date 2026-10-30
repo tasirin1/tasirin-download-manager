@@ -64,26 +64,51 @@ object ServerSecurity {
             RegexOption.IGNORE_CASE
         )
 
-    // Kredensial userinfo di dalam nilai URL (issue #913): bentuk
-    // https://user:pass@host yang ditempel ke url= tidak memuat nama
-    // parameter sama sekali sehingga lolos LOG_SECRET_RE. Pola ini
-    // menyamarkan segmen user:pass di antara pemisah skema (:// atau
-    // %3A%2F%2F) dan @ (%40 atau @) — wajib ada titik dua di antaranya
-    // agar URL ber-port tanpa userinfo tidak ikut tersamar.
-    private val LOG_USERINFO_RE =
-        Regex(
-            "((?:%3A%2F%2F)|(?:://))[^&\\s]*?(?:%3A|:)[^&\\s]*?(%40|@)",
-            RegexOption.IGNORE_CASE
-        )
+    // Segmen URL sesudah pemisah skema di dalam nilai query, untuk
+    // penyamaran userinfo oleh maskUserinfo (issue #913, diperluas
+    // #918): tangkap pemisah (:// atau %3A%2F%2F) + larian sesudahnya
+    // sampai & mentah atau spasi.
+    private val LOG_URL_RUN_RE =
+        Regex("((?:%3A%2F%2F)|(?:://))([^&\\s]+)", RegexOption.IGNORE_CASE)
 
     fun redactQueryForLog(query: String?): String {
         if (query.isNullOrEmpty()) return ""
         val named = LOG_SECRET_RE.replace(query.trimStart('?')) { m ->
             m.groupValues[1] + m.groupValues[2] + "<redacted>"
         }
-        return "?" + LOG_USERINFO_RE.replace(named) { m ->
-            m.groupValues[1] + "<redacted>" + m.groupValues[2]
+        return "?" + LOG_URL_RUN_RE.replace(named) { m ->
+            maskUserinfo(m.groupValues[1], m.groupValues[2], m.value)
         }
+    }
+
+    /**
+     * Samarkan SELURUH userinfo sebuah URL di dalam nilai query:
+     * semua yang mendahului @ terakhir di segmen otoritas (sebelum '/'
+     * atau %2F pertama) diganti <redacted>, host tetap tampil. Tanpa
+     * syarat titik dua — token-sebagai-username adalah kredensial
+     * penuh — dan berhenti di @ TERAKHIR agar kata sandi yang memuat
+     * @ tidak bocor ekornya (issue #918; pola lazy #913 berhenti di @
+     * pertama). URL tanpa @ di otoritas (termasuk yang ber-port, atau
+     * @ hanya di path) dikembalikan utuh.
+     */
+    private fun maskUserinfo(sep: String, run: String, whole: String): String {
+        val encoded = sep.contains('%')
+        val cut = if (encoded) {
+            run.indexOf("%2F", ignoreCase = true)
+        } else {
+            run.indexOf('/')
+        }
+        val authority = if (cut >= 0) run.substring(0, cut) else run
+        val rest = if (cut >= 0) run.substring(cut) else ""
+        val at = if (encoded) {
+            authority.lastIndexOf("%40", ignoreCase = true)
+        } else {
+            authority.lastIndexOf('@')
+        }
+        if (at < 0) return whole
+        val atLen = if (encoded) 3 else 1
+        return sep + "<redacted>" + authority.substring(at, at + atLen) +
+            authority.substring(at + atLen) + rest
     }
 
     /** Redaksi token pada path untuk log request: `/share/<token>` dan

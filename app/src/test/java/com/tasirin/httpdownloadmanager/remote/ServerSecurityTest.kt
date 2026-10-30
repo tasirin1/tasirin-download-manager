@@ -91,7 +91,7 @@ class ServerSecurityTest {
         )
         // Kredensial userinfo di dalam url= ikut disamarkan (#913):
         // bentuk terenkode penuh maupun mentah; URL ber-port tanpa
-        // userinfo dan userinfo tanpa kata sandi tidak berubah.
+        // userinfo tidak berubah.
         // Nilai harapan dibuktikan port Python 1:1 dari kedua regex.
         assertEquals(
             "?url=https%3A%2F%2F<redacted>%40dl.example%2Ffile.zip",
@@ -107,9 +107,35 @@ class ServerSecurityTest {
             "?url=https://dl.example:8080/file.zip",
             ServerSecurity.redactQueryForLog("?url=https://dl.example:8080/file.zip")
         )
+        // Userinfo tanpa kata sandi KINI ikut tersamar (#918):
+        // token-sebagai-username adalah kredensial penuh.
         assertEquals(
-            "?url=https://user@dl.example/file.zip",
+            "?url=https://<redacted>@dl.example/file.zip",
             ServerSecurity.redactQueryForLog("?url=https://user@dl.example/file.zip")
+        )
+        // Kata sandi memuat @: samarkan sampai @ terakhir di otoritas
+        // (#918); @ di path dan nama berkas %40 tanpa userinfo utuh.
+        assertEquals(
+            "?url=https://<redacted>@host/f.zip",
+            ServerSecurity.redactQueryForLog("?url=https://user:p@ss@host/f.zip")
+        )
+        assertEquals(
+            "?url=https%3A%2F%2F<redacted>%40host%2Ff.zip",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fuser%3Ap%40ss%40host%2Ff.zip"
+            )
+        )
+        assertEquals(
+            "?url=https://<redacted>@github.com/x/y.zip",
+            ServerSecurity.redactQueryForLog("?url=https://tok123@github.com/x/y.zip")
+        )
+        assertEquals(
+            "?url=https://dl.example:8080/p@ge",
+            ServerSecurity.redactQueryForLog("?url=https://dl.example:8080/p@ge")
+        )
+        assertEquals(
+            "?url=https%3A%2F%2Fhost%2Fa%40b.zip",
+            ServerSecurity.redactQueryForLog("?url=https%3A%2F%2Fhost%2Fa%40b.zip")
         )
         assertEquals(
             "?api_key=<redacted>&b=2",
