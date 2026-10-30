@@ -108,7 +108,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private val fsMediaCache = ConcurrentHashMap<String, Pair<Long, Pair<List<String>, List<FsMediaEntry>>>>()
     // Cache listing folder biasa untuk pagination: tanpa ini, tiap offset
     // membaca dan mengurutkan ulang folder besar. Satu slot saja agar RAM tetap
-    // kecil di Android 5; aksi tulis langsung membuangnya.
+    // kecil di device kelas bawah; aksi tulis langsung membuangnya.
     private class FsFileListing(val path: String, val entries: List<File>, val total: Int)
     @Volatile private var fsFileListingCache: Pair<Long, FsFileListing>? = null
     // completedUploads / finalizingUploads / failedUploads hidup di

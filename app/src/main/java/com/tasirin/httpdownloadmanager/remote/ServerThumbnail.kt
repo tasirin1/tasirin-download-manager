@@ -52,7 +52,7 @@ internal fun isThumbFailureFresh(
 ): Boolean = now - storedAt < ttlMs
 
 /** Satu lock per media mencegah banyak permintaan thumbnail awal men-decode
- *  video yang sama secara paralel (hemat CPU/RAM di device Android 5+).
+ *  video yang sama secara paralel (hemat CPU/RAM di device kelas bawah).
  *  Lock tidak aktif dibuang agar browsing ribuan media tidak menumpuk RAM. */
 private val thumbLocks = ConcurrentHashMap<String, ThumbLock>()
 

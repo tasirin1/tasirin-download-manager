@@ -175,7 +175,7 @@ class FileSaver(context: Context) {
         if (cleanFolder.isNotBlank()) {
             if (cleanFolder.startsWith("m:")) {
                 // Kolom IS_PENDING/RELATIVE_PATH dan koleksi Downloads hanya
-                // ada di API 29+: di Android 5-9 insert MediaStore bisa gagal,
+                // ada di API 29+: di Android 6-9 insert MediaStore bisa gagal,
                 // jadi fallback ke dir publik/internal seperti tujuan download.
                 if (Build.VERSION.SDK_INT >= 29) {
                     return saveToMediaStore(fileName, cleanFolder.substring(2), writer)
@@ -1091,7 +1091,7 @@ class FileSaver(context: Context) {
     ): String {
         if (Build.VERSION.SDK_INT < 29) return fileName
         // Default di-resolve di sini (setelah guard API 29), bukan di parameter,
-        // supaya aman di Android 5 (MediaStore.Downloads baru ada API 29).
+        // supaya aman di Android 6-9 (MediaStore.Downloads baru ada API 29).
         val col = collection ?: MediaStore.Downloads.EXTERNAL_CONTENT_URI
         return runCatching {
             val resolver = appContext.contentResolver

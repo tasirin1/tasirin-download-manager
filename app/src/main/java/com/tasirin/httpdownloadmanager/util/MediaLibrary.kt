@@ -123,7 +123,7 @@ object MediaLibrary {
         }
     }
 
-    /** Koleksi Downloads (API 29+); fallback aman "Files" untuk Android 5-9.
+    /** Koleksi Downloads (API 29+); fallback aman "Files" untuk Android 6-9.
      *  Pemanggil sudah guard API 29, jadi fallback tidak pernah terpakai. */
     private fun downloadsCollection(): Uri =
         if (Build.VERSION.SDK_INT >= 29) MediaStore.Downloads.EXTERNAL_CONTENT_URI
