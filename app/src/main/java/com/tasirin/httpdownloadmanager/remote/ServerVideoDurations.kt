@@ -168,10 +168,18 @@ class ServerVideoDurations(
      *  gagal-probe direset, supaya galeri mem-probe ulang dan save()
      *  berikutnya menulis himpunan segar. */
     fun invalidate() {
-        synchronized(lock) {
-            generation++
-            cache = JSONObject()
-            probeFailAt.clear()
+        // Ikut serialisasi tulis berkas (issue #841): FILE_LOCK
+        // diperoleh SEBELUM lock — urutan yang sama dengan save()
+        // (FILE_LOCK -> lock), jadi tak ada pembalikan urutan yang
+        // membuka deadlock. Tanpa ini, invalidate yang mendarat
+        // SELAMA tulis save() berjalan dikalahkan rename staging:
+        // berkas yang baru dihapus hidup lagi berisi potret lama.
+        synchronized(FILE_LOCK) {
+            synchronized(lock) {
+                generation++
+                cache = JSONObject()
+                probeFailAt.clear()
+            }
             runCatching { file.delete() }
         }
     }
