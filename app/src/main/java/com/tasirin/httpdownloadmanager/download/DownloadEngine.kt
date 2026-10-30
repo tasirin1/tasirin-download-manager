@@ -935,14 +935,26 @@ class DownloadEngine(appContext: Context) {
                 val origin = java.net.URL(current).let { "${it.protocol}://${it.host}" }
                 conn.setRequestProperty("Referer", "$origin/")
             } catch (_: Exception) { /* Referer opsional, tidak wajib */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (Referer opsional: URL tak ter-parse tidak boleh menggagalkan koneksi)
-            // YouTube/Instagram CDN butuh Referer + Origin agar HTTP 403 tidak muncul
-            if (current.contains("googlevideo.com") || current.contains("youtube.com")) {
+            // YouTube/Instagram CDN butuh Referer + Origin agar HTTP 403 tidak muncul.
+            // Klasifikasi berbasis host ter-parse (issue #844): substring
+            // atas URL utuh — terutama 'scontent' tanpa konteks host —
+            // mengirim Referer platform ke host asing yang path/query-nya
+            // kebetulan memuat string itu. Host scontent Instagram selalu
+            // berawalan 'scontent' (scontent.fxxx.fna.fbcdn.net dst).
+            val reqHost = urlHostOf(current)
+            if (reqHost == "googlevideo.com" || reqHost.endsWith(".googlevideo.com") ||
+                reqHost == "youtube.com" || reqHost.endsWith(".youtube.com")
+            ) {
                 conn.setRequestProperty("Referer", "https://www.youtube.com/")
                 conn.setRequestProperty("Origin", "https://www.youtube.com")
-            } else if (current.contains("cdninstagram.com") || current.contains("scontent")) {
+            } else if (reqHost == "cdninstagram.com" || reqHost.endsWith(".cdninstagram.com") ||
+                reqHost.startsWith("scontent")
+            ) {
                 conn.setRequestProperty("Referer", "https://www.instagram.com/")
                 conn.setRequestProperty("Origin", "https://www.instagram.com")
-            } else if (current.contains("phncdn.com") || current.contains("pornhub.com")) {
+            } else if (reqHost == "phncdn.com" || reqHost.endsWith(".phncdn.com") ||
+                reqHost == "pornhub.com" || reqHost.endsWith(".pornhub.com")
+            ) {
                 conn.setRequestProperty("Referer", "https://www.pornhub.com/")
                 conn.setRequestProperty("Origin", "https://www.pornhub.com")
             }
