@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): 'connection refused' kembali ke FAILED terminal, bukan PAUSED abadi** -- pelebaran #969 mendelegasikan isNetworkError ke isConnectError secara utuh sehingga penolakan definitif sisi server ikut berakhir PAUSED: autoResume menyala, anggaran retry terhapus, tanpa notifikasi selesai, dan item bangkit lagi tiap jaringan pulih tanpa vonis akhir. Delegasi kini diganti frasa transien lokal yang memang dimaksud (unable to resolve host, network is unreachable) di samping isSlowError (issue #976).
+
 - **fix(web): fokus dilepas dari sel galeri saat modal media dibuka dan dikembalikan saat ditutup** -- openMedia sebelumnya membiarkan fokus di sel pemicu yang bertabindex, sehingga penjaga handler tombol media menolak semua tombol pemutar (panah/Space/J/L/M/F mati) dan Space/Enter malah mengklik ulang sel di balik modal sampai video termuat ulang. Kini pembukaan pertama menyimpan fokus lewat mekanisme #947 lalu mem-blur ke body agar tombol media hidup, dan closeMedia mengembalikan fokus ke sel pemicu (issue #975).
 
 - **fix(remote): memo cap ZIP kini ikut dibuang pada invalidasi cache** -- zipStampMemo sebelumnya tak disentuh corong invalidasi mana pun, sehingga ZIP yang dibangun ulang sesudah mutasi server tersimpan di bawah label cap lama; bila sumber kemudian dikembalikan dari luar aplikasi ke keadaan semula dalam TTL cache, cap segar yang sah kembali sama dan ZIP berlabel lama itu HIT dengan isi yang sudah ditinggalkan. Kedua corong invalidasi (global dan terarah) kini membersihkan memo cap (issue #974).

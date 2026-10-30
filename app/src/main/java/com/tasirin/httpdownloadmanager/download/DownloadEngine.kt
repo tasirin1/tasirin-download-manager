@@ -2187,13 +2187,19 @@ class DownloadEngine(appContext: Context) {
             // fetchHlsSegment wajib lolos klasifikasi ini agar retry segmen
             // benar-benar berjalan (issue #167).
             message.contains("truncated", ignoreCase = true) ||
-            // Stall/lambat dan sisa frasa connect (issue #969):
-            // klasifikasi ini menentukan PAUSED-vs-FAILED terminal dan
-            // retry level segmen — kegagalan jaringan menetes (watchdog
-            // stall) dan DNS ("Unable to resolve host") sebelumnya
-            // lolos dari keduanya dan berakhir FAILED permanen walau
-            // sifatnya transien jaringan yang sama.
-            isSlowError(message) || isConnectError(message)
+            // Stall/lambat dan frasa connect yang TRANSIEN LOKAL
+            // (issue #969, disaring issue #976): klasifikasi ini
+            // menentukan PAUSED-vs-FAILED terminal dan retry level
+            // segmen — kegagalan jaringan menetes (watchdog stall)
+            // dan DNS ("Unable to resolve host") sebelumnya lolos
+            // dari keduanya dan berakhir FAILED permanen. Delegasi
+            // utuh ke isConnectError TIDAK dipakai: ia ikut memuat
+            // "connection refused", penolakan definitif sisi server
+            // yang harus tetap FAILED terminal, bukan PAUSED abadi
+            // yang bangkit lagi tiap jaringan berkedip.
+            isSlowError(message) ||
+            message.contains("unable to resolve host", ignoreCase = true) ||
+            message.contains("network is unreachable", ignoreCase = true)
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
