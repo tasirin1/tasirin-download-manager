@@ -1726,6 +1726,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             h = h * 31 + (if (it.checksumVerified) 1 else 0)
             h = h * 31 + (if (it.monitor) 1 else 0)
             h = h * 31 + (if (it.totalBytesEstimated) 1 else 0)
+            // Limit & prioritas ikut (#977): dialog Limit & Priority
+            // membaca dua field ini dari salinan adapter dan menulis
+            // balik — tanpa ikut sig, perubahan dari remote pada item
+            // diam tak pernah sampai ke adapter dan Save menimpa
+            // nilai baru dengan nilai lama secara diam-diam.
+            h = h * 31 + it.speedLimitKbps
+            h = h * 31 + it.priority
         }
         return h
     }
