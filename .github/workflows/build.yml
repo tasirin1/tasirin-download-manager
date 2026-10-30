@@ -291,7 +291,11 @@ jobs:
           # entri baru (mis. chore metadata) memakai teks generik.
           BASE="${{ github.event.before }}"
           if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
-            NOTES=$(git diff "$BASE" HEAD -- CHANGELOG.md 2>/dev/null | grep -E '^\+- ' | sed 's/^+//' | head -n 15)
+            # || true WAJIB (issue #786): run: memakai bash -eo pipefail —
+            # grep yang tak menemukan bullet (push sah tanpa entri baru)
+            # atau git diff yang gagal membuat pipa berstatus 1 dan
+            # set -e membunuh langkah ini sebelum teks generik tercapai.
+            NOTES=$(git diff "$BASE" HEAD -- CHANGELOG.md 2>/dev/null | grep -E '^\+- ' | sed 's/^+//' | head -n 15 || true)
           fi
           if [ -z "$NOTES" ]; then
             NOTES="APK rilis terbaru (build ${CODE}), ditandatangani dengan kunci release resmi (bukan debug). Unduh lalu pasang di HP/TV box."
