@@ -993,7 +993,15 @@ class SettingsActivity : AppCompatActivity() {
             binding.btnSave.isEnabled = false
             lifecycleScope.launch {
                 try {
-                    saveSettings(binding.inputPort.text?.toString()?.trim()?.toIntOrNull())
+                    // Simpan adalah satu rangkaian konsekuensi yang
+                    // sudah dimulai pengguna (issue #902, kelas #823):
+                    // tanpa NonCancellable, Back di tengah proses
+                    // membatalkan segmen folder->PIN->port di titik
+                    // suspensi berikutnya sehingga sebagian tersimpan
+                    // diam-diam dan sebagian hilang tanpa sinyal.
+                    withContext(NonCancellable) {
+                        saveSettings(binding.inputPort.text?.toString()?.trim()?.toIntOrNull())
+                    }
                 } finally {
                     savingSettings = false
                     binding.btnSave.isEnabled = true
