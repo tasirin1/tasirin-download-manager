@@ -422,6 +422,43 @@ class FileSaver(context: Context) {
             }
         }
 
+    /** Salin isi ke dokumen staging `<nama>.part` di [tree] lalu rename ke
+     *  nama final [unique] (pola staging writeCustomFolder #734, diperluas
+     *  ke publish/move/organize oleh #746): proses mati di tengah salin
+     *  hanya meninggalkan dokumen .part, bukan dokumen terpotong bernama
+     *  final. Mengembalikan dokumen final, atau null bila staging tak
+     *  bisa dibuat / rename ditolak provider (pemanggil jatuh ke tulis
+     *  langsung sebagai jalan terakhir). Kegagalan salin dilempar sesudah
+     *  staging dibuang — pemanggil tidak mengulang salinan yang gagal di
+     *  tengah jalan. [unique] wajib dipilih pemanggil di dalam kunci nama
+     *  (mergeLockFor) TANPA membuat dokumen final lebih dulu, agar
+     *  rename bisa mendarat. */
+    private fun copyToStagingDoc(
+        tree: DocumentFile,
+        unique: String,
+        copy: (OutputStream) -> Unit
+    ): DocumentFile? {
+        val stagingDoc = tree.createFile(MimeTypes.forFile(unique), "$unique.part") ?: return null
+        val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
+        if (output == null) {
+            runCatching { stagingDoc.delete() }
+            return null
+        }
+        try {
+            output.use { copy(it) }
+        } catch (e: Exception) {
+            runCatching { stagingDoc.delete() }
+            throw e
+        }
+        if (!runCatching { stagingDoc.renameTo(unique) }.getOrDefault(false)) {
+            runCatching { stagingDoc.delete() }
+            return null
+        }
+        // URI otoritatif dari pohon, sama seperti writeCustomFolder:
+        // objek hasil rename bisa menyimpan URI lama di sebagian provider.
+        return tree.findFile(unique) ?: stagingDoc
+    }
+
     private fun writeCustomFolder(
         fileName: String,
         folderUri: Uri,
@@ -520,6 +557,22 @@ class FileSaver(context: Context) {
         folderUri: Uri
     ): PublishResult? = runCatching {
         val tree = DocumentFile.fromTreeUri(appContext, folderUri) ?: return null
+        // Staging SAF (issue #746): salin ke `<nama>.part` lalu rename,
+        // pola writeCustomFolder (#734) — proses mati di tengah salin tak
+        // lagi meninggalkan dokumen terpotong bernama final di folder
+        // pengguna. Nama unik dipilih di dalam kunci nama TANPA membuat
+        // dokumen final lebih dulu agar rename bisa mendarat.
+        val stagedUnique = synchronized(mergeLockFor(FileNames.safe(fileName))) {
+            uniqueDocumentName(tree, fileName)
+        }
+        val stagedDoc = copyToStagingDoc(tree, stagedUnique) { out ->
+            partial.inputStream().use { input -> input.copyTo(out, IO_BUF) }
+        }
+        if (stagedDoc != null) {
+            partial.delete()
+            return@runCatching PublishResult(contentUri = stagedDoc.uri.toString(), fileName = stagedUnique)
+        }
+        // Jalan terakhir: tulis langsung ke dokumen final (perilaku lama).
         val (target, unique, createdDoc) = claimCustomDoc(tree, fileName) ?: return null
         // Sama seperti writeCustomFolder: stream null sesudah dokumen
         // dibuat meninggalkan yatim 0-byte — buang yang baru dibuat.
@@ -995,14 +1048,16 @@ class FileSaver(context: Context) {
     fun move(item: DownloadItem, destTreeUri: Uri): PublishResult? {
         return runCatching {
             val tree = DocumentFile.fromTreeUri(appContext, destTreeUri) ?: return null
-            // Klaim berkunci seperti publish folder kustom (issue #410):
-            // pola cek-lalu-buat tanpa kunci di sini bisa memilih nama yang
-            // sama dengan publish paralel bernama sama.
-            val (target, unique, createdDoc) = claimCustomDoc(tree, item.fileName) ?: return null
-            try {
-                // Sumber dibaca di dalam try: bila tak bisa dibuka (URI basi /
-                // file hilang / null), target kosong yang terlanjur dibuat
-                // wajib dibuang agar tak jadi yatim di folder tujuan.
+            // Staging SAF (issue #746): salin ke `<nama>.part` lalu
+            // rename, pola writeCustomFolder (#734) — proses mati di
+            // tengah salin tak lagi meninggalkan dokumen terpotong
+            // bernama final di folder tujuan. Nama unik dipilih di
+            // dalam kunci nama TANPA membuat dokumen final lebih dulu
+            // agar rename bisa mendarat.
+            val stagedUnique = synchronized(mergeLockFor(FileNames.safe(item.fileName))) {
+                uniqueDocumentName(tree, item.fileName)
+            }
+            val stagedDoc = copyToStagingDoc(tree, stagedUnique) { out ->
                 val input = when {
                     !item.contentUri.isNullOrEmpty() ->
                         appContext.contentResolver.openInputStream(item.contentUri.toUri())
@@ -1010,21 +1065,47 @@ class FileSaver(context: Context) {
                         runCatching { File(item.filePath).inputStream() }.getOrNull()
                     else -> null
                 } ?: throw java.io.IOException("Failed to open move source")
-                input.use { src ->
-                    val out = appContext.contentResolver.openOutputStream(target.uri, "wt")
-                        ?: throw java.io.IOException("Failed to open move destination")
-                    out.use { dst -> src.copyTo(dst, IO_BUF) }
-                }
-            } catch (e: Exception) {
-                // Hanya dokumen yang BARU dibuat panggilan ini yang boleh
-                // dibuang (issue #447): claimCustomDoc bisa mengembalikan
-                // dokumen yang sudah ada (lomba eksternal), dan kegagalan
-                // sebelum openOutputStream (mis. sumber tak bisa dibuka)
-                // tidak menyentuhnya — menghapusnya menghancurkan berkas
-                // lama milik pengguna.
-                if (createdDoc) runCatching { target.delete() }
-                throw e
+                input.use { src -> src.copyTo(out, IO_BUF) }
             }
+            val claimResult: Pair<DocumentFile, String> = if (stagedDoc != null) {
+                stagedDoc to stagedUnique
+            } else {
+                // Jalan terakhir: tulis langsung ke dokumen final
+                // (perilaku lama). Klaim berkunci seperti publish folder
+                // kustom (issue #410): pola cek-lalu-buat tanpa kunci di
+                // sini bisa memilih nama yang sama dengan publish paralel
+                // bernama sama.
+                val (t, u, createdDoc) = claimCustomDoc(tree, item.fileName) ?: return null
+                try {
+                    // Sumber dibaca di dalam try: bila tak bisa dibuka (URI basi /
+                    // file hilang / null), target kosong yang terlanjur dibuat
+                    // wajib dibuang agar tak jadi yatim di folder tujuan.
+                    val input = when {
+                        !item.contentUri.isNullOrEmpty() ->
+                            appContext.contentResolver.openInputStream(item.contentUri.toUri())
+                        !item.filePath.isNullOrEmpty() ->
+                            runCatching { File(item.filePath).inputStream() }.getOrNull()
+                        else -> null
+                    } ?: throw java.io.IOException("Failed to open move source")
+                    input.use { src ->
+                        val out = appContext.contentResolver.openOutputStream(t.uri, "wt")
+                            ?: throw java.io.IOException("Failed to open move destination")
+                        out.use { dst -> src.copyTo(dst, IO_BUF) }
+                    }
+                } catch (e: Exception) {
+                    // Hanya dokumen yang BARU dibuat panggilan ini yang boleh
+                    // dibuang (issue #447): claimCustomDoc bisa mengembalikan
+                    // dokumen yang sudah ada (lomba eksternal), dan kegagalan
+                    // sebelum openOutputStream (mis. sumber tak bisa dibuka)
+                    // tidak menyentuhnya — menghapusnya menghancurkan berkas
+                    // lama milik pengguna.
+                    if (createdDoc) runCatching { t.delete() }
+                    throw e
+                }
+                t to u
+            }
+            val target = claimResult.first
+            val unique = claimResult.second
             deleteFiles(item)
             // Duplikat tertinggal wajib terlacak (issue #492): deleteFiles
             // menelan semua kegagalan, jadi pindah yang "berhasil" bisa
@@ -1209,10 +1290,45 @@ class FileSaver(context: Context) {
                         val subDir = parent.findFile(sub)
                             ?: parent.createDirectory(sub)
                             ?: return result
-                        // Klaim berkunci seperti jalur SAF lain (issue
-                        // #410): nama dipilih + dokumen dibuat atomik di
-                        // dalam kunci nama, bukan cek-lalu-buat terpisah
-                        // yang bisa tabrakan dengan klaim paralel senama.
+                        // Staging SAF (issue #746): salin ke
+                        // `<nama>.part` di subfolder lalu rename, pola
+                        // writeCustomFolder (#734) — proses mati di tengah
+                        // salin tak lagi meninggalkan dokumen terpotong
+                        // bernama final. Nama unik dipilih di dalam kunci
+                        // nama TANPA membuat dokumen final lebih dulu.
+                        val stagedUnique = synchronized(mergeLockFor(FileNames.safe(fileName))) {
+                            uniqueDocumentName(subDir, fileName)
+                        }
+                        val stagedDoc = copyToStagingDoc(subDir, stagedUnique) { out ->
+                            val input = appContext.contentResolver.openInputStream(uri)
+                                ?: throw java.io.IOException("Failed to open organize source")
+                            input.use { src -> src.copyTo(out, IO_BUF) }
+                        }
+                        if (stagedDoc != null) {
+                            // Hapus sumber WAJIB terkonfirmasi (issue
+                            // #492), sama seperti jalur langsung di bawah:
+                            // sumber yang gagal dihapus berarti salinan
+                            // staging dibuang dan pindah dianggap gagal.
+                            if (appContext.contentResolver.delete(uri, null, null) <= 0) {
+                                runCatching {
+                                    appContext.contentResolver.delete(stagedDoc.uri, null, null)
+                                }
+                                return result
+                            }
+                            // Nama hasil staging ikut dikembalikan
+                            // (issue #457/#468), sama seperti jalur klaim.
+                            return PublishResult(
+                                contentUri = stagedDoc.uri.toString(),
+                                fileName = stagedUnique,
+                                moved = true
+                            ).also { MediaLibrary.invalidateScanCache() }
+                        }
+                        // Jalan terakhir: tulis langsung ke dokumen final
+                        // (perilaku lama). Klaim berkunci seperti jalur SAF
+                        // lain (issue #410): nama dipilih + dokumen dibuat
+                        // atomik di dalam kunci nama, bukan cek-lalu-buat
+                        // terpisah yang bisa tabrakan dengan klaim paralel
+                        // senama.
                         val (target, unique, createdDoc) = claimCustomDoc(subDir, fileName)
                             ?: return result
                         val input = appContext.contentResolver.openInputStream(uri)
