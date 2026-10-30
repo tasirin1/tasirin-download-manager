@@ -83,48 +83,59 @@ object ServerSecurity {
 
     /**
      * Samarkan SELURUH userinfo sebuah URL di dalam nilai query:
-     * semua yang mendahului @ terakhir di segmen otoritas (sebelum '/'
-     * atau %2F pertama) diganti <redacted>, host tetap tampil. Tanpa
-     * syarat titik dua — token-sebagai-username adalah kredensial
-     * penuh — dan berhenti di @ TERAKHIR agar kata sandi yang memuat
-     * @ tidak bocor ekornya (issue #918; pola lazy #913 berhenti di @
+     * semua yang mendahului @ terakhir di segmen otoritas diganti
+     * <redacted>, host tetap tampil. Tanpa syarat titik dua pada
+     * jalur biasa — token-sebagai-username adalah kredensial penuh —
+     * dan berhenti di @ TERAKHIR agar kata sandi yang memuat @ tidak
+     * bocor ekornya (issue #918; pola lazy #913 berhenti di @
      * pertama). URL tanpa @ di otoritas (termasuk yang ber-port, atau
-     * @ hanya di path) dikembalikan utuh.
+     * @ hanya di path) dikembalikan utuh. Untuk flavor terenkode,
+     * pembatasnya adalah %40 terakhir di run; garis miring terenkode
+     * di dalam sandi ditangani oleh cabang khusus di bawah (#921,
+     * #922, #923).
      */
     private fun maskUserinfo(sep: String, run: String, whole: String): String {
-        val encoded = sep.contains('%')
-        var cut = if (encoded) {
-            run.indexOf("%2F", ignoreCase = true)
-        } else {
-            run.indexOf('/')
+        if (!sep.contains('%')) {
+            val cut = run.indexOf('/')
+            val authority = if (cut >= 0) run.substring(0, cut) else run
+            val at = authority.lastIndexOf('@')
+            if (at < 0) return whole
+            val rest = if (cut >= 0) run.substring(cut) else ""
+            return sep + "<redacted>" + authority.substring(at, at + 1) +
+                authority.substring(at + 1) + rest
         }
-        var authority = if (cut >= 0) run.substring(0, cut) else run
-        if (encoded && !authority.contains("%40", ignoreCase = true)) {
-            // Kemungkinan userinfo memuat %2F (kata sandi ber-'/' tiba
-            // terenkode dari klien web, issue #921): otoritas awal yang
-            // terpotong di %2F pertama tak memuat %40 padahal userinfo
-            // ada. Hanya perluas bila ada %40 yang didahului %3A (pola
-            // user:pass) agar %40 di nama berkas tanpa userinfo — tak
-            // pernah didahului %3A — tetap utuh; otoritas diperpanjang
-            // sampai %2F pertama SESUDAH %40 terakhir.
-            val lastAt = run.lastIndexOf("%40", ignoreCase = true)
-            if (lastAt > 0 &&
-                run.substring(0, lastAt).contains("%3A", ignoreCase = true)
-            ) {
-                cut = run.indexOf("%2F", lastAt, ignoreCase = true)
-                authority = if (cut >= 0) run.substring(0, cut) else run
+        // Flavor terenkode: pembatas userinfo adalah %40 TERAKHIR di
+        // run (issue #922 — sandi yang memuat %40 sebelum %2F-nya kini
+        // tersamar sampai %40 terakhir juga). Bila %2F pertama
+        // mendahului %40 terakhir, garis miring itu bisa berada DI
+        // DALAM userinfo (sandi ber-'/', issue #921) ATAU memang
+        // pemisah path dengan %40 di path/query; bedakan lewat bukti
+        // titik dua user:pass di segmen SEBELUM %2F pertama saja
+        // (issue #923: jangkar di segmen itu, bukan seluruh awalan
+        // run), dengan penjaga titik dua port (segmen sesudah %3A
+        // semua digit = port, bukan userinfo).
+        val lastAt = run.lastIndexOf("%40", ignoreCase = true)
+        if (lastAt < 0) return whole
+        val firstSlash = run.indexOf("%2F", ignoreCase = true)
+        val cut: Int
+        if (firstSlash < 0 || firstSlash > lastAt) {
+            cut = firstSlash
+        } else {
+            val prefix = run.substring(0, firstSlash)
+            val colon = prefix.indexOf("%3A", ignoreCase = true)
+            if (colon < 0) return whole
+            val afterColon = prefix.substring(colon + 3)
+            if (afterColon.isNotEmpty() && afterColon.all { it.isDigit() }) {
+                return whole
             }
+            cut = run.indexOf("%2F", lastAt, ignoreCase = true)
         }
+        val authority = if (cut >= 0) run.substring(0, cut) else run
         val rest = if (cut >= 0) run.substring(cut) else ""
-        val at = if (encoded) {
-            authority.lastIndexOf("%40", ignoreCase = true)
-        } else {
-            authority.lastIndexOf('@')
-        }
+        val at = authority.lastIndexOf("%40", ignoreCase = true)
         if (at < 0) return whole
-        val atLen = if (encoded) 3 else 1
-        return sep + "<redacted>" + authority.substring(at, at + atLen) +
-            authority.substring(at + atLen) + rest
+        return sep + "<redacted>" + authority.substring(at, at + 3) +
+            authority.substring(at + 3) + rest
     }
 
     /** Redaksi token pada path untuk log request: `/share/<token>` dan

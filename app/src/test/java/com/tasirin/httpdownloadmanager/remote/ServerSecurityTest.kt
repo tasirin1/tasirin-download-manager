@@ -156,6 +156,41 @@ class ServerSecurityTest {
             "?url=https%3A%2F%2F<redacted>%40host",
             ServerSecurity.redactQueryForLog("?url=https%3A%2F%2Fuser%40host")
         )
+        // Sandi memuat %40 SEBELUM %2F-nya (#922): penyamaran berjalan
+        // sampai %40 terakhir, ekor sesudah garis miring tak bocor.
+        assertEquals(
+            "?url=https%3A%2F%2F<redacted>%40host%2Ff.zip",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fuser%3Ap%40q%2FLONGTAIL%40host%2Ff.zip"
+            )
+        )
+        // Bukti titik dua kini dijangkar di segmen sebelum %2F pertama
+        // (#923): %3A di query-dalam-nilai dan %40 di path tidak lagi
+        // menyamarkan URL tanpa userinfo; titik dua port pun dijaga.
+        assertEquals(
+            "?url=https%3A%2F%2Fcdn.example%2Fv.mp4%3Ft%3D12%3A30%26mail%3Da%40b.co",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fcdn.example%2Fv.mp4%3Ft%3D12%3A30%26mail%3Da%40b.co"
+            )
+        )
+        assertEquals(
+            "?url=https%3A%2F%2Fhost%2Fdir%3Aname%2Fa%40b.zip",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fhost%2Fdir%3Aname%2Fa%40b.zip"
+            )
+        )
+        assertEquals(
+            "?url=https%3A%2F%2Fhost%3A8080%2Fp%40ge",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fhost%3A8080%2Fp%40ge"
+            )
+        )
+        assertEquals(
+            "?url=https%3A%2F%2F<redacted>%40github.com%2Fx.zip",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Ftok%40github.com%2Fx.zip"
+            )
+        )
         assertEquals(
             "?api_key=<redacted>&b=2",
             ServerSecurity.redactQueryForLog("?api_key=K-123&b=2")
