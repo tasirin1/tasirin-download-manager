@@ -2120,6 +2120,12 @@ String(it.speedLimitKbps || 0),
 'KB/s (0 = unlimited). Optional priority -1/0/1 at the end, e.g. 512 1',
 'Save',
 function (val) {
+const freshNow = currentItems.find(function (x) { return x.id === it.id; });
+if (!freshNow) { mmShowToast('Item is no longer available', 2500); return; }
+if ((allowedStates.limit || []).indexOf(freshNow.state) < 0) {
+mmShowToast('Item changed — reopen the menu to act on its current state', 3000);
+return;
+}
 const parts = val.trim().split(/\s+/);
 const speed = parseInt(parts[0], 10);
 if (isNaN(speed) || speed < 0) return;
@@ -4168,7 +4174,15 @@ function doAction(id, action) {
 if (action === 'delete') {
 const it = currentItems.find(function (x) { return x.id === id; });
 const label = it && it.fileName ? it.fileName : 'this item';
-showConfirm('Delete item?', 'Delete \"' + label + '\" from the download list? The file on the device will also be deleted.', 'Delete', function () { doActionNow(id, action); });
+showConfirm('Delete item?', 'Delete \"' + label + '\" from the download list? The file on the device will also be deleted.', 'Delete', function () {
+const freshNow = currentItems.find(function (x) { return x.id === id; });
+if (!freshNow) { mmShowToast('Item is no longer available', 2500); return; }
+if (['COMPLETED', 'FAILED', 'CANCELLED'].indexOf(freshNow.state) < 0) {
+mmShowToast('Item changed — reopen the menu to act on its current state', 3000);
+return;
+}
+doActionNow(id, action);
+});
 return;
 }
 if (action === 'clear_completed') {
