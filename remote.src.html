@@ -7419,6 +7419,14 @@ async function pollSnapshot() {
       sseSilentReconnects = 0;
       sseOutageSeen = false;
       connectEvents();
+    } else if (!sseGaveUp && sse) {
+      // Bukti putus yang tak terpakai pada snapshot sukses saat SSE
+      // sehat dibuang (issue #838): tanpa ini, dua gagal poll sesaat
+      // mengunci bukti selamanya, dan berjam-jam kemudian bukti basi
+      // itu menghidupkan SSE yang give-up karena diam — persis yang
+      // hendak dicegah #785. Bukti yang segar (SSE memang sedang
+      // give-up) tidak disentuh cabang ini.
+      sseOutageSeen = false;
     }
     if (data.status) applyServerStatus(data.status);
     const items = data.items || [];

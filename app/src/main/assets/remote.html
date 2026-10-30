@@ -4648,6 +4648,8 @@ sseGaveUp = false;
 sseSilentReconnects = 0;
 sseOutageSeen = false;
 connectEvents();
+} else if (!sseGaveUp && sse) {
+sseOutageSeen = false;
 }
 if (data.status) applyServerStatus(data.status);
 const items = data.items || [];
