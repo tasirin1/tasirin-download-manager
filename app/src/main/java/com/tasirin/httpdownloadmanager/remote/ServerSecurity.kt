@@ -93,12 +93,28 @@ object ServerSecurity {
      */
     private fun maskUserinfo(sep: String, run: String, whole: String): String {
         val encoded = sep.contains('%')
-        val cut = if (encoded) {
+        var cut = if (encoded) {
             run.indexOf("%2F", ignoreCase = true)
         } else {
             run.indexOf('/')
         }
-        val authority = if (cut >= 0) run.substring(0, cut) else run
+        var authority = if (cut >= 0) run.substring(0, cut) else run
+        if (encoded && !authority.contains("%40", ignoreCase = true)) {
+            // Kemungkinan userinfo memuat %2F (kata sandi ber-'/' tiba
+            // terenkode dari klien web, issue #921): otoritas awal yang
+            // terpotong di %2F pertama tak memuat %40 padahal userinfo
+            // ada. Hanya perluas bila ada %40 yang didahului %3A (pola
+            // user:pass) agar %40 di nama berkas tanpa userinfo — tak
+            // pernah didahului %3A — tetap utuh; otoritas diperpanjang
+            // sampai %2F pertama SESUDAH %40 terakhir.
+            val lastAt = run.lastIndexOf("%40", ignoreCase = true)
+            if (lastAt > 0 &&
+                run.substring(0, lastAt).contains("%3A", ignoreCase = true)
+            ) {
+                cut = run.indexOf("%2F", lastAt, ignoreCase = true)
+                authority = if (cut >= 0) run.substring(0, cut) else run
+            }
+        }
         val rest = if (cut >= 0) run.substring(cut) else ""
         val at = if (encoded) {
             authority.lastIndexOf("%40", ignoreCase = true)

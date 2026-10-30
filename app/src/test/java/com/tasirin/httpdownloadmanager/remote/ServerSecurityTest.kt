@@ -137,6 +137,25 @@ class ServerSecurityTest {
             "?url=https%3A%2F%2Fhost%2Fa%40b.zip",
             ServerSecurity.redactQueryForLog("?url=https%3A%2F%2Fhost%2Fa%40b.zip")
         )
+        // Kata sandi terenkode memuat %2F (#921): otoritas diperpanjang
+        // melewati %2F di dalam sandi sampai %2F sesudah %40 terakhir;
+        // host dan port tetap tampil.
+        assertEquals(
+            "?url=https%3A%2F%2F<redacted>%40host%2Ff.zip",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fuser%3Ap%2Fq%40host%2Ff.zip"
+            )
+        )
+        assertEquals(
+            "?url=https%3A%2F%2F<redacted>%40host%3A8080%2Ff.zip",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fuser%3Ap%2Fq%40host%3A8080%2Ff.zip"
+            )
+        )
+        assertEquals(
+            "?url=https%3A%2F%2F<redacted>%40host",
+            ServerSecurity.redactQueryForLog("?url=https%3A%2F%2Fuser%40host")
+        )
         assertEquals(
             "?api_key=<redacted>&b=2",
             ServerSecurity.redactQueryForLog("?api_key=K-123&b=2")
