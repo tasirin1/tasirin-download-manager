@@ -45,8 +45,16 @@ def main():
             print(f"JaCoCo {ctype}: {covered / (covered + missed):.1%} ({covered}/{covered + missed})")
     step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if step_summary and summary:
-        with open(step_summary, "a", encoding="utf-8") as fh:
-            fh.write("### JaCoCo coverage (unit test)\n\n" + "\n".join(summary) + "\n")
+        # Penulisan ringkasan dijaga (issue #688): skrip pelaporan murni
+        # tak boleh memerahkan langkah Coverage — OSError di berkas
+        # GITHUB_STEP_SUMMARY (hilang/rotasi/tak bisa ditulis) cukup
+        # peringatan, vonis tetap 0 sesuai janji docstring "tak gagal
+        # keras" (kelas yang sama dengan laporan rusak pada #615).
+        try:
+            with open(step_summary, "a", encoding="utf-8") as fh:
+                fh.write("### JaCoCo coverage (unit test)\n\n" + "\n".join(summary) + "\n")
+        except OSError as exc:
+            print(f"PERINGATAN: gagal menulis GITHUB_STEP_SUMMARY: {exc}")
     return 0
 
 
