@@ -3937,13 +3937,27 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  sehingga CSRF tag-img tak bisa mencetaknya; tokennya pun tak terbaca
      *  lintas-origin tanpa CORS. */
     private fun mintZipDlToken(): Response {
-        pruneZipDlTokens()
         val token = UUID.randomUUID().toString().replace("-", "")
-        if (zipDlTokens.size >= MAX_ZIP_DL_TOKENS) {
-            val oldest = zipDlTokens.entries.minByOrNull { it.value }?.key
-            if (oldest != null) zipDlTokens.remove(oldest)
+        // Penuh sesudah prune = tolak pencetakan baru (issue #899),
+        // meniru token share #235: token yang sudah diterbitkan dan
+        // belum kedaluwarsa tak boleh dibunuh diam-diam oleh pencetakan
+        // lain. Cek + sisip atomik dalam satu monitor peta agar dua
+        // pencetakan paralel tak sama-sama lolos melewati kuota.
+        val full = synchronized(zipDlTokens) {
+            pruneZipDlTokens()
+            if (zipDlTokens.size >= MAX_ZIP_DL_TOKENS) {
+                true
+            } else {
+                zipDlTokens[token] = System.currentTimeMillis() + ZIP_DL_TTL_MS
+                false
+            }
         }
-        zipDlTokens[token] = System.currentTimeMillis() + ZIP_DL_TTL_MS
+        if (full) {
+            return jsonResponse(
+                JSONObject().put("ok", false)
+                    .put("error", "Too many active ZIP download tokens. Try again shortly.")
+            )
+        }
         return jsonResponse(JSONObject().put("ok", true).put("zt", token))
     }
 
