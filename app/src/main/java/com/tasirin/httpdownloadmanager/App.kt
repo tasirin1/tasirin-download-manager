@@ -79,6 +79,10 @@ class App : Application() {
     // dan download jeda-jaringan tak pernah lanjut otomatis.
     private fun registerNetworkCallback() {
         runCatching {
+            // Kegagalan total wajib berjejak (issue #966): tanpa log,
+            // networkUp macet di nilai awal true (gerbang outage tak
+            // pernah aktif) dan auto-resume mati, semuanya senyap
+            // seumur proses. onFailure dipasang di ujung rantai.
             val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             val request = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -123,6 +127,8 @@ class App : Application() {
             } else {
                 cm.registerNetworkCallback(request, callback)
             }
+        }.onFailure {
+            logEvent("NETWORK CALLBACK REGISTRATION FAILED: ${it.message?.take(80)}")
         }
     }
 
