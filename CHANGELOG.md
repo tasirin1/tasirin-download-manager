@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): membuka Share Manager membatalkan Share item yang masih berjalan** -- shareItem digerbang generasinya sendiri, tetapi openShareManager tidak membatalkannya, jadi respons Share lambat yang tiba sesudah manager dibuka menimpa isi modal menjadi tampilan share sesi. Manager kini ikut menaikkan generasi shareItem (issue #998).
+
 - **fix(web): fokus bertahan galeri memakai pola aman repo** -- pemindahan fokus di trimGalleryTop sebelumnya memanggil focus beropsi objek tanpa jaring pengaman, menyimpang dari pola popReturnFocus; di browser lama yang melempar pada argumen opsi, eksepsinya akan menggugurkan sisa loadMoreGallery (roving + sentinel). Kini dibungkus try fokus beropsi dengan fallback fokus polos (issue #997).
 
 - **fix(web): tipe error diteruskan mmShowToast ke toast global** -- penerusan sebelumnya membuang tipe sehingga semua kegagalan yang lewat helper pemutar (ZIP gagal/terlalu besar, Move/Delete gagal, refresh gagal) tampil sebagai toast info biru saat modal media tertutup. mmShowToast kini menerima tipe opsional dan 12 situs pemanggil kegagalan mengoper tipe error (issue #996).

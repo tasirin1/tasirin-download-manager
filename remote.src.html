@@ -7400,6 +7400,10 @@ async function revokeShareSid(sid) {
 function openShareManager() {
   if (shareModal.classList.contains('hidden')) pushReturnFocus(); // #947
   shareViewSeq++;
+  // Batalkan Share item yang masih berjalan (issue #998): tanpa
+  // ini respons POST Share yang tiba belakangan menimpa manager
+  // yang baru saja sengaja dibuka pengguna.
+  shareItemSeq++;
   currentShareToken = '';
   document.getElementById('shareText').textContent =
     'Share links stay valid until they expire or are revoked.';
