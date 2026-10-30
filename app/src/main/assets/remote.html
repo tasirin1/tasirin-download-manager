@@ -1687,7 +1687,7 @@ if (!hasMore) {
 if (btn) btn.remove();
 return;
 }
-if (btn) return;
+if (btn) { fsList.appendChild(btn); return; }
 const b = document.createElement('button');
 b.id = 'fsLoadMoreBtn';
 b.type = 'button';
