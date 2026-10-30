@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): ekstensi audio .opus kini dikenali ikon & lencananya** -- `FILE_ICON_AUD` tak memuat `opus` sehingga berkas .opus tampil berikon klip kertas generik tanpa lencana di Downloads maupun Files; `opus` kini masuk daftar (satu daftar dipakai ikon unduhan, lencana jenis, dan ikon Files) (issue #766).
 - **fix(remote): favicon HentaiHaven kini tampil di kartu unduhan** -- Kelas CSS `.social-favicon.p-hentaihaven` sudah ada tetapi `socialFavicon()` tak punya cabang untuk host-nya sehingga unduhan HentaiHaven tampil polos; cabang `hentaihaven.xxx` kini ditambahkan (issue #765).
 - **fix(remote): petak ikon mode compact Downloads kini benar-benar 32x32 persegi** -- Aturan compact hanya menyetel `width`/`height` sehingga `flex-basis: 36px` dari aturan dasar menang dan ikon menjadi 36x32 pipih + baris sub geser 4px dari nama; kini `flex-basis: 32px` ikut disetel dan indent sub (40px) segaris lagi (issue #764).
 - **fix(remote): lencana jenis berkas tidak lagi hilang untuk nama berkas panjang** -- Lencana `.f-type` sebelumnya anak inline terakhir di dalam kotak nama yang ter-clamp 2 baris sehingga terpotong untuk nama panjang; teks nama kini dibungkus span `.name-txt` yang memikul clamp di dalam baris flex, lencana selalu tampil di sampingnya (rebuild + patch diselaraskan) (issue #763).
