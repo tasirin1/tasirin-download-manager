@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Tombol tonal gaya M3: terisi primary_container + teks primary (di style).
      Stroke 1dp primary di state normal/pressed agar tak menyatu dengan kartu
-     putih; fokus D-pad selalu aksen oranye 3dp (ala vault) agar tak tertukar
+     gelap; fokus D-pad selalu aksen oranye 3dp (ala vault) agar tak tertukar
      dengan biru primer saat navigasi remote TV. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
