@@ -7312,6 +7312,12 @@ let sseSilentReconnects = 0;
 // GAGAL (pollSnapshot catch). Hanya bukti ini yang boleh menghidupkan
 // lagi SSE yang give-up lewat snapshot sukses (issue #785).
 let sseOutageSeen = false;
+// Penghitung gagal KHUSUS pollSnapshot (issue #831): failCount umum
+// dibagi dengan refresh(), jadi syarat dua-gagal-berurutan #821 bisa
+// terpenuhi oleh satu gagal refresh + satu gagal poll — bukan bukti
+// putus polling. Yang ini hanya naik di catch pollSnapshot dan hanya
+// direset oleh suksesnya.
+let snapFailCount = 0;
 let lastForcedReconnectAt = 0;
 function connectEvents() {
   if (sse) { try { sse.close(); } catch (e) {} }
@@ -7398,6 +7404,7 @@ async function pollSnapshot() {
     if (mySeq <= snapApplied) return;
     snapApplied = mySeq;
     failCount = 0;
+    snapFailCount = 0;
     hasLoadedItems = true;
     statusLine.textContent = '';
     hideConnBanner();
@@ -7426,11 +7433,14 @@ async function pollSnapshot() {
     // Server tak terjangkau lewat polling juga: catat sebagai bukti
     // putus agar snapshot sukses berikutnya boleh menghidupkan SSE
     // yang give-up (issue #785). Bukti putus mensyaratkan DUA
-    // kegagalan BERURUTAN (issue #821): satu timeout/500 sesaat saat
-    // server sibuk bukanlah putus, dan menganggapnya putus membuka
-    // lagi siklus reconnect SSE yang hendak ditutup #785 — hanya
-    // berirama lebih lambat. failCount direset tiap snapshot sukses.
-    if (failCount >= 2) sseOutageSeen = true;
+    // kegagalan POLL BERURUTAN (issue #821): satu timeout/500 sesaat
+    // saat server sibuk bukanlah putus, dan menganggapnya putus
+    // membuka lagi siklus reconnect SSE yang hendak ditutup #785.
+    // Penghitungnya KHUSUS poll (issue #831): failCount umum dibagi
+    // dengan refresh(), jadi satu gagal refresh + satu gagal poll
+    // dulu ikut memenuhi syarat — bukan bukti putus polling.
+    snapFailCount++;
+    if (snapFailCount >= 2) sseOutageSeen = true;
     if (failCount > 2) {
       statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
     }

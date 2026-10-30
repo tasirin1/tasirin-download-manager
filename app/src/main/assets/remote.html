@@ -4572,6 +4572,7 @@ let lastSseAt = 0;
 let sseGaveUp = false;
 let sseSilentReconnects = 0;
 let sseOutageSeen = false;
+let snapFailCount = 0;
 let lastForcedReconnectAt = 0;
 function connectEvents() {
 if (sse) { try { sse.close(); } catch (e) {} }
@@ -4638,6 +4639,7 @@ const data = await res.json();
 if (mySeq <= snapApplied) return;
 snapApplied = mySeq;
 failCount = 0;
+snapFailCount = 0;
 hasLoadedItems = true;
 statusLine.textContent = '';
 hideConnBanner();
@@ -4657,7 +4659,8 @@ updateToolbar(items);
 }
 } catch (e) {
 failCount++;
-if (failCount >= 2) sseOutageSeen = true;
+snapFailCount++;
+if (snapFailCount >= 2) sseOutageSeen = true;
 if (failCount > 2) {
 statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
 }
