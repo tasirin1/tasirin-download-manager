@@ -62,7 +62,10 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.Collections
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 import java.net.HttpCookie
@@ -3153,6 +3156,34 @@ class DownloadEngine(appContext: Context) {
         return if (q.isNotEmpty()) "?$q" else ""
     }
 
+    /** Ambil banyak playlist sekaligus (issue #703): dulu kandidat
+     *  varian dan rendisi audio diambil satu per satu secara serial
+     *  sehingga master bervarian banyak membayar round-trip berurutan
+     *  sebelum byte pertama. Hasil dikembalikan sebagai Result
+     *  berurutan sesuai daftar URL; PEMILIHAN tetap dilakukan pemanggil
+     *  secara berurutan persis seperti dulu — yang berubah hanya waktu
+     *  tunggu (maksimum, bukan jumlah), bukan hasilnya. Pool kecil
+     *  dibatasi 4 dan selalu dimatikan; daftar 0-1 URL tanpa pool. */
+    private fun <T> fetchAllParallel(urls: List<String>, fetch: (String) -> T): List<Result<T>> {
+        if (urls.size <= 1) return urls.map { url -> runCatching { fetch(url) } }
+        val pool = Executors.newFixedThreadPool(minOf(4, urls.size))
+        try {
+            val futures = urls.map { url -> pool.submit(Callable { fetch(url) }) }
+            return futures.map { future ->
+                try {
+                    Result.success(future.get())
+                } catch (e: ExecutionException) {
+                    Result.failure(e.cause ?: e)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    Result.failure(e)
+                }
+            }
+        } finally {
+            pool.shutdown()
+        }
+    }
+
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
     private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = "", username: String = "", password: String = ""): HlsPlan? {
         // Segmen terenkripsi yang diunduh mentah = file sampah berstatus
@@ -3237,12 +3268,19 @@ class DownloadEngine(appContext: Context) {
         // varian berikut masih dicoba; bila semua gagal, alasan jelas
         // dilempar ulang (bukan "No HLS segments found" yang samar).
         var fatalError: IOException? = null
-        for (candidate in candidates) {
-            val videoSegs = try {
-                mediaSegmentsWithDurations(candidate.url, headers, baseUrl, username, password)
-            } catch (e: IOException) {
-                if (fatalError == null) fatalError = e
-                null
+        // Semua playlist kandidat diambil sekaligus (issue #703):
+        // evaluasi di bawah tetap berurutan persis seperti dulu (urutan
+        // prioritas, fatal pertama, kandidat pertama yang berhasil
+        // menang) — yang berubah hanya waktu tunggunya, bukan hasilnya.
+        val candidateResults = fetchAllParallel(candidates.map { it.url }) { url ->
+            mediaSegmentsWithDurations(url, headers, baseUrl, username, password)
+        }
+        for ((candidateIndex, candidate) in candidates.withIndex()) {
+            val videoSegs = candidateResults[candidateIndex].getOrElse { e ->
+                if (e is IOException) {
+                    if (fatalError == null) fatalError = e
+                    null
+                } else throw e
             }
             if (videoSegs == null) {
                 continue
@@ -3272,10 +3310,15 @@ class DownloadEngine(appContext: Context) {
                 }
                 var audioResult: List<String>? = null
                 var audioFatal: IOException? = null
-                for (rendition in ordered) {
-                    val segs = try {
-                        mediaSegments(rendition.url, headers, baseUrl, username, password)
-                    } catch (e: IOException) {
+                // Rendisi grup ini juga diambil sekaligus (issue #703);
+                // pemilihan tetap yang pertama berhasil menurut urutan
+                // prioritas di atas.
+                val renditionResults = fetchAllParallel(ordered.map { it.url }) { url ->
+                    mediaSegments(url, headers, baseUrl, username, password)
+                }
+                for ((renditionIndex, _) in ordered.withIndex()) {
+                    val segs = renditionResults[renditionIndex].getOrElse { e ->
+                        if (e !is IOException) throw e
                         // Alasan fatal tak ditelan buta (issue #553):
                         // gerbang yang sama yang melempar untuk video
                         // (terenkripsi/live/byterange/MAP) dulu tertelan
@@ -3284,8 +3327,9 @@ class DownloadEngine(appContext: Context) {
                         // COMPLETED tanpa pesan. Catat bila tak ada
                         // rendition yang berhasil; kandidat digugurkan dan
                         // alasannya dilempar sesudah loop kandidat (issue
-                        // #565), sejajar fatalError jalur video; kegagalan jaringan/
-                        // 404 per-rendition tetap degradasi seperti dulu.
+                        // #565), sejajar fatalError jalur video; kegagalan
+                        // jaringan/404 per-rendition tetap degradasi
+                        // seperti dulu.
                         if (audioFatal == null &&
                             e.message?.contains("not supported") == true
                         ) {
