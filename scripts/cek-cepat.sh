@@ -66,9 +66,12 @@ fi
 # 5. fmtDate wajib TEPAT SATU definisi di remote.src.html (issue #725):
 # nol definisi sama mematikannya dengan ganda (hoisting menimpa), dan
 # jumlah dihitung per KEMUNCULAN (grep -o), bukan per baris — dua
-# definisi sebaris dulu terbaca n=1 oleh grep -c.
+# definisi sebaris dulu terbaca n=1 oleh grep -c. `|| true` WAJIB
+# (issue #730): grep tanpa hasil keluar 1, dan di bawah set -euo
+# pipefail status itu membunuh assignment sebelum baris GAGAL di
+# bawah tercetak — gerbang gagal dalam diam persis pada kasus nol.
 if [ -f remote.src.html ]; then
-  n=$(grep -o -E 'function[[:space:]]+fmtDate|fmtDate[[:space:]]*=[[:space:]]*function|(const|let)[[:space:]]+fmtDate[[:space:]]*=' remote.src.html | wc -l)
+  n=$(grep -o -E 'function[[:space:]]+fmtDate|fmtDate[[:space:]]*=[[:space:]]*function|(const|let)[[:space:]]+fmtDate[[:space:]]*=' remote.src.html | wc -l || true)
   if [ "${n:-0}" -ne 1 ]; then echo "GAGAL: fmtDate terdefinisi $n kali di remote.src.html (wajib tepat 1)"; gagal=1; fi
 fi
 exit $gagal
