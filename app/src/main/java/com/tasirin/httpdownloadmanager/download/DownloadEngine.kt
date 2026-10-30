@@ -2700,6 +2700,20 @@ class DownloadEngine(appContext: Context) {
             val code = conn.responseCode
             if (code !in 200..299) return false
             val total = contentLength(conn)
+            // Anggaran byte sadar ruang kosong (issue #702): plafon
+            // lama 512MB mentah menolak video adaptif panjang yang sah
+            // padahal ruang sehat. Batas kini mengikuti ruang bebas
+            // volume target dikurangi cadangan MIN_FREE_BYTES, dan
+            // Content-Length yang dikenal dicek di muka dengan pesan
+            // ruang yang jelas — bukan lagi "too large" yang keliru.
+            val freeAtStart = target.absoluteFile.parentFile?.usableSpace ?: Long.MAX_VALUE
+            if (total > 0 && total > freeAtStart - MIN_FREE_BYTES) {
+                throw IOException(
+                    "Not enough storage for adaptive file: need " +
+                        "${Formats.bytes(total)}, available ${Formats.bytes(freeAtStart)}"
+                )
+            }
+            val byteCap = (freeAtStart - MIN_FREE_BYTES).coerceAtLeast(0)
             BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
                 val input = conn.inputStream
                 try {
@@ -2729,8 +2743,8 @@ class DownloadEngine(appContext: Context) {
                         }
                         zeroStreak = 0
                         bytes += read
-                        if (bytes > HLS_SEGMENT_MAX_BYTES * 8L) {
-                            throw IOException("adaptive file too large")
+                        if (bytes > byteCap) {
+                            throw IOException("adaptive file exceeds available storage")
                         }
                         out.write(buffer, 0, read)
                         throttle.sleepIfNeeded { progress.downloaded + bytes }
