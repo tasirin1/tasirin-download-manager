@@ -1918,6 +1918,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 zipCache.entries.removeIf {
                     it.key == key && it.value.second == tmp
                 }
+                // Entri rusak terbuang = memo cap ikut (issue #990).
+                zipStampMemo.clear()
                 return@repeat
             }
             val total = runCatching { input.channel.size() }.getOrDefault(-1L)
@@ -1926,6 +1928,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 zipCache.entries.removeIf {
                     it.key == key && it.value.second == tmp
                 }
+                // Entri rusak terbuang = memo cap ikut (issue #990).
+                zipStampMemo.clear()
                 runCatching { tmp.delete() }
                 return null
             }
@@ -2031,6 +2035,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 }
                 zipCache.remove(key)
                 runCatching { file.delete() }
+                // Entri terbuang = memo cap ikut dibuang (issue #990),
+                // sejajar corong invalidasi #974/#986.
+                zipStampMemo.clear()
             }
             // Tandai sedang-dibuat (issue #885): retainAll hitungan di
             // mediaZip mempertahankan kunci yang entrinya belum sempat
@@ -2067,11 +2074,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // dalam predikat, sebelum remove iteratornya sendiri
             // berjalan, sehingga entri yang diganti zipCached di sela
             // itu bisa ikut jatuh dan berkas barunya yatim (issue #683).
+            var removedAny = false
             val expiredEntries = zipCache.entries.filter { (_, value) ->
                 now - value.first >= ZIP_CACHE_TTL_MS
             }
             expiredEntries.forEach { (key, value) ->
                 if (zipCache.remove(key, value)) {
+                    removedAny = true
                     runCatching { value.second.delete() }
                 }
             }
@@ -2083,10 +2092,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (zipCache.size <= ZIP_CACHE_MAX && totalBytes <= ZIP_CACHE_MAX_BYTES) break
                 if (entry.key == keepKey && zipCache.size == 1) continue
                 if (!zipCache.remove(entry.key, entry.value)) continue
+                removedAny = true
                 val file = entry.value.second
                 runCatching { file.delete() }
                 totalBytes -= entry.value.third
             }
+            // Prune yang benar-benar membuang entri ikut membuang
+            // memo cap (issue #990); prune tanpa buangan tak menyentuh
+            // memo agar hemat cap #970 tak terkikis percuma.
+            if (removedAny) zipStampMemo.clear()
         }
     }
 

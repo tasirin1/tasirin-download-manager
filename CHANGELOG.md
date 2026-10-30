@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): jalur eviction zipCache kini ikut membuang memo cap** -- kedaluwarsa TTL di zipCached, prune (kedaluwarsa + ukuran/jumlah, hanya bila benar-benar ada entri terbuang), dan pembuangan entri rusak di openZipStream sebelumnya melepas entri tanpa menyentuh memo cap, menyisakan jendela salah-label sempit bila perubahan eksternal jatuh di jendela memo yang sama. Kelas #974 kini tertutup di semua jalur pelepasan entri (issue #990).
+
 - **fix(download): tutup sisa celah balapan wake lock — field volatile + cek destroyed tepat sebelum acquire** -- cek di pintu updateWakeLock dan acquire tidak atomik, jadi kolektor yang ter-preempt di sela-selanya masih bisa meng-acquire lock sesudah onDestroy tuntas. Kini field wakeLock @Volatile dan destroyed diperiksa sekali lagi tepat sebelum acquire (issue #989).
 
 - **fix(download): veto 'connection refused' didahulukan di isNetworkError** -- pesan refused sungguhan di Android berbentuk komposit yang memuat frasa positif 'failed to connect' ('... ECONNREFUSED (Connection refused)'), sehingga tanpa veto yang diperiksa sebelum pencocokan positif apa pun, niat #976 kalah dan server mati permanen tetap berakhir PAUSED abadi. Kini pesan bermuatan refused tidak pernah terklasifikasi error jaringan di sini (issue #988).
