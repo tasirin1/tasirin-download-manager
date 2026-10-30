@@ -13,7 +13,7 @@
     <string-array name="about_rows">
         <item>Developer: Julius Rudi Tasirin</item>
         <item>Purpose: fast downloads and complete remote device control</item>
-        <item>Platform: Android phones, TV boxes &amp; STBs (Android 5+)</item>
+        <item>Platform: Android phones, TV boxes &amp; STBs (Android 6+)</item>
         <item>Remote web: manage downloads, files and videos from a browser</item>
         <item>Security: PIN protection, signed updates and local-first access</item>
         <item>Performance: lightweight build optimized for low-memory devices</item>
