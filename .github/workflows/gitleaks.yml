@@ -3,7 +3,19 @@ name: Gitleaks (deteksi secret)
 on:
   push:
     branches: ["main"]
+    # Push/PR docs-only tidak bisa memuat secret baru di kode — pola
+    # paths-ignore yang sama seperti build.yml (issue #701).
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "docs/**"
+      - ".gitignore"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "docs/**"
+      - ".gitignore"
   workflow_dispatch:
 
 permissions:
