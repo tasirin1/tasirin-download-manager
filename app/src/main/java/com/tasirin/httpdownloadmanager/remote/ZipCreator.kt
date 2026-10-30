@@ -133,15 +133,20 @@ object ZipCreator {
 
     /** ZIP daftar token media (dipakai /api/media_zip: unduh banyak foto/video,
      *  file, atau folder filesystem secara rekursif). */
+    // Mengembalikan jumlah token yang sungguh menyumbang entri
+    // (issue #864): keputusan lewati di dalam sini (token rusak, tak
+    // diizinkan, gagal buka #857, budget habis) sebelumnya hilang
+    // tanpa jejak sehingga pemanggil tak bisa melaporkan yang gugur.
     fun zipTokens(
         zos: ZipOutputStream,
         tokens: List<String>,
         context: Context,
         isFileAllowed: (String) -> Boolean,
         isUriAllowed: (android.net.Uri) -> Boolean = { false }
-    ) {
+    ): Int {
         val used = mutableMapOf<String, Int>()
         val budget = ZipBudget()
+        var contributed = 0
         tokens.forEach { token ->
             if (budget.count >= MAX_ZIP_ENTRIES) return
             val raw = MediaLibrary.decodeToken(token) ?: return@forEach
@@ -186,6 +191,7 @@ object ZipCreator {
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
                         ).forEach { child -> if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
                             zipFile(zos, child, root, depth = 1, seen = dirSeen, isFileAllowed = isFileAllowed, budget = budget, usedNames = dirUsed) }
+                        contributed++
                         return@runCatching
                     }
                     // canon + izin sudah diverifikasi di atas untuk File yang
@@ -228,9 +234,11 @@ object ZipCreator {
                 } finally {
                     runCatching { zos.closeEntry() }
                 }
+                contributed++
             }
             outcome.exceptionOrNull()?.let { if (it is IOException) throw it }
         }
+        return contributed
     }
 
     private fun displayNameFor(context: Context, uri: android.net.Uri): String = runCatching {

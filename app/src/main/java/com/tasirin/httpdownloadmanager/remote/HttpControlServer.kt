@@ -1859,6 +1859,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Nilai = Triple(createdAt, file, size): ukuran disimpan saat insert agar
     // prune tak perlu file.length() (stat syscall) per entri per pembuatan ZIP.
     private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Triple<Long, File, Long>>()
+    // Jumlah token tertulis per kunci cache ZIP (issue #864): cache hit
+    // tidak menjalankan pembuatnya, jadi hitungan aktual disimpan di sini.
+    private val zipWrittenCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
     private val zipLocks = Array(8) { Any() }
     private val zipEvictionLock = Any()
 
@@ -2043,25 +2046,35 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val tokens = (requestedTokens.filter(::isMediaTokenAllowed) + pathTokens).distinct()
         if (tokens.isEmpty()) return notFound()
         val key = "tokens:" + tokens.sorted().joinToString(",")
+        var freshWritten = -1
         val (input, total) = openZipStream(key) {
             createTempZip { zos ->
-                ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
+                freshWritten = ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
             }
         } ?: return notFound()
-        appendLog("ZIP MEDIA: ${tokens.size} file (${Formats.bytes(total)})")
+        // Jumlah token yang sungguh tertulis (issue #864): pada pembuatan
+        // segar nilainya dari zipTokens barusan; pada cache hit nilainya
+        // disimpan di peta pendamping berkunci cache yang sama. Tanpa
+        // keduanya (tak seharusnya terjadi) jatuh ke jumlah yang diminta.
+        if (freshWritten >= 0) {
+            if (zipWrittenCounts.size > 256) zipWrittenCounts.clear()
+            zipWrittenCounts[key] = freshWritten
+        }
+        val written = zipWrittenCounts[key] ?: tokens.size
+        appendLog("ZIP MEDIA: $written file (${Formats.bytes(total)})")
         val response = streamMedia(
-            name = "gallery-${tokens.size}-files.zip",
+            name = "gallery-$written-files.zip",
             mime = "application/zip",
             input = input,
             total = total,
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
         )
-        // Path pilihan yang gugur validasi (hilang/tak diizinkan) tidak
-        // boleh hilang diam-diam: klien menampilkannya dari header ini
-        // (issue #849).
-        val skippedPaths = paths.size - pathTokens.size
-        if (skippedPaths > 0) response.addHeader("X-Zip-Skipped", skippedPaths.toString())
+        // Pilihan yang gugur — path pra-tokenisasi (#849) maupun token
+        // yang gugur di dalam zipTokens (#864) — tidak boleh hilang
+        // diam-diam: klien menampilkannya dari header ini.
+        val skippedTotal = (paths.size - pathTokens.size) + (tokens.size - written)
+        if (skippedTotal > 0) response.addHeader("X-Zip-Skipped", skippedTotal.toString())
         return response
     }
 
