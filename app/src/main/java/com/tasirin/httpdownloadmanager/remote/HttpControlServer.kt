@@ -1859,9 +1859,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Nilai = Triple(createdAt, file, size): ukuran disimpan saat insert agar
     // prune tak perlu file.length() (stat syscall) per entri per pembuatan ZIP.
     private val zipCache = java.util.concurrent.ConcurrentHashMap<String, Triple<Long, File, Long>>()
-    // Jumlah token tertulis per kunci cache ZIP (issue #864): cache hit
-    // tidak menjalankan pembuatnya, jadi hitungan aktual disimpan di sini.
-    private val zipWrittenCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    // Pasangan (entri tertulis, item terlewat) per kunci cache ZIP
+    // (issue #864/#874): cache hit tidak menjalankan pembuatnya, jadi
+    // hitungan aktual disimpan di sini.
+    private val zipWrittenCounts = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Int>>()
     private val zipLocks = Array(8) { Any() }
     private val zipEvictionLock = Any()
 
@@ -2046,21 +2047,25 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val tokens = (requestedTokens.filter(::isMediaTokenAllowed) + pathTokens).distinct()
         if (tokens.isEmpty()) return notFound()
         val key = "tokens:" + tokens.sorted().joinToString(",")
-        var freshWritten = -1
+        var freshResult: ZipCreator.ZipTokensResult? = null
         val (input, total) = openZipStream(key) {
             createTempZip { zos ->
-                freshWritten = ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
+                freshResult = ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
             }
         } ?: return notFound()
-        // Jumlah token yang sungguh tertulis (issue #864): pada pembuatan
-        // segar nilainya dari zipTokens barusan; pada cache hit nilainya
-        // disimpan di peta pendamping berkunci cache yang sama. Tanpa
-        // keduanya (tak seharusnya terjadi) jatuh ke jumlah yang diminta.
-        if (freshWritten >= 0) {
+        // Hitungan aktual arsip (issue #864, diperdalam #874): entri
+        // yang sungguh tertulis + item terlewat sampai granularitas
+        // anak folder. Pada pembuatan segar nilainya dari zipTokens
+        // barusan; pada cache hit nilainya disimpan di peta pendamping
+        // berkunci cache yang sama. Tanpa keduanya (tak seharusnya
+        // terjadi) jatuh ke perkiraan dari jumlah token yang diminta.
+        freshResult?.let { r ->
             if (zipWrittenCounts.size > 256) zipWrittenCounts.clear()
-            zipWrittenCounts[key] = freshWritten
+            zipWrittenCounts[key] = r.entriesWritten to r.skippedItems
         }
-        val written = zipWrittenCounts[key] ?: tokens.size
+        val counts = zipWrittenCounts[key]
+        val written = counts?.first ?: tokens.size
+        val skippedInZip = counts?.second ?: (tokens.size - written)
         appendLog("ZIP MEDIA: $written file (${Formats.bytes(total)})")
         val response = streamMedia(
             name = "gallery-$written-files.zip",
@@ -2070,10 +2075,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
         )
-        // Pilihan yang gugur — path pra-tokenisasi (#849) maupun token
-        // yang gugur di dalam zipTokens (#864) — tidak boleh hilang
-        // diam-diam: klien menampilkannya dari header ini.
-        val skippedTotal = (paths.size - pathTokens.size) + (tokens.size - written)
+        // Pilihan yang gugur — path pra-tokenisasi (#849) maupun item
+        // yang gugur di dalam zipTokens (#864/#874) — tidak boleh
+        // hilang diam-diam: klien menampilkannya dari header ini.
+        val skippedTotal = (paths.size - pathTokens.size) + skippedInZip
         if (skippedTotal > 0) response.addHeader("X-Zip-Skipped", skippedTotal.toString())
         return response
     }

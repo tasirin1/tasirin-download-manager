@@ -24,6 +24,11 @@ object ZipCreator {
      *  thread HTTP ber menit-menit / OOM bila tak dibatasi. */
     const val MAX_ZIP_ENTRIES = 5000
 
+    /** Hasil zipTokens: entri yang sungguh tertulis + item terlewat
+     *  (token yang tak menyumbang apa pun dan berkas yang terlewat di
+     *  dalam folder token), untuk pelaporan jujur pemanggil (#874). */
+    data class ZipTokensResult(val entriesWritten: Int, val skippedItems: Int)
+
     /** Akumulator jumlah entri yang sudah ditulis (diteruskan saat rekursi). */
     class ZipBudget(var count: Int = 0) {
         fun tryTake(): Boolean {
@@ -64,6 +69,11 @@ object ZipCreator {
     }
 
     // isFileAllowed wajib terakhir agar trailing lambda tetap jalan.
+    // Mengembalikan (entri tertulis, berkas terlewat) agar pemanggil
+    // bisa melaporkan isi arsip dengan jujur sampai granularitas anak
+    // folder (issue #874). Penolakan penjaga (izin/kedalaman/siklus/
+    // budget) adalah keputusan traversal, bukan 'terlewat', dan tidak
+    // dihitung di sisi mana pun.
     fun zipFile(
         zos: ZipOutputStream,
         file: File,
@@ -73,29 +83,29 @@ object ZipCreator {
         budget: ZipBudget = ZipBudget(),
         usedNames: MutableMap<String, Int> = mutableMapOf(),
         isFileAllowed: (String) -> Boolean
-    ) {
+    ): Pair<Int, Int> {
         // Izin dicek terhadap canonical path: symlink file di dalam root
         // yang menunjuk ke luar root lolos bila hanya absolutePath (lokasi
         // link) yang diperiksa, lalu inputStream() membaca target luar.
         val canonicalForAllow = runCatching { file.canonicalPath }.getOrNull()
-        if (canonicalForAllow == null || !isFileAllowed(canonicalForAllow)) return
+        if (canonicalForAllow == null || !isFileAllowed(canonicalForAllow)) return 0 to 0
         // Symlink melingkar (folder menunjuk leluhurnya) membuat rekursi tak
         // berujung -> StackOverflow; hentikan via canonical + batas kedalaman.
         // Pakai ulang canonical di atas: resolusi kedua untuk File yang sama
         // hanya mengulang syscall tanpa informasi baru.
-        if (depth > MAX_ZIP_DEPTH) return
+        if (depth > MAX_ZIP_DEPTH) return 0 to 0
         if (file.isDirectory) {
-            if (!seen.add(canonicalForAllow)) return
+            if (!seen.add(canonicalForAllow)) return 0 to 0
         }
         // Dedupe seperti zipTokens/zipMedia: dua nama yang ternormalisasi
         // sama (kontrol C0 -> '_') membuat ZipException duplikat — cabang
         // file menelan diam-diam, cabang direktori menggugurkan seluruh ZIP.
         val entryPath = uniqueZipName(
             safeEntryPath(if (prefix.isEmpty()) file.name else "$prefix/${file.name}")
-                .ifEmpty { return },
+                .ifEmpty { return 0 to 0 },
             usedNames
         )
-        if (!budget.tryTake()) return
+        if (!budget.tryTake()) return 0 to 0
         if (file.isDirectory) {
             // listFiles null = galat I/O, BUKAN folder kosong: menyamakan
             // keduanya mencatat folder berisi sebagai entri kosong
@@ -108,19 +118,24 @@ object ZipCreator {
             if (children.isEmpty()) {
                 zos.putNextEntry(ZipEntry("$entryPath/"))
                 zos.closeEntry()
-                return
+                return 1 to 0
             }
+            var written = 0
+            var skipped = 0
             children.sortedWith(
                 Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
             ).forEach { child ->
                 if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
-                zipFile(zos, child, entryPath, depth + 1, seen, budget, usedNames, isFileAllowed)
+                val (w, s) = zipFile(zos, child, entryPath, depth + 1, seen, budget, usedNames, isFileAllowed)
+                written += w
+                skipped += s
             }
+            return written to skipped
         } else if (file.isFile) {
             // Gagal MEMBUKA sumber = berkas terlewat (issue #866, selaras
             // #857 untuk token flat): berkas yang hilang di antara
             // listing dan buka tak boleh membunuh seluruh ZIP folder.
-            val input = runCatching { file.inputStream() }.getOrNull() ?: return
+            val input = runCatching { file.inputStream() }.getOrNull() ?: return 0 to 1
             // Kegagalan MENYALIN di tengah tetap TIDAK ditelan (issue
             // #846): entri tanpa ukuran/CRC di muka memakai data
             // descriptor, jadi salinan yang putus di tengah akan
@@ -133,28 +148,38 @@ object ZipCreator {
             } finally {
                 runCatching { zos.closeEntry() }
             }
+            return 1 to 0
         }
+        // Bukan berkas maupun folder lagi (hilang di antara listing
+        // dan gilirannya): terlewat, bukan fatal.
+        return 0 to 1
     }
 
     /** ZIP daftar token media (dipakai /api/media_zip: unduh banyak foto/video,
      *  file, atau folder filesystem secara rekursif). */
-    // Mengembalikan jumlah token yang sungguh menyumbang entri
-    // (issue #864): keputusan lewati di dalam sini (token rusak, tak
-    // diizinkan, gagal buka #857, budget habis) sebelumnya hilang
-    // tanpa jejak sehingga pemanggil tak bisa melaporkan yang gugur.
+    // Mengembalikan hitungan entri tertulis + item terlewat
+    // (issue #864, diperdalam #874): keputusan lewati di dalam sini
+    // (token rusak, tak diizinkan, gagal buka #857, budget habis,
+    // berkas terlewat di dalam folder) sebelumnya hilang tanpa jejak
+    // sehingga pemanggil tak bisa melaporkan yang gugur.
     fun zipTokens(
         zos: ZipOutputStream,
         tokens: List<String>,
         context: Context,
         isFileAllowed: (String) -> Boolean,
         isUriAllowed: (android.net.Uri) -> Boolean = { false }
-    ): Int {
+    ): ZipTokensResult {
         val used = mutableMapOf<String, Int>()
         val budget = ZipBudget()
-        var contributed = 0
+        var entriesWritten = 0
+        var skippedItems = 0
         tokens.forEach { token ->
-            if (budget.count >= MAX_ZIP_ENTRIES) return contributed
-            val raw = MediaLibrary.decodeToken(token) ?: return@forEach
+            if (budget.count >= MAX_ZIP_ENTRIES) return ZipTokensResult(entriesWritten, skippedItems)
+            val raw = MediaLibrary.decodeToken(token)
+            if (raw == null) {
+                skippedItems++
+                return@forEach
+            }
             // Galat I/O di dalam blok (baca sumber putus, listFiles gagal)
             // TIDAK ditelan runCatching ini: ia dilempar ulang sesudah
             // blok agar seluruh ZIP gagal secara terbuka (issue #846).
@@ -166,7 +191,10 @@ object ZipCreator {
                 if (raw.startsWith("f:")) {
                     val f = File(raw.removePrefix("f:"))
                     val canon = runCatching { f.canonicalPath }.getOrNull()
-                    if (canon == null || !isFileAllowed(canon)) return@forEach
+                    if (canon == null || !isFileAllowed(canon)) {
+                        skippedItems++
+                        return@forEach
+                    }
                     if (f.isDirectory) {
                         // Nama folder mentah tak boleh jadi prefix entri: folder
                         // bernama ".."/backslash/karakter kontrol lolos sebagai
@@ -192,11 +220,19 @@ object ZipCreator {
                         // tersalin lagi satu tingkat (issue #454).
                         val dirSeen = mutableSetOf(canon)
                         val dirUsed = mutableMapOf<String, Int>()
+                        var dirWritten = 0
                         children.sortedWith(
                             Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
                         ).forEach { child -> if (budget.count >= MAX_ZIP_ENTRIES) return@forEach
-                            zipFile(zos, child, root, depth = 1, seen = dirSeen, isFileAllowed = isFileAllowed, budget = budget, usedNames = dirUsed) }
-                        contributed++
+                            val (w, s) = zipFile(zos, child, root, depth = 1, seen = dirSeen, isFileAllowed = isFileAllowed, budget = budget, usedNames = dirUsed)
+                            dirWritten += w
+                            skippedItems += s
+                        }
+                        entriesWritten += dirWritten
+                        // Folder yang tak menulis satu entri pun (kosong
+                        // atau seluruh anaknya gugur) adalah item
+                        // terlewat, bukan kontributor (issue #873).
+                        if (dirWritten == 0) skippedItems++
                         return@runCatching
                     }
                     // canon + izin sudah diverifikasi di atas untuk File yang
@@ -210,15 +246,22 @@ object ZipCreator {
                         runCatching { f.inputStream() }.getOrNull()
                     } else null
                 } else {
-                    if (!raw.startsWith("u:")) return@forEach
+                    if (!raw.startsWith("u:")) {
+                        skippedItems++
+                        return@forEach
+                    }
                     val uri = raw.removePrefix("u:").toUri()
-                    if (!isUriAllowed(uri)) return@forEach
+                    if (!isUriAllowed(uri)) {
+                        skippedItems++
+                        return@forEach
+                    }
                     name = displayNameFor(context, uri)
                     input = runCatching {
                         context.contentResolver.openInputStream(uri)
                     }.getOrNull()
                 }
                 if (input == null) {
+                    skippedItems++
                     return@runCatching
                 }
                 // Konsumsi budget juga di jalur file tunggal: tanpa ini guard
@@ -228,6 +271,7 @@ object ZipCreator {
                 // return polos membocorkan satu FD per token sisa.
                 if (!budget.tryTake()) {
                     runCatching { input.close() }
+                    skippedItems++
                     return@forEach
                 }
                 val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
@@ -239,11 +283,11 @@ object ZipCreator {
                 } finally {
                     runCatching { zos.closeEntry() }
                 }
-                contributed++
+                entriesWritten++
             }
             outcome.exceptionOrNull()?.let { if (it is IOException) throw it }
         }
-        return contributed
+        return ZipTokensResult(entriesWritten, skippedItems)
     }
 
     private fun displayNameFor(context: Context, uri: android.net.Uri): String = runCatching {
