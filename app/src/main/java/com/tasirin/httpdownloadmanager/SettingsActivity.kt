@@ -1050,11 +1050,15 @@ class SettingsActivity : AppCompatActivity() {
             ) {
                 StoragePrefs.setServerBackgroundEnabled(this, false)
                 StoragePrefs.setServerAutoStartEnabled(this, false)
-                lifecycleScope.launch {
-                    withContext(Dispatchers.IO) { App.stopHttpServer() }
-                    stopServiceIfIdle()
-                    renderServer()
-                }
+                // Inline, bukan coroutine lepas (issue #801): launch
+                // fire-and-forget bisa batal sebelum jalan bila activity
+                // dihancurkan tepat sesudah Simpan — server tetap hidup
+                // padahal PIN diwajibkan tanpa PIN dan pref sudah
+                // terlanjur dimatikan. Pola handler hapus PIN di berkas
+                // ini: tunggu stop di dalam saveSettings sendiri.
+                // renderServer() dipanggil pemanggil sesudah blok ini.
+                withContext(Dispatchers.IO) { App.stopHttpServer() }
+                stopServiceIfIdle()
             }
             val newPort = requestedPort
             if (!portInvalid && newPort != null) {
@@ -1062,7 +1066,10 @@ class SettingsActivity : AppCompatActivity() {
                 StoragePrefs.setServerPort(this, newPort)
                 if (newPort != oldPort) {
                     App.logEvent("PORT CHANGED: $oldPort -> $newPort")
-                    lifecycleScope.launch(Dispatchers.IO) {
+                    // Inline seperti cabang PIN di atas (issue #801):
+                    // restart tak boleh hilang karena coroutine lepas
+                    // keburu batal — pref port sudah berubah.
+                    withContext(Dispatchers.IO) {
                         App.restartHttpServer(applicationContext)
                     }
                 }
