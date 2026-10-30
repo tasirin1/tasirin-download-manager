@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): lipatan dangkal cap ZIP menjangkau satu tingkat di bawah direktori terantre** -- sesudah plafon jalan kaki, perubahan di bawah direktori yang belum dibuka sebelumnya tak terlihat oleh cap sama sekali (mtime direktori terantre tak bergerak untuk perubahan di cucunya). Kini anak langsung direktori terantre ikut dilipat dalam anggaran terbatas yang sama, sehingga tambah/hapus/ubah berkas satu tingkat di bawahnya ikut menggerakkan cap (issue #981).
+
 - **fix(remote): cap folder ZIP kini deterministik — anak terurut dan cap dari path kanonik** -- jalan kaki cap sebelumnya mengiterasi listFiles() tanpa urutan (lipatan hash peka-urutan, jadi cap folder diam bisa berdenyut antarpermintaan dan menentukan direktori terantre secara acak di ambang plafon), dan di fsZip cap dihitung dari ejaan path mentah klien walau kunci memo memakai ejaan kanonik. Kini anak diurutkan seperti pembuat ZIP dan cap dihitung dari File kanonik yang sama dengan kuncinya (issue #980).
 
 - **test(remote): zipFsSourceStamp dipindah ke ZipCreator dan diuji perilaku capnya** -- logika jalan kaki cap (urutan lipat, plafon, lipatan dangkal) sebelumnya tertanam private di kelas server ber-Context padahal hanya bergantung java.io.File. Kini internal di ZipCreator dengan uji folder sementara: format cap berkas tunggal, folder kosong, determinisme pada pohon diam, dan deteksi perubahan isi/tambah/ganti-nama (issue #979).

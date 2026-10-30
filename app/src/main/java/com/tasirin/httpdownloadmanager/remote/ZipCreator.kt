@@ -423,12 +423,32 @@ object ZipCreator {
             // Subpohon yang tak sempat dibuka tetap dilipat dangkal
             // (issue #972): path+ukuran+mtime direktori yang masih
             // terantre menangkap perubahan struktural di sana tanpa
-            // biaya membukanya satu per satu.
+            // biaya membukanya satu per satu. Anak langsung direktori
+            // terantre ikut dilipat (issue #981, terbatas anggaran
+            // yang sama) agar perubahan satu tingkat di bawahnya —
+            // tambah/hapus berkas di sana — ikut menggerakkan cap;
+            // perubahan isi berkas yang sudah ada di kedalaman itu
+            // tetap di luar jangkauan cap dangkal.
+            var shallowBudget = ZIP_STAMP_MAX_ENTRIES
             while (stack.isNotEmpty()) {
                 val queued = stack.removeLast()
                 hash = zipStampFold(hash, queued.absolutePath)
                 hash = zipStampFold(hash, queued.length().toString())
                 hash = zipStampFold(hash, queued.lastModified().toString())
+                if (shallowBudget > 0) {
+                    val kids = queued.listFiles()?.sortedWith(
+                        Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
+                    )
+                    if (kids != null) {
+                        for (kid in kids) {
+                            if (shallowBudget <= 0) break
+                            shallowBudget--
+                            hash = zipStampFold(hash, kid.absolutePath)
+                            hash = zipStampFold(hash, kid.length().toString())
+                            hash = zipStampFold(hash, kid.lastModified().toString())
+                        }
+                    }
+                }
             }
         }
         return "d" + count + ":" + hash + ":" + (if (truncated) "t" else "c") +
