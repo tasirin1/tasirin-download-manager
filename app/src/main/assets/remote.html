@@ -1772,7 +1772,8 @@ loadFs();
 });
 document.getElementById('fsBatchDelete').addEventListener('click', function () {
 if (!fsSelected.size) return;
-showConfirm('Delete ' + fsSelected.size + ' item(s)?', 'The folder will be deleted along with its contents.', 'Delete', function () {
+const fsBatchHasDir = Array.from(fsSelected).some(function (x) { return x.kind === 'dir'; });
+showConfirm('Delete ' + fsSelected.size + ' item(s)?', fsBatchHasDir ? 'Folders will be deleted along with their contents.' : 'The selected items will be deleted from the device.', 'Delete', function () {
 (async function () {
 const items = Array.from(fsSelected);
 const res = await runFsActions('Deleting', 'deleted', items, function (it) {
@@ -2100,7 +2101,8 @@ openMedia(base, media, playlist.length ? playlist : [base]);
 async function doFsOp(it, op) {
 if (op === 'delete') {
 showConfirm('Delete ' + (it.kind === 'dir' ? 'folder' : 'file') + '?',
-'Delete \"' + it.name + '\" from the device? The folder will be deleted along with its contents.',
+'Delete \"' + it.name + '\" from the device?' +
+(it.kind === 'dir' ? ' The folder will be deleted along with its contents.' : ''),
 'Delete',
 function () {
 runFsActions('Deleting', 'deleted', [it], function (x) {
