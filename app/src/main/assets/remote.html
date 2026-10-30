@@ -4648,7 +4648,7 @@ sseGaveUp = false;
 sseSilentReconnects = 0;
 sseOutageSeen = false;
 connectEvents();
-} else if (!sseGaveUp && sse) {
+} else if (!sseGaveUp && sse && sse.readyState === EventSource.OPEN) {
 sseOutageSeen = false;
 }
 if (data.status) applyServerStatus(data.status);

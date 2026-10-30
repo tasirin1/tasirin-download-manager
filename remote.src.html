@@ -7419,13 +7419,17 @@ async function pollSnapshot() {
       sseSilentReconnects = 0;
       sseOutageSeen = false;
       connectEvents();
-    } else if (!sseGaveUp && sse) {
+    } else if (!sseGaveUp && sse && sse.readyState === EventSource.OPEN) {
       // Bukti putus yang tak terpakai pada snapshot sukses saat SSE
       // sehat dibuang (issue #838): tanpa ini, dua gagal poll sesaat
       // mengunci bukti selamanya, dan berjam-jam kemudian bukti basi
       // itu menghidupkan SSE yang give-up karena diam — persis yang
       // hendak dicegah #785. Bukti yang segar (SSE memang sedang
-      // give-up) tidak disentuh cabang ini.
+      // give-up) tidak disentuh cabang ini. "Sehat" di sini berarti
+      // readyState OPEN (issue #842, definisi pollTick sendiri):
+      // EventSource CONNECTING/CLOSED yang belum dideklarasikan
+      // give-up BUKAN sehat — bukti segarnya harus bertahan sampai
+      // deklarasi give-up agar revive bisa mengonsumsinya.
       sseOutageSeen = false;
     }
     if (data.status) applyServerStatus(data.status);
