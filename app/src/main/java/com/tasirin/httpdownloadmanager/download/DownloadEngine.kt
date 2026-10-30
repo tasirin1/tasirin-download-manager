@@ -168,8 +168,11 @@ class DownloadEngine(appContext: Context) {
     private var saveJob: Job? = null
     private var progressSaveJob: Job? = null
     private var lastProgressSaveAt = 0L
-    // URL yang pernah gagal di sesi ini: cadangan yang sama tidak dicoba
-    // berulang-ulang (hemat waktu saat ISP/proxy menolak beberapa host).
+    // URL yang pernah gagal di sesi ini, PER ITEM (issue #953): cadangan
+    // yang sama tidak dicoba berulang-ulang oleh item yang sama (hemat
+    // waktu saat ISP/proxy menolak beberapa host), tetapi kegagalan
+    // transien satu item tidak boleh membuang mirror item lain yang
+    // berbagi URL cermin yang sama — kunci entri adalah id item + URL.
     // LinkedHashMap(accessOrder=true) = LRU otomatis — akses terakhir dipindah
     // ke akhir, sehingga eviction selalu membuang entry paling tua.
     // Dipakai dari multiple coroutines (handleFailure + runDownload).
@@ -177,9 +180,9 @@ class DownloadEngine(appContext: Context) {
     private val failedUrls = LinkedHashMap<String, Boolean>(0, 0.75f, true)
     private val FAILED_URLS_MAX = 256
 
-    private fun rememberFailedUrl(url: String) {
+    private fun rememberFailedUrl(itemId: String, url: String) {
         synchronized(failedUrlLock) {
-            failedUrls[url] = true
+            failedUrls["$itemId\n$url"] = true
             // Evict LRU: bila melebihi batas, buang setengah yang paling tua
             if (failedUrls.size > FAILED_URLS_MAX) {
                 val iter = failedUrls.keys.iterator()
@@ -189,8 +192,8 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun isFailedUrl(url: String): Boolean = synchronized(failedUrlLock) {
-        failedUrls.containsKey(url)
+    private fun isFailedUrl(itemId: String, url: String): Boolean = synchronized(failedUrlLock) {
+        failedUrls.containsKey("$itemId\n$url")
     }
 
     // Cached maxConcurrent — hindari recompute dari SharedPreferences tiap cek.
@@ -1933,7 +1936,7 @@ class DownloadEngine(appContext: Context) {
         val attempts = (retryAttempts[id] ?: 0) + 1
         val rangeRejected = isRangeRejectError(message)
         val slowRejected = isSlowError(message)
-        rememberFailedUrl(item.url)
+        rememberFailedUrl(item.id, item.url)
         // YouTube CDN (googlevideo.com) menolak URL yang butuh n-signature dengan
         // HTTP 403 permanen — retry tidak akan pernah berhasil, jadi gagalkan
         // segera dengan pesan yang jelas (mirror/URL lain juga sia-sia).
@@ -1983,7 +1986,7 @@ class DownloadEngine(appContext: Context) {
             emptyList()
         }
         val allMirrors = (if (item.mirrors.isNotEmpty()) item.mirrors else autoMirrors)
-            .filterNot { isFailedUrl(it) }
+            .filterNot { isFailedUrl(item.id, it) }
         // Error Range pasti gagal lagi di URL yang sama, dan mirror yang pernah
         // gagal tidak perlu dicoba ulang: langsung coba cadangan berikutnya.
         // Kegagalan HTTP per-URL (issue #544) ikut memicu: skenario utama
@@ -3973,7 +3976,7 @@ class DownloadEngine(appContext: Context) {
                     // 60,8/61,1 MB masuk lalu size-mismatch → retry 6 detik
                     // kemudian kena HTTP 200). Coba re-extract URL segar lalu
                     // resume dari progres yang ada.
-                    rememberFailedUrl(item.url)
+                    rememberFailedUrl(item.id, item.url)
                     val fresh = refreshExpiredCdnUrl(item.id)
                     if (fresh != null) {
                         App.logEvent(
@@ -4003,7 +4006,7 @@ class DownloadEngine(appContext: Context) {
                     // (mis. proxy transparan ISP): semua percobaan Range akan gagal
                     // selamanya, jadi buang segmen lalu unduh sekali jalan tanpa
                     // Range (partial lama ikut dibuang).
-                    rememberFailedUrl(item.url)
+                    rememberFailedUrl(item.id, item.url)
                     App.logEvent(
                         "DOWNLOAD ${item.fileName}: Range rejected (${e.message}), " +
                             "downloading again in one pass"
