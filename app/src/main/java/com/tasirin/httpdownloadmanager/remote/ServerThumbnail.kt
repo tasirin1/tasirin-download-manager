@@ -169,6 +169,15 @@ internal fun getOrCreateThumb(
         if (cached.isFile && cached.length() > 0 && !slotStale) {
             cached
         } else {
+            // Cek ulang cache kegagalan DI DALAM kunci (issue #753):
+            // thread pendahulu di kunci yang sama bisa baru saja
+            // mencatat kegagalan segar untuk kunci ini — tanpa cek
+            // ulang, burst paralel untuk video korup yang sama mengulang
+            // decode MediaMetadataRetriever mahal satu per satu, persis
+            // beban yang hendak dicegah cache kegagalan itu.
+            thumbFailures[key]?.let { at ->
+                if (isThumbFailureFresh(at, System.currentTimeMillis())) return@synchronized null
+            }
             val bmp = generateThumb(ctx, raw, isFsPathAllowed, isMediaUriAllowed)
                 ?: run {
                     thumbFailures[key] = System.currentTimeMillis()
