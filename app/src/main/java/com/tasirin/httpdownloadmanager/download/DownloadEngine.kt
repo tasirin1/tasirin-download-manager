@@ -2341,9 +2341,9 @@ class DownloadEngine(appContext: Context) {
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
 
-        val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES)
+        val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES, item.username, item.password)
             ?: throw IOException("Cannot fetch HLS manifest")
-        val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang)
+        val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang, item.username, item.password)
         if (plan == null || plan.videoSegments.isEmpty()) {
             throw IOException("No HLS segments found")
         }
@@ -3133,7 +3133,7 @@ class DownloadEngine(appContext: Context) {
     }
 
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
-    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = ""): HlsPlan? {
+    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = "", username: String = "", password: String = ""): HlsPlan? {
         // Segmen terenkripsi yang diunduh mentah = file sampah berstatus
         // COMPLETED: gagal cepat dengan pesan jelas, bukan unduh sia-sia.
         if (isEncryptedHlsPlaylist(body)) {
@@ -3218,7 +3218,7 @@ class DownloadEngine(appContext: Context) {
         var fatalError: IOException? = null
         for (candidate in candidates) {
             val videoSegs = try {
-                mediaSegmentsWithDurations(candidate.url, headers, baseUrl)
+                mediaSegmentsWithDurations(candidate.url, headers, baseUrl, username, password)
             } catch (e: IOException) {
                 if (fatalError == null) fatalError = e
                 null
@@ -3253,7 +3253,7 @@ class DownloadEngine(appContext: Context) {
                 var audioFatal: IOException? = null
                 for (rendition in ordered) {
                     val segs = try {
-                        mediaSegments(rendition.url, headers, baseUrl)
+                        mediaSegments(rendition.url, headers, baseUrl, username, password)
                     } catch (e: IOException) {
                         // Alasan fatal tak ditelan buta (issue #553):
                         // gerbang yang sama yang melempar untuk video
@@ -3312,12 +3312,14 @@ class DownloadEngine(appContext: Context) {
     private fun mediaSegmentsWithDurations(
         playlistUrl: String,
         headers: String = "",
-        authAnchorUrl: String = playlistUrl
+        authAnchorUrl: String = playlistUrl,
+        username: String = "",
+        password: String = ""
     ): List<Pair<String, Long>>? {
         // Ambil media playlist; gagal HTTP/exception = null agar kandidat berikut dicoba.
         val body: String? = try {
             val conn = openAuthenticatedConnection(
-                playlistUrl, method = "GET", username = "", password = "", headers = headers,
+                playlistUrl, method = "GET", username = username, password = password, headers = headers,
                 authAnchorUrl = authAnchorUrl
             )
             try {
@@ -3362,9 +3364,11 @@ class DownloadEngine(appContext: Context) {
     private fun mediaSegments(
         playlistUrl: String,
         headers: String = "",
-        authAnchorUrl: String = playlistUrl
+        authAnchorUrl: String = playlistUrl,
+        username: String = "",
+        password: String = ""
     ): List<String>? =
-        mediaSegmentsWithDurations(playlistUrl, headers, authAnchorUrl)?.map { it.first }
+        mediaSegmentsWithDurations(playlistUrl, headers, authAnchorUrl, username, password)?.map { it.first }
 
     /** Estimasi byte video dari BANDWIDTH (bit/detik) x total durasi #EXTINF.
      *  Sumber: master playlist — tersedia sebelum segmen diunduh. */
@@ -3389,10 +3393,10 @@ class DownloadEngine(appContext: Context) {
         return safeMulDiv(totalUs, 128_000L, 8_000_000L)
     }
 
-    private fun fetchText(url: String, headers: String, maxBytes: Int): String? {
+    private fun fetchText(url: String, headers: String, maxBytes: Int, username: String = "", password: String = ""): String? {
         return runCatching {
             val conn = openAuthenticatedConnection(
-                url, method = "GET", username = "", password = "", headers = headers
+                url, method = "GET", username = username, password = password, headers = headers
             )
             try {
                 val code = conn.responseCode
