@@ -82,20 +82,33 @@ private val RANGE_RE = Regex("bytes=(\\d*)-(\\d*)", RegexOption.IGNORE_CASE)
 internal fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
     if (header.isNullOrBlank() || total <= 0 || header.contains(',')) return null
     val match = RANGE_RE.matchEntire(header.trim()) ?: return null
-    val start = match.groupValues[1].toLongOrNull()
-    val endRaw = match.groupValues[2].toLongOrNull()
+    val startText = match.groupValues[1]
+    val endText = match.groupValues[2]
     return when {
-        start != null -> {
+        startText.isNotEmpty() -> {
+            // Grup awal non-kosong yang gagal parse berarti digitnya
+            // meluap Long: posisi awal raksasa tak terpenuhi -> null
+            // (416 mengikuti), BUKAN ditafsir sebagai permintaan
+            // sufiks seperti sebelumnya (issue #933).
+            val start = startText.toLongOrNull() ?: return null
             if (start < 0 || start >= total) return null
-            val end = endRaw ?: (total - 1)
+            // Akhir yang meluap dijepit ke ujung berkas.
+            val end = if (endText.isEmpty()) {
+                total - 1
+            } else {
+                endText.toLongOrNull() ?: (total - 1)
+            }
             // Akhir sebelum awal (mis. bytes=5-3) tidak terpenuhi -> 416,
             // bukan rentang 1-byte semu seperti sebelumnya (coerceIn).
             if (end < start) return null
             start to end.coerceAtMost(total - 1)
         }
-        endRaw != null -> {
-            if (endRaw <= 0) return null
-            (total - endRaw).coerceAtLeast(0) to (total - 1)
+        endText.isNotEmpty() -> {
+            // Sufiks: panjang yang meluap Long berarti >= total, jadi
+            // seluruh berkas (semantik RFC), bukan 416 (issue #933).
+            val suffix = endText.toLongOrNull() ?: return 0L to (total - 1)
+            if (suffix <= 0) return null
+            (total - suffix).coerceAtLeast(0) to (total - 1)
         }
         else -> null
     }

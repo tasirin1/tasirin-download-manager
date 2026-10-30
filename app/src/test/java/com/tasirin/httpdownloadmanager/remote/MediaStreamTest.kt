@@ -55,4 +55,21 @@ class MediaStreamTest {
     fun parseRange_akhirLewatTotal_dipotong() {
         assertEquals(900L to 999L, parseRange("bytes=900-1500", 1000))
     }
+
+    @Test
+    fun parseRange_komponenOverflowLong() {
+        // Awal yang meluap Long tak terpenuhi (null -> 416), BUKAN
+        // ditafsir sebagai sufiks 5 byte terakhir (issue #933).
+        assertNull(parseRange("bytes=99999999999999999999999999-5", 1000))
+        // Panjang sufiks yang meluap berarti >= total: seluruh berkas.
+        assertEquals(
+            0L to 999L,
+            parseRange("bytes=-99999999999999999999999999", 1000)
+        )
+        // Akhir yang meluap tetap dijepit ke ujung berkas.
+        assertEquals(
+            5L to 999L,
+            parseRange("bytes=5-99999999999999999999999999", 1000)
+        )
+    }
 }
