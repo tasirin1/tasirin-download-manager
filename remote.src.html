@@ -54,37 +54,43 @@
   }
 
   :root[data-theme="dark"] {
-    --bg: #0e1220;
-    --bg-soft: #171c2e;
-    --card: #191f33;
-    --ink: #eef1fb;
-    --muted: #8f9cb8;
-    --primary: #6d7cff;
-    --primary-2: #8592ff;
-    --primary-soft: #262e52;
+    --bg: #0A0F24;
+    --bg-soft: #0D1738;
+    --card: #141E3D;
+    --ink: #EAF0FF;
+    --muted: #93A5CC;
+    --primary: #38BDF8;
+    --primary-2: #7DD3FC;
+    --primary-soft: #16265C;
+    --grad: linear-gradient(135deg, #7C3AED, #2563EB 55%, #06B6D4);
+    --grad-shadow: rgba(37,99,235,.4);
     --accent: #ff922b;
     --accent-soft: #3a2410;
-    --green: #35c47a;
-    --green-bg: #12301f;
-    --red: #ff6661;
-    --red-bg: #3a1d1b;
-    --amber: #f2b544;
-    --amber-bg: #352a11;
-    --blue-bg: #1c2745;
-    --line: #293148;
+    --green: #34D399;
+    --green-bg: #0B2E22;
+    --red: #F87171;
+    --red-bg: #33181C;
+    --amber: #FBBF24;
+    --amber-bg: #33270E;
+    --blue-bg: #16265C;
+    --line: #2A3757;
     --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.45);
-    --topbar-bg: #101524;
-    --tabbar-bg: #101524;
-    --track: #222a40;
-    --hover-soft: #242c44;
-    --mm-bg: #0b0e18;
-    --mm-ink: #eef1fb;
-    --mm-muted: #8f9cb8;
-    --mm-thumb: #1c2230;
+    --topbar-bg: #0D1738;
+    --tabbar-bg: #0D1738;
+    --track: #1E2A4A;
+    --hover-soft: #1B2748;
+    --mm-bg: #070B18;
+    --mm-ink: #EAF0FF;
+    --mm-muted: #93A5CC;
+    --mm-thumb: #141E3D;
     --mm-hover: rgba(255,255,255,.08);
     color-scheme: dark;
   }
+
+  :root[data-theme="dark"] body {
+ background: linear-gradient(180deg, #1B2A5E, #0D1738 45%, #0A0F24);
+ background-attachment: fixed; }
 
   * {
  box-sizing: border-box; }
@@ -311,10 +317,10 @@
   .f-type.t-arc { background: #fff6e0; color: #b26a00; border-color: #ffd8a8; }
   .f-type.t-doc { background: #eaf1ff; color: #1a56db; border-color: #b3c7ff; }
   :root[data-theme="dark"] .f-type { background: rgba(120,130,160,.16); color: var(--muted); border-color: var(--line); }
-  :root[data-theme="dark"] .f-type.t-video { background: rgba(67,83,230,.22); color: #9aa7ff; border-color: rgba(67,83,230,.45); }
-  :root[data-theme="dark"] .f-type.t-audio { background: rgba(217,72,15,.2); color: #ffa86b; border-color: rgba(217,72,15,.4); }
-  :root[data-theme="dark"] .f-type.t-img { background: rgba(24,128,56,.22); color: #7fd79a; border-color: rgba(24,128,56,.45); }
-  :root[data-theme="dark"] .f-type.t-apk { background: rgba(124,58,237,.22); color: #c9a2ff; border-color: rgba(124,58,237,.45); }
+  :root[data-theme="dark"] .f-type.t-video { background: rgba(139,92,246,.22); color: #c4b5fd; border-color: rgba(139,92,246,.45); }
+  :root[data-theme="dark"] .f-type.t-audio { background: rgba(244,63,94,.18); color: #fb7185; border-color: rgba(244,63,94,.4); }
+  :root[data-theme="dark"] .f-type.t-img { background: rgba(6,182,212,.18); color: #22d3ee; border-color: rgba(6,182,212,.4); }
+  :root[data-theme="dark"] .f-type.t-apk { background: rgba(61,220,132,.16); color: #3ddc84; border-color: rgba(61,220,132,.4); }
   :root[data-theme="dark"] .f-type.t-pdf { background: rgba(217,48,37,.2); color: #ff9d97; border-color: rgba(217,48,37,.45); }
   :root[data-theme="dark"] .f-type.t-arc { background: rgba(178,106,0,.2); color: #ffcf7d; border-color: rgba(178,106,0,.45); }
   :root[data-theme="dark"] .f-type.t-doc { background: rgba(26,86,219,.22); color: #9fb9ff; border-color: rgba(26,86,219,.45); }
@@ -2055,8 +2061,8 @@ connReloadBtn.addEventListener('click', function () {
 });
 // Tema remote: auto (ikuti sistem) / light / dark, disimpan di localStorage.
 const THEME_KEY = 'dm_theme';
-let themeMode = 'auto';
-try { themeMode = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) {}
+let themeMode = 'dark';
+try { themeMode = localStorage.getItem(THEME_KEY) || 'dark'; } catch (e) {}
 // Validasi ke himpunan sah: nilai localStorage adalah data tak tepercaya
 // dan themeMode mengalir ke innerHTML tombol tema di applyTheme().
 if (themeMode !== 'auto' && themeMode !== 'light' && themeMode !== 'dark') themeMode = 'auto';
