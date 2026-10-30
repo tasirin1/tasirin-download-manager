@@ -8,6 +8,12 @@ import org.json.JSONObject
  *  lama agar data prefs tetap terbaca (tidak perlu migrasi). */
 object DownloadItemCodec {
 
+    // Plafon segmen yang diterima jalur muat (issue #733): rencana sah
+    // paling banyak 8 segmen (jepit segmentCount di StoragePrefs), jadi
+    // 64 memberi ruang kepala besar tanpa membuka alokasi raksasa.
+    private const val MAX_DECODED_SEGMENT_INDEX = 64
+    private const val MAX_DECODED_SEGMENTS = 64
+
     fun encode(items: List<DownloadItem>): String {
         val arr = JSONArray()
         items.forEach { item ->
@@ -164,7 +170,22 @@ object DownloadItemCodec {
                     // Entri segmen korup (negatif/terbalik) dilewati agar tidak
                     // meracuni resume multi-segmen; segmen valid tetap dipakai.
                     if (index < 0 || start < 0 || end < start || downloaded < 0) continue
-                    add(DownloadSegment(index, start, end, downloaded))
+                    // Batas ketangguhan muat (issue #733): segmen buatan
+                    // aplikasi selalu <= 8 (jepit segmentCount di prefs),
+                    // jadi index/jumlah di luar plafon ini pasti blob korup
+                    // atau asing. Tanpa batas, encodeProgress mengalokasi
+                    // LongArray sebesar index terbesar + 1 di tiap tick
+                    // simpan progres (index raksasa = OOM / luapan negatif).
+                    // downloaded juga dijepit ke panjang segmennya sendiri,
+                    // sejajar jepit overlayProgress di berkas ini.
+                    if (index > MAX_DECODED_SEGMENT_INDEX) continue
+                    if (size >= MAX_DECODED_SEGMENTS) break
+                    add(
+                        DownloadSegment(
+                            index, start, end,
+                            downloaded.coerceAtMost(end - start + 1)
+                        )
+                    )
                 }
             }
         }.getOrDefault(emptyList())
