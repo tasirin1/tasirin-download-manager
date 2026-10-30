@@ -245,7 +245,25 @@ if (hasLoadedItems) render(lastItems);
 else refresh();
 }, 220);
 });
+function closeTopOverlay() {
+function shown(id) {
+const el = document.getElementById(id);
+return el && !el.classList.contains('hidden');
+}
+if (shown('confirmModal')) { hideConfirm(); return true; }
+if (shown('inputModal')) { hideInput(); return true; }
+if (shown('moveModal')) { closeMovePicker(); return true; }
+if (shown('shareModal')) { closeShare(); return true; }
+if (shown('itemSheet')) { closeItemSheet(); return true; }
+if (shown('fsSheet')) { closeFsSheet(); return true; }
+if (shown('addSheet')) { toggleAddForm(false); return true; }
+return false;
+}
 document.addEventListener('keydown', function (e) {
+if (e.key === 'Escape' && closeTopOverlay()) {
+e.preventDefault();
+return;
+}
 const tag = (e.target && e.target.tagName) || '';
 const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable);
 if (typing) return;

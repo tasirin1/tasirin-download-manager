@@ -2402,8 +2402,33 @@ dlSearchInput.addEventListener('input', function () {
     else refresh();
   }, 220);
 });
+// Escape menutup lapisan teratas yang tampil (issue #932), lewat
+// jalur tutup yang sama dengan tombol Cancel/backdrop tiap
+// permukaan; untuk dialog konfirmasi Escape berarti batal (No).
+// Urutan mengikuti tumpukan visual, modal paling atas lebih dulu.
+// mediaModal dan menu-menu punya handler Escape sendiri.
+function closeTopOverlay() {
+  function shown(id) {
+    const el = document.getElementById(id);
+    return el && !el.classList.contains('hidden');
+  }
+  if (shown('confirmModal')) { hideConfirm(); return true; }
+  if (shown('inputModal')) { hideInput(); return true; }
+  if (shown('moveModal')) { closeMovePicker(); return true; }
+  if (shown('shareModal')) { closeShare(); return true; }
+  if (shown('itemSheet')) { closeItemSheet(); return true; }
+  if (shown('fsSheet')) { closeFsSheet(); return true; }
+  if (shown('addSheet')) { toggleAddForm(false); return true; }
+  return false;
+}
 // Pintasan keyboard desktop (bukan TV): n = add, / = cari, Esc = tutup cari.
 document.addEventListener('keydown', function (e) {
+  // Escape dinilai sebelum penjaga typing: fokus bisa berada di
+  // field di dalam sheet/modal yang justru mau ditutup (issue #932).
+  if (e.key === 'Escape' && closeTopOverlay()) {
+    e.preventDefault();
+    return;
+  }
   const tag = (e.target && e.target.tagName) || '';
   const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable);
   if (typing) return;
