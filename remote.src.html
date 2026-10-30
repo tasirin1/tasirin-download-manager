@@ -4436,6 +4436,7 @@ function openMovePicker(items) {
   document.getElementById('moveSub').textContent = label;
   movePickOpen(fsPath || '');
   moveModal.classList.remove('hidden');
+  document.getElementById('moveCancel').focus();
 }
 
 function closeMovePicker() {
@@ -4633,6 +4634,7 @@ function showFsTask(title) {
   fsTaskBarEl.style.width = '4%';
   fsTaskCancelBtn.disabled = false;
   fsTaskModal.classList.remove('hidden');
+  fsTaskCancelBtn.focus();
 }
 
 function updateFsTask(text, pct) {
@@ -6575,6 +6577,9 @@ function showConfirm(title, text, yesLabel, cb) {
   document.getElementById('confirmYes').textContent = yesLabel;
   confirmCb = cb;
   confirmModal.classList.remove('hidden');
+  // Fokus wajib pindah ke dalam dialog: tanpa ini, tekanan OK/Enter pertama
+  // pengguna D-pad/TV mengaktifkan elemen di belakang scrim (issue #761).
+  document.getElementById('confirmYes').focus();
 }
 function hideConfirm() {
   confirmModal.classList.add('hidden');
@@ -6690,6 +6695,7 @@ async function shareItem(id) {
       document.getElementById(id).classList.remove('hidden');
     });
     shareModal.classList.remove('hidden');
+    document.getElementById('shareClose').focus();
     refreshShareList();
   } catch (e) {
     if (seq !== shareItemSeq) return;
@@ -6815,6 +6821,7 @@ function openShareManager() {
     document.getElementById(id).classList.add('hidden');
   });
   shareModal.classList.remove('hidden');
+  document.getElementById('shareClose').focus();
   refreshShareList();
 }
 document.getElementById('shareLinksBtn').addEventListener('click', openShareManager);

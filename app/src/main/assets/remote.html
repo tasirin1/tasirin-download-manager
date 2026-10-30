@@ -2150,6 +2150,7 @@ const label = items.length === 1
 document.getElementById('moveSub').textContent = label;
 movePickOpen(fsPath || '');
 moveModal.classList.remove('hidden');
+document.getElementById('moveCancel').focus();
 }
 function closeMovePicker() {
 moveModal.classList.add('hidden');
@@ -2312,6 +2313,7 @@ fsTaskTextEl.textContent = 'Starting\u2026';
 fsTaskBarEl.style.width = '4%';
 fsTaskCancelBtn.disabled = false;
 fsTaskModal.classList.remove('hidden');
+fsTaskCancelBtn.focus();
 }
 function updateFsTask(text, pct) {
 if (fsTaskModal.classList.contains('hidden')) return;
@@ -4034,6 +4036,7 @@ document.getElementById('confirmText').textContent = text;
 document.getElementById('confirmYes').textContent = yesLabel;
 confirmCb = cb;
 confirmModal.classList.remove('hidden');
+document.getElementById('confirmYes').focus();
 }
 function hideConfirm() {
 confirmModal.classList.add('hidden');
@@ -4140,6 +4143,7 @@ linkEl.classList.remove('hidden');
 document.getElementById(id).classList.remove('hidden');
 });
 shareModal.classList.remove('hidden');
+document.getElementById('shareClose').focus();
 refreshShareList();
 } catch (e) {
 if (seq !== shareItemSeq) return;
@@ -4257,6 +4261,7 @@ link.classList.add('hidden');
 document.getElementById(id).classList.add('hidden');
 });
 shareModal.classList.remove('hidden');
+document.getElementById('shareClose').focus();
 refreshShareList();
 }
 document.getElementById('shareLinksBtn').addEventListener('click', openShareManager);
