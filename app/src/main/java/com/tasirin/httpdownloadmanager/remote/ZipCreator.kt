@@ -349,6 +349,14 @@ object ZipCreator {
             }
         }
         if (queryFailed) throw IOException("MediaStore query failed for $folder")
-        outcome.exceptionOrNull()?.let { if (it is IOException) throw it }
+        // Pengecualian APA PUN yang mengakhiri blok cursor secara
+        // abnormal menggagalkan ZIP (issue #867): sebelumnya hanya
+        // IOException yang dilempar ulang, jadi iterasi yang putus
+        // (SQLiteException provider) menghasilkan arsip PARSIAL yang
+        // disajikan sukses dan ter-cache, dan getColumnIndexOrThrow
+        // yang gagal menghasilkan arsip KOSONG yang sama — bug asal
+        // #858 lewat pintu lain. Lewati-entri yang disengaja (gagal
+        // buka per entri) sudah terbungkus runCatching di dalam blok.
+        outcome.exceptionOrNull()?.let { throw it }
     }
 }
