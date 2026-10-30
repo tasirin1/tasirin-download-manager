@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): sorotan seret-lepas di File Manager kini hanya menyala untuk seretan berkas** -- handler dragover daftar berkas sebelumnya memasang kelas .fs-drag dan preventDefault untuk SEMUA seretan termasuk teks/URL dari tab lain, padahal drop-nya pasti diabaikan diam-diam; kini sorotan hanya muncul bila dataTransfer.types memuat 'Files' (issue #943).
+
 - **fix(data): item ber-id duplikat dari blob tersimpan kini didedupe saat decode** -- DownloadItemCodec.decode mempertahankan entri pertama per id dan melewati duplikatnya; sebelumnya duplikat kedua membeku permanen di engine (penilaian per-id bersifat first-match) dan remove(id) menghapus kedua entri dari daftar tetapi hanya berkas entri pertama, menyisakan berkas parsial yatim. Dikunci uji DownloadItemCodecTest (issue #942).
 
 - **fix(util): potongan nama jalur char tak lagi membelah pasangan surrogate** -- kedua titik potong di FileNames.safe kini mundur satu satuan bila akan membelah emoji (helper safeCut), menyamai kesadaran pasangan yang sudah dimiliki jalur byte; sebelumnya nama terbit bisa memuat surrogate yatim yang menjadi '?' di disk. Dikunci uji FileNamesTest (issue #941).

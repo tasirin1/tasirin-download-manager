@@ -2967,6 +2967,8 @@ fsMsg('Upload failed to start: ' + ((err && err.message) ? err.message : err), t
 });
 fsList.addEventListener('dragover', function (e) {
 if (!fsPath) return;
+const dt = e.dataTransfer;
+if (!dt || !dt.types || dt.types.indexOf('Files') === -1) return;
 e.preventDefault();
 fsList.classList.add('fs-drag');
 });
