@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(ui): emptyView daftar utama tak lagi berkedip palsu saat start dingin** -- emisi pertama kolektor selalu daftar kosong selama muatan awal engine (parse + dekripsi antrean) berjalan, dan MainActivity langsung menilainya sebagai 'tidak ada unduhan'. Kini emptyView hanya tampil bila daftar kosong DAN muatan awal selesai; karena antrean sungguh kosong tidak memicu emisi baru saat gerbang muat selesai (StateFlow menahan nilai sama), penilaian ulang digantung eksplisit pada awaitInitialLoad (issue #978).
+
 - **fix(ui): progressSig kini memuat limit kecepatan dan prioritas** -- dua field itu sebelumnya tak ikut hash gerbang submitList, sehingga perubahan limit/prioritas pada item diam (termasuk dari remote web) tidak pernah sampai ke salinan adapter; dialog Limit & Priority lalu menampilkan nilai lama dan tombol Save bisa menimpa nilai baru dengan nilai lama secara diam-diam. Kelas yang sama dengan #316 (issue #977).
 
 - **fix(download): 'connection refused' kembali ke FAILED terminal, bukan PAUSED abadi** -- pelebaran #969 mendelegasikan isNetworkError ke isConnectError secara utuh sehingga penolakan definitif sisi server ikut berakhir PAUSED: autoResume menyala, anggaran retry terhapus, tanpa notifikasi selesai, dan item bangkit lagi tiap jaringan pulih tanpa vonis akhir. Delegasi kini diganti frasa transien lokal yang memang dimaksud (unable to resolve host, network is unreachable) di samping isSlowError (issue #976).

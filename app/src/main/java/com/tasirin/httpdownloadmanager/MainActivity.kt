@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
      *  jendela 400ms dijadwalkan ulang agar tetap tampil walau emisi
      *  engine berhenti sesudahnya. */
     private var trailingSubmitJob: Job? = null
+    private var emptyGateJob: Job? = null
     private var lastStickyTitle: String? = null
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -344,7 +345,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         }
                     }
                     updateStickyHeader()
-                    val showEmpty = items.isEmpty()
+                    // Kosong hanya dinilai sesudah muatan awal selesai
+                    // (issue #978): emisi pertama selalu daftar kosong
+                    // selama parse+dekripsi antrean berjalan, dan tanpa
+                    // gerbang ini emptyView berkedip palsu tiap start
+                    // dingin — gerbang yang sama dengan DownloadService.
+                    val showEmpty = items.isEmpty() && App.engine.isInitialLoadComplete()
                     binding.emptyView.visibility =
                         if (showEmpty) View.VISIBLE else View.GONE
                     // Animasi jalan di anak (getChildAt(0)): guard wajib baca
@@ -360,6 +366,30 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         }
                     } else if (!showEmpty) {
                         emptyChild?.clearAnimation()
+                    }
+                    if (items.isEmpty() && !App.engine.isInitialLoadComplete() &&
+                        emptyGateJob?.isActive != true
+                    ) {
+                        // Antrean sungguh kosong tidak memicu emisi baru
+                        // saat muatan selesai (StateFlow menahan nilai
+                        // yang sama), jadi penilaian ulang emptyView
+                        // digantung eksplisit pada gerbang muat (#978).
+                        emptyGateJob = lifecycleScope.launch {
+                            App.engine.awaitInitialLoad()
+                            if (lastItems.isEmpty()) {
+                                binding.emptyView.visibility = View.VISIBLE
+                                val child = binding.emptyView.getChildAt(0)
+                                if (child?.animation == null) {
+                                    runCatching {
+                                        child?.startAnimation(
+                                            AnimationUtils.loadAnimation(
+                                                this@MainActivity, R.anim.pulse
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                     updateToolbar(items)
                 }
