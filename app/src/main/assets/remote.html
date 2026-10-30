@@ -259,9 +259,16 @@ if (shown('addSheet')) { toggleAddForm(false); return true; }
 return false;
 }
 document.addEventListener('keydown', function (e) {
-if (e.key === 'Escape' && closeTopOverlay()) {
+if (e.key === 'Escape') {
+if (closeTopOverlay()) {
 e.preventDefault();
 return;
+}
+if (!dlSearchRow.classList.contains('hidden')) {
+e.preventDefault();
+closeDlSearch();
+return;
+}
 }
 const tag = (e.target && e.target.tagName) || '';
 const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable);
@@ -273,13 +280,6 @@ const overlayOpen = moreMenuOpen || fsToolsMenuOpen || ['confirmModal', 'inputMo
 const el = document.getElementById(id);
 return el && !el.classList.contains('hidden');
 }) || (function () { const mm = document.getElementById('mediaModal'); return mm && mm.classList.contains('open'); })();
-if (e.key === 'Escape') {
-if (!dlSearchRow.classList.contains('hidden')) {
-e.preventDefault();
-closeDlSearch();
-}
-return;
-}
 if (e.code === 'KeyN' && !sheetOpen && !overlayOpen) {
 e.preventDefault();
 onNewDownloadClick();
