@@ -3105,6 +3105,21 @@ class DownloadEngine(appContext: Context) {
             // Content-Length header segmen (bila ada) = ukuran pasti segmen ini.
             val declared = segConn.contentLength.toLong().takeIf { it > 0 }
             if (declared != null) onLength(declared)
+            // Anggaran byte segmen sadar ruang kosong (issue #836,
+            // pola #702): plafon mentah 64 MB membunuh segmen sah dari
+            // CDN bersegmen panjang padahal segmen di-stream ke disk,
+            // bukan ditampung di RAM. Batas kini mengikuti ruang bebas
+            // volume spool dikurangi cadangan MIN_FREE_BYTES, dan
+            // Content-Length yang dikenal dicek di muka dengan pesan
+            // ruang yang jelas.
+            val freeAtStart = spool.absoluteFile.parentFile?.usableSpace ?: Long.MAX_VALUE
+            val byteCap = (freeAtStart - MIN_FREE_BYTES).coerceAtLeast(0)
+            if (declared != null && declared > byteCap) {
+                throw IOException(
+                    "Not enough storage for HLS segment: need " +
+                        "${Formats.bytes(declared)}, available ${Formats.bytes(freeAtStart)}"
+                )
+            }
             var segBytes = 0L
             // Watchdog macet/lambat seperti jalur lain (issue #575):
             // pola sama persis downloadSegment di bawah.
@@ -3132,8 +3147,8 @@ class DownloadEngine(appContext: Context) {
                         }
                         zeroStreak = 0
                         segBytes += read
-                        if (segBytes > HLS_SEGMENT_MAX_BYTES) {
-                            throw IOException("HLS segment too large")
+                        if (segBytes > byteCap) {
+                            throw IOException("Not enough storage for HLS segment")
                         }
                         segOut.write(buffer, 0, read)
                         throttle.sleepIfNeeded { committed + segBytes }
@@ -4766,7 +4781,6 @@ class DownloadEngine(appContext: Context) {
         private const val MAX_ZERO_READS = 64
         private const val MAX_REDIRECTS = 5
         private const val HLS_PROBE_MAX_BYTES = 1_000_000
-        private const val HLS_SEGMENT_MAX_BYTES = 64L * 1024 * 1024
         /** Segmen HLS ukuran ini dianggap segmen data (bukan init/small). */
         private const val HLS_REF_SEGMENT_MIN = 256L * 1024
         private const val SEGMENT_MIN_BYTES = 5L * 1024 * 1024
