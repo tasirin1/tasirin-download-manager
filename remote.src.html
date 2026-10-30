@@ -303,7 +303,16 @@
  flex: 1; min-width: 0; }
 
   .name {
- font-weight: 700; font-size: 13.5px; word-break: break-all; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+ font-weight: 700; font-size: 13.5px; display: flex; align-items: flex-start; }
+
+  /* Teks nama yang ter-clamp 2 baris tinggal di span sendiri supaya lencana
+     jenis berkas (.f-type) di sebelahnya tidak ikut terpotong clamp
+     untuk nama panjang (issue #763). */
+  .name-txt {
+ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; min-width: 0; }
+
+  .name .f-type {
+ flex: 0 0 auto; }
 
   .pin-indicator { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--primary); font-weight: 700; margin-left: 6px; vertical-align: middle; }
   .pin-indicator svg { width: 12px; height: 12px; }
@@ -6241,7 +6250,7 @@ function patchRowSub(li, it) {
   var nameEl = li._name || (li._name = li.querySelector('.name'));
   if (nameEl && nameEl._fn !== it.fileName) {
     nameEl._fn = it.fileName;
-    nameEl.innerHTML = (dlPinned.has(it.id) ? '<span class="pin-indicator">' + UI_ICONS.checksq + ' Pinned</span>' : '') + escapeHtml(it.fileName) + fileTypeBadge(it.fileName);
+    nameEl.innerHTML = (dlPinned.has(it.id) ? '<span class="pin-indicator">' + UI_ICONS.checksq + ' Pinned</span>' : '') + '<span class="name-txt">' + escapeHtml(it.fileName) + '</span>' + fileTypeBadge(it.fileName);
   }
   const errBox = li._err || (li._err = li.querySelector('.err'));
   if (errBox) {
@@ -6488,7 +6497,7 @@ function rebuildList(items) {
     const okBadge = it.checksumVerified ? '<span class="checksum-ok" title="Checksum verified">\u2713</span>' : '';
     li.innerHTML =
       '<div class="item-top"><div class="icon-wrap"><div class="icon ' + iconStateCls(it.state) + '">' + socialFavicon(it.url) + fileIcon(it.fileName, it.url) + '</div>' + ((it.state === 'DOWNLOADING' || it.state === 'PAUSED') ? '<div class="pause-overlay" data-action="' + (it.state === 'DOWNLOADING' ? 'pause' : 'resume') + '" title="' + (it.state === 'DOWNLOADING' ? 'Pause' : 'Resume') + '">' + (it.state === 'DOWNLOADING' ? UI_ICONS.pause : UI_ICONS.play) + '</div>' : '') + '</div><div class="item-body">' +
-      '<div class="name">' + (dlPinned.has(it.id) ? '<span class="pin-indicator">' + UI_ICONS.checksq + ' Pinned</span>' : '') + escapeHtml(it.fileName) + fileTypeBadge(it.fileName) + '</div>' + okBadge + retryBadge + err +
+      '<div class="name">' + (dlPinned.has(it.id) ? '<span class="pin-indicator">' + UI_ICONS.checksq + ' Pinned</span>' : '') + '<span class="name-txt">' + escapeHtml(it.fileName) + '</span>' + fileTypeBadge(it.fileName) + '</div>' + okBadge + retryBadge + err +
       (retry ? '<div class="err-actions">' + retry + '</div>' : '') +
       '</div>' +
       '<button class="item-menu-btn" type="button" title="Actions">' + UI_ICONS.menu + '</button>' +
