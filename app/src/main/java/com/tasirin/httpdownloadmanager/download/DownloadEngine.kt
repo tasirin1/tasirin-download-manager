@@ -3539,11 +3539,17 @@ class DownloadEngine(appContext: Context) {
      *  deleteFiles tak melihat file final): tanpa ini file tetap mendarat di
      *  folder tujuan tanpa entri daftar dan tak terkelola. */
     private suspend fun ensurePublishedKept(id: String, vararg published: FileSaver.PublishResult) {
-        coroutineContext.ensureActive()
         if (_items.value.none { it.id == id }) {
             published.forEach { deletePublished(it) }
             throw CancellationException("item $id removed after publish")
         }
+        // Item masih ada tetapi job dibatalkan = pause yang mendarat di
+        // jendela finalisasi (issue #780): berkas SUDAH terbit penuh dan
+        // partial sudah berpindah, jadi tidak ada sisa yang bisa di-resume.
+        // Finalisasi dituntaskan (item menjadi COMPLETED — sama seperti
+        // pause yang mendarat sesudah langkah ini) alih-alih melempar
+        // ensureActive() di sini, yang meninggalkan berkas terbit yatim
+        // tak terujuk dan memaksa resume mengunduh ulang dari nol.
     }
 
     private suspend fun runSingle(
