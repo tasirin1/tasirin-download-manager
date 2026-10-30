@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): fallback loadFs ke root kini membatalkan mode pilih** -- jalur catch yang melompat ke root karena folder restorasi tak tersedia sebelumnya memuat ulang tanpa reset, sehingga mode pilih bisa tersangkut di root (tombol Select tersembunyi di sana, kelas fs-selecting tertinggal) bila pengguna menekan Select tepat saat fetch gagal. Jalur fallback kini mereset seleksi seperti pemicu pengganti konteks lain (issue #983).
+
 - **fix(download): urutan pelepasan wake lock di onDestroy DownloadService dibalik** -- onDestroy sebelumnya melepas lock sebelum membatalkan scope kolektor, memberi celah bagi kolektor di thread IO yang sedang memproses emisi aktif untuk meng-acquire lock baru sesudah pelepasan — lock tanpa pemilik sampai timeout 1 jam. Kini keadaan destroyed ditandai lebih dulu (dan diperiksa updateWakeLock sebelum acquire), scope dibatalkan, baru lock dilepas (issue #982).
 
 - **fix(remote): lipatan dangkal cap ZIP menjangkau satu tingkat di bawah direktori terantre** -- sesudah plafon jalan kaki, perubahan di bawah direktori yang belum dibuka sebelumnya tak terlihat oleh cap sama sekali (mtime direktori terantre tak bergerak untuk perubahan di cucunya). Kini anak langsung direktori terantre ikut dilipat dalam anggaran terbatas yang sama, sehingga tambah/hapus/ubah berkas satu tingkat di bawahnya ikut menggerakkan cap (issue #981).

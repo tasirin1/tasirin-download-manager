@@ -3850,6 +3850,10 @@ async function loadFs() {
       fsPath = '';
       fsRestoredOnce = false;
       localStorage.removeItem(FS_LAST_PATH_KEY);
+      // Lompatan ke root adalah penggantian konteks (issue #983):
+      // tanpa reset, mode pilih tersangkut di root — tombol Select
+      // tersembunyi di sana dan kelas fs-selecting tertinggal.
+      if (fsSelectMode) resetFsSelection();
       fsMsg('Last folder unavailable \u2014 showing storage roots', true);
       loadFs();
       return;

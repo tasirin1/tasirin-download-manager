@@ -1466,6 +1466,7 @@ if (fsRestoredOnce && fsPath) {
 fsPath = '';
 fsRestoredOnce = false;
 localStorage.removeItem(FS_LAST_PATH_KEY);
+if (fsSelectMode) resetFsSelection();
 fsMsg('Last folder unavailable \u2014 showing storage roots', true);
 loadFs();
 return;
