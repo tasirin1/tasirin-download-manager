@@ -6878,11 +6878,17 @@ let confirmCb = null;
 // panggilan ASINKRON (alert gagal share dari fetch yang baru kembali)
 // tidak boleh menimpa dialog yang sedang dibaca pengguna.
 const confirmQueue = [];
+// Cap waktu tampil dialog (issue #946): tekanan OK/Enter kedua yang
+// beruntun tidak boleh mengonfirmasi dialog antrean yang baru muncul
+// dan belum terbaca — aktivasi Yes diabaikan dalam jendela singkat
+// sesudah dialog ditampilkan.
+let confirmShownAt = 0;
 function showConfirm(title, text, yesLabel, cb, opts) {
   if (!confirmModal.classList.contains('hidden')) {
     confirmQueue.push([title, text, yesLabel, cb, opts]);
     return;
   }
+  confirmShownAt = Date.now();
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmText').textContent = text;
   const yesBtn = document.getElementById('confirmYes');
@@ -6906,6 +6912,7 @@ function hideConfirm() {
 }
 document.getElementById('confirmNo').addEventListener('click', hideConfirm);
 document.getElementById('confirmYes').addEventListener('click', function () {
+  if (Date.now() - confirmShownAt < 350) return; // issue #946
   const cb = confirmCb;
   hideConfirm();
   if (cb) cb();
