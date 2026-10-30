@@ -3603,7 +3603,7 @@ var it = currentItems.find(function (x) { return x.id === itemId; });
 if (it && it.state === 'DOWNLOADING') doAction(itemId, 'pause');
 else if (it && (it.state === 'PAUSED' || it.state === 'FAILED' || it.state === 'CANCELLED')) doAction(itemId, 'resume');
 } else if (released > TH) {
-showConfirm('Delete', 'Delete this download?', 'Delete', function () { doAction(itemId, 'delete'); });
+doAction(itemId, 'delete');
 }
 }, {passive: true});
 li.addEventListener('touchcancel', function () {
