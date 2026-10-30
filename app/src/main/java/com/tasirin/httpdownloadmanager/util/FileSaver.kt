@@ -637,7 +637,14 @@ class FileSaver(context: Context) {
      *  partial/staging — di downloadDir disapu pemindaian yatim biasa,
      *  di direktori tujuan luar disapu cleanupOrphanPartials lewat
      *  pencocokan nama final item yang dikenal (issue #402) — dan
-     *  rename dalam satu direktori bersifat atomik. */
+     *  rename dalam satu direktori bersifat atomik.
+     *  Bila filesystem menolak rename menimpa berkas klaim (issue
+     *  #719): byte disalin LENGKAP ke staging .part lebih dulu, klaim
+     *  kosong dihapus, lalu staging di-rename ke nama final yang kini
+     *  kosong. Salinan langsung ke nama final hanya jalan terakhir
+     *  bila rename itu pun ditolak — satu-satunya titik di mana
+     *  kematian proses bisa menyisakan berkas terpotong bernama
+     *  final (pengecualian di jalur tangkap tetap menghapusnya). */
     private fun publishFileIntoDir(partial: File, dir: File, fileName: String): PublishResult {
         val target = uniqueTargetFile(File(dir, fileName))
         var completed = false
@@ -649,10 +656,25 @@ class FileSaver(context: Context) {
                 if (partial.renameTo(target)) {
                     completed = true
                 } else {
-                    // renameTo menolak menimpa klaim di sebagian filesystem:
-                    // jatuh ke salinan langsung ke target yang sudah diklaim.
-                    target.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
-                    completed = true
+                    // renameTo menolak menimpa klaim di sebagian
+                    // filesystem (issue #719): jangan salin langsung ke
+                    // nama final — salin lengkap ke staging, hapus klaim
+                    // kosong, lalu rename staging ke nama yang kosong.
+                    val staging = uniqueTargetFile(File(dir, fileName + ".part"))
+                    try {
+                        staging.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
+                        target.delete()
+                        if (staging.renameTo(target)) {
+                            completed = true
+                        } else {
+                            // Jalan terakhir (lihat KDoc): rename pun
+                            // ditolak sesudah klaim dihapus.
+                            target.outputStream().use { out -> staging.inputStream().use { it.copyTo(out, IO_BUF) } }
+                            completed = true
+                        }
+                    } finally {
+                        runCatching { staging.delete() }
+                    }
                     partial.delete()
                 }
             } else {
@@ -662,8 +684,16 @@ class FileSaver(context: Context) {
                     if (staging.renameTo(target)) {
                         completed = true
                     } else {
-                        target.outputStream().use { out -> staging.inputStream().use { it.copyTo(out, IO_BUF) } }
-                        completed = true
+                        // Sama seperti cabang satu direktori (issue
+                        // #719): hapus klaim kosong lalu rename ulang;
+                        // salinan langsung hanya jalan terakhir.
+                        target.delete()
+                        if (staging.renameTo(target)) {
+                            completed = true
+                        } else {
+                            target.outputStream().use { out -> staging.inputStream().use { it.copyTo(out, IO_BUF) } }
+                            completed = true
+                        }
                     }
                 } finally {
                     // Sesudah rename berhasil path staging sudah tidak ada;
