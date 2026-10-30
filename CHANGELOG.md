@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): invalidateFsRootsCache kini ikut membuang memo cap ZIP** -- corong ini membuang seluruh zipCache dan merupakan satu-satunya invalidasi ZIP dari pemindahan berkas native (DownloadEngine.move), tetapi tidak termasuk dua corong yang diperbaiki #974, sehingga rantai salah-saji cap lama yang sama masih bisa dipicu lewat jalur pindah berkas dari aplikasi. Memo cap kini dibersihkan di sana juga (issue #986).
+
 - **fix(web): fokus galeri dipindah ke sel yang bertahan saat pemangkasan atas membuang sel terfokus** -- trimGalleryTop sebelumnya membuang sel teratas tanpa memeriksa fokus, sehingga pengguna keyboard/D-pad yang selnya terbuang kehilangan fokus ke body diam-diam dan urutan Tab mulai lagi dari awal dokumen. Kini fokus dipindah ke sel pertama yang bertahan (issue #985).
 
 - **feat(web): navigasi panah + roving tabindex di grid galeri** -- sebelumnya setiap sel galeri adalah tab-stop (sampai ~240 pada jendela render) dan tombol panah tidak bekerja sama sekali di grid, menyulitkan pengguna keyboard/D-pad TV. Kini satu sel menjadi tab-stop (sel terfokus mempromosikan dirinya), dan tombol panah memindah fokus antar sel mengikuti jumlah kolom dari tata letak nyata (issue #984).

@@ -2786,6 +2786,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Invalidate fsRoots cache saat settings berubah. */
     fun invalidateFsRootsCache() {
+        // Memo cap ikut dibuang (issue #986): corong ini membuang
+        // seluruh zipCache (blok CAS di bawah) dan merupakan
+        // satu-satunya invalidasi ZIP dari DownloadEngine.move() —
+        // tanpa ini rantai salah-saji #974 hidup lagi lewat jalur
+        // pindah berkas native.
+        zipStampMemo.clear()
         cachedFsRoots = null
         cachedFsRootsCanonical = null
         fsFileListingCache = null
