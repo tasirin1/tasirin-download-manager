@@ -453,6 +453,20 @@ def check_upload_call(text: str) -> list:
     return problems
 
 
+def _out_tak_sinkron(minified: str, problems: list) -> bool:
+    """True bila OUT tak sinkron ATAU tak terbaca (issue #727).
+
+    Perbandingan sinkron ini satu-satunya titik baca #715 yang dulu
+    tak terjaga: remote.html non-UTF-8 melempar BerkasTakTerbaca
+    keluar dari --check sebagai traceback. Kini vonisnya problem
+    bernama, dan perbandingan dilewati."""
+    try:
+        return read_utf8(OUT) != minified
+    except BerkasTakTerbaca as exc:
+        problems.append(str(exc))
+        return False
+
+
 def main() -> int:
     if not SRC.exists():
         print(f"ERROR: {SRC} tidak ditemukan.")
@@ -478,7 +492,7 @@ def main() -> int:
                 "berpasangan dengan remote.src.html; bangkitkan dengan: "
                 "python3 scripts/prepare_remote.py"
             )
-        elif read_utf8(OUT) != minified:
+        elif _out_tak_sinkron(minified, problems):
             problems.append(
                 f"{OUT.name} TIDAK sinkron dengan remote.src.html — "
                 "jalankan: python3 scripts/prepare_remote.py lalu commit keduanya."
