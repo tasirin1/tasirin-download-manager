@@ -224,6 +224,13 @@ def cek_xml(gagal):
             ET.parse(os.path.join(AKAR, path))
         except ET.ParseError as e:
             buruk.append("%s (%s)" % (path, e))
+        except OSError:
+            # Berkas hilang/tak terbaca di tengah lari (symlink putus,
+            # terhapus sesudah os.walk) = vonis bernama, bukan traceback
+            # FileNotFoundError yang membunuh seluruh gerbang — pola
+            # yang sama seperti cabang manifest di bawah (issue #716,
+            # kelas #587).
+            buruk.append("%s (hilang/tak terbaca)" % path)
     for path in ("app/src/main/AndroidManifest.xml",):
         try:
             ET.parse(os.path.join(AKAR, path))
