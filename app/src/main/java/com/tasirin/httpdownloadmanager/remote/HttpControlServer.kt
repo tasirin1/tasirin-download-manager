@@ -2480,8 +2480,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         fsMediaCache.clear()
         galleryCache = null
         synchronized(zipEvictionLock) {
-            zipCache.values.forEach { (_, file, _) -> runCatching { file.delete() } }
-            zipCache.clear()
+            // Per entri dengan CAS seperti invalidateZipCache (#676):
+            // zipCached memasang entri di bawah kunci strip per-key, bukan
+            // kunci eviksi ini, jadi clear() menyeluruh bisa membuang entri
+            // segar yang terpasang di sela-sela dan mengyatimkan berkasnya
+            // (issue #682).
+            zipCache.entries.toList().forEach { (key, entry) ->
+                if (zipCache.remove(key, entry)) {
+                    runCatching { entry.second.delete() }
+                }
+            }
         }
     }
 
