@@ -1227,6 +1227,12 @@
   .move-folder .mv-meta {
  flex: 0 0 auto; font-size: 11px; font-weight: 400; color: var(--muted); }
 
+  .move-folder .mv-ico {
+ display: inline-flex; flex: 0 0 auto; width: 20px; height: 20px; color: var(--primary); }
+
+  .move-folder .mv-ico svg {
+ width: 100%; height: 100%; }
+
   .move-empty {
  padding: 18px 6px; text-align: center; color: var(--muted); font-size: 13px; }
 
@@ -4521,7 +4527,7 @@ function renderMoveFolders(dirs, list) {
     b.className = 'move-folder';
     let meta = '';
     if (it.itemCount >= 0) meta = '<span class="mv-meta">' + it.itemCount + (it.sizeTruncated ? '+' : '') + ' item</span>';
-    b.innerHTML = '<span class="mv-ico">\u{1F4C1}</span><span class="mv-name">' + escapeHtml(it.name) + '</span>' + meta;
+    b.innerHTML = '<span class="mv-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="mv-name">' + escapeHtml(it.name) + '</span>' + meta;
     b.addEventListener('click', function () { movePickOpen(it.path); });
     list.appendChild(b);
   });

@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): ikon folder dialog Move kini SVG, bukan emoji** -- Baris folder tujuan sebelumnya memakai emoji 📁 (satu-satunya ikon emoji di keluarga dialog, tanpa aturan CSS sama sekali) sehingga tampil beda gaya/warna per perangkat; kini glyph folder SVG yang sama dengan ikon folder Files + aturan `.mv-ico` (issue #777).
 - **fix(remote): tombol konfirmasi tidak lagi selalu merah danger** -- `#confirmYes` sebelumnya ber-class `danger` tetap sehingga aksi jinak (Clear completed) tampil destruktif dan alert gagal-share punya OK merah + Cancel ganda; `showConfirm` kini menerima opsi `{ danger: false }` (tombol `.primary`) dan `{ hideCancel: true }` untuk alert satu keputusan (issue #776).
 - **fix(remote): breadcrumb Files kini menggulir ke chip folder aktif** -- Jalur bersarang bernama panjang bisa meluber melewati lebar layar dan chip folder saat ini tersembunyi di luar sisi kanan; `renderFsCrumbs` kini menggulir bar ke ujung setiap render (issue #775).
 - **fix(remote): lencana durasi & Resume galeri tidak lagi bisa tumpang tindih** -- Keduanya absolut di dasar thumbnail yang sama tanpa batas lebar sehingga di sel sempit (durasi format jam + "Resume from …") bisa bersentuhan; kini masing-masing dibatasi separuh lebar sel dengan elipsis (issue #774).
