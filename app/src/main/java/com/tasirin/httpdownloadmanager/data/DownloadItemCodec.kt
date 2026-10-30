@@ -180,10 +180,18 @@ object DownloadItemCodec {
                     // sejajar jepit overlayProgress di berkas ini.
                     if (index > MAX_DECODED_SEGMENT_INDEX) continue
                     if (size >= MAX_DECODED_SEGMENTS) break
+                    // Panjang segmen inklusif dihitung jenuh: end-start+1
+                    // polos meluap membungkus ke Long.MIN_VALUE untuk
+                    // end = Long.MAX_VALUE, dan coerceAtMost lalu
+                    // mengembalikan downloaded negatif raksasa (issue
+                    // #748, sisa sudut #733).
+                    val segLen = end - start
+                    val maxDownloaded =
+                        if (segLen == Long.MAX_VALUE) Long.MAX_VALUE else segLen + 1
                     add(
                         DownloadSegment(
                             index, start, end,
-                            downloaded.coerceAtMost(end - start + 1)
+                            downloaded.coerceAtMost(maxDownloaded)
                         )
                     )
                 }
