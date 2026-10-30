@@ -3476,7 +3476,8 @@ function structSig(items) {
 return items.map(function (it) {
 return it.id + '|' + it.state + '|' + (it.error || '') + '|' + it.fileName + '|' + it.addedAt +
 '|' + (dlPinned.has(it.id) ? 1 : 0) +
-'|' + (it.retryCount || 0) + '|' + (it.checksumVerified ? 1 : 0);
+'|' + (it.retryCount || 0) + '|' + (it.checksumVerified ? 1 : 0) +
+'|' + (it.url || '');
 }).join(';');
 }
 var EMPTY_ICONS = {
