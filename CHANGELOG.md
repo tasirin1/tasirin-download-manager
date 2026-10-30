@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): lencana retry & tanda checksum tidak lagi basi di baris yang di-patch** -- Keduanya hanya dibuat saat rebuild tetapi `structSig` tidak memuat `retryCount`/`checksumVerified`, dan `patchRowSub` tidak menulis ulang lencananya; kedua nilai kini ikut tanda tangan struktural (pola pin #604) sehingga perubahannya memicu rebuild (issue #768).
 - **fix(remote): favicon sosial + ikon berkas kini pas di petak 36px** -- Kombinasi favicon 14px + margin 4px + SVG 22px = 40px melampaui petak ikon sehingga ikon berkas item sosial menyusut/meluber; margin kini 2px, SVG sesudah favicon 20px (total pas 36px), dan favicon mode compact 10px (issue #767).
 - **fix(remote): ekstensi audio .opus kini dikenali ikon & lencananya** -- `FILE_ICON_AUD` tak memuat `opus` sehingga berkas .opus tampil berikon klip kertas generik tanpa lencana di Downloads maupun Files; `opus` kini masuk daftar (satu daftar dipakai ikon unduhan, lencana jenis, dan ikon Files) (issue #766).
 - **fix(remote): favicon HentaiHaven kini tampil di kartu unduhan** -- Kelas CSS `.social-favicon.p-hentaihaven` sudah ada tetapi `socialFavicon()` tak punya cabang untuk host-nya sehingga unduhan HentaiHaven tampil polos; cabang `hentaihaven.xxx` kini ditambahkan (issue #765).

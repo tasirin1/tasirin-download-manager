@@ -5923,8 +5923,11 @@ function structSig(items) {
     // pengurutan hanya diterapkan rebuildList, jadi perubahan pin
     // WAJIB mengubah sig agar rebuild terjadi — tanpa ini kartu tak
     // berubah sampai perubahan struktural lain kebetulan memicu.
+    // Lencana retry & tanda checksum juga hanya dibuat saat rebuild
+    // (patchRowSub tidak menulisnya), jadi ikut tanda tangan (issue #768).
     return it.id + '|' + it.state + '|' + (it.error || '') + '|' + it.fileName + '|' + it.addedAt +
-      '|' + (dlPinned.has(it.id) ? 1 : 0);
+      '|' + (dlPinned.has(it.id) ? 1 : 0) +
+      '|' + (it.retryCount || 0) + '|' + (it.checksumVerified ? 1 : 0);
   }).join(';');
 }
 
