@@ -3192,7 +3192,14 @@ function trimGalleryTop() {
   galleryGrid.style.paddingTop = (galTopPad() + h) + 'px';
   if (focusDropped) {
     const survivor = galleryGrid.querySelector('.gal-cell');
-    if (survivor) survivor.focus({ preventScroll: true });
+    if (survivor) {
+      // Pola aman yang sama dengan popReturnFocus (issue #997):
+      // browser lama bisa melempar pada argumen opsi objek, dan
+      // eksepsi di sini akan menggugurkan sisa loadMoreGallery.
+      try { survivor.focus({ preventScroll: true }); } catch (err) {
+        try { survivor.focus(); } catch (err2) {}
+      }
+    }
   }
 }
 function restoreGalleryTop() {

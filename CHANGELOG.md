@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): fokus bertahan galeri memakai pola aman repo** -- pemindahan fokus di trimGalleryTop sebelumnya memanggil focus beropsi objek tanpa jaring pengaman, menyimpang dari pola popReturnFocus; di browser lama yang melempar pada argumen opsi, eksepsinya akan menggugurkan sisa loadMoreGallery (roving + sentinel). Kini dibungkus try fokus beropsi dengan fallback fokus polos (issue #997).
+
 - **fix(web): tipe error diteruskan mmShowToast ke toast global** -- penerusan sebelumnya membuang tipe sehingga semua kegagalan yang lewat helper pemutar (ZIP gagal/terlalu besar, Move/Delete gagal, refresh gagal) tampil sebagai toast info biru saat modal media tertutup. mmShowToast kini menerima tipe opsional dan 12 situs pemanggil kegagalan mengoper tipe error (issue #996).
 
 - **fix(web): toast pemutar disembunyikan saat media dibuka/ditutup** -- toast kegagalan video sebelumnya hanya mati oleh timernya sendiri (sampai 2600 ms), jadi membuka video lain yang sehat dalam jendela itu mewarisi tulisan kegagalan video lama. openMedia dan closeMedia kini menyembunyikan toast dan membatalkan timernya (issue #995).

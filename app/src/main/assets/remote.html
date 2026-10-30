@@ -911,7 +911,11 @@ galTopHidden += drop;
 galleryGrid.style.paddingTop = (galTopPad() + h) + 'px';
 if (focusDropped) {
 const survivor = galleryGrid.querySelector('.gal-cell');
-if (survivor) survivor.focus({ preventScroll: true });
+if (survivor) {
+try { survivor.focus({ preventScroll: true }); } catch (err) {
+try { survivor.focus(); } catch (err2) {}
+}
+}
 }
 }
 function restoreGalleryTop() {
