@@ -64,10 +64,25 @@ object ServerSecurity {
             RegexOption.IGNORE_CASE
         )
 
+    // Kredensial userinfo di dalam nilai URL (issue #913): bentuk
+    // https://user:pass@host yang ditempel ke url= tidak memuat nama
+    // parameter sama sekali sehingga lolos LOG_SECRET_RE. Pola ini
+    // menyamarkan segmen user:pass di antara pemisah skema (:// atau
+    // %3A%2F%2F) dan @ (%40 atau @) — wajib ada titik dua di antaranya
+    // agar URL ber-port tanpa userinfo tidak ikut tersamar.
+    private val LOG_USERINFO_RE =
+        Regex(
+            "((?:%3A%2F%2F)|(?:://))[^&\\s]*?(?:%3A|:)[^&\\s]*?(%40|@)",
+            RegexOption.IGNORE_CASE
+        )
+
     fun redactQueryForLog(query: String?): String {
         if (query.isNullOrEmpty()) return ""
-        return "?" + LOG_SECRET_RE.replace(query.trimStart('?')) { m ->
+        val named = LOG_SECRET_RE.replace(query.trimStart('?')) { m ->
             m.groupValues[1] + m.groupValues[2] + "<redacted>"
+        }
+        return "?" + LOG_USERINFO_RE.replace(named) { m ->
+            m.groupValues[1] + "<redacted>" + m.groupValues[2]
         }
     }
 

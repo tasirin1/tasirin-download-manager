@@ -89,6 +89,28 @@ class ServerSecurityTest {
             "?session=<redacted>&a=1",
             ServerSecurity.redactQueryForLog("?session=zzz999&a=1")
         )
+        // Kredensial userinfo di dalam url= ikut disamarkan (#913):
+        // bentuk terenkode penuh maupun mentah; URL ber-port tanpa
+        // userinfo dan userinfo tanpa kata sandi tidak berubah.
+        // Nilai harapan dibuktikan port Python 1:1 dari kedua regex.
+        assertEquals(
+            "?url=https%3A%2F%2F<redacted>%40dl.example%2Ffile.zip",
+            ServerSecurity.redactQueryForLog(
+                "?url=https%3A%2F%2Fuser%3As3cret%40dl.example%2Ffile.zip"
+            )
+        )
+        assertEquals(
+            "?url=https://<redacted>@dl.example/file.zip",
+            ServerSecurity.redactQueryForLog("?url=https://user:s3cret@dl.example/file.zip")
+        )
+        assertEquals(
+            "?url=https://dl.example:8080/file.zip",
+            ServerSecurity.redactQueryForLog("?url=https://dl.example:8080/file.zip")
+        )
+        assertEquals(
+            "?url=https://user@dl.example/file.zip",
+            ServerSecurity.redactQueryForLog("?url=https://user@dl.example/file.zip")
+        )
         assertEquals(
             "?api_key=<redacted>&b=2",
             ServerSecurity.redactQueryForLog("?api_key=K-123&b=2")
