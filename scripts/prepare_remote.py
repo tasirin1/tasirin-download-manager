@@ -23,6 +23,24 @@ OUT = ROOT / "app" / "src" / "main" / "assets" / "remote.html"
 VALUES_DIR = ROOT / "app" / "src" / "main" / "res" / "values"
 JAVA_DIR = ROOT / "app" / "src" / "main" / "java"
 
+
+class BerkasTakTerbaca(Exception):
+    """Berkas sumber tak bisa dibaca sebagai UTF-8 (issue #715)."""
+
+
+def read_utf8(path) -> str:
+    # Vonis bernama untuk berkas non-UTF-8 / tak terbaca (issue #715):
+    # dulu read_text mentah meledak jadi traceback UnicodeDecodeError
+    # tanpa menyebut berkasnya, dan seluruh --check gugur tanpa vonis.
+    try:
+        return path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError) as exc:
+        raise BerkasTakTerbaca(
+            "berkas tak terbaca sebagai UTF-8: "
+            + str(path.relative_to(ROOT))
+            + f" ({exc.__class__.__name__})"
+        ) from exc
+
 # Kata Indonesia yang tidak boleh muncul di string UI (guard i18n).
 BANNED_ID = [
     "belum", "ketuk", "tambah", "hapus", "batal", "jeda",
@@ -290,7 +308,7 @@ def strip_comments(text: str) -> str:
 
 
 def scan_remote() -> list:
-    html = OUT.read_text(encoding="utf-8")
+    html = read_utf8(OUT)
     # Nilai properti content: di dalam blok style ikut dipindai
     # (issue #536): teks itu ter-render sebagai UI (lencana/label).
     # Dibatasi ke content: saja (issue #540): mengekstrak SEMUA
@@ -315,7 +333,7 @@ def scan_remote() -> list:
 def scan_xml() -> list:
     hits = []
     for xml_path in sorted(VALUES_DIR.glob("*.xml")):
-        text = xml_path.read_text(encoding="utf-8")
+        text = read_utf8(xml_path)
         text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
         for m in re.finditer(r"<string[^>]*>(.*?)</string>|<item>(.*?)</item>", text, re.S):
             value = (m.group(1) or m.group(2) or "")
@@ -335,7 +353,7 @@ def scan_kotlin() -> list:
         r'|"((?:[^"\\]|\\.)*)"', re.S
     )
     for path in sorted(JAVA_DIR.rglob("*.kt")):
-        src = path.read_text(encoding="utf-8")
+        src = read_utf8(path)
         for m in token_re.finditer(src):
             lit = m.group(1)
             if lit is None:
@@ -346,7 +364,7 @@ def scan_kotlin() -> list:
 
 def node_check() -> list:
     errors = []
-    html = OUT.read_text(encoding="utf-8")
+    html = read_utf8(OUT)
     scripts = re.findall(r"<script[^>]*>(.*?)</script>", html, re.S)
     for i, script in enumerate(scripts):
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
@@ -439,7 +457,11 @@ def main() -> int:
     if not SRC.exists():
         print(f"ERROR: {SRC} tidak ditemukan.")
         return 1
-    src_text = SRC.read_text(encoding="utf-8")
+    try:
+        src_text = read_utf8(SRC)
+    except BerkasTakTerbaca as exc:
+        print(f"ERROR: {exc}")
+        return 1
     minified = minify_html(src_text)
 
     if len(sys.argv) > 1 and sys.argv[1] == "--check":
@@ -456,17 +478,25 @@ def main() -> int:
                 "berpasangan dengan remote.src.html; bangkitkan dengan: "
                 "python3 scripts/prepare_remote.py"
             )
-        elif OUT.read_text(encoding="utf-8") != minified:
+        elif read_utf8(OUT) != minified:
             problems.append(
                 f"{OUT.name} TIDAK sinkron dengan remote.src.html — "
                 "jalankan: python3 scripts/prepare_remote.py lalu commit keduanya."
             )
 
-        js_errors = node_check() if OUT.exists() else []
+        try:
+            js_errors = node_check() if OUT.exists() else []
+        except BerkasTakTerbaca as exc:
+            problems.append(str(exc))
+            js_errors = []
         if js_errors:
             problems.append("node --check gagal: " + " | ".join(js_errors))
 
-        remote_hits = scan_remote() if OUT.exists() else []
+        try:
+            remote_hits = scan_remote() if OUT.exists() else []
+        except BerkasTakTerbaca as exc:
+            problems.append(str(exc))
+            remote_hits = []
         if remote_hits:
             problems.append(
                 "remote.html memuat kata Indonesia: "
@@ -485,10 +515,18 @@ def main() -> int:
                     "kembalikan direktorinya atau perbarui jalur pindaian "
                     "di prepare_remote.py"
                 )
-        xml_hits = scan_xml()
+        try:
+            xml_hits = scan_xml()
+        except BerkasTakTerbaca as exc:
+            problems.append(str(exc))
+            xml_hits = []
         if xml_hits:
             problems.append("values/*.xml memuat kata Indonesia: " + ", ".join(xml_hits))
-        kt_hits = scan_kotlin()
+        try:
+            kt_hits = scan_kotlin()
+        except BerkasTakTerbaca as exc:
+            problems.append(str(exc))
+            kt_hits = []
         if kt_hits:
             problems.append("string literal Kotlin memuat kata Indonesia: " + ", ".join(kt_hits))
 
