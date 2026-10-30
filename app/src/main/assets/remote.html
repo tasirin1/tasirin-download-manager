@@ -1592,6 +1592,7 @@ fsTotal = data.total || fsItems.length;
 fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
 more.forEach(function (it) { fsAppendRow(fsList, it); });
 fsUpdateLoadMore();
+if (fsSearchInput.value) fsSetSearch(fsSearchInput.value);
 } catch (e) {
 fsMsg('Failed to load more: ' + e, true);
 } finally {

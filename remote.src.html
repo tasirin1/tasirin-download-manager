@@ -3917,6 +3917,11 @@ async function fsLoadMore() {
     fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
     more.forEach(function (it) { fsAppendRow(fsList, it); });
     fsUpdateLoadMore();
+    // Nilai ulang pesan hasil pencarian terhadap keadaan termuat yang
+    // baru (issue #859): tanpa ini pesan 'No matches in loaded items'
+    // tetap tampil di atas kecocokan yang baru dimuat, atau terus
+    // menyuruh Load more sesudah semua halaman termuat.
+    if (fsSearchInput.value) fsSetSearch(fsSearchInput.value);
   } catch (e) {
     fsMsg('Failed to load more: ' + e, true);
   } finally {
