@@ -46,6 +46,10 @@ object SocialMediaExtractor {
     /** Batas total waktu ekstraksi media sosial (ms). */
     private const val EXTRACT_TOTAL_TIMEOUT_MS = 60_000L
 
+    // Anggaran total probe 403 semua opsi YouTube (issue #805): satu
+    // gelombang paralel HEAD (connect+read 6+6 dtk) plus margin.
+    private const val FORBIDDEN_PROBE_BUDGET_MS = 15_000L
+
     /** Timeout HTTP halaman/API per request (dipakai 5+ situs, satu tempat). */
     private const val PAGE_TIMEOUT_MS = 20000
 
@@ -801,7 +805,11 @@ object SocialMediaExtractor {
             }
             // If the page-derived URLs are all n-transformed (403 on the CDN),
             // fall back to Piped instances which return pre-resolved download URLs.
-            if (options.isEmpty() || options.firstOrNull()?.let { isUrlForbidden(it) } == true) {
+            // Probe SEMUA opsi, bukan hanya yang pertama (issue #805):
+            // opsi ber-URL 403 disaring keluar; fallback hanya berjalan
+            // bila tak ada opsi sehat tersisa.
+            val alive = filterForbidden(options)
+            if (alive.isEmpty()) {
                 val piped = extractYouTubeViaPiped(videoId)
                 if (piped.isNotEmpty()) {
                     return piped
@@ -814,8 +822,11 @@ object SocialMediaExtractor {
                 if (cobalt != null) {
                     return listOf(cobalt)
                 }
+                // Semua fallback kosong: kembalikan opsi halaman apa
+                // adanya sebagai upaya terakhir (perilaku lama).
+                return options
             }
-            return options
+            return alive
         } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (gagal parse halaman YouTube: biarkan fallback lain lanjut)
             // Gagal mem-parse halaman/response YouTube — biarkan fallback lain lanjut.
         }
@@ -1042,6 +1053,33 @@ object SocialMediaExtractor {
             }
         }
         return videoUrl to audioUrl
+    }
+
+    /** Saring opsi yang URL langsungnya menjawab 403 (issue #805).
+     *  Probe HEAD berjalan paralel di stageExecutor dengan anggaran
+     *  tunggu bersama; opsi yang probenya gagal/timeout/tertunda
+     *  DIPERTAHANKAN — hanya 403 yang terbukti yang dibuang (sejalan
+     *  isUrlForbidden yang getOrDefault false). */
+    private fun filterForbidden(options: List<Result>): List<Result> {
+        if (options.isEmpty()) return options
+        val futures = options.map { opt ->
+            try {
+                stageExecutor.submit(Callable { isUrlForbidden(opt) })
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val deadline = System.nanoTime() + FORBIDDEN_PROBE_BUDGET_MS * 1_000_000L
+        return options.filterIndexed { i, _ ->
+            val f = futures[i] ?: return@filterIndexed true
+            val remaining = deadline - System.nanoTime()
+            if (remaining <= 0) return@filterIndexed true
+            try {
+                !f.get(remaining, TimeUnit.NANOSECONDS)
+            } catch (_: Exception) {
+                true
+            }
+        }
     }
 
     private fun isUrlForbidden(item: Result): Boolean {
