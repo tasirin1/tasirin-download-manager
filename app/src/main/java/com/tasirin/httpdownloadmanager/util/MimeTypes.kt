@@ -45,8 +45,13 @@ object MimeTypes {
             eq("xml") -> "application/xml"
             else -> "application/octet-stream"
         }
-        if (cache.size > 2000) cache.clear()
-        cache[fileName] = mime
+        // Cek-ukuran + clear + put dalam satu kunci (issue #693):
+        // tanpa kunci beberapa thread bisa clear beruntun dan membuang
+        // entri yang baru dimasukkan thread lain.
+        synchronized(cache) {
+            if (cache.size > 2000) cache.clear()
+            cache[fileName] = mime
+        }
         return mime
     }
 
