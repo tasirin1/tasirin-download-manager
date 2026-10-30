@@ -57,6 +57,18 @@ class FileNamesTest {
     }
 
     @Test
+    fun `safe - potongan tidak membelah pasangan surrogate`() {
+        // Issue #941: emoji mengangkangi titik potong basis (potong
+        // di 196 = tengah pasangan) -> potong mundur satu satuan,
+        // nama terbit tanpa surrogate yatim.
+        val withExt = FileNames.safe("a".repeat(195) + "😀" + "a".repeat(10) + ".mp4")
+        assertEquals("a".repeat(195) + ".mp4", withExt)
+        // Potong polos 200 di tengah pasangan: hasil 199 'a'.
+        val plain = FileNames.safe("a".repeat(199) + "😀" + "a".repeat(10))
+        assertEquals("a".repeat(199), plain)
+    }
+
+    @Test
     fun `unique - nama bebas tidak diubah`() {
         val result = FileNames.unique("video.mp4") { false }
         assertEquals("video.mp4", result)

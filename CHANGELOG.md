@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(util): potongan nama jalur char tak lagi membelah pasangan surrogate** -- kedua titik potong di FileNames.safe kini mundur satu satuan bila akan membelah emoji (helper safeCut), menyamai kesadaran pasangan yang sudah dimiliki jalur byte; sebelumnya nama terbit bisa memuat surrogate yatim yang menjadi '?' di disk. Dikunci uji FileNamesTest (issue #941).
 - **fix(remote): prune cache durasi kini menegakkan anggaran byte, bukan hanya jumlah entri** -- cache 2000 entri berpath dalam terserialisasi melewati plafon muat 512KB cacheLocked() sehingga seluruh cache dibuang di tiap start dingin lalu ditulis lagi sama besarnya (amnesia permanen); prune kini juga membuang entri tertua sampai perkiraan serialisasi konservatif (panjang kunci + 24 per entri) di bawah anggaran 448KB. Dikunci uji ServerVideoDurationsTest (issue #940).
 
 - **fix(util): nama ber-basis >199 char tak lagi kehilangan ekstensi saat pangkas** -- kelayakan ekstensi pada jalur char FileNames.safe kini dinilai dari panjang ekstensinya saja (dot > 0), bukan posisi titik; sebelumnya basis yang sendiri melewati 199 char menghasilkan nama tanpa ekstensi sama sekali. Nilai harapan dibuktikan port Python 1:1 dan dikunci di FileNamesTest (issue #939).

@@ -53,9 +53,9 @@ object FileNames {
             val dot = clean.lastIndexOf('.')
             val ext = if (dot > 0) clean.substring(dot) else ""
             clean = if (ext.isNotEmpty() && ext.length < 200) {
-                clean.substring(0, 200 - ext.length) + ext
+                clean.substring(0, safeCut(clean, 200 - ext.length)) + ext
             } else {
-                clean.substring(0, 200)
+                clean.substring(0, safeCut(clean, 200))
             }
         }
         // Batas filesystem dalam byte (255): 200 char CJK = 600 byte sehingga
@@ -95,6 +95,18 @@ object FileNames {
         }
         return clean
     }
+
+    /** Titik potong yang tidak membelah pasangan surrogate: mundur
+     *  satu satuan bila char tepat sebelum potong adalah surrogate
+     *  tinggi (issue #941) — jalur byte di safe() sudah sadar-pasangan
+     *  (bobot 4), jalur char kini menyamainya agar nama terbit tak
+     *  memuat surrogate yatim yang menjadi '?' di disk. */
+    private fun safeCut(s: String, cut: Int): Int =
+        if (cut > 0 && cut < s.length && s[cut - 1].isHighSurrogate()) {
+            cut - 1
+        } else {
+            cut
+        }
 
     private val RESERVED_NAMES = setOf(
         "CON", "PRN", "AUX", "NUL",
