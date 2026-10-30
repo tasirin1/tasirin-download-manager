@@ -339,11 +339,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             ).closeConnection()
         } catch (e: Exception) {
             logError(e)
+            // Koneksi WAJIB ditutup (issue #782, kelas yang sama dengan
+            // #705): handler bisa melempar di tengah pembacaan body
+            // (readForm), menyisakan byte body yang akan dibaca sebagai
+            // awal request berikutnya pada koneksi keep-alive yang sama.
             newFixedLengthResponse(
                 Response.Status.INTERNAL_ERROR,
                 "text/plain; charset=utf-8",
                 "Internal server error"
-            )
+            ).closeConnection()
         }
         secureHeaders(session.uri, response)
         appendRequestLog(session, response, System.currentTimeMillis() - startedAt)
