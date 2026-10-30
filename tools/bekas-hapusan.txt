@@ -31,3 +31,4 @@ invalidateServerGalleryCache
 isPathAllowed
 isBrowseableAncestor
 setTextFolder
+saveFolder

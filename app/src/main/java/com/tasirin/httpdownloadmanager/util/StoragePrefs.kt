@@ -128,15 +128,6 @@ object StoragePrefs {
         return raw?.takeIf { it.isNotEmpty() }?.let { it.toUri() }
     }
 
-    fun saveFolder(context: Context, uri: Uri?) {
-        prefs(context).edit {
-            putString(KEY_FOLDER_URI, uri?.toString())
-            // Kunci folder_name warisan tidak pernah dibaca (issue #365):
-            // jangan ditulis lagi, dan buang nilai yatim lama bila ada.
-            remove("folder_name")
-        }
-    }
-
     fun isBackgroundEnabled(context: Context): Boolean =
         prefs(context)
             .safeBoolean(KEY_BACKGROUND, true)
