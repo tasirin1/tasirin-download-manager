@@ -565,6 +565,12 @@ class SettingsActivity : AppCompatActivity() {
                     }
                     binding.serverSwitch.isEnabled = true
                     renderServer()
+                    // Render ulang toggle juga: stop/start-gagal menulis
+                    // pref pasangan (autostart ikut false) tetapi
+                    // renderServer tak menyentuh checkbox-nya, jadi
+                    // labelnya basi sampai kunjungan layar berikutnya
+                    // (issue #920).
+                    renderChecks()
                 }
             }
         }
