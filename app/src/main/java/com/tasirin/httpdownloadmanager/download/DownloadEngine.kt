@@ -249,16 +249,19 @@ class DownloadEngine(appContext: Context) {
 
     private fun deferUntilLoaded(key: String, action: () -> Unit) {
         val startJob = synchronized(deferredGateLock) {
-            if (deferredGateQueue.any { it.first == key }) {
+            // Kunci yang sama didaftarkan ulang: entri lama dibuang dan
+            // pendaftaran baru masuk di ekor (issue #960) — niat TERAKHIR
+            // pengguna yang menang. Dulu pendaftaran ulang dibuang,
+            // sehingga pola Jeda-Lanjut-Jeda selama muatan awal berakhir
+            // Lanjut. Penggabungan panggilan identik beruntun tetap
+            // terjaga: antrean tak pernah memuat dua entri berkunci sama.
+            deferredGateQueue.removeIf { it.first == key }
+            deferredGateQueue.addLast(key to action)
+            if (deferredGateJobActive) {
                 false
             } else {
-                deferredGateQueue.addLast(key to action)
-                if (deferredGateJobActive) {
-                    false
-                } else {
-                    deferredGateJobActive = true
-                    true
-                }
+                deferredGateJobActive = true
+                true
             }
         }
         if (!startJob) return
