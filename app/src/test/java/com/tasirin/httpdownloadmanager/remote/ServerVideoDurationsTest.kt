@@ -24,6 +24,20 @@ class ServerVideoDurationsTest {
     }
 
     @Test
+    fun `prune menegakkan anggaran byte untuk kunci panjang`() {
+        // Issue #940: 2000 entri berkunci 300 char terserialisasi
+        // ~620KB — melewati plafon muat 512KB sehingga seluruh cache
+        // dibuang di start dingin. Prune byte menyisakan himpunan
+        // yang JSON-nya muat di bawah plafon.
+        val cache = JSONObject()
+        repeat(2000) { cache.put("k".repeat(300) + it, 123456L) }
+        val pruned = ServerVideoDurations.prune(cache)
+        assertTrue(pruned.length() < 2000)
+        assertTrue(pruned.length() > 0)
+        assertTrue(pruned.toString().length <= 524_288)
+    }
+
+    @Test
     fun `keyFor memasang cap ubah pada token`() {
         // #417: cap berubah -> kunci berubah -> durasi lama tak terwarisi.
         // #441: ukuran ikut dikunci — cap sama tetapi ukuran beda

@@ -24,7 +24,17 @@ class ServerVideoDurations(
         const val TARGET_ENTRIES = 1500
         const val PROBE_FAILURE_TTL_MS = 10L * 60 * 1000
 
-        /** Batasi cache bila melebihi [MAX_ENTRIES] (sisakan [TARGET_ENTRIES]).
+        /** Anggaran byte serialisasi cache. Plafon muat cacheLocked()
+         *  adalah 512KB dan berkas yang melewatinya dibuang UTUH;
+         *  tanpa anggaran ini, cache 2000 entri berpath dalam
+         *  terserialisasi melewati plafon itu sehingga seluruh cache
+         *  hilang di tiap start dingin dan save() menulis lagi berkas
+         *  yang sama besarnya — amnesia permanen (issue #940). Margin
+         *  di bawah plafon menampung pertumbuhan antar-prune. */
+        const val MAX_SERIALIZED_BYTES = 448_000
+
+        /** Batasi cache bila melebihi [MAX_ENTRIES] (sisakan [TARGET_ENTRIES])
+         *  atau melebihi [MAX_SERIALIZED_BYTES].
          *  Murni (tanpa Android) supaya bisa di-unit-test. */
         fun prune(cache: JSONObject): JSONObject {
             if (cache.length() > MAX_ENTRIES) {
@@ -35,6 +45,22 @@ class ServerVideoDurations(
                     iter.next()
                     iter.remove()
                     removed++
+                }
+            }
+            // Anggaran byte (issue #940): perkiraan konservatif per
+            // entri = panjang kunci + 24 (kutip, titik dua, koma, dan
+            // nilai Long sampai 19 digit) — selalu >= ukuran JSON
+            // sebenarnya, jadi hasil prune tak pernah melewati plafon
+            // muat. Buang dari entri tertua (urutan iterasi kunci).
+            var est = 2
+            val measure = cache.keys()
+            while (measure.hasNext()) est += measure.next().length + 24
+            if (est > MAX_SERIALIZED_BYTES) {
+                val iter = cache.keys()
+                while (iter.hasNext() && est > MAX_SERIALIZED_BYTES) {
+                    val key = iter.next()
+                    iter.remove()
+                    est -= key.length + 24
                 }
             }
             return cache
