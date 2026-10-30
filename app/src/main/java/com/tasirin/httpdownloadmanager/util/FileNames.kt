@@ -38,9 +38,21 @@ object FileNames {
         val base = clean.substringBefore('.').uppercase(Locale.ROOT)
         if (base in RESERVED_NAMES) clean = "_$clean"
         if (clean.length > 200) {
+            // Pertahankan ekstensi utuh seperti jalur byte di bawah:
+            // pangkas BASIS ke 200 - panjang ekstensi. Cara lama
+            // (substring(0,190) + ekstensi) menggandakan fragmen
+            // ekstensi dan bisa menghasilkan 240+ char, sedangkan
+            // titik di posisi 191+ jatuh ke potongan polos yang
+            // memotong ekstensi ('.mp4' -> '.mp') (issue #934).
+            // Ekstensi raksasa (>= 200) diperlakukan sebagai nama
+            // biasa, sejajar perlakuan jalur byte (#336).
             val dot = clean.lastIndexOf('.')
-            clean = if (dot in 1..190) clean.substring(0, 190) + clean.substring(dot)
-            else clean.substring(0, 200)
+            val ext = if (dot in 1..199) clean.substring(dot) else ""
+            clean = if (ext.isNotEmpty() && ext.length < 200) {
+                clean.substring(0, 200 - ext.length) + ext
+            } else {
+                clean.substring(0, 200)
+            }
         }
         // Batas filesystem dalam byte (255): 200 char CJK = 600 byte sehingga
         // gagal ENAMETOOLONG. Pangkas per karakter (tak belah UTF-8) sambil

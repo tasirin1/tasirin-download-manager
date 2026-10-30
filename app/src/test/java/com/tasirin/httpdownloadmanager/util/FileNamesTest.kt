@@ -36,6 +36,21 @@ class FileNamesTest {
     }
 
     @Test
+    fun `safe - pangkas 200 char mempertahankan ekstensi utuh`() {
+        // Issue #934 pita B: titik di posisi 197 — cara lama memotong
+        // polos sehingga '.mp4' menjadi '.mp'.
+        val bandB = FileNames.safe("a".repeat(197) + ".mp4")
+        assertEquals(200, bandB.length)
+        assertTrue(bandB.endsWith(".mp4"))
+        // Pita A: titik di posisi 180 dengan ekstensi 50 — cara lama
+        // menggandakan fragmen ekstensi dan menghasilkan 240 char.
+        val bandA = FileNames.safe("a".repeat(180) + "." + "b".repeat(49))
+        assertEquals(200, bandA.length)
+        assertTrue(bandA.endsWith("." + "b".repeat(49)))
+        assertEquals(1, bandA.count { it == '.' })
+    }
+
+    @Test
     fun `unique - nama bebas tidak diubah`() {
         val result = FileNames.unique("video.mp4") { false }
         assertEquals("video.mp4", result)
