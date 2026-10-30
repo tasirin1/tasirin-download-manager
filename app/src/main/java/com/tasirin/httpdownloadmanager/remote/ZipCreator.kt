@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.MediaStore
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import java.io.File
+import java.io.IOException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -96,8 +97,15 @@ object ZipCreator {
         )
         if (!budget.tryTake()) return
         if (file.isDirectory) {
-            val children = runCatching { file.listFiles() }.getOrNull()
-            if (children.isNullOrEmpty()) {
+            // listFiles null = galat I/O, BUKAN folder kosong: menyamakan
+            // keduanya mencatat folder berisi sebagai entri kosong
+            // (issue #846). Gagalkan pembuatan ZIP secara terbuka.
+            val children = try {
+                file.listFiles()
+            } catch (e: Exception) {
+                throw IOException("Cannot list folder: " + file.name, e)
+            } ?: throw IOException("Cannot list folder: " + file.name)
+            if (children.isEmpty()) {
                 zos.putNextEntry(ZipEntry("$entryPath/"))
                 zos.closeEntry()
                 return
@@ -109,13 +117,16 @@ object ZipCreator {
                 zipFile(zos, child, entryPath, depth + 1, seen, budget, usedNames, isFileAllowed)
             }
         } else if (file.isFile) {
-            runCatching {
-                zos.putNextEntry(ZipEntry(entryPath))
-                try {
-                    file.inputStream().use { it.copyTo(zos, IO_BUF) }
-                } finally {
-                    runCatching { zos.closeEntry() }
-                }
+            // Kegagalan baca sumber TIDAK ditelan (issue #846): entri
+            // tanpa ukuran/CRC di muka memakai data descriptor, jadi
+            // salinan yang putus di tengah difinalkan closeEntry sebagai
+            // berkas utuh. Galat dibiarkan naik; createTempZip membuang
+            // seluruh ZIP dan pemanggil menerima kegagalan yang jujur.
+            zos.putNextEntry(ZipEntry(entryPath))
+            try {
+                file.inputStream().use { it.copyTo(zos, IO_BUF) }
+            } finally {
+                runCatching { zos.closeEntry() }
             }
         }
     }
@@ -134,7 +145,12 @@ object ZipCreator {
         tokens.forEach { token ->
             if (budget.count >= MAX_ZIP_ENTRIES) return
             val raw = MediaLibrary.decodeToken(token) ?: return@forEach
-            runCatching {
+            // Galat I/O di dalam blok (baca sumber putus, listFiles gagal)
+            // TIDAK ditelan runCatching ini: ia dilempar ulang sesudah
+            // blok agar seluruh ZIP gagal secara terbuka (issue #846).
+            // Keputusan lewati-token lain (izin, token rusak) tetap di
+            // dalam blok seperti sebelumnya.
+            val outcome = runCatching {
                 val name: String
                 val input: java.io.InputStream?
                 if (raw.startsWith("f:")) {
@@ -147,7 +163,14 @@ object ZipCreator {
                         // path traversal di extractor pihak ketiga (cabang file
                         // tunggal di bawah sudah lewat safeEntryPath).
                         val root = tokenDirRootName(f.name, used)
-                        val children = runCatching { f.listFiles() }.getOrNull() ?: return@runCatching
+                        // listFiles gagal = galat I/O, bukan folder kosong
+                        // (issue #846): lempar agar ditangkap outcome dan
+                        // dilempar ulang sebagai kegagalan ZIP.
+                        val children = try {
+                            f.listFiles()
+                        } catch (e: Exception) {
+                            throw IOException("Cannot list folder: " + f.name, e)
+                        } ?: throw IOException("Cannot list folder: " + f.name)
                         // seen + usedNames dipakai bersama seluruh sibling: map
                         // fresh per child membuat nama ternormalisasi kembar
                         // (kontrol C0 -> '_') menimpa entri duplikat sehingga
@@ -189,15 +212,16 @@ object ZipCreator {
                     return@forEach
                 }
                 val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
-                runCatching {
-                    zos.putNextEntry(ZipEntry(entry))
-                    try {
-                        input.use { it.copyTo(zos, IO_BUF) }
-                    } finally {
-                        runCatching { zos.closeEntry() }
-                    }
+                // Tanpa runCatching: salinan yang putus harus menggagalkan
+                // ZIP, bukan memfinalkan entri terpotong (issue #846).
+                zos.putNextEntry(ZipEntry(entry))
+                try {
+                    input.use { it.copyTo(zos, IO_BUF) }
+                } finally {
+                    runCatching { zos.closeEntry() }
                 }
             }
+            outcome.exceptionOrNull()?.let { if (it is IOException) throw it }
         }
     }
 
@@ -252,7 +276,10 @@ object ZipCreator {
         // duplikat sehingga file kedua hilang diam-diam.
         val used = mutableMapOf<String, Int>()
         val budget = ZipBudget()
-        runCatching {
+        // Galat I/O dari salinan di dalam dilempar ulang sesudah blok
+        // (issue #846); kegagalan query itu sendiri tetap ditelan
+        // seperti sebelumnya (folder media tak terbaca = ZIP kosong).
+        val outcome = runCatching {
             resolver.query(
                 collection, projection,
                 "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? ESCAPE '\\'",
@@ -273,17 +300,19 @@ object ZipCreator {
                     resolver.openInputStream(
                         ContentUris.withAppendedId(collection, c.getLong(iId))
                     )?.use { input ->
-                        runCatching {
-                            zos.putNextEntry(ZipEntry(entry))
-                            try {
-                                input.copyTo(zos, IO_BUF)
-                            } finally {
-                                runCatching { zos.closeEntry() }
-                            }
+                        // Tanpa runCatching: stream MediaStore yang putus
+                        // di tengah tidak boleh memfinalkan entri
+                        // terpotong sebagai berkas utuh (issue #846).
+                        zos.putNextEntry(ZipEntry(entry))
+                        try {
+                            input.copyTo(zos, IO_BUF)
+                        } finally {
+                            runCatching { zos.closeEntry() }
                         }
                     }
                 }
             }
         }
+        outcome.exceptionOrNull()?.let { if (it is IOException) throw it }
     }
 }
