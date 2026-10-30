@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): cap per-token mediaZip kini men-decode token sebelum memeriksa awalan** -- token media yang beredar selalu ter-encode Base64 dari raw 'f:'/'u:', dan alfabet Base64 tidak memuat ':' — pemeriksaan awalan #961 pada string encode tidak pernah cocok, sehingga cap selalu 'x' dan seluruh permukaan mediaZip tetap menyajikan ZIP basi untuk perubahan eksternal. Lambda cap kini memakai MediaLibrary.decodeToken, pola yang sama dengan isMediaTokenAllowed (issue #968).
+
 - **docs(web): luruskan komentar header closeTopOverlay yang basi sejak #937** -- komentar sebelumnya mengklaim menu-menu punya handler Escape sendiri dan modal ditutup paling dulu; sejak #937 kedua menu justru ditangani otoritas tunggal ini dan ditutup paling dulu, sedangkan hanya mediaModal yang menangani Escape sendiri. Komentar kini sesuai urutan nyata agar pemelihara tidak menghidupkan lagi listener per-menu (issue #967).
 
 - **fix(app): kegagalan registrasi NetworkCallback kini tercatat di log** -- registerNetworkCallback sebelumnya membungkus seluruh pendaftarannya dalam runCatching tanpa penanganan gagal, sehingga kegagalan total (anomali platform) membuat bendera konektivitas macet di nilai awal dan auto-resume mati seumur proses tanpa satu baris jejak pun. Kini kegagalan dicatat lewat logEvent (issue #966).

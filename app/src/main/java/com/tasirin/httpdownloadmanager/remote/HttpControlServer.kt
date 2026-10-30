@@ -2196,14 +2196,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val tokens = (requestedTokens.filter(::isMediaTokenAllowed) + pathTokens).distinct()
         if (tokens.isEmpty()) return notFound()
         // Cap sumber per token (issue #961), dilipat dalam urutan
-        // terurut yang sama dengan kunci agar deterministik.
+        // terurut yang sama dengan kunci agar deterministik. Token
+        // WAJIB di-decode dulu (issue #968): token yang beredar selalu
+        // Base64 dari raw 'f:'/'u:' (MediaLibrary.cachedToken) dan
+        // alfabet Base64 tak memuat ':' — memeriksa awalan pada string
+        // encode membuat kedua cabang tak pernah tercapai dan cap
+        // selalu 'x'. Pola sama dengan isMediaTokenAllowed.
         val sortedTokens = tokens.sorted()
         val tokenStamp = sortedTokens.joinToString(";") { token ->
+            val raw = MediaLibrary.decodeToken(token)
             when {
-                token.startsWith(FS_PREFIX) ->
-                    zipFsSourceStamp(File(token.removePrefix(FS_PREFIX)))
-                token.startsWith("u:") ->
-                    zipUriSourceStamp(token.removePrefix("u:").toUri())
+                raw != null && raw.startsWith(FS_PREFIX) ->
+                    zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
+                raw != null && raw.startsWith("u:") ->
+                    zipUriSourceStamp(raw.removePrefix("u:").toUri())
                 else -> "x"
             }
         }
