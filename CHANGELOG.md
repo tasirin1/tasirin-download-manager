@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): label tombol batch galeri tidak lagi basi sesudah halaman berikutnya termuat** -- updateGalBatch sebelumnya hanya dipanggil dari toggle seleksi dan handler Select all, sehingga sesudah pengguna memilih semua item termuat secara manual lalu scroll memuat item baru yang tidak terpilih, label tetap 'Cancel all' padahal mengetuknya menjalankan aksi sebaliknya (memilih semua). Kini cabang muat-lanjutan menyegarkan bilah batch bila mode pilih aktif (issue #955).
+
 - **fix(app): bendera konektivitas tidak lagi macet false di Android 6** -- jalur registrasi NetworkCallback API 23 bersifat per-network, sehingga onLost untuk satu network mematikan bendera networkUp walau network lain masih hidup, dan bendera bisa tetap false sampai perubahan network berikutnya (failover mirror tertahan tanpa alasan). Callback kini menahan himpunan network yang tersedia dan networkUp adalah agregatnya (turun hanya bila himpunan kosong) di semua jalur registrasi (issue #954).
 
 - **fix(download): daftar URL gagal kini per item, bukan global** -- failedUrls sebelumnya berkunci string URL saja seumur proses dan diisi pada setiap kegagalan tanpa klasifikasi, sehingga satu timeout transien item pertama di URL cermin bersama membuat failover item kedua melewati cermin sehat yang belum pernah dicobanya. Kunci entri kini id item + URL: penghematan percobaan ulang untuk item yang sama tetap utuh, pencemaran lintas item hilang (issue #953).

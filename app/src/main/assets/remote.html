@@ -827,6 +827,7 @@ galleryItems = galleryItems.concat(items);
 galleryPage++;
 galleryHasMore = !!data.hasMore;
 galleryRetryDone = false;
+if (galSelectMode) updateGalBatch();
 loadMoreGallery();
 }
 } catch (e) {

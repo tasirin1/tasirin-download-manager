@@ -3075,6 +3075,10 @@ async function loadGalleryRequest(reset) {
       galleryPage++;
       galleryHasMore = !!data.hasMore;
       galleryRetryDone = false;
+      // Label batch wajib segar sesudah concat (issue #955): tanpa ini
+      // label 'Cancel all' basi bertahan padahal item baru tidak
+      // terpilih, dan ketukan tombolnya menjalankan aksi sebaliknya.
+      if (galSelectMode) updateGalBatch();
       loadMoreGallery();
     }
   } catch (e) {
