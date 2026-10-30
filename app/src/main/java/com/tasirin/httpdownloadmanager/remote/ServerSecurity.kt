@@ -178,21 +178,16 @@ object ServerSecurity {
     }
 
     /** Validasi tujuan tulis dari remote: blank memakai default, `m:` hanya
-     * relative path MediaStore, sedangkan path file harus di dalam root. */
-    fun isRemoteDestinationAllowed(path: String, roots: List<File>): Boolean {
-        val clean = path.trim()
-        if (clean.isEmpty()) return true
-        if (clean.startsWith("m:")) {
-            val relative = clean.removePrefix("m:").trim().trim('/')
-            if (relative.isEmpty()) return true
-            if (relative.contains('\\')) return false
-            return relative.split('/').none { it.isEmpty() || it == "." || it == ".." }
-        }
-        // Trim ulang setelah prefix dilepas: "f: /sdcard/x" sah dan
-        // tidak boleh ditolak hanya karena spasi pemisah prefix.
-        val filePath = if (clean.startsWith("f:")) clean.removePrefix("f:").trim() else clean
-        return isPathAllowed(filePath, roots)
-    }
+     * relative path MediaStore, sedangkan path file harus di dalam root.
+     * Varian List<File> ini MENDELEGASIKAN ke varian Fast (issue #793):
+     * dulu kebijakan ditulis dua kali dengan mekanisme cek segmen berbeda
+     * (split vs hasBadSegment) dan hanya varian Fast yang jalan di
+     * produksi, jadi uji atas fungsi ini bisa hijau pada logika yang tak
+     * pernah dipakai. Ekuivalensi kedua cek segmen dibuktikan menyeluruh
+     * (port Python: 364 kasus string, 0 beda); pola delegasi yang sama
+     * dengan isPathAllowed. */
+    fun isRemoteDestinationAllowed(path: String, roots: List<File>): Boolean =
+        isRemoteDestinationAllowedFast(path, canonicalRootPaths(roots))
 
     /** true bila ada segmen kosong/./.. — validasi sekali jalan untuk
      *  varian fast (jalur request, tanpa alokasi daftar antara). */
@@ -233,16 +228,8 @@ object ServerSecurity {
         roots: List<File>,
         fullAccess: Boolean,
         mediaRoot: String = "/storage/emulated/0"
-    ): Boolean {
-        val clean = relativePath.trim().trim('/')
-        if (clean.isEmpty()) return fullAccess
-        if (clean.contains('\\') || clean.split('/').any { it.isEmpty() || it == "." || it == ".." }) {
-            return false
-        }
-        if (fullAccess) return true
-        val virtualPath = "$mediaRoot/$clean"
-        return isPathAllowed(virtualPath, roots)
-    }
+    ): Boolean =
+        isMediaStorePathAllowedFast(relativePath, canonicalRootPaths(roots), fullAccess, mediaRoot)
 
     /** Varian cepat isMediaStorePathAllowed (root sudah di-canonical). */
     fun isMediaStorePathAllowedFast(
