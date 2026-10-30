@@ -6572,6 +6572,15 @@ function render(items) {
   updateRows(items);
 }
 
+// Override persen HLS (issue #994): 0 adalah nilai SAH selama
+// segmen pertama (rata-rata byte segmen masih 0), jadi jangan
+// pakai pola || -1 yang menelan 0 menjadi -1 dan membuat total
+// estimasi tampil sebagai total pasti.
+function hlsOverrideOf(it) {
+  return (typeof it.progressPercentOverride === 'number')
+    ? it.progressPercentOverride : -1;
+}
+
 function rowSubHtml(it) {
   const done = it.state === 'COMPLETED';
   const prog = done ? 100 : Math.max(0, Math.min(100, Math.round(it.progress || 0)));
@@ -6579,7 +6588,7 @@ function rowSubHtml(it) {
   if (done) {
     meta = fmt(it.totalBytes || it.bytesDownloaded);
     if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
-  } else if (it.totalBytes > 0 && (it.progressPercentOverride || -1) < 0) {
+  } else if (it.totalBytes > 0 && hlsOverrideOf(it) < 0) {
     meta = fmt(it.bytesDownloaded) + ' / ' + fmt(getLockedTotal(it));
   } else {
     meta = fmt(it.bytesDownloaded);
@@ -6588,7 +6597,7 @@ function rowSubHtml(it) {
     meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
     if (it.etaSeconds > 0) meta += ' \u00b7 ETA ' + fmtEta(it.etaSeconds);
   }
-  var isHls = it.state === 'DOWNLOADING' && (it.progressPercentOverride || -1) >= 0;
+  var isHls = it.state === 'DOWNLOADING' && hlsOverrideOf(it) >= 0;
   const barCls = it.state === 'DOWNLOADING' ? (' downloading' + (isHls ? ' hls' : '')) : (it.state === 'PAUSED' ? ' paused' : '');
   return '<div class="item-sub">' +
     '<div class="meta">' + stateBadge(it.state) + '<span>' + meta + '</span></div>' +
@@ -6625,7 +6634,7 @@ function fmtDate(ms) {
 const lockedTotalBytes = new Map();
 function getLockedTotal(it) {
   if (it.state === 'COMPLETED') return it.totalBytes || it.bytesDownloaded;
-  if ((it.progressPercentOverride || -1) >= 0) return it.bytesDownloaded;
+  if (hlsOverrideOf(it) >= 0) return it.bytesDownloaded;
   if (it.totalBytes > 0) {
     var prev = lockedTotalBytes.get(it.id);
     if (!prev) lockedTotalBytes.set(it.id, it.totalBytes);
@@ -6648,7 +6657,7 @@ function rowMetaText(it) {
     return meta;
   }
   // HLS: progressPercentOverride >= 0 means total is estimated, don't show it
-  if ((it.progressPercentOverride || -1) >= 0) {
+  if (hlsOverrideOf(it) >= 0) {
     return fmt(it.bytesDownloaded);
   }
   var locked = getLockedTotal(it);
@@ -6709,7 +6718,7 @@ function patchRowSub(li, it) {
   // Update bar class based on state (remove downloading/hls when done)
   const barEl = sub._bar || (sub._bar = sub.querySelector('.bar'));
   if (barEl) {
-    var isHlsU = it.state === 'DOWNLOADING' && (it.progressPercentOverride || -1) >= 0;
+    var isHlsU = it.state === 'DOWNLOADING' && hlsOverrideOf(it) >= 0;
     var wantCls = it.state === 'DOWNLOADING' ? ('downloading' + (isHlsU ? ' hls' : '')) : (it.state === 'PAUSED' ? 'paused' : '');
     if (barEl._barCls !== wantCls) {
       barEl.classList.remove('downloading', 'hls', 'paused');
@@ -6785,12 +6794,12 @@ function updateRows(items) {
         pv[2] === it.progress && pv[3] === it.speedBps &&
         pv[4] === it.etaSeconds && pv[5] === (it.retryCount || 0) &&
         pv[6] === (it.checksumVerified ? 1 : 0) &&
-        pv[7] === (it.progressPercentOverride || -1)) {
+        pv[7] === hlsOverrideOf(it)) {
       continue;
     }
     li._pv = [it.bytesDownloaded, it.totalBytes, it.progress, it.speedBps,
       it.etaSeconds, it.retryCount || 0, it.checksumVerified ? 1 : 0,
-      it.progressPercentOverride || -1];
+      hlsOverrideOf(it)];
     // Cap URL, bukan URL utuh (issue #830, pola #822 di structSig):
     // tanda tangan baris ini dihitung per baris per snapshot.
     const sig = it.state + '|' + it.bytesDownloaded + '|' + it.totalBytes + '|' + it.progress + '|' + it.speedBps + '|' +

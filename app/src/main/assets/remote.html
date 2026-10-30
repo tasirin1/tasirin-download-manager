@@ -3859,6 +3859,10 @@ return;
 }
 updateRows(items);
 }
+function hlsOverrideOf(it) {
+return (typeof it.progressPercentOverride === 'number')
+? it.progressPercentOverride : -1;
+}
 function rowSubHtml(it) {
 const done = it.state === 'COMPLETED';
 const prog = done ? 100 : Math.max(0, Math.min(100, Math.round(it.progress || 0)));
@@ -3866,7 +3870,7 @@ let meta;
 if (done) {
 meta = fmt(it.totalBytes || it.bytesDownloaded);
 if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
-} else if (it.totalBytes > 0 && (it.progressPercentOverride || -1) < 0) {
+} else if (it.totalBytes > 0 && hlsOverrideOf(it) < 0) {
 meta = fmt(it.bytesDownloaded) + ' / ' + fmt(getLockedTotal(it));
 } else {
 meta = fmt(it.bytesDownloaded);
@@ -3875,7 +3879,7 @@ if (it.state === 'DOWNLOADING' && it.speedBps > 0) {
 meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
 if (it.etaSeconds > 0) meta += ' \u00b7 ETA ' + fmtEta(it.etaSeconds);
 }
-var isHls = it.state === 'DOWNLOADING' && (it.progressPercentOverride || -1) >= 0;
+var isHls = it.state === 'DOWNLOADING' && hlsOverrideOf(it) >= 0;
 const barCls = it.state === 'DOWNLOADING' ? (' downloading' + (isHls ? ' hls' : '')) : (it.state === 'PAUSED' ? ' paused' : '');
 return '<div class="item-sub">' +
 '<div class="meta">' + stateBadge(it.state) + '<span>' + meta + '</span></div>' +
@@ -3907,7 +3911,7 @@ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) 
 const lockedTotalBytes = new Map();
 function getLockedTotal(it) {
 if (it.state === 'COMPLETED') return it.totalBytes || it.bytesDownloaded;
-if ((it.progressPercentOverride || -1) >= 0) return it.bytesDownloaded;
+if (hlsOverrideOf(it) >= 0) return it.bytesDownloaded;
 if (it.totalBytes > 0) {
 var prev = lockedTotalBytes.get(it.id);
 if (!prev) lockedTotalBytes.set(it.id, it.totalBytes);
@@ -3926,7 +3930,7 @@ let meta = fmt(it.totalBytes || it.bytesDownloaded);
 if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
 return meta;
 }
-if ((it.progressPercentOverride || -1) >= 0) {
+if (hlsOverrideOf(it) >= 0) {
 return fmt(it.bytesDownloaded);
 }
 var locked = getLockedTotal(it);
@@ -3977,7 +3981,7 @@ const pct = sub._pct || (sub._pct = sub.querySelector('.bar-pct'));
 if (pct && pct._p !== prog) { pct._p = prog; pct.textContent = prog + '%'; }
 const barEl = sub._bar || (sub._bar = sub.querySelector('.bar'));
 if (barEl) {
-var isHlsU = it.state === 'DOWNLOADING' && (it.progressPercentOverride || -1) >= 0;
+var isHlsU = it.state === 'DOWNLOADING' && hlsOverrideOf(it) >= 0;
 var wantCls = it.state === 'DOWNLOADING' ? ('downloading' + (isHlsU ? ' hls' : '')) : (it.state === 'PAUSED' ? 'paused' : '');
 if (barEl._barCls !== wantCls) {
 barEl.classList.remove('downloading', 'hls', 'paused');
@@ -4038,12 +4042,12 @@ if (pv && pv[0] === it.bytesDownloaded && pv[1] === it.totalBytes &&
 pv[2] === it.progress && pv[3] === it.speedBps &&
 pv[4] === it.etaSeconds && pv[5] === (it.retryCount || 0) &&
 pv[6] === (it.checksumVerified ? 1 : 0) &&
-pv[7] === (it.progressPercentOverride || -1)) {
+pv[7] === hlsOverrideOf(it)) {
 continue;
 }
 li._pv = [it.bytesDownloaded, it.totalBytes, it.progress, it.speedBps,
 it.etaSeconds, it.retryCount || 0, it.checksumVerified ? 1 : 0,
-it.progressPercentOverride || -1];
+hlsOverrideOf(it)];
 const sig = it.state + '|' + it.bytesDownloaded + '|' + it.totalBytes + '|' + it.progress + '|' + it.speedBps + '|' +
 it.etaSeconds + '|' + (it.error || '') + '|' + (it.retryCount || 0) + '|' + (it.checksumVerified ? 1 : 0) + '|' + it.fileName + '|' + urlSig(it.url);
 if (lastRowSig[it.id] === sig) continue;
