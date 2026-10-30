@@ -2537,6 +2537,7 @@ class DownloadEngine(appContext: Context) {
                     rollbackReplacement(item.id)
                     throw IOException(it)
                 }
+                ensurePresentForCommit(item.id, published0)
                 commitReplacement(item.id)
                 val published = organizeIfEnabled(saver, published0, finalName)
                 ensurePublishedKept(item.id, published0, published)
@@ -2566,6 +2567,7 @@ class DownloadEngine(appContext: Context) {
                 rollbackReplacement(item.id)
                 throw IOException(it)
             }
+            ensurePresentForCommit(item.id, published0)
             commitReplacement(item.id)
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
@@ -2947,6 +2949,7 @@ class DownloadEngine(appContext: Context) {
                 rollbackReplacement(item.id)
                 throw IOException(it)
             }
+            ensurePresentForCommit(item.id, published0)
             commitReplacement(item.id)
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
@@ -3817,6 +3820,7 @@ class DownloadEngine(appContext: Context) {
             rollbackReplacement(item.id)
             throw IOException(it)
         }
+        ensurePresentForCommit(item.id, published0)
         commitReplacement(item.id)
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
@@ -3992,6 +3996,7 @@ class DownloadEngine(appContext: Context) {
             rollbackReplacement(item.id)
             throw IOException(it)
         }
+        ensurePresentForCommit(item.id, published0)
         commitReplacement(item.id)
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
@@ -4489,6 +4494,25 @@ class DownloadEngine(appContext: Context) {
         updateItem(itemId) { it.copy(checksumVerified = true) }
         flushSave()
         return null
+    }
+
+    /** Penjaga commit sesudah verifikasi checksum (issue #881): digest
+     *  adalah pembacaan sinkron yang tak terinterupsi pembatalan, dan
+     *  verifyChecksum sendiri mengembalikan null (lolos) bila item
+     *  sudah hilang saat ia mulai. Bila pengguna menghapus penerus di
+     *  jendela itu, commitReplacement tetap memensiunkan pendahulu
+     *  yang bagus untuk penerus yang tak lagi diinginkan — versi lama
+     *  hilang permanen, melanggar janji #215. Item hilang = hasil
+     *  publish dibuang + rollback, persis jalur checksum gagal. */
+    private fun ensurePresentForCommit(
+        itemId: String,
+        published: FileSaver.PublishResult
+    ) {
+        if (_items.value.none { it.id == itemId }) {
+            deletePublished(published)
+            rollbackReplacement(itemId)
+            throw CancellationException("item $itemId removed during finalize")
+        }
     }
 
     private fun computeDigest(
