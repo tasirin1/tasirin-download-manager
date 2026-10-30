@@ -627,7 +627,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialCarouselSection.isVisible = false
                 return
             }
-            val isYoutube = target.contains("youtube.com/") || target.contains("youtu.be/")
+            // Berbasis host (issue #839, saudara #818/#828): substring
+            // atas URL utuh salah memberi picker YouTube ke tautan
+            // sosmed lain yang query-nya memuat youtube.com/.
+            val isYoutube = SocialMediaExtractor.isYouTubeUrl(target)
             if (isYoutube) {
                 socialOptions = emptyList()
                 socialVideoOptions = emptyList()
