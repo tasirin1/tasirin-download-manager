@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(util): pre-filter SQL galeri tidak lagi membuang video di luar subfolder saat folder root ikut dipilih** -- pembangunan selection sebelumnya melewati folder root dengan continue tetapi klausa subfolder lain tetap membatasi kueri MediaStore, sehingga baris di luar subfolder tak pernah termuat (berkasnya diselamatkan scan filesystem tanpa durasi; galeri native tak punya probe durasi sehingga label durasi hilang). Pembangunan selection kini diekstrak menjadi fungsi murni bangunSelectionFolder yang mengembalikan null (tanpa batasan) bila ada folder root, dan teruji di GalleryFolderFilterTest (issue #945).
+
 - **fix(download): normalisasi PTS muxer kini benar-benar selalu naik** -- writeTrackPts sebelumnya hanya menaikkan timestamp yang MENURUN; dua sampel berurutan ber-PTS identik lolos apa adanya ke MediaMuxer, melanggar kontrak fungsi itu sendiri, dan sentinel firstPts=-1 bertabrakan dengan sampleTime sah -1 sehingga sampel kedua menjadi basis dan ikut ternormalisasi ke 0. Kini kesamaan juga dinaikkan (lastPts+1) dan sampel pertama ditandai boolean terpisah (issue #944).
 
 - **fix(web): sorotan seret-lepas di File Manager kini hanya menyala untuk seretan berkas** -- handler dragover daftar berkas sebelumnya memasang kelas .fs-drag dan preventDefault untuk SEMUA seretan termasuk teks/URL dari tab lain, padahal drop-nya pasti diabaikan diam-diam; kini sorotan hanya muncul bila dataTransfer.types memuat 'Files' (issue #943).

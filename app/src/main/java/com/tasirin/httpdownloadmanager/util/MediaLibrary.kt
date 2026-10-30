@@ -193,6 +193,35 @@ object MediaLibrary {
         return "uri:" + (contentUri ?: token)
     }
 
+    /** Bangun pre-filter SQL (selection + args) kueri MediaStore dari
+     *  folder terpilih. Mengembalikan null bila pre-filter TIDAK boleh
+     *  membatasi kueri: daftar kosong, atau ada folder yang rel-nya
+     *  kosong alias seluruh root dipilih (issue #945 — sebelumnya folder
+     *  root dilewati `continue` tetapi klausa subfolder lain tetap
+     *  membatasi, sehingga baris MediaStore di luar subfolder tak pernah
+     *  termuat dan durasinya hilang di galeri native). Murni agar bisa
+     *  di-unit-test seperti filter final. */
+    internal fun bangunSelectionFolder(
+        selectedFolders: List<String>,
+        galleryRoot: String,
+        relCol: String
+    ): Pair<String, Array<String>>? {
+        val clauses = mutableListOf<String>()
+        val args = mutableListOf<String>()
+        val root = galleryRoot
+        for (folder in selectedFolders) {
+            val rel = folder.trimEnd('/').removePrefix(root).trim('/')
+            if (rel.isEmpty()) return null // seluruh root dipilih → tanpa batasan
+            // Nama folder asli bisa mengandung "%"/"_" (mis. "100%"):
+            // escape agar LIKE tidak melebar ke folder lain.
+            clauses += "($relCol LIKE ? ESCAPE '\\' OR $relCol = ?)"
+            args += escapeLike(rel) + "/%"
+            args += "$rel/"
+        }
+        if (clauses.isEmpty()) return null
+        return clauses.joinToString(" OR ") to args.toTypedArray()
+    }
+
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
     private val VIDEO_EXTS = setOf("mp4", "mkv", "webm", "avi", "mov", "3gp", "m4v", "mpg", "mpeg", "ts", "m2ts")
 
@@ -618,30 +647,13 @@ object MediaLibrary {
             if (selectedFolders.isNotEmpty()) {
                 val relCol: String? =
                     if (Build.VERSION.SDK_INT >= 29) MediaStore.MediaColumns.RELATIVE_PATH else null
-                if (relCol != null) {
-                    val clauses = mutableListOf<String>()
-                    val args = mutableListOf<String>()
-                    val root = galleryRoot
-                    for (folder in selectedFolders) {
-                        val rel = folder.trimEnd('/').removePrefix(root).trim('/')
-                        if (rel.isEmpty()) continue // seluruh root dipilih → tanpa batasan
-                        // Nama folder asli bisa mengandung "%"/"_" (mis. "100%"):
-                        // escape agar LIKE tidak melebar ke folder lain.
-                        clauses += "($relCol LIKE ? ESCAPE '\\' OR $relCol = ?)"
-                        args += escapeLike(rel) + "/%"
-                        args += "$rel/"
-                    }
-                    if (clauses.isEmpty()) {
-                        selection = null
-                        selectionArgs = null
-                    } else {
-                        selection = clauses.joinToString(" OR ")
-                        selectionArgs = args.toTypedArray()
-                    }
+                val built = if (relCol != null) {
+                    bangunSelectionFolder(selectedFolders, galleryRoot, relCol)
                 } else {
-                    selection = null
-                    selectionArgs = null
+                    null
                 }
+                selection = built?.first
+                selectionArgs = built?.second
             } else {
                 selection = null
                 selectionArgs = null

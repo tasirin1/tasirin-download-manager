@@ -1,6 +1,9 @@
 package com.tasirin.httpdownloadmanager.util
 
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -141,5 +144,51 @@ class GalleryFolderFilterTest {
         val otherFolder = "$otherRoot/DCIM/Camera"
         assertTrue(tampil(null, "DCIM/Camera/VID.mp4", otherRoot, listOf(otherFolder)))
         assertFalse(tampil(null, "Movies/VID.mp4", otherRoot, listOf(otherFolder)))
+    }
+
+    // Pre-filter SQL (issue #945): campuran folder root + subfolder tidak
+    // boleh membatasi kueri ke subfolder saja.
+    @Test
+    fun `selection - root ikut dipilih berarti tanpa batasan`() {
+        assertNull(
+            MediaLibrary.bangunSelectionFolder(
+                listOf(root, "$root/Movies"), root, "relative_path"
+            )
+        )
+        assertNull(
+            MediaLibrary.bangunSelectionFolder(
+                listOf("$root/Movies", root), root, "relative_path"
+            )
+        )
+        assertNull(
+            MediaLibrary.bangunSelectionFolder(listOf(root), root, "relative_path")
+        )
+        assertNull(
+            MediaLibrary.bangunSelectionFolder(emptyList(), root, "relative_path")
+        )
+    }
+
+    @Test
+    fun `selection - hanya subfolder menghasilkan klausa LIKE per folder`() {
+        val built = MediaLibrary.bangunSelectionFolder(
+            listOf("$root/Movies", "$root/DCIM/Camera"), root, "relative_path"
+        )
+        assertEquals(
+            "(relative_path LIKE ? ESCAPE '\\' OR relative_path = ?) OR " +
+                "(relative_path LIKE ? ESCAPE '\\' OR relative_path = ?)",
+            built!!.first
+        )
+        assertArrayEquals(
+            arrayOf("Movies/%", "Movies/", "DCIM/Camera/%", "DCIM/Camera/"),
+            built.second
+        )
+    }
+
+    @Test
+    fun `selection - nama folder berkoma persen di-escape`() {
+        val built = MediaLibrary.bangunSelectionFolder(
+            listOf("$root/100%"), root, "relative_path"
+        )
+        assertArrayEquals(arrayOf("100\\%/%", "100%/"), built!!.second)
     }
 }
