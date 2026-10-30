@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): ikon tampilan kosong tidak menyala di tema gelap** -- Kotak ikon .empty .ico bergradasi berakhir di #f1edff (lavender hampir putih) yang dikunci permanen, sehingga menyala terang di halaman gelap saat folder/list kosong; kini berakhir di var(--hover-soft) khusus tema gelap (temuan audit tampilan atas permintaan owner, tanpa issue).
 - **fix(remote): kotak ikon jenis berkas di File Manager menyesuaikan tema gelap** -- Varian .fs-ico-* (APK, arsip, PDF, gambar, audio, video, teks, lain) berlatar pastel terang tema terang tanpa penyesuaian gelap, sehingga tiap baris berkas menonjol terang di kartu gelap; kini tint rgba + ikon diperterang di tema gelap meniru pola lencana .f-type (temuan audit tampilan atas permintaan owner, tanpa issue).
 - **fix(remote): pita hitam di belakang breadcrumb File Manager pada tema gelap hilang** -- Pembungkus lengket breadcrumb (.fs-sticky) berlatar polos --bg (#0A0F24) sementara badan halaman tema gelap bergradasi, sehingga tampil sebagai kotak hitam mengambang membingkai bar breadcrumb (dilaporkan owner lewat tangkapan layar perangkat). Kini transparan di tema gelap, meniru perbaikan yang sama yang sudah diterapkan pada #filtersSticky; bar breadcrumb sendiri tetap berlatar --card (laporan owner langsung, tanpa issue).
 

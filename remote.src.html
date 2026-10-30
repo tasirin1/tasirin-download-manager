@@ -1433,6 +1433,11 @@
   .empty .ico {
  position: relative; width: 88px; height: 88px; margin: 0 auto; border-radius: 28px; background: linear-gradient(135deg, var(--primary-soft), #f1edff); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 28px rgba(99,102,241,.16); }
 
+  /* Tema gelap: ujung gradasi #f1edff hampir putih membuat kotak ikon
+     tampilan kosong menyala di halaman gelap; akhiri di navy lembut. */
+  :root[data-theme="dark"] .empty .ico {
+ background: linear-gradient(135deg, var(--primary-soft), var(--hover-soft)); }
+
   .empty .ico::after {
  content: ""; position: absolute; inset: -9px; border-radius: 34px; border: 1.5px dashed rgba(99,102,241,.25); }
 
