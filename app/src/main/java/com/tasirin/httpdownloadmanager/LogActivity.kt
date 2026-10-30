@@ -119,7 +119,7 @@ class LogActivity : AppCompatActivity() {
     /** Ekspor log error (crash + error server) ke file .txt di folder Download. */
     private fun exportLogTxt() {
         binding.logExport.isEnabled = false
-        lifecycleScope.launch {
+        val exportJob = lifecycleScope.launch {
             val exported = withContext(Dispatchers.IO) {
                 val log = App.httpServer.snapshotLog()
                 val header = buildString {
@@ -208,8 +208,12 @@ class LogActivity : AppCompatActivity() {
                 R.string.log_export_failed
             }
             Toast.makeText(this@LogActivity, messageRes, Toast.LENGTH_LONG).show()
-            binding.logExport.isEnabled = true
         }
+        // Pengaktifan kembali tombol dijamin untuk SEMUA jalan keluar
+        // (issue #869): pengecualian di luar runCatching di dalam
+        // (mis. snapshotLog) atau pembatalan coroutine tidak boleh
+        // meninggalkan tombol mati sampai activity dibuat ulang.
+        exportJob.invokeOnCompletion { binding.logExport.isEnabled = true }
     }
 
     private fun refreshLog() {
