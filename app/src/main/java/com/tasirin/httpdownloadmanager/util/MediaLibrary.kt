@@ -667,6 +667,14 @@ object MediaLibrary {
                     -1
                 }
                 while (c.moveToNext()) {
+                    // Plafon materialisasi (issue #752): blok sumber lain
+                    // semua beranggaran, tetapi loop kursor ini dulu
+                    // memuat seluruh hasil MediaStore sebelum dedupe +
+                    // take akhir — lonjakan memori/CPU per cache-miss di
+                    // perpustakaan video raksasa. Kursor terurut
+                    // DATE_MODIFIED DESC, jadi yang tertahan adalah
+                    // entri terbaru, selaras potongan akhir.
+                    if (list.size >= GALLERY_MAX_ENTRIES) break
                     val name = c.getString(iName) ?: continue
                     val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
                     // Nilai mentah dipertahankan (issue #525): string
