@@ -76,6 +76,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private lateinit var adapter: DownloadAdapter
     private lateinit var listLayoutManager: LinearLayoutManager
     private var pendingMoveId: String? = null
+    // Penjaga re-entry cek update dari dialog About (issue #853,
+    // pola #524 di SettingsActivity).
+    @Volatile private var checkingAboutUpdate = false
     private var summaryActive = 0
     private var summaryPaused = 0
     private var summaryFailed = 0
@@ -1356,7 +1359,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
         view.findViewById<Button>(R.id.btn_about_update).setOnClickListener {
-            checkUpdateFromAbout()
+            checkUpdateFromAbout(it as Button)
         }
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1376,8 +1379,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     /** Cek versi terbaru dari GitHub (cek-saja: aplikasi tidak mengunduh
      *  APK sendiri agar tidak dicurigai Play Protect sebagai dropper). */
-    private fun checkUpdateFromAbout() {
+    private fun checkUpdateFromAbout(button: Button) {
+        // Tanpa penjaga, ketukan berulang selama cek jaringan berjalan
+        // (timeout 15 dtk) melahirkan cek paralel dan dialog hasil
+        // bertumpuk (issue #853; pola #524 di SettingsActivity).
+        if (checkingAboutUpdate) return
+        checkingAboutUpdate = true
+        button.isEnabled = false
         lifecycleScope.launch {
+            try {
             val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@MainActivity) }
             val current = runCatching {
                 packageManager.packageInfoCompat(packageName).versionCodeCompat().toInt()
@@ -1417,6 +1427,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     }
                 }
                 .show()
+            } finally {
+                checkingAboutUpdate = false
+                button.isEnabled = true
+            }
         }
     }
 
