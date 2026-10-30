@@ -420,6 +420,7 @@ let gallerySeq = 0;
 let galleryLoading = false;
 let galleryLoadTicket = 0;
 let galSelectMode = false;
+let galSelectSession = 0;
 const galSelected = new Set();
 const galBatch = document.getElementById('galBatch');
 const mediaModal = document.getElementById('mediaModal');
@@ -718,6 +719,7 @@ galleryRetryDone = false;
 galSelected.clear();
 if (galSelectMode) {
 galSelectMode = false;
+galSelectSession++;
 galBatch.classList.add('hidden');
 galleryGrid.classList.remove('gal-selecting');
 var gsBtn = document.getElementById('galSelectBtn');
@@ -967,6 +969,7 @@ else img.src = img.dataset.thumb;
 var GAL_SELECT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><polyline points="9 12 11 14 15 10"/></svg>';
 function galSetSelectMode(on) {
 galSelectMode = on;
+galSelectSession++;
 galSelected.clear();
 var gsBtn = document.getElementById("galSelectBtn");
 gsBtn.innerHTML = on ? UI_ICONS.close : GAL_SELECT_ICON;
@@ -1021,17 +1024,20 @@ const allSel = galleryItems.length > 0 && galSelected.size === galleryItems.leng
 if (!allSel && galleryHasMore && !btn.disabled) {
 btn.disabled = true;
 btn.textContent = 'Loading...';
+const session = galSelectSession;
 let guard = 0;
 while (galleryHasMore && guard++ < 500) {
+if (galSelectSession !== session) break;
 while (galleryLoading) {
 await new Promise(function (r) { setTimeout(r, 100); });
 }
+if (galSelectSession !== session) break;
 const before = galleryItems.length;
 await loadGallery(false);
 if (galleryItems.length === before) break;
 }
 btn.disabled = false;
-if (!galSelectMode) {
+if (galSelectSession !== session || !galSelectMode) {
 btn.textContent = 'Select all';
 return;
 }
