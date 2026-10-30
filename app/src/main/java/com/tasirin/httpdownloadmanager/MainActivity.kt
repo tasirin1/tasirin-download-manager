@@ -80,6 +80,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     // Penjaga re-entry cek update dari dialog About (issue #853,
     // pola #524 di SettingsActivity).
     @Volatile private var checkingAboutUpdate = false
+    // Instance tombol update pada dialog About yang sedang tampil
+    // (dialog di-inflate baru tiap dibuka, issue #856).
+    private var aboutUpdateButton: Button? = null
     private var summaryActive = 0
     private var summaryPaused = 0
     private var summaryFailed = 0
@@ -1390,10 +1393,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 )
             }
         }
-        view.findViewById<Button>(R.id.btn_about_update).setOnClickListener {
-            checkUpdateFromAbout(it as Button)
-        }
+        val aboutBtn = view.findViewById<Button>(R.id.btn_about_update)
+        aboutUpdateButton = aboutBtn
+        // Dialog yang dibuka ulang saat cek sebelumnya masih berjalan
+        // mewarisi keadaan nonaktif itu (issue #856): tanpa ini tombol
+        // barunya tampak aktif tetapi ketukannya kembali diam-diam.
+        aboutBtn.isEnabled = !checkingAboutUpdate
+        aboutBtn.setOnClickListener { checkUpdateFromAbout() }
         val dialog = Dialog(this)
+        dialog.setOnDismissListener {
+            if (aboutUpdateButton === aboutBtn) aboutUpdateButton = null
+        }
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
@@ -1411,13 +1421,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     /** Cek versi terbaru dari GitHub (cek-saja: aplikasi tidak mengunduh
      *  APK sendiri agar tidak dicurigai Play Protect sebagai dropper). */
-    private fun checkUpdateFromAbout(button: Button) {
+    private fun checkUpdateFromAbout() {
         // Tanpa penjaga, ketukan berulang selama cek jaringan berjalan
         // (timeout 15 dtk) melahirkan cek paralel dan dialog hasil
         // bertumpuk (issue #853; pola #524 di SettingsActivity).
         if (checkingAboutUpdate) return
         checkingAboutUpdate = true
-        button.isEnabled = false
+        aboutUpdateButton?.isEnabled = false
         lifecycleScope.launch {
             try {
             val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@MainActivity) }
@@ -1461,7 +1471,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 .show()
             } finally {
                 checkingAboutUpdate = false
-                button.isEnabled = true
+                // Aktifkan instance yang SEDANG tampil (bisa jadi dialog
+                // dibuka ulang selama cek berjalan, issue #856).
+                aboutUpdateButton?.isEnabled = true
             }
         }
     }
