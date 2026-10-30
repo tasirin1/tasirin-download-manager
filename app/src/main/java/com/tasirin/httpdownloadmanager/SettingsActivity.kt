@@ -668,10 +668,14 @@ class SettingsActivity : AppCompatActivity() {
                     // titik suspensi meninggalkan server menyala melawan
                     // pref + PIN wajib tanpa PIN.
                     withContext(NonCancellable + Dispatchers.IO) { App.stopHttpServer() }
-                    withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        stopServiceIfIdle()
-                        renderServer()
-                    }
+                    // Langsung di sini, tanpa withContext terpisah
+                    // (issue #840): lifecycleScope sudah berjalan di
+                    // Main, dan hop Main ekstra adalah titik suspensi
+                    // yang bisa membatalkan stopServiceIfIdle tepat
+                    // sesudah stop — kedua situs saudara memanggilnya
+                    // sinkron sesudah stop mereka.
+                    stopServiceIfIdle()
+                    renderServer()
                 }
             }
             renderChecks()
