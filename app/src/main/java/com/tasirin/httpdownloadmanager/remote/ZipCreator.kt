@@ -285,14 +285,24 @@ object ZipCreator {
         val used = mutableMapOf<String, Int>()
         val budget = ZipBudget()
         // Galat I/O dari salinan di dalam dilempar ulang sesudah blok
-        // (issue #846); kegagalan query itu sendiri tetap ditelan
-        // seperti sebelumnya (folder media tak terbaca = ZIP kosong).
+        // (issue #846). Kegagalan QUERY (provider melempar / cursor null)
+        // kini juga menggagalkan ZIP (issue #858): sebelumnya ia
+        // menghasilkan ZIP kosong 22 byte yang disajikan sebagai sukses
+        // dan ter-cache 60 detik. Folder yang sungguh kosong tetap sah
+        // (query sukses, nol baris cocok).
+        var queryFailed = false
         val outcome = runCatching {
-            resolver.query(
-                collection, projection,
-                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? ESCAPE '\\'",
-                arrayOf(likeArg), null
-            )?.use { c ->
+            val cursor = try {
+                resolver.query(
+                    collection, projection,
+                    "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? ESCAPE '\\'",
+                    arrayOf(likeArg), null
+                )
+            } catch (e: Exception) {
+                null
+            }
+            if (cursor == null) queryFailed = true
+            cursor?.use { c ->
                 val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val iRel = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
@@ -305,9 +315,13 @@ object ZipCreator {
                     val rawEntry = safeEntryPath(if (dirPart.isEmpty()) name else "$dirPart/$name")
                     if (rawEntry.isEmpty()) continue
                     val entry = uniqueZipName(rawEntry, used)
-                    resolver.openInputStream(
-                        ContentUris.withAppendedId(collection, c.getLong(iId))
-                    )?.use { input ->
+                    // Gagal MEMBUKA entri = entri terlewat (selaras
+                    // issue #857); gagal MENYALIN di tengah tetap fatal.
+                    runCatching {
+                        resolver.openInputStream(
+                            ContentUris.withAppendedId(collection, c.getLong(iId))
+                        )
+                    }.getOrNull()?.use { input ->
                         // Tanpa runCatching: stream MediaStore yang putus
                         // di tengah tidak boleh memfinalkan entri
                         // terpotong sebagai berkas utuh (issue #846).
@@ -321,6 +335,7 @@ object ZipCreator {
                 }
             }
         }
+        if (queryFailed) throw IOException("MediaStore query failed for $folder")
         outcome.exceptionOrNull()?.let { if (it is IOException) throw it }
     }
 }
