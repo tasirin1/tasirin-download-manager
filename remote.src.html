@@ -6962,7 +6962,10 @@ function isSocialUrl(u) {
   if (!h) return false;
   // CDN berkas langsung bukan halaman sosial.
   if (socialHostMatches(h, 'cdninstagram.com') || socialHostMatches(h, 'tiktokcdn.com')) return false;
-  if (socialHostMatches(h, 'tiktok.com')) return true;
+  // douyin.com = keluarga TikTok (issue #819): label, favicon, dan
+  // MainActivity native sudah mengenalinya — gerbang ini tertinggal,
+  // jadi tautan douyin tak pernah memicu badge maupun probe opsi.
+  if (socialHostMatches(h, 'tiktok.com') || socialHostMatches(h, 'douyin.com')) return true;
   if (socialHostMatches(h, 'instagram.com') || h === 'instagr.am') {
     var p = '';
     try { p = new URL(u).pathname; } catch (e) {}
