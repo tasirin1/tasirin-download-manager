@@ -2410,6 +2410,14 @@ document.addEventListener('keydown', function (e) {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const es = document.getElementById('addSheet');
   const sheetOpen = es && !es.classList.contains('hidden');
+  // Modal/sheet lain yang sedang tampil menahan pintasan (issue
+  // #931): tanpa ini, menekan n atau / saat dialog konfirmasi
+  // terbuka membuka permukaan DI BAWAH scrim dan memindahkan fokus
+  // ke belakangnya — merusak invariant fokus dialog teratas (#761).
+  const overlayOpen = ['confirmModal', 'inputModal', 'moveModal', 'shareModal', 'itemSheet', 'fsSheet'].some(function (id) {
+    const el = document.getElementById(id);
+    return el && !el.classList.contains('hidden');
+  }) || (function () { const mm = document.getElementById('mediaModal'); return mm && mm.classList.contains('open'); })();
   if (e.key === 'Escape') {
     if (!dlSearchRow.classList.contains('hidden')) {
       e.preventDefault();
@@ -2417,12 +2425,12 @@ document.addEventListener('keydown', function (e) {
     }
     return;
   }
-  if (e.code === 'KeyN' && !sheetOpen) {
+  if (e.code === 'KeyN' && !sheetOpen && !overlayOpen) {
     e.preventDefault();
     onNewDownloadClick();
     return;
   }
-  if (e.key === '/' && !sheetOpen && currentRoute() === 'downloads') {
+  if (e.key === '/' && !sheetOpen && !overlayOpen && currentRoute() === 'downloads') {
     e.preventDefault();
     openDlSearch(true);
   }

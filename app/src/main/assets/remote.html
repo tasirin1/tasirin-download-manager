@@ -252,6 +252,10 @@ if (typing) return;
 if (e.ctrlKey || e.metaKey || e.altKey) return;
 const es = document.getElementById('addSheet');
 const sheetOpen = es && !es.classList.contains('hidden');
+const overlayOpen = ['confirmModal', 'inputModal', 'moveModal', 'shareModal', 'itemSheet', 'fsSheet'].some(function (id) {
+const el = document.getElementById(id);
+return el && !el.classList.contains('hidden');
+}) || (function () { const mm = document.getElementById('mediaModal'); return mm && mm.classList.contains('open'); })();
 if (e.key === 'Escape') {
 if (!dlSearchRow.classList.contains('hidden')) {
 e.preventDefault();
@@ -259,12 +263,12 @@ closeDlSearch();
 }
 return;
 }
-if (e.code === 'KeyN' && !sheetOpen) {
+if (e.code === 'KeyN' && !sheetOpen && !overlayOpen) {
 e.preventDefault();
 onNewDownloadClick();
 return;
 }
-if (e.key === '/' && !sheetOpen && currentRoute() === 'downloads') {
+if (e.key === '/' && !sheetOpen && !overlayOpen && currentRoute() === 'downloads') {
 e.preventDefault();
 openDlSearch(true);
 }
