@@ -4231,8 +4231,10 @@ if (okCount === ids.length) {
 showToast(doneVerb + ' ' + okCount + ' item(s)', 2500);
 } else if (netCount > 0 && okCount + netCount === ids.length) {
 showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest could not be reached (connection problem)', 4000, 'error');
-} else {
+} else if (netCount === 0) {
 showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest were not eligible', 4000, 'error');
+} else {
+showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest failed', 4000, 'error');
 }
 refresh();
 }

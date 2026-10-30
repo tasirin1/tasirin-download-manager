@@ -6976,8 +6976,12 @@ async function batchRun(action, doneVerb) {
     // Semua kegagalan adalah transport (#919): jangan salahkan
     // eligibility item untuk koneksi yang putus.
     showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest could not be reached (connection problem)', 4000, 'error');
-  } else {
+  } else if (netCount === 0) {
     showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest were not eligible', 4000, 'error');
+  } else {
+    // Campuran state + transport (#924): untuk item yang gagal
+    // transport eligibilitasnya tak diketahui, jadi bunyi netral.
+    showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest failed', 4000, 'error');
   }
   refresh();
 }
