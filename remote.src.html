@@ -4549,9 +4549,9 @@ function openItemSheet(it) {
             // item bisa berubah terminal selama pengguna mengetik, dan
             // server memasang limit tanpa gerbang state.
             const freshNow = currentItems.find(function (x) { return x.id === it.id; });
-            if (!freshNow) { mmShowToast('Item is no longer available', 2500); return; }
+            if (!freshNow) { showToast('Item is no longer available', 3000, 'error'); return; }
             if ((allowedStates.limit || []).indexOf(freshNow.state) < 0) {
-              mmShowToast('Item changed — reopen the menu to act on its current state', 3000);
+              showToast('Item changed — reopen the menu for current actions', 3000, 'error');
               return;
             }
             const parts = val.trim().split(/\s+/);
@@ -6905,9 +6905,9 @@ function doAction(id, action) {
       // item bisa aktif lagi (retry dari klien lain) selama dialog
       // terbuka, dan remove di server tak bergerbang state.
       const freshNow = currentItems.find(function (x) { return x.id === id; });
-      if (!freshNow) { mmShowToast('Item is no longer available', 2500); return; }
+      if (!freshNow) { showToast('Item is no longer available', 3000, 'error'); return; }
       if (['COMPLETED', 'FAILED', 'CANCELLED'].indexOf(freshNow.state) < 0) {
-        mmShowToast('Item changed — reopen the menu to act on its current state', 3000);
+        showToast('Item changed — reopen the menu for current actions', 3000, 'error');
         return;
       }
       doActionNow(id, action);
