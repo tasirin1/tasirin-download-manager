@@ -190,18 +190,14 @@ object StoragePrefs {
         }
     }
 
-    fun setTextFolder(context: Context, path: String?) {
-        prefs(context).edit {
-            putString(KEY_TEXT_FOLDER, path?.takeIf { it.isNotBlank() })
-        }
-    }
-
     /** Tulis path teks + bersihkan folder SAF dalam SATU transaksi
-     *  (issue #905): pasangan setTextFolder + saveFolder(null) yang
-     *  terpisah bisa tertinggal setengah oleh kematian proses —
+     *  (issue #905): pasangan penulisan path teks + saveFolder(null)
+     *  yang terpisah bisa tertinggal setengah oleh kematian proses —
      *  path teks baru tersimpan tetapi folder_uri lama masih ada dan
      *  MENANG di prioritas publish FileSaver, jadi UI dan tujuan
-     *  terbit berpisah selamanya. */
+     *  terbit berpisah selamanya. (Fungsi penulisan path teks saja
+     *  yang lama dihapus pada issue #1022: tak pernah dipanggil lagi
+     *  sesudah fungsi gabungan ini menggantikannya.) */
     fun setTextFolderAndClearFolderUri(context: Context, path: String?) {
         prefs(context).edit {
             putString(KEY_TEXT_FOLDER, path?.takeIf { it.isNotBlank() })

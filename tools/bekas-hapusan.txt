@@ -30,3 +30,4 @@ fileIconCircleColor
 invalidateServerGalleryCache
 isPathAllowed
 isBrowseableAncestor
+setTextFolder
