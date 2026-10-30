@@ -2126,22 +2126,26 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         when (params["action"]) {
             "pause" -> {
                 if (id.isEmpty() || !App.engine.pause(id)) {
-                    return jsonResponse(JSONObject().put("ok", false))
+                    return jsonResponse(JSONObject().put("ok", false)
+                        .put("error", "This action is not available for the item's current state"))
                 }
             }
             "resume" -> {
                 if (id.isEmpty() || !App.engine.resume(id)) {
-                    return jsonResponse(JSONObject().put("ok", false))
+                    return jsonResponse(JSONObject().put("ok", false)
+                        .put("error", "This action is not available for the item's current state"))
                 }
             }
             "cancel" -> {
                 if (id.isEmpty() || !App.engine.cancel(id)) {
-                    return jsonResponse(JSONObject().put("ok", false))
+                    return jsonResponse(JSONObject().put("ok", false)
+                        .put("error", "This action is not available for the item's current state"))
                 }
             }
             "delete" -> {
                 if (id.isEmpty() || !App.engine.remove(id)) {
-                    return jsonResponse(JSONObject().put("ok", false))
+                    return jsonResponse(JSONObject().put("ok", false)
+                        .put("error", "This action is not available for the item's current state"))
                 }
             }
             "rename" -> {

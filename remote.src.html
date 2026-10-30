@@ -6354,17 +6354,18 @@ function updateBatchCount() {
 }
 document.getElementById('batchModeBtn').addEventListener('click', toggleBatchMode);
 document.getElementById('batchCancelBtn').addEventListener('click', toggleBatchMode);
-document.getElementById('batchPauseBtn').addEventListener('click', function () { batchSelected.forEach(function (id) { doAction(id, 'pause'); }); });
-document.getElementById('batchResumeBtn').addEventListener('click', function () { batchSelected.forEach(function (id) { doAction(id, 'resume'); }); });
+document.getElementById('batchPauseBtn').addEventListener('click', function () { batchRun('pause', 'Paused'); });
+document.getElementById('batchResumeBtn').addEventListener('click', function () { batchRun('resume', 'Resumed'); });
 document.getElementById('batchDeleteBtn').addEventListener('click', function () {
   const hiddenDel = batchHiddenCount();
   showConfirm('Delete selected', 'Delete ' + batchSelected.size + ' item(s)?' +
     (hiddenDel ? ' ' + hiddenDel + ' of them are hidden by the current filter/search.' : ''), 'Delete', function () {
-    // Langsung doActionNow, BUKAN doAction: konfirmasi batch di atas sudah
-    // cukup. doAction menyisipkan konfirmasi per item lewat showConfirm
-    // singleton, jadi N panggilan sinkron saling menimpa dan hanya item
-    // terakhir yang terhapus (issue #671).
-    batchSelected.forEach(function (id) { doActionNow(id, 'delete'); });
+    // Langsung doActionNow via batchRun, BUKAN doAction: konfirmasi batch
+    // di atas sudah cukup. doAction menyisipkan konfirmasi per item lewat
+    // showConfirm singleton, jadi N panggilan sinkron saling menimpa dan
+    // hanya item terakhir yang terhapus (issue #671). batchRun mengambil
+    // salinan id secara sinkron sebelum mode batch dimatikan di bawah.
+    batchRun('delete', 'Deleted');
     toggleBatchMode();
   });
 });
@@ -6924,7 +6925,7 @@ function doAction(id, action) {
   }
   doActionNow(id, action);
 }
-async function doActionNow(id, action, extra) {
+async function doActionNow(id, action, extra, quiet) {
   try {
     const body = new URLSearchParams({id: id, action: action});
     if (extra) {
@@ -6940,12 +6941,34 @@ async function doActionNow(id, action, extra) {
       throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status));
     }
     refresh();
+    return true;
   } catch (e) {
     // Semua pemanggil doActionNow adalah UI Downloads; fsMsg menulis ke
     // #fsStatus di dalam #fsView yang hidden di luar route files sehingga
     // error (terutama delete gagal) tak terlihat sama sekali.
-    showToast('Action failed: ' + e.message, 4000, 'error');
+    // Mode quiet (batch, issue #917): jangan menulis toast per item —
+    // penelepon mengumpulkan hasil dan melaporkan satu ringkasan.
+    if (!quiet) {
+      showToast('Action failed: ' + e.message, 4000, 'error');
+    }
+    return false;
   }
+}
+// Aksi batch Downloads (issue #917): tembak semua id dalam mode senyap,
+// lalu laporkan SATU toast ringkasan hitungan. Sebelumnya tiap item
+// menulis toast ke elemen yang sama sehingga saling menimpa, dan
+// penolakan state tampil sebagai 'Action failed: HTTP 200'.
+async function batchRun(action, doneVerb) {
+  const ids = Array.from(batchSelected);
+  if (!ids.length) return;
+  const results = await Promise.all(ids.map(function (id) { return doActionNow(id, action, null, true); }));
+  const okCount = results.filter(Boolean).length;
+  if (okCount === ids.length) {
+    showToast(doneVerb + ' ' + okCount + ' item(s)', 2500);
+  } else {
+    showToast(doneVerb + ' ' + okCount + ' of ' + ids.length + ' item(s) — the rest were not eligible', 4000, 'error');
+  }
+  refresh();
 }
 
 const shareModal = document.getElementById('shareModal');
