@@ -111,9 +111,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // kecil di Android 5; aksi tulis langsung membuangnya.
     private class FsFileListing(val path: String, val entries: List<File>, val total: Int)
     @Volatile private var fsFileListingCache: Pair<Long, FsFileListing>? = null
-    private val completedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
-    private val finalizingUploads = ConcurrentHashMap<String, String>()
-    private val failedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
+    // completedUploads / finalizingUploads / failedUploads hidup di
+    // companion (proses), BUKAN per instance — lihat catatan di sana
+    // (issue #736).
     private val uploadLocks = ConcurrentHashMap<String, UploadLock>()
     private val finalizingGate = Any()
     private val uploadLockGate = Any()
@@ -4032,6 +4032,21 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     companion object {
+        // Status upload bersifat PROSES, bukan per instance (issue #736):
+        // finalisasi berjalan di serverScope instance yang membuatnya, dan
+        // restart server (ganti port) menukar instance di tengah finalisasi
+        // itu — status yang ditulis instance lama ke petanya sendiri hilang
+        // dari instance baru, sehingga uploadVerify menjawab "expired,
+        // upload again" yang salah fakta untuk berkas yang sebenarnya
+        // terbit. Di companion, penulisan instance lama mendarat di peta
+        // yang sama dengan yang dibaca instance baru. (Snapshot/restore
+        // completedUploads di App.restartHttpServer menjadi tak wajib,
+        // tetapi dipertahankan: tak berbahaya dan menutup jendela
+        // snapshot->stop yang sama seperti sebelumnya.)
+        private val completedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
+        private val finalizingUploads = ConcurrentHashMap<String, String>()
+        private val failedUploads = ConcurrentHashMap<String, Pair<String, Long>>()
+
         /** Regex sanitasi log — dihoist agar tidak dikompilasi ulang per panggilan log. */
         private const val SERVER_IO_BUF = 64 * 1024
         private val LOG_SANITIZE_RE = Regex("[\r\n\t]+")
