@@ -9,10 +9,29 @@ class GalleryFolderFilterTest {
     private val root = "/storage/emulated/0"
     private val folder = "$root/DCIM/Camera"
 
+    // Menyusun jalur PRODUKSI persis: gerbang level scan (daftar kosong =
+    // tanpa saringan) + allowedFoldersFor + inSelectedFoldersPrecomputed
+    // yang dipakai scan per baris. Dulu uji memanggil wrapper
+    // isInGalleryFolders yang tak pernah dijalankan produksi (issue #684).
+    private fun tampil(
+        dataPath: String?,
+        relativePath: String?,
+        externalRoot: String,
+        selectedFolders: List<String>,
+        volumeName: String? = null
+    ): Boolean {
+        if (selectedFolders.isEmpty()) return true
+        return MediaLibrary.inSelectedFoldersPrecomputed(
+            dataPath, relativePath,
+            MediaLibrary.allowedFoldersFor(selectedFolders, externalRoot),
+            volumeName
+        )
+    }
+
     @Test
     fun `tanpa filter folder - semua item tampil`() {
-        assertTrue(MediaLibrary.isInGalleryFolders("/x/a.mp4", null, root, emptyList()))
-        assertTrue(MediaLibrary.isInGalleryFolders(null, null, root, emptyList()))
+        assertTrue(tampil("/x/a.mp4", null, root, emptyList()))
+        assertTrue(tampil(null, null, root, emptyList()))
     }
 
     @Test
@@ -23,104 +42,104 @@ class GalleryFolderFilterTest {
         // lewat cabang relatif. Primer bernama eksplisit tetap lolos.
         val movies = "$root/Movies"
         assertFalse(
-            MediaLibrary.isInGalleryFolders(null, "Movies/", root, listOf(movies), volumeName = "external")
+            tampil(null, "Movies/", root, listOf(movies), volumeName = "external")
         )
         assertTrue(
-            MediaLibrary.isInGalleryFolders(null, "Movies/", root, listOf(movies), volumeName = "external_primary")
+            tampil(null, "Movies/", root, listOf(movies), volumeName = "external_primary")
         )
         // Baris volume sekunder ber-DATA terisi diputuskan path absolutnya.
         assertTrue(
-            MediaLibrary.isInGalleryFolders("$movies/VID.mp4", null, root, listOf(movies), volumeName = "external")
+            tampil("$movies/VID.mp4", null, root, listOf(movies), volumeName = "external")
         )
     }
 
     @Test
     fun `path absolut - file di folder atau subfolder cocok`() {
-        assertTrue(MediaLibrary.isInGalleryFolders("$folder/VID.mp4", null, root, listOf(folder)))
-        assertTrue(MediaLibrary.isInGalleryFolders("$folder/sub/VID.mp4", null, root, listOf(folder)))
-        assertTrue(MediaLibrary.isInGalleryFolders(folder, null, root, listOf(folder)))
+        assertTrue(tampil("$folder/VID.mp4", null, root, listOf(folder)))
+        assertTrue(tampil("$folder/sub/VID.mp4", null, root, listOf(folder)))
+        assertTrue(tampil(folder, null, root, listOf(folder)))
     }
 
     @Test
     fun `path absolut - di luar folder terpilih ditolak`() {
-        assertFalse(MediaLibrary.isInGalleryFolders("$root/Movies/VID.mp4", null, root, listOf(folder)))
-        assertFalse(MediaLibrary.isInGalleryFolders("$root/Dcim/VID.mp4", null, root, listOf(folder)))
+        assertFalse(tampil("$root/Movies/VID.mp4", null, root, listOf(folder)))
+        assertFalse(tampil("$root/Dcim/VID.mp4", null, root, listOf(folder)))
     }
 
     @Test
     fun `path absolut - beda huruf besar masih cocok (SQLite LIKE & FAT)`() {
         // Android 6 MediaStore DATA kadang beda kapitalisasi dari folder
         // yang diketik user; SQLite LIKE sendiri case-insensitive.
-        assertTrue(MediaLibrary.isInGalleryFolders("$root/dcim/camera/VID.mp4", null, root, listOf(folder)))
-        assertTrue(MediaLibrary.isInGalleryFolders("$root/DCIM/Camera/Sub/VID.mp4", null, root, listOf(folder.lowercase())))
+        assertTrue(tampil("$root/dcim/camera/VID.mp4", null, root, listOf(folder)))
+        assertTrue(tampil("$root/DCIM/Camera/Sub/VID.mp4", null, root, listOf(folder.lowercase())))
     }
 
     @Test
     fun `path absolut - alias root primer cocok dengan folder asli`() {
         // Android 5-6: DATA kadang memakai symlink /sdcard atau /mnt/sdcard
         // padahal folder galeri disimpan dengan /storage/emulated/0.
-        assertTrue(MediaLibrary.isInGalleryFolders("/sdcard/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
-        assertTrue(MediaLibrary.isInGalleryFolders("/mnt/sdcard/DCIM/Camera/sub/VID.mp4", null, root, listOf(folder)))
-        assertTrue(MediaLibrary.isInGalleryFolders("/storage/emulated/legacy/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
+        assertTrue(tampil("/sdcard/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
+        assertTrue(tampil("/mnt/sdcard/DCIM/Camera/sub/VID.mp4", null, root, listOf(folder)))
+        assertTrue(tampil("/storage/emulated/legacy/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
     }
 
     @Test
     fun `path absolut - volume lain dengan nama folder sama tidak ikut`() {
         // Folder galeri hanya bisa di bawah root primer; jangan menyeret
         // video dari USB/SD eksternal yang kebetulan punya folder senama.
-        assertFalse(MediaLibrary.isInGalleryFolders("/storage/9999-ABCD/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
+        assertFalse(tampil("/storage/9999-ABCD/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
     }
 
     @Test
     fun `relative path MediaStore - cocok walau DATA null`() {
         // Android 11+: DATA bisa null, RELATIVE_PATH = "DCIM/Camera/"
-        assertTrue(MediaLibrary.isInGalleryFolders(null, "DCIM/Camera/VID.mp4", root, listOf(folder)))
-        assertTrue(MediaLibrary.isInGalleryFolders(null, "DCIM/Camera/sub/VID.mp4", root, listOf(folder)))
-        assertTrue(MediaLibrary.isInGalleryFolders(null, "DCIM/Camera/", root, listOf(folder)))
+        assertTrue(tampil(null, "DCIM/Camera/VID.mp4", root, listOf(folder)))
+        assertTrue(tampil(null, "DCIM/Camera/sub/VID.mp4", root, listOf(folder)))
+        assertTrue(tampil(null, "DCIM/Camera/", root, listOf(folder)))
     }
 
     @Test
     fun `relative path MediaStore - di luar folder terpilih ditolak`() {
-        assertFalse(MediaLibrary.isInGalleryFolders(null, "Movies/VID.mp4", root, listOf(folder)))
-        assertFalse(MediaLibrary.isInGalleryFolders(null, "Download/VID.mp4", root, listOf(folder)))
+        assertFalse(tampil(null, "Movies/VID.mp4", root, listOf(folder)))
+        assertFalse(tampil(null, "Download/VID.mp4", root, listOf(folder)))
     }
 
     @Test
     fun `relative path MediaStore - beda huruf besar masih cocok`() {
-        assertTrue(MediaLibrary.isInGalleryFolders(null, "dcim/camera/VID.mp4", root, listOf(folder)))
+        assertTrue(tampil(null, "dcim/camera/VID.mp4", root, listOf(folder)))
     }
 
     @Test
     fun `entry tanpa path sama sekali - ditolak saat filter aktif`() {
         // Bug lama: SAF/MediaStore tanpa DATA ikut tampil walau di luar pilihan.
-        assertFalse(MediaLibrary.isInGalleryFolders(null, null, root, listOf(folder)))
+        assertFalse(tampil(null, null, root, listOf(folder)))
     }
 
     @Test
     fun `pilih seluruh root - semua relative path cocok`() {
-        assertTrue(MediaLibrary.isInGalleryFolders(null, "Anything/VID.mp4", root, listOf(root)))
-        assertTrue(MediaLibrary.isInGalleryFolders("$root/Anything/VID.mp4", null, root, listOf(root)))
+        assertTrue(tampil(null, "Anything/VID.mp4", root, listOf(root)))
+        assertTrue(tampil("$root/Anything/VID.mp4", null, root, listOf(root)))
     }
 
     @Test
     fun `prefix mirip tapi beda folder - ditolak (batas slash)`() {
         // /DCIM/Camera2 bukan subfolder /DCIM/Camera; tanpa cek batas,
         // startsWith polos ikut mencocokkan.
-        assertFalse(MediaLibrary.isInGalleryFolders("${folder}2/VID.mp4", null, root, listOf(folder)))
-        assertFalse(MediaLibrary.isInGalleryFolders("${folder}X/VID.mp4", null, root, listOf(folder)))
-        assertFalse(MediaLibrary.isInGalleryFolders(null, "DCIM/Camera2/VID.mp4", root, listOf(folder)))
+        assertFalse(tampil("${folder}2/VID.mp4", null, root, listOf(folder)))
+        assertFalse(tampil("${folder}X/VID.mp4", null, root, listOf(folder)))
+        assertFalse(tampil(null, "DCIM/Camera2/VID.mp4", root, listOf(folder)))
     }
 
     @Test
     fun `alias root primer - beda huruf besar tetap cocok`() {
-        assertTrue(MediaLibrary.isInGalleryFolders("/SDCARD/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
+        assertTrue(tampil("/SDCARD/DCIM/Camera/VID.mp4", null, root, listOf(folder)))
     }
 
     @Test
     fun `root eksternal berbeda - relative path tetap relatif ke root itu`() {
         val otherRoot = "/storage/9999-ABCD"
         val otherFolder = "$otherRoot/DCIM/Camera"
-        assertTrue(MediaLibrary.isInGalleryFolders(null, "DCIM/Camera/VID.mp4", otherRoot, listOf(otherFolder)))
-        assertFalse(MediaLibrary.isInGalleryFolders(null, "Movies/VID.mp4", otherRoot, listOf(otherFolder)))
+        assertTrue(tampil(null, "DCIM/Camera/VID.mp4", otherRoot, listOf(otherFolder)))
+        assertFalse(tampil(null, "Movies/VID.mp4", otherRoot, listOf(otherFolder)))
     }
 }

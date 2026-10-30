@@ -340,32 +340,6 @@ object MediaLibrary {
         else runCatching { Environment.getExternalStorageDirectory().absolutePath }
             .getOrDefault("/storage/emulated/0")
 
-    /** Filter murni: apakah entry media berada di salah satu folder galeri
-     *  terpilih. [dataPath] = path absolut (kolom DATA / hasil File),
-     *  [relativePath] = RELATIVE_PATH MediaStore (API 29+), keduanya boleh
-     *  null. Saat [selectedFolders] kosong = tampilkan semua.
-     *
-     *  Entry tanpa path sama sekali tidak bisa diverifikasi lokasinya, jadi
-     *  saat filter aktif TIDAK ditampilkan — ini menutup bug lama di mana
-     *  baris MediaStore yang kolom DATA-nya null (Android 11+) ikut tampil
-     *  walau berada di luar folder terpilih (keluhan "masih menscan semua").
-     */
-    fun isInGalleryFolders(
-        dataPath: String?,
-        relativePath: String?,
-        externalRoot: String,
-        selectedFolders: List<String>,
-        volumeName: String? = null
-    ): Boolean {
-        if (selectedFolders.isEmpty()) return true
-        // Normalisasi semua path: trim whitespace + trailing slash. Komparasi
-        // dilakukan case-insensitive: konsisten dengan SQLite LIKE (NOCASE)
-        // yang dipakai MediaStore API < 29, dan aman untuk filesystem
-        // FAT/SD yang case-insensitive.
-        val allowed = selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
-        return inSelectedFolders(dataPath, relativePath, externalRoot, allowed, volumeName)
-    }
-
     /** Alias root penyimpanan primer Android 5-6: kolom DATA MediaStore kadang
      *  memakai symlink lama (/sdcard, /mnt/sdcard, /storage/emulated/legacy)
      *  padahal folder galeri disimpan dengan externalRoot (/storage/emulated/0).
@@ -380,7 +354,7 @@ object MediaLibrary {
      *  loop per-entry (ribuan baris MediaStore) sebelumnya mengalokasi
      *  `lowercase()` untuk tiap folder di tiap baris — boros GC di HP kentang.
      *  Perbandingan case-insensitive memakai regionMatches agar tanpa alokasi. */
-    private class AllowedFolder(val raw: String, root: String) {
+    internal class AllowedFolder(val raw: String, root: String) {
         val cleanRoot: String = root.trim().trimEnd('/')
         val prefix: String = "$raw/"
         val relLc: String? =
@@ -388,24 +362,13 @@ object MediaLibrary {
         val isWholeRoot: Boolean = raw == cleanRoot || relLc?.isEmpty() == true
     }
 
-    private fun allowedFoldersFor(selectedFolders: List<String>, externalRoot: String): List<AllowedFolder> =
+    // internal (bukan private) agar uji galeri menyusun jalur produksi
+    // yang sama persis, bukan wrapper khusus uji (issue #684).
+    internal fun allowedFoldersFor(selectedFolders: List<String>, externalRoot: String): List<AllowedFolder> =
         selectedFolders.map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
             .map { AllowedFolder(it, externalRoot) }
 
-    /** Bagian murni filter folder galeri; [allowed] sudah ternormalisasi
-     *  (trim + tanpa trailing slash). Dipakai scanUncached per-entry tanpa
-     *  menormalisasi ulang daftar folder untuk ribuan baris MediaStore. */
-    private fun inSelectedFolders(
-        dataPath: String?,
-        relativePath: String?,
-        externalRoot: String,
-        allowed: List<String>,
-        volumeName: String? = null
-    ): Boolean = inSelectedFoldersPrecomputed(
-        dataPath, relativePath, allowedFoldersFor(allowed, externalRoot), volumeName
-    )
-
-    private fun inSelectedFoldersPrecomputed(
+    internal fun inSelectedFoldersPrecomputed(
         dataPath: String?,
         relativePath: String?,
         allowed: List<AllowedFolder>,

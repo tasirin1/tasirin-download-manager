@@ -24,3 +24,5 @@ applyExtraFolders
 applyGalleryFolders
 cacheDuration
 recordProbeFailure
+isInGalleryFolders
+inSelectedFolders
