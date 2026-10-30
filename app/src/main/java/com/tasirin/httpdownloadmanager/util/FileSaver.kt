@@ -29,7 +29,11 @@ class FileSaver(context: Context) {
     data class PublishResult(
         val contentUri: String? = null,
         val filePath: String? = null,
-        val fileName: String? = null
+        val fileName: String? = null,
+        // Penanda diisi organizeByType bila berkas sungguh berpindah folder:
+        // perpindahan MediaStore tak mengubah contentUri maupun filePath,
+        // jadi tanpa penanda ini pemanggil tak bisa tahu (issue #677).
+        val moved: Boolean = false
     )
 
     fun partialFile(fileName: String, segment: Int? = null): File {
@@ -1024,7 +1028,8 @@ class FileSaver(context: Context) {
                             // rename yang memeriksa update() > 0.
                             val moved = appContext.contentResolver.update(uri, values, null, null) > 0
                             if (!moved) result
-                            else if (unique != fileName) result.copy(fileName = unique) else result
+                            else if (unique != fileName) result.copy(fileName = unique, moved = true)
+                            else result.copy(moved = true)
                         }
                     } else {
                         val doc = DocumentFile.fromSingleUri(appContext, uri) ?: return result
@@ -1079,7 +1084,7 @@ class FileSaver(context: Context) {
                         // (issue #468), bukan target.name yang nullable
                         // dari query DISPLAY_NAME provider.
                         // Sama seperti writeCustomFolder (issue #569).
-                        PublishResult(contentUri = target.uri.toString(), fileName = unique)
+                        PublishResult(contentUri = target.uri.toString(), fileName = unique, moved = true)
                             .also { MediaLibrary.invalidateScanCache() }
                     }
                 }
@@ -1098,7 +1103,7 @@ class FileSaver(context: Context) {
                         // path lama + baru; notifyMediaChanged juga
                         // mengosongkan scanCache.
                         MediaLibrary.notifyMediaChanged(appContext, file.absolutePath, target.absolutePath)
-                        PublishResult(filePath = target.absolutePath, fileName = target.name)
+                        PublishResult(filePath = target.absolutePath, fileName = target.name, moved = true)
                     } else {
                         // Klaim kosong uniqueTargetFile tertinggal bila rename
                         // gagal: hapus bila masih kosong seperti rename().

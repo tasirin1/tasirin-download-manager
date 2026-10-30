@@ -1793,6 +1793,13 @@ class DownloadEngine(appContext: Context) {
         val newPath = organized.filePath
         if (newPath != null && newPath != result.filePath) {
             App.invalidateServerDownloadCaches(newPath)
+        } else if (organized.moved) {
+            // Perpindahan berbasis contentUri (MediaStore/SAF): tak ada path
+            // berkas untuk invalidasi terarah, dan contentUri MediaStore
+            // bahkan tak berubah saat RELATIVE_PATH pindah — penanda moved
+            // dari organizeByType yang memicu invalidasi global di sini
+            // (issue #677).
+            App.invalidateServerDownloadCaches(null)
         }
         return organized
     }
