@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): kirim-semua carousel kini ikut mengirim postBody** -- allBody pada loop send-all sebelumnya hanya memuat headers; pada mode itu body utama tak pernah dikirim sehingga sesi POST kehilangan bodinya untuk semua foto. Kini postBody disertakan persis seperti body utama dan loop URL tambahan #929 (issue #936).
+
 - **fix(ui): toast 'Moved up/down' tak lagi tampil untuk perpindahan no-op** -- moveUp/moveDown engine kini mengembalikan Boolean (false saat item sudah di tepi daftar) dan MainActivity hanya menampilkan toast bila benar berpindah; sebelumnya ketukan pada item teratas/terbawah tetap mengklaim berhasil (issue #935).
 - **fix(util): pangkas nama 200-char kini mempertahankan ekstensi utuh pada semua pita panjang** -- jalur char FileNames.safe memangkas basis ke 200 - panjang ekstensi (menyamai jalur byte); cara lama menggandakan fragmen ekstensi dan bisa menghasilkan 240+ char untuk titik di posisi 151-190, dan memotong ekstensi ('.mp4' -> '.mp') untuk titik di posisi 191+. Nilai harapan dibuktikan port Python 1:1 dan dikunci di FileNamesTest (issue #934).
 - **fix(remote): komponen Range yang meluap Long tak lagi tertukar dengan komponen absen** -- parseRange membedakan grup kosong dari grup non-kosong yang gagal parse: posisi awal raksasa kini tak terpenuhi (416) alih-alih disajikan sebagai 5 byte terakhir berkas, dan panjang sufiks yang meluap berarti seluruh berkas (206) alih-alih 416. Nilai harapan dibuktikan port Python 1:1 atas seluruh ekspektasi lama + kasus baru, dan dikunci di MediaStreamTest (issue #933).

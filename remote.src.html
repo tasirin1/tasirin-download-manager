@@ -7507,6 +7507,10 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         } else {
           allBody.append('headers', document.getElementById('dlHeaders').value.trim());
         }
+        // postBody adalah pengaturan per-sesi (lihat #929): pada mode
+        // send-all body utama tak pernah dikirim, jadi tanpa baris ini
+        // SEMUA foto kehilangan bodi POST-nya (issue #936).
+        allBody.append('postBody', document.getElementById('dlPostBody').value.trim());
         var aRes = await fetchTimeout(API + '/api/add', {
           method: 'POST',
           body: allBody,

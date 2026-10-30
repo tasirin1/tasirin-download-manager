@@ -4662,6 +4662,7 @@ allBody.append('headers', (uh ? uh + '\n' : '') + 'Cookie: ' + cOpt.cookies);
 } else {
 allBody.append('headers', document.getElementById('dlHeaders').value.trim());
 }
+allBody.append('postBody', document.getElementById('dlPostBody').value.trim());
 var aRes = await fetchTimeout(API + '/api/add', {
 method: 'POST',
 body: allBody,
