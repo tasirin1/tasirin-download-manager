@@ -3806,11 +3806,11 @@ async function loadFs() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (seq !== fsLoadSeq) return;
-    // Muat-ulang penuh membatalkan seleksi (issue #957): fsItems diganti
-    // objek baru sehingga seleksi lama yatim — bilah batch akan
-    // menindak berkas yang tidak terlihat lagi (pada popstate bahkan
-    // lintas folder). Sejajar semantik reset galeri.
-    if (fsSelectMode) resetFsSelection();
+    // Reset seleksi yatim #957 TIDAK boleh di sini (issue #964):
+    // tombol Select masuk mode pilih lalu memanggil loadFs untuk
+    // menggambar ulang — reset di titik ini membatalkan mode sebelum
+    // render. Reset kini dilakukan pemicu muat-ulang yang sebenarnya
+    // (popstate/selesai mkdir/selesai upload) sebelum fetch dimulai.
     if (fsMsgGen === msgGenAtStart) fsStatus.textContent = '';
     renderFsCrumbs(fsPath);
     // Home hanya berguna saat berada di dalam folder; sembunyi di root.
@@ -5064,7 +5064,12 @@ document.getElementById('fsMkdirBtn').addEventListener('click', async function (
   }
   showInput('Create new folder', 'New Folder', 'New folder name in: ' + fsPath, 'Create', function (name) {
     if (!name) return;
-    postFsAction({action: 'mkdir', path: fsPath, name: name}).then(loadFs).catch(function() {});
+    postFsAction({action: 'mkdir', path: fsPath, name: name}).then(function () {
+      // Muat-ulang sesudah aksi membatalkan seleksi (issue #957),
+      // sebelum fetch dimulai (issue #965).
+      if (fsSelectMode) resetFsSelection();
+      loadFs();
+    }).catch(function() {});
   });
 });
 
@@ -5491,6 +5496,9 @@ function startFsUpload(jobs) {
         fsUploadFile.value = '';
         fsUploadDir.value = '';
 
+        // Muat-ulang sesudah upload membatalkan seleksi (issue #957),
+        // sebelum fetch dimulai (issue #965).
+        if (fsSelectMode) resetFsSelection();
         loadFs();
         if (ok) {
           fsMsg('Done: ' + jobs.length + ' files uploaded');
@@ -7672,6 +7680,10 @@ window.addEventListener('popstate', function () {
   if (currentRoute() !== 'files' || fsBackStack.length === 0) return;
   fsSaveScroll();
   fsPath = fsBackStack.pop();
+  // Kembali ke folder induk membatalkan seleksi folder anak (issue
+  // #957): tanpa ini bilah batch menindak berkas folder yang sudah
+  // tidak tampil. Sinkron sebelum fetch (issue #965).
+  if (fsSelectMode) resetFsSelection();
   loadFs();
 });
 applyRoute();

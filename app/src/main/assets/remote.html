@@ -1439,7 +1439,6 @@ const res = await fetchTimeout(API + '/api/fs?path=' + encodeURIComponent(fsPath
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
 if (seq !== fsLoadSeq) return;
-if (fsSelectMode) resetFsSelection();
 if (fsMsgGen === msgGenAtStart) fsStatus.textContent = '';
 renderFsCrumbs(fsPath);
 document.getElementById('fsHomeBtn').classList.toggle('hidden', !fsPath);
@@ -2541,7 +2540,10 @@ return;
 }
 showInput('Create new folder', 'New Folder', 'New folder name in: ' + fsPath, 'Create', function (name) {
 if (!name) return;
-postFsAction({action: 'mkdir', path: fsPath, name: name}).then(loadFs).catch(function() {});
+postFsAction({action: 'mkdir', path: fsPath, name: name}).then(function () {
+if (fsSelectMode) resetFsSelection();
+loadFs();
+}).catch(function() {});
 });
 });
 const UPLOAD_CHUNK = 2 * 1024 * 1024;
@@ -2929,6 +2931,7 @@ function (ok, failed) {
 btn.disabled = false;
 fsUploadFile.value = '';
 fsUploadDir.value = '';
+if (fsSelectMode) resetFsSelection();
 loadFs();
 if (ok) {
 fsMsg('Done: ' + jobs.length + ' files uploaded');
@@ -4769,6 +4772,7 @@ if (mmGuardPopPending) { mmGuardPopPending = false; return; }
 if (currentRoute() !== 'files' || fsBackStack.length === 0) return;
 fsSaveScroll();
 fsPath = fsBackStack.pop();
+if (fsSelectMode) resetFsSelection();
 loadFs();
 });
 applyRoute();

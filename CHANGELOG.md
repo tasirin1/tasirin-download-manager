@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): tombol Select File Manager hidup lagi — reset seleksi #957 dipindah ke pemicu muat-ulang** -- penempatan reset di dalam loadFs pada #957 membatalkan mode pilih yang baru dinyalakan handler tombol Select (ia memanggil loadFs untuk menggambar ulang), sehingga tombol itu mati total pada setiap muat sukses. Reset kini dilakukan secara sinkron sebelum fetch oleh pemicu yang memang mengganti konteks daftar (popstate/Back, selesai membuat folder, selesai upload), yang sekaligus menutup celah jalur-gagal di mana seleksi bertahan di atas tampilan error (issue #964, #965).
+
 - **fix(web): label batch File Manager disegarkan sesudah Load more** -- fsLoadMore sebelumnya menggabungkan halaman berikutnya tanpa memanggil updateFsBatch, sehingga label 'Cancel all' dari Select all halaman sebelumnya tetap tampil padahal item baru tak terpilih dan ketukan tombol justru memilih semua — kelas yang sama dengan #955 di galeri. Kini bilah batch dihitung ulang sesudah concat bila mode pilih aktif (issue #963).
 
 - **fix(remote): token folder kosong kini menghasilkan entri folder di ZIP, bukan arsip 0-entri** -- cabang folder zipTokens sebelumnya hanya mengiterasi anak, sehingga folder kosong tak menulis entri apa pun dan token tunggal folder kosong menghasilkan ZIP 22 byte yang tersaji sebagai unduhan sukses. Kini folder kosong menulis entri direktorinya sendiri (tergerbang budget entri), sejajar perilaku zipFile (issue #962).
