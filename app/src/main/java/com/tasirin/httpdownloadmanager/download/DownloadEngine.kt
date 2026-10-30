@@ -1666,26 +1666,18 @@ class DownloadEngine(appContext: Context) {
             if (b == null) {
                 updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
             } else {
-                // Ada checksum yang akan diverifikasi pemanggil (tertulis
-                // di item atau sidecar di samping hasil terbit): entri
-                // pendahulu + berkas cadangan dipertahankan sampai hasil
-                // verifikasi jelas lewat commit/rollbackReplacement. Tanpa
-                // checksum, versi lama langsung dipensiunkan di sini.
-                val expectsVerify = parseChecksum(item.checksum) != null ||
-                    saver.sidecarChecksum(
-                        item.copy(
-                            contentUri = result.contentUri ?: item.contentUri,
-                            filePath = result.filePath ?: item.filePath
-                        )
-                    ) != null
-                if (expectsVerify) {
-                    pendingReplacements[item.id] =
-                        PendingReplacement(predecessor, b, stale)
-                } else {
-                    runCatching { b.delete() }
-                    stale?.let { s -> runCatching { s.delete() } }
-                    updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
-                }
+                // Entri pendahulu + berkas cadangan selalu DIPARKIR
+                // sampai pemanggil mencapai commit/rollbackReplacement.
+                // Awalnya hanya jalur ber-checksum yang diparkir dan
+                // jalur tanpa checksum memensiunkan versi lama langsung
+                // di sini — tetapi pensiun di sini mendahului penjaga
+                // keberadaan #881 sehingga menghapus penerus di jendela
+                // publish tetap menghilangkan kedua versi (issue #890).
+                // Kelima situs finalisasi selalu mencapai commit atau
+                // rollback, dan rekonsiliasi start proses menangani
+                // parkiran yang ditinggal mati di antaranya.
+                pendingReplacements[item.id] =
+                    PendingReplacement(predecessor, b, stale)
             }
         }
         // Buang snapshot galeri server (issue #558): publishItem
