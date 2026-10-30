@@ -724,7 +724,7 @@ galSelectMode = false;
 galBatch.classList.add('hidden');
 galleryGrid.classList.remove('gal-selecting');
 var gsBtn = document.getElementById('galSelectBtn');
-if (gsBtn) gsBtn.textContent = 'Select';
+if (gsBtn) { gsBtn.innerHTML = GAL_SELECT_ICON; gsBtn.title = 'Select videos'; }
 }
 if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
 galleryGrid.innerHTML = '';
@@ -960,10 +960,13 @@ else img.src = img.dataset.thumb;
 }
 (frag || galleryGrid).insertBefore(cell, frag ? null : gallerySentinel);
 }
+var GAL_SELECT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><polyline points="9 12 11 14 15 10"/></svg>';
 function galSetSelectMode(on) {
 galSelectMode = on;
 galSelected.clear();
-document.getElementById("galSelectBtn").textContent = on ? "Cancel selection" : "Select";
+var gsBtn = document.getElementById("galSelectBtn");
+gsBtn.innerHTML = on ? UI_ICONS.close : GAL_SELECT_ICON;
+gsBtn.title = on ? "Cancel selection" : "Select videos";
 galleryGrid.classList.toggle("gal-selecting", on);
 galBatch.classList.add("hidden");
 galleryGrid.querySelectorAll(".gal-cell").forEach(function (cell) {
