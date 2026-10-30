@@ -1556,8 +1556,10 @@ class DownloadEngine(appContext: Context) {
                     // Attempt mati terbatalkan: parkiran penggantian yang
                     // belum commit tak boleh yatim (issue #908) — jalur ini
                     // melewati handleFailure seluruhnya. No-op murah bila
-                    // tak ada parkiran.
-                    rollbackReplacement(item.id)
+                    // tak ada parkiran. Bergerbang pemilik (issue #911):
+                    // attempt yang lebih baru untuk id yang sama memiliki
+                    // parkirannya sendiri.
+                    rollbackReplacementIfOwner(item.id, coroutineContext[Job])
                     throw e
                 } catch (e: Throwable) {
                     // Error runtime (mis. NoSuchMethodError) diubah jadi status FAILED,
@@ -1568,9 +1570,10 @@ class DownloadEngine(appContext: Context) {
                     // PAUSED yang baru ditulis pause() (issue #743).
                     // Rollback parkiran SEBELUM konversi (issue #908):
                     // cabang konversi tak mencapai handleFailure, dan
-                    // rollback di sana bersifat no-op murah.
+                    // rollback di sana bersifat no-op murah. Bergerbang
+                    // pemilik (issue #911) seperti jalur batal di atas.
                     if (!coroutineContext.isActive) {
-                        rollbackReplacement(item.id)
+                        rollbackReplacementIfOwner(item.id, coroutineContext[Job])
                         throw CancellationException()
                     }
                     handleFailure(item.id, e.message)
@@ -1814,6 +1817,23 @@ class DownloadEngine(appContext: Context) {
     }
 
     /** Verifikasi penerus gagal: pulihkan berkas pendahulu (#215). */
+    /**
+     * Rollback parkiran dari jalur pembatalan sebuah attempt (issue #911):
+     * hanya bila belum ada attempt yang LEBIH BARU terdaftar untuk id ini.
+     * Attempt baru memiliki parkirannya sendiri di bawah kunci yang sama;
+     * rollback buta dari unwind job lama bisa mengonsumsi entri attempt
+     * baru (kasus terburuk tanpa checksum: commit attempt baru jadi
+     * no-op sementara penerus ditandai COMPLETED berisi byte pendahulu).
+     * Parkiran basi milik attempt lama yang dilewati di sini ditangani
+     * attempt baru secara koheren lewat cabang aside di publishItem.
+     */
+    private fun rollbackReplacementIfOwner(successorId: String, self: Job?) {
+        val registered = synchronized(jobs) { jobs[successorId] }
+        if (registered == null || registered === self) {
+            rollbackReplacement(successorId)
+        }
+    }
+
     private fun rollbackReplacement(successorId: String) {
         val pending = pendingReplacements.remove(successorId) ?: return
         val target = pending.predecessor.filePath
