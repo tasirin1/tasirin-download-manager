@@ -131,12 +131,22 @@ def nama_tak_lacak():
     return [x for x in out.split("\0") if x] if out else []
 
 
+_baca_cache = {}
+
+
 def baca(path):
+    # Memo per proses (issue #808): gerbang membaca berkas yang sama
+    # berulang kali lintas cek; isi berkas tak berubah selama satu lari
+    # (gerbang tak menulis berkas repo), jadi aman di-cache.
+    if path in _baca_cache:
+        return _baca_cache[path]
     try:
         with open(os.path.join(AKAR, path), encoding="utf-8", errors="replace") as f:
-            return f.read()
+            isi = f.read()
     except OSError:
-        return ""
+        isi = ""
+    _baca_cache[path] = isi
+    return isi
 
 
 def jalan_repo(rel, ext=(".kt",)):
@@ -147,7 +157,21 @@ def jalan_repo(rel, ext=(".kt",)):
                 yield os.path.relpath(os.path.join(akar, nama), AKAR)
 
 
+_himpun_cache = None
+
+
 def himpun_definisi():
+    # Dihitung SEKALI per proses (issue #808): dulu fungsi ini dipanggil
+    # dua kali (cek_acuan_yatim + cek_definisi_baru) dan tiap panggilan
+    # menelusuri + membaca ulang seluruh res/*.xml dan berkas .kt/.xml
+    # repo. Kedua pemanggil hanya membaca hasilnya — berbagi aman.
+    global _himpun_cache
+    if _himpun_cache is None:
+        _himpun_cache = _himpun_definisi_mentah()
+    return _himpun_cache
+
+
+def _himpun_definisi_mentah():
     definisi = {}
     acuan = {}
 

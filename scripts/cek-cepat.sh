@@ -14,7 +14,10 @@ elif [ "$ADA_RG" = 1 ] && rg --pcre2 -n '' app/src/main/res/drawable >/dev/null 
   if rg -n --pcre2 '(?<![0-9])\.-?[0-9]' app/src/main/res/drawable 2>/dev/null | grep -q .; then
     echo "GAGAL: path vektor tanpa nol depan (pakai 0.9 bukan .9)"; gagal=1;
   fi
-elif grep -R -P '' . >/dev/null 2>&1; then
+elif printf '\n' | grep -P '' >/dev/null 2>&1; then
+  # Probe dukungan -P cukup dari stdin (issue #808): pola lama
+  # grep -R -P '' . memindai rekursif SELURUH pohon termasuk .git
+  # hanya untuk menguji fitur yang sama.
   if grep -R -n -P '(?<![0-9])\.-?[0-9]' app/src/main/res/drawable 2>/dev/null | grep -q .; then
     echo "GAGAL: path vektor tanpa nol depan (pakai 0.9 bukan .9)"; gagal=1;
   fi
