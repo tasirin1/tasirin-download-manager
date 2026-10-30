@@ -2213,11 +2213,22 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val cleanName = FileNames.safe(item.fileName)
         val partial = File(File(context.filesDir, "downloads"), "$cleanName.part")
         if (!partial.exists() || !partial.isFile) return notFound()
+        // Total dibaca dari FD yang dibuka, bukan path hidup (issue #792,
+        // pola snapshot #232 di cabang segmen): reset unduhan (ETag
+        // berubah) mengganti .part dengan inode baru di tengah request —
+        // partial.length() dari path bisa mengumumkan panjang berkas baru
+        // sementara FD mengalirkan inode lama, sehingga Content-Length
+        // tak terpenuhi dan pemutar klien menggantung sampai timeout.
+        val input = runCatching { FileInputStream(partial) }.getOrNull() ?: return notFound()
+        val total = runCatching { input.channel.size() }.getOrElse {
+            runCatching { input.close() }
+            return notFound()
+        }
         return streamMedia(
             name = item.fileName,
             mime = mime,
-            input = FileInputStream(partial),
-            total = partial.length(),
+            input = input,
+            total = total,
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = false
         )
