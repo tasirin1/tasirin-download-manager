@@ -45,9 +45,13 @@ object FileNames {
             // titik di posisi 191+ jatuh ke potongan polos yang
             // memotong ekstensi ('.mp4' -> '.mp') (issue #934).
             // Ekstensi raksasa (>= 200) diperlakukan sebagai nama
-            // biasa, sejajar perlakuan jalur byte (#336).
+            // biasa, sejajar perlakuan jalur byte (#336). Kelayakan
+            // ekstensi dinilai dari PANJANGNYA saja, bukan posisi
+            // titik: basis yang sendiri >199 char (titik di indeks
+            // 200+) tetap berhak mempertahankan ekstensinya (issue
+            // #939, menyamai semantik unique() di berkas ini).
             val dot = clean.lastIndexOf('.')
-            val ext = if (dot in 1..199) clean.substring(dot) else ""
+            val ext = if (dot > 0) clean.substring(dot) else ""
             clean = if (ext.isNotEmpty() && ext.length < 200) {
                 clean.substring(0, 200 - ext.length) + ext
             } else {

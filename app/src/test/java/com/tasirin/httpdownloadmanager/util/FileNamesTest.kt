@@ -48,6 +48,12 @@ class FileNamesTest {
         assertEquals(200, bandA.length)
         assertTrue(bandA.endsWith("." + "b".repeat(49)))
         assertEquals(1, bandA.count { it == '.' })
+        // Issue #939: basis sendiri melewati 199 char (titik di
+        // indeks 200+) — ekstensi tetap dipertahankan karena yang
+        // digerbang panjang ekstensinya, bukan posisi titik.
+        val bandC = FileNames.safe("a".repeat(201) + ".mp4")
+        assertEquals(200, bandC.length)
+        assertTrue(bandC.endsWith(".mp4"))
     }
 
     @Test
