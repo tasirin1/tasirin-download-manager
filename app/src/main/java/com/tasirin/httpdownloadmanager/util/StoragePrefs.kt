@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.util
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Base64
 import java.security.MessageDigest
@@ -28,6 +29,29 @@ object StoragePrefs {
                 .also { cachedPrefs = it }
         }
     }
+    // Pembaca aman bertipe (issue #906): SharedPreferences.getX
+    // melempar ClassCastException bila nilai tersimpan bertipe tak
+    // cocok (data korup, restore, atau warisan versi lama). Di jalur
+    // start aplikasi (konstruktor HttpControlServer + field awal
+    // DownloadEngine) lemparan itu menggugurkan App.onCreate dan
+    // aplikasi crash setiap kali dibuka, tanpa jalur pulih dari
+    // dalam aplikasi. Semua getter di objek ini membaca lewat
+    // helper berikut dan jatuh ke nilai default pada tipe tak cocok.
+    private fun SharedPreferences.safeBoolean(key: String, def: Boolean): Boolean =
+        try { getBoolean(key, def) } catch (e: ClassCastException) { def }
+
+    private fun SharedPreferences.safeInt(key: String, def: Int): Int =
+        try { getInt(key, def) } catch (e: ClassCastException) { def }
+
+    private fun SharedPreferences.safeLong(key: String, def: Long): Long =
+        try { getLong(key, def) } catch (e: ClassCastException) { def }
+
+    private fun SharedPreferences.safeString(key: String, def: String?): String? =
+        try { getString(key, def) } catch (e: ClassCastException) { def }
+
+    private fun SharedPreferences.safeStringSet(key: String, def: Set<String>?): Set<String>? =
+        try { getStringSet(key, def) } catch (e: ClassCastException) { def }
+
     private const val HEX_CHARS = "0123456789abcdef"
     private const val KEY_FOLDER_URI = "folder_uri"
     private const val KEY_BACKGROUND = "background_download"
@@ -78,7 +102,7 @@ object StoragePrefs {
         // nilai prefs lama dan membuatnya basi permanen.
         synchronized(prefsLock) {
             val filled = collapsedCache
-                ?: (prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet()) ?: emptySet())
+                ?: (prefs(context).safeStringSet(KEY_COLLAPSED_SECTIONS, emptySet()) ?: emptySet())
                     .also { collapsedCache = it }
             return key in filled
         }
@@ -87,7 +111,7 @@ object StoragePrefs {
     fun setSectionCollapsed(context: Context, key: String, collapsed: Boolean) {
         // Sinkron: dua toggle paralel bisa read-modify-write dan saling menimpa.
         synchronized(prefsLock) {
-            val stored = collapsedCache ?: prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
+            val stored = collapsedCache ?: prefs(context).safeStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
             val set = (stored ?: emptySet()).toMutableSet()
             if (collapsed) set.add(key) else set.remove(key)
             collapsedCache = set
@@ -100,7 +124,7 @@ object StoragePrefs {
 
     fun getFolderUri(context: Context): Uri? {
         val raw = prefs(context)
-            .getString(KEY_FOLDER_URI, null)
+            .safeString(KEY_FOLDER_URI, null)
         return raw?.takeIf { it.isNotEmpty() }?.let { it.toUri() }
     }
 
@@ -115,7 +139,7 @@ object StoragePrefs {
 
     fun isBackgroundEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_BACKGROUND, true)
+            .safeBoolean(KEY_BACKGROUND, true)
 
     fun setBackgroundEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -127,7 +151,7 @@ object StoragePrefs {
     // mengaktifkan (kurangi sinyal persistence ala malware bagi Play Protect).
     fun isAutoStartEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_AUTOSTART, false)
+            .safeBoolean(KEY_AUTOSTART, false)
 
     fun setAutoStartEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -137,7 +161,7 @@ object StoragePrefs {
 
     fun isServerBackgroundEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_SERVER_BACKGROUND, false)
+            .safeBoolean(KEY_SERVER_BACKGROUND, false)
 
     fun setServerBackgroundEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -147,11 +171,11 @@ object StoragePrefs {
 
     fun getTextFolder(context: Context): String? =
         prefs(context)
-            .getString(KEY_TEXT_FOLDER, null)?.takeIf { it.isNotBlank() }
+            .safeString(KEY_TEXT_FOLDER, null)?.takeIf { it.isNotBlank() }
 
     fun getExtraFolders(context: Context): List<String> =
         prefs(context)
-            .getString(KEY_EXTRA_FOLDERS, null)
+            .safeString(KEY_EXTRA_FOLDERS, null)
             ?.split("\n")
             ?.map { it.trim() }
             ?.filter { it.isNotEmpty() }
@@ -191,7 +215,7 @@ object StoragePrefs {
     // Play Protect); hanya diminta setelah pengguna menyalakan toggle.
     fun isBatteryExemptEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_BATTERY_EXEMPT, false)
+            .safeBoolean(KEY_BATTERY_EXEMPT, false)
 
     fun setBatteryExemptEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -200,7 +224,7 @@ object StoragePrefs {
     }
 
     fun isAutoOpenComplete(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_AUTO_OPEN_COMPLETE, false)
+        prefs(context).safeBoolean(KEY_AUTO_OPEN_COMPLETE, false)
 
     fun setAutoOpenComplete(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -210,7 +234,7 @@ object StoragePrefs {
 
     fun getServerPin(context: Context): String? =
         prefs(context)
-            .getString(KEY_SERVER_PIN, null)?.takeIf { it.isNotBlank() }
+            .safeString(KEY_SERVER_PIN, null)?.takeIf { it.isNotBlank() }
 
     /** Simpan PIN sebagai PBKDF2-HMAC-SHA1 (lihat PinHash); nilai kosong menghapus PIN. */
     fun setServerPin(context: Context, pin: String?) {
@@ -272,7 +296,7 @@ object StoragePrefs {
     /** Secret acak untuk tanda tangan URL stream parsial; tidak memakai nama package. */
     @Synchronized
     fun partialStreamSecret(context: Context): String {
-        prefs(context).getString(KEY_PARTIAL_STREAM_SECRET, null)?.takeIf { it.isNotEmpty() }?.let { return it }
+        prefs(context).safeString(KEY_PARTIAL_STREAM_SECRET, null)?.takeIf { it.isNotEmpty() }?.let { return it }
         val bytes = ByteArray(32)
         SecureRandom().nextBytes(bytes)
         val value = Base64.encodeToString(
@@ -293,7 +317,7 @@ object StoragePrefs {
         sessionSecretCache?.let { return it }
         synchronized(this) {
             sessionSecretCache?.let { return it }
-            prefs(context).getString(KEY_SERVER_SESSION_SECRET, null)?.takeIf { it.isNotEmpty() }?.let {
+            prefs(context).safeString(KEY_SERVER_SESSION_SECRET, null)?.takeIf { it.isNotEmpty() }?.let {
                 sessionSecretCache = it
                 return it
             }
@@ -316,7 +340,7 @@ object StoragePrefs {
 
     fun isPinEnforced(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_PIN_ENFORCED, true)
+            .safeBoolean(KEY_PIN_ENFORCED, true)
 
     fun setPinEnforced(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -326,7 +350,7 @@ object StoragePrefs {
 
     fun isFsFullAccessEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_FS_FULL_ACCESS, false)
+            .safeBoolean(KEY_FS_FULL_ACCESS, false)
 
     fun setFsFullAccessEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -337,7 +361,7 @@ object StoragePrefs {
     /** true = user baru saja menekan Enable (halaman izin sistem dibuka); dipakai
      *  untuk auto-aktifkan "Full access to main storage" setelah izin diberikan. */
     fun isFullAccessPending(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_FS_FULL_ACCESS_PENDING, false)
+        prefs(context).safeBoolean(KEY_FS_FULL_ACCESS_PENDING, false)
 
     fun setFullAccessPending(context: Context, pending: Boolean) {
         prefs(context).edit {
@@ -348,7 +372,7 @@ object StoragePrefs {
     /** Server remote read-only: upload, ubah file, dan hapus media ditolak. */
     fun isServerReadOnly(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_SERVER_READ_ONLY, false)
+            .safeBoolean(KEY_SERVER_READ_ONLY, false)
 
     fun setServerReadOnly(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -358,7 +382,7 @@ object StoragePrefs {
 
     fun isServerAutoStartEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_SERVER_AUTOSTART, false)
+            .safeBoolean(KEY_SERVER_AUTOSTART, false)
 
     /** Server hanya boleh start otomatis bila PIN wajib sudah disetel. */
     fun isServerStartAllowed(context: Context): Boolean =
@@ -372,7 +396,7 @@ object StoragePrefs {
 
     fun maxConcurrent(context: Context): Int =
         prefs(context)
-            .getInt(KEY_MAX_CONCURRENT, 2).coerceIn(1, 5)
+            .safeInt(KEY_MAX_CONCURRENT, 2).coerceIn(1, 5)
 
     fun setMaxConcurrent(context: Context, value: Int) {
         prefs(context).edit {
@@ -382,7 +406,7 @@ object StoragePrefs {
 
     fun speedLimitKbps(context: Context): Int =
         prefs(context)
-            .getInt(KEY_SPEED_LIMIT, 0).coerceIn(0, 100_000)
+            .safeInt(KEY_SPEED_LIMIT, 0).coerceIn(0, 100_000)
 
     fun setSpeedLimitKbps(context: Context, value: Int) {
         prefs(context).edit {
@@ -392,7 +416,7 @@ object StoragePrefs {
 
     fun maxRetries(context: Context): Int =
         prefs(context)
-            .getInt(KEY_MAX_RETRIES, 2).coerceIn(0, 5)
+            .safeInt(KEY_MAX_RETRIES, 2).coerceIn(0, 5)
 
     fun setMaxRetries(context: Context, value: Int) {
         prefs(context).edit {
@@ -402,7 +426,7 @@ object StoragePrefs {
 
     fun isAutoSortEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_AUTO_SORT, false)
+            .safeBoolean(KEY_AUTO_SORT, false)
 
     fun setAutoSortEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -412,7 +436,7 @@ object StoragePrefs {
 
     fun isSmallFirstEnabled(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_SMALL_FIRST, false)
+            .safeBoolean(KEY_SMALL_FIRST, false)
 
     fun setSmallFirstEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -422,7 +446,7 @@ object StoragePrefs {
 
     fun isDeletePartialOnCancel(context: Context): Boolean =
         prefs(context)
-            .getBoolean(KEY_DELETE_PARTIAL_ON_CANCEL, false)
+            .safeBoolean(KEY_DELETE_PARTIAL_ON_CANCEL, false)
 
     fun setDeletePartialOnCancel(context: Context, enabled: Boolean) {
         prefs(context).edit {
@@ -433,7 +457,7 @@ object StoragePrefs {
 
     fun serverPort(context: Context): Int =
         prefs(context)
-            .getInt(KEY_SERVER_PORT, DEFAULT_PORT).coerceIn(1024, 65535)
+            .safeInt(KEY_SERVER_PORT, DEFAULT_PORT).coerceIn(1024, 65535)
 
     fun setServerPort(context: Context, value: Int) {
         prefs(context).edit {
@@ -443,7 +467,7 @@ object StoragePrefs {
 
     fun segmentCount(context: Context): Int =
         prefs(context)
-            .getInt(KEY_SEGMENTS, 4).coerceIn(1, 8)
+            .safeInt(KEY_SEGMENTS, 4).coerceIn(1, 8)
 
     fun setSegmentCount(context: Context, value: Int) {
         prefs(context).edit {
@@ -455,7 +479,7 @@ object StoragePrefs {
         prefs(context)
             // Nilai lama/korup (0/hiperbesar) tanpa clamp membuat connect
             // langsung gagal atau menggantung: fail-closed ke rentang valid.
-            .getInt(KEY_CONNECT_TIMEOUT_SEC, 15).coerceIn(5, 120)
+            .safeInt(KEY_CONNECT_TIMEOUT_SEC, 15).coerceIn(5, 120)
 
     fun setConnectTimeoutSec(context: Context, sec: Int) {
         prefs(context).edit {
@@ -465,7 +489,7 @@ object StoragePrefs {
 
     fun getReadTimeoutSec(context: Context): Int =
         prefs(context)
-            .getInt(KEY_READ_TIMEOUT_SEC, 30).coerceIn(10, 300)
+            .safeInt(KEY_READ_TIMEOUT_SEC, 30).coerceIn(10, 300)
 
     fun setReadTimeoutSec(context: Context, sec: Int) {
         prefs(context).edit {
@@ -476,7 +500,7 @@ object StoragePrefs {
     /** Terakhir kali thumbnail cache dibersihkan otomatis (0 = belum pernah). */
     fun lastThumbCleanup(context: Context): Long =
         prefs(context)
-            .getLong(KEY_THUMB_CLEANUP_LAST, 0L)
+            .safeLong(KEY_THUMB_CLEANUP_LAST, 0L)
 
     fun setThumbCleanupDone(context: Context, timeMs: Long) {
         prefs(context)
@@ -492,7 +516,7 @@ object StoragePrefs {
     }
 
     fun getUserAgent(context: Context): String =
-        prefs(context).getString(KEY_USER_AGENT, "").orEmpty()
+        prefs(context).safeString(KEY_USER_AGENT, "").orEmpty()
 
     fun setUserAgent(context: Context, value: String) {
         prefs(context).edit { putString(KEY_USER_AGENT, value) }
@@ -501,7 +525,7 @@ object StoragePrefs {
     /** Folder yang disertakan di galeri (path absolut, e.g. "/storage/emulated/0/DCIM/Camera").
      *  String kosong = semua folder (default). Disimpan sebagai baris per folder. */
     fun getGalleryFolders(context: Context): List<String> =
-        prefs(context).getString(KEY_GALLERY_FOLDERS, null)
+        prefs(context).safeString(KEY_GALLERY_FOLDERS, null)
             ?.split("\n")
             ?.map { it.trim() }
             ?.filter { it.isNotEmpty() }
@@ -518,7 +542,7 @@ object StoragePrefs {
      *  tulis bisa disapu persis milik sendiri — baris aplikasi lain tak
      *  pernah ditebak dari isi koleksi. */
     fun pendingMediaStoreRowEntries(context: Context): List<String> =
-        prefs(context).getString(KEY_PENDING_MEDIASTORE_ROWS, null)
+        prefs(context).safeString(KEY_PENDING_MEDIASTORE_ROWS, null)
             ?.split("\n")?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?: emptyList()
 
@@ -560,7 +584,7 @@ object StoragePrefs {
      *  persis milik sendiri oleh sweepStaleFinalClaims. Baca-ubah-tulis
      *  di dalam prefsLock sejak lahir (pelajaran issue #751). */
     fun finalClaimEntries(context: Context): List<String> =
-        prefs(context).getString(KEY_PENDING_FINAL_CLAIMS, null)
+        prefs(context).safeString(KEY_PENDING_FINAL_CLAIMS, null)
             ?.split("\n")?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?: emptyList()
 
