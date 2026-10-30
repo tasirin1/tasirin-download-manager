@@ -6,8 +6,6 @@
     <color name="white">#FFFFFF</color>
     <color name="window_bg">#0A0F24</color>
     <color name="ic_launcher_background">#1565C0</color>
-    <color name="status_on">#34D399</color>
-    <color name="status_off">#F87171</color>
     <color name="text_primary">#EAF0FF</color>
     <color name="text_secondary">#93A5CC</color>
     <color name="text_hint">#71809F</color>
@@ -18,19 +16,11 @@
     <color name="gallery_ext_text">#71809F</color>
     <color name="gallery_overlay">#6610182A</color>
     <color name="chip_pressed_blue">#3338BDF8</color>
-    <color name="status_off_soft">#33181C</color>
     <!-- Kontainer tonal modern (gaya M3): tombol sekunder, kartu ringkasan. -->
     <color name="primary_container">#1E2A4A</color>
     <color name="primary_container_pressed">#27365E</color>
 
     <!-- Lingkaran ikon tipe file (item download). -->
-    <color name="icon_circle_video">#1C2745</color>
-    <color name="icon_circle_audio">#0B2E22</color>
-    <color name="icon_circle_image">#2A1E4D</color>
-    <color name="icon_circle_pdf">#33181C</color>
-    <color name="icon_circle_apk">#3A2A10</color>
-    <color name="icon_circle_archive">#1E2A4A</color>
-    <color name="icon_circle_generic">#1E2A4A</color>
 
     <!-- Settings: badge server & section accent -->
     <color name="badge_on_text">#34D399</color>
