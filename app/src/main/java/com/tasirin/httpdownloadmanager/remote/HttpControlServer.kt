@@ -1887,9 +1887,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  basi akan menghidupkan lagi file yang sudah dihapus. Stream yang
      *  sudah terbuka selamat dari unlink di Linux. */
     private fun invalidateZipCache() {
-        val entries = zipCache.values.toList()
-        zipCache.clear()
-        entries.forEach { runCatching { it.second.delete() } }
+        // Per entri dengan CAS, bukan clear() menyeluruh: entri segar yang
+        // dipasang zipCached di sela invalidasi tak ikut terbuang dan
+        // berkasnya tak yatim (issue #676).
+        zipCache.entries.toList().forEach { (key, entry) ->
+            if (zipCache.remove(key, entry)) {
+                runCatching { entry.second.delete() }
+            }
+        }
     }
 
     private fun createTempZip(fill: (ZipOutputStream) -> Unit): File? = try {
@@ -2428,8 +2433,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 dir.startsWith("$folder/"))
         }
         doomed.forEach { (key, entry) ->
-            zipCache.remove(key)
-            runCatching { entry.second.delete() }
+            // CAS (remove berkunci nilai): berkas hanya dihapus bila entri
+            // di map masih entri dari potret ini. remove tanpa syarat bisa
+            // membuang entri SEGAR yang baru dibangun ulang zipCached di
+            // sela invalidasi dan mengyatimkan berkas barunya (issue #676).
+            if (zipCache.remove(key, entry)) {
+                runCatching { entry.second.delete() }
+            }
         }
     }
 
