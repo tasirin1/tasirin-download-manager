@@ -3222,6 +3222,7 @@ function loadMoreGallery() {
     galleryGrid.insertBefore(frag, gallerySentinel);
     galleryLoaded += next.length;
     trimGalleryTop();
+    galSyncRoving();
     if (galleryLoaded < galleryItems.length &&
         galleryItems.length > 120 && typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(loadMoreGallery);
@@ -3237,10 +3238,49 @@ function loadMoreGallery() {
   }
 }
 
+// Navigasi panah grid galeri + roving tabindex (issue #984):
+// tanpa ini tiap sel adalah tab-stop (sampai ~240 sel jendela) dan
+// tombol panah tak bekerja sama sekali di grid — buruk untuk
+// keyboard/D-pad yang aturan repo wajib ramah. Kini satu sel
+// menjadi tab-stop; sel yang menerima fokus mempromosikan dirinya,
+// dan panah memindah fokus mengikuti jumlah kolom tata letak nyata.
+function galSyncRoving() {
+  if (!galleryGrid.querySelector('.gal-cell[tabindex="0"]')) {
+    var first = galleryGrid.querySelector('.gal-cell');
+    if (first) first.setAttribute('tabindex', '0');
+  }
+}
+galleryGrid.addEventListener('focusin', function (e) {
+  var cell = e.target && e.target.closest ? e.target.closest('.gal-cell') : null;
+  if (!cell) return;
+  var prev = galleryGrid.querySelector('.gal-cell[tabindex="0"]');
+  if (prev && prev !== cell) prev.setAttribute('tabindex', '-1');
+  cell.setAttribute('tabindex', '0');
+});
+galleryGrid.addEventListener('keydown', function (e) {
+  var cell = e.target && e.target.closest ? e.target.closest('.gal-cell') : null;
+  if (!cell) return;
+  var cells = Array.prototype.slice.call(galleryGrid.querySelectorAll('.gal-cell'));
+  var idx = cells.indexOf(cell);
+  if (idx < 0) return;
+  var cols = 0;
+  var top0 = cells[0].offsetTop;
+  while (cols < cells.length && cells[cols].offsetTop === top0) cols++;
+  if (cols < 1) cols = 1;
+  var next = -1;
+  if (e.key === 'ArrowRight') next = idx + 1;
+  else if (e.key === 'ArrowLeft') next = idx - 1;
+  else if (e.key === 'ArrowDown') next = idx + cols;
+  else if (e.key === 'ArrowUp') next = idx - cols;
+  else return;
+  e.preventDefault();
+  if (next >= 0 && next < cells.length) cells[next].focus();
+});
+
 function renderGalleryCell(it, frag) {
   const cell = document.createElement('div');
   cell.className = 'gal-cell';
-  cell.setAttribute('tabindex', '0');
+  cell.setAttribute('tabindex', '-1');
   const thumb = API + '/api/thumb?token=' + encodeURIComponent(it.token);
   const media = API + '/api/media?token=' + encodeURIComponent(it.token);
   const ext = extOf(it.name);

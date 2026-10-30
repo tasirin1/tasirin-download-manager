@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **feat(web): navigasi panah + roving tabindex di grid galeri** -- sebelumnya setiap sel galeri adalah tab-stop (sampai ~240 pada jendela render) dan tombol panah tidak bekerja sama sekali di grid, menyulitkan pengguna keyboard/D-pad TV. Kini satu sel menjadi tab-stop (sel terfokus mempromosikan dirinya), dan tombol panah memindah fokus antar sel mengikuti jumlah kolom dari tata letak nyata (issue #984).
+
 - **fix(web): fallback loadFs ke root kini membatalkan mode pilih** -- jalur catch yang melompat ke root karena folder restorasi tak tersedia sebelumnya memuat ulang tanpa reset, sehingga mode pilih bisa tersangkut di root (tombol Select tersembunyi di sana, kelas fs-selecting tertinggal) bila pengguna menekan Select tepat saat fetch gagal. Jalur fallback kini mereset seleksi seperti pemicu pengganti konteks lain (issue #983).
 
 - **fix(download): urutan pelepasan wake lock di onDestroy DownloadService dibalik** -- onDestroy sebelumnya melepas lock sebelum membatalkan scope kolektor, memberi celah bagi kolektor di thread IO yang sedang memproses emisi aktif untuk meng-acquire lock baru sesudah pelepasan — lock tanpa pemilik sampai timeout 1 jam. Kini keadaan destroyed ditandai lebih dulu (dan diperiksa updateWakeLock sebelum acquire), scope dibatalkan, baru lock dilepas (issue #982).
