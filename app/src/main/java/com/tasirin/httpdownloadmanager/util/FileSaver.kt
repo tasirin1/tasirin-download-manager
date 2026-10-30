@@ -234,8 +234,10 @@ class FileSaver(context: Context) {
         writer: (OutputStream) -> Unit
     ): PublishResult {
         val target = uniqueTargetFile(File(dir, fileName))
-        val staging = File(dir, target.name + ".part")
-        runCatching { staging.delete() }
+        // Klaim nama staging juga (pola publishFileIntoDir): "<final>.part"
+        // adalah namespace partial unduhan, jadi nama polos + delete() buta
+        // bisa menghapus partial unduhan aktif yang bernama sama (issue #744).
+        val staging = uniqueTargetFile(File(dir, target.name + ".part"))
         try {
             BufferedOutputStream(staging.outputStream()).use { out -> writer(out) }
         } catch (e: Exception) {
