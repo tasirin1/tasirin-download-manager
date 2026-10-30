@@ -187,15 +187,7 @@ class FileSaver(context: Context) {
             if (!dir.isDirectory && !dir.mkdirs()) {
                 throw IOException("Destination folder is invalid or not writable: $cleanFolder")
             }
-            val target = uniqueTargetFile(File(dir, fileName))
-            try {
-                BufferedOutputStream(target.outputStream()).use { out -> writer(out) }
-            } catch (e: Exception) {
-                // Gagal di tengah upload: buang file setengah jadi.
-                runCatching { target.delete() }
-                throw e
-            }
-            return PublishResult(filePath = target.absolutePath, fileName = target.name)
+            return writePlainFileStaged(dir, fileName, writer)
         }
         when (destination) {
             "internal" -> return writeInternal(fileName, writer)
@@ -213,14 +205,7 @@ class FileSaver(context: Context) {
             if (dir.isDirectory || dir.mkdirs()) {
                 // Nama unik seperti cabang lain: impor upload jangan menimpa
                 // file senama yang sudah ada di folder teks.
-                val target = uniqueTargetFile(File(dir, fileName))
-                try {
-                    target.outputStream().use { out -> writer(out) }
-                } catch (e: Exception) {
-                    runCatching { target.delete() }
-                    throw e
-                }
-                return PublishResult(filePath = target.absolutePath, fileName = target.name)
+                return writePlainFileStaged(dir, fileName, writer)
             }
         }
         return if (Build.VERSION.SDK_INT >= 29) {
@@ -230,13 +215,49 @@ class FileSaver(context: Context) {
         }
     }
 
-    private fun writeInternal(fileName: String, writer: (OutputStream) -> Unit): PublishResult {
-        val target = uniqueTargetFile(File(downloadDir, fileName))
+    private fun writeInternal(fileName: String, writer: (OutputStream) -> Unit): PublishResult =
+        writePlainFileStaged(downloadDir, fileName, writer)
+
+    /** Tulis stream impor ke berkas polos lewat staging `<nama>.part` lalu
+     *  rename ke nama final (issue #734) — pola yang sama dengan jalur
+     *  publish unduhan (#372/#719). Cabang-cabang saveStream sebelumnya
+     *  menulis langsung ke nama final, jadi proses mati di tengah salin
+     *  meninggalkan berkas terpotong bernama final yang tak dirujuk item
+     *  mana pun; staging .part tak pernah disangka berkas selesai, dan
+     *  sisanya di downloadDir disapu cleanupOrphanPartials. Klaim nama
+     *  final tetap atomik lewat uniqueTargetFile; rename yang gagal jatuh
+     *  ke salin langsung dari staging (jalan terakhir — target adalah
+     *  klaim kosong milik panggilan ini sendiri). */
+    private fun writePlainFileStaged(
+        dir: File,
+        fileName: String,
+        writer: (OutputStream) -> Unit
+    ): PublishResult {
+        val target = uniqueTargetFile(File(dir, fileName))
+        val staging = File(dir, target.name + ".part")
+        runCatching { staging.delete() }
         try {
-            BufferedOutputStream(target.outputStream()).use { out -> writer(out) }
+            BufferedOutputStream(staging.outputStream()).use { out -> writer(out) }
         } catch (e: Exception) {
+            // Gagal di tengah upload: buang staging + klaim final kosong.
+            runCatching { staging.delete() }
             runCatching { target.delete() }
             throw e
+        }
+        // Terbitkan: hapus klaim kosong lalu rename (urutan #719). Rename
+        // sevolume seharusnya selalu berhasil sesudah klaim dihapus.
+        runCatching { target.delete() }
+        if (!staging.renameTo(target)) {
+            try {
+                staging.inputStream().use { ins ->
+                    target.outputStream().use { out -> ins.copyTo(out, IO_BUF) }
+                }
+                runCatching { staging.delete() }
+            } catch (e: Exception) {
+                runCatching { staging.delete() }
+                runCatching { target.delete() }
+                throw e
+            }
         }
         return PublishResult(filePath = target.absolutePath, fileName = target.name)
     }
@@ -247,14 +268,7 @@ class FileSaver(context: Context) {
         if (Environment.getExternalStorageState() != Environment.MEDIA_MOUNTED) return null
         runCatching { publicDir.mkdirs() }
         if (!publicDir.isDirectory || !publicDir.canWrite()) return null
-        val target = uniqueTargetFile(File(publicDir, fileName))
-        try {
-            target.outputStream().use { out -> writer(out) }
-        } catch (e: Exception) {
-            runCatching { target.delete() }
-            throw e
-        }
-        return PublishResult(filePath = target.absolutePath, fileName = target.name)
+        return writePlainFileStaged(publicDir, fileName, writer)
     }
 
     private fun saveToMediaStore(
@@ -283,6 +297,10 @@ class FileSaver(context: Context) {
                 ?: throw IOException("Failed to create file in MediaStore")
             Triple(uri, unique, values)
         }
+        // Catat baris pending milik panggilan ini (issue #734): bila proses
+        // mati sebelum IS_PENDING dicabut di bawah, baris yatimnya disapu
+        // sweepStalePendingMediaStoreRows pada bersih-bersih berikutnya.
+        StoragePrefs.notePendingMediaStoreRow(appContext, uri.toString())
         try {
             resolver.openOutputStream(uri)?.use { out -> writer(out) }
                 ?: throw IOException("Failed to open MediaStore output")
@@ -298,6 +316,7 @@ class FileSaver(context: Context) {
             if (resolver.update(uri, values, null, null) <= 0) {
                 throw IOException("Failed to publish MediaStore file (IS_PENDING not cleared)")
             }
+            StoragePrefs.forgetPendingMediaStoreRow(appContext, uri.toString())
             // Corong invalidasi galeri (issue #557): SEMUA terbitan
             // MediaStore — unduhan maupun upload server lewat
             // saveStream — bermuara di sini, jadi satu panggilan ini
@@ -309,7 +328,37 @@ class FileSaver(context: Context) {
             return PublishResult(contentUri = uri.toString(), fileName = unique)
         } catch (e: Exception) {
             runCatching { resolver.delete(uri, null, null) }
+            StoragePrefs.forgetPendingMediaStoreRow(appContext, uri.toString())
             throw e
+        }
+    }
+
+    /** Sapu baris MediaStore IS_PENDING yatim milik aplikasi sendiri
+     *  (issue #734): entri yang dicatat notePendingMediaStoreRow tetapi tak
+     *  pernah diterbitkan karena proses mati di tengah tulis. Hanya entri
+     *  tercatat yang disentuh, dan hanya yang berumur > 2 jam (samakan
+     *  ambang sapuan partial) agar tulis yang sedang berjalan tak diganggu.
+     *  Baris yang sudah terbit/hilang cukup dilupakan dari catatan. */
+    private fun sweepStalePendingMediaStoreRows() {
+        if (Build.VERSION.SDK_INT < 29) return
+        val resolver = appContext.contentResolver
+        val now = System.currentTimeMillis()
+        StoragePrefs.pendingMediaStoreRowEntries(appContext).forEach { entry ->
+            val uriStr = entry.substringBefore('|')
+            val notedAt = entry.substringAfter('|', "").toLongOrNull() ?: 0L
+            if (now - notedAt < 2L * 60 * 60 * 1000) return@forEach
+            runCatching {
+                val uri = Uri.parse(uriStr)
+                var stillPending = false
+                resolver.query(
+                    uri, arrayOf(MediaStore.Downloads.IS_PENDING), null, null, null
+                )?.use { c ->
+                    if (c.moveToFirst()) stillPending = c.getInt(0) == 1
+                }
+                if (stillPending) resolver.delete(uri, null, null)
+                // Terbit, tersapu, atau memang sudah hilang: catatan selesai.
+                StoragePrefs.forgetPendingMediaStoreRow(appContext, uriStr)
+            }
         }
     }
 
@@ -345,6 +394,62 @@ class FileSaver(context: Context) {
         writer: (OutputStream) -> Unit
     ): PublishResult? = runCatching {
         val tree = DocumentFile.fromTreeUri(appContext, folderUri) ?: return null
+        // Staging SAF (issue #734): tulis ke dokumen `<nama>.part` lalu
+        // rename ke nama final, sejajar cabang berkas polos — proses mati
+        // di tengah tulis tak lagi meninggalkan dokumen terpotong bernama
+        // final. Nama unik diputuskan di dalam kunci nama yang sama
+        // seperti claimCustomDoc, tanpa membuat dokumen final lebih dulu.
+        val unique = synchronized(mergeLockFor(FileNames.safe(fileName))) {
+            uniqueDocumentName(tree, fileName)
+        }
+        val stagingDoc = tree.createFile(MimeTypes.forFile(unique), "$unique.part")
+        var staged: PublishResult? = null
+        if (stagingDoc != null) {
+            val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
+            if (output == null) {
+                // Sama seperti jalur langsung: stream tak terbuka sesudah
+                // dokumen dibuat -> buang dokumen baru, hasil null.
+                runCatching { stagingDoc.delete() }
+                return null
+            }
+            try {
+                output.use { writer(it) }
+            } catch (e: Exception) {
+                runCatching { stagingDoc.delete() }
+                throw e
+            }
+            staged = if (runCatching { stagingDoc.renameTo(unique) }.getOrDefault(false)) {
+                // URI otoritatif diambil ulang dari pohon: objek dokumen
+                // hasil rename bisa menyimpan URI lama pada sebagian
+                // provider, jadi findFile adalah sumber kebenarannya.
+                val finalDoc = tree.findFile(unique)
+                PublishResult(
+                    contentUri = (finalDoc ?: stagingDoc).uri.toString(),
+                    fileName = unique
+                )
+            } else {
+                // Provider menolak rename: buang staging dan jatuh ke
+                // tulis langsung (perilaku lama) sebagai jalan terakhir.
+                runCatching { stagingDoc.delete() }
+                null
+            }
+        }
+        staged ?: writeCustomFolderDirect(tree, fileName, writer)
+    }.getOrNull().also {
+        // Jalur SAF tak melewati MediaStore/notifyMediaChanged, jadi
+        // scanCache galeri wajib diinvalidasi eksplisit (issue #569):
+        // tanpa ini berkas SAF baru tak tampil di galeri sampai TTL
+        // cache (30/600 dtk) habis.
+        if (it != null) MediaLibrary.invalidateScanCache()
+    }
+
+    /** Tulis langsung ke dokumen final SAF (jalan terakhir writeCustomFolder
+     *  bila provider menolak rename staging, issue #734). */
+    private fun writeCustomFolderDirect(
+        tree: DocumentFile,
+        fileName: String,
+        writer: (OutputStream) -> Unit
+    ): PublishResult? = runCatching {
         val (target, unique, createdDoc) = claimCustomDoc(tree, fileName) ?: return null
         // Stream gagal dibuka sesudah dokumen dibuat: dokumen 0-byte
         // yatim tertinggal selamanya di folder pengguna (tak dirujuk
@@ -487,6 +592,9 @@ class FileSaver(context: Context) {
     fun cleanupOrphanPartials(items: List<DownloadItem>): Long {
         var freed = 0L
         var deletedInternal = false
+        // Baris MediaStore pending yatim milik sendiri (issue #734) disapu
+        // pada alur bersih-bersih yang sama.
+        runCatching { sweepStalePendingMediaStoreRows() }
         runCatching {
             val expected = buildSet {
                 items.forEach { item ->

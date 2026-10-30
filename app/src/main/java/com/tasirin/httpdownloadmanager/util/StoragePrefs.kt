@@ -36,6 +36,7 @@ object StoragePrefs {
     private const val KEY_SERVER_AUTOSTART = "server_autostart_boot"
     private const val KEY_SERVER_READ_ONLY = "server_read_only"
     private const val KEY_TEXT_FOLDER = "text_folder_path"
+    private const val KEY_PENDING_MEDIASTORE_ROWS = "pending_mediastore_rows"
     private const val KEY_AUTO_OPEN_COMPLETE = "auto_open_on_complete"
     private const val KEY_BATTERY_EXEMPT = "battery_exempt"
     private const val KEY_SERVER_PIN = "server_pin"
@@ -493,6 +494,35 @@ object StoragePrefs {
 
     fun setGalleryFolders(context: Context, folders: List<String>) {
         prefs(context).edit { putString(KEY_GALLERY_FOLDERS, folders.joinToString("\n")) }
+    }
+
+    /** Entri baris MediaStore yang sedang IS_PENDING=1 milik aplikasi ini,
+     *  format per baris "uri|epochMs" (issue #734): dicatat oleh
+     *  FileSaver.saveToMediaStore saat insert dan dibuang saat baris
+     *  diterbitkan/dihapus, agar baris yatim akibat proses mati di tengah
+     *  tulis bisa disapu persis milik sendiri — baris aplikasi lain tak
+     *  pernah ditebak dari isi koleksi. */
+    fun pendingMediaStoreRowEntries(context: Context): List<String> =
+        prefs(context).getString(KEY_PENDING_MEDIASTORE_ROWS, null)
+            ?.split("\n")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?: emptyList()
+
+    fun notePendingMediaStoreRow(context: Context, uri: String) {
+        val entries = pendingMediaStoreRowEntries(context)
+        if (entries.any { it.substringBefore('|') == uri }) return
+        val entry = uri + "|" + System.currentTimeMillis()
+        prefs(context).edit {
+            putString(KEY_PENDING_MEDIASTORE_ROWS, (entries + entry).joinToString("\n"))
+        }
+    }
+
+    fun forgetPendingMediaStoreRow(context: Context, uri: String) {
+        val entries = pendingMediaStoreRowEntries(context)
+        val kept = entries.filterNot { it.substringBefore('|') == uri }
+        if (kept.size == entries.size) return
+        prefs(context).edit {
+            putString(KEY_PENDING_MEDIASTORE_ROWS, kept.joinToString("\n"))
+        }
     }
 
     /** Bandingkan dua string tanpa short-circuit (constant-time). */
