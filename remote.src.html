@@ -2515,6 +2515,14 @@ const galleryBtn = document.getElementById('tabGallery');
 const galleryGrid = document.getElementById('galleryGrid');
 const galleryCount = document.getElementById('galleryCount');
 const galleryStatus = document.getElementById('galleryStatus');
+// Semua penulis teks status galeri lewat helper ini (issue #861):
+// handler ketuk + kursor dari status 'Tap to retry' (#852) tidak
+// boleh diwarisi teks berikutnya (error reset / PIN / sukses).
+function setGalleryStatus(text) {
+  galleryStatus.textContent = text;
+  galleryStatus.onclick = null;
+  galleryStatus.style.cursor = '';
+}
 let galleryItems = [];
 // Cache posisi video per render galeri: menghindari baca localStorage untuk
 // tiap cell video saat galeri di-render (bisa ratusan cell).
@@ -2983,7 +2991,7 @@ async function loadGalleryRequest(reset) {
     const res = await fetchTimeout(API + '/api/gallery?' + params.toString(), undefined, 25000);
     if (seq !== gallerySeq) return;
     if (res.status === 401) {
-      galleryStatus.textContent = 'PIN required. Reload the page to log in.';
+      setGalleryStatus('PIN required. Reload the page to log in.');
       if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
       galleryGrid.innerHTML = '';
       return;
@@ -2991,7 +2999,7 @@ async function loadGalleryRequest(reset) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (seq !== gallerySeq) return;
-    galleryStatus.textContent = '';
+    setGalleryStatus('');
     const items = data.items || [];
     if (reset) {
       galleryCache = {items: items, total: data.total || items.length, hasMore: !!data.hasMore, at: Date.now()};
@@ -3014,10 +3022,10 @@ async function loadGalleryRequest(reset) {
         // Jaringan bermasalah tapi masih ada salinan terakhir: pakai cache
         // sambil memberi tahu supaya pengguna tahu datanya bisa basi.
         mmShowToast('Failed to refresh — showing cached gallery', 3000);
-        galleryStatus.textContent = '';
+        setGalleryStatus('');
         renderGalleryReset(galleryCache.items, galleryCache.total, galleryCache.hasMore);
       } else {
-        galleryStatus.textContent = 'Failed to load gallery: ' + e;
+        setGalleryStatus('Failed to load gallery: ' + e);
         if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
         galleryGrid.innerHTML = emptyHtml('warn', 'Failed to load gallery', String(e), 'Retry');
         const rb = galleryGrid.querySelector('.cta button');
@@ -3029,11 +3037,10 @@ async function loadGalleryRequest(reset) {
       // scroll) tak akan memicu sentinel lagi, jadi beri status yang
       // bisa diketuk untuk mencoba ulang; scroll berikutnya pun
       // tetap memicu lewat sentinel seperti sebelumnya.
-      galleryStatus.textContent = 'Failed to load more. Tap to retry.';
+      setGalleryStatus('Failed to load more. Tap to retry.');
       galleryStatus.style.cursor = 'pointer';
       galleryStatus.onclick = function () {
-        galleryStatus.textContent = '';
-        galleryStatus.onclick = null;
+        setGalleryStatus('');
         loadGallery(false);
       };
     }
@@ -3453,7 +3460,7 @@ function applyRoute() {
     restartAnim(galleryView);
     toggleAddForm(false);
     if (galleryCacheFresh()) {
-      galleryStatus.textContent = '';
+      setGalleryStatus('');
       renderGalleryReset(galleryCache.items, galleryCache.total, galleryCache.hasMore);
       restoreRouteScroll('gallery');
     } else {

@@ -352,6 +352,11 @@ const galleryBtn = document.getElementById('tabGallery');
 const galleryGrid = document.getElementById('galleryGrid');
 const galleryCount = document.getElementById('galleryCount');
 const galleryStatus = document.getElementById('galleryStatus');
+function setGalleryStatus(text) {
+galleryStatus.textContent = text;
+galleryStatus.onclick = null;
+galleryStatus.style.cursor = '';
+}
 let galleryItems = [];
 let galleryVideoPos = {};
 const GALLERY_CHUNK = 24;
@@ -768,7 +773,7 @@ params.set('type', 'video');
 const res = await fetchTimeout(API + '/api/gallery?' + params.toString(), undefined, 25000);
 if (seq !== gallerySeq) return;
 if (res.status === 401) {
-galleryStatus.textContent = 'PIN required. Reload the page to log in.';
+setGalleryStatus('PIN required. Reload the page to log in.');
 if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
 galleryGrid.innerHTML = '';
 return;
@@ -776,7 +781,7 @@ return;
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const data = await res.json();
 if (seq !== gallerySeq) return;
-galleryStatus.textContent = '';
+setGalleryStatus('');
 const items = data.items || [];
 if (reset) {
 galleryCache = {items: items, total: data.total || items.length, hasMore: !!data.hasMore, at: Date.now()};
@@ -796,21 +801,20 @@ galleryRetryDone = true;
 setTimeout(function () { loadGallery(true); }, 2000);
 } else if (galleryCacheFresh()) {
 mmShowToast('Failed to refresh — showing cached gallery', 3000);
-galleryStatus.textContent = '';
+setGalleryStatus('');
 renderGalleryReset(galleryCache.items, galleryCache.total, galleryCache.hasMore);
 } else {
-galleryStatus.textContent = 'Failed to load gallery: ' + e;
+setGalleryStatus('Failed to load gallery: ' + e);
 if (gallerySentinel) { gallerySentinel.remove(); gallerySentinel = null; }
 galleryGrid.innerHTML = emptyHtml('warn', 'Failed to load gallery', String(e), 'Retry');
 const rb = galleryGrid.querySelector('.cta button');
 if (rb) rb.addEventListener('click', function () { loadGallery(true); });
 }
 } else {
-galleryStatus.textContent = 'Failed to load more. Tap to retry.';
+setGalleryStatus('Failed to load more. Tap to retry.');
 galleryStatus.style.cursor = 'pointer';
 galleryStatus.onclick = function () {
-galleryStatus.textContent = '';
-galleryStatus.onclick = null;
+setGalleryStatus('');
 loadGallery(false);
 };
 }
@@ -1171,7 +1175,7 @@ if (route === 'gallery') {
 restartAnim(galleryView);
 toggleAddForm(false);
 if (galleryCacheFresh()) {
-galleryStatus.textContent = '';
+setGalleryStatus('');
 renderGalleryReset(galleryCache.items, galleryCache.total, galleryCache.hasMore);
 restoreRouteScroll('gallery');
 } else {
