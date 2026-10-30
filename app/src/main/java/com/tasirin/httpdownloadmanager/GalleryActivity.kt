@@ -486,8 +486,14 @@ private class GalleryAdapter(
                 b.imageThumb.setImageBitmap(bmp)
                 // Thumbnail ada: sembunyikan play overlay (gambar sudah cukup)
                 if (e.isVideo) b.playOverlay.visibility = View.GONE
-            } else if (e.isVideo) {
-                // 3. Tidak ada thumbnail: play overlay tetap tampil sebagai fallback
+            } else if (e.isVideo && holder.bindingAdapterPosition == pos &&
+                items.getOrNull(pos)?.token == e.token
+            ) {
+                // 3. Tidak ada thumbnail: play overlay tetap tampil sebagai fallback.
+                // Gerbang identitas yang sama dengan cabang sukses (issue
+                // #1023): tanpa ini job basi yang selesai paling akhir bisa
+                // menyalakan overlay di cell yang sudah di-bind ulang ke
+                // entri lain (thumbnail barunya sudah termuat).
                 b.playOverlay.visibility = View.VISIBLE
             }
         }
