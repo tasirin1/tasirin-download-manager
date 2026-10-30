@@ -160,9 +160,18 @@ internal fun getOrCreateThumb(
     // untuknya — slot dibuat ulang sekali untuk inode baru.
     val stamp = thumbSourceStamp(ctx, raw)
     val growing = raw.startsWith("f:") && isThumbStampGrowing(stamp, System.currentTimeMillis())
-    val effectiveStamp = if (growing) "" else stamp
+    val fileInode: Long? = if (raw.startsWith("f:")) thumbFileInode(raw) else null
+    // Berkas diam pun membawa inode dalam capnya (issue #897):
+    // mtime+ukuran saja bisa identik pada penggantian ber-cap
+    // terpelihara, sehingga thumbnail lama tersaji untuk isi baru.
+    // Inode membedakan penggantian itu; stat gagal jatuh ke cap lama.
+    val effectiveStamp = when {
+        growing -> ""
+        stamp.isNotEmpty() && fileInode != null -> "$stamp:$fileInode"
+        else -> stamp
+    }
     val key = if (effectiveStamp.isEmpty()) sha256Hex(raw) else sha256Hex("$raw|$effectiveStamp")
-    val slotInode: Long? = if (growing) thumbFileInode(raw) else null
+    val slotInode: Long? = if (growing) fileInode else null
     thumbFailures[key]?.let { at ->
         if (isThumbFailureFresh(at, System.currentTimeMillis())) return null
     }
