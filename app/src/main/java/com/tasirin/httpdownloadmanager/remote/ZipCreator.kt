@@ -117,14 +117,19 @@ object ZipCreator {
                 zipFile(zos, child, entryPath, depth + 1, seen, budget, usedNames, isFileAllowed)
             }
         } else if (file.isFile) {
-            // Kegagalan baca sumber TIDAK ditelan (issue #846): entri
-            // tanpa ukuran/CRC di muka memakai data descriptor, jadi
-            // salinan yang putus di tengah difinalkan closeEntry sebagai
-            // berkas utuh. Galat dibiarkan naik; createTempZip membuang
-            // seluruh ZIP dan pemanggil menerima kegagalan yang jujur.
+            // Gagal MEMBUKA sumber = berkas terlewat (issue #866, selaras
+            // #857 untuk token flat): berkas yang hilang di antara
+            // listing dan buka tak boleh membunuh seluruh ZIP folder.
+            val input = runCatching { file.inputStream() }.getOrNull() ?: return
+            // Kegagalan MENYALIN di tengah tetap TIDAK ditelan (issue
+            // #846): entri tanpa ukuran/CRC di muka memakai data
+            // descriptor, jadi salinan yang putus di tengah akan
+            // difinalkan closeEntry sebagai berkas utuh bila ditelan.
+            // Galat dibiarkan naik; createTempZip membuang seluruh ZIP
+            // dan pemanggil menerima kegagalan yang jujur.
             zos.putNextEntry(ZipEntry(entryPath))
             try {
-                file.inputStream().use { it.copyTo(zos, IO_BUF) }
+                input.use { it.copyTo(zos, IO_BUF) }
             } finally {
                 runCatching { zos.closeEntry() }
             }
