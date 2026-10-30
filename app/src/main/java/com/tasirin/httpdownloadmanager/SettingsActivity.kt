@@ -984,12 +984,19 @@ class SettingsActivity : AppCompatActivity() {
         spinnerUA.setSelection(savedIdx)
         customUAInput.setText(savedUA)
         customUAInput.visibility = if (savedIdx == uaPresets.size - 1) View.VISIBLE else View.GONE
+        // Callback pertama listener adalah seleksi programatik awal
+        // (issue #1013): pada seleksi itu kolom kustom ditampilkan
+        // TANPA merebut fokus — requestFocus hanya untuk pilihan
+        // Custom yang benar-benar diketuk pengguna.
+        var uaInitialCallbackPending = true
         spinnerUA.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 val value = uaPresets[position].second
+                val isInitial = uaInitialCallbackPending
+                uaInitialCallbackPending = false
                 if (value == "CUSTOM") {
                     customUAInput.visibility = View.VISIBLE
-                    customUAInput.requestFocus()
+                    if (!isInitial) customUAInput.requestFocus()
                 } else {
                     customUAInput.visibility = View.GONE
                     StoragePrefs.setUserAgent(this@SettingsActivity, value)

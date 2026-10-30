@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(ui): spinner User-Agent tak lagi merebut fokus saat Settings dibuka** -- dengan UA kustom tersimpan, callback seleksi awal listener masuk cabang Custom dan memanggil requestFocus pada kolom kustom, memindahkan fokus (dan berpotensi memunculkan keyboard) tanpa pengguna menyentuh apa pun. Callback pertama kini hanya menampilkan kolom; requestFocus hanya untuk pilihan Custom yang benar-benar diketuk pengguna (issue #1013).
+
 - **fix(ui): toast kegagalan Move tak lagi menampilkan literal '%1$s'** -- string storage_picker_error memuat placeholder format, tetapi satu-satunya pemanggilnya memakai Toast.makeText ber-resource-id yang tidak melakukan substitusi, jadi pengguna melihat 'Failed to use folder: %1$s'. String kini tanpa placeholder (issue #1012).
 
 - **fix(ui): galeri native tak lagi menampilkan 'No videos found yet.' selama scan awal** -- kolektor engine memproses emisi pertamanya jauh sebelum scan MediaStore selesai dan updateList menilai daftar yang masih kosong sebagai galeri kosong. Kini emptyView hanya tampil bila scan pertama sudah terpasang, sejajar gerbang muatan awal MainActivity (#978) (issue #1011).
