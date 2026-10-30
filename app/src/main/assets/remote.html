@@ -4120,7 +4120,9 @@ showToast('Action failed: ' + e.message, 4000, 'error');
 }
 const shareModal = document.getElementById('shareModal');
 let currentShareToken = '';
+let shareItemSeq = 0;
 async function shareItem(id) {
+const seq = ++shareItemSeq;
 const body = new URLSearchParams({id: id});
 try {
 const res = await fetch(API + '/api/share', {
@@ -4129,6 +4131,7 @@ body,
 headers: {'X-Requested-With': 'XMLHttpRequest'}
 });
 const data = await res.json();
+if (seq !== shareItemSeq) return;
 if (!data || !data.ok) {
 showConfirm('Failed to create link', (data && data.error) || 'File not found.', 'OK', function () {});
 return;
@@ -4146,6 +4149,7 @@ document.getElementById(id).classList.remove('hidden');
 shareModal.classList.remove('hidden');
 refreshShareList();
 } catch (e) {
+if (seq !== shareItemSeq) return;
 showConfirm('Failed to create link', String(e), 'OK', function () {});
 }
 }

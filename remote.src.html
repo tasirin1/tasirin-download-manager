@@ -6607,7 +6607,12 @@ async function doActionNow(id, action, extra) {
 
 const shareModal = document.getElementById('shareModal');
 let currentShareToken = '';
+// Penjaga urut shareItem (meniru shareListSeq): dua Share beruntun untuk
+// item berbeda tak boleh saling menimpa modal — respons yang selesai
+// terakhir belum tentu milik klik terakhir (issue #680).
+let shareItemSeq = 0;
 async function shareItem(id) {
+  const seq = ++shareItemSeq;
   const body = new URLSearchParams({id: id});
   try {
     const res = await fetch(API + '/api/share', {
@@ -6616,6 +6621,7 @@ async function shareItem(id) {
       headers: {'X-Requested-With': 'XMLHttpRequest'}
     });
     const data = await res.json();
+    if (seq !== shareItemSeq) return;
     if (!data || !data.ok) {
       showConfirm('Failed to create link', (data && data.error) || 'File not found.', 'OK', function () {});
       return;
@@ -6633,6 +6639,7 @@ async function shareItem(id) {
     shareModal.classList.remove('hidden');
     refreshShareList();
   } catch (e) {
+    if (seq !== shareItemSeq) return;
     showConfirm('Failed to create link', String(e), 'OK', function () {});
   }
 }
