@@ -2995,6 +2995,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         var itemCount = 0
         var totalSize = 0L
         var truncated = false
+        // Ada direktori yang gagal dibaca di tengah pindai (issue #791):
+        // statistiknya tak pasti dan tak boleh di-cache sebagai angka
+        // pasti — pola taint #435 yang sama, khusus kegagalan list.
+        var listingFailed = false
         // Rekursif ke seluruh subtree (issue #398): versi dangkal
         // sebelumnya hanya menjumlah berkas langsung, jadi folder yang
         // isinya bersarang tampil berukuran 0/kecil dan penjaga klien
@@ -3039,7 +3043,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (!frame.expanded) {
                 frame.expanded = true
                 if (truncated) continue
-                val children = runCatching { frame.dir.listFiles() }.getOrNull() ?: continue
+                val children = runCatching { frame.dir.listFiles() }.getOrNull()
+                if (children == null) {
+                    // listFiles gagal (folder terhapus bersamaan, izin
+                    // berubah, I/O error): frame ini selesai dengan
+                    // hitungan 0 palsu bila dibiarkan — tandai gagal +
+                    // taint agar tak ter-memo dan hasil akar tak di-cache
+                    // (issue #791).
+                    listingFailed = true
+                    frame.hadSkip = true
+                    continue
+                }
                 for (c in children) {
                     if (itemCount >= FS_STATS_MAX_ENTRIES) {
                         truncated = true
@@ -3079,9 +3093,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 stack.removeLast()
             }
         }
-        val result = Triple(itemCount, totalSize, truncated)
-        fsStatsCache[cacheKey] = now to result
-        if (!truncated) {
+        // Hasil yang memuat kegagalan list ditandai tak pasti (elemen
+        // ketiga, semantik #415: penjaga ZIP klien menolak angka tak
+        // pasti) dan TIDAK ditulis ke cache akar maupun memo (issue #791).
+        val result = Triple(itemCount, totalSize, truncated || listingFailed)
+        if (!listingFailed) fsStatsCache[cacheKey] = now to result
+        if (!truncated && !listingFailed) {
             for ((childPath, stats) in localStats) {
                 if (childPath != cacheKey && childPath !in tainted) fsStatsCache[childPath] = now to stats
             }
