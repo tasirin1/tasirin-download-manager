@@ -4231,8 +4231,10 @@ showToast('Link copied', 2500);
 fallbackCopy();
 }
 });
+let shareRevoking = false;
 document.getElementById('shareRevoke').addEventListener('click', async function () {
-if (!currentShareToken) return;
+if (!currentShareToken || shareRevoking) return;
+shareRevoking = true;
 try {
 const res = await fetchTimeout(API + '/api/share_revoke', {
 method: 'POST',
@@ -4249,6 +4251,8 @@ showToast('Failed to revoke link', 3000, 'error');
 }
 } catch (e) {
 showToast('Failed to revoke link', 3000, 'error');
+} finally {
+shareRevoking = false;
 }
 });
 document.getElementById('shareOpen').addEventListener('click', function () {
@@ -4295,6 +4299,8 @@ box.appendChild(row);
 });
 }
 async function revokeShareSid(sid) {
+if (shareRevoking) return;
+shareRevoking = true;
 try {
 const res = await fetchTimeout(API + '/api/share_revoke_id', {
 method: 'POST',
@@ -4309,6 +4315,8 @@ showToast('Failed to revoke link', 3000, 'error');
 }
 } catch (e) {
 showToast('Failed to revoke link', 3000, 'error');
+} finally {
+shareRevoking = false;
 }
 refreshShareList();
 }
