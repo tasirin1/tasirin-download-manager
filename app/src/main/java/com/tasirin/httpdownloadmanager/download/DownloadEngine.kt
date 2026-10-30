@@ -1880,6 +1880,13 @@ class DownloadEngine(appContext: Context) {
 
     private fun handleFailure(id: String, message: String?) {
         val item = _items.value.find { it.id == id } ?: return
+        // Jaring pengaman parkiran penggantian (issue #896): jalur yang
+        // dirancang selalu commit/rollback sebelum melempar, tetapi
+        // lemparan tak-terancang di jendela publish->commit dapat
+        // mencapai titik ini dengan parkiran masih hidup. Rollback di
+        // sini memulihkan pendahulu dan mencegah cadangan .replaced
+        // yatim permanen; no-op murah bila tak ada parkiran.
+        rollbackReplacement(id)
         speedTracker.reset(id)
         // Buang sampel speed/ETA + penyangga segmen agar retry tidak memakai
         // angka basi sesaat (≤1 dtk) dari attempt yang gagal.
