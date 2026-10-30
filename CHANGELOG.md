@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): kegagalan Move berkas selesai kini memberi tahu pengguna** -- FileSaver.move menelan semua kegagalan menjadi null, engine mengabaikannya (bertipe Unit), dan picker menilai keberhasilan dari runCatching atas panggilan yang tak pernah melempar, jadi toast error adalah kode mati dan pemindahan yang gagal (izin SAF dicabut, folder tujuan hilang) berlalu senyap. DownloadEngine.move kini mengembalikan Boolean dan picker menampilkannya (issue #999).
+
 - **fix(web): membuka Share Manager membatalkan Share item yang masih berjalan** -- shareItem digerbang generasinya sendiri, tetapi openShareManager tidak membatalkannya, jadi respons Share lambat yang tiba sesudah manager dibuka menimpa isi modal menjadi tampilan share sesi. Manager kini ikut menaikkan generasi shareItem (issue #998).
 
 - **fix(web): fokus bertahan galeri memakai pola aman repo** -- pemindahan fokus di trimGalleryTop sebelumnya memanggil focus beropsi objek tanpa jaring pengaman, menyimpang dari pola popReturnFocus; di browser lama yang melempar pada argumen opsi, eksepsinya akan menggugurkan sisa loadMoreGallery (roving + sentinel). Kini dibungkus try fokus beropsi dengan fallback fokus polos (issue #997).

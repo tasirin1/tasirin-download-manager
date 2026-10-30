@@ -154,11 +154,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             // (ANR/jank; callback ActivityResult jalan di main).
             // Pola sama seperti openRemote() di atas.
             lifecycleScope.launch {
+                // Keberhasilan dinilai dari nilai kembalian move
+                // (issue #999): runCatching atas panggilan yang tak
+                // pernah melempar membuat toast error ini kode mati.
                 val ok = withContext(Dispatchers.IO) {
-                    runCatching {
-                        takePersistablePermission(uri)
-                        App.engine.move(id, uri)
-                    }.isSuccess
+                    runCatching { takePersistablePermission(uri) }
+                    App.engine.move(id, uri)
                 }
                 if (!ok) {
                     Toast.makeText(this@MainActivity, R.string.storage_picker_error, Toast.LENGTH_LONG).show()

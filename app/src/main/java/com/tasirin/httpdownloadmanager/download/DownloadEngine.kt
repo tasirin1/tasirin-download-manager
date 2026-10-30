@@ -1500,9 +1500,13 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    fun move(id: String, destTreeUri: Uri) {
-        val item = _items.value.find { it.id == id } ?: return
-        if (item.state != DownloadState.COMPLETED) return
+    /** Mengembalikan keberhasilan (issue #999): FileSaver.move
+     *  menelan semua kegagalan menjadi null, jadi tanpa nilai
+     *  kembalian ini pemanggil tak bisa memberi tahu pengguna bahwa
+     *  pemindahan gagal dan berkas tetap di lokasi lama. */
+    fun move(id: String, destTreeUri: Uri): Boolean {
+        val item = _items.value.find { it.id == id } ?: return false
+        if (item.state != DownloadState.COMPLETED) return false
         val result = fileSaver.move(item, destTreeUri)
         if (result != null) {
             updateItem(id) {
@@ -1514,7 +1518,9 @@ class DownloadEngine(appContext: Context) {
             }
             // Invalidasi cache galeri supaya file yang dipindah langsung terdeteksi.
             com.tasirin.httpdownloadmanager.App.httpServer.invalidateFsRootsCache()
+            return true
         }
+        return false
     }
 
     private fun attemptStart(id: String) {
