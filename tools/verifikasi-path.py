@@ -1475,6 +1475,14 @@ def utama():
                 with open(os.path.join(AKAR, nama), encoding="utf-8") as f:
                     isi = f.read(2_000_001)
             except (OSError, UnicodeDecodeError):
+                # Berkas tak terbaca (non-UTF-8/hilang) tak boleh
+                # dilewati senyap (issue #722): tanpa peringatan ini
+                # keluarga cek berbasis diff buta terhadap berkas itu,
+                # kelas file_unscanned #344 di security_audit.
+                peringatan.append(
+                    "Isi " + nama + " tak terbaca (non-UTF-8/hilang) — "
+                    "cek berbasis diff tak menilainya (issue #722)"
+                )
                 continue
             if len(isi) > 2_000_000:
                 # Batas baca tercapai: suntikan parsial WAJIB diberi
@@ -1557,6 +1565,12 @@ def utama():
                 with open(os.path.join(AKAR, nama), encoding="utf-8") as f:
                     isi = f.read(2_000_001)
             except (OSError, UnicodeDecodeError):
+                # Sama seperti mode jalur (issue #722): lewati dengan
+                # peringatan bernama, bukan senyap.
+                peringatan.append(
+                    "Isi " + nama + " tak terbaca (non-UTF-8/hilang) — "
+                    "cek berbasis diff tak menilainya (issue #722)"
+                )
                 continue
             if len(isi) > 2_000_000:
                 # Peringatan terpotong yang sama seperti mode jalur
