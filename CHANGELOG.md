@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): urutan pelepasan wake lock di onDestroy DownloadService dibalik** -- onDestroy sebelumnya melepas lock sebelum membatalkan scope kolektor, memberi celah bagi kolektor di thread IO yang sedang memproses emisi aktif untuk meng-acquire lock baru sesudah pelepasan — lock tanpa pemilik sampai timeout 1 jam. Kini keadaan destroyed ditandai lebih dulu (dan diperiksa updateWakeLock sebelum acquire), scope dibatalkan, baru lock dilepas (issue #982).
+
 - **fix(remote): lipatan dangkal cap ZIP menjangkau satu tingkat di bawah direktori terantre** -- sesudah plafon jalan kaki, perubahan di bawah direktori yang belum dibuka sebelumnya tak terlihat oleh cap sama sekali (mtime direktori terantre tak bergerak untuk perubahan di cucunya). Kini anak langsung direktori terantre ikut dilipat dalam anggaran terbatas yang sama, sehingga tambah/hapus/ubah berkas satu tingkat di bawahnya ikut menggerakkan cap (issue #981).
 
 - **fix(remote): cap folder ZIP kini deterministik — anak terurut dan cap dari path kanonik** -- jalan kaki cap sebelumnya mengiterasi listFiles() tanpa urutan (lipatan hash peka-urutan, jadi cap folder diam bisa berdenyut antarpermintaan dan menentukan direktori terantre secara acak di ambang plafon), dan di fsZip cap dihitung dari ejaan path mentah klien walau kunci memo memakai ejaan kanonik. Kini anak diurutkan seperti pembuat ZIP dan cap dihitung dari File kanonik yang sama dengan kuncinya (issue #980).

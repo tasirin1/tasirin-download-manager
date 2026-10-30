@@ -28,6 +28,11 @@ class DownloadService : Service() {
     // mulai agar refresh notifikasi tidak ter-skip throttle (anti progress nyangkut).
     private var lastActiveIds: Set<String> = emptySet()
     private var wakeLock: PowerManager.WakeLock? = null
+
+    // Penanda hancur untuk balapan lepas wake lock (issue #982):
+    // kolektor di thread IO memeriksa ini sebelum acquire.
+    @Volatile
+    private var destroyed = false
     // Start server latar sedang berjalan di coroutine terpisah (issue
     // #474): selama bendera ini menyala, kolektor dan onStartCommand
     // tidak boleh menilai server "mati" hanya karena bind belum
@@ -169,12 +174,18 @@ class DownloadService : Service() {
     }
 
     override fun onDestroy() {
+        // Urutan dibalik (issue #982): tandai hancur + batalkan scope
+        // DULU, baru lepas lock yang terbaca sesudahnya. Urutan lama
+        // (lepas dulu, batal kemudian) memberi celah bagi kolektor
+        // yang sedang memproses emisi untuk meng-acquire lock baru
+        // sesudah pelepasan — lock tanpa pemilik sampai timeout.
+        destroyed = true
+        scope.cancel()
         val lock = wakeLock
         wakeLock = null
         if (lock != null && runCatching { lock.isHeld }.getOrDefault(false)) {
             runCatching { lock.release() }
         }
-        scope.cancel()
         super.onDestroy()
     }
 
@@ -192,6 +203,9 @@ class DownloadService : Service() {
     // adalah desain sengaja — bukan kebocoran.
     @SuppressLint("Wakelock")
     private fun updateWakeLock(active: Boolean) {
+        // Service yang sedang dihancurkan tak boleh acquire lagi
+        // (issue #982): tak ada pemilik yang akan melepasnya.
+        if (active && destroyed) return
         if (active) {
             if (wakeLock == null) {
                 val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
