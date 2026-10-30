@@ -531,7 +531,12 @@ class SettingsActivity : AppCompatActivity() {
                                 Toast.LENGTH_LONG
                             ).show()
                         } else {
+                            // Pasangan pref ditulis bersama seperti semua
+                            // penulis false lain (issue #916): background
+                            // false sendirian meninggalkan autostart true
+                            // yang mati senyap sesudah boot.
                             StoragePrefs.setServerBackgroundEnabled(this@SettingsActivity, false)
+                            StoragePrefs.setServerAutoStartEnabled(this@SettingsActivity, false)
                             Toast.makeText(
                                 this@SettingsActivity,
                                 getString(
@@ -591,6 +596,18 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun renderChecks() {
+        // Rekonsiliasi pasangan autostart/background server (issue
+        // #916), mengikuti pola baterai #523 di fungsi ini juga:
+        // keadaan divergen warisan versi lama (autostart true,
+        // background false) membuat autostart mati senyap sesudah
+        // boot. Sembuhkan ke arah janji yang terlihat pengguna —
+        // mencentang autostart memang mengaktifkan background (#914) —
+        // tiap kali layar ini dirender (termasuk dari onResume).
+        if (StoragePrefs.isServerAutoStartEnabled(this) &&
+            !StoragePrefs.isServerBackgroundEnabled(this)
+        ) {
+            StoragePrefs.setServerBackgroundEnabled(this, true)
+        }
         renderToggle(
             binding.checkServerAutostart,
             StoragePrefs.isServerAutoStartEnabled(this),
