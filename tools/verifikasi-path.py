@@ -1603,8 +1603,15 @@ def utama():
             daftar = jalan("git", "diff", "--name-only", "-z", hulu.strip() + "...HEAD") or ""
             berubah = [x for x in daftar.split("\0") if x]
         else:
-            diff = jalan("git", "diff", "HEAD~1...HEAD") or ""
-            berubah = [x for x in (jalan("git", "diff", "--name-only", "-z", "HEAD~1...HEAD") or "").split("\0") if x]
+            # Tanpa upstream: basis berjenjang yang sama dengan
+            # rentang hapusan (issue #833, keluarga #825) — diff isi +
+            # daftar berubah tak boleh menyusut ke commit teratas
+            # saja, karena seluruh keluarga cek berbasis diff membaca
+            # dari sini.
+            basis_diff = _basis_rentang_hapus()
+            rentang_diff = (basis_diff + "...HEAD") if basis_diff else "HEAD~1...HEAD"
+            diff = jalan("git", "diff", rentang_diff) or ""
+            berubah = [x for x in (jalan("git", "diff", "--name-only", "-z", rentang_diff) or "").split("\0") if x]
         # core.quotepath=false: nama non-ASCII tampil mentah, bukan
         # kutipan oktal yang tak dikenali daftar berkas (#312).
         kotor = jalan("git", "-c", "core.quotepath=false", "status", "--porcelain") or ""
