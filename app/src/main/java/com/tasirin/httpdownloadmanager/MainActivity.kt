@@ -372,7 +372,12 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 App.startHttpServer()
             }
         }
-        handleIncomingIntent(intent)
+        // Intent peluncur hanya diproses pada pembuatan segar: sesudah
+        // proses mati, sistem membuat ulang activity dengan intent SEND
+        // yang asal, sehingga tanpa penjaga ini dialog tambah URL lama
+        // muncul lagi dari Recents (issue #845). Intent baru untuk
+        // instance yang hidup tetap lewat onNewIntent.
+        if (savedInstanceState == null) handleIncomingIntent(intent)
         } catch (t: Throwable) {
             // Error level-VM (memori habis, linkage rusak) jangan ditelan:
             // biarkan crash agar laporan sistem jujur; Exception biasa tetap
