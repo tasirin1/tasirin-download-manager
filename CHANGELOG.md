@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): putus jaringan lokal tidak lagi membakar rantai mirror dan membuang partial** -- handleFailure sebelumnya memicu failover mirror juga untuk error connect yang disebabkan jaringan perangkat sendiri mati total: tiap switch menghapus berkas partial dan menolkan progres, lalu attempt berikutnya gagal lagi selama outage hingga semua mirror habis. Kini App melacak keadaan konektivitas dari NetworkCallback (onAvailable/onLost) dan error connect saat jaringan perangkat turun melewati cabang mirror — retry biasa yang mempertahankan partial yang bekerja, dan unduhan dilanjutkan otomatis saat koneksi pulih (issue #952).
+
 - **fix(download): URL direct bertanda tangan tidak lagi ditulis ke log server** -- dua baris logEvent ekstraksi sosial sebelumnya menginterpolasi 80 karakter pertama URL direct hasil ekstraksi; buffer log hanya disanitasi newline (tanpa redaksi rahasia) dan bisa diekspor ke berkas TXT di folder Download publik, melanggar kebijakan repo yang menyamakan URL bertanda tangan dengan rahasia di log. Kini yang dicatat hanya host tujuannya (issue #951).
 
 - **fix(ui): sorotan baris gagal di halaman Log tidak lagi terlewat untuk pesan berhuru kecil** -- gerbang cepat highlightLog memakai contains peka huruf besar untuk 'ERROR'/'FAILED' padahal pencocok per barisnya memakai ignoreCase, sehingga sesi yang kegagalan satu-satunya berhuru kecil ('download failed', 'APK VIEW failed') tampil tanpa satu pun baris merah. Gerbang kini ignoreCase, sejajar pencocoknya (issue #950).

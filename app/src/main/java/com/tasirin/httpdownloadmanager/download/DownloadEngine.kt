@@ -1989,7 +1989,14 @@ class DownloadEngine(appContext: Context) {
         // Kegagalan HTTP per-URL (issue #544) ikut memicu: skenario utama
         // mirror adalah link mati di host asal, yang dulu tak pernah sampai
         // ke cabang ini karena pesan "HTTP <kode>" tak cocok klasifikasi mana pun.
-        if (allMirrors.isNotEmpty() && (rangeRejected || slowRejected || isConnectError(message) ||
+        // Outage lokal tidak boleh membakar rantai mirror (issue #952):
+        // error connect saat jaringan PERANGKAT sendiri mati bukan
+        // kesalahan host mana pun — switch akan menghapus partial dan
+        // menghabiskan mirror satu per satu. Lewati cabang ini dan
+        // biarkan retry biasa (partial utuh) yang bekerja; NetworkCallback
+        // melanjutkan unduhan saat koneksi pulih.
+        val outageLocal = isConnectError(message) && !App.networkUp
+        if (allMirrors.isNotEmpty() && !outageLocal && (rangeRejected || slowRejected || isConnectError(message) ||
                 isHttpMirrorFailoverError(message))
         ) {
             val next = allMirrors.first()

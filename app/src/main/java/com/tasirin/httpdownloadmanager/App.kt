@@ -85,7 +85,15 @@ class App : Application() {
                 .build()
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
+                    networkUp = true
                     runCatching { engine.resumeAutoPaused() }
+                }
+
+                override fun onLost(network: Network) {
+                    // Bendera konektivitas untuk gerbang failover mirror
+                    // engine (issue #952). Default network callback hanya
+                    // menembak onLost bila tak ada jaringan bawaan lain.
+                    networkUp = false
                 }
             }
             networkCallback = callback
@@ -110,6 +118,14 @@ class App : Application() {
         // Tahan NetworkCallback seumur proses (lihat registerNetworkCallback).
         // NetworkCallback bukan Context/activity sehingga aman ditahan statis.
         @Volatile private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+        // Keadaan konektivitas terakhir dari NetworkCallback (issue #952):
+        // engine membacanya untuk menahan failover mirror saat jaringan
+        // PERANGKAT mati. Mulai true (asumsi tersedia) agar tak pernah
+        // menggerbang sebelum callback pertama melaporkan keadaan.
+        @Volatile
+        var networkUp: Boolean = true
+            private set
         const val CRASH_LOG_FILE = "crash.log"
         private const val THUMB_CLEANUP_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
         // StaticFieldLeak: sengaja ditahan — kedua objek menyimpan Application
