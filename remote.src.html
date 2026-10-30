@@ -738,6 +738,9 @@
   .fs-load-more {
  width: 100%; padding: 10px 12px; font-size: 13px; font-weight: 600; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; transition: all .15s ease; }
 
+  .fs-noresults {
+ padding: 26px 16px; text-align: center; color: var(--muted); font-size: 13.5px; }
+
   .fs-load-more:hover {
  border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
 
@@ -3847,7 +3850,25 @@ function fsApplySearch(row) {
 
 function fsSetSearch(q) {
   fsSearchQuery = q.trim().toLowerCase();
-  fsList.querySelectorAll('.fs-row').forEach(fsApplySearch);
+  let visible = 0;
+  fsList.querySelectorAll('.fs-row').forEach(function (row) {
+    fsApplySearch(row);
+    if (row.style.display !== 'none') visible++;
+  });
+  // Pencarian tanpa hasil wajib menjelaskan dirinya: sebelumnya daftar
+  // tampil kosong hampa dan tombol Load more melayang (issue #770).
+  let noRes = document.getElementById('fsNoResults');
+  if (!noRes) {
+    noRes = document.createElement('div');
+    noRes.id = 'fsNoResults';
+    noRes.className = 'fs-noresults hidden';
+    noRes.textContent = 'No files match your search.';
+    fsList.appendChild(noRes);
+  }
+  const showNoRes = !!fsSearchQuery && fsItems.length > 0 && visible === 0;
+  noRes.classList.toggle('hidden', !showNoRes);
+  const lm = document.getElementById('fsLoadMoreBtn');
+  if (lm) lm.style.display = showNoRes ? 'none' : '';
 }
 
 fsSearchBtn.addEventListener('click', function () {

@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): pencarian Files tanpa hasil kini menampilkan pesan** -- Menyaring dengan kata yang tak cocok sebelumnya menyisakan daftar kosong hampa (tak beda dari folder rusak) plus tombol Load more melayang; kini tampil pesan "No files match your search." dan tombol disembunyikan selama keadaan itu (issue #770).
 - **fix(remote): tombol Load more Files selalu kembali ke ujung daftar** -- Baris halaman berikutnya ditambahkan via `appendChild` sesudah posisi tombol sehingga tombol tertinggal di tengah daftar; `fsUpdateLoadMore` kini memindah tombol yang sudah ada ke ujung setiap dipanggil (issue #769).
 - **fix(remote): lencana retry & tanda checksum tidak lagi basi di baris yang di-patch** -- Keduanya hanya dibuat saat rebuild tetapi `structSig` tidak memuat `retryCount`/`checksumVerified`, dan `patchRowSub` tidak menulis ulang lencananya; kedua nilai kini ikut tanda tangan struktural (pola pin #604) sehingga perubahannya memicu rebuild (issue #768).
 - **fix(remote): favicon sosial + ikon berkas kini pas di petak 36px** -- Kombinasi favicon 14px + margin 4px + SVG 22px = 40px melampaui petak ikon sehingga ikon berkas item sosial menyusut/meluber; margin kini 2px, SVG sesudah favicon 20px (total pas 36px), dan favicon mode compact 10px (issue #767).
