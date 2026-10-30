@@ -6614,10 +6614,16 @@ function escapeHtml(s) {
 
 const confirmModal = document.getElementById('confirmModal');
 let confirmCb = null;
-function showConfirm(title, text, yesLabel, cb) {
+function showConfirm(title, text, yesLabel, cb, opts) {
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmText').textContent = text;
-  document.getElementById('confirmYes').textContent = yesLabel;
+  const yesBtn = document.getElementById('confirmYes');
+  yesBtn.textContent = yesLabel;
+  // Warna tombol mengikuti sifat aksi (pola #678): bawaan danger untuk
+  // aksi destruktif; pemanggil jinak/alert memakai { danger: false },
+  // dan alert satu keputusan menyembunyikan Cancel (issue #776).
+  yesBtn.className = (opts && opts.danger === false) ? 'primary' : 'danger';
+  document.getElementById('confirmNo').classList.toggle('hidden', !!(opts && opts.hideCancel));
   confirmCb = cb;
   confirmModal.classList.remove('hidden');
   // Fokus wajib pindah ke dalam dialog: tanpa ini, tekanan OK/Enter pertama
@@ -6673,7 +6679,7 @@ function doAction(id, action) {
     return;
   }
   if (action === 'clear_completed') {
-    showConfirm('Clear completed list?', 'All completed items will be removed from the list. Files on the device will NOT be deleted.', 'Clear', function () { doActionNow(id, action); });
+    showConfirm('Clear completed list?', 'All completed items will be removed from the list. Files on the device will NOT be deleted.', 'Clear', function () { doActionNow(id, action); }, { danger: false });
     return;
   }
   if (action === 'share') {
@@ -6724,7 +6730,7 @@ async function shareItem(id) {
     const data = await res.json();
     if (seq !== shareItemSeq) return;
     if (!data || !data.ok) {
-      showConfirm('Failed to create link', (data && data.error) || 'File not found.', 'OK', function () {});
+      showConfirm('Failed to create link', (data && data.error) || 'File not found.', 'OK', function () {}, { danger: false, hideCancel: true });
       return;
     }
     currentShareToken = data.token;
@@ -6742,7 +6748,7 @@ async function shareItem(id) {
     refreshShareList();
   } catch (e) {
     if (seq !== shareItemSeq) return;
-    showConfirm('Failed to create link', String(e), 'OK', function () {});
+    showConfirm('Failed to create link', String(e), 'OK', function () {}, { danger: false, hideCancel: true });
   }
 }
 function closeShare() {
