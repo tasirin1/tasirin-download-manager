@@ -4622,18 +4622,25 @@ class DownloadEngine(appContext: Context) {
         // Tapi commit() sinkron di main thread = ANR saat daftar besar,
         // jadi di main thread tulis apply dulu lalu commit di IO.
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            // Encode SEKALI, tulis dua cara (issue #370): apply dulu
-            // supaya antrean tulis segera berjalan, lalu commit hasil
-            // encode yang sama di latar — bukan encode ulang penuh.
-            val prepared = repository.prepareSave(_items.value)
-            if (prepared != null) {
-                repository.applyPrepared(prepared)
-                scope.launch { repository.commitPrepared(prepared) }
+            // Encode dipindah ke IO (issue #790): encode penuh antrean
+            // (JSON + hash per item) dulu dibayar sinkron di main thread
+            // oleh pemanggil seperti addDownload. Aman dipindah karena
+            // preparePersist @Synchronized dan writePrepared menjaga
+            // nomor urut PreparedSave — snapshot basi tak menimpa yang
+            // baru; apply + commit tetap atas snapshot yang sama (#370).
+            val snapshot = _items.value
+            scope.launch {
+                val prepared = repository.prepareSave(snapshot)
+                if (prepared != null) {
+                    repository.applyPrepared(prepared)
+                    repository.commitPrepared(prepared)
+                }
+                logEncryptFallbackIfUsed()
             }
         } else {
             repository.saveImmediate(_items.value)
+            logEncryptFallbackIfUsed()
         }
-        logEncryptFallbackIfUsed()
     }
 
     /** Konsumsi sinyal fallback enkripsi (issue #209): flag ini sebelumnya
