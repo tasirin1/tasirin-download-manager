@@ -25,6 +25,13 @@ concurrency:
 permissions:
   contents: read
 
+# Batas ukuran APK release (3,5 MB) — SATU sumber (issue #807): dulu
+# konstanta ini ditulis dua kali (langkah cek ukuran dan audit rilis
+# jq) sehingga suntingan satu sisi bisa membuat audit menolak APK yang
+# baru dinyatakan lolos, atau sebaliknya.
+env:
+  MAX_APK_BYTES: "3670016"
+
 jobs:
   verify:
     name: Verifikasi cepat (tanpa SDK)
@@ -237,7 +244,7 @@ jobs:
           RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
           DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
           if [ -f "$RELEASE_APK" ]; then
-            APK="$RELEASE_APK"; LIMIT=3670016; LABEL="release"
+            APK="$RELEASE_APK"; LIMIT=$MAX_APK_BYTES; LABEL="release"
           else
             APK="$DEBUG_APK"; LIMIT=10485760; LABEL="debug (tanpa minify)"
           fi
@@ -372,8 +379,8 @@ jobs:
           EXPECTED_NAME="Tasirin Download Manager v${VER} (build ${CODE})"
           echo "$RELEASE" | jq -e --arg name "${EXPECTED_NAME}" '.name == $name' >/dev/null \
             || { echo "::error::Judul release v${VER} tidak sesuai build ${CODE}"; exit 1; }
-          echo "$RELEASE" | jq -e --arg apk "${EXPECTED_APK}" \
-            '[.assets[] | select(.name == $apk)] | length == 1 and .[0].size > 0 and .[0].size <= 3670016' >/dev/null \
+          echo "$RELEASE" | jq -e --arg apk "${EXPECTED_APK}" --argjson maxapk "$MAX_APK_BYTES" \
+            '[.assets[] | select(.name == $apk)] | length == 1 and .[0].size > 0 and .[0].size <= $maxapk' >/dev/null \
             || { echo "::error::Asset ${EXPECTED_APK} tidak ada, duplikat, kosong, atau melebihi batas"; exit 1; }
           echo "$RELEASE" | jq -e '.assets[] | select(.name == "mapping.txt") | .size > 0' >/dev/null \
             || { echo "::error::mapping.txt tidak ada atau kosong pada release v${VER}"; exit 1; }

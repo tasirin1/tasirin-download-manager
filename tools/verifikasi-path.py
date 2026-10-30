@@ -789,16 +789,30 @@ def cek_definisi_baru(peringatan, diff):
                                   % (kunci, nama))
 
 
-def cek_pengingat_changelog(peringatan, berubah):
+def _cakupan_changelog():
+    """Satu sumber cakupan kode wajib CHANGELOG (issue #807): impor
+    konstanta guard keras CI scripts/check_changelog.py. Dulu daftar
+    awalan/berkas disalin manual di sini (#717 menyelaraskan sekali);
+    salinan kedua bisa selip lagi pada suntingan berikutnya. Gagal
+    impor melempar — pemanggil menjadikannya GAGAL (fail-closed),
+    bukan diam-diam memakai daftar basi."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "check_changelog", os.path.join(AKAR, "scripts", "check_changelog.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.CODE_PREFIXES, mod.CODE_EXACT
+
+
+def cek_pengingat_changelog(gagal, peringatan, berubah):
     if not berubah or "CHANGELOG.md" in berubah:
         return
-    # Cakupan disamakan dengan guard keras check_changelog (issue
-    # #717): dulu gradle/, .github/, .githooks/, build.gradle.kts, dan
-    # settings.gradle.kts lolos tanpa pengingat lokal walau CI menolak.
-    awalan_kode = ("app/src/main/", "scripts/", "tools/", "gradle/",
-                   ".github/", ".githooks/")
-    berkas_kode = ("remote.src.html", "app/build.gradle.kts",
-                   "build.gradle.kts", "settings.gradle.kts")
+    try:
+        awalan_kode, berkas_kode = _cakupan_changelog()
+    except Exception as exc:  # fail-closed: cakupan tak bisa dibuktikan sama
+        gagal.append("cakupan CHANGELOG tak bisa dimuat dari "
+                     "scripts/check_changelog.py: %s" % exc)
+        return
     if any(b.startswith(awalan_kode) or b in berkas_kode
            for b in berubah):
         peringatan.append("Kode aplikasi berubah tanpa CHANGELOG.md — catat per rilis (aturan repo)")
@@ -1637,7 +1651,7 @@ def utama():
         hapus = list(dict.fromkeys(hapus))
     cek_berkas_dihapus(gagal, hapus)
     if not args.semua:
-        cek_pengingat_changelog(peringatan, berubah)
+        cek_pengingat_changelog(gagal, peringatan, berubah)
     if diff:
         cek_panggil_bekas_hapusan(gagal, diff)
         cek_locale_baru(gagal, diff)
