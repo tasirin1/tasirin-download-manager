@@ -7561,6 +7561,11 @@ function probeSocialQuality() {
   socialVideoOptions = [];
   socialPhotoOptions = [];
   socialDebounce = setTimeout(function () {
+    // Kebasian diperiksa SEBELUM memasang state apa pun (issue
+    // #1009): kolom bisa sudah dibersihkan oleh submit yang sukses
+    // di dalam jendela debounce — timer yatim tak boleh memasang
+    // picker 'Loading...' pada form yang sudah kosong.
+    if ((document.getElementById('url').value.trim().split(/\s+/)[0] || '') !== u) return;
     // Berbasis host (issue #818, pola #784): substring atas URL utuh
     // salah mengklasifikasikan tautan sosial lain yang path/query-nya
     // memuat teks youtube.com/ sebagai YouTube.
@@ -7604,7 +7609,19 @@ function probeSocialQuality() {
         // Bandingkan TOKEN PERTAMA terkini (cara capture u yang sama):
         // membandingkan seluruh isi kolom membuat input multi-URL tidak
         // pernah cocok sehingga picker mati total (issue #164).
-        if ((document.getElementById('url').value.trim().split(/\s+/)[0] || '') !== u) return;
+        if ((document.getElementById('url').value.trim().split(/\s+/)[0] || '') !== u) {
+          // Respons basi dibuang TANPA meninggalkan picker
+          // 'Loading...' yatim (issue #1009) — tetapi hanya bila
+          // tak ada probe sosial lebih baru yang kini memiliki
+          // picker itu (kolom berisi tautan sosial lain).
+          var curFirst = document.getElementById('url').value.trim().split(/\s+/)[0] || '';
+          if (!curFirst || !isSocialUrl(curFirst)) {
+            qualitySelect.classList.add('hidden');
+            photoSelect.classList.add('hidden');
+            socialPlatform = '';
+          }
+          return;
+        }
         if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
         socialPlatform = d.platform || 'social';
         var videos = d.videos || [];

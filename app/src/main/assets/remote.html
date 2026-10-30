@@ -4657,6 +4657,7 @@ socialPlatform = '';
 socialVideoOptions = [];
 socialPhotoOptions = [];
 socialDebounce = setTimeout(function () {
+if ((document.getElementById('url').value.trim().split(/\s+/)[0] || '') !== u) return;
 var _sosh = socialHost(u);
 var isYT = !!_sosh && (socialHostMatches(_sosh, 'youtube.com') || _sosh === 'youtu.be');
 if (isYT) {
@@ -4686,7 +4687,15 @@ photoSelect.classList.add('hidden');
 fetchTimeout(API + '/api/social_options?url=' + encodeURIComponent(u), undefined, 30000)
 .then(function (r) { return r.json(); })
 .then(function (d) {
-if ((document.getElementById('url').value.trim().split(/\s+/)[0] || '') !== u) return;
+if ((document.getElementById('url').value.trim().split(/\s+/)[0] || '') !== u) {
+var curFirst = document.getElementById('url').value.trim().split(/\s+/)[0] || '';
+if (!curFirst || !isSocialUrl(curFirst)) {
+qualitySelect.classList.add('hidden');
+photoSelect.classList.add('hidden');
+socialPlatform = '';
+}
+return;
+}
 if (!d.ok) { document.getElementById('platformBadge').classList.add('hidden'); qualitySelect.classList.add('hidden'); socialPlatform = ''; return; }
 socialPlatform = d.platform || 'social';
 var videos = d.videos || [];

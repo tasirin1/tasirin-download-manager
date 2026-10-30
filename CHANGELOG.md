@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): timer probe sosial memeriksa kebasian sebelum memasang picker** -- callback debounce sebelumnya memasang state sosial + picker 'Loading...' dari URL tangkapan tanpa memeriksa isi kolom terkini, jadi submit yang sukses di dalam jendela debounce meninggalkan picker basi pada form yang sudah kosong; jalur buang respons basi juga kini menyembunyikan picker bila tak ada probe yang lebih baru yang memilikinya (issue #1009).
+
 - **fix(web): geser-kanan Delete kini digerbang state terminal seperti menu** -- panel kanan sebelumnya dibangun dan ditawarkan untuk semua state, sehingga item yang sedang diunduh pun menampilkan konfirmasi hapus resmi lalu ditolak toast 'Item changed' yang menyesatkan. Panel kini mengikuti pola panel kiri (#605): label dan geseran hanya aktif untuk COMPLETED/FAILED/CANCELLED, dan pelepasan geser memverifikasi state sekali lagi (issue #1008).
 
 - **fix(web): kirim ulang carousel hanya mengirim foto yang gagal** -- mode 'Select photo: All' sebelumnya meng-POST ulang seluruh carousel sesudah gagal parsial (form tetap terbuka), dan server tak punya dedupe, jadi foto yang sudah berhasil masuk daftar dua kali. Kini URL yang sudah berhasil dicatat per tanda tangan carousel (probe baru meresetnya sendiri) dan dilewati pada kirim ulang (issue #1007).
