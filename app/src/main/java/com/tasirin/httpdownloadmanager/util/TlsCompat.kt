@@ -31,6 +31,12 @@ object TlsCompat {
     @Volatile
     private var sslContext: SSLContext? = null
 
+    /** Stempel kegagalan build terakhir untuk jeda coba ulang (#692). */
+    @Volatile
+    private var sslBuildFailedAtMs = 0L
+
+    private const val SSL_BUILD_RETRY_MS = 60_000L
+
     fun apply(conn: HttpsURLConnection, context: Context) {
         val ctx = sslContext(context) ?: return
         conn.sslSocketFactory = ctx.socketFactory
@@ -40,7 +46,20 @@ object TlsCompat {
         sslContext?.let { return it }
         synchronized(this) {
             sslContext?.let { return it }
-            sslContext = build(context)
+            // Kegagalan build ikut di-cache sesaat (issue #692): hasil
+            // null tak pernah disimpan, jadi perangkat yang TLS-nya
+            // rusak membangun ulang KeyStore penuh di SETIAP koneksi.
+            // Jeda coba ulang memberi jalan pulih tanpa badai bangun.
+            val failedAt = sslBuildFailedAtMs
+            if (failedAt != 0L &&
+                System.currentTimeMillis() - failedAt < SSL_BUILD_RETRY_MS
+            ) return null
+            val built = build(context)
+            if (built == null) {
+                sslBuildFailedAtMs = System.currentTimeMillis()
+            } else {
+                sslContext = built
+            }
             return sslContext
         }
     }
