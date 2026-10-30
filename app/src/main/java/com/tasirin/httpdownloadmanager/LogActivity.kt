@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -251,8 +250,16 @@ class LogActivity : AppCompatActivity() {
             while (true) {
                 val idx = text.indexOf(q, from, ignoreCase = true)
                 if (idx < 0) break
+                // Latar kuning pucat wajib berpasangan teks gelap
+                // (issue #712): teks tema nyaris putih di atas #FFE082
+                // berkontras +/-1,2:1 sehingga hasil pencarian justru
+                // tenggelam.
                 sb.setSpan(
                     BackgroundColorSpan(0xFFFFE082.toInt()),
+                    idx, idx + q.length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                sb.setSpan(
+                    ForegroundColorSpan(0xFF212121.toInt()),
                     idx, idx + q.length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 from = idx + q.length
@@ -268,7 +275,7 @@ class LogActivity : AppCompatActivity() {
                 lineContains(text, lineStart, end, "FAILED")
             ) {
                 sb.setSpan(
-                    ForegroundColorSpan(Color.RED),
+                    ForegroundColorSpan(0xFFF87171.toInt()), // merah palet tema gelap (issue #712), bukan Color.RED mentah
                     lineStart, end, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
             }
