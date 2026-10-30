@@ -6801,12 +6801,23 @@ document.getElementById('shareCopy').addEventListener('click', function () {
   const link = document.getElementById('shareLink');
   link.focus();
   link.select();
-  let copied = false;
+  // Alur salin kini berurutan (issue #797): Clipboard API ditunggu dulu;
+  // fallback execCommand hanya jalan bila API tak ada atau janjinya
+  // DITOLAK — bukan keduanya sekaligus seperti bendera sinkron dulu
+  // (copied selalu false saat dicek) — dan hasil akhir selalu
+  // diberitahukan ke pengguna lewat toast.
+  const fallbackCopy = function () {
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    if (ok) showToast('Link copied', 2500);
+    else showToast('Copy failed — long-press the link to copy it', 3000, 'error');
+  };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(link.value).then(function () { copied = true; }).catch(function () {});
-  }
-  if (!copied) {
-    try { document.execCommand('copy'); } catch (e) {}
+    navigator.clipboard.writeText(link.value).then(function () {
+      showToast('Link copied', 2500);
+    }).catch(fallbackCopy);
+  } else {
+    fallbackCopy();
   }
 });
 document.getElementById('shareRevoke').addEventListener('click', async function () {
