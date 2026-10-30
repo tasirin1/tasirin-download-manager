@@ -6967,7 +6967,9 @@ document.getElementById('shareCopy').addEventListener('click', function () {
 // modal — satu bendera bersama menelan ketukan sah di kontrol
 // saudara tanpa umpan balik apa pun.
 let shareRevoking = false;
-let shareListRevoking = false;
+// Penjaga daftar bersifat per-sid (issue #893): satu bendera global
+// menelan ketukan sah pada baris LAIN selama satu POST berjalan.
+const shareListRevoking = new Set();
 document.getElementById('shareRevoke').addEventListener('click', async function () {
   if (!currentShareToken || shareRevoking) return;
   shareRevoking = true;
@@ -7043,8 +7045,8 @@ async function refreshShareList() {
   });
 }
 async function revokeShareSid(sid) {
-  if (shareListRevoking) return;
-  shareListRevoking = true;
+  if (shareListRevoking.has(sid)) return;
+  shareListRevoking.add(sid);
   try {
     const res = await fetchTimeout(API + '/api/share_revoke_id', {
       method: 'POST',
@@ -7060,7 +7062,7 @@ async function revokeShareSid(sid) {
   } catch (e) {
     showToast('Failed to revoke link', 3000, 'error');
   } finally {
-    shareListRevoking = false;
+    shareListRevoking.delete(sid);
   }
   refreshShareList();
 }
