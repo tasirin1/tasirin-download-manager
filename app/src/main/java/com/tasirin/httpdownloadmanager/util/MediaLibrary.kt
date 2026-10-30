@@ -718,6 +718,11 @@ object MediaLibrary {
                         if (!seenDirs.add(canonical)) return@onEnter false
                         true
                     }
+                        // asSequence WAJIB (issue #718): tanpa ini filter
+                        // di Iterable bersifat eager — seluruh pohon
+                        // dimaterialkan dulu baru take() memotong, jadi
+                        // anggaran #413 tak memangkas biaya traversal.
+                        .asSequence()
                         .filter { it.isFile && isGalleryVideo(it.name) }
                         // Anggaran sisa global, bukan 3000 penuh per
                         // sumber (issue #413): gabungan walk bisa
@@ -767,6 +772,7 @@ object MediaLibrary {
                         if (!seenDirs.add(canonical)) return@onEnter false
                         true
                     }
+                        .asSequence()
                         .filter { it.isFile && isGalleryVideo(it.name) }
                         .take((GALLERY_MAX_ENTRIES - addedByScan).coerceAtLeast(0))
                         .forEach { addFile(it); addedByScan++ }
