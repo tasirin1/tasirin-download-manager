@@ -2077,7 +2077,7 @@ let themeMode = 'dark';
 try { themeMode = localStorage.getItem(THEME_KEY) || 'dark'; } catch (e) {}
 // Validasi ke himpunan sah: nilai localStorage adalah data tak tepercaya
 // dan themeMode mengalir ke innerHTML tombol tema di applyTheme().
-if (themeMode !== 'auto' && themeMode !== 'light' && themeMode !== 'dark') themeMode = 'auto';
+if (themeMode !== 'auto' && themeMode !== 'light' && themeMode !== 'dark') themeMode = 'dark';
 const themeMq = (window.matchMedia && typeof window.matchMedia === 'function')
   ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 function effectiveTheme() {
