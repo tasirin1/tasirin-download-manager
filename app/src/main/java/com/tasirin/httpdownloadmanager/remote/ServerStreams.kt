@@ -28,8 +28,15 @@ internal class ChainInputStream(files: List<File>) : InputStream() {
         val lens = mutableListOf<Long>()
         try {
             for (f in files) {
-                opened.add(FileInputStream(f))
-                lens.add(f.length())
+                val stream = FileInputStream(f)
+                opened.add(stream)
+                // Panjang dari FD yang baru dibuka (issue #814), bukan
+                // f.length() dari path hidup: klaim #232 di atas (byte
+                // dan total selalu satu versi) hanya benar bila total
+                // dibaca dari inode yang sama dengan yang mengalir —
+                // berkas yang diganti/dipotong di antara open dan stat
+                // path dulu bisa membuat total milik versi lain.
+                lens.add(stream.channel.size())
             }
         } catch (e: Exception) {
             opened.forEach { runCatching { it.close() } }
