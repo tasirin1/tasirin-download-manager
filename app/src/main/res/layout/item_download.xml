@@ -56,7 +56,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
-                android:background="@drawable/bg_badge_pill"
+                android:background="@drawable/bg_home_badge_pill"
                 android:paddingLeft="10dp"
                 android:paddingTop="4dp"
                 android:paddingRight="10dp"

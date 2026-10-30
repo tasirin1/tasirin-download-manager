@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pil badge status tema gelap: dasar PUTIH padat (alpha penuh) agar tint
+     warna status dari adapter tampil persis warnanya. Jangan pakai
+     bg_badge_pill di sini: isinya #1A1565C0 (alpha 10%) membuat tint tampil
+     10% opacity -> badge gelap tak terbaca di atas kartu kaca. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/white" />
+    <corners android:radius="999dp" />
+</shape>
