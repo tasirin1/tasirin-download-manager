@@ -22,7 +22,12 @@ def headings(path: Path) -> list[int]:
     # info string.
     fence_char = ""
     fence_len = 0
-    for line in path.read_text(encoding="utf-8").splitlines():
+    # utf-8-sig (issue #742): BOM di awal berkas (bawaan beberapa editor
+    # Windows) dibuang saat decode — dengan utf-8 polos BOM menempel pada
+    # heading pertama sehingga heading itu tak terhitung dan guard salah
+    # vonis "tidak sinkron". Byte non-UTF-8 sungguhan tetap melempar
+    # UnicodeDecodeError seperti sebelumnya (vonis bernama #613).
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         stripped = line.lstrip()
         fm = re.match(r"^(`{3,}|~{3,})", stripped)
         if fence_char:
