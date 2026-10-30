@@ -2137,6 +2137,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  basi akan menghidupkan lagi file yang sudah dihapus. Stream yang
      *  sudah terbuka selamat dari unlink di Linux. */
     private fun invalidateZipCache() {
+        // Memo cap ikut dibuang (issue #974): tanpa ini, ZIP pasca-
+        // mutasi tersimpan di bawah label cap lama dan perubahan
+        // eksternal yang mengembalikan keadaan semula bisa HIT pada
+        // isi yang sudah ditinggalkan sampai TTL cache penuh.
+        zipStampMemo.clear()
         // Per entri dengan CAS, bukan clear() menyeluruh: entri segar yang
         // dipasang zipCached di sela invalidasi tak ikut terbuang dan
         // berkasnya tak yatim (issue #676).
@@ -2760,6 +2765,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  jalur terarah ini; terbitan MediaStore sendiri ber-path null dan
      *  jatuh ke invalidasi global. */
     private fun invalidateZipCacheFor(publishedFilePath: String?) {
+        // Memo cap ikut dibuang seperti di invalidasi global (issue
+        // #974): memo tak mengenal cakupan folder, jadi dibersihkan
+        // utuh — biayanya hanya hitung ulang cap berikutnya.
+        zipStampMemo.clear()
         // Bandingkan dalam ejaan KANONIK di kedua sisi: kunci cache sudah
         // kanonik sejak #675, jadi path terbit pun dikanonikkan di sini —
         // folder ketikan alias (mis. /sdcard/... sebagai alias

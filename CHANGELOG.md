@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): memo cap ZIP kini ikut dibuang pada invalidasi cache** -- zipStampMemo sebelumnya tak disentuh corong invalidasi mana pun, sehingga ZIP yang dibangun ulang sesudah mutasi server tersimpan di bawah label cap lama; bila sumber kemudian dikembalikan dari luar aplikasi ke keadaan semula dalam TTL cache, cap segar yang sah kembali sama dan ZIP berlabel lama itu HIT dengan isi yang sudah ditinggalkan. Kedua corong invalidasi (global dan terarah) kini membersihkan memo cap (issue #974).
+
 - **test(remote): zipStampFold dipindah ke ZipCreator dan diuji vektor FNV-1a** -- lipatan hash cap sumber ZIP adalah fungsi murni tetapi tertanam private di HttpControlServer sehingga tak terjangkau uji JVM. Kini ia internal di ZipCreator (paket sama, situs panggil server menyesuaikan; nama fungsi dipertahankan sehingga tidak masuk bekas-hapusan — gerbang memperlakukan nama di daftar itu sebagai terlarang dipanggil) dengan uji vektor tetap + sensitivitas urutan yang nilai harapannya dibuktikan port Python 1:1 (issue #973).
 
 - **fix(remote): cap folder ZIP melipat direktori terantre saat jalan kaki terpotong** -- zipFsSourceStamp sebelumnya berhenti melipat sama sekali sesudah plafon 8192 entri, sehingga perubahan struktural di subpohon yang belum dibuka tak terlihat oleh cap sampai TTL cache. Kini direktori yang masih terantre di stack dilipat dangkal (path, ukuran, mtime) tanpa dibuka (issue #972).
