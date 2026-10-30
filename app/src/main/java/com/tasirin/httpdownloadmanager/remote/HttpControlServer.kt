@@ -1205,21 +1205,31 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Probe durasi galeri dengan batas waktu (issue #783): probe MMR
      *  sinkron di thread HTTP bisa menggantung tanpa batas pada berkas
      *  rusak/storage lambat. Pola probeSocialOptionsBlocking: jalankan di
-     *  probeExecutor bersama dan tunggu hanya sisa anggaran request;
-     *  timeout atau pool jenuh = 0 untuk item ini (kegagalan dicatat
-     *  pemanggil sehingga shouldProbe menahan probe ulang dekat). */
-    private fun probeGalleryDuration(token: String, deadlineNanos: Long): Long {
+     *  probeExecutor bersama dan tunggu hanya sisa anggaran request.
+     *  Hasil bertiga makna (issue #809): nilai > 0 = durasi; 0 = probe
+     *  BENAR-BENAR berjalan dan tak menemukan durasi/gagal (pemanggil
+     *  mencatatnya, shouldProbe menahan probe ulang dekat); null = TAK
+     *  BISA DISIMPULKAN (timeout kehabisan sisa anggaran, submit ditolak
+     *  pool jenuh, atau interupsi) — pemanggil TIDAK mencatatnya sebagai
+     *  gagal, sebab menghukum berkas sehat yang hanya kehabisan giliran
+     *  anggaran dengan kunci 10 menit adalah vonis yang salah. */
+    private fun probeGalleryDuration(token: String, deadlineNanos: Long): Long? {
         val remainingMs = (deadlineNanos - System.nanoTime()) / 1_000_000
-        if (remainingMs <= 0) return 0L
+        if (remainingMs <= 0) return null
         return try {
             val future = probeExecutor.submit<Long> { videoDurations.probeDurationMs(token) }
             try {
                 future.get(remainingMs, java.util.concurrent.TimeUnit.MILLISECONDS)
             } catch (_: java.util.concurrent.TimeoutException) {
                 future.cancel(true)
+                null
+            } catch (_: java.util.concurrent.ExecutionException) {
                 0L
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                null
             }
-        } catch (_: Exception) { 0L }
+        } catch (_: Exception) { null }
     }
 
     private fun handleUpload(session: IHTTPSession): Response {
@@ -2435,11 +2445,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         // ke cache, lihat #326. Tampilan request ini tetap
                         // memakai d apa adanya.
                         val gen = videoDurations.currentGeneration()
-                        d = probeGalleryDuration(e.token, probeDeadline)
-                        if (d > 0) {
-                            videoDurations.cacheDurationIfCurrent(dKey, d, gen)
-                        } else {
-                            videoDurations.recordProbeFailureIfCurrent(dKey, gen)
+                        // null = tak bisa disimpulkan (#809): jangan
+                        // catat gagal — throttle 10 menit hanya untuk
+                        // probe yang benar-benar berjalan dan gagal.
+                        val probed = probeGalleryDuration(e.token, probeDeadline)
+                        if (probed != null) {
+                            if (probed > 0) {
+                                d = probed
+                                videoDurations.cacheDurationIfCurrent(dKey, probed, gen)
+                            } else {
+                                videoDurations.recordProbeFailureIfCurrent(dKey, gen)
+                            }
                         }
                         extracted++
                     }
