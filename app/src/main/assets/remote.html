@@ -4667,6 +4667,8 @@ extraBody.append('speedLimitKbps', document.getElementById('speed').value);
 extraBody.append('priority', document.getElementById('priority').value);
 extraBody.append('path', document.getElementById('storage').value.trim());
 extraBody.append('method', document.getElementById('dlMethod').value);
+extraBody.append('headers', document.getElementById('dlHeaders').value.trim());
+extraBody.append('postBody', document.getElementById('dlPostBody').value.trim());
 var xRes = await fetchTimeout(API + '/api/add', {
 method: 'POST', body: extraBody,
 headers: {'X-Requested-With': 'XMLHttpRequest'}

@@ -7501,6 +7501,14 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
         extraBody.append('priority', document.getElementById('priority').value);
         extraBody.append('path', document.getElementById('storage').value.trim());
         extraBody.append('method', document.getElementById('dlMethod').value);
+        // Headers + postBody adalah pengaturan per-sesi unduhan, bukan
+        // per-berkas: URL tambahan membutuhkannya sama seperti URL
+        // pertama (CDN yang sama, autentikasi yang sama) — tanpa ini
+        // tempel multi-URL hanya URL pertama yang terautentikasi dan
+        // sisanya ditolak 403 (issue #929). name/checksum memang tetap
+        // dikecualikan karena nilainya per-berkas.
+        extraBody.append('headers', document.getElementById('dlHeaders').value.trim());
+        extraBody.append('postBody', document.getElementById('dlPostBody').value.trim());
         var xRes = await fetchTimeout(API + '/api/add', {
           method: 'POST', body: extraBody,
           headers: {'X-Requested-With': 'XMLHttpRequest'}
