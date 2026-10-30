@@ -83,13 +83,19 @@ class App : Application() {
             val request = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build()
+            // Semantik callback berbeda per jalur (issue #956): jalur
+            // LISTEN (registerNetworkCallback, API 23) melaporkan SETIAP
+            // network — agregat himpunan #954 sah di sana. Jalur default
+            // (API 24+) hanya melaporkan network default TERAKHIR:
+            // network yang berhenti jadi default tak pernah dilaporkan
+            // hilang, jadi entri himpunannya basi menetap dan networkUp
+            // macet true. Di jalur default, onAvailable MENGGANTI isi
+            // himpunan dan onLost mengosongkannya.
+            val defaultCallback = Build.VERSION.SDK_INT >= 24
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    // Himpunan network tersedia (issue #954): callback
-                    // jalur request (API 23) bersifat per-network, jadi
-                    // keadaan naik/turun wajib agregat himpunan, bukan
-                    // event terakhir.
                     synchronized(availableNetworks) {
+                        if (defaultCallback) availableNetworks.clear()
                         availableNetworks.add(network)
                         networkUp = true
                     }
@@ -102,7 +108,11 @@ class App : Application() {
                     // kosong — network lain yang masih hidup menahan
                     // networkUp tetap true (issue #954).
                     synchronized(availableNetworks) {
-                        availableNetworks.remove(network)
+                        if (defaultCallback) {
+                            availableNetworks.clear()
+                        } else {
+                            availableNetworks.remove(network)
+                        }
                         networkUp = availableNetworks.isNotEmpty()
                     }
                 }
@@ -138,7 +148,9 @@ class App : Application() {
         var networkUp: Boolean = true
             private set
 
-        // Network yang saat ini tersedia menurut callback (issue #954):
+        // Network yang saat ini tersedia menurut callback (issue
+        // #954/#956: agregat di jalur LISTEN, singleton terganti di
+        // jalur default):
         // registrasi mengulang onAvailable untuk network yang sudah
         // hidup, jadi himpunan terisi sendiri sejak awal; semua akses
         // disinkronkan pada himpunan ini.
