@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(ui): galeri native tak lagi menampilkan 'No videos found yet.' selama scan awal** -- kolektor engine memproses emisi pertamanya jauh sebelum scan MediaStore selesai dan updateList menilai daftar yang masih kosong sebagai galeri kosong. Kini emptyView hanya tampil bila scan pertama sudah terpasang, sejajar gerbang muatan awal MainActivity (#978) (issue #1011).
+
 - **fix(ui): dialog Limit & Priority membaca nilai terkini saat Simpan** -- fallback kecepatan Custom dan prioritas sebelumnya memakai snapshot saat dialog dibuka, sehingga perubahan dari remote web (limit_priority) yang tiba selagi dialog terbuka tertimpa diam-diam saat pengguna menekan Save walau field itu tak disentuhnya. Fallback kini dibaca segar dari engine (issue #1010).
 
 - **fix(web): timer probe sosial memeriksa kebasian sebelum memasang picker** -- callback debounce sebelumnya memasang state sosial + picker 'Loading...' dari URL tangkapan tanpa memeriksa isi kolom terkini, jadi submit yang sukses di dalam jendela debounce meninggalkan picker basi pada form yang sudah kosong; jalur buang respons basi juga kini menyembunyikan picker bila tak ada probe yang lebih baru yang memilikinya (issue #1009).

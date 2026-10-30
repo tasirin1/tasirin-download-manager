@@ -50,6 +50,7 @@ class GalleryActivity : AppCompatActivity() {
      *  lebih baru dimulai sesudahnya (dua penulis fullList: muat awal dan
      *  collector engine — hasil lama tidak boleh menimpa yang baru). */
     private var galleryScanGen = 0
+    private var initialScanDone = false
     private var loadedCount = GALLERY_PAGE
     private var loadingMore = false
     private var partialProgress: Map<String, Int> = emptyMap()
@@ -89,7 +90,10 @@ class GalleryActivity : AppCompatActivity() {
             val scanned = withContext(Dispatchers.IO) {
                 MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
             }
-            if (gen == galleryScanGen) fullList = scanned
+            if (gen == galleryScanGen) {
+                fullList = scanned
+                initialScanDone = true
+            }
             binding.progress.visibility = View.GONE
             loadMore() // halaman awal kurang dari satu layar -> isi otomatis
             // Terbitkan hasil scan awal SELALU (issue #384): loadMore
@@ -122,7 +126,10 @@ class GalleryActivity : AppCompatActivity() {
                     val scanned = withContext(Dispatchers.IO) {
                         MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
                     }
-                    if (gen == galleryScanGen) fullList = scanned
+                    if (gen == galleryScanGen) {
+                        fullList = scanned
+                        initialScanDone = true
+                    }
                 } else {
                     fullList = mergedProgress(fullList)
                 }
@@ -145,7 +152,13 @@ class GalleryActivity : AppCompatActivity() {
 
     private fun updateList() {
         adapter.submit(fullList)
-        binding.emptyView.visibility = if (fullList.isEmpty()) View.VISIBLE else View.GONE
+        // Kosong hanya dinilai sesudah scan pertama terpasang
+        // (issue #1011): kolektor engine memproses emisi pertamanya
+        // jauh sebelum scan MediaStore selesai, dan tanpa gerbang
+        // ini 'No videos found yet.' berkedip selama durasi scan —
+        // kelas yang sama dengan gerbang muatan awal #978.
+        binding.emptyView.visibility =
+            if (fullList.isEmpty() && initialScanDone) View.VISIBLE else View.GONE
     }
 
     private fun canLoadMore(): Boolean =
