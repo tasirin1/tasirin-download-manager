@@ -1553,6 +1553,11 @@ class DownloadEngine(appContext: Context) {
                     App.logEvent("DOWNLOAD STARTED: ${item.fileName}")
                     runDownload(item)
                 } catch (e: CancellationException) {
+                    // Attempt mati terbatalkan: parkiran penggantian yang
+                    // belum commit tak boleh yatim (issue #908) — jalur ini
+                    // melewati handleFailure seluruhnya. No-op murah bila
+                    // tak ada parkiran.
+                    rollbackReplacement(item.id)
                     throw e
                 } catch (e: Throwable) {
                     // Error runtime (mis. NoSuchMethodError) diubah jadi status FAILED,
@@ -1561,7 +1566,13 @@ class DownloadEngine(appContext: Context) {
                     // menutup soket -> SocketException) BUKAN kegagalan unduhan:
                     // tanpa konversi ini handleFailure bisa menimpa status
                     // PAUSED yang baru ditulis pause() (issue #743).
-                    if (!coroutineContext.isActive) throw CancellationException()
+                    // Rollback parkiran SEBELUM konversi (issue #908):
+                    // cabang konversi tak mencapai handleFailure, dan
+                    // rollback di sana bersifat no-op murah.
+                    if (!coroutineContext.isActive) {
+                        rollbackReplacement(item.id)
+                        throw CancellationException()
+                    }
                     handleFailure(item.id, e.message)
                 }
             }
@@ -1879,14 +1890,16 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun handleFailure(id: String, message: String?) {
-        val item = _items.value.find { it.id == id } ?: return
-        // Jaring pengaman parkiran penggantian (issue #896): jalur yang
-        // dirancang selalu commit/rollback sebelum melempar, tetapi
-        // lemparan tak-terancang di jendela publish->commit dapat
-        // mencapai titik ini dengan parkiran masih hidup. Rollback di
-        // sini memulihkan pendahulu dan mencegah cadangan .replaced
-        // yatim permanen; no-op murah bila tak ada parkiran.
+        // Jaring pengaman parkiran penggantian (issue #896) berjalan
+        // SEBELUM penilaian item (issue #908): rollback tak bergantung
+        // pada item, dan item yang sudah terhapus dari daftar (dihapus
+        // pengguna selama verifikasi berjalan) tak boleh membuat
+        // rollback terlewat — parkiran yatim bersifat permanen.
+        // Jalur yang dirancang selalu commit/rollback sebelum melempar;
+        // ini menangkap lemparan tak-terancang di jendela
+        // publish->commit. No-op murah bila tak ada parkiran.
         rollbackReplacement(id)
+        val item = _items.value.find { it.id == id } ?: return
         speedTracker.reset(id)
         // Buang sampel speed/ETA + penyangga segmen agar retry tidak memakai
         // angka basi sesaat (≤1 dtk) dari attempt yang gagal.
