@@ -354,10 +354,6 @@ class SettingsActivity : AppCompatActivity() {
         return true
     }
 
-    /** Hapus file .part menggantung + cache thumbnail. Tidak menyentuh file
-     *  milik download yang masih berjalan/antre/jeda. */
-
-
     private fun addGalleryFolderRow(box: LinearLayout, path: String) {
         val row = layoutInflater.inflate(R.layout.row_extra_folder, box, false)
         val input = row.findViewById<EditText>(R.id.extra_folder_path)
@@ -403,6 +399,10 @@ class SettingsActivity : AppCompatActivity() {
         return paths
     }
 
+    /** Hapus file .part menggantung + cache thumbnail. Tidak menyentuh file
+     *  milik download yang masih berjalan/antre/jeda. (KDoc ini sebelumnya
+     *  menggantung di atas addGalleryFolderRow — dipindah ke sini pada
+     *  issue #1025.) */
     private fun cleanupJunkFiles(): Pair<Int, Long> {
         var files = 0
         var bytes = 0L
