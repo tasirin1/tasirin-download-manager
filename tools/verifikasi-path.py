@@ -331,6 +331,29 @@ def cek_duplikat_definisi(gagal):
             gagal.append("Definisi ganda di %s: %s" % (path, ", ".join(ganda[:5])))
 
 
+def _basis_rentang_hapus():
+    """Basis rentang hapusan ter-commit mode default (issue #825):
+    upstream (@{u}) bila terkonfigurasi; tanpa upstream, cabang
+    remote-tracking yang tersedia lebih dulu (origin/<cabang ini>,
+    lalu origin/HEAD). Jatuh langsung ke HEAD~1 seperti dulu membuat
+    hapusan ter-commit selain di commit teratas lolos pada branch
+    yang belum punya upstream (mis. branch fitur lokal baru).
+    None = tak ada basis jauh; pemanggil memakai cadangan HEAD~1."""
+    hulu = jalan(
+        "git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    if hulu:
+        return hulu.strip()
+    cabang = jalan("git", "rev-parse", "--abbrev-ref", "HEAD")
+    kandidat = []
+    if cabang:
+        kandidat.append("origin/" + cabang.strip())
+    kandidat.append("origin/HEAD")
+    for ref in kandidat:
+        if jalan("git", "rev-parse", "--verify", "--quiet", ref):
+            return ref
+    return None
+
+
 def berkas_dihapus(rentang):
     args = None
     if rentang and ("..." in rentang or ".." in rentang):
@@ -1665,11 +1688,12 @@ def utama():
         # HEAD~1...HEAD). Tanpa ini cek_berkas_dihapus buta terhadap
         # hapusan ter-commit (pohon bersih) dan kelas yang masih disebut
         # berkas lain lolos LOLOS — baru ketahuan di CI mode --rentang.
-        hulu_hapus = jalan(
-            "git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"
-        )
+        # Basisnya dari _basis_rentang_hapus (issue #825): tanpa
+        # upstream pun rentang diperlebar ke remote-tracking yang ada,
+        # bukan menyusut ke commit teratas saja.
+        basis_hapus = _basis_rentang_hapus()
         rentang_hapus = (
-            (hulu_hapus.strip() + "...HEAD") if hulu_hapus else "HEAD~1...HEAD"
+            (basis_hapus + "...HEAD") if basis_hapus else "HEAD~1...HEAD"
         )
         hapus += berkas_dihapus(rentang_hapus)
         hapus = list(dict.fromkeys(hapus))
