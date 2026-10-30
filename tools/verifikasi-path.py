@@ -1621,6 +1621,20 @@ def utama():
         keluar = jalan("git", "diff", "--cached", "--name-status", "-z")
         if keluar:
             hapus += parse_hapus_name_status_z(keluar)
+        # Penghapusan yang sudah ter-commit lokal tetapi belum ter-push
+        # (issue #787): nilai juga dari rentang belum-ter-push yang sama
+        # dengan sumber diff mode default (@{u}...HEAD, cadangan
+        # HEAD~1...HEAD). Tanpa ini cek_berkas_dihapus buta terhadap
+        # hapusan ter-commit (pohon bersih) dan kelas yang masih disebut
+        # berkas lain lolos LOLOS — baru ketahuan di CI mode --rentang.
+        hulu_hapus = jalan(
+            "git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"
+        )
+        rentang_hapus = (
+            (hulu_hapus.strip() + "...HEAD") if hulu_hapus else "HEAD~1...HEAD"
+        )
+        hapus += berkas_dihapus(rentang_hapus)
+        hapus = list(dict.fromkeys(hapus))
     cek_berkas_dihapus(gagal, hapus)
     if not args.semua:
         cek_pengingat_changelog(peringatan, berubah)
