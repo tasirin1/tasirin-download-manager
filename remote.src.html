@@ -5205,15 +5205,19 @@ window.addEventListener('beforeunload', function (e) {
           ((typeof anyActiveTransfer === 'function') && anyActiveTransfer());
       } catch (e) { busy = false; }
       if (busy) { arm(); return; }
-      fetch(API + '/api/logout', {
+      // Berbatas waktu (issue #829): fetch polos yang menggantung
+      // membuat .finally pengarah ke halaman kunci tak pernah jalan.
+      fetchTimeout(API + '/api/logout', {
         method: 'POST',
         headers: {'X-Requested-With': 'XMLHttpRequest'}
-      }).finally(function () {
+      }, 15000).finally(function () {
         window.location.href = API + '/';
       });
     }, LOCK_MS);
   }
-  fetch(API + '/api/pin_enabled').then(function (r) { return r.json(); }).then(function (d) {
+  // Berbatas waktu (issue #829): probe yang menggantung membuat
+  // kunci-otomatis tak pernah terpasang selama sesi itu.
+  fetchTimeout(API + '/api/pin_enabled', undefined, 15000).then(function (r) { return r.json(); }).then(function (d) {
     if (!d || !d.enabled) return;
     arm();
     document.addEventListener('click', arm, { passive: true });
