@@ -61,14 +61,17 @@ RULES = [
         "secret_github_token",
         "error",
         "Possible GitHub token committed",
-        r"\b(?:github_pat_|ghp_)[A-Za-z0-9_]{30,}",
+        # Semua awalan token GitHub (issue #847): sebelumnya hanya
+        # github_pat_/ghp_ sehingga token OAuth (gho_), user-to-server
+        # (ghu_), server-to-server (ghs_), dan refresh (ghr_) lolos.
+        r"\b(?:github_pat_|ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9_]{30,}",
         frozenset({"text"}),
     ),
     Rule(
         "secret_aws_access_key",
         "error",
         "Possible AWS access key committed",
-        r"\bAKIA[0-9A-Z]{16}\b",
+        r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",
         frozenset({"text"}),
     ),
     Rule(
@@ -76,6 +79,31 @@ RULES = [
         "error",
         "Private key material committed",
         r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----",
+        frozenset({"text"}),
+    ),
+    # Kelas token umum lain (issue #847): tanpa aturan, bentuk-bentuk
+    # ini lolos dari semua gerbang lokal dan hanya tertangkap gitleaks
+    # CI. Pola menuntut awalan spesifik + panjang agar tak menembak
+    # prosa biasa.
+    Rule(
+        "secret_slack_token",
+        "error",
+        "Possible Slack token committed",
+        r"\bxox[baprs]-[0-9A-Za-z-]{10,}",
+        frozenset({"text"}),
+    ),
+    Rule(
+        "secret_google_api_key",
+        "error",
+        "Possible Google API key committed",
+        r"\bAIza[0-9A-Za-z_-]{35}\b",
+        frozenset({"text"}),
+    ),
+    Rule(
+        "secret_stripe_key",
+        "error",
+        "Possible Stripe secret key committed",
+        r"\b(?:sk|rk)_live_[0-9A-Za-z]{16,}",
         frozenset({"text"}),
     ),
     Rule(
@@ -278,6 +306,18 @@ EXTENSION_LANGUAGES = {
     # skrip justru berkas yang paling mungkin memegang token.
     ".sh": "text",
     ".bash": "text",
+    # Pembawa rahasia klasik lain (issue #847, kelas #551 yang sama):
+    # tanpa pemetaan ini berkas .env/.json/.pem dibuang sebelum aturan
+    # secret berjalan — padahal .env dan kunci privat justru tempat
+    # rahasia paling lazim tersimpan.
+    ".env": "text",
+    ".json": "text",
+    ".pem": "text",
+    ".key": "text",
+    ".ini": "text",
+    ".cfg": "text",
+    ".conf": "text",
+    ".gradle": "text",
 }
 
 EXCLUDED_PARTS = {
@@ -310,10 +350,12 @@ def language_for(path: Path) -> str | None:
     lang = EXTENSION_LANGUAGES.get(path.suffix.lower())
     if lang is not None:
         return lang
-    # Skrip hook tanpa ekstensi di .githooks/ (issue #551): sama
-    # seperti .sh, perlakukan sebagai text agar aturan secret
-    # menjangkaunya.
-    if path.suffix == "" and ".githooks" in path.parts:
+    # Berkas tanpa ekstensi (issue #847, menggeneralisasi #551 yang
+    # hanya menjangkau .githooks/): perlakukan sebagai text agar
+    # aturan secret menjangkaunya. Berkas biner/terlalu besar tidak
+    # lolos diam — read_lines menolaknya dan scan_path mencatatnya
+    # sebagai file_unscanned (mekanisme #344).
+    if path.suffix == "":
         return "text"
     return None
 
@@ -963,6 +1005,22 @@ def run_self_test() -> int:
             "extra.txt": [
                 "AKIAIOSFODNN7EXAMPLE",  # audit-ignore: secret_aws_access_key
                 "-----BEGIN RSA PRIVATE KEY-----",  # audit-ignore: secret_private_key
+                # Aturan rahasia baru + awalan GitHub lengkap (#847).
+                # Nilai contoh DIRAKIT dari potongan: literal utuh
+                # berbentuk token ditolak GitHub Push Protection saat
+                # berkas ini sendiri di-push, walau isinya contoh palsu.
+                "gho_" + "B" * 36,  # audit-ignore: secret_github_token
+                "xoxb-" + "1" * 20,  # audit-ignore: secret_slack_token
+                "AIza" + "C" * 35,  # audit-ignore: secret_google_api_key
+                "sk_live_" + "D" * 24,  # audit-ignore: secret_stripe_key
+            ],
+            # Cakupan ekstensi baru (#847): token di berkas .env dan di
+            # berkas tanpa ekstensi wajib tertangkap aturan secret.
+            "extra.env": [
+                "TOKEN=ghp_" + "B" * 36,  # audit-ignore: secret_github_token
+            ],
+            "extra_hook": [
+                "-----BEGIN EC PRIVATE KEY-----",  # audit-ignore: secret_private_key
             ],
             "extra.kt": [
                 'webView.addJavascriptInterface(bridge, "x")',
@@ -1063,14 +1121,25 @@ def run_self_test() -> int:
         item["rule_id"] == "js_dynamic_exec" and item["path"] == "big_unscanned.js"
         for item in findings
     )
-    # Ke-13 aturan yang sebelumnya tanpa sampel (#427) wajib menembak.
+    # Ke-13 aturan yang sebelumnya tanpa sampel (#427) wajib menembak,
+    # ditambah 3 aturan rahasia baru (#847).
     extra_rules_hit = {
         "secret_aws_access_key", "secret_private_key", "webview_js_bridge",
         "webview_javascript_enabled", "backup_enabled", "shell_true",
         "unsafe_blank_window", "cleartext_base_config", "debug_stack_trace",
         "global_coroutine_scope", "non_null_assertion",
         "header_comparison_case_sensitive", "file_scoped_catch_all",
+        "secret_slack_token", "secret_google_api_key", "secret_stripe_key",
     } <= by_rule
+    # Cakupan ekstensi (#847): sampel di .env dan tanpa ekstensi menembak.
+    env_hit = any(
+        item["rule_id"] == "secret_github_token" and item["path"] == "extra.env"
+        for item in findings
+    )
+    noext_hit = any(
+        item["rule_id"] == "secret_private_key" and item["path"] == "extra_hook"
+        for item in findings
+    )
     nested_log = any(
         item["rule_id"] == "sensitive_log" and item["path"] == "sample_nested.kt"
         for item in findings
@@ -1123,9 +1192,9 @@ def run_self_test() -> int:
         and item["path"] == "sample_strparen.kt"
         for item in findings
     )
-    if missing or suppressed or str_leak or prose_suppressed or not leak_next_line or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned or not extra_rules_hit or not catch_komentar or not catch_multibaris or catch_berisi_fp:
+    if missing or suppressed or str_leak or prose_suppressed or not leak_next_line or not multi_leak or not multi_sql or fp_hit or not nested_log or not nested_sql or not nested_path or not nested2_log or not nested2_path or strparen_fp or not strparen_leak or not strparen_semi or not comment_leak or not nested3_log or not nested5_log or not tplcomment_leak or not multi_js or not multi_xss or not unscanned_hit or not big_unscanned_hit or not big_not_scanned or not extra_rules_hit or not env_hit or not noext_hit or not catch_komentar or not catch_multibaris or catch_berisi_fp:
         print(json.dumps(findings, indent=2))
-        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, leak_next_line={leak_next_line}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}, extra_rules_hit={extra_rules_hit}, catch_komentar={catch_komentar}, catch_multibaris={catch_multibaris}, catch_berisi_fp={catch_berisi_fp}")
+        print(f"SELF TEST GAGAL: missing={sorted(missing)}, suppressed={suppressed}, str_leak={len(str_leak)}, prose_suppressed={prose_suppressed}, leak_next_line={leak_next_line}, multi_leak={multi_leak}, multi_sql={multi_sql}, fp_hit={fp_hit}, nested_log={nested_log}, nested_sql={nested_sql}, nested_path={nested_path}, nested2_log={nested2_log}, nested2_path={nested2_path}, strparen_fp={strparen_fp}, strparen_leak={strparen_leak}, strparen_semi={strparen_semi}, comment_leak={comment_leak}, nested3_log={nested3_log}, nested5_log={nested5_log}, tplcomment_leak={tplcomment_leak}, multi_js={multi_js}, multi_xss={multi_xss}, unscanned_hit={unscanned_hit}, big_unscanned_hit={big_unscanned_hit}, big_not_scanned={big_not_scanned}, extra_rules_hit={extra_rules_hit}, env_hit={env_hit}, noext_hit={noext_hit}, catch_komentar={catch_komentar}, catch_multibaris={catch_multibaris}, catch_berisi_fp={catch_berisi_fp}")
         return 1
     print(f"SELF TEST OK: {len(required)} aturan representatif terdeteksi, suppression aktif.")
     return 0
