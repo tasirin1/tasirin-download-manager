@@ -465,6 +465,11 @@
   .gal-grid {
  display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 14px 12px; grid-auto-flow: dense; }
 
+  /* Status kosong/gagal, CTA, dan skeleton bukan sel video: wajib membentang
+     selebar grid, bukan terjepit di satu kolom (issue #759). */
+  .gal-grid > .empty, .gal-grid > .empty-cta, .gal-grid > .sk-grid {
+ grid-column: 1 / -1; }
+
   @media (min-width: 1000px) {
     .gal-grid {
       grid-template-columns: repeat(5, 1fr);
