@@ -509,24 +509,32 @@ object StoragePrefs {
             ?: emptyList()
 
     fun notePendingMediaStoreRow(context: Context, uri: String) {
-        // Entri yang sudah ada DITIMPA cap waktunya, bukan dipertahankan
-        // (issue #745): umur sapuan harus mengukur aktivitas tulis
-        // terakhir, bukan insert pertama — penulis yang masih aktif
-        // menyegarkan catatan ini berkala lewat aliran tulisnya.
-        val kept = pendingMediaStoreRowEntries(context)
-            .filterNot { it.substringBefore('|') == uri }
-        val entry = uri + "|" + System.currentTimeMillis()
-        prefs(context).edit {
-            putString(KEY_PENDING_MEDIASTORE_ROWS, (kept + entry).joinToString("\n"))
+        // Seluruh baca-ubah-tulis di dalam prefsLock (issue #751, pola
+        // setSectionCollapsed #690): dua terbitan MediaStore paralel bisa
+        // saling menimpa hasil suntingan — catatan baris pending hilang
+        // (yatim tak tersapu) atau yang sudah dilupakan bangkit lagi.
+        synchronized(prefsLock) {
+            // Entri yang sudah ada DITIMPA cap waktunya, bukan dipertahankan
+            // (issue #745): umur sapuan harus mengukur aktivitas tulis
+            // terakhir, bukan insert pertama — penulis yang masih aktif
+            // menyegarkan catatan ini berkala lewat aliran tulisnya.
+            val kept = pendingMediaStoreRowEntries(context)
+                .filterNot { it.substringBefore('|') == uri }
+            val entry = uri + "|" + System.currentTimeMillis()
+            prefs(context).edit {
+                putString(KEY_PENDING_MEDIASTORE_ROWS, (kept + entry).joinToString("\n"))
+            }
         }
     }
 
     fun forgetPendingMediaStoreRow(context: Context, uri: String) {
-        val entries = pendingMediaStoreRowEntries(context)
-        val kept = entries.filterNot { it.substringBefore('|') == uri }
-        if (kept.size == entries.size) return
-        prefs(context).edit {
-            putString(KEY_PENDING_MEDIASTORE_ROWS, kept.joinToString("\n"))
+        synchronized(prefsLock) {
+            val entries = pendingMediaStoreRowEntries(context)
+            val kept = entries.filterNot { it.substringBefore('|') == uri }
+            if (kept.size == entries.size) return
+            prefs(context).edit {
+                putString(KEY_PENDING_MEDIASTORE_ROWS, kept.joinToString("\n"))
+            }
         }
     }
 
