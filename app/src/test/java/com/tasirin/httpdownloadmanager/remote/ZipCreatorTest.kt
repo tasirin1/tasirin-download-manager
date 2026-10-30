@@ -225,6 +225,98 @@ class ZipCreatorTest {
         assertTrue(afterAdd != ZipCreator.zipFsSourceStamp(dir))
     }
 
+    // Implementasi acuan yang DIBEKUKAN di sisi uji (issue #991):
+    // salinan algoritma komposisi cap saat ini (basis, urutan lipat,
+    // plafon 8192, lipatan dangkal, sufiks). Uji paritas di bawah
+    // membandingkannya dengan produksi atas pohon yang sama, jadi
+    // perubahan komposisi produksi yang tak disengaja membuat CI
+    // merah walau nilai emas mentah tak bisa dipakai (path absolut
+    // folder sementara berbeda tiap mesin).
+    private fun referenceFsStamp(root: java.io.File): String {
+        if (root.isFile) return "f" + root.length() + ":" + root.lastModified()
+        if (!root.isDirectory) return "none"
+        var hash = -3750763034362895579L
+        var count = 0
+        var truncated = false
+        val seen = mutableSetOf<String>()
+        val stack = ArrayDeque<java.io.File>()
+        stack.add(root)
+        while (stack.isNotEmpty() && !truncated) {
+            val dir = stack.removeLast()
+            val canon = runCatching { dir.canonicalPath }.getOrNull() ?: dir.absolutePath
+            if (!seen.add(canon)) continue
+            val children = dir.listFiles()?.sortedWith(
+                Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
+            ) ?: continue
+            for (child in children) {
+                if (count >= 8192) {
+                    truncated = true
+                    break
+                }
+                count++
+                hash = ZipCreator.zipStampFold(hash, child.absolutePath)
+                hash = ZipCreator.zipStampFold(hash, child.length().toString())
+                hash = ZipCreator.zipStampFold(hash, child.lastModified().toString())
+                if (child.isDirectory) stack.add(child)
+            }
+        }
+        if (truncated) {
+            var shallowBudget = 8192
+            while (stack.isNotEmpty()) {
+                val queued = stack.removeLast()
+                hash = ZipCreator.zipStampFold(hash, queued.absolutePath)
+                hash = ZipCreator.zipStampFold(hash, queued.length().toString())
+                hash = ZipCreator.zipStampFold(hash, queued.lastModified().toString())
+                if (shallowBudget > 0) {
+                    val kids = queued.listFiles()?.sortedWith(
+                        Comparator { a, b -> a.name.compareTo(b.name, ignoreCase = true) }
+                    )
+                    if (kids != null) {
+                        for (kid in kids) {
+                            if (shallowBudget <= 0) break
+                            shallowBudget--
+                            hash = ZipCreator.zipStampFold(hash, kid.absolutePath)
+                            hash = ZipCreator.zipStampFold(hash, kid.length().toString())
+                            hash = ZipCreator.zipStampFold(hash, kid.lastModified().toString())
+                        }
+                    }
+                }
+            }
+        }
+        return "d" + count + ":" + hash + ":" + (if (truncated) "t" else "c") +
+            ":" + root.lastModified()
+    }
+
+    @Test
+    fun `fs stamp matches frozen reference composition and detects deletion`() {
+        val dir = temp.newFolder("parity")
+        val sub = java.io.File(dir, "sub")
+        assertTrue(sub.mkdir())
+        java.io.File(dir, "a.txt").writeText("alpha")
+        val victim = java.io.File(sub, "b.txt")
+        victim.writeText("beta")
+        java.io.File(sub, "c.txt").writeText("gamma")
+        val before = ZipCreator.zipFsSourceStamp(dir)
+        assertEquals(referenceFsStamp(dir), before)
+        // Hapus berkas menggerakkan cap (arah yang belum terkunci #979).
+        assertTrue(victim.delete())
+        val after = ZipCreator.zipFsSourceStamp(dir)
+        assertTrue(before != after)
+        assertEquals(referenceFsStamp(dir), after)
+    }
+
+    @Test
+    fun `fs stamp flags truncation past the entry ceiling`() {
+        val dir = temp.newFolder("wide")
+        for (i in 1..8200) {
+            java.io.File(dir, "f" + i + ".bin").createNewFile()
+        }
+        val stamp = ZipCreator.zipFsSourceStamp(dir)
+        assertTrue(stamp.startsWith("d8192:"))
+        assertTrue(stamp.contains(":t:"))
+        assertEquals(referenceFsStamp(dir), stamp)
+    }
+
     @Test
     fun `stamp fold is order sensitive and chains like concatenation`() {
         val basis = -3750763034362895579L

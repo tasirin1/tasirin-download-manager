@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **test(remote): komposisi cap folder ZIP kini terkunci uji paritas + terpotong + hapus** -- uji #979 sebelumnya swa-referensi sehingga perubahan basis/urutan lipat/plafon/flag terpotong tak membuat CI merah. Kini berkas uji memuat implementasi acuan yang dibekukan dan membandingkannya dengan produksi atas pohon yang sama (nilai emas mentah tak bisa dipakai karena path folder sementara berbeda tiap mesin), ditambah deteksi hapus berkas dan kasus terpotong 8200 entri berflag 't' (issue #991).
+
 - **fix(remote): jalur eviction zipCache kini ikut membuang memo cap** -- kedaluwarsa TTL di zipCached, prune (kedaluwarsa + ukuran/jumlah, hanya bila benar-benar ada entri terbuang), dan pembuangan entri rusak di openZipStream sebelumnya melepas entri tanpa menyentuh memo cap, menyisakan jendela salah-label sempit bila perubahan eksternal jatuh di jendela memo yang sama. Kelas #974 kini tertutup di semua jalur pelepasan entri (issue #990).
 
 - **fix(download): tutup sisa celah balapan wake lock — field volatile + cek destroyed tepat sebelum acquire** -- cek di pintu updateWakeLock dan acquire tidak atomik, jadi kolektor yang ter-preempt di sela-selanya masih bisa meng-acquire lock sesudah onDestroy tuntas. Kini field wakeLock @Volatile dan destroyed diperiksa sekali lagi tepat sebelum acquire (issue #989).
