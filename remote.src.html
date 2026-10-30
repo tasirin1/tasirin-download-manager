@@ -582,6 +582,14 @@
   .fs-sticky {
  position: sticky; top: 0; z-index: 25; background: var(--bg); padding: 6px 0 8px; margin: -6px 0 2px; }
 
+  /* Tema gelap: badan halaman bergradasi, jadi latar polos --bg pada
+     pembungkus lengket tampil sebagai pita hitam mengambang di belakang
+     breadcrumb (bar filter galeri #filtersSticky kena yang sama dan
+     sudah dibuat transparan). Bar breadcrumb sendiri berlatar --card,
+     jadi transparan di sini tetap terbaca. */
+  :root[data-theme="dark"] .fs-sticky {
+ background: transparent; }
+
 
 
   .fs-path {
