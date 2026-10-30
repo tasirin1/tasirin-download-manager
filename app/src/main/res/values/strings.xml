@@ -94,6 +94,7 @@
     <string name="speed_and_eta">%1$s · ETA %2$s</string>
 
     <string name="action_rename">Rename</string>
+    <string name="rename_failed">Rename failed</string>
     <string name="action_move">Move</string>
     <string name="action_move_up">Move Up</string>
     <string name="action_move_down">Move Down</string>

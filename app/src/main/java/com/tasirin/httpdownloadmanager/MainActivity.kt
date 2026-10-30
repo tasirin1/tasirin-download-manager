@@ -1656,7 +1656,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val newName = input.text?.toString()?.trim().orEmpty()
                 if (newName.isNotEmpty() && newName != item.fileName) {
                     lifecycleScope.launch(Dispatchers.IO) {
-                        App.engine.rename(item.id, newName)
+                        // Hasil rename wajib dilaporkan (issue #1015):
+                        // sebelumnya Boolean dibuang sehingga kegagalan
+                        // (berkas sudah pindah/hilang, state berubah)
+                        // senyap dan pengguna mengira berhasil — jalur
+                        // web untuk aksi yang sama membalas ok:false.
+                        val ok = App.engine.rename(item.id, newName)
+                        if (!ok) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(this@MainActivity, R.string.rename_failed, Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 }
             }
