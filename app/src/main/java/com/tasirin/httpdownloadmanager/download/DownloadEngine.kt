@@ -1505,6 +1505,11 @@ class DownloadEngine(appContext: Context) {
                 } catch (e: Throwable) {
                     // Error runtime (mis. NoSuchMethodError) diubah jadi status FAILED,
                     // bukan force close.
+                    // Kegagalan yang muncul sesudah job dibatalkan (pause/cancel
+                    // menutup soket -> SocketException) BUKAN kegagalan unduhan:
+                    // tanpa konversi ini handleFailure bisa menimpa status
+                    // PAUSED yang baru ditulis pause() (issue #743).
+                    if (!coroutineContext.isActive) throw CancellationException()
                     handleFailure(item.id, e.message)
                 }
             }
@@ -2819,6 +2824,10 @@ class DownloadEngine(appContext: Context) {
             throw e
         } catch (e: Exception) {
             audioM4a?.delete()
+            // Pause menutup soket di tengah unduh audio adaptif: jangan
+            // ditelan sebagai "audio gagal, lanjut video-only" — itu
+            // pembatalan (issue #743).
+            if (e is IOException && !coroutineContext.isActive) throw CancellationException()
             App.logEvent("HLS: adaptive audio download failed (${e.message?.take(50)}), skipped")
             null
         }
@@ -2877,6 +2886,10 @@ class DownloadEngine(appContext: Context) {
             runCatching { videoMp4.delete() }
             runCatching { audioM4a.delete() }
             runCatching { mp4.delete() }
+            // Pause membatalkan job + menutup soket: SocketException dari
+            // downloadAdaptiveFile harus jadi pembatalan, bukan kegagalan
+            // (pola runSingle/downloadSegment; issue #743).
+            if (e is IOException && !coroutineContext.isActive) throw CancellationException()
             throw e
         }
     }
@@ -3010,6 +3023,10 @@ class DownloadEngine(appContext: Context) {
                 val msg = e.message.orEmpty()
                 val denied = msg.contains("404") || msg.contains("403")
                 if (denied && fallbackQuery.isNotEmpty() && !url.contains("?")) {
+                    // Jangan mulai unduhan segmen baru dalam konteks yang
+                    // sudah dibatalkan (pause): jalur langsung ini tidak
+                    // melewati ensureActive kepala loop lagi (issue #743).
+                    coroutineContext.ensureActive()
                     // CDN signed-URL: segmen relatif tanpa token ditolak —
                     // coba sekali lagi dengan query token playlist varian.
                     App.logEvent("HLS: segment 404/403, retrying with playlist query")
