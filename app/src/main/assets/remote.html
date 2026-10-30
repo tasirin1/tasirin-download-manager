@@ -1040,10 +1040,10 @@ const before = galleryItems.length;
 await loadGallery(false);
 if (galleryItems.length === before) break;
 }
-btn.disabled = false;
 if (galSelectSession !== session || !galSelectMode) {
 return;
 }
+btn.disabled = false;
 }
 galSelected.clear();
 if (!allSel) galleryItems.forEach(function (it) { galSelected.add(it); });

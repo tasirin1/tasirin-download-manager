@@ -3309,17 +3309,19 @@ document.getElementById('galBatchAll').addEventListener('click', async function 
       await loadGallery(false);
       if (galleryItems.length === before) break;
     }
-    btn.disabled = false;
     // Ekor hanya berlaku untuk sesi yang sama (issue #868 + #878):
     // mode yang dimatikan lalu dinyalakan lagi selama menunggu adalah
     // sesi BARU dengan seleksi manualnya sendiri — handler lama tak
-    // boleh menimpanya, termasuk LABEL tombolnya (issue #887): sesi
-    // baru bisa sudah memasang 'Cancel all' yang benar lewat
-    // updateGalBatch. Kepemilikan tombol dikembalikan jalur sesi:
-    // galSetSelectMode(true) menyetel ulang disabled + label.
+    // boleh menimpanya, termasuk LABEL tombolnya (issue #887) dan
+    // status disabled-nya (issue #892): mengaktifkan tombol sebelum
+    // cek sesi membuka tombol di tengah loop handler sesi baru,
+    // melahirkan handler ketiga untuk sesi yang sama. Ekor
+    // lintas-sesi tidak menyentuh tombol sama sekali; kepemilikan
+    // penuh di jalur sesi (galSetSelectMode(true) menyetel ulang).
     if (galSelectSession !== session || !galSelectMode) {
       return;
     }
+    btn.disabled = false;
   }
   galSelected.clear();
   if (!allSel) galleryItems.forEach(function (it) { galSelected.add(it); });
