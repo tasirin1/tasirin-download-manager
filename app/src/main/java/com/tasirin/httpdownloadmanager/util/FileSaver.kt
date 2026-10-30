@@ -235,34 +235,75 @@ class FileSaver(context: Context) {
         writer: (OutputStream) -> Unit
     ): PublishResult {
         val target = uniqueTargetFile(File(dir, fileName))
-        // Klaim nama staging juga (pola publishFileIntoDir): "<final>.part"
-        // adalah namespace partial unduhan, jadi nama polos + delete() buta
-        // bisa menghapus partial unduhan aktif yang bernama sama (issue #744).
-        val staging = uniqueTargetFile(File(dir, target.name + ".part"))
+        // Catat klaim nama final (issue #749): proses mati di tengah
+        // tulis meninggalkan klaim 0 byte ini menetap; sapuan
+        // sweepStaleFinalClaims membuangnya berdasar catatan ini (pola
+        // catatan pending MediaStore #734). Catatan dilupakan di
+        // finally: klaim yang terbit menjadi berkas sungguhan tak boleh
+        // tersapu, yang gagal sudah terhapus di cabang catch.
+        StoragePrefs.noteFinalClaim(appContext, target.absolutePath)
         try {
-            BufferedOutputStream(staging.outputStream()).use { out -> writer(out) }
-        } catch (e: Exception) {
-            // Gagal di tengah upload: buang staging + klaim final kosong.
-            runCatching { staging.delete() }
-            runCatching { target.delete() }
-            throw e
-        }
-        // Terbitkan: hapus klaim kosong lalu rename (urutan #719). Rename
-        // sevolume seharusnya selalu berhasil sesudah klaim dihapus.
-        runCatching { target.delete() }
-        if (!staging.renameTo(target)) {
+            // Klaim nama staging juga (pola publishFileIntoDir): "<final>.part"
+            // adalah namespace partial unduhan, jadi nama polos + delete() buta
+            // bisa menghapus partial unduhan aktif yang bernama sama (issue #744).
+            val staging = uniqueTargetFile(File(dir, target.name + ".part"))
             try {
-                staging.inputStream().use { ins ->
-                    target.outputStream().use { out -> ins.copyTo(out, IO_BUF) }
-                }
-                runCatching { staging.delete() }
+                BufferedOutputStream(staging.outputStream()).use { out -> writer(out) }
             } catch (e: Exception) {
+                // Gagal di tengah upload: buang staging + klaim final kosong.
                 runCatching { staging.delete() }
                 runCatching { target.delete() }
                 throw e
             }
+            // Terbitkan: hapus klaim kosong lalu rename (urutan #719). Rename
+            // sevolume seharusnya selalu berhasil sesudah klaim dihapus.
+            runCatching { target.delete() }
+            if (!staging.renameTo(target)) {
+                try {
+                    staging.inputStream().use { ins ->
+                        target.outputStream().use { out -> ins.copyTo(out, IO_BUF) }
+                    }
+                    runCatching { staging.delete() }
+                } catch (e: Exception) {
+                    runCatching { staging.delete() }
+                    runCatching { target.delete() }
+                    throw e
+                }
+            }
+            return PublishResult(filePath = target.absolutePath, fileName = target.name)
+        } finally {
+            StoragePrefs.forgetFinalClaim(appContext, target.absolutePath)
         }
-        return PublishResult(filePath = target.absolutePath, fileName = target.name)
+    }
+
+    /** Sapu klaim nama final 0 byte yatim milik writePlainFileStaged
+     *  (issue #749): hanya entri tercatat yang disentuh, hanya yang
+     *  berumur > 2 jam (samakan ambang sapuan lain), dan hanya bila
+     *  berkasnya masih persis 0 byte serta tak ada staging `.part`
+     *  senama yang hidup di sebelahnya. Berkas bernama final yang sudah
+     *  berisi tak pernah dihapus — catatannya saja yang dilupakan. */
+    private fun sweepStaleFinalClaims() {
+        val now = System.currentTimeMillis()
+        StoragePrefs.finalClaimEntries(appContext).forEach { entry ->
+            val path = entry.substringBefore('|')
+            val notedAt = entry.substringAfter('|', "").toLongOrNull() ?: 0L
+            if (now - notedAt < 2L * 60 * 60 * 1000) return@forEach
+            val f = File(path)
+            when {
+                !f.exists() || f.length() > 0L ->
+                    StoragePrefs.forgetFinalClaim(appContext, path)
+                else -> {
+                    val stagingAlive = f.parentFile?.listFiles()?.any {
+                        it.name.startsWith(f.name) && it.name.contains(".part")
+                    } ?: false
+                    if (!stagingAlive && runCatching { f.delete() }.getOrDefault(false)) {
+                        StoragePrefs.forgetFinalClaim(appContext, path)
+                    }
+                    // Staging masih hidup / hapus gagal: catatan dibiarkan
+                    // untuk sapuan berikutnya.
+                }
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -682,6 +723,8 @@ class FileSaver(context: Context) {
         // Baris MediaStore pending yatim milik sendiri (issue #734) disapu
         // pada alur bersih-bersih yang sama.
         runCatching { sweepStalePendingMediaStoreRows() }
+        // Klaim nama final 0 byte yatim (issue #749), alur yang sama.
+        runCatching { sweepStaleFinalClaims() }
         runCatching {
             val expected = buildSet {
                 items.forEach { item ->
