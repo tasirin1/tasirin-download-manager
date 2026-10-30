@@ -1086,7 +1086,7 @@ class DownloadEngine(appContext: Context) {
     /** Pindahkan item ke atas/atas-antrean (daftar tampil terbaru di atas).
      *  Pertukaran posisi hanya pada item yang tidak aktif download, supaya
      *  tidak mengganggu segmen yang sedang berjalan. */
-    fun moveUp(id: String) {
+    fun moveUp(id: String): Boolean {
         // Pertukaran dinilai + diterapkan di dalam monitor (#274):
         // indeks dari snapshot luar kunci bisa basi saat daftar berubah
         // bersamaan (item terhapus/bertambah) -> tukar salah sasaran
@@ -1104,13 +1104,16 @@ class DownloadEngine(appContext: Context) {
                 items
             }
         }
-        val name = movedName ?: return
+        // Nilai balik jujur (issue #935): false = no-op (sudah di
+        // tepi), agar pemanggil tidak mengklaim berhasil pindah.
+        val name = movedName ?: return false
         scheduleSave()
         App.logEvent("DOWNLOAD MOVED UP: $name")
+        return true
     }
 
     /** Pindahkan item ke bawah antrean. */
-    fun moveDown(id: String) {
+    fun moveDown(id: String): Boolean {
         var movedName: String? = null
         updateTransformed { cur ->
             val idx = cur.indexOfFirst { it.id == id }
@@ -1124,9 +1127,10 @@ class DownloadEngine(appContext: Context) {
                 items
             }
         }
-        val name = movedName ?: return
+        val name = movedName ?: return false
         scheduleSave()
         App.logEvent("DOWNLOAD MOVED DOWN: $name")
+        return true
     }
 
     fun retryFailed() {

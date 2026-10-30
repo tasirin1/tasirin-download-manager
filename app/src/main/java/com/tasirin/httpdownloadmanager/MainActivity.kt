@@ -1557,12 +1557,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         }
         if (item.state != DownloadState.DOWNLOADING) {
             options.add(getString(R.string.action_move_up) to {
-                App.engine.moveUp(item.id)
-                Toast.makeText(this, R.string.moved_up, Toast.LENGTH_SHORT).show()
+                // Toast hanya bila benar berpindah (issue #935):
+                // item di tepi adalah no-op senyap di engine.
+                if (App.engine.moveUp(item.id)) {
+                    Toast.makeText(this, R.string.moved_up, Toast.LENGTH_SHORT).show()
+                }
             })
             options.add(getString(R.string.action_move_down) to {
-                App.engine.moveDown(item.id)
-                Toast.makeText(this, R.string.moved_down, Toast.LENGTH_SHORT).show()
+                if (App.engine.moveDown(item.id)) {
+                    Toast.makeText(this, R.string.moved_down, Toast.LENGTH_SHORT).show()
+                }
             })
         }
         if (item.state == DownloadState.COMPLETED ||
