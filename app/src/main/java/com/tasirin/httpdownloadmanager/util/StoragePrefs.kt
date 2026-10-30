@@ -69,9 +69,17 @@ object StoragePrefs {
     fun isSectionCollapsed(context: Context, key: String): Boolean {
         val cached = collapsedCache
         if (cached != null) return key in cached
-        val set = prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet())
-        collapsedCache = set
-        return key in (set ?: emptySet())
+        // Pengisian cache wajib di dalam prefsLock (issue #690):
+        // setSectionCollapsed memakai cache yang sama sebagai basis
+        // read-modify-write di dalam kunci ini — pengisian di luar
+        // kunci bisa menimpa cache yang baru diperbarui penulis dengan
+        // nilai prefs lama dan membuatnya basi permanen.
+        synchronized(prefsLock) {
+            val filled = collapsedCache
+                ?: (prefs(context).getStringSet(KEY_COLLAPSED_SECTIONS, emptySet()) ?: emptySet())
+                    .also { collapsedCache = it }
+            return key in filled
+        }
     }
 
     fun setSectionCollapsed(context: Context, key: String, collapsed: Boolean) {
