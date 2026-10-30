@@ -131,7 +131,18 @@ internal fun getOrCreateThumb(
     isFsPathAllowed: (String) -> Boolean,
     isMediaUriAllowed: (Uri) -> Boolean
 ): File? {
-    if (!isThumbSourceAllowed(ctx, raw, isFsPathAllowed, isMediaUriAllowed)) return null
+    // Nama tampil sumber u: dihitung SEKALI di sini (issue #794) lalu
+    // diteruskan ke kedua konsumennya — dulu isThumbSourceAllowed dan
+    // generateThumb sama-sama me-resolusi (DocumentFile + query
+    // DISPLAY_NAME) per cache-miss. Urutan izin dipertahankan: nama
+    // hanya di-resolusi bila URI lolos isMediaUriAllowed.
+    val mediaName: String? = if (raw.startsWith("u:")) {
+        val uri = raw.substring(2).toUri()
+        if (isMediaUriAllowed(uri)) resolveMediaDisplayName(ctx, uri) else null
+    } else {
+        null
+    }
+    if (!isThumbSourceAllowed(ctx, raw, isFsPathAllowed, isMediaUriAllowed, mediaName)) return null
     // Kunci cache memakai hash penuh 256-bit: 16 hex char (64 bit) bisa
     // tabrakan antar file dan menyajikan thumbnail milik video lain.
     // Cap isi (mtime+ukuran) ikut dikunci (issue #399): berkas yang
@@ -178,7 +189,7 @@ internal fun getOrCreateThumb(
             thumbFailures[key]?.let { at ->
                 if (isThumbFailureFresh(at, System.currentTimeMillis())) return@synchronized null
             }
-            val bmp = generateThumb(ctx, raw, isFsPathAllowed, isMediaUriAllowed)
+            val bmp = generateThumb(ctx, raw, isFsPathAllowed, isMediaUriAllowed, mediaName)
                 ?: run {
                     thumbFailures[key] = System.currentTimeMillis()
                     if (thumbFailures.size > 512) {
@@ -238,11 +249,29 @@ internal fun getOrCreateThumb(
     }.also { lock.lastUse.set(System.currentTimeMillis()) }
 }
 
+/** Resolusi nama tampil URI media (issue #794): DocumentFile bisa
+ *  mengembalikan nama kosong untuk URI MediaStore di sebagian
+ *  perangkat, jadi fallback ke kolom DISPLAY_NAME langsung. */
+private fun resolveMediaDisplayName(ctx: Context, uri: Uri): String {
+    var name = DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()
+    if (name.isBlank()) {
+        name = runCatching {
+            ctx.contentResolver.query(
+                uri,
+                arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME),
+                null, null, null
+            )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        }.getOrNull().orEmpty()
+    }
+    return name
+}
+
 private fun isThumbSourceAllowed(
     ctx: Context,
     raw: String,
     isFsPathAllowed: (String) -> Boolean,
-    isMediaUriAllowed: (Uri) -> Boolean
+    isMediaUriAllowed: (Uri) -> Boolean,
+    mediaName: String? = null
 ): Boolean {
     return when {
         raw.startsWith("f:") -> {
@@ -253,17 +282,7 @@ private fun isThumbSourceAllowed(
         raw.startsWith("u:") -> {
             val uri = raw.substring(2).toUri()
             if (!isMediaUriAllowed(uri)) return false
-            var name = DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()
-            if (name.isBlank()) {
-                name = runCatching {
-                    ctx.contentResolver.query(
-                        uri,
-                        arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME),
-                        null, null, null
-                    )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
-                }.getOrNull().orEmpty()
-            }
-            MediaLibrary.mediaKind(name) == "video"
+            MediaLibrary.mediaKind(mediaName ?: resolveMediaDisplayName(ctx, uri)) == "video"
         }
         else -> false
     }
@@ -273,7 +292,8 @@ internal fun generateThumb(
     ctx: Context,
     raw: String,
     isFsPathAllowed: (String) -> Boolean,
-    isMediaUriAllowed: (Uri) -> Boolean
+    isMediaUriAllowed: (Uri) -> Boolean,
+    mediaName: String? = null
 ): Bitmap? {
     return runCatching {
         when {
@@ -286,20 +306,7 @@ internal fun generateThumb(
             raw.startsWith("u:") -> {
                 val uri = raw.substring(2).toUri()
                 if (!isMediaUriAllowed(uri)) return null
-                // DocumentFile bisa mengembalikan nama kosong untuk URI
-                // MediaStore di sebagian perangkat (thumb selalu 404 walau
-                // video valid): fallback ke kolom DISPLAY_NAME langsung.
-                var name = DocumentFile.fromSingleUri(ctx, uri)?.name.orEmpty()
-                if (name.isBlank()) {
-                    name = runCatching {
-                        ctx.contentResolver.query(
-                            uri,
-                            arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME),
-                            null, null, null
-                        )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
-                    }.getOrNull().orEmpty()
-                }
-                if (MediaLibrary.mediaKind(name) != "video") return null
+                if (MediaLibrary.mediaKind(mediaName ?: resolveMediaDisplayName(ctx, uri)) != "video") return null
                 videoThumb(ctx, uri = uri)
             }
             else -> null
