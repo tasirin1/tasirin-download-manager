@@ -2209,8 +2209,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             memoizedZipStamp("tok:$token") {
                 val raw = MediaLibrary.decodeToken(token)
                 when {
-                    raw != null && raw.startsWith(FS_PREFIX) ->
-                        ZipCreator.zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
+                    raw != null && raw.startsWith(FS_PREFIX) -> {
+                        // Kanonikkan seperti fsZip (issue #992):
+                        // folder yang sama berejaan varian menghasilkan
+                        // cap yang sama.
+                        val plain = File(raw.removePrefix(FS_PREFIX))
+                        val canon = runCatching { plain.canonicalFile }.getOrNull()
+                        ZipCreator.zipFsSourceStamp(canon ?: plain)
+                    }
                     raw != null && raw.startsWith("u:") ->
                         zipUriSourceStamp(raw.removePrefix("u:").toUri())
                     else -> "x"
