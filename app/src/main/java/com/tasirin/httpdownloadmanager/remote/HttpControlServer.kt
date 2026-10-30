@@ -1831,8 +1831,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (canon != null) "fs:" + FS_PREFIX + canon else "fs:" + raw
         }
         val (input, total) = openZipStream(key) {
-            createTempZip { zos ->
-                if (raw.startsWith(MS_PREFIX)) {
+            val created = createTempZip { zos ->
+                // Hitungan kedua cabang dicatat dengan mekanisme yang
+                // sama seperti mediaZip (issue #886): ditulis di dalam
+                // lambda pembuat, dibaca untuk header/log di bawah.
+                val counts = if (raw.startsWith(MS_PREFIX)) {
                     ZipCreator.zipMedia(zos, raw.removePrefix(MS_PREFIX), context)
                 } else {
                     ZipCreator.zipFile(
@@ -1840,10 +1843,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         isFileAllowed = ::isFsPathAllowed
                     )
                 }
+                zipWrittenCounts[key] = counts
+                zipWrittenCounts.keys.retainAll(zipCache.keys + zipInFlight + key)
             }
+            created
         } ?: return notFound()
-        appendLog("ZIP CREATED: $folderName.zip (${Formats.bytes(total)})")
-        return streamMedia(
+        val fsSkipped = zipWrittenCounts[key]?.second ?: 0
+        appendLog(
+            "ZIP CREATED: $folderName.zip (${Formats.bytes(total)})" +
+                if (fsSkipped > 0) " — $fsSkipped skipped" else ""
+        )
+        val response = streamMedia(
             name = "$folderName.zip",
             mime = "application/zip",
             input = input,
@@ -1851,6 +1861,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             rangeHeader = session.headers["range"] ?: session.headers["Range"],
             download = true
         )
+        if (fsSkipped > 0) response.addHeader("X-Zip-Skipped", fsSkipped.toString())
+        return response
     }
 
     /** ZIP folder/daftar token dibuat sekali lalu dipakai ulang dalam 60 detik.

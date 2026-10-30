@@ -339,8 +339,10 @@ object ZipCreator {
         }
     }
 
-    fun zipMedia(zos: ZipOutputStream, relative: String, context: Context) {
-        if (Build.VERSION.SDK_INT < 29) return
+    // Mengembalikan (entri tertulis, entri terlewat) seperti zipFile
+    // agar fsZip bisa melaporkan isi arsipnya dengan jujur (issue #886).
+    fun zipMedia(zos: ZipOutputStream, relative: String, context: Context): Pair<Int, Int> {
+        if (Build.VERSION.SDK_INT < 29) return 0 to 0
         val base = relative.trim('/')
         val folder = base + "/"
         val resolver = context.contentResolver
@@ -366,6 +368,8 @@ object ZipCreator {
         // dan ter-cache 60 detik. Folder yang sungguh kosong tetap sah
         // (query sukses, nol baris cocok).
         var queryFailed = false
+        var written = 0
+        var skipped = 0
         val outcome = runCatching {
             val cursor = try {
                 resolver.query(
@@ -382,7 +386,12 @@ object ZipCreator {
                 val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val iRel = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
                 while (c.moveToNext()) {
-                    if (!budget.tryTake()) break
+                    if (!budget.tryTake()) {
+                        // Baris ini dan sisanya tak terkunjungi:
+                        // terhitung terlewat (selaras issue #884).
+                        if (c.count > 0) skipped += c.count - c.position
+                        break
+                    }
                     val relPath = c.getString(iRel) ?: continue
                     val name = c.getString(iName) ?: continue
                     if (!relPath.startsWith(folder)) continue
@@ -392,20 +401,26 @@ object ZipCreator {
                     val entry = uniqueZipName(rawEntry, used)
                     // Gagal MEMBUKA entri = entri terlewat (selaras
                     // issue #857); gagal MENYALIN di tengah tetap fatal.
-                    runCatching {
+                    val input = runCatching {
                         resolver.openInputStream(
                             ContentUris.withAppendedId(collection, c.getLong(iId))
                         )
-                    }.getOrNull()?.use { input ->
-                        // Tanpa runCatching: stream MediaStore yang putus
-                        // di tengah tidak boleh memfinalkan entri
-                        // terpotong sebagai berkas utuh (issue #846).
-                        zos.putNextEntry(ZipEntry(entry))
-                        try {
-                            input.copyTo(zos, IO_BUF)
-                        } finally {
-                            runCatching { zos.closeEntry() }
+                    }.getOrNull()
+                    if (input == null) {
+                        skipped++
+                    } else {
+                        input.use {
+                            // Tanpa runCatching: stream MediaStore yang putus
+                            // di tengah tidak boleh memfinalkan entri
+                            // terpotong sebagai berkas utuh (issue #846).
+                            zos.putNextEntry(ZipEntry(entry))
+                            try {
+                                it.copyTo(zos, IO_BUF)
+                            } finally {
+                                runCatching { zos.closeEntry() }
+                            }
                         }
+                        written++
                     }
                 }
             }
@@ -420,5 +435,6 @@ object ZipCreator {
         // #858 lewat pintu lain. Lewati-entri yang disengaja (gagal
         // buka per entri) sudah terbungkus runCatching di dalam blok.
         outcome.exceptionOrNull()?.let { throw it }
+        return written to skipped
     }
 }
