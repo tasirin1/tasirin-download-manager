@@ -166,7 +166,8 @@
     <string name="location_label">Location: %1$s</string>
     <string name="location_media_store">MediaStore / Custom folder</string>
     <string name="location_internal">App internal storage</string>
-    <string name="settings_pin_hint">PIN — leave empty to keep current; enter a new PIN to change it</string>
+    <string name="settings_pin_hint">PIN — leave empty to keep current; a new PIN needs at least 4 characters</string>
+    <string name="settings_pin_too_short">PIN too short — use at least 4 characters; other settings were saved</string>
     <string name="settings_pin_remove">Remove PIN</string>
     <string name="pause_all">Pause all</string>
     <string name="resume_all">Resume all</string>

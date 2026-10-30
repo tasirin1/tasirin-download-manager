@@ -1047,13 +1047,20 @@ class SettingsActivity : AppCompatActivity() {
             App.httpServer.invalidateFsRootsCache()
             App.httpServer.invalidateStatusCache()
             val newPin = binding.inputPin.text?.toString()?.trim().orEmpty()
+            // Panjang minimum PIN (issue #903): PIN 1-3 karakter
+            // memberi perlindungan praktis nol untuk server berakses
+            // berkas (lockout login 5x/30 dtk tak menolong pada ruang
+            // tebak sekecil itu). Terlalu pendek = bagian PIN dilewati
+            // seperti port tak sah (#547), bagian lain tetap tersimpan
+            // dan toast akhir menyebut bagian yang belum tersimpan.
+            val pinTooShort = newPin.isNotEmpty() && newPin.length < MIN_SERVER_PIN_LENGTH
             // PBKDF2 150k iterasi berat di HP lama: hash/verify di IO agar save tak jank.
             // (Tombol nonaktif + re-enable dijamin wireSave via try/finally.)
             // Field kosong = PERTAHANKAN PIN lama (issue #383): field ini
             // selalu kosong saat layar dibuka, jadi meneruskan kekosongan
             // ke setServerPin menghapus PIN pada setiap Simpan yang tak
             // terkait. Penghapusan hanya lewat tombol Remove PIN eksplisit.
-            val pinEvent = if (newPin.isEmpty()) {
+            val pinEvent = if (newPin.isEmpty() || pinTooShort) {
                 null
             } else {
                 withContext(Dispatchers.IO) {
@@ -1072,7 +1079,9 @@ class SettingsActivity : AppCompatActivity() {
             }
             if (pinEvent != null) App.logEvent(pinEvent)
             // PIN tidak boleh tertinggal terlihat di field setelah disimpan.
-            binding.inputPin.setText("")
+            // PIN yang ditolak (terlalu pendek) justru dipertahankan di
+            // field agar pengguna bisa memperpanjangnya (#903).
+            if (!pinTooShort) binding.inputPin.setText("")
             if (StoragePrefs.isPinEnforced(this) &&
                 StoragePrefs.getServerPin(this).isNullOrEmpty()
             ) {
@@ -1111,6 +1120,8 @@ class SettingsActivity : AppCompatActivity() {
             renderServer()
             if (portInvalid) {
                 Toast.makeText(this, R.string.settings_port_invalid, Toast.LENGTH_LONG).show()
+            } else if (pinTooShort) {
+                Toast.makeText(this, R.string.settings_pin_too_short, Toast.LENGTH_LONG).show()
             } else {
                 Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
             }
@@ -1246,6 +1257,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val MIN_SERVER_PIN_LENGTH = 4
         private val PART_PATTERN = Regex("\\.part(\\.\\d+)?$")
     }
 }
