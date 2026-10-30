@@ -6954,30 +6954,46 @@ let socialPlatform = '';  // 'youtube' | 'social' | ''
 let socialVideoOptions = [];  // [{label, url, ...}]
 let socialPhotoOptions = [];  // [{label, url, ...}]
 
+// Host persis atau subdomain sah dari domain (issue #784): pencocokan
+// substring atas URL utuh sebelumnya membuat domain mirip
+// (notyoutube.com, phoenix.com yang mengandung "x.com/") dan URL yang
+// path/query-nya memuat teks domain lain salah dikenali sebagai sosial.
+// socialHost() yang sama dipakai socialFavicon.
+function socialHostMatches(h, domain) {
+  return h === domain || h.endsWith('.' + domain);
+}
 function isSocialUrl(u) {
-  var l = u.toLowerCase();
-  if (l.indexOf('cdninstagram.com') !== -1) return false;
-  if (l.indexOf('tiktokcdn.com') !== -1) return false;
-  return l.indexOf('tiktok.com/') !== -1 ||
-    l.indexOf('instagram.com/p/') !== -1 || l.indexOf('instagram.com/reel/') !== -1 ||
-    l.indexOf('instagram.com/tv/') !== -1 || l.indexOf('instagr.am/') !== -1 ||
-    l.indexOf('twitter.com/') !== -1 || l.indexOf('x.com/') !== -1 ||
-    l.indexOf('youtube.com/') !== -1 || l.indexOf('youtu.be/') !== -1 ||
-    l.indexOf('xvideos.com/') !== -1 || l.indexOf('xnxx.com/') !== -1 || l.indexOf('xnxxvideos.me/') !== -1 || l.indexOf('pornhub.com/') !== -1 || l.indexOf('pornhubpremium.com/') !== -1 ||
-    // audit-ignore-next: maintenance_marker (nama domain resmi situs, bukan marker)
-    l.indexOf('hentaihaven.xxx/') !== -1;
+  var h = socialHost(u);
+  if (!h) return false;
+  // CDN berkas langsung bukan halaman sosial.
+  if (socialHostMatches(h, 'cdninstagram.com') || socialHostMatches(h, 'tiktokcdn.com')) return false;
+  if (socialHostMatches(h, 'tiktok.com')) return true;
+  if (socialHostMatches(h, 'instagram.com') || h === 'instagr.am') {
+    var p = '';
+    try { p = new URL(u).pathname; } catch (e) {}
+    return p.indexOf('/p/') === 0 || p.indexOf('/reel/') === 0 || p.indexOf('/tv/') === 0;
+  }
+  if (socialHostMatches(h, 'twitter.com') || socialHostMatches(h, 'x.com')) return true;
+  if (socialHostMatches(h, 'youtube.com') || h === 'youtu.be') return true;
+  if (socialHostMatches(h, 'xvideos.com')) return true;
+  if (socialHostMatches(h, 'xnxx.com') || h === 'xnxxvideos.me') return true;
+  if (socialHostMatches(h, 'pornhub.com') || h === 'pornhubpremium.com') return true;
+  // audit-ignore-next: maintenance_marker (nama domain resmi situs, bukan marker)
+  if (h === 'hentaihaven.xxx') return true;
+  return false;
 }
 
 function socialPlatformLabel(u) {
-  if (u.indexOf('youtube.com/') !== -1 || u.indexOf('youtu.be/') !== -1) return 'YouTube';
-  if (u.indexOf('tiktok.com/') !== -1 || u.indexOf('douyin.com') !== -1) return 'TikTok';
-  if (u.indexOf('instagram.com') !== -1 || u.indexOf('instagr.am') !== -1) return 'Instagram';
-  if (u.indexOf('twitter.com') !== -1 || u.indexOf('x.com') !== -1) return 'X';
-  if (u.indexOf('xvideos.com/') !== -1) return 'XVideos';
-  if (u.indexOf('xnxx.com/') !== -1 || u.indexOf('xnxxvideos.me/') !== -1) return 'XNXX';
-  if (u.indexOf('pornhub.com/') !== -1 || u.indexOf('pornhubpremium.com/') !== -1) return 'Pornhub';
+  var h = socialHost(u);
+  if (socialHostMatches(h, 'youtube.com') || h === 'youtu.be') return 'YouTube';
+  if (socialHostMatches(h, 'tiktok.com') || socialHostMatches(h, 'douyin.com')) return 'TikTok';
+  if (socialHostMatches(h, 'instagram.com') || h === 'instagr.am') return 'Instagram';
+  if (socialHostMatches(h, 'twitter.com') || socialHostMatches(h, 'x.com')) return 'X';
+  if (socialHostMatches(h, 'xvideos.com')) return 'XVideos';
+  if (socialHostMatches(h, 'xnxx.com') || h === 'xnxxvideos.me') return 'XNXX';
+  if (socialHostMatches(h, 'pornhub.com') || h === 'pornhubpremium.com') return 'Pornhub';
   // audit-ignore-next: maintenance_marker (nama domain resmi situs, bukan marker)
-  if (u.indexOf('hentaihaven.xxx/') !== -1) return 'HentaiHaven';
+  if (h === 'hentaihaven.xxx') return 'HentaiHaven';
   return 'Social media';
 }
 function platformBadgeKey(label) {
