@@ -663,7 +663,11 @@ class SettingsActivity : AppCompatActivity() {
                 StoragePrefs.setServerBackgroundEnabled(this, false)
                 StoragePrefs.setServerAutoStartEnabled(this, false)
                 lifecycleScope.launch {
-                    withContext(Dispatchers.IO) { App.stopHttpServer() }
+                    // NonCancellable (issue #832, kelas #823): pref sudah
+                    // terlanjur berubah di atas; stop yang terbatalkan di
+                    // titik suspensi meninggalkan server menyala melawan
+                    // pref + PIN wajib tanpa PIN.
+                    withContext(NonCancellable + Dispatchers.IO) { App.stopHttpServer() }
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
                         stopServiceIfIdle()
                         renderServer()
@@ -715,7 +719,10 @@ class SettingsActivity : AppCompatActivity() {
                 ) {
                     StoragePrefs.setServerBackgroundEnabled(this@SettingsActivity, false)
                     StoragePrefs.setServerAutoStartEnabled(this@SettingsActivity, false)
-                    withContext(Dispatchers.IO) { App.stopHttpServer() }
+                    // NonCancellable (issue #832, kelas #823): PIN sudah
+                    // terhapus dan pref sudah mati di atas; stop yang
+                    // terbatalkan membuat server berjalan terbuka.
+                    withContext(NonCancellable + Dispatchers.IO) { App.stopHttpServer() }
                     stopServiceIfIdle()
                 }
                 renderServer()
