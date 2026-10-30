@@ -657,9 +657,16 @@ class FileSaver(context: Context) {
         publishFileIntoDir(partial, dir, fileName)
     }.getOrNull()
 
-    fun freeBytes(): Long = runCatching {
+    fun freeBytes(): Long = freeBytesOrNull() ?: 0L
+
+    /** Null bila StatFs gagal dibaca (issue #810): pemanggil yang
+     *  menjaga unduhan BERJALAN harus bisa membedakan 'ruang habis'
+     *  dari 'tidak tahu', agar glitch sesaat tak terbaca sebagai ruang
+     *  0 dan membatalkan unduhan sehat. Pemanggil pra-terbang tetap
+     *  memakai freeBytes() yang gagal-tertutup (0). */
+    fun freeBytesOrNull(): Long? = runCatching {
         StatFs(downloadDir.absolutePath).availableBytes
-    }.getOrDefault(0L)
+    }.getOrNull()
 
     fun destinationFreeBytes(folderPath: String = ""): Long {
         // Partial download ditulis di downloadDir internal dan tmp upload di

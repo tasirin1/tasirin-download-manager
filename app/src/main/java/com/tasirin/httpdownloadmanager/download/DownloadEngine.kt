@@ -3688,8 +3688,13 @@ class DownloadEngine(appContext: Context) {
                     // overrun ditoleransi verifySize, jadi loop menulis
                     // sampai disk benar-benar habis. Pola pra-terbang HLS:
                     // berhenti begitu ruang volume partial menyentuh cadangan.
-                    val freeNow = saver.freeBytes()
-                    if (freeNow < MIN_FREE_BYTES) {
+                    // freeBytesOrNull (issue #810): kegagalan StatFs
+                    // sesaat tak boleh terbaca ruang 0 — unduhan sehat
+                    // bisa dibatalkan palsu 'Storage almost full'.
+                    // Baca gagal = lewati cek tick ini; kesalahan tulis
+                    // sungguhan tetap muncul dari jalur tulisnya sendiri.
+                    val freeNow = saver.freeBytesOrNull()
+                    if (freeNow != null && freeNow < MIN_FREE_BYTES) {
                         throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
                     }
                     val (speed, eta) = speedTracker.sample(item.id, downloaded, total)
