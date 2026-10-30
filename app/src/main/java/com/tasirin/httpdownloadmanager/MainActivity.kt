@@ -2134,10 +2134,18 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     companion object {
         private const val STATE_PENDING_MOVE_ID = "state_pending_move_id"
         private val AUTO_OPEN_VIDEO_EXTS = setOf("mp4", "mkv", "webm", "ts", "avi", "mov", "flv")
-        private val URL_PATTERN = Regex("https?://[^\\s\"'<>]+")
+        // Tak peka huruf pada skema (issue #1014): gerbang engine sendiri
+        // menerima skema tak peka huruf, jadi URL tempelan HTTPS:// yang
+        // sah tidak boleh gugur di ekstraktor ini.
+        private val URL_PATTERN = Regex("https?://[^\\s\"'<>]+", RegexOption.IGNORE_CASE)
         private fun extractUrls(text: String): List<String> =
             URL_PATTERN.findAll(text)
-                .map { it.value.trimEnd(',', ';', ':', ')', ']', '}', '"', '\'', '>', '.', '\u2019', '\u201d', '\u2026') }
+                .map { match ->
+                    val trimmed = match.value.trimEnd(',', ';', ':', ')', ']', '}', '"', '\'', '>', '.', '\u2019', '\u201d', '\u2026')
+                    // Skema dinormalisasi huruf kecil; host/jalur utuh.
+                    val sep = trimmed.indexOf("://")
+                    if (sep > 0) trimmed.substring(0, sep).lowercase() + trimmed.substring(sep) else trimmed
+                }
                 .filter { it.startsWith("http://") || it.startsWith("https://") }
                 .distinct()
                 .toList()

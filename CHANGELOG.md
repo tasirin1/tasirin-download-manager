@@ -667,6 +667,7 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(ui): ekstraktor URL native kini menerima skema tak peka huruf** -- Regex URL dialog tambah sebelumnya peka huruf dan filternya hanya menerima skema huruf kecil, sehingga URL sah berskema HTTPS:// yang ditempel/dibagikan gugur diam-diam (atau memicu toast 'URL must not be empty' yang salah) padahal gerbang engine sendiri menerimanya — kelas yang sama dengan #930 di sisi web. Pola kini IGNORE_CASE dan skema hasil dinormalisasi huruf kecil, dibuktikan port 1:1 (issue #1014).
 - **fix(ui): spinner User-Agent tak lagi merebut fokus saat Settings dibuka** -- dengan UA kustom tersimpan, callback seleksi awal listener masuk cabang Custom dan memanggil requestFocus pada kolom kustom, memindahkan fokus (dan berpotensi memunculkan keyboard) tanpa pengguna menyentuh apa pun. Callback pertama kini hanya menampilkan kolom; requestFocus hanya untuk pilihan Custom yang benar-benar diketuk pengguna (issue #1013).
 
 - **fix(ui): toast kegagalan Move tak lagi menampilkan literal '%1$s'** -- string storage_picker_error memuat placeholder format, tetapi satu-satunya pemanggilnya memakai Toast.makeText ber-resource-id yang tidak melakukan substitusi, jadi pengguna melihat 'Failed to use folder: %1$s'. String kini tanpa placeholder (issue #1012).
