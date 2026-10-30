@@ -326,11 +326,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
         } catch (e: RejectedExecutionException) {
             appendLog("Server pool terminated, request rejected")
+            // Tutup koneksi juga di sini (issue #816): dua cabang error
+            // lain di serve() sudah menutupnya (#705/#782) — penolakan
+            // bisa datang sesudah body terbaca sebagian, dan menyisakan
+            // koneksi keep-alive terbuka membuka lagi desync yang sama.
             newFixedLengthResponse(
                 Response.Status.SERVICE_UNAVAILABLE,
                 "text/plain; charset=utf-8",
                 "Server restarting, try again"
-            )
+            ).closeConnection()
         } catch (_: BodyTooLargeException) {
             newFixedLengthResponse(
                 Response.Status.PAYLOAD_TOO_LARGE,
