@@ -95,6 +95,22 @@ class ZipCreatorTest {
     }
 
     @Test
+    fun `zip entry names never collide with literal suffixed names`() {
+        // Nilai harapan dibuktikan port Python 1:1 (issue #912): nama
+        // hasil dedupe ikut terdaftar sehingga berkas literal bernama
+        // "movie (1).mp4" tidak menghasilkan entri duplikat.
+        val used = mutableMapOf<String, Int>()
+        assertEquals("movie.mp4", ZipCreator.uniqueZipName("movie.mp4", used))
+        assertEquals("movie (1).mp4", ZipCreator.uniqueZipName("movie.mp4", used))
+        assertEquals("movie (1) (1).mp4", ZipCreator.uniqueZipName("movie (1).mp4", used))
+
+        val used2 = mutableMapOf<String, Int>()
+        assertEquals("movie (1).mp4", ZipCreator.uniqueZipName("movie (1).mp4", used2))
+        assertEquals("movie.mp4", ZipCreator.uniqueZipName("movie.mp4", used2))
+        assertEquals("movie (2).mp4", ZipCreator.uniqueZipName("movie.mp4", used2))
+    }
+
+    @Test
     fun `recursive zip deduplicates normalized entry names`() {
         val root = temp.newFolder("dup")
         // Dua nama berbeda yang ternormalisasi sama (kontrol C0 -> '_'):

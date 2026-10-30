@@ -332,12 +332,28 @@ object ZipCreator {
         used[base] = count + 1
         if (count == 0) return base
         val dot = base.lastIndexOf('.')
-        return if (dot > 0) {
-            base.substring(0, dot) + " ($count)" + base.substring(dot)
-        } else {
-            "$base ($count)"
+        // Nama HASIL wajib ikut terdaftar (issue #912): tanpa ini berkas
+        // literal bernama "movie (1).mp4" bertabrakan dengan hasil dedupe
+        // "movie.mp4" kedua, dan putNextEntry melempar duplicate entry
+        // yang menggagalkan seluruh ZIP. Nomor dinaikkan sampai kandidat
+        // benar-benar bebas; urutan tanpa tabrakan menghasilkan nama
+        // yang persis sama dengan perilaku lama.
+        var n = count
+        var candidate = suffixedZipName(base, dot, n)
+        while (used.getOrDefault(candidate, 0) > 0) {
+            n++
+            candidate = suffixedZipName(base, dot, n)
         }
+        used[candidate] = 1
+        return candidate
     }
+
+    private fun suffixedZipName(base: String, dot: Int, n: Int): String =
+        if (dot > 0) {
+            base.substring(0, dot) + " ($n)" + base.substring(dot)
+        } else {
+            "$base ($n)"
+        }
 
     // Mengembalikan (entri tertulis, entri terlewat) seperti zipFile
     // agar fsZip bisa melaporkan isi arsipnya dengan jujur (issue #886).
