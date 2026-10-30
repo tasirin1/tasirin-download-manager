@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(remote): kunci cache ZIP kini memuat cap isi sumber** -- kunci sebelumnya hanya path/daftar token, sehingga perubahan berkas dari luar aplikasi (aplikasi Files lain, USB, penulis lain di folder yang sama) tidak membatalkan cache dan ZIP basi tersaji sampai 60 detik. Kini kunci fsZip menempelkan cap stat sumber (jalan kaki rekursif terbatas ukuran+mtime untuk filesystem; agregat jumlah/jumlah ukuran/mtime terbesar MediaStore untuk folder media), kunci mediaZip menempelkan cap per token, dan parser invalidasi terarah memotong segmen cap sebelum menafsirkan kunci sebagai path (issue #961).
+
 - **fix(download): niat terakhir pengguna menang pada antrean aksi tertunda muatan awal** -- deferUntilLoaded sebelumnya membuang pendaftaran ulang kunci yang masih mengantre, sehingga pola ketuk Jeda-Lanjut-Jeda pada notifikasi selama cold start berakhir Lanjut (berlawanan dengan ketukan terakhir). Kini entri lama berkunci sama dibuang dan pendaftaran baru masuk di ekor antrean; penggabungan panggilan identik beruntun tetap terjaga (issue #960).
 
 - **fix(download): klasifikasi lambat/macet kini ikut tergerbang outage lokal** -- gerbang #952 sebelumnya hanya menahan error connect; pesan 'connection stalled'/'speed too low' dari watchdog tidak memuat substring connect mana pun, sehingga pada jaringan menetes (bendera konektivitas sudah turun tetapi byte sesekali masih lolos) failover mirror tetap berjalan dan menghapus partial. Kini slowRejected ikut ditahan saat jaringan perangkat turun; perilaku saat jaringan naik tidak berubah (issue #959).

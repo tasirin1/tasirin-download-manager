@@ -1822,13 +1822,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // beda huruf) harus berbagi satu entri dan cocok dengan
         // perbandingan invalidasi terarah — kunci mentah membuat entri
         // varian lolos terbuang dan ZIP basi tersaji (issue #675).
+        // Cap sumber menempel di ekor kunci (issue #961): perubahan
+        // EKSTERNAL (aplikasi lain/USB) tak melewati invalidasi server,
+        // jadi kunci path saja menyajikan ZIP basi sampai TTL 60 detik.
+        // Parser kunci di invalidateZipCacheFor memotong segmen ini.
         val key = if (raw.startsWith(MS_PREFIX)) {
-            "fs:" + raw
+            "fs:" + raw + "|s:" + zipMediaFolderStamp(raw.removePrefix(MS_PREFIX))
         } else {
             val canon = runCatching {
                 File(raw.removePrefix(FS_PREFIX)).canonicalPath
             }.getOrNull()
-            if (canon != null) "fs:" + FS_PREFIX + canon else "fs:" + raw
+            val base = if (canon != null) "fs:" + FS_PREFIX + canon else "fs:" + raw
+            base + "|s:" + zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
         }
         val (input, total) = openZipStream(key) {
             val created = createTempZip { zos ->
@@ -1917,6 +1922,121 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return input to total
         }
         return null
+    }
+
+    /** Satu langkah lipat hash FNV-1a 64 untuk cap sumber ZIP. */
+    private fun zipStampFold(hash: Long, text: String): Long {
+        var h = hash
+        for (ch in text) {
+            h = h xor ch.code.toLong()
+            h *= 1099511628211L
+        }
+        return h
+    }
+
+    /** Cap isi sumber ZIP filesystem (issue #961): berkas tunggal =
+     *  ukuran+mtime; folder = lipatan (path, ukuran, mtime) seluruh isi
+     *  yang terjangkau jalan kaki rekursif terbatas, dengan himpunan
+     *  kanonik anti-putaran symlink seperti zipFile. Jalan kaki stat
+     *  murni (tanpa baca isi) — jauh lebih murah daripada membuat ZIP,
+     *  dan pada cache-hit ia menggantikan pembuatan ulang itu. */
+    private fun zipFsSourceStamp(root: File): String {
+        if (root.isFile) return "f" + root.length() + ":" + root.lastModified()
+        if (!root.isDirectory) return "none"
+        var hash = -3750763034362895579L
+        var count = 0
+        var truncated = false
+        val seen = mutableSetOf<String>()
+        val stack = ArrayDeque<File>()
+        stack.add(root)
+        while (stack.isNotEmpty() && !truncated) {
+            val dir = stack.removeLast()
+            val canon = runCatching { dir.canonicalPath }.getOrNull() ?: dir.absolutePath
+            if (!seen.add(canon)) continue
+            val children = dir.listFiles() ?: continue
+            for (child in children) {
+                if (count >= ZIP_STAMP_MAX_ENTRIES) {
+                    truncated = true
+                    break
+                }
+                count++
+                hash = zipStampFold(hash, child.absolutePath)
+                hash = zipStampFold(hash, child.length().toString())
+                hash = zipStampFold(hash, child.lastModified().toString())
+                if (child.isDirectory) stack.add(child)
+            }
+        }
+        return "d" + count + ":" + hash + ":" + (if (truncated) "t" else "c") +
+            ":" + root.lastModified()
+    }
+
+    /** Cap sumber satu URI media (issue #961): SIZE + DATE_MODIFIED
+     *  dari provider; kolom tak tersedia menghasilkan nilai stabil -1
+     *  (cap melemah untuk token itu, cache tetap berguna). */
+    private fun zipUriSourceStamp(uri: android.net.Uri): String = runCatching {
+        val projection = arrayOf(
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.DATE_MODIFIED
+        )
+        context.contentResolver.query(uri, projection, null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                val iSize = c.getColumnIndex(MediaStore.MediaColumns.SIZE)
+                val iMod = c.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED)
+                val size = if (iSize >= 0) {
+                    runCatching { c.getLong(iSize) }.getOrDefault(-1L)
+                } else {
+                    -1L
+                }
+                val mod = if (iMod >= 0) {
+                    runCatching { c.getLong(iMod) }.getOrDefault(-1L)
+                } else {
+                    -1L
+                }
+                "u$size:$mod"
+            } else {
+                "u-missing"
+            }
+        } ?: "u-null"
+    }.getOrDefault("u-err")
+
+    /** Cap sumber folder MediaStore (issue #961): jumlah baris +
+     *  jumlah SIZE + DATE_MODIFIED terbesar di bawah folder, dari satu
+     *  kueri dengan seleksi LIKE yang sama seperti zipMedia.
+     *  Granularitas DATE_MODIFIED detik: perubahan isi berukuran sama
+     *  dalam detik yang sama masih bisa lolos — jendela basi menyusut
+     *  dari 60 detik menjadi sekitar satu detik. */
+    private fun zipMediaFolderStamp(relative: String): String {
+        if (Build.VERSION.SDK_INT < 29) return "pre29"
+        val base = relative.trim('/')
+        val folder = base + "/"
+        val collection = MediaLibrary.mediaCollectionForRoot(base)
+        val projection = arrayOf(
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.DATE_MODIFIED
+        )
+        val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? ESCAPE '\\'"
+        val args = arrayOf(ServerSecurity.escapeLike(folder) + "%")
+        return runCatching {
+            context.contentResolver.query(collection, projection, selection, args, null)
+                ?.use { c ->
+                    val iSize = c.getColumnIndex(MediaStore.MediaColumns.SIZE)
+                    val iMod = c.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED)
+                    var count = 0
+                    var sum = 0L
+                    var maxMod = 0L
+                    while (c.moveToNext()) {
+                        count++
+                        if (iSize >= 0) {
+                            sum += runCatching { c.getLong(iSize) }.getOrDefault(0L)
+                        }
+                        if (iMod >= 0) {
+                            val m = runCatching { c.getLong(iMod) }.getOrDefault(0L)
+                            if (m > maxMod) maxMod = m
+                        }
+                    }
+                    "m$count:$sum:$maxMod"
+                } ?: "m-null"
+        }.getOrDefault("m-err")
     }
 
     private fun zipCached(key: String, create: () -> File?): File? {
@@ -2075,7 +2195,19 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         val tokens = (requestedTokens.filter(::isMediaTokenAllowed) + pathTokens).distinct()
         if (tokens.isEmpty()) return notFound()
-        val key = "tokens:" + tokens.sorted().joinToString(",")
+        // Cap sumber per token (issue #961), dilipat dalam urutan
+        // terurut yang sama dengan kunci agar deterministik.
+        val sortedTokens = tokens.sorted()
+        val tokenStamp = sortedTokens.joinToString(";") { token ->
+            when {
+                token.startsWith(FS_PREFIX) ->
+                    zipFsSourceStamp(File(token.removePrefix(FS_PREFIX)))
+                token.startsWith("u:") ->
+                    zipUriSourceStamp(token.removePrefix("u:").toUri())
+                else -> "x"
+            }
+        }
+        val key = "tokens:" + sortedTokens.joinToString(",") + "|s:" + tokenStamp
         val (input, total) = openZipStream(key) {
             val created = createTempZip { zos ->
                 val r = ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
@@ -2609,7 +2741,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return
         }
         val doomed = zipCache.entries.filter { (key, _) ->
-            val raw = key.removePrefix("fs:")
+            // Potong segmen cap sumber #961 di ekor kunci sebelum
+            // sisa kunci ditafsirkan sebagai path.
+            val raw = key.removePrefix("fs:").substringBefore("|s:")
             if (!raw.startsWith(FS_PREFIX)) return@filter false
             val folder = raw.removePrefix(FS_PREFIX).trimEnd('/')
             // folder == publishedFilePath menangkap ZIP SATU-BERKAS: kunci
@@ -4308,6 +4442,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // Ukuran chunk protokol upload klien (remote.src.html UPLOAD_CHUNK = 2MB).
         // Offset kini wajib eksplisit dari klien; konstanta dihapus agar tak unused.
         private const val ZIP_CACHE_TTL_MS = 60_000L
+        private const val ZIP_STAMP_MAX_ENTRIES = 8192
         private const val ZIP_CACHE_MAX = 8
         private const val ZIP_CACHE_MAX_BYTES = 256L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
