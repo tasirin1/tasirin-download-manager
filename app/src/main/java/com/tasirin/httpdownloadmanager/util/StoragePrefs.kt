@@ -508,11 +508,15 @@ object StoragePrefs {
             ?: emptyList()
 
     fun notePendingMediaStoreRow(context: Context, uri: String) {
-        val entries = pendingMediaStoreRowEntries(context)
-        if (entries.any { it.substringBefore('|') == uri }) return
+        // Entri yang sudah ada DITIMPA cap waktunya, bukan dipertahankan
+        // (issue #745): umur sapuan harus mengukur aktivitas tulis
+        // terakhir, bukan insert pertama — penulis yang masih aktif
+        // menyegarkan catatan ini berkala lewat aliran tulisnya.
+        val kept = pendingMediaStoreRowEntries(context)
+            .filterNot { it.substringBefore('|') == uri }
         val entry = uri + "|" + System.currentTimeMillis()
         prefs(context).edit {
-            putString(KEY_PENDING_MEDIASTORE_ROWS, (entries + entry).joinToString("\n"))
+            putString(KEY_PENDING_MEDIASTORE_ROWS, (kept + entry).joinToString("\n"))
         }
     }
 

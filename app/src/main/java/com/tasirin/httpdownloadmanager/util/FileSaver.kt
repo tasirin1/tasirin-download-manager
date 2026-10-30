@@ -16,6 +16,7 @@ import java.io.File
 import java.io.IOException
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.FilterOutputStream
 import java.io.OutputStream
 
 class FileSaver(context: Context) {
@@ -304,8 +305,31 @@ class FileSaver(context: Context) {
         // sweepStalePendingMediaStoreRows pada bersih-bersih berikutnya.
         StoragePrefs.notePendingMediaStoreRow(appContext, uri.toString())
         try {
-            resolver.openOutputStream(uri)?.use { out -> writer(out) }
+            val rawOut = resolver.openOutputStream(uri)
                 ?: throw IOException("Failed to open MediaStore output")
+            // Bungkus aliran tulis: segarkan cap waktu catatan pending
+            // berkala (maks tiap 30 menit) agar sapuan menghitung umur
+            // dari aktivitas tulis terakhir — unggahan raksasa yang
+            // menulis > 2 jam tidak dihapus di tengah jalan (issue #745).
+            val out = object : FilterOutputStream(rawOut) {
+                private var lastRefresh = System.currentTimeMillis()
+                private fun refreshIfDue() {
+                    val now = System.currentTimeMillis()
+                    if (now - lastRefresh >= 30L * 60 * 1000) {
+                        lastRefresh = now
+                        StoragePrefs.notePendingMediaStoreRow(appContext, uri.toString())
+                    }
+                }
+                override fun write(b: Int) {
+                    super.write(b)
+                    refreshIfDue()
+                }
+                override fun write(b: ByteArray, off: Int, len: Int) {
+                    super.write(b, off, len)
+                    refreshIfDue()
+                }
+            }
+            out.use { writer(it) }
             values.clear()
             values.put(MediaStore.Downloads.IS_PENDING, 0)
             // Hasil update WAJIB diperiksa (issue #491): update yang
@@ -340,6 +364,8 @@ class FileSaver(context: Context) {
      *  pernah diterbitkan karena proses mati di tengah tulis. Hanya entri
      *  tercatat yang disentuh, dan hanya yang berumur > 2 jam (samakan
      *  ambang sapuan partial) agar tulis yang sedang berjalan tak diganggu.
+     *  Umur diukur dari aktivitas tulis terakhir: penulis menyegarkan
+     *  cap catatannya berkala selama menulis (issue #745).
      *  Baris yang sudah terbit/hilang cukup dilupakan dari catatan. */
     private fun sweepStalePendingMediaStoreRows() {
         if (Build.VERSION.SDK_INT < 29) return
@@ -357,7 +383,13 @@ class FileSaver(context: Context) {
                 )?.use { c ->
                     if (c.moveToFirst()) stillPending = c.getInt(0) == 1
                 }
-                if (stillPending) resolver.delete(uri, null, null)
+                if (stillPending) {
+                    // Hapus bersyarat dalam satu panggilan: baris yang
+                    // diterbitkan (IS_PENDING=0) tepat di celah antara
+                    // query di atas dan delete ini tidak ikut terhapus
+                    // (issue #745).
+                    resolver.delete(uri, MediaStore.Downloads.IS_PENDING + "=1", null)
+                }
                 // Terbit, tersapu, atau memang sudah hilang: catatan selesai.
                 StoragePrefs.forgetPendingMediaStoreRow(appContext, uriStr)
             }
