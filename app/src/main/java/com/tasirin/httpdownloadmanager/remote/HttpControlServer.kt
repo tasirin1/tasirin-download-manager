@@ -760,7 +760,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun logout(): Response {
         // Logout merotasi secret sesi = mutasi state, jadi ikut
         // ditahan mode read-only (issue #694).
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
         appendLog("LOGOUT")
         StoragePrefs.rotateServerSessionSecret(context)
         synchronized(sessionSecretLock) { cachedSessionSecret = null }
@@ -1067,7 +1067,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // sebelumnya hanya upload dan fs_action yang mengecek, jadi
         // tambah/aksi unduhan, share, dan logout lolos. Nama setelannya
         // "Read-only server": tak ada perubahan state apa pun.
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
         val params = readForm(session)
         val url = params["url"]?.trim().orEmpty()
         if (url.isEmpty()) {
@@ -2003,7 +2003,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
 
     private fun runAction(session: IHTTPSession): Response {
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
         val params = readForm(session)
         val id = params["id"].orEmpty()
         // Aksi no-op (id tak dikenal / state tak cocok / rename gagal) dibalas
@@ -3770,7 +3770,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // ---------- Berbagi file via tautan sementara ----------
 
     private fun createShare(session: IHTTPSession): Response {
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
         val params = readForm(session)
         val id = params["id"].orEmpty()
         val item = App.engine.items.value.find {
@@ -3809,7 +3809,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  menunggu kedaluwarsa 24 jam. Token adalah rahasia pembawa —
      *  jangan dicatat ke log. */
     private fun revokeShare(session: IHTTPSession): Response {
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
         val params = readForm(session)
         val token = params["token"].orEmpty()
         if (token.isEmpty()) {
@@ -3847,7 +3847,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  Id yang cocok ke lebih dari satu token ditolak (tabrakan hash
      *  tak boleh mencabut tautan yang salah). */
     private fun revokeShareById(session: IHTTPSession): Response {
-        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied()
+        if (StoragePrefs.isServerReadOnly(context)) return readOnlyDenied().closeConnection()
         val params = readForm(session)
         val sid = params["sid"].orEmpty()
         if (sid.isEmpty()) {
