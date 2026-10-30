@@ -7406,8 +7406,12 @@ async function pollSnapshot() {
     failCount++;
     // Server tak terjangkau lewat polling juga: catat sebagai bukti
     // putus agar snapshot sukses berikutnya boleh menghidupkan SSE
-    // yang give-up (issue #785).
-    sseOutageSeen = true;
+    // yang give-up (issue #785). Bukti putus mensyaratkan DUA
+    // kegagalan BERURUTAN (issue #821): satu timeout/500 sesaat saat
+    // server sibuk bukanlah putus, dan menganggapnya putus membuka
+    // lagi siklus reconnect SSE yang hendak ditutup #785 — hanya
+    // berirama lebih lambat. failCount direset tiap snapshot sukses.
+    if (failCount >= 2) sseOutageSeen = true;
     if (failCount > 2) {
       statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
     }

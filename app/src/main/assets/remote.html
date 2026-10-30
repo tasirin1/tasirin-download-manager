@@ -4651,7 +4651,7 @@ updateToolbar(items);
 }
 } catch (e) {
 failCount++;
-sseOutageSeen = true;
+if (failCount >= 2) sseOutageSeen = true;
 if (failCount > 2) {
 statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
 }
