@@ -2140,6 +2140,25 @@
 
 const API = '';
 
+// Pemulihan fokus sesudah permukaan ditutup (issue #947): permukaan
+// (sheet/modal) memindahkan fokus ke dalam saat dibuka; tanpa
+// pemulihan, fokus jatuh ke body saat elemen terfokus menjadi
+// display:none dan navigasi D-pad/Tab mulai lagi dari awal dokumen.
+// Tumpukan agar permukaan bersarang (sheet -> dialog) tertib.
+const returnFocusStack = [];
+function pushReturnFocus() {
+  const el = document.activeElement;
+  returnFocusStack.push((el && el !== document.body) ? el : null);
+}
+function popReturnFocus() {
+  const el = returnFocusStack.pop();
+  if (el && document.contains(el)) {
+    try { el.focus({ preventScroll: true }); } catch (err) {
+      try { el.focus(); } catch (err2) {}
+    }
+  }
+}
+
 const UI_ICONS = {
   menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 8 16 8"/></svg>',
@@ -4452,6 +4471,7 @@ async function downloadZipWithProgress(url, label) {
   fsTaskCancelBtn.disabled = true;
 }
 function openFsSheet(it) {
+  if (fsSheet.classList.contains('hidden')) pushReturnFocus(); // #947
   document.getElementById('fsSheetTitle').textContent = it.name;
   const list = document.getElementById('fsSheetList');
   list.innerHTML = '';
@@ -4485,7 +4505,9 @@ function openFsSheet(it) {
   fsSheet.classList.remove('hidden');
 }
 function closeFsSheet() {
+  const wasHidden = fsSheet.classList.contains('hidden');
   fsSheet.classList.add('hidden');
+  if (!wasHidden) popReturnFocus(); // issue #947
 }
 document.getElementById('fsSheetCancel').addEventListener('click', closeFsSheet);
 fsSheet.addEventListener('click', function (e) {
@@ -4494,6 +4516,7 @@ fsSheet.addEventListener('click', function (e) {
 
 const itemSheet = document.getElementById('itemSheet');
 function openItemSheet(it) {
+  if (itemSheet.classList.contains('hidden')) pushReturnFocus(); // #947
   // Objek dari closure baris bisa basi (issue #593): structSig dan
   // penjaga baris tidak memuat speedLimitKbps/priority, jadi perubahan
   // kedua field itu tak mengganti closure — sheet membaca nilai lama
@@ -4630,7 +4653,9 @@ function openItemSheet(it) {
   itemSheet.classList.remove('hidden');
 }
 function closeItemSheet() {
+  const wasHidden = itemSheet.classList.contains('hidden');
   itemSheet.classList.add('hidden');
+  if (!wasHidden) popReturnFocus(); // issue #947
 }
 document.getElementById('itemSheetCancel').addEventListener('click', closeItemSheet);
 itemSheet.addEventListener('click', function (e) {
@@ -4722,6 +4747,7 @@ let movePickSeq = 0;
 const MOVE_PICK_MAX = 5000;
 
 function openMovePicker(items) {
+  if (moveModal.classList.contains('hidden')) pushReturnFocus(); // #947
   moveItems = items;
   const label = items.length === 1
     ? 'Destination for: ' + items[0].name
@@ -4733,7 +4759,9 @@ function openMovePicker(items) {
 }
 
 function closeMovePicker() {
+  const wasHidden = moveModal.classList.contains('hidden');
   moveModal.classList.add('hidden');
+  if (!wasHidden) popReturnFocus(); // issue #947
   moveItems = [];
   // Batalkan loop paginasi yang sedang berjalan (issue #656): tanpa
   // menaikkan nomor urut, pemeriksaan seq di movePickOpen tetap lolos
@@ -6883,10 +6911,18 @@ const confirmQueue = [];
 // dan belum terbaca — aktivasi Yes diabaikan dalam jendela singkat
 // sesudah dialog ditampilkan.
 let confirmShownAt = 0;
+let confirmFocusTransferred = false;
 function showConfirm(title, text, yesLabel, cb, opts) {
   if (!confirmModal.classList.contains('hidden')) {
     confirmQueue.push([title, text, yesLabel, cb, opts]);
     return;
+  }
+  // Issue #947: simpan pemicu — kecuali slot fokus dialihkan dari
+  // dialog sebelumnya dalam rantai antrean (hideConfirm).
+  if (confirmFocusTransferred) {
+    confirmFocusTransferred = false;
+  } else {
+    pushReturnFocus();
   }
   confirmShownAt = Date.now();
   document.getElementById('confirmTitle').textContent = title;
@@ -6908,7 +6944,14 @@ function hideConfirm() {
   confirmModal.classList.add('hidden');
   confirmCb = null;
   const next = confirmQueue.shift();
-  if (next) showConfirm(next[0], next[1], next[2], next[3], next[4]);
+  if (next) {
+    // Slot fokus pemicu dialihkan ke dialog berikutnya (issue #947):
+    // jangan pulihkan di tengah rantai antrean.
+    confirmFocusTransferred = true;
+    showConfirm(next[0], next[1], next[2], next[3], next[4]);
+  } else {
+    popReturnFocus();
+  }
 }
 document.getElementById('confirmNo').addEventListener('click', hideConfirm);
 document.getElementById('confirmYes').addEventListener('click', function () {
@@ -6924,6 +6967,7 @@ confirmModal.addEventListener('click', function (e) {
 const inputModal = document.getElementById('inputModal');
 let inputCb = null;
 function showInput(title, value, hint, yesLabel, cb) {
+  if (inputModal.classList.contains('hidden')) pushReturnFocus(); // #947
   document.getElementById('inputTitle').textContent = title;
   document.getElementById('inputHint').textContent = hint || '';
   const field = document.getElementById('inputField');
@@ -6934,8 +6978,10 @@ function showInput(title, value, hint, yesLabel, cb) {
   setTimeout(function () { field.focus(); field.select(); }, 80);
 }
 function hideInput() {
+  const wasHidden = inputModal.classList.contains('hidden');
   inputModal.classList.add('hidden');
   inputCb = null;
+  if (!wasHidden) popReturnFocus(); // issue #947
 }
 document.getElementById('inputNo').addEventListener('click', hideInput);
 document.getElementById('inputYes').addEventListener('click', function () {
@@ -7074,6 +7120,7 @@ async function shareItem(id) {
     ['shareCopy', 'shareOpen', 'shareRevoke'].forEach(function (id) {
       document.getElementById(id).classList.remove('hidden');
     });
+    if (shareModal.classList.contains('hidden')) pushReturnFocus(); // #947
     shareModal.classList.remove('hidden');
     document.getElementById('shareClose').focus();
     refreshShareList();
@@ -7084,7 +7131,9 @@ async function shareItem(id) {
 }
 function closeShare() {
   shareViewSeq++;
+  const wasHidden = shareModal.classList.contains('hidden');
   shareModal.classList.add('hidden');
+  if (!wasHidden) popReturnFocus(); // issue #947
 }
 document.getElementById('shareClose').addEventListener('click', closeShare);
 shareModal.addEventListener('click', function (e) {
@@ -7226,6 +7275,7 @@ async function revokeShareSid(sid) {
   refreshShareList();
 }
 function openShareManager() {
+  if (shareModal.classList.contains('hidden')) pushReturnFocus(); // #947
   shareViewSeq++;
   currentShareToken = '';
   document.getElementById('shareText').textContent =
