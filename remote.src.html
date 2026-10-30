@@ -4027,6 +4027,10 @@ async function fsLoadMore() {
     if (seq !== fsLoadSeq) return;
     const more = data.items || [];
     fsItems = fsItems.concat(more);
+    // Segarkan label batch (issue #963): item baru tak terpilih,
+    // jadi label 'Cancel all' dari Select all halaman sebelumnya
+    // basi — pola yang sama dengan #955 di galeri.
+    if (fsSelectMode) updateFsBatch();
     fsOffset = fsItems.length;
     fsSetAfterCursor();
     fsTotal = data.total || fsItems.length;

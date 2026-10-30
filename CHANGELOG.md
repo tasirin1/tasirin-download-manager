@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(web): label batch File Manager disegarkan sesudah Load more** -- fsLoadMore sebelumnya menggabungkan halaman berikutnya tanpa memanggil updateFsBatch, sehingga label 'Cancel all' dari Select all halaman sebelumnya tetap tampil padahal item baru tak terpilih dan ketukan tombol justru memilih semua — kelas yang sama dengan #955 di galeri. Kini bilah batch dihitung ulang sesudah concat bila mode pilih aktif (issue #963).
+
 - **fix(remote): token folder kosong kini menghasilkan entri folder di ZIP, bukan arsip 0-entri** -- cabang folder zipTokens sebelumnya hanya mengiterasi anak, sehingga folder kosong tak menulis entri apa pun dan token tunggal folder kosong menghasilkan ZIP 22 byte yang tersaji sebagai unduhan sukses. Kini folder kosong menulis entri direktorinya sendiri (tergerbang budget entri), sejajar perilaku zipFile (issue #962).
 
 - **fix(remote): kunci cache ZIP kini memuat cap isi sumber** -- kunci sebelumnya hanya path/daftar token, sehingga perubahan berkas dari luar aplikasi (aplikasi Files lain, USB, penulis lain di folder yang sama) tidak membatalkan cache dan ZIP basi tersaji sampai 60 detik. Kini kunci fsZip menempelkan cap stat sumber (jalan kaki rekursif terbatas ukuran+mtime untuk filesystem; agregat jumlah/jumlah ukuran/mtime terbesar MediaStore untuk folder media), kunci mediaZip menempelkan cap per token, dan parser invalidasi terarah memotong segmen cap sebelum menafsirkan kunci sebagai path (issue #961).

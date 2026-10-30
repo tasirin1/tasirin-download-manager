@@ -1639,6 +1639,7 @@ const data = await res.json();
 if (seq !== fsLoadSeq) return;
 const more = data.items || [];
 fsItems = fsItems.concat(more);
+if (fsSelectMode) updateFsBatch();
 fsOffset = fsItems.length;
 fsSetAfterCursor();
 fsTotal = data.total || fsItems.length;
