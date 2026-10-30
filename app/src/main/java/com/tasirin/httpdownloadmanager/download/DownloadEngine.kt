@@ -4462,25 +4462,54 @@ class DownloadEngine(appContext: Context) {
     private fun parseChecksum(raw: String): Pair<String, String>? {
         val clean = raw.trim()
         if (clean.isEmpty()) return null
-        val (algo, rest) = when {
-            clean.startsWith("md5:", ignoreCase = true) -> "MD5" to clean.substring(4)
-            clean.startsWith("sha1:", ignoreCase = true) -> "SHA-1" to clean.substring(5)
-            clean.startsWith("sha256:", ignoreCase = true) -> "SHA-256" to clean.substring(7)
-            else -> {
-                // Tanpa awalan: tebak algoritma dari panjang hex polos
-                // (MD5 32, SHA-1 40, SHA-256 64). Sebelumnya nilai polos
-                // selalu ditafsir MD5 sehingga hash SHA polos mustahil
-                // cocok dan unduhan utuh terhapus (issue #342).
-                val bare = clean.trim()
-                when (bare.length) {
-                    32 -> "MD5" to bare
-                    40 -> "SHA-1" to bare
-                    64 -> "SHA-256" to bare
-                    else -> return null
-                }
+        // Label longgar (issue #925): md5:/sha1:/sha-1:/sha256:/sha-256:
+        // dengan spasi di sekitar titik dua ikut diterima — label
+        // 'SHA-256: <hex>' itulah yang ditampilkan banyak situs, dan
+        // sebelumnya gugur diam-diam menjadi "tanpa checksum".
+        val labelMatch = Regex(
+            "^(md5|sha-?1|sha-?256)\\s*:\\s*", RegexOption.IGNORE_CASE
+        ).find(clean)
+        val labeledAlgo: String?
+        val rest0: String
+        if (labelMatch != null) {
+            labeledAlgo = when (
+                labelMatch.groupValues[1].lowercase(Locale.ROOT).replace("-", "")
+            ) {
+                "md5" -> "MD5"
+                "sha1" -> "SHA-1"
+                else -> "SHA-256"
+            }
+            rest0 = clean.substring(labelMatch.value.length)
+        } else {
+            labeledAlgo = null
+            rest0 = clean
+        }
+        // Token pertama ala keluaran sha256sum ('<hex>  file.zip' /
+        // '<hex> *file.zip', issue #925; pola yang sama dengan
+        // sidecarChecksum #347). Hex berkelompok-spasi diterima hanya
+        // bila SEMUA token hex dan gabungannya berpanjang sah.
+        val tokens = rest0.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (tokens.isEmpty()) return null
+        var candidate = tokens[0]
+        if (labeledAlgo == null && tokens.size > 1) {
+            val joined = tokens.joinToString("")
+            if ((joined.length == 32 || joined.length == 40 || joined.length == 64) &&
+                joined.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
+            ) {
+                candidate = joined
             }
         }
-        val value = rest.trim().lowercase(Locale.ROOT)
+        // Tanpa label: tebak algoritma dari panjang hex polos
+        // (MD5 32, SHA-1 40, SHA-256 64). Sebelumnya nilai polos
+        // selalu ditafsir MD5 sehingga hash SHA polos mustahil
+        // cocok dan unduhan utuh terhapus (issue #342).
+        val algo = labeledAlgo ?: when (candidate.length) {
+            32 -> "MD5"
+            40 -> "SHA-1"
+            64 -> "SHA-256"
+            else -> return null
+        }
+        val value = candidate.lowercase(Locale.ROOT)
         val expectedLen = when (algo) {
             "MD5" -> 32
             "SHA-1" -> 40
