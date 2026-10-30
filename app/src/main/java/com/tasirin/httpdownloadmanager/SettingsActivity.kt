@@ -1240,8 +1240,9 @@ class SettingsActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
             return
         }
-        StoragePrefs.setTextFolder(this, normalized)
-        StoragePrefs.saveFolder(this, null)
+        // Satu transaksi atomik (issue #905): jangan menulis path
+        // teks dan pembersihan folder_uri dalam dua edit terpisah.
+        StoragePrefs.setTextFolderAndClearFolderUri(this, normalized)
         refreshActiveStorageUi()
         Toast.makeText(
             this,

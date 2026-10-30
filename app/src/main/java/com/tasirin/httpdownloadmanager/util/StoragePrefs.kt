@@ -172,6 +172,20 @@ object StoragePrefs {
         }
     }
 
+    /** Tulis path teks + bersihkan folder SAF dalam SATU transaksi
+     *  (issue #905): pasangan setTextFolder + saveFolder(null) yang
+     *  terpisah bisa tertinggal setengah oleh kematian proses —
+     *  path teks baru tersimpan tetapi folder_uri lama masih ada dan
+     *  MENANG di prioritas publish FileSaver, jadi UI dan tujuan
+     *  terbit berpisah selamanya. */
+    fun setTextFolderAndClearFolderUri(context: Context, path: String?) {
+        prefs(context).edit {
+            putString(KEY_TEXT_FOLDER, path?.takeIf { it.isNotBlank() })
+            putString(KEY_FOLDER_URI, null)
+            remove("folder_name")
+        }
+    }
+
     // Default mati: jangan meminta "abaikan optimasi baterai" saat pertama
     // dibuka (permintaan otomatis = sinyal persistence ala malware bagi
     // Play Protect); hanya diminta setelah pengguna menyalakan toggle.
