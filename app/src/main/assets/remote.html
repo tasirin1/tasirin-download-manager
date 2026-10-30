@@ -2012,7 +2012,7 @@ let fsDlAbort = null;
 const ZIP_MEMORY_LIMIT = 96 * 1024 * 1024;
 async function downloadZipWithProgress(url, label) {
 if (fsTaskBusy || fsDlActive) {
-mmShowToast('Another operation is already running', 2500);
+mmShowToast('Another operation is already running', 2500, 'error');
 return;
 }
 fsDlActive = true;
@@ -2025,7 +2025,7 @@ try {
 const res = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ac ? ac.signal : undefined});
 if (!res.ok) throw new Error('HTTP ' + res.status);
 const zipSkipped = Number(res.headers.get('X-Zip-Skipped')) || 0;
-if (zipSkipped > 0) mmShowToast(zipSkipped + ' selected item(s) skipped (missing or not allowed).', 3500);
+if (zipSkipped > 0) mmShowToast(zipSkipped + ' selected item(s) skipped (missing or not allowed).', 3500, 'error');
 const len = Number(res.headers.get('Content-Length')) || 0;
 let fileName = '';
 const cd = res.headers.get('Content-Disposition') || '';
@@ -2469,7 +2469,7 @@ closeMovePicker();
 if (res.failed) {
 mmShowToast('Move failed \u2014 check the status message', 3000, 'error');
 } else if (res.cancelled) {
-mmShowToast('Move cancelled \u2014 ' + count + (count === 1 ? ' item' : ' items') + ' moved', 3000);
+mmShowToast('Move cancelled \u2014 ' + count + (count === 1 ? ' item' : ' items') + ' moved', 3000, 'error');
 } else {
 mmShowToast('Moved ' + count + (count === 1 ? ' item' : ' items'), 2500);
 }
@@ -2483,7 +2483,7 @@ document.getElementById('moveYes').addEventListener('click', moveHere);
 document.getElementById('moveNewFolder').addEventListener('click', function () {
 if (!movePath) return;
 if (movePath.indexOf('m:') === 0) {
-mmShowToast('MediaStore: folders cannot be created manually', 2500);
+mmShowToast('MediaStore: folders cannot be created manually', 2500, 'error');
 return;
 }
 showInput('Create new folder', 'New Folder', 'New folder name in: ' + movePath, 'Create', function (name) {
@@ -2536,7 +2536,7 @@ return new Promise(function (resolve) { setTimeout(resolve, ms); });
 }
 async function runFsActions(title, verbDone, items, makeParams) {
 if (fsTaskBusy) {
-mmShowToast('Another operation is already running', 2500);
+mmShowToast('Another operation is already running', 2500, 'error');
 return {done: 0, cancelled: false, failed: true};
 }
 fsTaskBusy = true;
