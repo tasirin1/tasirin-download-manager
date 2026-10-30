@@ -2480,7 +2480,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
             matched++
         }
-        if (extracted > 0) videoDurations.save()
+        // Async (issue #817): tulis disk cache durasi tak menahan respons.
+        if (extracted > 0) videoDurations.saveAsync()
         // Filter nama (param legacy q): matched = hitungan yang cocok, bukan
         // hitungan scan — bandingkan dengan pageEnd agar halaman terakhir hasil
         // filter tak mengklaim hasMore lalu memicu fetch halaman kosong sia-sia.

@@ -162,6 +162,37 @@ class ServerVideoDurations(
         }
     }
 
+    private val saveExecutor by lazy {
+        java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+            Thread(r, "durations-save").apply { isDaemon = true }
+        }
+    }
+
+    @Volatile private var saveQueued = false
+
+    /** Jadwalkan save() di thread khusus (issue #817): pemanggilnya
+     *  thread request galeri — tulis disk sinkron di sana menahan
+     *  respons dan lock cache sesudah anggaran probe dibayar. Antrean
+     *  DIGABUNG: save membaca cache terkini saat berjalan, jadi satu
+     *  save tertunda mewakili semua permintaan; bendera direset
+     *  SEBELUM save berjalan agar permintaan yang datang di tengah
+     *  tulis mengantrekan save berikutnya. Persistensi cache bersifat
+     *  best-effort — kegagalan antre ditelan. */
+    fun saveAsync() {
+        synchronized(lock) {
+            if (saveQueued) return
+            saveQueued = true
+        }
+        try {
+            saveExecutor.execute {
+                synchronized(lock) { saveQueued = false }
+                save()
+            }
+        } catch (_: Exception) {
+            synchronized(lock) { saveQueued = false }
+        }
+    }
+
     /** Tulis cache ke disk (sedikit & jarang; tidak wajib thread-safe ekstra).
      *  Cache kosong menghapus file: tanpa ini video_durations.json basi
      *  tetap dibaca ulang setelah invalidate() walau tak ada durasi baru. */
