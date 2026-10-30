@@ -47,6 +47,20 @@ class ServerVideoDurations(
             ttlMs: Long = PROBE_FAILURE_TTL_MS
         ): Boolean = storedAt != null && now - storedAt < ttlMs
 
+        // Mesin simpan milik PROSES, bukan instance (issue #826):
+        // berkas video_durations.json + staging-nya dipakai semua
+        // instance server (restart membuat instance baru), jadi
+        // executor bersama meniru pola probeExecutor (satu thread per
+        // proses, bukan satu per instance yang bocor seumur proses)
+        // dan FILE_LOCK menserialkan tulis berkas lintas instance —
+        // lock instance saja tak menolong dua instance yang menulis
+        // staging yang sama.
+        private val SAVE_EXECUTOR: java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+                Thread(r, "durations-save").apply { isDaemon = true }
+            }
+        private val FILE_LOCK = Any()
+
         /** Kunci cache durasi untuk satu entri galeri: token + cap ubah
          *  sumber (issue #417). Token saja diturunkan murni dari path,
          *  jadi berkas yang DIGANTI di luar aplikasi pada path yang sama
@@ -162,12 +176,6 @@ class ServerVideoDurations(
         }
     }
 
-    private val saveExecutor by lazy {
-        java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-            Thread(r, "durations-save").apply { isDaemon = true }
-        }
-    }
-
     @Volatile private var saveQueued = false
 
     /** Jadwalkan save() di thread khusus (issue #817): pemanggilnya
@@ -184,7 +192,7 @@ class ServerVideoDurations(
             saveQueued = true
         }
         try {
-            saveExecutor.execute {
+            SAVE_EXECUTOR.execute {
                 synchronized(lock) { saveQueued = false }
                 save()
             }
@@ -195,12 +203,18 @@ class ServerVideoDurations(
 
     /** Tulis cache ke disk (sedikit & jarang; tidak wajib thread-safe ekstra).
      *  Cache kosong menghapus file: tanpa ini video_durations.json basi
-     *  tetap dibaca ulang setelah invalidate() walau tak ada durasi baru. */
+     *  tetap dibaca ulang setelah invalidate() walau tak ada durasi baru.
+     *  Potret string diambil di bawah kunci instance (serialisasi tak
+     *  ditimpa mutasi cache di tengah), tulisnya di bawah FILE_LOCK
+     *  statis (issue #826: staging dipakai lintas instance). */
     fun save() {
-        synchronized(lock) {
+        val snapshot = synchronized(lock) {
             val c = cacheLocked()
+            c.length() to c.toString()
+        }
+        synchronized(FILE_LOCK) {
             runCatching {
-                if (c.length() == 0) {
+                if (snapshot.first == 0) {
                     file.delete()
                     return@runCatching
                 }
@@ -208,7 +222,7 @@ class ServerVideoDurations(
                 // meninggalkan JSON setengah jadi yang merusak cache berikutnya.
                 val staging = File(file.parentFile, file.name + ".tmp")
                 try {
-                    staging.writeText(c.toString())
+                    staging.writeText(snapshot.second)
                     if (!staging.renameTo(file)) {
                         runCatching { file.delete() }
                         if (!staging.renameTo(file) || !file.isFile) {
