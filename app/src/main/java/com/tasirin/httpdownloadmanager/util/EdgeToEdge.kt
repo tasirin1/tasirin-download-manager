@@ -8,7 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
-/** Android 15 (targetSdk 36) memaksa edge-to-edge: konten digambar di bawah
+/** Android 15+ (aplikasi bertarget API 35+, termasuk targetSdk 36) memaksa edge-to-edge: konten digambar di bawah
  *  status/navigation bar. Panggil setelah setContentView dengan root view;
  *  padding root otomatis menyesuaikan insets system bar (aman Android 6+). */
 fun ComponentActivity.applyEdgeToEdge(root: View, darkBars: Boolean = true) {
