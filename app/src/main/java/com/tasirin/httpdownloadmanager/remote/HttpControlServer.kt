@@ -765,7 +765,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // / sesudah "logout" yang ditolak langsung menyajikan halaman
         // penuh lagi dan kunci idle menjadi no-op.
         val readOnly = StoragePrefs.isServerReadOnly(context)
-        appendLog(if (readOnly) "LOGOUT (read-only: sesi lokal saja)" else "LOGOUT")
+        appendLog(if (readOnly) "LOGOUT (read-only: local session only)" else "LOGOUT")
         if (!readOnly) {
             StoragePrefs.rotateServerSessionSecret(context)
             synchronized(sessionSecretLock) { cachedSessionSecret = null }
