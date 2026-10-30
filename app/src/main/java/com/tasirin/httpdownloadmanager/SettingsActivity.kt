@@ -850,9 +850,15 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.spinnerSpeed.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                // Cabang Custom membaca pref SEGAR (issue #1000),
+                // bukan tangkapan saat layar dibuka: nilai bisa
+                // berubah dari remote web selama Settings terbuka,
+                // dan tangkapan basi akan menimpanya diam-diam.
+                // Pola yang sama di spinner segmen/timeout di bawah.
                 StoragePrefs.setSpeedLimitKbps(
                     this@SettingsActivity,
-                    if (position < speedKbps.size) speedKbps[position] else currentSpeed
+                    if (position < speedKbps.size) speedKbps[position]
+                    else StoragePrefs.speedLimitKbps(this@SettingsActivity)
                 )
                 // Limiter global di-cache di engine: tanpa refresh, nilai baru
                 // tak berlaku sampai restart (kecuali dimatikan ke 0).
@@ -894,7 +900,8 @@ class SettingsActivity : AppCompatActivity() {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 StoragePrefs.setSegmentCount(
                     this@SettingsActivity,
-                    if (position in segmentValues.indices) segmentValues[position] else currentSegments
+                    if (position in segmentValues.indices) segmentValues[position]
+                    else StoragePrefs.segmentCount(this@SettingsActivity)
                 )
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -917,7 +924,8 @@ class SettingsActivity : AppCompatActivity() {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 StoragePrefs.setConnectTimeoutSec(
                     this@SettingsActivity,
-                    if (position in connectValues.indices) connectValues[position] else currentConnect
+                    if (position in connectValues.indices) connectValues[position]
+                    else StoragePrefs.getConnectTimeoutSec(this@SettingsActivity)
                 )
                 runCatching { App.engine.refreshTimeouts() }
             }
@@ -940,7 +948,8 @@ class SettingsActivity : AppCompatActivity() {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 StoragePrefs.setReadTimeoutSec(
                     this@SettingsActivity,
-                    if (position in readValues.indices) readValues[position] else currentRead
+                    if (position in readValues.indices) readValues[position]
+                    else StoragePrefs.getReadTimeoutSec(this@SettingsActivity)
                 )
                 runCatching { App.engine.refreshTimeouts() }
             }
