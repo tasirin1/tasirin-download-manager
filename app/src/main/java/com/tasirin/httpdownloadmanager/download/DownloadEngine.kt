@@ -2199,7 +2199,17 @@ class DownloadEngine(appContext: Context) {
             // yang bangkit lagi tiap jaringan berkedip.
             isSlowError(message) ||
             message.contains("unable to resolve host", ignoreCase = true) ||
-            message.contains("network is unreachable", ignoreCase = true)
+            message.contains("network is unreachable", ignoreCase = true) ||
+            // Frasa transien yang lolos dari semua pola di atas
+            // (issue #987): "connect timed out" tak memuat "timeout"
+            // ("timed" != "timeout") dan ikut tersapu penyaringan
+            // #976; "connection reset" (putus di tengah aliran) dan
+            // "broken pipe" (sisi tulisnya) tak memuat satu pun
+            // substring klasifier — ketiganya kegagalan jaringan
+            // sesaat yang harus berakhir PAUSED, bukan FAILED.
+            message.contains("connect timed out", ignoreCase = true) ||
+            message.contains("connection reset", ignoreCase = true) ||
+            message.contains("broken pipe", ignoreCase = true)
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {

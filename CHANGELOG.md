@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **fix(download): tiga frasa transien kembali terklasifikasi sebagai error jaringan** -- 'connect timed out' (tak memuat substring 'timeout', ikut tersapu penyaringan #976), 'connection reset' (putus di tengah aliran), dan 'broken pipe' sebelumnya lolos dari semua klasifier sehingga item berakhir FAILED terminal dan segmen HLS kehilangan retry level-segmen, padahal ketiganya kegagalan jaringan sesaat yang seharusnya PAUSED (issue #987).
+
 - **fix(remote): invalidateFsRootsCache kini ikut membuang memo cap ZIP** -- corong ini membuang seluruh zipCache dan merupakan satu-satunya invalidasi ZIP dari pemindahan berkas native (DownloadEngine.move), tetapi tidak termasuk dua corong yang diperbaiki #974, sehingga rantai salah-saji cap lama yang sama masih bisa dipicu lewat jalur pindah berkas dari aplikasi. Memo cap kini dibersihkan di sana juga (issue #986).
 
 - **fix(web): fokus galeri dipindah ke sel yang bertahan saat pemangkasan atas membuang sel terfokus** -- trimGalleryTop sebelumnya membuang sel teratas tanpa memeriksa fokus, sehingga pengguna keyboard/D-pad yang selnya terbuang kehilangan fokus ke body diam-diam dan urutan Tab mulai lagi dari awal dokumen. Kini fokus dipindah ke sel pertama yang bertahan (issue #985).
