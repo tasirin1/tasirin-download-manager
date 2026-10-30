@@ -47,6 +47,7 @@ import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import com.tasirin.httpdownloadmanager.util.packageInfoCompat
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.tasirin.httpdownloadmanager.util.whiteNavigationIcon
@@ -1057,7 +1058,12 @@ class SettingsActivity : AppCompatActivity() {
                 // terlanjur dimatikan. Pola handler hapus PIN di berkas
                 // ini: tunggu stop di dalam saveSettings sendiri.
                 // renderServer() dipanggil pemanggil sesudah blok ini.
-                withContext(Dispatchers.IO) { App.stopHttpServer() }
+                // NonCancellable (issue #823): pref sudah terlanjur
+                // ditulis false di atas — pembatalan lifecycleScope
+                // yang mendarat persis di titik suspensi withContext
+                // tak boleh lagi membatalkan stop-nya, atau server
+                // tetap hidup tak konsisten dengan pref.
+                withContext(NonCancellable + Dispatchers.IO) { App.stopHttpServer() }
                 stopServiceIfIdle()
             }
             val newPort = requestedPort
@@ -1069,7 +1075,8 @@ class SettingsActivity : AppCompatActivity() {
                     // Inline seperti cabang PIN di atas (issue #801):
                     // restart tak boleh hilang karena coroutine lepas
                     // keburu batal — pref port sudah berubah.
-                    withContext(Dispatchers.IO) {
+                    // NonCancellable untuk alasan yang sama (#823).
+                    withContext(NonCancellable + Dispatchers.IO) {
                         App.restartHttpServer(applicationContext)
                     }
                 }
