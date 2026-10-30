@@ -144,6 +144,23 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
 
+    /** Dialog penjelasan sebelum membuka halaman izin "Install unknown
+     *  apps" sistem: kontekstual dari Pengaturan (tombolnya hanya tampil
+     *  bila izin belum diberikan), bukan prompt otomatis — pola yang sama
+     *  dengan offerSystemAllFilesAccess. */
+    private fun offerInstallPermission() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_install_perm_btn)
+            .setMessage(R.string.settings_install_perm_hint)
+            .setPositiveButton(R.string.ok) { _, _ ->
+                if (!Permissions.requestInstallPermission(this)) {
+                    Toast.makeText(this, R.string.settings_open_system_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     /** Seksi kartu yang bisa dilipat (state disimpan di StoragePrefs). */
     private class SectionSpec(
         val sectionId: Int,
@@ -435,6 +452,12 @@ class SettingsActivity : AppCompatActivity() {
                 requestPermissionsIfNeeded()
             }
         }
+        // Tombol izin install hanya tampil bila izinnya belum diberikan
+        // (pola storageBtn di atas): sesudah user memberi izin di halaman
+        // sistem, renderServer dari onResume menyembunyikannya lagi.
+        binding.installPermBtn.visibility =
+            if (Permissions.needsInstallPermission(this)) View.VISIBLE else View.GONE
+        binding.installPermBtn.setOnClickListener { offerInstallPermission() }
         binding.serverSwitch.text = getString(
             if (server.isAlive) R.string.server_stop else R.string.server_start
         )

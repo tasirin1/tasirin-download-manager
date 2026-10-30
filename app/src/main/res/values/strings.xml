@@ -293,6 +293,8 @@
     <string name="settings_fs_full_access">Full access to main storage (file manager)</string>
     <string name="settings_server_read_only">Read-only server</string>
     <string name="remote_storage_btn">Enable file access</string>
+    <string name="settings_install_perm_btn">Enable app installs</string>
+    <string name="settings_install_perm_hint">Android blocks this app from installing downloaded APK files until you allow it. On the next screen, turn on &quot;Allow from this source&quot;. Downloads themselves work without it.</string>
     <string name="remote_pin_required">Set a PIN first before starting the server</string>
     <string name="settings_auto_open">Open file after download completes</string>
     <string name="settings_server_autostart">Auto-start server on boot</string>

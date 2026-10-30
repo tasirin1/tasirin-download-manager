@@ -93,4 +93,38 @@ object Permissions {
         if (!launched) StoragePrefs.setFullAccessPending(context, false)
         return launched
     }
+
+    /** Apakah izin "Install unknown apps" (Android 8+) belum diberikan:
+     *  tanpa ini installer sistem menolak memasang APK hasil unduhan
+     *  (openApk di MainActivity hanya bisa mengarahkan user ke halaman
+     *  sistemnya). Di bawah Android 8 izin ini tidak ada. */
+    fun needsInstallPermission(context: Context): Boolean =
+        Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()
+
+    /** Buka halaman "Install unknown apps" khusus aplikasi (fallback ke
+     *  daftar umum semua aplikasi). Kembalikan false bila halaman sistem
+     *  gagal dibuka sama sekali (pemanggil wajib memberi tahu user,
+     *  jangan diam) — pola yang sama dengan requestAllFilesAccess. */
+    fun requestInstallPermission(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < 26) return false
+        // NEW_TASK hanya bila bukan Activity (alasan sama seperti di
+        // requestAllFilesAccess).
+        val newTask = context !is android.app.Activity
+        fun Intent.withTask(): Intent =
+            if (newTask) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) else this
+        return runCatching {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    "package:${context.packageName}".toUri()
+                ).withTask()
+            )
+            true
+        }.getOrDefault(false) || runCatching {
+            context.startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).withTask()
+            )
+            true
+        }.getOrDefault(false)
+    }
 }
