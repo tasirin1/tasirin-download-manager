@@ -211,7 +211,15 @@ class WebExtractActivity : AppCompatActivity() {
         val js = grabScript() ?: return
         webView.evaluateJavascript(js) { raw ->
             if (finished) return@evaluateJavascript
-            val payload = raw?.trim('"')?.replace("\\\"", "\"")?.replace("\\\\", "\\").orEmpty()
+            // raw adalah string JSON (evaluateJavascript meng-encode
+            // hasil skrip sebagai literal string JSON): urai sebagai
+            // JSON sungguhan, bukan bedah string manual (issue #802) —
+            // urutan replace lama merusak nilai yang memuat backslash
+            // tepat sebelum tanda kutip, sehingga JSONObject di bawah
+            // gagal dan hasil grab terbuang diam-diam.
+            val payload = raw?.let {
+                runCatching { JSONArray("[$it]").getString(0) }.getOrNull()
+            }.orEmpty()
             val obj = runCatching { JSONObject(payload) }.getOrNull() ?: return@evaluateJavascript
             val episodesJson = trimEpisodes(obj.optJSONArray("episodes"))
             if (episodesJson.isNotBlank() && episodesJson != "[]") lastEpisodesJson = episodesJson
