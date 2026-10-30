@@ -1730,13 +1730,22 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.save) { _, _ ->
                 val selSpeed = spinnerSpeed.selectedItemPosition
+                // Nilai fallback dibaca SEGAR dari engine (issue
+                // #1010): snapshot saat dialog dibuka bisa sudah
+                // diganti dari remote (limit_priority), dan menulis
+                // balik snapshot menimpa perubahan itu diam-diam
+                // untuk field yang tak disentuh pengguna di dialog.
+                val fresh = App.engine.items.value.find { it.id == item.id }
                 App.engine.setLimitAndPriority(
                     item.id,
                     // Guard dua arah: selectedItemPosition -1 (tak ada
                     // seleksi) dulu lolos syarat '< size' lalu mengindeks
                     // negatif; spinner prioritas kini dijaga juga (issue #208).
-                    if (selSpeed in speedKbps.indices) speedKbps[selSpeed] else itemSpeed,
-                    priorityValues.getOrElse(spinnerPriority.selectedItemPosition) { item.priority }
+                    if (selSpeed in speedKbps.indices) speedKbps[selSpeed]
+                    else fresh?.speedLimitKbps ?: itemSpeed,
+                    priorityValues.getOrElse(spinnerPriority.selectedItemPosition) {
+                        fresh?.priority ?: item.priority
+                    }
                 )
             }
             .show()
