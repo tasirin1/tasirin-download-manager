@@ -3327,7 +3327,7 @@ async function refresh() {
 const mySeq = ++snapSeq;
 if (!hasLoadedItems) showListSkeleton();
 try {
-const res = await fetch(API + '/api/downloads');
+const res = await fetchTimeout(API + '/api/downloads', undefined, 15000);
 if (res.status === 401) {
 statusLine.textContent = 'PIN required. Reload the page to log in.';
 return;
@@ -4386,7 +4386,7 @@ socialPhotoOptions = [];
 qualitySelect.innerHTML = '<option value="0">Loading…</option>';
 qualitySelect.classList.remove('hidden');
 photoSelect.classList.add('hidden');
-fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
+fetchTimeout(API + '/api/social_options?url=' + encodeURIComponent(u), undefined, 30000)
 .then(function (r) { return r.json(); })
 .then(function (d) {
 if ((document.getElementById('url').value.trim().split(/[\s,]+/)[0] || '') !== u) return;

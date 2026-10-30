@@ -5823,7 +5823,10 @@ async function refresh() {
   const mySeq = ++snapSeq;
   if (!hasLoadedItems) showListSkeleton();
   try {
-    const res = await fetch(API + '/api/downloads');
+    // fetchTimeout, bukan fetch polos (issue #798): server yang menerima
+    // koneksi lalu menggantung tidak boleh membiarkan promise refresh —
+    // yang dipanggil sesudah hampir setiap aksi — menggantung selamanya.
+    const res = await fetchTimeout(API + '/api/downloads', undefined, 15000);
     if (res.status === 401) {
       statusLine.textContent = 'PIN required. Reload the page to log in.';
       return;
@@ -7063,7 +7066,11 @@ function probeSocialQuality() {
     qualitySelect.innerHTML = '<option value="0">Loading…</option>';
     qualitySelect.classList.remove('hidden');
     photoSelect.classList.add('hidden');
-    fetch(API + '/api/social_options?url=' + encodeURIComponent(u))
+    // Batas 30 dtk (issue #798): probe sisi server sendiri berbatas
+    // 20 dtk; tanpa batas di klien, pemilih kualitas tertahan "Loading…"
+    // selamanya bila koneksi menggantung — timeout memicu catch yang
+    // menyembunyikan picker.
+    fetchTimeout(API + '/api/social_options?url=' + encodeURIComponent(u), undefined, 30000)
       .then(function (r) { return r.json(); })
       .then(function (d) {
         // Respons basi: pengguna sudah mengganti tautan selama probe
