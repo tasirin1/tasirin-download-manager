@@ -351,10 +351,14 @@ jobs:
           # hilang permanen tanpa pengganti. Kini: rilis yang sudah ada
           # (job rerun) cukup diunggahi ulang asetnya (--clobber) dan
           # disegarkan judul/catatan/latest-nya; yang belum ada dibuat.
-          # Tak ada operasi destruktif atas rilis itu sendiri, jadi
-          # pembatalan di tengah hanya meninggalkan rilis lama utuh
-          # yang diperbaiki run berikutnya (audit di bawah memverifikasi
-          # aset sesudahnya). Bendera --latest untuk edit hanya diteruskan
+          # Tak ada operasi destruktif atas rilis itu sendiri. Koreksi
+          # cakupan (issue #855): pembatalan di tengah langkah ini bisa
+          # meninggalkan rilis versi run ITU tanpa aset, dan push
+          # berikutnya (nomor lari baru -> versi baru) TIDAK pernah
+          # memperbaikinya — klaim "diperbaiki run berikutnya" hanya
+          # benar untuk re-run run yang sama. Karena itu audit di bawah
+          # turut meneriaki rilis sebelumnya yang tanpa aset. Bendera
+          # --latest untuk edit hanya diteruskan
           # bila memang dimaksudkan: mengosongkannya berarti latest
           # tak berubah, yang tepat untuk rerun.
           if gh release view "v${VER}" > /dev/null 2>&1; then
@@ -391,3 +395,20 @@ jobs:
           echo "$RELEASE" | jq -e '.assets[] | select(.name == "mapping.txt") | .size > 0' >/dev/null \
             || { echo "::error::mapping.txt tidak ada atau kosong pada release v${VER}"; exit 1; }
           echo "Rilis v${VER}: asset ${EXPECTED_APK} + mapping.txt sehat."
+
+          echo "--- Cek rilis sebelumnya (yatim pembatalan, issue #855) ---"
+          # Rilis terbaru selain versi ini = pendahulu langsung (versi
+          # monoton mengikuti urutan buat). Bila ia tanpa aset APK, ia
+          # hampir pasti yatim dari run yang terbatalkan di tengah
+          # publish; teriaki sebagai peringatan bernama + ringkasan
+          # langkah agar terlihat (bukan error: run ini sendiri sehat).
+          PREV=$(gh release list --limit 5 --json tagName --jq '.[].tagName' | grep -v -x "v${VER}" | head -n 1 || true)
+          if [ -n "$PREV" ]; then
+            PREV_HAS_APK=$(gh release view "$PREV" --json assets --jq '[.assets[] | select(.name | endswith(".apk"))] | length')
+            if [ "$PREV_HAS_APK" = "0" ]; then
+              echo "::warning::Rilis sebelumnya $PREV tanpa aset APK (kemungkinan yatim akibat run terbatalkan di tengah publish, issue #855) — periksa/hapus manual."
+              echo "⚠️ Rilis $PREV tanpa aset APK (yatim pembatalan publish, issue #855)." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Rilis sebelumnya $PREV sehat ($PREV_HAS_APK aset APK)."
+            fi
+          fi
