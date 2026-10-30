@@ -468,6 +468,19 @@ def _out_tak_sinkron(minified: str, problems: list) -> bool:
 
 
 def main() -> int:
+    # Pemilihan mode KETAT (issue #806): dulu argumen pertama apa pun
+    # selain persis "--check" jatuh ke mode TULIS — salah ketik seperti
+    # --chek menimpa remote.html lalu keluar 0, mengubah gerbang sinkron
+    # menjadi "selalu sinkronkan sendiri lalu lulus". Kini hanya dua
+    # bentuk sah: tanpa argumen (tulis) atau tepat --check; sisanya
+    # error pemakaian dengan exit 2 dan tanpa menyentuh berkas apa pun.
+    args = sys.argv[1:]
+    if args not in ([], ["--check"]):
+        print(
+            "ERROR: argumen tidak dikenal: " + " ".join(args) +
+            " — pemakaian: prepare_remote.py [--check]"
+        )
+        return 2
     if not SRC.exists():
         print(f"ERROR: {SRC} tidak ditemukan.")
         return 1
@@ -478,7 +491,7 @@ def main() -> int:
         return 1
     minified = minify_html(src_text)
 
-    if len(sys.argv) > 1 and sys.argv[1] == "--check":
+    if args == ["--check"]:
         problems = []
 
         # OUT hilang wajib vonis bernama (issue #626): dulu
