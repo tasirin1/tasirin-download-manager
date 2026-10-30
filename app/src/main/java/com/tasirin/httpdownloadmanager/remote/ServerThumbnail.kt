@@ -13,6 +13,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /** Thumbnail generation & caching — di-extract dari HttpControlServer supaya
@@ -21,6 +22,12 @@ import java.util.concurrent.atomic.AtomicLong
 
 private class ThumbLock {
     val lastUse = AtomicLong(System.currentTimeMillis())
+
+    /** Jumlah pemakai aktif: lock yang sedang menahan decode tidak
+     *  boleh dieviksi walau lastUse-nya tua (issue #898). Dinaikkan
+     *  oleh thumbLockFor di dalam kunci peta dan diturunkan pemanggil
+     *  sesudah blok synchronized selesai. */
+    val inUse = AtomicInteger(0)
 }
 
 private const val THUMB_FAILURE_TTL_MS = 30L * 60 * 1000
@@ -64,20 +71,28 @@ private fun thumbLockFor(key: String): ThumbLock {
     // yang sama secara interleave (thumbnail korup tersaji permanen).
     return synchronized(thumbLocks) {
         if (thumbLocks.size > 512) {
-            // Satu removeIf: buang lock menganggur >10 menit; bila masih penuh
-            // (browsing ribuan media sekaligus), buang kelebihan tertua sekaligus
-            // agar tak ada scan dua pass per request galeri.
-            thumbLocks.entries.removeIf { it.key != key && now - it.value.lastUse.get() > 600_000L }
+            // Satu removeIf: buang lock menganggur >10 menit; lock yang
+            // sedang dipakai tak pernah dibuang (issue #898) — decode
+            // yang menggantung lama tampak menganggur dari lastUse.
+            thumbLocks.entries.removeIf {
+                it.key != key && it.value.inUse.get() == 0 &&
+                    now - it.value.lastUse.get() > 600_000L
+            }
             if (thumbLocks.size > 768) {
-                val sorted = thumbLocks.entries.sortedBy { it.value.lastUse.get() }
-                val drop = thumbLocks.size - 512
+                val droppable = thumbLocks.entries
+                    .filter { it.key != key && it.value.inUse.get() == 0 }
+                    .sortedBy { it.value.lastUse.get() }
+                val drop = minOf(thumbLocks.size - 512, droppable.size)
                 for (i in 0 until drop) {
-                    val k = sorted.getOrNull(i)?.key ?: break
-                    if (k != key) thumbLocks.remove(k)
+                    thumbLocks.remove(droppable[i].key)
                 }
             }
         }
-        thumbLocks.getOrPut(key) { ThumbLock() }
+        thumbLocks.getOrPut(key) { ThumbLock() }.also {
+            // Di dalam kunci peta: tak ada jendela di mana lock sudah
+            // terambil tetapi belum terhitung dipakai.
+            it.inUse.incrementAndGet()
+        }
     }.also { it.lastUse.set(now) }
 }
 
@@ -179,7 +194,8 @@ internal fun getOrCreateThumb(
     if (!dir.isDirectory) return null
     val cached = File(dir, "$key.jpg")
     val lock = thumbLockFor(key)
-    return synchronized(lock) {
+    try {
+        return synchronized(lock) {
         // Slot path-saja basi bila inode sumbernya bukan yang menghasilkan
         // isi slot (issue #735): catatan hilang (proses baru) juga dianggap
         // basi — dibuat ulang sekali lebih aman daripada menyajikan
@@ -255,7 +271,10 @@ internal fun getOrCreateThumb(
                 null
             }
         }
-    }.also { lock.lastUse.set(System.currentTimeMillis()) }
+        }.also { lock.lastUse.set(System.currentTimeMillis()) }
+    } finally {
+        lock.inUse.decrementAndGet()
+    }
 }
 
 /** Resolusi nama tampil URI media (issue #794): DocumentFile bisa
