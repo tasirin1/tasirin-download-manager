@@ -14,7 +14,15 @@ import java.io.PushbackInputStream
  *
  *  Frame dibaca lazy satu per satu dari sumber (ByteArray atau File) dan
  *  tidak pernah dipegang semua di RAM — muxing video panjang tidak lagi
- *  menahan seluruh file audio (bisa ratusan MB) sekaligus. */
+ *  menahan seluruh file audio (bisa ratusan MB) sekaligus.
+ *
+ *  Jalur PRODUKSI hanya [open] dan [stripId3Stream]. Dua fungsi
+ *  ByteArray — [parse] dan [stripId3] — adalah IMPLEMENTASI ACUAN
+ *  untuk uji: versi stream dibuktikan setara dengannya (issue #371,
+ *  #395, #634) dan AdtsAacTest membandingkan keduanya. Jangan hapus
+ *  sebagai "kode mati" dan jangan jadikan jalur produksi (menahan
+ *  berkas utuh di RAM); keduanya ditandai eksplisit pada tempatnya
+ *  (issue #704). */
 object AdtsAac {
 
     /** Hasil parse: info format + iterasi frame yang bisa diulang. */
@@ -90,7 +98,11 @@ object AdtsAac {
     }
 
     /** Hapus semua tag ID3 dari data (biasanya di tiap segmen audio HLS), sisanya
-     *  tetap berisi header ADTS utuh agar MediaExtractor dapat membacanya. */
+     *  tetap berisi header ADTS utuh agar MediaExtractor dapat membacanya.
+     *
+     *  ACUAN UJI (issue #704) — bukan jalur produksi; produksi memakai
+     *  [stripId3Stream]. Fungsi ini adalah spesifikasi yang dibuktikan
+     *  setara dengan versi stream oleh AdtsAacTest. */
     fun stripId3(data: ByteArray): ByteArray {
         val out = java.io.ByteArrayOutputStream(data.size)
         var pos = 0
@@ -214,7 +226,11 @@ object AdtsAac {
         return written
     }
 
-    /** Parse data ADTS (boleh diawali ID3). null bila tidak ada frame AAC. */
+    /** Parse data ADTS (boleh diawali ID3). null bila tidak ada frame AAC.
+     *
+     *  ACUAN UJI (issue #704) — bukan jalur produksi; produksi memakai
+     *  [open] (lazy dari berkas). Fungsi ini adalah spesifikasi yang
+     *  dibuktikan setara dengan jalur berkas oleh AdtsAacTest. */
     fun parse(data: ByteArray): Stream? {
         var pos = skipId3(data, 0)
         if (pos + 7 > data.size) return null
