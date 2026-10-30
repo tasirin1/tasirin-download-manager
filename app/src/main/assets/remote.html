@@ -4575,7 +4575,8 @@ e.preventDefault();
 const rawUrl = document.getElementById('url').value.trim();
 if (!rawUrl) return;
 const urls = rawUrl.split(/\s+/).filter(function (u) {
-return u.indexOf('http://') === 0 || u.indexOf('https://') === 0;
+const low = u.toLowerCase();
+return low.indexOf('http://') === 0 || low.indexOf('https://') === 0;
 });
 if (!urls.length) { showToast('No valid URLs found.', 3000, 'error'); return; }
 const url = urls[0];

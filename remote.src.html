@@ -7399,7 +7399,11 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
   // di dalam URL (CDN bergaya c_fill,w_800 atau query ?a=1,2) —
   // memecah pada koma memotong URL sah diam-diam.
   const urls = rawUrl.split(/\s+/).filter(function (u) {
-    return u.indexOf('http://') === 0 || u.indexOf('https://') === 0;
+    // Skema URL tak peka huruf (RFC): 'HTTPS://…' sah dan tak boleh
+    // terbuang diam-diam dari tempelan campuran (issue #930). Token
+    // yang diteruskan ke server tetap apa adanya.
+    const low = u.toLowerCase();
+    return low.indexOf('http://') === 0 || low.indexOf('https://') === 0;
   });
   if (!urls.length) { showToast('No valid URLs found.', 3000, 'error'); return; }
   // For social media quality, use first URL only
