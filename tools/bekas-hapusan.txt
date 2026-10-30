@@ -27,3 +27,4 @@ recordProbeFailure
 isInGalleryFolders
 inSelectedFolders
 fileIconCircleColor
+invalidateServerGalleryCache

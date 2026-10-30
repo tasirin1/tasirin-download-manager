@@ -2468,7 +2468,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Galeri berubah (hapus/upload/pindah media) — buang snapshot 15 detik
      *  supaya request berikutnya langsung scan ulang, tidak tampil basi.
      *  internal (issue #558): penyelesaian unduhan di engine ikut
-     *  membuang snapshot ini lewat App.invalidateServerGalleryCache. */
+     *  membuang snapshot ini lewat App.invalidateServerDownloadCaches. */
     internal fun invalidateGalleryCache() {
         galleryCache = null
     }

@@ -130,16 +130,6 @@ class App : Application() {
             runCatching { if (::httpServer.isInitialized) httpServer.appendLog(message) }
         }
 
-        /** Buang snapshot galeri milik server web (issue #558):
-         *  galleryCache adalah lapisan kedua di atas MediaLibrary
-         *  yang tak tersentuh notifikasi terbit FileSaver, jadi
-         *  penyelesaian unduhan harus membuangnya secara eksplisit
-         *  agar galeri web tak menyajikan daftar pra-selesai sampai
-         *  TTL berakhir. Aman dipanggil kapan pun. */
-        fun invalidateServerGalleryCache() {
-            runCatching { if (::httpServer.isInitialized) httpServer.invalidateGalleryCache() }
-        }
-
         /** Buang cache galeri + listing media + ZIP server (issue #660):
          *  penyelesaian unduhan biasa wajib membuang ketiganya — galeri
          *  saja membuat listing media dan ZIP folder menyajikan keadaan
