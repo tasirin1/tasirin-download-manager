@@ -1003,8 +1003,20 @@ loadGallery(true);
 document.getElementById('galBatchCancel').addEventListener('click', function () {
 galSetSelectMode(false);
 });
-document.getElementById('galBatchAll').addEventListener('click', function () {
+document.getElementById('galBatchAll').addEventListener('click', async function () {
+const btn = document.getElementById('galBatchAll');
 const allSel = galleryItems.length > 0 && galSelected.size === galleryItems.length;
+if (!allSel && galleryHasMore && !btn.disabled) {
+btn.disabled = true;
+btn.textContent = 'Loading...';
+let guard = 0;
+while (galleryHasMore && guard++ < 500) {
+const before = galleryItems.length;
+await loadGallery(false);
+if (galleryItems.length === before) break;
+}
+btn.disabled = false;
+}
 galSelected.clear();
 if (!allSel) galleryItems.forEach(function (it) { galSelected.add(it); });
 galleryGrid.querySelectorAll('.gal-cell').forEach(function (cell) {
