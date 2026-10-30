@@ -1827,13 +1827,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // jadi kunci path saja menyajikan ZIP basi sampai TTL 60 detik.
         // Parser kunci di invalidateZipCacheFor memotong segmen ini.
         val key = if (raw.startsWith(MS_PREFIX)) {
-            "fs:" + raw + "|s:" + zipMediaFolderStamp(raw.removePrefix(MS_PREFIX))
+            "fs:" + raw + "|s:" + memoizedZipStamp("ms:$raw") {
+                zipMediaFolderStamp(raw.removePrefix(MS_PREFIX))
+            }
         } else {
             val canon = runCatching {
                 File(raw.removePrefix(FS_PREFIX)).canonicalPath
             }.getOrNull()
             val base = if (canon != null) "fs:" + FS_PREFIX + canon else "fs:" + raw
-            base + "|s:" + zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
+            base + "|s:" + memoizedZipStamp(base) {
+                zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
+            }
         }
         val (input, total) = openZipStream(key) {
             val created = createTempZip { zos ->
@@ -1922,6 +1926,25 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             return input to total
         }
         return null
+    }
+
+    // Memo cap sumber ZIP (issue #970): cap dihitung sebelum lookup
+    // cache, dan unduhan ZIP dilayani banyak sub-request Range —
+    // tanpa memo, jalan kaki stat penuh dibayar per sub-request.
+    // TTL pendek melipat ledakan sub-request menjadi satu hitungan;
+    // harga kejujurannya terbatas: cap bisa basi sampai TTL ini di
+    // atas jendela TTL cache ZIP itu sendiri.
+    private val zipStampMemo = ConcurrentHashMap<String, Pair<Long, String>>()
+
+    private fun memoizedZipStamp(id: String, compute: () -> String): String {
+        val now = System.currentTimeMillis()
+        zipStampMemo[id]?.let { (at, stamp) ->
+            if (now - at < ZIP_STAMP_MEMO_TTL_MS) return stamp
+        }
+        val stamp = compute()
+        if (zipStampMemo.size > 64) zipStampMemo.clear()
+        zipStampMemo[id] = now to stamp
+        return stamp
     }
 
     /** Satu langkah lipat hash FNV-1a 64 untuk cap sumber ZIP. */
@@ -2204,13 +2227,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // selalu 'x'. Pola sama dengan isMediaTokenAllowed.
         val sortedTokens = tokens.sorted()
         val tokenStamp = sortedTokens.joinToString(";") { token ->
-            val raw = MediaLibrary.decodeToken(token)
-            when {
-                raw != null && raw.startsWith(FS_PREFIX) ->
-                    zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
-                raw != null && raw.startsWith("u:") ->
-                    zipUriSourceStamp(raw.removePrefix("u:").toUri())
-                else -> "x"
+            memoizedZipStamp("tok:$token") {
+                val raw = MediaLibrary.decodeToken(token)
+                when {
+                    raw != null && raw.startsWith(FS_PREFIX) ->
+                        zipFsSourceStamp(File(raw.removePrefix(FS_PREFIX)))
+                    raw != null && raw.startsWith("u:") ->
+                        zipUriSourceStamp(raw.removePrefix("u:").toUri())
+                    else -> "x"
+                }
             }
         }
         val key = "tokens:" + sortedTokens.joinToString(",") + "|s:" + tokenStamp
@@ -4449,6 +4474,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // Offset kini wajib eksplisit dari klien; konstanta dihapus agar tak unused.
         private const val ZIP_CACHE_TTL_MS = 60_000L
         private const val ZIP_STAMP_MAX_ENTRIES = 8192
+        private const val ZIP_STAMP_MEMO_TTL_MS = 3_000L
         private const val ZIP_CACHE_MAX = 8
         private const val ZIP_CACHE_MAX_BYTES = 256L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5

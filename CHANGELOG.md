@@ -667,6 +667,8 @@
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
 
+- **perf(remote): cap sumber ZIP kini dimemo 3 detik agar tak dibayar per sub-request Range** -- cap #961 dihitung saat membangun kunci (sebelum lookup cache), sehingga jalan kaki stat folder sampai 8192 entri dan iterasi kursor folder media dibayar berulang pada cache-hit maupun tiap sub-request Range unduhan ZIP yang sama. Kini cap dimemo per kunci dasar/token dengan TTL 3 detik: ledakan sub-request terlipat menjadi satu hitungan, dengan harga terbatas berupa jendela basi tambahan maksimal 3 detik (issue #970).
+
 - **fix(download): kegagalan stall/lambat dan DNS kini berakhir PAUSED menunggu jaringan, bukan FAILED terminal** -- isNetworkError sebelumnya tidak mencakup pesan watchdog ('Connection stalled', 'Speed too low') maupun frasa DNS 'Unable to resolve host', sehingga sesudah retry habis kegagalan transien itu jatuh ke FAILED dengan autoResume mati dan tak pernah dihidupkan lagi oleh NetworkCallback. Klasifikasi kini ikut menerima isSlowError/isConnectError, yang sekaligus memberi stall segmen HLS pengulangan level segmen (issue #969).
 
 - **fix(remote): cap per-token mediaZip kini men-decode token sebelum memeriksa awalan** -- token media yang beredar selalu ter-encode Base64 dari raw 'f:'/'u:', dan alfabet Base64 tidak memuat ':' — pemeriksaan awalan #961 pada string encode tidak pernah cocok, sehingga cap selalu 'x' dan seluruh permukaan mediaZip tetap menyajikan ZIP basi untuk perubahan eksternal. Lambda cap kini memakai MediaLibrary.decodeToken, pola yang sama dengan isMediaTokenAllowed (issue #968).
