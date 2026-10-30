@@ -65,6 +65,13 @@ def api_verified_bot(base):
             # batas default runner (issue #334); gagal-tertutup:
             # rentang tidak disertifikasi sebagai bot murni.
             return False
+        except OSError:
+            # gh tidak terpasang (runner self-hosted / image minimal /
+            # pemanggilan lokal): FileNotFoundError adalah subclass
+            # OSError. Tanpa tangkapan ini guard gugur dengan traceback
+            # mentah (issue #741); gagal-tertutup seperti timeout:
+            # rentang tidak disertifikasi sebagai bot murni.
+            return False
         if out.returncode != 0 or out.stdout.strip() != "true":
             return False
     return True
