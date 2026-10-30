@@ -1917,16 +1917,24 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     }
 
     private fun openFolder(item: DownloadItem) {
-        // Beberapa file manager tidak mengikuti activity resolution standar,
-        // jadi intent dicoba langsung sebelum jatuh ke app Downloads.
-        folderIntents(item).forEach { intent ->
-            if (runCatching { startActivity(intent) }.isSuccess) return
+        // folderIntents memuat query MediaStore sinkron untuk item
+        // contentUri (issue #804): hitung di IO agar ketukan tak membayar
+        // IPC + SQLite MediaStore di main thread; percobaan startActivity
+        // tetap di main thread sesudahnya.
+        lifecycleScope.launch {
+            val intents = withContext(Dispatchers.IO) { folderIntents(item) }
+            // Beberapa file manager tidak mengikuti activity resolution
+            // standar, jadi intent dicoba langsung sebelum jatuh ke app
+            // Downloads.
+            intents.forEach { intent ->
+                if (runCatching { startActivity(intent) }.isSuccess) return@launch
+            }
+            val downloads = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (runCatching { startActivity(downloads) }.isSuccess) return@launch
+            Toast.makeText(this@MainActivity, R.string.open_folder_unavailable, Toast.LENGTH_LONG)
+                .show()
         }
-        val downloads = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (runCatching { startActivity(downloads) }.isSuccess) return
-        Toast.makeText(this, R.string.open_folder_unavailable, Toast.LENGTH_LONG)
-            .show()
     }
 
     /** Kembalikan daftar intent fallback untuk membuka folder download.
