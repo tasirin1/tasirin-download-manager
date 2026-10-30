@@ -197,7 +197,17 @@ internal fun getOrCreateThumb(
             thumbFailures.remove(key)
             if (growing && slotInode != null) {
                 thumbSlotInodes[key] = slotInode
-                if (thumbSlotInodes.size > 1024) thumbSlotInodes.clear()
+                if (thumbSlotInodes.size > 1024) {
+                    // Pangkas entri LAIN sampai batas (issue #754):
+                    // clear() polos ikut membuang entri yang barusan
+                    // ditulis, sehingga request berikutnya menilai slot
+                    // basi dan membuat thumbnail ulang sekali ekstra.
+                    val keys = thumbSlotInodes.keys.iterator()
+                    while (thumbSlotInodes.size > 1024 && keys.hasNext()) {
+                        val k = keys.next()
+                        if (k != key) thumbSlotInodes.remove(k)
+                    }
+                }
             }
             runCatching {
                 // Tulis via staging lalu rename: gagal di tengah tak boleh
