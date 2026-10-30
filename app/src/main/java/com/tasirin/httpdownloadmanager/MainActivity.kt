@@ -45,7 +45,6 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tasirin.httpdownloadmanager.data.DownloadItem
-import com.tasirin.httpdownloadmanager.util.Hex
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
@@ -61,6 +60,7 @@ import com.tasirin.httpdownloadmanager.util.setupSpinner
 import com.tasirin.httpdownloadmanager.util.versionCodeCompat
 import com.tasirin.httpdownloadmanager.util.packageInfoCompat
 import com.tasirin.httpdownloadmanager.util.SpeedOptions
+import com.tasirin.httpdownloadmanager.util.sha256Hex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -472,7 +472,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 "view:" + intent.data?.toString().orEmpty()
             else -> return null
         }
-        return Hex.sha256Hex(raw)
+        return sha256Hex(raw)
     }
 
     private fun lastIntentSig(): String? =
