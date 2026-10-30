@@ -141,6 +141,7 @@ object ZipCreator {
             // Gagal MEMBUKA sumber = berkas terlewat (issue #866, selaras
             // #857 untuk token flat): berkas yang hilang di antara
             // listing dan buka tak boleh membunuh seluruh ZIP folder.
+            val expected = file.length()
             val input = runCatching { file.inputStream() }.getOrNull() ?: return 0 to 1
             // Kegagalan MENYALIN di tengah tetap TIDAK ditelan (issue
             // #846): entri tanpa ukuran/CRC di muka memakai data
@@ -150,7 +151,7 @@ object ZipCreator {
             // dan pemanggil menerima kegagalan yang jujur.
             zos.putNextEntry(ZipEntry(entryPath))
             try {
-                input.use { it.copyTo(zos, IO_BUF) }
+                input.use { copyZipEntryVerified(it, zos, expected, true, file.name) }
             } finally {
                 runCatching { zos.closeEntry() }
             }
@@ -199,6 +200,8 @@ object ZipCreator {
             val outcome = runCatching {
                 val name: String
                 val input: java.io.InputStream?
+                var expectedSize = -1L
+                var expectedStrictZero = false
                 if (raw.startsWith("f:")) {
                     val f = File(raw.removePrefix("f:"))
                     val canon = runCatching { f.canonicalPath }.getOrNull()
@@ -260,6 +263,10 @@ object ZipCreator {
                     // berkas yang hilang di antara listing dan buka tak
                     // boleh membunuh seluruh batch. Yang menggagalkan
                     // ZIP hanya gagal MENYALIN di tengah (issue #846).
+                    if (f.isFile) {
+                        expectedSize = f.length()
+                        expectedStrictZero = true
+                    }
                     input = if (f.isFile) {
                         runCatching { f.inputStream() }.getOrNull()
                     } else null
@@ -274,6 +281,7 @@ object ZipCreator {
                         return@forEachIndexed
                     }
                     name = displayNameFor(context, uri)
+                    expectedSize = sizeFor(context, uri)
                     input = runCatching {
                         context.contentResolver.openInputStream(uri)
                     }.getOrNull()
@@ -297,7 +305,7 @@ object ZipCreator {
                 // ZIP, bukan memfinalkan entri terpotong (issue #846).
                 zos.putNextEntry(ZipEntry(entry))
                 try {
-                    input.use { it.copyTo(zos, IO_BUF) }
+                    input.use { copyZipEntryVerified(it, zos, expectedSize, expectedStrictZero, name) }
                 } finally {
                     runCatching { zos.closeEntry() }
                 }
@@ -307,6 +315,41 @@ object ZipCreator {
         }
         return ZipTokensResult(entriesWritten, skippedItems)
     }
+
+    /** Salin isi satu entri lalu verifikasi jumlah byte tersalin
+     *  terhadap ukuran sumber yang ditangkap sebelumnya (issue #958):
+     *  berkas yang berubah ukuran di tengah salin berakhir pada EOF
+     *  dini secara bersih dan dulu difinalkan sebagai entri utuh.
+     *  Ketidakcocokan melempar IOException — ZIP gagal dengan jujur,
+     *  selaras doktrin #846. Ukuran dianggap diketahui bila > 0, atau
+     *  >= 0 bila [strictZero] (jalur berkas: File.length otoritatif,
+     *  termasuk 0; provider MediaStore bisa melaporkan 0 untuk berkas
+     *  valid sehingga 0 di sana berarti tak diketahui). */
+    private fun copyZipEntryVerified(
+        input: java.io.InputStream,
+        zos: ZipOutputStream,
+        expected: Long,
+        strictZero: Boolean,
+        name: String
+    ) {
+        val copied = input.copyTo(zos, IO_BUF)
+        val known = if (strictZero) expected >= 0 else expected > 0
+        if (known && copied != expected) {
+            throw IOException("File changed while zipping: $name")
+        }
+    }
+
+    private fun sizeFor(context: Context, uri: android.net.Uri): Long = runCatching {
+        val projection = arrayOf(MediaStore.MediaColumns.SIZE)
+        context.contentResolver.query(uri, projection, null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                val idx = c.getColumnIndex(MediaStore.MediaColumns.SIZE)
+                if (idx >= 0) c.getLong(idx) else -1L
+            } else {
+                -1L
+            }
+        } ?: -1L
+    }.getOrDefault(-1L)
 
     private fun displayNameFor(context: Context, uri: android.net.Uri): String = runCatching {
         val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
@@ -366,7 +409,8 @@ object ZipCreator {
         val projection = arrayOf(
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
-            MediaStore.MediaColumns.RELATIVE_PATH
+            MediaStore.MediaColumns.RELATIVE_PATH,
+            MediaStore.MediaColumns.SIZE
         )
         // folder dari request: escape wildcard LIKE agar "%"/"_" di nama
         // folder tidak menjaring direktori lain di luar folder terpilih.
@@ -401,6 +445,7 @@ object ZipCreator {
                 val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val iRel = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
+                val iSize = c.getColumnIndex(MediaStore.MediaColumns.SIZE)
                 while (c.moveToNext()) {
                     if (!budget.tryTake()) {
                         // Baris ini dan sisanya tak terkunjungi:
@@ -425,13 +470,18 @@ object ZipCreator {
                     if (input == null) {
                         skipped++
                     } else {
+                        val expected = if (iSize >= 0) {
+                            runCatching { c.getLong(iSize) }.getOrDefault(-1L)
+                        } else {
+                            -1L
+                        }
                         input.use {
                             // Tanpa runCatching: stream MediaStore yang putus
                             // di tengah tidak boleh memfinalkan entri
                             // terpotong sebagai berkas utuh (issue #846).
                             zos.putNextEntry(ZipEntry(entry))
                             try {
-                                it.copyTo(zos, IO_BUF)
+                                copyZipEntryVerified(it, zos, expected, false, name)
                             } finally {
                                 runCatching { zos.closeEntry() }
                             }
