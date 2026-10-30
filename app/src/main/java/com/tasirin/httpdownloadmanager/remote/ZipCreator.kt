@@ -153,7 +153,7 @@ object ZipCreator {
         val budget = ZipBudget()
         var contributed = 0
         tokens.forEach { token ->
-            if (budget.count >= MAX_ZIP_ENTRIES) return
+            if (budget.count >= MAX_ZIP_ENTRIES) return contributed
             val raw = MediaLibrary.decodeToken(token) ?: return@forEach
             // Galat I/O di dalam blok (baca sumber putus, listFiles gagal)
             // TIDAK ditelan runCatching ini: ia dilempar ulang sesudah
