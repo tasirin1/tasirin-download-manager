@@ -86,10 +86,34 @@ internal class ChainInputStream(files: List<File>) : InputStream() {
         if (n <= 0) return 0
         var remaining = n
         while (remaining > 0) {
-            val want = minOf(skipBuf.size.toLong(), remaining).toInt()
-            val r = read(skipBuf, 0, want)
-            if (r <= 0) break
-            remaining -= r
+            val cur = next() ?: break
+            if (remaining >= remainingInCurrent) {
+                // Segmen ini terlewati penuh: buang sisanya dari hitungan
+                // tanpa membaca satu byte pun; next() pada putaran
+                // berikutnya menutup + memajukan indeks.
+                remaining -= remainingInCurrent
+                remainingInCurrent = 0
+                continue
+            }
+            // Sisa lompatan berada di dalam segmen ini: posisikan
+            // channel-nya langsung (issue #1018) — dulu skip membaca &
+            // membuang byte sebanding offset, jadi seek jauh pada
+            // stream parsial multi-segmen membayar O(offset) baca flash.
+            // Pemosisian gagal (sangat jarang untuk berkas reguler)
+            // jatuh ke baca-buang hanya untuk sisa segmen ini.
+            val jumped = runCatching {
+                cur.channel.position(cur.channel.position() + remaining)
+                true
+            }.getOrDefault(false)
+            if (jumped) {
+                remainingInCurrent -= remaining
+                remaining = 0
+            } else {
+                val want = minOf(skipBuf.size.toLong(), remaining).toInt()
+                val r = read(skipBuf, 0, want)
+                if (r <= 0) break
+                remaining -= r
+            }
         }
         return n - remaining
     }
