@@ -799,6 +799,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun loginPage(error: String): Response {
+        // Escape di titik tenggelam (issue #1031): semua pemanggil hari
+        // ini mengisi konstanta/angka server sehingga belum ada XSS
+        // aktif, tetapi interpolasi mentah berarti satu pemanggil masa
+        // depan yang meneruskan teks request langsung jadi XSS
+        // terefleksi di halaman pra-auth. Escape di sini menutup
+        // kelasnya untuk semua pemanggil.
+        val safeError = error
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
         val html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -938,7 +949,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     </div>
     <button type="submit">Log in &rarr;</button>
   </form>
-  <div class="err ${if (error.isEmpty()) "" else "show"}">&#9888;&#65039; $error</div>
+  <div class="err ${if (error.isEmpty()) "" else "show"}">&#9888;&#65039; $safeError</div>
   <div class="foot">Tasirin Download Manager &middot; your local network access</div>
 </div>
 </body>
