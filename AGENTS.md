@@ -594,10 +594,11 @@ jangan digabung dengan PR fitur lain.
 
 ### Verifikasi perubahan
 
-18. **`python3 scripts/check_repo.py`** — jalankan sebelum commit. Cek 9
+18. **`python3 scripts/check_repo.py`** — jalankan sebelum commit. Cek 11
     guard: SDK lokal, struktur repo, kelengkapan AGENTS.md, admin konsisten
-    (stale/CODEOWNERS/labeler/toolchain), remote web sync, upload smoke,
-    README sync, audit self-test, security audit, whitespace.
+    (stale/CODEOWNERS/labeler/toolchain), remote web (sinkron + upload
+    smoke), verifikasi path, cek cepat, README sync, audit self-test,
+    security audit, whitespace.
 19. **`python3 scripts/prepare_remote.py --check`** — wajib setelah mengubah
     `remote.src.html`. Cek sinkron, node --check, larangan kata Indonesia.
 20. **`python3 scripts/security_audit.py`** — audit statis otomatis di CI.
