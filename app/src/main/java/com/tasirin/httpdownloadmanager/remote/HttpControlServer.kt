@@ -4224,7 +4224,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 )
             }
         }
-        return jsonResponse(JSONObject().put("ok", true).put("shares", arr))
+        // "now" = jam server dalam epoch yang sama dengan expiresAt,
+        // agar klien menghitung sisa waktu terhadap jam yang benar
+        // (issue #1035) — jam perangkat pembuka halaman bisa meleset.
+        return jsonResponse(
+            JSONObject().put("ok", true).put("shares", arr)
+                .put("now", System.currentTimeMillis())
+        )
     }
 
     /** Cabut share per id pendek dari daftar (#259): pasangan

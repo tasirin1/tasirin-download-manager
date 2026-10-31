@@ -4496,13 +4496,14 @@ empty.textContent = 'No active share links';
 box.appendChild(empty);
 return;
 }
+const serverNow = data.now || Date.now();
 data.shares.forEach(function (s) {
 const row = document.createElement('div');
 row.className = 'cm-row';
 row.style.justifyContent = 'space-between';
 const label = document.createElement('span');
 label.className = 'cm-text';
-const ms = (s.expiresAt || 0) - Date.now();
+const ms = (s.expiresAt || 0) - serverNow;
 const left = ms <= 0 ? 'expired'
 : ('expires in ' + Math.floor(ms / 3600000) + 'h ' + Math.floor(ms % 3600000 / 60000) + 'm');
 label.textContent = (s.name || '') + ' \u2014 ' + left;
