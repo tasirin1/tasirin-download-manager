@@ -11,6 +11,7 @@ import android.os.PowerManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.ServiceCompat
 import com.tasirin.httpdownloadmanager.App
+import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.NotificationHelper
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
@@ -75,6 +76,22 @@ class DownloadService : Service() {
                     App.startHttpServer()
                 } finally {
                     serverStartPending = false
+                    // Penilaian penutup (issue #1034): start yang GAGAL
+                    // sesudah emisi kolektor pertama lewat tak pernah
+                    // dinilai ulang karena tak ada emisi items baru.
+                    // Hanya bila muatan awal sudah selesai — sebelum
+                    // itu daftar masih kosong palsu (#264) dan kolektor
+                    // yang akan menilai lewat emisi pertamanya. Start
+                    // yang BERHASIL membuat penilaian ini no-op
+                    // (isAlive -> server dinilai aktif).
+                    if (App.engine.isInitialLoadComplete()) {
+                        val itemsNow = App.engine.items.value
+                        val activeNow = itemsNow.any {
+                            it.state == DownloadState.DOWNLOADING ||
+                                it.state == DownloadState.PENDING
+                        }
+                        stopSelfIfNoWork(itemsNow, activeNow, isServerActive())
+                    }
                 }
             }
         }
@@ -93,16 +110,8 @@ class DownloadService : Service() {
                         it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
                     }
                     updateWakeLock(active)
-                    val serverActive = StoragePrefs.isServerBackgroundEnabled(this@DownloadService) &&
-                        (App.httpServer.isAlive || serverStartPending || App.serverStartInProgress())
-                    if (!active && !serverActive) {
-                        NotificationHelper.updateNotification(this@DownloadService, items, serverActive)
-                        ServiceCompat.stopForeground(
-                            this@DownloadService,
-                            ServiceCompat.STOP_FOREGROUND_REMOVE
-                        )
-                        stopSelf()
-                    } else {
+                    val serverActive = isServerActive()
+                    if (!stopSelfIfNoWork(items, active, serverActive)) {
                         // Progress berubah ~4x/detik; batasi refresh UI jadi 1x/detik
                         // agar tidak boros baterai/CPU. Tapi bila keanggotaan item
                         // aktif berubah (ada yang selesai/mulai — mis. download
@@ -130,6 +139,30 @@ class DownloadService : Service() {
                 }
             }
         }
+    }
+
+    /** Server dinilai aktif dari pref + keadaan hidupnya saat ini juga
+     *  (start yang sedang berjalan dihitung aktif, warisan #474/#488). */
+    private fun isServerActive(): Boolean =
+        StoragePrefs.isServerBackgroundEnabled(this) &&
+            (App.httpServer.isAlive || serverStartPending || App.serverStartInProgress())
+
+    /** Satu-satunya keputusan berhenti service (issue #1034): kolektor
+     *  memanggilnya per emisi, dan penyelesaian start server di
+     *  onCreate memanggilnya sekali lagi — kegagalan start yang telat
+     *  tak menghasilkan emisi items, jadi tanpa penilaian penutup itu
+     *  service bisa tertinggal foreground dengan notifikasi "server
+     *  aktif" yang basi. Mengembalikan true bila service dihentikan. */
+    private fun stopSelfIfNoWork(
+        items: List<DownloadItem>,
+        active: Boolean,
+        serverActive: Boolean
+    ): Boolean {
+        if (active || serverActive) return false
+        NotificationHelper.updateNotification(this, items, serverActive)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        return true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
