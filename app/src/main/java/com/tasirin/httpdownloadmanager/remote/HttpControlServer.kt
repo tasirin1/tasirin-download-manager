@@ -505,10 +505,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val cutoff60 = now - 60_000L
             snapshotLastHit.entries.removeIf { it.value < cutoff60 }
         }
-        // loginAttempts: entry > 15 menit
+        // loginAttempts: entry > 15 menit (konstanta yang sama dengan
+        // pruneLoginAttempts, issue #1030)
         if (loginAttempts.size > 16) {
             loginAttempts.entries.removeIf {
-                now - it.value.updatedAt > 15 * 60 * 1000L
+                now - it.value.updatedAt > LOGIN_ATTEMPT_DECAY_MS
             }
         }
         // completedUploads: entry > 1 jam
@@ -702,7 +703,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (loginAttempts.isEmpty()) return
             loginAttempts.entries.removeIf {
                 it.value.lockedUntil < now &&
-                    now - it.value.updatedAt > LOGIN_LOCK_MS
+                    now - it.value.updatedAt > LOGIN_ATTEMPT_DECAY_MS
             }
             while (loginAttempts.size > MAX_LOGIN_ATTEMPT_ENTRIES) {
                 // Entri yang sedang terkunci TIDAK boleh terbuang (#219):
@@ -4473,6 +4474,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val ZIP_CACHE_MAX_BYTES = 256L * 1024 * 1024
         private const val MAX_LOGIN_ATTEMPTS = 5
         private const val LOGIN_LOCK_MS = 30_000L
+
+        /** Umur menganggur sebelum penghitung gagal login sebuah entri
+         *  diluruhkan (issue #1030): wajib JAUH lebih panjang dari masa
+         *  kunci — sebelumnya prune memakai LOGIN_LOCK_MS (30 detik)
+         *  sehingga tebakan yang dijeda >30 detik tak pernah terakumulasi
+         *  mencapai ambang kunci (serangan tetes-lambat). Nilai yang sama
+         *  dipakai periodicCleanup untuk peta yang sama. */
+        private const val LOGIN_ATTEMPT_DECAY_MS = 15 * 60 * 1000L
         private const val MAX_LOGIN_ATTEMPT_ENTRIES = 512
         private const val MAX_SHARE_TOKENS = 256
         private const val ZIP_DL_TTL_MS = 120_000L
