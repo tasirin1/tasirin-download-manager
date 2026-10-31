@@ -2087,6 +2087,14 @@ break;
 }
 if (!fallbackAnchor) {
 const blob = new Blob(chunks, {type: res.headers.get('Content-Type') || 'application/zip'});
+if (blob.arrayBuffer) {
+const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+if (head.length < 2 || head[0] !== 0x50 || head[1] !== 0x4B) {
+let detail = '';
+try { detail = (await blob.slice(0, 120).text()).trim(); } catch (e3) {}
+throw new Error('Server did not return a ZIP file' + (detail ? ': ' + detail : ''));
+}
+}
 const a = document.createElement('a');
 a.href = URL.createObjectURL(blob);
 a.download = fileName || 'download.zip';
