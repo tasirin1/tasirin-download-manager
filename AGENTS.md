@@ -628,3 +628,7 @@ jangan digabung dengan PR fitur lain.
 | Commit tanpa CHANGELOG | CI gagal guard CHANGELOG | tambah entri ke `CHANGELOG.md` |
 | Force push ke `main` | History rusak, branch protection | buat PR, jangan force push |
 | Commit keystore/password | Secret bocor | hanya di GitHub Secrets |
+
+## Aturan rilis maraton (owner 2026-10-31)
+
+Satu maraton = satu versi rilis: seluruh perbaikan dalam satu maraton dikumpulkan dan diterbitkan sebagai SATU versi di akhir maraton, bukan satu versi per perbaikan. Karena workflow repo ini membump versi dan menerbitkan release pada setiap push ke `main`, commit perbaikan maraton ditahan secara lokal selama maraton berjalan dan di-push sekali di akhir maraton (satu push = satu bump = satu release). Versi kanonik aturan ini ada di `SOUL.md` repo memori (seksi aturan maraton, berlaku semua repo).
