@@ -24,6 +24,7 @@ import java.util.Locale
 import android.view.View
 import android.view.animation.AnimationUtils
 import androidx.core.view.isVisible
+import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.download.HlsRendition
 import android.widget.Button
 import android.widget.EditText
@@ -421,6 +422,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         ) {
             lifecycleScope.launch(Dispatchers.IO) {
                 App.startHttpServer()
+                // Mode background: pastikan service penjaga proses
+                // berjalan bersama server (issue #1028).
+                DownloadService.ensureRunning(this@MainActivity)
             }
         }
         // Intent peluncur diproses pada pembuatan segar; pada pembuatan

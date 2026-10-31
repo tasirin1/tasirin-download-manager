@@ -10,6 +10,7 @@ import android.net.NetworkRequest
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import com.tasirin.httpdownloadmanager.download.DownloadEngine
+import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.CrashLog
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
@@ -58,6 +59,9 @@ class App : Application() {
                 // restartHttpServer yang sedang menukar instance,
                 // server berakhir menyala pada instance yang salah.
                 startHttpServer()
+                // Mode background: service-lah yang menjaga proses
+                // (dan server ini) tetap hidup di latar (issue #1028).
+                DownloadService.ensureRunning(this@App)
             }.start()
         }
         registerNetworkCallback()

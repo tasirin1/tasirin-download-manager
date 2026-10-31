@@ -548,6 +548,10 @@ class SettingsActivity : AppCompatActivity() {
                         }
                     } else if (!started) {
                         StoragePrefs.setServerBackgroundEnabled(this@SettingsActivity, true)
+                        // Server mode background wajib dijaga service,
+                        // kalau tidak ia mati senyap saat proses direbut
+                        // sistem (issue #1028).
+                        DownloadService.ensureRunning(this@SettingsActivity)
                         Toast.makeText(
                             this@SettingsActivity,
                             getString(R.string.remote_started, App.httpServer.listeningPort),

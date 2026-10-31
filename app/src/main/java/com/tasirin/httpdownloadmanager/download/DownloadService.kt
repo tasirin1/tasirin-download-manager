@@ -207,8 +207,30 @@ class DownloadService : Service() {
     // sehat (emisi tiap tick progres) tak pernah kehilangan lock; stall total
     // >1 jam melepas CPU (hemat baterai) dan dipegang lagi saat pulih via
     // NetworkCallback/retry -> emisi -> re-acquire di bawah.
-    private companion object {
+    companion object {
         const val WAKELOCK_TIMEOUT_MS = 60 * 60 * 1000L
+
+        /** Pastikan DownloadService berjalan (issue #1028). Server mode
+         *  background hanya terlindungi dari rebut proses sistem bila
+         *  service ini hidup — logika berhenti kolektornya sendiri sudah
+         *  memperhitungkan server aktif, dan onCreate service ikut
+         *  men-start server. Sebelumnya hanya jalur unduhan dan jalur
+         *  boot yang men-start service, jadi server yang dinyalakan dari
+         *  Settings/App/MainActivity tanpa unduhan bisa mati senyap
+         *  saat proses cached direbut sistem. Kegagalan start (mis.
+         *  pembatasan start FGS dari latar Android 12+) ditelan seperti
+         *  jalur engine: pen-start lain (job boot, start unduhan) tetap
+         *  akan menjalankannya, dan server sendiri sudah menyala. */
+        fun ensureRunning(context: Context) {
+            runCatching {
+                val intent = Intent(context, DownloadService::class.java)
+                if (Build.VERSION.SDK_INT >= 26) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            }
+        }
     }
 
     // Acquire/release lintas callback lifecycle (bukan try/finally satu metode)

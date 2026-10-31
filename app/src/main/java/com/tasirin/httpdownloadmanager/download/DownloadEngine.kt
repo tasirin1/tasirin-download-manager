@@ -2,9 +2,7 @@ package com.tasirin.httpdownloadmanager.download
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Base64
@@ -4799,16 +4797,11 @@ class DownloadEngine(appContext: Context) {
     private fun sanitizeFileName(name: String): String = FileNames.safe(name)
 
     private fun ensureServiceRunning() {
-        runCatching {
-            val intent = Intent(context, DownloadService::class.java)
-            if (Build.VERSION.SDK_INT >= 26) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-        }
-        // Jika foreground service gagal dimulai (mis. pembatasan Android 12+ saat
-        // di latar belakang), download tetap dijalankan di proses aplikasi.
+        // Badan start tunggal di DownloadService.ensureRunning (#1028):
+        // bila foreground service gagal dimulai (mis. pembatasan
+        // Android 12+ saat di latar belakang), unduhan tetap dijalankan
+        // di proses aplikasi.
+        DownloadService.ensureRunning(context)
     }
 
     @Synchronized
