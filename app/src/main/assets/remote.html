@@ -1194,6 +1194,7 @@ const FS_PAGE = 250;
 const FS_MAX_SCROLL_POSITIONS = 128;
 let fsScrollPos = {};
 let fsSelectMode = false;
+let fsSelectSession = 0;
 const fsSelected = new Set();
 const fsView = document.getElementById('fsView');
 const fsBtn = document.getElementById('tabFiles');
@@ -1894,6 +1895,7 @@ document.getElementById('fsBatchSize').textContent = total > 0 ? '\u00b7 ' + fmt
 document.getElementById('fsBatchAll').textContent = (fsItems || []).length > 0 && fsSelected.size === fsItems.length ? 'Cancel all' : 'Select all';
 }
 function resetFsSelection() {
+fsSelectSession++;
 fsSelectMode = false;
 fsSelected.clear();
 fsSelectBtn.textContent = 'Select';
@@ -1903,6 +1905,7 @@ fsBatch.classList.add('hidden');
 }
 function enterFsSelect() {
 closeFsToolsMenu();
+fsSelectSession++;
 fsSelectMode = true;
 fsSelectBtn.textContent = 'Cancel selection';
 fsSelectBtn.classList.add('on');
@@ -1969,16 +1972,42 @@ exitFsSelect();
 document.getElementById('fsBatchCancel').addEventListener('click', function () {
 exitFsSelect();
 });
-document.getElementById('fsBatchAll').addEventListener('click', function () {
+document.getElementById('fsBatchAll').addEventListener('click', async function () {
+const btn = document.getElementById('fsBatchAll');
+const allSel = (fsItems || []).length > 0 && fsTotal <= fsItems.length &&
+fsSelected.size === fsItems.length;
+if (!allSel && fsTotal > (fsItems || []).length && !btn.disabled) {
+btn.disabled = true;
+btn.textContent = 'Loading...';
+const session = fsSelectSession;
+const path = fsPath;
+let guard = 0;
+while (fsTotal > fsItems.length && guard++ < 500) {
+if (fsSelectSession !== session || fsPath !== path || !fsSelectMode) break;
+while (fsLoadingMore) {
+await new Promise(function (r) { setTimeout(r, 100); });
+}
+if (fsSelectSession !== session || fsPath !== path || !fsSelectMode) break;
+const before = fsItems.length;
+await fsLoadMore();
+if (fsItems.length === before) break;
+}
+if (fsSelectSession !== session || fsPath !== path || !fsSelectMode) {
+btn.disabled = false;
+if (fsSelectMode) updateFsBatch();
+return;
+}
+btn.disabled = false;
+}
 const all = fsItems || [];
-const allSel = all.length > 0 && fsSelected.size === all.length;
+const nowAllSel = all.length > 0 && fsSelected.size === all.length && fsTotal <= all.length;
 fsSelected.clear();
-if (!allSel) {
+if (!nowAllSel) {
 for (let i = 0; i < all.length; i++) fsSelected.add(all[i]);
 }
 fsList.querySelectorAll('.fs-row .fs-check').forEach(function (c) {
-c.classList.toggle('on', !allSel);
-c.textContent = !allSel ? '\u2713' : '';
+c.classList.toggle('on', !nowAllSel);
+c.textContent = !nowAllSel ? '\u2713' : '';
 });
 updateFsBatch();
 });

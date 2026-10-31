@@ -3531,6 +3531,10 @@ const FS_PAGE = 250;
 const FS_MAX_SCROLL_POSITIONS = 128;
 let fsScrollPos = {};
 let fsSelectMode = false;
+// Sesi mode pilih fs (issue #1029): naik pada setiap masuk/keluar mode
+// pilih agar handler Select all yang masih memuat halaman bisa tahu
+// sesinya sudah gugur — pola galSelectSession di galeri (#877).
+let fsSelectSession = 0;
 const fsSelected = new Set();
 const fsView = document.getElementById('fsView');
 const fsBtn = document.getElementById('tabFiles');
@@ -4334,6 +4338,7 @@ function updateFsBatch() {
 }
 
 function resetFsSelection() {
+  fsSelectSession++;
   fsSelectMode = false;
   fsSelected.clear();
   fsSelectBtn.textContent = 'Select';
@@ -4344,6 +4349,7 @@ function resetFsSelection() {
 
 function enterFsSelect() {
   closeFsToolsMenu();
+  fsSelectSession++;
   fsSelectMode = true;
   fsSelectBtn.textContent = 'Cancel selection';
   fsSelectBtn.classList.add('on');
@@ -4422,16 +4428,58 @@ document.getElementById('fsBatchCancel').addEventListener('click', function () {
   exitFsSelect();
 });
 
-document.getElementById('fsBatchAll').addEventListener('click', function () {
+document.getElementById('fsBatchAll').addEventListener('click', async function () {
+  const btn = document.getElementById('fsBatchAll');
+  // "Select all" wajib berarti seluruh isi folder (issue #1029),
+  // menyamai galeri pada #851: muat semua halaman tersisa dulu.
+  // allSel hanya benar bila SELURUH folder (fsTotal) sudah termuat
+  // dan terpilih — memilih halaman termuat saja bukan "semua",
+  // tetapi tombol lama berbalik 'Cancel all' pada keadaan itu.
+  const allSel = (fsItems || []).length > 0 && fsTotal <= fsItems.length &&
+    fsSelected.size === fsItems.length;
+  if (!allSel && fsTotal > (fsItems || []).length && !btn.disabled) {
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+    const session = fsSelectSession;
+    const path = fsPath;
+    let guard = 0;
+    while (fsTotal > fsItems.length && guard++ < 500) {
+      // Sesi mode pilih berubah di tengah muatan (keluar mode, masuk
+      // lagi, atau navigasi folder): berhenti — daftar yang kini
+      // tampil bukan lagi yang diminta Select all ini.
+      if (fsSelectSession !== session || fsPath !== path || !fsSelectMode) break;
+      // Tunggu pemuatan lain yang sedang berjalan reda dulu (pola
+      // #860 di galeri): fsLoadMore kembali seketika saat sibuk dan
+      // loop akan keliru menilai 'tak ada kemajuan'.
+      while (fsLoadingMore) {
+        await new Promise(function (r) { setTimeout(r, 100); });
+      }
+      if (fsSelectSession !== session || fsPath !== path || !fsSelectMode) break;
+      const before = fsItems.length;
+      await fsLoadMore();
+      // Halaman gagal dimuat (jumlah tak bertambah): berhenti dan
+      // pilih yang termuat — hitungan terpilih tetap jujur.
+      if (fsItems.length === before) break;
+    }
+    if (fsSelectSession !== session || fsPath !== path || !fsSelectMode) {
+      // Ekor lintas-sesi hanya memulihkan tombol; label & seleksi
+      // milik sesi yang sedang berlaku (updateFsBatch menilai ulang
+      // label dari keadaan semasa bila mode pilih masih hidup).
+      btn.disabled = false;
+      if (fsSelectMode) updateFsBatch();
+      return;
+    }
+    btn.disabled = false;
+  }
   const all = fsItems || [];
-  const allSel = all.length > 0 && fsSelected.size === all.length;
+  const nowAllSel = all.length > 0 && fsSelected.size === all.length && fsTotal <= all.length;
   fsSelected.clear();
-  if (!allSel) {
+  if (!nowAllSel) {
     for (let i = 0; i < all.length; i++) fsSelected.add(all[i]);
   }
   fsList.querySelectorAll('.fs-row .fs-check').forEach(function (c) {
-    c.classList.toggle('on', !allSel);
-    c.textContent = !allSel ? '\u2713' : '';
+    c.classList.toggle('on', !nowAllSel);
+    c.textContent = !nowAllSel ? '\u2713' : '';
   });
   updateFsBatch();
 });
