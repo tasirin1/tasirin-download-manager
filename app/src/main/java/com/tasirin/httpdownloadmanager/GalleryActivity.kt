@@ -131,20 +131,52 @@ class GalleryActivity : AppCompatActivity() {
                 if (!filesChanged && now - lastUiAt < 800L) return@collect
                 lastUiAt = now
                 if (filesChanged) {
-                    val gen = ++galleryScanGen
-                    val scanned = withContext(Dispatchers.IO) {
-                        MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
-                    }
-                    if (gen == galleryScanGen) {
-                        fullList = scanned
-                        initialScanDone = true
-                    }
+                    rescanGallery()
                 } else {
                     fullList = mergedProgress(fullList)
                 }
                 updateList()
             }
             }
+        }
+    }
+
+    /** Scan ulang galeri penuh (IO) dengan penjaga generasi bersama:
+     *  hanya hasil scan terbaru yang diterapkan ke fullList. */
+    private suspend fun rescanGallery() {
+        val gen = ++galleryScanGen
+        val scanned = withContext(Dispatchers.IO) {
+            MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
+        }
+        if (gen == galleryScanGen) {
+            fullList = scanned
+            initialScanDone = true
+        }
+    }
+
+    // Segar ulang saat kembali ke depan (issue #1050): galeri tak punya
+    // onResume/onPause sama sekali sebelumnya, dan invalidasi
+    // MediaLibrary hanya membersihkan cache pemindaian — bukan daftar
+    // milik activity. Mutasi eksternal selama galeri di latar (berkas
+    // dihapus/dipindah dari player atau file manager) tak menghasilkan
+    // emisi engine apa pun, jadi entri hantu bertahan sampai activity
+    // dibuat ulang. Bendera wasStopped membedakan resume pertama
+    // (sesudah onCreate, scan awal yang menangani) dari kepulangan.
+    private var galleryWasStopped = false
+
+    override fun onStop() {
+        super.onStop()
+        galleryWasStopped = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!galleryWasStopped || !initialScanDone) return
+        galleryWasStopped = false
+        lifecycleScope.launch {
+            MediaLibrary.invalidateScanCache()
+            rescanGallery()
+            updateList()
         }
     }
 
