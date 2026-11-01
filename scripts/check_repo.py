@@ -396,15 +396,26 @@ def fast_checks() -> list[Result]:
     results += list(static_checks())
     results.append(agents_md_completeness())
     results.append(admin_consistency())
+    # Rentang diff verifikasi-path dari lingkungan (issue #1085):
+    # workflow CI meneruskan rentang eventnya lewat variabel ini agar
+    # verifikasi-path berjalan SEKALI per job dengan kekuatan rentang,
+    # bukan dua kali (ber-rentang sebagai langkah workflow terpisah +
+    # tanpa rentang di suite ini). Lokal tanpa variabel = tanpa rentang.
+    rentang = os.environ.get("VERIFIKASI_PATH_RENTANG", "").strip()
+    verif_args = ["--rentang", rentang] if rentang else []
     results.extend(
         [
             python_tool("remote web", "scripts/prepare_remote.py", ["--check"]),
-            python_tool("verifikasi path", "tools/verifikasi-path.py"),
+            python_tool("verifikasi path", "tools/verifikasi-path.py", verif_args),
             run("cek cepat", ["bash", str(ROOT / "scripts/cek-cepat.sh")]),
             # Langkah "upload smoke" terpisah SENGAJA tidak ada (#294):
             # prepare_remote --check di atas sudah menjalankannya lewat
             # run_upload_smoke — versi lama menjalankan smoke dua kali.
-            python_tool("readme sync", "scripts/check_readme_sync.py"),
+            # Langkah "readme sync" terpisah SENGAJA tidak ada (issue
+            # #1085): cek-cepat.sh di atas sudah menjalankan
+            # check_readme_sync.py dan menampilkan keluarannya (vonis
+            # bernama #613), jadi langkah terpisah hanya membayar
+            # pemeriksaan yang sama dua kali per lari.
             python_tool("audit self-test", "scripts/security_audit.py", ["--self-test"]),
             python_tool("security audit", "scripts/security_audit.py"),
         ]

@@ -60,32 +60,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/check_changelog.py "${{ github.event.pull_request.base.sha }}" "${{ github.event.before }}"
 
-      - name: Verifikasi path (tanpa SDK Android)
-        # Dulu workflow verifikasi-path.yml tersendiri; kini satu gerbang di
-        # sini agar satu status, satu runner, tanpa duplikasi checkout.
-        # Rentang event WAJIB diteruskan: tanpa --rentang skrip jatuh ke
-        # diff HEAD~1 sehingga cek berbasis diff hanya menilai commit
-        # terakhir dari push/PR multi-commit (issue #156).
-        run: |
-          BASE="${{ github.event.pull_request.base.sha }}"
-          if [ -z "$BASE" ]; then BASE="${{ github.event.before }}"; fi
-          if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
-            python3 tools/verifikasi-path.py --rentang "$BASE...${{ github.sha }}"
-          else
-            python3 tools/verifikasi-path.py
-          fi
-
       - name: Guard konsistensi repo (check_repo.py)
         # Dulu hanya jalan lewat hook pre-commit lokal yang opt-in —
         # drift AGENTS.md vs wrapper lolos saat merge PR #135 (issue #184).
         # Langkah ini SUMBER TUNGGAL suite gerbang cepat (issue #379):
         # fast_checks di check_repo.py sudah menjalankan prepare_remote
         # --check, check_readme_sync, security_audit --self-test + audit
-        # penuh, verifikasi-path (tanpa rentang; versi ber-rentang event
-        # tetap langkah khusus di atas karena lebih kuat), dan cek-cepat
+        # penuh, verifikasi-path (ber-rentang event lewat lingkungan,
+        # issue #1085), dan cek-cepat
         # — langkah per-alat terpisah untuk itu semua dihapus agar suite
         # tidak berjalan dua kali per push/PR.
-        run: python3 scripts/check_repo.py
+        # Rentang event diteruskan ke suite lewat lingkungan (issue
+        # #1085): verifikasi-path berjalan SEKALI di dalam check_repo
+        # dengan --rentang itu (tanpa rentang ia jatuh ke diff HEAD~1
+        # sehingga cek berbasis diff hanya menilai commit terakhir
+        # dari push/PR multi-commit, issue #156). Langkah workflow
+        # verifikasi-path terpisah dihapus agar tak berjalan dua kali.
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="${{ github.event.before }}"; fi
+          if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            export VERIFIKASI_PATH_RENTANG="$BASE...${{ github.sha }}"
+          fi
+          python3 scripts/check_repo.py
 
   build:
     name: Build APK

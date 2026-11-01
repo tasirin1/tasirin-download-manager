@@ -401,8 +401,10 @@ Dua job: **`verify`** (cepat, tanpa SDK — gagal-cepat sebelum Gradle) lalu
 dikecualikan untuk PR Dependabot) → **`scripts/prepare_remote.py --check`**
 (sinkron remote.html, node --check, guard i18n) + **cek sinkron
 README/README.en** → **audit statis bug/error/keamanan
-(`security_audit.py --self-test`)** → **`tools/verifikasi-path.py`** (penuh,
-tanpa `--rentang`) + **`scripts/cek-cepat.sh`**.
+(`security_audit.py --self-test`)** → **`tools/verifikasi-path.py`** (penuh;
+di CI berjalan sekali di dalam `check_repo.py` dengan `--rentang` event
+yang diteruskan lewat lingkungan `VERIFIKASI_PATH_RENTANG`, issue #1085)
++ **`scripts/cek-cepat.sh`**.
 
 **Job `build`**: checkout → JDK 17 → Android SDK → **cek kesehatan
 keystore** (fingerprint `c2785a61...` + **masa berlaku**: error < 90 hari,
