@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan internal: KDoc Permissions tidak lagi menyebut Android 5 pada rentang perilaku izin; aplikasi mendukung mulai Android 6 (issue #1119).
 - Perbaikan: tombol Simpan di Pengaturan tidak lagi menulis ulang folder ekstra/galeri dan port yang tidak berubah, chip navigasi tidak menulis ulang keadaan seksi yang sudah terbuka, dan verifikasi PIN PBKDF2 tidak lagi dibayar dua kali per Simpan (issue #1118).
 - Perbaikan: kolom User-Agent kustom di Pengaturan tidak lagi menulis ulang preferensi dan menyegarkan mesin bila isi akhirnya sama dengan yang tersimpan (mis. mengetik lalu menghapus lagi) (issue #1117).
 - Perbaikan internal: dua komentar lama di pemuat thumbnail web remote yang menyatakan muatan berjalan tidak disentuh kini diselaraskan dengan perilaku pemulihan slot sejak issue #1099, agar tidak menyesatkan pengelola berikutnya (issue #1116).

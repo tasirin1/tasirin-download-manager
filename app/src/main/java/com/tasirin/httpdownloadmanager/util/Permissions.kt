@@ -11,8 +11,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 
 /** Daftar izin runtime yang perlu diminta (duplikat lama ada di MainActivity
- *  dan SettingsActivity). Android 5-12 tidak memakai notifikasi runtime,
- *  Android 5-9 tidak butuh WRITE_EXTERNAL_STORAGE diminta di runtime.
+ *  dan SettingsActivity). Android 6-12 tidak memakai notifikasi runtime,
+ *  Android 6-9 tidak butuh WRITE_EXTERNAL_STORAGE diminta di runtime.
  *  Android 10+ (API 29+) memakai scoped storage / All-files-access:
  *  izin ini tak ada di manifest (maxSdkVersion 28) sehingga memintanya
  *  hanya dialog sampah — dibatasi ke API 23..28. */
