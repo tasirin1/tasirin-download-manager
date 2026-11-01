@@ -14,6 +14,9 @@ object DownloadItemCodec {
     private const val MAX_DECODED_SEGMENT_INDEX = 64
     private const val MAX_DECODED_SEGMENTS = 64
 
+    // Plafon kelayakan byte progres tersimpan (issue #1058): 2^40.
+    private const val MAX_PLAUSIBLE_PROGRESS_BYTES = 1L shl 40
+
     fun encode(items: List<DownloadItem>): String {
         val arr = JSONArray()
         items.forEach { item ->
@@ -288,8 +291,18 @@ object DownloadItemCodec {
         val prog = runCatching { JSONObject(progressRaw) }.getOrNull() ?: return items
         return items.map { item ->
             val p = prog.optJSONObject(item.id) ?: return@map item
-            val b = p.optLong("b", item.bytesDownloaded)
-            val t = p.optLong("t", item.totalBytes)
+            // Nilai progres wajib layak fisik (issue #1058): blob korup
+            // {"b": Long.MAX_VALUE, "t": 0} dulu lolos utuh karena jepit
+            // ke total hanya berlaku bila total diketahui — angka absurd
+            // tampil di daftar dan ikut ter-encode ulang pada save
+            // berikutnya. Plafon 2^40 byte (1 TiB) jauh di atas unduhan
+            // terbesar realistis di perangkat sasaran (HP/TV box);
+            // nilai di luar 0..plafon pasti korup dan diabaikan
+            // (kembali ke nilai item sendiri).
+            val bRaw = p.optLong("b", item.bytesDownloaded)
+            val tRaw = p.optLong("t", item.totalBytes)
+            val b = if (bRaw in 0..MAX_PLAUSIBLE_PROGRESS_BYTES) bRaw else item.bytesDownloaded
+            val t = if (tRaw in 0..MAX_PLAUSIBLE_PROGRESS_BYTES) tRaw else item.totalBytes
             // Ambil max per field: bila hanya total yang tumbuh (kasus save &
             // saveProgress balapan), bytes versi lama tidak boleh menimpa mundur.
             // Clamp bytes ke total: progres basi yang lebih besar dari total

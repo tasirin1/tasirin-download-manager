@@ -297,6 +297,26 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `overlayProgress - nilai progres tak layak fisik diabaikan`() {
+        // Issue #1058: blob korup b=Long.MAX_VALUE dengan total tak
+        // diketahui (t=0) dulu lolos utuh ke daftar + encode ulang.
+        val items = listOf(
+            DownloadItem(
+                id = "a", url = "https://a/x", fileName = "a", state = DownloadState.PAUSED,
+                bytesDownloaded = 110, totalBytes = 0
+            )
+        )
+        val raw = """{"a":{"b":${Long.MAX_VALUE},"t":0}}"""
+        val out = DownloadItemCodec.overlayProgress(items, raw)
+        assertEquals(110L, out[0].bytesDownloaded)
+        assertEquals(0L, out[0].totalBytes)
+        // Nilai besar yang masih layak (di bawah plafon) tetap diterapkan.
+        val raw2 = """{"a":{"b":5000,"t":0}}"""
+        val out2 = DownloadItemCodec.overlayProgress(items, raw2)
+        assertEquals(5000L, out2[0].bytesDownloaded)
+    }
+
+    @Test
     fun `overlayProgress - segmen ber-end Long MAX tidak meluap cap`() {
         // Issue #789: cap end-start+1 polos membungkus ke Long.MIN_VALUE
         // untuk end ekstrem sehingga progres segmen tak pernah diterapkan.
