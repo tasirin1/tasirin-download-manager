@@ -1,6 +1,7 @@
 package com.tasirin.httpdownloadmanager.download
 
 import java.io.BufferedInputStream
+import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -25,22 +26,54 @@ import java.io.PushbackInputStream
  *  (issue #704). */
 object AdtsAac {
 
-    /** Hasil parse: info format + iterasi frame yang bisa diulang. */
+    /** Hasil parse: info format + iterasi frame yang bisa diulang.
+     *  Sumber frame adalah PABRIK iterator, bukan Sequence (issue #1041):
+     *  iterator berkas memiliki stream yang wajib ditutup deterministik —
+     *  Sequence yang ditinggal di tengah (isEmpty berhenti di frame
+     *  pertama, eksepsi di tengah forEachFrame) tak pernah menyelesaikan
+     *  blok `use` di dalamnya sehingga FD bocor sampai finalizer GC.
+     *  Tiap akses di sini menutup iteratornya di finally. */
     class Stream(
         val sampleRate: Int,
         val channels: Int,
         val csd0: ByteArray,
-        private val frames: Sequence<ByteArray>
+        private val frames: () -> Iterator<ByteArray>
     ) {
         /** Jumlah frame AAC (menghitung dengan iterasi penuh sumber). */
-        val frameCount: Int get() = frames.count()
+        val frameCount: Int
+            get() {
+                val it = frames()
+                try {
+                    var n = 0
+                    while (it.hasNext()) {
+                        it.next()
+                        n++
+                    }
+                    return n
+                } finally {
+                    (it as? Closeable)?.close()
+                }
+            }
 
         /** true bila tidak ada frame AAC sama sekali. */
-        val isEmpty: Boolean get() = frames.none()
+        val isEmpty: Boolean
+            get() {
+                val it = frames()
+                try {
+                    return !it.hasNext()
+                } finally {
+                    (it as? Closeable)?.close()
+                }
+            }
 
         /** Jalankan `action` untuk tiap frame AAC (payload tanpa header ADTS). */
         fun forEachFrame(action: (ByteArray) -> Unit) {
-            frames.forEach(action)
+            val it = frames()
+            try {
+                while (it.hasNext()) action(it.next())
+            } finally {
+                (it as? Closeable)?.close()
+            }
         }
     }
 
@@ -244,7 +277,7 @@ object AdtsAac {
             SAMPLE_RATES[first.sfIndex],
             first.channels,
             csd0(first.profile, first.sfIndex, first.channels),
-            dataFrames(data)
+            { dataFrames(data).iterator() }
         )
     }
 
@@ -264,7 +297,7 @@ object AdtsAac {
                 SAMPLE_RATES[h.sfIndex],
                 h.channels,
                 csd0(h.profile, h.sfIndex, h.channels),
-                fileFrames(file)
+                { fileFrameIterator(file) }
             )
         } finally {
             input.close()
@@ -308,13 +341,48 @@ object AdtsAac {
         }
     }
 
-    /** Iterasi frame dari file — membuka stream baru per iterasi dan membaca
-     *  satu frame pada satu waktu. */
-    private fun fileFrames(file: File): Sequence<ByteArray> = sequence {
-        PushbackInputStream(BufferedInputStream(FileInputStream(file)), 16).use { input ->
-            while (true) {
-                val frame = readFrame(input) ?: break
-                yield(frame.payload)
+    /** Iterator frame dari file — membuka stream baru per iterator dan
+     *  membaca satu frame pada satu waktu. Stream ditutup saat iterator
+     *  habis, saat baca gagal, atau saat pemilik memanggil close()
+     *  (konsumen short-circuit seperti isEmpty) — deterministik, tidak
+     *  menunggu finalizer (issue #1041). */
+    private fun fileFrameIterator(file: File): Iterator<ByteArray> {
+        val input = PushbackInputStream(BufferedInputStream(FileInputStream(file)), 16)
+        return object : Iterator<ByteArray>, Closeable {
+            private var pending: ByteArray? = null
+            private var loaded = false
+            private var closed = false
+
+            private fun load() {
+                if (loaded || closed) return
+                loaded = true
+                pending = try {
+                    readFrame(input)?.payload
+                } catch (e: Exception) {
+                    close()
+                    throw e
+                }
+                if (pending == null) close()
+            }
+
+            override fun hasNext(): Boolean {
+                load()
+                return pending != null
+            }
+
+            override fun next(): ByteArray {
+                load()
+                val frame = pending ?: throw NoSuchElementException()
+                pending = null
+                loaded = false
+                return frame
+            }
+
+            override fun close() {
+                if (!closed) {
+                    closed = true
+                    runCatching { input.close() }
+                }
             }
         }
     }
