@@ -4949,7 +4949,10 @@ if (document.visibilityState === 'hidden') return;
 clearTimeout(pollTimer);
 pollTimer = setTimeout(pollTick, nextPollMs());
 }
+let snapInFlight = false;
 async function pollSnapshot() {
+if (snapInFlight) return;
+snapInFlight = true;
 const mySeq = ++snapSeq;
 try {
 const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
@@ -4988,6 +4991,8 @@ if (snapFailCount >= 2) sseOutageSeen = true;
 if (failCount > 2) {
 statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
 }
+} finally {
+snapInFlight = false;
 }
 }
 function pollTick() {

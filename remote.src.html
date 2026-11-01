@@ -7981,7 +7981,16 @@ function schedulePoll() {
   pollTimer = setTimeout(pollTick, nextPollMs());
 }
 
+// Penjaga in-flight polling (issue #1046): pollTick menjadwalkan tick
+// berikutnya tanpa menunggu snapshot selesai, jadi snapshot yang lambat
+// (server HP kecil + poll 1 detik) menumpuk paralel dan hasil lamanya
+// dibuang snapSeq — pekerjaan sia-sia berlipat. Satu snapshot berjalan
+// pada satu waktu; tick yang menabraknya cukup menunggu jadwal berikut.
+let snapInFlight = false;
+
 async function pollSnapshot() {
+  if (snapInFlight) return;
+  snapInFlight = true;
   const mySeq = ++snapSeq;
   try {
     const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
@@ -8045,6 +8054,8 @@ async function pollSnapshot() {
     if (failCount > 2) {
       statusLine.textContent = 'Cannot connect to the server. Check the server in the app.';
     }
+  } finally {
+    snapInFlight = false;
   }
 }
 
