@@ -381,7 +381,9 @@ kuat dan tanpa diskusi:
   (mis. update GitHub Actions) di-**auto-merge** setelah CI hijau (workflow
   `auto-merge.yml`). PR dependensi Gradle tetap manual karena wajib
   regenerasi metadata verifikasi. Yang di-ignore (perlu upgrade toolchain
-  manual): hanya major AGP & Kotlin. Ignore lama untuk `activity`,
+  manual): hanya major AGP (Kotlin dibundel AGP 9 — ignore
+  `org.jetbrains.kotlin.android` dicabut 2026-11-01, issue #1089, karena
+  plugin itu tak dideklarasikan di mana pun). Ignore lama untuk `activity`,
   `lifecycle`, dan `androidx.core` dicabut 2026-10-28 karena alasannya
   (minSdk 21 / compileSdk 36) sudah tidak berlaku. Guard CHANGELOG
   dikecualikan untuk author `dependabot[bot]`.

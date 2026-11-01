@@ -27,12 +27,16 @@ updates:
         patterns:
           - "com.android.tools*"
     ignore:
-      # Major AGP/Kotlin perlu upgrade Gradle dulu; tangani manual bertahap,
+      # Major AGP perlu upgrade Gradle dulu; tangani manual bertahap,
       # bukan PR otomatis yang gagal CI (AGENTS.md aturan #14).
       - dependency-name: "com.android.application"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "org.jetbrains.kotlin.android"
-        update-types: ["version-update:semver-major"]
+      # Ignore org.jetbrains.kotlin.android DICABUT (issue #1089):
+      # plugin Kotlin dibundel AGP 9 (built-in Kotlin) dan nama itu
+      # tak dideklarasikan di katalog maupun build script mana pun,
+      # jadi ignore-nya tak pernah bisa cocok — konfigurasi sampah
+      # yang memberi kesan perlindungan major-Kotlin yang tak ada.
+      # Versi Kotlin mengikuti AGP; naik major Kotlin = naik AGP.
       # Ignore lama (material, androidx.core, activity-ktx, lifecycle-*-ktx)
       # dicabut 2026-10-28: alasannya — minSdk 21 dan compileSdk 36 — sudah
       # tidak berlaku sesudah proyek naik ke minSdk 23 + compileSdk 37
