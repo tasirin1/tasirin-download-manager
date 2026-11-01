@@ -61,6 +61,12 @@ class WebExtractActivity : AppCompatActivity() {
     private var cachedGrabScript: String? = null
     private val handler = Handler(Looper.getMainLooper())
 
+    // Jaring pengaman mulai polling (dijadwalkan di onCreate): WAJIB
+    // bernama agar bisa dibatalkan di onDestroy (issue #1079) — lambda
+    // anonim postDelayed tak bisa di-removeCallbacks, jadi instance
+    // activity ter-retain Handler s.d. +/-4,5 detik sesudah hancur.
+    private val safetyStartGrab = Runnable { startGrabLoop() }
+
     private val grabLoop = object : Runnable {
         override fun run() {
             if (finished) return
@@ -179,7 +185,7 @@ class WebExtractActivity : AppCompatActivity() {
         }
         webView.loadUrl(watchUrl)
         // Jaring pengaman: mulai polling walau onPageFinished telat (halaman berat).
-        handler.postDelayed({ startGrabLoop() }, GRAB_INTERVAL_MS * 3)
+        handler.postDelayed(safetyStartGrab, GRAB_INTERVAL_MS * 3)
     }
 
     /** Muat skrip grab sekali dari assets (gagal -> null, polling mencoba lagi).
@@ -299,6 +305,7 @@ class WebExtractActivity : AppCompatActivity() {
     override fun onDestroy() {
         finished = true
         handler.removeCallbacks(grabLoop)
+        handler.removeCallbacks(safetyStartGrab)
         if (::webView.isInitialized) {
             runCatching { webView.stopLoading() }
             (webView.parent as? android.view.ViewGroup)?.removeView(webView)
