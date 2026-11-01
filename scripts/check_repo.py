@@ -345,14 +345,19 @@ def tool_syntax() -> Result:
     langkah Coverage CI / saat memasang hook. compile() + bash -n
     menangkapnya tanpa mengeksekusi logika apa pun. YAML .github
     (issue #1083) ikut di-parse di sini: workflow rusak dulu lolos
-    gerbang lokal dan baru ketahuan saat GitHub menolaknya."""
+    gerbang lokal dan baru ketahuan saat GitHub menolaknya.
+    scripts/check_changelog.py ikut dikompilasi (issue #1103): ia
+    menggating CI tetapi secara lokal hanya terimpor insidental oleh
+    verifikasi-path, dan impor itu terlewati justru pada pola commit
+    normal repo ini (kode + bullet CHANGELOG, karena pengingat
+    changelog return dini bila CHANGELOG.md ikut berubah)."""
     started = time.monotonic()
     problems: list[str] = []
-    rel_py = "scripts/jacoco_summary.py"
-    try:
-        compile((ROOT / rel_py).read_text(encoding="utf-8"), rel_py, "exec")
-    except (OSError, UnicodeDecodeError, SyntaxError) as exc:
-        problems.append(f"{rel_py}: {exc}")
+    for rel_py in ("scripts/jacoco_summary.py", "scripts/check_changelog.py"):
+        try:
+            compile((ROOT / rel_py).read_text(encoding="utf-8"), rel_py, "exec")
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            problems.append(f"{rel_py}: {exc}")
     if shutil.which("bash"):
         proc = subprocess.run(
             ["bash", "-n", str(ROOT / "tools/pasang-hook.sh")],
@@ -385,7 +390,7 @@ def tool_syntax() -> Result:
                 problems.append(f"{rel}: YAML tak ter-parse: {exc}")
     except ImportError:
         problems.append("modul yaml tak tersedia untuk validasi YAML .github")
-    detail = ("jacoco_summary.py + pasang-hook.sh + YAML .github valid."
+    detail = ("jacoco_summary.py + check_changelog.py + pasang-hook.sh + YAML .github valid."
               if not problems else "; ".join(problems))
     return Result("sintaks perkakas", not problems,
                   time.monotonic() - started, detail)
