@@ -441,6 +441,9 @@ try { ob.observe(img); } catch (e) { window._thumbQueue(img, img.dataset.thumb);
 window._thumbRelease = function(img) {
 if (thumbObserver) { try { thumbObserver.unobserve(img); } catch (e) {} }
 thumbPending.delete(img);
+for (let i = queue.length - 1; i >= 0; i--) {
+if (queue[i].img === img) queue.splice(i, 1);
+}
 };
 window._thumbQueueClear = function() {
 queue.length = 0;
