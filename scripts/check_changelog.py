@@ -177,7 +177,44 @@ def changed_files(base):
     return None
 
 
+def check_structure() -> str | None:
+    """Validasi struktur dasar CHANGELOG.md (issue #1087): berkas
+    wajib diawali judul H1 dan tak boleh ada bullet sebelum heading
+    seksi (## ) pertama — 667 bullet yatim menumpuk di kepala
+    berkas tanpa heading apa pun, tak terlihat parser berbasis
+    seksi. Mengembalikan pesan galat atau None bila sehat."""
+    try:
+        lines = open("CHANGELOG.md", encoding="utf-8").read().splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        return "CHANGELOG.md tak terbaca: " + exc.__class__.__name__
+    seen_h1 = False
+    seen_section = False
+    for line in lines:
+        if line.startswith("## "):
+            seen_section = True
+            break
+        if line.startswith("# "):
+            seen_h1 = True
+        if line.startswith("- ") and not seen_section:
+            return ("CHANGELOG.md memuat bullet sebelum heading "
+                    "seksi pertama — semua entri wajib berada di "
+                    "bawah heading ## (issue #1087)")
+    if not seen_h1:
+        return ("CHANGELOG.md tak diawali judul H1 (# ...) "
+                "(issue #1087)")
+    if not seen_section:
+        return "CHANGELOG.md tak memiliki heading seksi ## (issue #1087)"
+    return None
+
+
 def main():
+    # Struktur dinilai lebih dulu dan tanpa syarat (issue #1087):
+    # vonis diff di bawah boleh melewatkan guard pada push pertama,
+    # tetapi berkas yang strukturnya rusak tak boleh ikut lolos.
+    struktur_error = check_structure()
+    if struktur_error:
+        print("::error::" + struktur_error)
+        return 1
     base = sys.argv[1] if len(sys.argv) > 1 else ""
     before = sys.argv[2] if len(sys.argv) > 2 else ""
     if not base or base == "null":
