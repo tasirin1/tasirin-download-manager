@@ -318,6 +318,22 @@ EXTENSION_LANGUAGES = {
     ".cfg": "text",
     ".conf": "text",
     ".gradle": "text",
+    # Format teks yang hadir di repo tetapi belum terdaftar (issue
+    # #1106): .bat sejajar .sh (#551) sebagai skrip, .pro adalah
+    # berkas aturan teks, .webmanifest adalah JSON.
+    ".bat": "text",
+    ".pro": "text",
+    ".webmanifest": "text",
+}
+
+# Ekstensi biner yang dikenal (issue #1106): berkas-berkas ini memang
+# bukan teks; hanya ekstensi DI LUAR daftar bahasa dan daftar ini
+# yang diperlakukan sebagai teks oleh language_for di bawah.
+KNOWN_BINARY_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".bmp", ".ico",
+    ".jar", ".zip", ".apk", ".aab", ".so", ".dll", ".exe", ".class",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+    ".mp3", ".mp4", ".webm", ".mov", ".mkv", ".pdf",
 }
 
 EXCLUDED_PARTS = {
@@ -357,7 +373,17 @@ def language_for(path: Path) -> str | None:
     # sebagai file_unscanned (mekanisme #344).
     if path.suffix == "":
         return "text"
-    return None
+    # Ekstensi tak terdaftar (issue #1106): dulu berkas semacam ini
+    # dibuang repository_files TANPA jejak \u2014 tak dipindai dan tak
+    # dicatat tak terpindai \u2014 jadi token di catatan.bak dkk lolos
+    # diam-diam (kelas fail-open #551/#847, hanya lapisannya daftar
+    # izin itu sendiri). Kini ekstensi biner yang dikenal memang
+    # dilewati (memang bukan teks); sisanya diperlakukan teks seperti
+    # berkas tanpa ekstensi: terbaca UTF-8 berarti terpindai aturan
+    # secret, tak terbaca berarti file_unscanned (mekanisme #344).
+    if path.suffix.lower() in KNOWN_BINARY_EXTENSIONS:
+        return None
+    return "text"
 
 
 def repository_files(root: Path) -> list[Path]:
