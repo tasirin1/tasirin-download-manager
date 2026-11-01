@@ -758,14 +758,19 @@ def scan_path(root: Path, rules: Iterable[Rule] = RULES) -> list[dict[str, objec
             # Berkas terlewat TIDAK boleh diam (issue #344): audit yang
             # melewatkan berkas besar/non-UTF-8 tanpa jejak adalah
             # fail-open -- CI hijau sementara berkas itu tidak terpindai
-            # aturan apa pun. Laporkan sebagai warning agar terlihat.
+            # aturan apa pun. Dulu dilaporkan sebagai warning, tetapi
+            # main() hanya gagal pada error dan tak ada pemanggil yang
+            # memakai --strict, jadi secret/kode berbahaya di berkas
+            # besar/biner tetap lolos semua gerbang (issue #1037).
+            # Kini levelnya error: audit yang tak memindai sebuah berkas
+            # tak boleh menyatakan dirinya lulus.
             findings.append(
                 {
                     "path": relative.as_posix(),
                     "line": 1,
                     "column": 1,
                     "rule_id": "file_unscanned",
-                    "severity": "warning",
+                    "severity": "error",
                     "title": "File skipped by audit (over 2MB or not UTF-8); "
                     "its contents were not scanned",
                     "excerpt": "(file not scanned)",
