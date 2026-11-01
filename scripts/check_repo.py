@@ -59,10 +59,23 @@ def python_tool(name: str, script: str, args: list[str] | None = None) -> Result
 
 def static_checks() -> tuple[Result, ...]:
     missing = [name for name in REQUIRED_FILES if not (ROOT / name).is_file()]
+    # Berkas wajib KOSONG juga gagal (issue #1084): is_file() saja
+    # meloloskan LICENSE/SECURITY.md/CONTRIBUTING.md yang terkosongkan
+    # (checkout rusak / suntingan gagal) — kelas fail-open yang sudah
+    # ditutup untuk bekas-hapusan.txt/remote.src.html di gerbang lain.
+    empty = [
+        name for name in REQUIRED_FILES
+        if (ROOT / name).is_file() and (ROOT / name).stat().st_size == 0
+    ]
     detail = "Semua file pengelolaan wajib ada."
+    problems = []
     if missing:
-        detail = "File wajib tidak ditemukan: " + ", ".join(missing)
-    return (Result("struktur repo", not missing, 0.0, detail),)
+        problems.append("File wajib tidak ditemukan: " + ", ".join(missing))
+    if empty:
+        problems.append("File wajib kosong: " + ", ".join(empty))
+    if problems:
+        detail = "; ".join(problems)
+    return (Result("struktur repo", not problems, 0.0, detail),)
 
 
 def _local_sdk_markers() -> list[str]:
