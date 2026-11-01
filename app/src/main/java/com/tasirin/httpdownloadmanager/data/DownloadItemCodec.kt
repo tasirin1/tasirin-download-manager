@@ -166,43 +166,57 @@ object DownloadItemCodec {
         }.getOrDefault(emptyList())
     }
 
+    /** Parse SATU entri segmen; null = entri dilewati (tipe salah ATAU
+     *  nilai invalid — semantik lewati yang sama, issue #1057). */
+    private fun parseSegmentEntry(so: JSONObject): DownloadSegment? {
+        val index = so.getInt("index")
+        val start = so.getLong("start")
+        val end = so.getLong("end")
+        val downloaded = so.getLong("downloaded")
+        // Entri segmen korup (negatif/terbalik) dilewati agar tidak
+        // meracuni resume multi-segmen; segmen valid tetap dipakai.
+        if (index < 0 || start < 0 || end < start || downloaded < 0) return null
+        // Batas ketangguhan muat (issue #733): segmen buatan
+        // aplikasi selalu <= 8 (jepit segmentCount di prefs),
+        // jadi index/jumlah di luar plafon ini pasti blob korup
+        // atau asing. Tanpa batas, encodeProgress mengalokasi
+        // LongArray sebesar index terbesar + 1 di tiap tick
+        // simpan progres (index raksasa = OOM / luapan negatif).
+        // downloaded juga dijepit ke panjang segmennya sendiri,
+        // sejajar jepit overlayProgress di berkas ini.
+        if (index > MAX_DECODED_SEGMENT_INDEX) return null
+        // Panjang segmen inklusif dihitung jenuh: end-start+1
+        // polos meluap membungkus ke Long.MIN_VALUE untuk
+        // end = Long.MAX_VALUE, dan coerceAtMost lalu
+        // mengembalikan downloaded negatif raksasa (issue
+        // #748, sisa sudut #733).
+        val segLen = end - start
+        val maxDownloaded =
+            if (segLen == Long.MAX_VALUE) Long.MAX_VALUE else segLen + 1
+        return DownloadSegment(
+            index, start, end,
+            downloaded.coerceAtMost(maxDownloaded)
+        )
+    }
+
     private fun parseSegments(o: JSONObject): List<DownloadSegment> {
         val parsed = runCatching {
             val segArr = o.getJSONArray("segments")
             buildList {
                 for (j in 0 until segArr.length()) {
-                    val so = segArr.getJSONObject(j)
-                    val index = so.getInt("index")
-                    val start = so.getLong("start")
-                    val end = so.getLong("end")
-                    val downloaded = so.getLong("downloaded")
-                    // Entri segmen korup (negatif/terbalik) dilewati agar tidak
-                    // meracuni resume multi-segmen; segmen valid tetap dipakai.
-                    if (index < 0 || start < 0 || end < start || downloaded < 0) continue
-                    // Batas ketangguhan muat (issue #733): segmen buatan
-                    // aplikasi selalu <= 8 (jepit segmentCount di prefs),
-                    // jadi index/jumlah di luar plafon ini pasti blob korup
-                    // atau asing. Tanpa batas, encodeProgress mengalokasi
-                    // LongArray sebesar index terbesar + 1 di tiap tick
-                    // simpan progres (index raksasa = OOM / luapan negatif).
-                    // downloaded juga dijepit ke panjang segmennya sendiri,
-                    // sejajar jepit overlayProgress di berkas ini.
-                    if (index > MAX_DECODED_SEGMENT_INDEX) continue
                     if (size >= MAX_DECODED_SEGMENTS) break
-                    // Panjang segmen inklusif dihitung jenuh: end-start+1
-                    // polos meluap membungkus ke Long.MIN_VALUE untuk
-                    // end = Long.MAX_VALUE, dan coerceAtMost lalu
-                    // mengembalikan downloaded negatif raksasa (issue
-                    // #748, sisa sudut #733).
-                    val segLen = end - start
-                    val maxDownloaded =
-                        if (segLen == Long.MAX_VALUE) Long.MAX_VALUE else segLen + 1
-                    add(
-                        DownloadSegment(
-                            index, start, end,
-                            downloaded.coerceAtMost(maxDownloaded)
-                        )
-                    )
+                    // runCatching PER ENTRI (issue #1057): getJSONObject/
+                    // getInt/getLong melempar pada kesalahan tipe, dan
+                    // satu runCatching luar membuat SATU entri bertipe
+                    // salah membuang seluruh rencana — berbeda dengan
+                    // nilai invalid yang memang dilewati per entri.
+                    // Kini keduanya dilewati per entri; validasi
+                    // keseluruhan #1042 di bawah tetap yang memutuskan
+                    // rencana akhir utuh atau dibuang.
+                    val seg = runCatching {
+                        parseSegmentEntry(segArr.getJSONObject(j))
+                    }.getOrNull() ?: continue
+                    add(seg)
                 }
             }
         }.getOrDefault(emptyList())

@@ -193,6 +193,23 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `decode - entri segmen bertipe salah dilewati per entri`() {
+        // Issue #1057: satu entri sampah (bukan objek / index teks) tak
+        // boleh membuang rencana yang utuh di sebelahnya.
+        val segs = decodeSegments(
+            """[{"index":0,"start":0,"end":99,"downloaded":40},123,""" +
+                """{"index":1,"start":100,"end":199,"downloaded":5}]"""
+        )
+        assertEquals(2, segs.size)
+        val onlyJunk = decodeSegments("""[123]""")
+        assertTrue(onlyJunk.isEmpty())
+        val textIndex = decodeSegments(
+            """[{"index":"nol","start":0,"end":99,"downloaded":0}]"""
+        )
+        assertTrue(textIndex.isEmpty())
+    }
+
+    @Test
     fun `decode - indeks segmen duplikat membuang seluruh rencana`() {
         // Issue #1042: dua entri index 0 = dua coroutine menulis
         // .part.0 yang sama saat resume.
