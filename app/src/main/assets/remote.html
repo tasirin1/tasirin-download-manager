@@ -4515,12 +4515,21 @@ if (!box) return;
 const seq = ++shareListSeq;
 box.textContent = '';
 let data = null;
+let loadFailed = false;
 try {
 const res = await fetchTimeout(API + '/api/shares', undefined, 15000);
 data = await res.json();
-} catch (e) {}
+if (!res.ok) loadFailed = true;
+} catch (e) { loadFailed = true; }
 if (seq !== shareListSeq) return;
-if (!data || !data.ok || !data.shares || !data.shares.length) {
+if (loadFailed || !data || !data.ok) {
+const err = document.createElement('div');
+err.className = 'cm-text';
+err.textContent = 'Could not load share links. Check the connection and try again.';
+box.appendChild(err);
+return;
+}
+if (!data.shares || !data.shares.length) {
 const empty = document.createElement('div');
 empty.className = 'cm-text';
 empty.textContent = 'No active share links';

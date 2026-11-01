@@ -7420,16 +7420,28 @@ async function refreshShareList() {
   const seq = ++shareListSeq;
   box.textContent = '';
   let data = null;
+  let loadFailed = false;
   try {
     const res = await fetchTimeout(API + '/api/shares', undefined, 15000);
     data = await res.json();
-  } catch (e) {}
+    if (!res.ok) loadFailed = true;
+  } catch (e) { loadFailed = true; }
   // Respons basi tidak boleh menimpa daftar yang lebih baru (#269,
   // pola fsLoadSeq yang sama): refresh yang dipicu revoke bisa selesai
   // lebih lambat dari refresh berikutnya dan menghidupkan lagi baris
   // tautan yang sebenarnya sudah dicabut.
   if (seq !== shareListSeq) return;
-  if (!data || !data.ok || !data.shares || !data.shares.length) {
+  // Gagal muat BUKAN daftar kosong (issue #1048): menelan error lalu
+  // merender cabang kosong yang sama membuat pengguna mengira tak ada
+  // tautan aktif beredar, padahal tautan itu masih sah di server.
+  if (loadFailed || !data || !data.ok) {
+    const err = document.createElement('div');
+    err.className = 'cm-text';
+    err.textContent = 'Could not load share links. Check the connection and try again.';
+    box.appendChild(err);
+    return;
+  }
+  if (!data.shares || !data.shares.length) {
     const empty = document.createElement('div');
     empty.className = 'cm-text';
     empty.textContent = 'No active share links';
