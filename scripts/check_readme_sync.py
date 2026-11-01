@@ -22,6 +22,11 @@ def headings(path: Path) -> list[int]:
     # info string.
     fence_char = ""
     fence_len = 0
+    # Baris teks sebelumnya (untuk heading Setext, issue #1082):
+    # heading gaya Judul\n=== / Judul\n--- dan heading di dalam
+    # blockquote (> ## Judul) dulu tak terlihat pencocokan ATX kolom 0,
+    # jadi menambahkannya di satu README saja lolos sebagai 'sinkron'.
+    prev_text = False
     # utf-8-sig (issue #742): BOM di awal berkas (bawaan beberapa editor
     # Windows) dibuang saat decode — dengan utf-8 polos BOM menempel pada
     # heading pertama sehingga heading itu tak terhitung dan guard salah
@@ -43,10 +48,29 @@ def headings(path: Path) -> list[int]:
         if fm:
             fence_char = fm.group(1)[0]
             fence_len = len(fm.group(1))
+            prev_text = False
+            continue
+        # Heading di dalam blockquote: > ## Judul (issue #1082).
+        bq = re.match(r"^>\s*(#{1,6})\s+", line)
+        if bq:
+            levels.append(len(bq.group(1)))
+            prev_text = False
             continue
         m = re.match(r"^(#{1,6})\s+", line)
         if m:
             levels.append(len(m.group(1)))
+            prev_text = False
+            continue
+        # Garis bawah Setext (issue #1082): === sesudah baris teks =
+        # heading level 1, --- = level 2. Tanpa baris teks sebelumnya
+        # (sesudah baris kosong/heading lain) --- adalah thematic
+        # break dan === bukan apa-apa \u2014 keduanya bukan heading.
+        sx = re.match(r"^(=+|-+)\s*$", line)
+        if sx and prev_text:
+            levels.append(1 if sx.group(1).startswith("=") else 2)
+            prev_text = False
+            continue
+        prev_text = bool(line.strip())
     return levels
 
 
