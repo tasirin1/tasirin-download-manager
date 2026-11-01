@@ -125,6 +125,22 @@ class DownloadEngine(appContext: Context) {
         ConcurrentHashMap<String, PendingReplacement>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
 
+    // Cache rencana HLS per item (issue #1061): parseHlsPlan mengambil
+    // playlist SEMUA kandidat varian + rendisi audio, dan dulu diulang
+    // penuh di SETIAP percobaan — retry membayar ulang belasan unduhan
+    // playlist sebelum byte segmen pertama dilanjutkan. Rencana dipakai
+    // ulang hanya bila body master yang baru di-fetch IDENTIK dan
+    // umurnya <= TTL singkat: URL segmen bertanda tangan bisa kedaluwarsa,
+    // jadi jendela pakai-ulang sengaja pendek (retry otomatis berjarak
+    // detik) dan master yang berubah selalu memicu rencana baru.
+    private data class CachedHlsPlan(
+        val masterBody: String,
+        val plan: HlsPlan,
+        val atMs: Long
+    )
+
+    private val hlsPlanCache = ConcurrentHashMap<String, CachedHlsPlan>()
+
     // Throttle attempt yang sedang berjalan per item (issue #747):
     // setLimitAndPriority mendorong batas baru ke throttle aktif agar
     // perubahan limit per-item berlaku langsung di tengah unduhan.
@@ -2537,7 +2553,22 @@ class DownloadEngine(appContext: Context) {
 
         val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES, item.username, item.password, trackId = item.id)
             ?: throw IOException("Cannot fetch HLS manifest")
-        val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang, item.username, item.password, trackId = item.id)
+        // Pakai ulang rencana segar bila master tak berubah (#1061);
+        // selain itu parse penuh dan simpan (peta dibatasi kasar: cache
+        // ini hanya menolong retry beruntun, bukan katalog permanen).
+        val cachedPlan = hlsPlanCache[item.id]
+        val plan = if (cachedPlan != null && cachedPlan.masterBody == master &&
+            System.currentTimeMillis() - cachedPlan.atMs <= HLS_PLAN_CACHE_TTL_MS
+        ) {
+            cachedPlan.plan
+        } else {
+            parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang, item.username, item.password, trackId = item.id)
+                ?.also { fresh ->
+                    if (hlsPlanCache.size >= 16) hlsPlanCache.clear()
+                    hlsPlanCache[item.id] =
+                        CachedHlsPlan(master, fresh, System.currentTimeMillis())
+                }
+        }
         if (plan == null || plan.videoSegments.isEmpty()) {
             throw IOException("No HLS segments found")
         }
@@ -5065,6 +5096,9 @@ class DownloadEngine(appContext: Context) {
         private const val MAX_ZERO_READS = 64
         private const val MAX_REDIRECTS = 5
         private const val HLS_PROBE_MAX_BYTES = 1_000_000
+
+        /** Umur pakai-ulang rencana HLS ter-cache (issue #1061). */
+        private const val HLS_PLAN_CACHE_TTL_MS = 60_000L
         /** Segmen HLS ukuran ini dianggap segmen data (bukan init/small). */
         private const val HLS_REF_SEGMENT_MIN = 256L * 1024
         private const val SEGMENT_MIN_BYTES = 5L * 1024 * 1024
