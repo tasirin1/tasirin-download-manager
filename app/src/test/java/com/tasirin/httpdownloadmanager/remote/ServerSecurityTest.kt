@@ -580,6 +580,20 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun hasEscapingSymlink_folderTakBisaDiListDianggapBerbahaya() {
+        // Issue #1096: KDoc menjanjikan gagal-tertutup — ketidakmampuan
+        // memverifikasi anak dianggap berbahaya. Folder yang listFiles-
+        // nya null (galat I/O/izin) tak boleh dilewati diam-diam.
+        val rootDir = root()
+        val unlistable = object : File(rootDir, "sub") {
+            override fun listFiles(): Array<File>? = null
+        }
+        assertTrue(
+            ServerSecurity.hasEscapingSymlink(unlistable, listOf(rootDir.canonicalPath))
+        )
+    }
+
+    @Test
     fun hasEscapingSymlink_symlinkDirektoriKeLuarRoot() {
         val rootDir = root()
         File(rootDir, "sub").mkdirs()

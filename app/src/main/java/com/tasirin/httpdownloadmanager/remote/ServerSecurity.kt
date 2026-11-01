@@ -216,7 +216,12 @@ object ServerSecurity {
         stack.add(dir)
         while (stack.isNotEmpty()) {
             val cur = stack.removeLast()
-            val children = runCatching { cur.listFiles() }.getOrNull() ?: continue
+            // Gagal me-list satu subpohon = anaknya tak bisa
+            // diverifikasi: gagal-tertutup, seperti janji KDoc di atas
+            // (issue #1096). Pola ?: continue lama melewati seluruh
+            // subpohon tanpa pemeriksaan, jadi symlink lepas di
+            // dalamnya tak terlihat oleh pra-cek delete/move.
+            val children = runCatching { cur.listFiles() }.getOrNull() ?: return true
             for (child in children) {
                 if (!child.isDirectory) continue
                 val canon = runCatching { child.canonicalFile.absolutePath }.getOrNull()
