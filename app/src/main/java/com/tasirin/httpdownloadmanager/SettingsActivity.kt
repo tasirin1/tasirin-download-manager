@@ -842,7 +842,14 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.spinnerConcurrent.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                StoragePrefs.setMaxConcurrent(this@SettingsActivity, position + 1)
+                // Penjaga nilai-sama (issue #1100): callback awal spinner
+                // selalu terpicu sekali oleh seleksi programatik saat
+                // layar dibuka; tanpa penjaga ini membuka Pengaturan
+                // menulis ulang pref + me-refresh engine tanpa ada
+                // perubahan. Pola yang sama di semua spinner di bawah.
+                val newValue = position + 1
+                if (newValue == StoragePrefs.maxConcurrent(this@SettingsActivity)) return
+                StoragePrefs.setMaxConcurrent(this@SettingsActivity, newValue)
                 runCatching { App.engine.refreshMaxConcurrent() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -865,11 +872,11 @@ class SettingsActivity : AppCompatActivity() {
                 // berubah dari remote web selama Settings terbuka,
                 // dan tangkapan basi akan menimpanya diam-diam.
                 // Pola yang sama di spinner segmen/timeout di bawah.
-                StoragePrefs.setSpeedLimitKbps(
-                    this@SettingsActivity,
-                    if (position < speedKbps.size) speedKbps[position]
+                val newSpeed = if (position < speedKbps.size) speedKbps[position]
                     else StoragePrefs.speedLimitKbps(this@SettingsActivity)
-                )
+                // Penjaga nilai-sama (issue #1100).
+                if (newSpeed == StoragePrefs.speedLimitKbps(this@SettingsActivity)) return
+                StoragePrefs.setSpeedLimitKbps(this@SettingsActivity, newSpeed)
                 // Limiter global di-cache di engine: tanpa refresh, nilai baru
                 // tak berlaku sampai restart (kecuali dimatikan ke 0).
                 runCatching { App.engine.refreshSpeedLimit() }
@@ -884,6 +891,8 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.spinnerRetry.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                // Penjaga nilai-sama (issue #1100).
+                if (position == StoragePrefs.maxRetries(this@SettingsActivity)) return
                 StoragePrefs.setMaxRetries(this@SettingsActivity, position)
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -908,11 +917,11 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.spinnerSegments.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                StoragePrefs.setSegmentCount(
-                    this@SettingsActivity,
-                    if (position in segmentValues.indices) segmentValues[position]
+                val newSegments = if (position in segmentValues.indices) segmentValues[position]
                     else StoragePrefs.segmentCount(this@SettingsActivity)
-                )
+                // Penjaga nilai-sama (issue #1100).
+                if (newSegments == StoragePrefs.segmentCount(this@SettingsActivity)) return
+                StoragePrefs.setSegmentCount(this@SettingsActivity, newSegments)
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -932,11 +941,11 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.spinnerConnectTimeout.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                StoragePrefs.setConnectTimeoutSec(
-                    this@SettingsActivity,
-                    if (position in connectValues.indices) connectValues[position]
+                val newConnect = if (position in connectValues.indices) connectValues[position]
                     else StoragePrefs.getConnectTimeoutSec(this@SettingsActivity)
-                )
+                // Penjaga nilai-sama (issue #1100).
+                if (newConnect == StoragePrefs.getConnectTimeoutSec(this@SettingsActivity)) return
+                StoragePrefs.setConnectTimeoutSec(this@SettingsActivity, newConnect)
                 runCatching { App.engine.refreshTimeouts() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -956,11 +965,11 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.spinnerReadTimeout.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                StoragePrefs.setReadTimeoutSec(
-                    this@SettingsActivity,
-                    if (position in readValues.indices) readValues[position]
+                val newRead = if (position in readValues.indices) readValues[position]
                     else StoragePrefs.getReadTimeoutSec(this@SettingsActivity)
-                )
+                // Penjaga nilai-sama (issue #1100).
+                if (newRead == StoragePrefs.getReadTimeoutSec(this@SettingsActivity)) return
+                StoragePrefs.setReadTimeoutSec(this@SettingsActivity, newRead)
                 runCatching { App.engine.refreshTimeouts() }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -1009,8 +1018,12 @@ class SettingsActivity : AppCompatActivity() {
                     if (!isInitial) customUAInput.requestFocus()
                 } else {
                     customUAInput.visibility = View.GONE
-                    StoragePrefs.setUserAgent(this@SettingsActivity, value)
-                    runCatching { App.engine.refreshUserAgent() }
+                    // Penjaga nilai-sama (issue #1100): callback awal tak
+                    // menulis ulang UA yang sama + me-refresh engine.
+                    if (value != StoragePrefs.getUserAgent(this@SettingsActivity)) {
+                        StoragePrefs.setUserAgent(this@SettingsActivity, value)
+                        runCatching { App.engine.refreshUserAgent() }
+                    }
                 }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
