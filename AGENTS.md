@@ -48,7 +48,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 ├── docs/site.webmanifest             # PWA manifest (installable)
 ├── docs/sw.js                        # Service worker PWA (network-first)
 ├── docs/icons/                       # Ikon PWA (192/512 PNG)
-├── docs/screenshots/                 # Screenshot README (remote-web.png, gallery.png, downloads.png)
+├── docs/screenshots/                 # Folder screenshot README (konvensi nama di README folder; berkasnya belum ditambahkan)
 ├── remote.src.html                   # SUMBER readable remote web (SELURUH halaman)
 ├── scripts/prepare_remote.py         # Minify remote.src.html → app/src/main/assets/remote.html + guard CI
 ├── scripts/check_changelog.py        # Guard CI: perubahan kode wajib update CHANGELOG.md (dipakai job verify)
