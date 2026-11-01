@@ -181,8 +181,8 @@ a:hover{color:#6ea8ff}
 
 <!-- ── Stats ── -->
 <div class="stats reveal">
-  <div class="stat"><div class="stat-value">&lt;1.2</div><div class="stat-label" data-i18n="stat_apk">MB APK</div></div>
-  <div class="stat"><div class="stat-value">21+</div><div class="stat-label" data-i18n="stat_sdk">Min SDK</div></div>
+  <div class="stat"><div class="stat-value" id="stat-apk-size">–</div><div class="stat-label" data-i18n="stat_apk">MB APK</div></div>
+  <div class="stat"><div class="stat-value">23+</div><div class="stat-label" data-i18n="stat_sdk">Min SDK</div></div>
   <div class="stat"><div class="stat-value" data-i18n="stat_val_nol">Nol</div><div class="stat-label" data-i18n="stat_iklan">Iklan</div></div>
   <div class="stat"><div class="stat-value">Open</div><div class="stat-label" data-i18n="stat_source">Source</div></div>
 </div>
@@ -376,6 +376,10 @@ function showRelease(data){
   var txt=data.tag_name+' · '+(apk.size/1024/1024).toFixed(1)+' MB';
   document.getElementById('version-badge').textContent=txt;
   document.getElementById('apk-size').textContent=(apk.size/1024/1024).toFixed(1)+' MB';
+  /* Stat ukuran di blok Stats ikut dari API (issue #1107): nilai
+     hardcode "<1.2" membusuk diam-diam sesudah APK tumbuh melewatinya. */
+  var statApk=document.getElementById('stat-apk-size');
+  if(statApk)statApk.textContent=(apk.size/1024/1024).toFixed(1);
   return true;
 }
 function fallbackBadge(){
