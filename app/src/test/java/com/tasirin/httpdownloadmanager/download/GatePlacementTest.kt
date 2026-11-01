@@ -32,14 +32,97 @@ class GatePlacementTest {
         error("unreachable")
     }
 
-    /** Indeks anggota kelas berikutnya (indentasi 4 spasi) sesudah [from]. */
-    private fun nextMemberIndex(src: String, from: Int): Int {
-        var best = src.length
-        for (marker in listOf("\n    private ", "\n    internal ", "\n    override ")) {
-            val i = src.indexOf(marker, from)
-            if (i >= 0 && i < best) best = i
+    /** Buang isi komentar + literal string/char dari sumber (issue
+     *  #1086): analisis posisi gerbang wajib menilai KODE saja \u2014
+     *  komentar yang menyebut nama gerbang dulu ikut terhitung sebagai
+     *  titik panggil (uji sehat kandas), dan kurung kurawal di dalam
+     *  string/komentar mengacaukan pencocokan badan fungsi. Komentar
+     *  blok bertingkat Kotlin didukung; string mentah """...""" dan
+     *  escape ditangani. Posisi antar-versi bergeser, tetapi seluruh
+     *  analisis uji ini berjalan di atas hasil bersih yang sama. */
+    private fun stripNonCode(src: String): String {
+        val out = StringBuilder(src.length)
+        var i = 0
+        val n = src.length
+        while (i < n) {
+            val c = src[i]
+            when {
+                c == '/' && i + 1 < n && src[i + 1] == '/' -> {
+                    while (i < n && src[i] != '\n') i++
+                }
+                c == '/' && i + 1 < n && src[i + 1] == '*' -> {
+                    i += 2
+                    var depth = 1
+                    while (i < n && depth > 0) {
+                        if (src[i] == '/' && i + 1 < n && src[i + 1] == '*') {
+                            depth++; i += 2
+                        } else if (src[i] == '*' && i + 1 < n && src[i + 1] == '/') {
+                            depth--; i += 2
+                        } else {
+                            i++
+                        }
+                    }
+                    out.append(' ')
+                }
+                c == '"' && i + 2 < n && src[i + 1] == '"' && src[i + 2] == '"' -> {
+                    i += 3
+                    while (i < n && !(src[i] == '"' && i + 2 < n && src[i + 1] == '"' && src[i + 2] == '"')) {
+                        i++
+                    }
+                    i = minOf(n, i + 3)
+                    out.append("\"\"")
+                }
+                c == '"' -> {
+                    i++
+                    while (i < n && src[i] != '"') {
+                        if (src[i] == '\\') i++
+                        i++
+                    }
+                    i = minOf(n, i + 1)
+                    out.append("\"\"")
+                }
+                c == '\'' -> {
+                    i++
+                    while (i < n && src[i] != '\'') {
+                        if (src[i] == '\\') i++
+                        i++
+                    }
+                    i = minOf(n, i + 1)
+                    out.append("''")
+                }
+                else -> {
+                    out.append(c)
+                    i++
+                }
+            }
         }
-        return best
+        return out.toString()
+    }
+
+    /** Akhir badan fungsi: posisi kurung kurawal penutup yang cocok
+     *  dengan kurung pembuka pertama sesudah [decl], pada sumber yang
+     *  sudah dibersihkan. Menggantikan pencarian penanda visibilitas
+     *  (issue #1086): penanda lama hanya mengenal private/internal/
+     *  override, jadi gerbang yang terpindah ke fungsi sesudahnya
+     *  yang berawalan fun/suspend/public/val tak terdeteksi keluar
+     *  badan. Tanda tangan kedua fungsi jangkar uji ini bebas kurung
+     *  kurawal sebelum badan, jadi kurung pertama memang pembuka badan. */
+    private fun bodyEnd(src: String, decl: Int): Int {
+        val open = src.indexOf('{', decl)
+        if (open < 0) return src.length
+        var depth = 0
+        var i = open
+        while (i < src.length) {
+            when (src[i]) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return i
+                }
+            }
+            i++
+        }
+        return src.length
     }
 
     /** Hitung kemunculan [needle] tanpa kompilasi Pattern (pola split boros). */
@@ -60,13 +143,13 @@ class GatePlacementTest {
         assertTrue("gerbang $gateCall tidak ditemukan sesudah $funAnchor", gate >= 0)
         assertTrue(
             "gerbang $gateCall berada di luar badan $funAnchor",
-            gate < nextMemberIndex(src, decl + funAnchor.length)
+            gate < bodyEnd(src, decl)
         )
     }
 
     @Test
     fun `gerbang resume utuh terpasang di dalam runDownload`() {
-        val src = engineSource()
+        val src = stripNonCode(engineSource())
         assertGateInside(
             src,
             "fun runDownload(",
@@ -78,7 +161,7 @@ class GatePlacementTest {
 
     @Test
     fun `gerbang segmen utuh terpasang di dalam downloadSegment`() {
-        val src = engineSource()
+        val src = stripNonCode(engineSource())
         assertGateInside(
             src,
             "fun downloadSegment(",
