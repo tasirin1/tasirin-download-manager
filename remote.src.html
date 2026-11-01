@@ -4576,6 +4576,13 @@ const ZIP_MEMORY_LIMIT = 96 * 1024 * 1024;
 // stream dulu membuat modal progres macet selamanya dan fsDlActive
 // mengunci semua operasi fs lain sampai Cancel manual ditekan.
 const ZIP_STALL_MS = 30000;
+// Batas diam fase PERSIAPAN (issue #1098): header baru tiba sesudah
+// server selesai MEMBANGUN ZIP, jadi batas 30 detik tanpa byte ikut
+// menghukum persiapan ZIP besar pertama (belum ter-cache) di HP
+// lambat sebagai "stalled" palsu — tanpa fallback pula, karena abort
+// terjadi di fase header. Fase persiapan dapat batas longgar
+// tersendiri; sesudah header tiba, batas ketat di atas berlaku.
+const ZIP_PREP_STALL_MS = 180000;
 async function downloadZipWithProgress(url, label) {
   if (fsTaskBusy || fsDlActive) {
     mmShowToast('Another operation is already running', 2500, 'error');
@@ -4587,20 +4594,25 @@ async function downloadZipWithProgress(url, label) {
   const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
   fsDlAbort = ac;
   let stalled = false;
+  let prepStalled = false;
+  let stallKind = 'prep';
   let stallTimer = null;
-  function armStall() {
+  function armStall(ms) {
     if (!ac) return;
     clearTimeout(stallTimer);
     stallTimer = setTimeout(function () {
-      stalled = true;
+      if (stallKind === 'prep') prepStalled = true; else stalled = true;
       try { ac.abort(); } catch (e) {}
-    }, ZIP_STALL_MS);
+    }, ms || ZIP_STALL_MS);
   }
-  armStall();
+  armStall(ZIP_PREP_STALL_MS);
   let fallbackAnchor = false;
   try {
     const res = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ac ? ac.signal : undefined});
     if (!res.ok) throw new Error('HTTP ' + res.status);
+    // Header tiba = persiapan server selesai: batas diam ketat.
+    stallKind = 'data';
+    armStall();
     // Server melaporkan pilihan yang ditolak (hilang/tak diizinkan)
     // lewat header ini agar ZIP yang lebih kecil dari pilihan pengguna
     // tidak lolos diam-diam (issue #849).
@@ -4669,7 +4681,10 @@ async function downloadZipWithProgress(url, label) {
       }
     }
   } catch (e) {
-    if (e && e.name === 'AbortError' && stalled) {
+    if (e && e.name === 'AbortError' && prepStalled) {
+      updateFsTask('Failed — server took too long preparing the ZIP', 4);
+      mmShowToast('ZIP preparation timed out', 3000, 'error');
+    } else if (e && e.name === 'AbortError' && stalled) {
       updateFsTask('Failed \u2014 connection stalled (no data for 30s)', 4);
       mmShowToast('ZIP download stalled', 3000, 'error');
     } else if (e && e.name === 'AbortError') {
