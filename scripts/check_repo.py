@@ -330,7 +330,9 @@ def tool_syntax() -> Result:
     tools/pasang-hook.sh tak dirujuk guard mana pun, jadi kesalahan
     sintaks keduanya dulu lolos "SEMUA SEHAT" dan baru ketahuan di
     langkah Coverage CI / saat memasang hook. compile() + bash -n
-    menangkapnya tanpa mengeksekusi logika apa pun."""
+    menangkapnya tanpa mengeksekusi logika apa pun. YAML .github
+    (issue #1083) ikut di-parse di sini: workflow rusak dulu lolos
+    gerbang lokal dan baru ketahuan saat GitHub menolaknya."""
     started = time.monotonic()
     problems: list[str] = []
     rel_py = "scripts/jacoco_summary.py"
@@ -350,7 +352,27 @@ def tool_syntax() -> Result:
             )
     else:
         problems.append("bash tak tersedia untuk memeriksa tools/pasang-hook.sh")
-    detail = ("jacoco_summary.py + pasang-hook.sh valid."
+    # Parse YAML seluruh .github (issue #1083): workflow + dependabot
+    # + labeler. Modul yaml diperlakukan wajib, sejajar pendahulu di
+    # admin_consistency (ketiadaannya sudah problem di sana).
+    try:
+        import yaml as _yaml
+        yaml_files = sorted((ROOT / ".github/workflows").glob("*.yml"))
+        yaml_files += sorted((ROOT / ".github/workflows").glob("*.yaml"))
+        for extra in (".github/dependabot.yml", ".github/labeler.yml"):
+            if (ROOT / extra).exists():
+                yaml_files.append(ROOT / extra)
+        if not yaml_files:
+            problems.append("tak ada berkas YAML .github ditemukan untuk divalidasi")
+        for yf in yaml_files:
+            rel = str(yf.relative_to(ROOT))
+            try:
+                _yaml.safe_load(yf.read_text(encoding="utf-8"))
+            except _yaml.YAMLError as exc:
+                problems.append(f"{rel}: YAML tak ter-parse: {exc}")
+    except ImportError:
+        problems.append("modul yaml tak tersedia untuk validasi YAML .github")
+    detail = ("jacoco_summary.py + pasang-hook.sh + YAML .github valid."
               if not problems else "; ".join(problems))
     return Result("sintaks perkakas", not problems,
                   time.monotonic() - started, detail)
