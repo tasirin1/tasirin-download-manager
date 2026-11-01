@@ -345,17 +345,21 @@ def scan_xml() -> list:
 def scan_kotlin() -> list:
     hits = []
     # Tokenizer satu-pass: raw string, komentar blok, komentar baris, char
-    # literal ('"'), atau string biasa — hanya isi string biasa yang dipindai.
+    # literal ('"'), atau string biasa — isi raw string DAN string biasa
+    # dipindai. Raw string dulu ditelan sebagai token tak-berisi (issue
+    # #1052): teks UI Indonesia di dalamnya lolos guard bahasa, padahal
+    # raw string sungguh dipakai kode produksi (template HTML server,
+    # regex, pesan). Komentar tetap dibuang dari pemindaian.
     # `//` di dalam string (mis. "https://") ikut termakan token string
     # sehingga tidak dianggap komentar dan tidak merusak pairing (false +/-).
     token_re = re.compile(
-        r'"""[\s\S]*?"""|/\*.*?\*/|//[^\n]*|\'(?:[^\'\\\n]|\\.)*\''
+        r'"""([\s\S]*?)"""|/\*.*?\*/|//[^\n]*|\'(?:[^\'\\\n]|\\.)*\''
         r'|"((?:[^"\\]|\\.)*)"', re.S
     )
     for path in sorted(JAVA_DIR.rglob("*.kt")):
         src = read_utf8(path)
         for m in token_re.finditer(src):
-            lit = m.group(1)
+            lit = m.group(1) if m.group(1) is not None else m.group(2)
             if lit is None:
                 continue
             for word, _ in banned_hits(lit):
