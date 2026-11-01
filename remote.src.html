@@ -4593,6 +4593,11 @@ async function downloadZipWithProgress(url, label) {
     }
     if (!res.body || !res.body.getReader || len > ZIP_MEMORY_LIMIT) {
       fallbackAnchor = true;
+      // Badan respons pertama tak akan dibaca: batalkan sekarang
+      // agar koneksinya lepas, bukan menggantung selama unduhan
+      // ulang via anchor berjalan (issue #1064; cache ZIP server
+      // membuat GET kedua murah di sisi server).
+      try { if (res.body && res.body.cancel) res.body.cancel(); } catch (e) {}
     } else {
       const reader = res.body.getReader();
       const chunks = [];

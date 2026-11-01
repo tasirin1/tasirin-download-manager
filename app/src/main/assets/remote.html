@@ -2091,6 +2091,7 @@ fileName = fileName.replace(/["']/g, '');
 }
 if (!res.body || !res.body.getReader || len > ZIP_MEMORY_LIMIT) {
 fallbackAnchor = true;
+try { if (res.body && res.body.cancel) res.body.cancel(); } catch (e) {}
 } else {
 const reader = res.body.getReader();
 const chunks = [];
