@@ -2676,8 +2676,10 @@ let galleryCache = null; // {items, total, hasMore, at}
     // ini cell yang dibuang windowing tetap tertahan referensinya
     // (img + URL) di queue[] sampai antrean terkuras atau galeri
     // reset \u2014 kebocoran yang janji #608 belum menutup. Entri
-    // antrean belum set src, jadi membuangnya aman; yang sedang
-    // jalan tak masuk queue dan tak disentuh.
+    // antrean belum set src, jadi membuangnya aman. Muatan yang
+    // sedang jalan tidak masuk queue; ia dinetralkan lewat
+    // releaseInflight di bawah (issue #1099, komentar diselaraskan
+    // pada issue #1116).
     for (let i = queue.length - 1; i >= 0; i--) {
       if (queue[i].img === img) queue.splice(i, 1);
     }
@@ -2687,7 +2689,7 @@ let galleryCache = null; // {items, total, hasMore, at}
   };
   // Buang antrean thumbnail yang belum jalan (cell-nya sudah hancur saat
   // galeri reset/ganti filter): entri antrean belum set src sehingga aman
-  // dibuang tanpa load sia-sia; yang sedang jalan dibiarkan selesai.
+  // dibuang tanpa load sia-sia; muatan yang sedang jalan ikut dinetralkan di bawah (issue #1099).
   window._thumbQueueClear = function() {
     queue.length = 0;
     // Muatan berjalan milik cell yang hancur ikut dinetralkan

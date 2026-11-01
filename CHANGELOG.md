@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan internal: dua komentar lama di pemuat thumbnail web remote yang menyatakan muatan berjalan tidak disentuh kini diselaraskan dengan perilaku pemulihan slot sejak issue #1099, agar tidak menyesatkan pengelola berikutnya (issue #1116).
 - Perbaikan internal: pra-cek symlink untuk hapus/pindah folder dari remote tidak lagi meng-kanonikkan tiap subfolder dua kali, sehingga pemeriksaan folder besar lebih ringan (issue #1115).
 - Perbaikan internal: sinyal penilaian-ulang berhenti DownloadService kini dinaikkan secara atomik sehingga tidak bisa hilang bila dua kegagalan restart server tiba bersamaan (issue #1114).
 - Perbaikan: koneksi unduhan kini dilepas bila penulisan body POST atau pembacaan kode respons gagal di tengah pengalihan, tidak lagi meninggalkan soket terhubung menggantung sampai timeout (issue #1112).
