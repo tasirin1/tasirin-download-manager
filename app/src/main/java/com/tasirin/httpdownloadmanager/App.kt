@@ -225,6 +225,7 @@ class App : Application() {
          *  satu kunci agar restart paralel terserialisasi (#260). */
         fun restartHttpServer(context: Context) {
             serverStartOps.incrementAndGet()
+            var startFailed = false
             try {
             synchronized(restartServerLock) {
                 val wasAlive = httpServer.isAlive
@@ -250,12 +251,18 @@ class App : Application() {
                     logEvent("SERVER RESTART: kept ${keptShares.size} share links, ${keptUploads.size} uploads")
                 }
                 if (wasAlive) {
-                    runCatching { httpServer.startServer() }
+                    startFailed =
+                        runCatching { httpServer.startServer() }.isFailure
                 }
             }
             } finally {
                 serverStartOps.decrementAndGet()
             }
+            // Restart yang gagal tak menghasilkan emisi items (issue
+            // #1039): minta service menilai ulang berhentinya, dinilai
+            // SESUDAH penghitung operasi turun agar serverStartInProgress
+            // tak lagi menutupi kegagalan ini sebagai "sedang start".
+            if (startFailed) DownloadService.requestReevaluate()
         }
 
         /** Start server di bawah kunci siklus hidup yang sama (#286):

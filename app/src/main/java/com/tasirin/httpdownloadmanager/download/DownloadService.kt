@@ -139,6 +139,25 @@ class DownloadService : Service() {
                 }
             }
         }
+        scope.launch(Dispatchers.IO) {
+            // Penilaian ulang atas sinyal restart server gagal (issue
+            // #1039): nilai replay awal hanya garis awal, bukan pemicu —
+            // penilaian reguler tetap milik kolektor items + penilaian
+            // penutup start onCreate (#1034). Gerbang muatan awal sama
+            // seperti penilaian penutup #1034 (#264).
+            var seenReevaluate = reevaluateRequests.value
+            reevaluateRequests.collect { req ->
+                if (req == seenReevaluate) return@collect
+                seenReevaluate = req
+                if (!App.engine.isInitialLoadComplete()) return@collect
+                val itemsNow = App.engine.items.value
+                val activeNow = itemsNow.any {
+                    it.state == DownloadState.DOWNLOADING ||
+                        it.state == DownloadState.PENDING
+                }
+                stopSelfIfNoWork(itemsNow, activeNow, isServerActive())
+            }
+        }
     }
 
     /** Server dinilai aktif dari pref + keadaan hidupnya saat ini juga
@@ -242,6 +261,22 @@ class DownloadService : Service() {
     // NetworkCallback/retry -> emisi -> re-acquire di bawah.
     companion object {
         const val WAKELOCK_TIMEOUT_MS = 60 * 60 * 1000L
+
+        // Sinyal penilaian ulang berhenti (issue #1039): restart server
+        // yang GAGAL (mis. ganti port, port baru terpakai) tak menghasilkan
+        // emisi items dan tak punya penilaian penutup seperti start dari
+        // onCreate (#1034), jadi service bisa tertinggal foreground dengan
+        // notifikasi "server aktif" basi. App menaikkan sinyal ini sesudah
+        // restart gagal; instance service yang hidup menilainya dengan
+        // stopSelfIfNoWork yang sama. Nilai replay StateFlow hanya dibaca
+        // sebagai garis awal oleh kolektor (bukan pemicu).
+        private val reevaluateRequests =
+            kotlinx.coroutines.flow.MutableStateFlow(0L)
+
+        /** Minta instance service yang hidup menilai ulang berhentinya. */
+        fun requestReevaluate() {
+            reevaluateRequests.value += 1
+        }
 
         /** Pastikan DownloadService berjalan (issue #1028). Server mode
          *  background hanya terlindungi dari rebut proses sistem bila
