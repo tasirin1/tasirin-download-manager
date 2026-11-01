@@ -1006,8 +1006,17 @@ class DownloadEngine(appContext: Context) {
             if (presetRange != null && presetRange > 0) {
                 conn.setRequestProperty("Range", "bytes=$presetRange-")
             }
-            configure(conn, current, effectiveMethod)
-            val code = conn.responseCode
+            // Koneksi hop ini belum lolos ke pemanggil: kegagalan
+            // configure (tulis body POST) atau baca kode respons di
+            // tengah hop wajib melepaskannya, kalau tidak soket
+            // terhubungnya bocor menunggu timeout/GC (issue #1112).
+            val code = try {
+                configure(conn, current, effectiveMethod)
+                conn.responseCode
+            } catch (e: Exception) {
+                conn.disconnect()
+                throw e
+            }
             // Hanya redirect asli yang diikuti: 304 (Not Modified) serta
             // 305/306 (proxy/unused) bukan redirect dan tidak punya Location.
             if (code != 301 && code != 302 && code != 303 && code != 307 && code != 308) return conn
