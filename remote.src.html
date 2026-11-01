@@ -5610,6 +5610,7 @@ window.addEventListener('beforeunload', function (e) {
   const LOCK_MS = 10 * 60 * 1000;
   let timer = null;
   let lastMove = 0;
+  let lastScroll = 0;
   function arm() {
     clearTimeout(timer);
     timer = setTimeout(function () {
@@ -5642,7 +5643,17 @@ window.addEventListener('beforeunload', function (e) {
     document.addEventListener('click', arm, { passive: true });
     document.addEventListener('touchstart', arm, { passive: true });
     document.addEventListener('keydown', arm, { passive: true });
-    document.addEventListener('scroll', arm, { passive: true });
+    // Scroll di-throttle 1 detik seperti mousemove (issue #1068):
+    // arm() melakukan clearTimeout + setTimeout baru, dan listener
+    // polos memicunya puluhan kali per detik selama pengguna
+    // menggulir halaman panjang — churn timer murni. Semantik idle
+    // tak berubah: gulir berkelanjutan tetap menunda kunci (arm
+    // terakhir <= 1 dtk sesudah gulir terakhir yang ter-throttle,
+    // jauh di bawah LOCK_MS 10 menit).
+    document.addEventListener('scroll', function () {
+      const now = Date.now();
+      if (now - lastScroll > 1000) { lastScroll = now; arm(); }
+    }, { passive: true });
     document.addEventListener('mousemove', function () {
       const now = Date.now();
       if (now - lastMove > 1000) { lastMove = now; arm(); }

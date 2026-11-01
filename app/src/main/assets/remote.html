@@ -2993,6 +2993,7 @@ return '';
 const LOCK_MS = 10 * 60 * 1000;
 let timer = null;
 let lastMove = 0;
+let lastScroll = 0;
 function arm() {
 clearTimeout(timer);
 timer = setTimeout(function () {
@@ -3018,7 +3019,10 @@ arm();
 document.addEventListener('click', arm, { passive: true });
 document.addEventListener('touchstart', arm, { passive: true });
 document.addEventListener('keydown', arm, { passive: true });
-document.addEventListener('scroll', arm, { passive: true });
+document.addEventListener('scroll', function () {
+const now = Date.now();
+if (now - lastScroll > 1000) { lastScroll = now; arm(); }
+}, { passive: true });
 document.addEventListener('mousemove', function () {
 const now = Date.now();
 if (now - lastMove > 1000) { lastMove = now; arm(); }
