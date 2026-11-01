@@ -16,7 +16,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -110,8 +112,15 @@ class GalleryActivity : AppCompatActivity() {
         // Tick persentase di-throttle (maks ~1/s): DiffUtil atas ribuan entry
         // tidak perlu dijalankan pada tiap emisi StateFlow (bisa beberapa per
         // detik saat banyak download aktif paralel).
+        // Kolektor digerbang STARTED (issue #1049): tanpa repeatOnLifecycle
+        // ia jalan terus saat activity STOPPED (mis. player eksternal di
+        // depan) — scan MediaStore penuh + DiffUtil ribuan entri ±1x/detik
+        // untuk layar yang tak dilihat siapa pun. StateFlow memutar ulang
+        // nilai terbaru saat STARTED lagi, jadi keadaan latar tertangkap
+        // utuh saat kembali (pola lifecycle MainActivity #149).
         var lastUiAt = 0L
         lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
             App.engine.items.collect { items ->
                 val newPartial = activeDownloadProgress(items)
                 val filesChanged = newPartial.keys != partialProgress.keys
@@ -134,6 +143,7 @@ class GalleryActivity : AppCompatActivity() {
                     fullList = mergedProgress(fullList)
                 }
                 updateList()
+            }
             }
         }
     }
