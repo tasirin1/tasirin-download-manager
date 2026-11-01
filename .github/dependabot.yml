@@ -26,6 +26,12 @@ updates:
       gradle-tools:
         patterns:
           - "com.android.tools*"
+          # Plugin AGP dilaporkan Dependabot dengan nama
+          # com.android.application (nama yang sama dipakai aturan
+          # ignore major di bawah) — tanpa pola ini ia tak pernah
+          # cocok grup perkakas dan PR-nya tiba berdiri sendiri
+          # (issue #1110).
+          - "com.android.application"
     ignore:
       # Major AGP perlu upgrade Gradle dulu; tangani manual bertahap,
       # bukan PR otomatis yang gagal CI (AGENTS.md aturan #14).
