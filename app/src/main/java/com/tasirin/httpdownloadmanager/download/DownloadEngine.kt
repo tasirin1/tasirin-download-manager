@@ -133,7 +133,16 @@ class DownloadEngine(appContext: Context) {
     // umurnya <= TTL singkat: URL segmen bertanda tangan bisa kedaluwarsa,
     // jadi jendela pakai-ulang sengaja pendek (retry otomatis berjarak
     // detik) dan master yang berubah selalu memicu rencana baru.
+    // Rencana juga diikat ke URL dasar yang melahirkannya dan umurnya
+    // dihitung jam monotonik (issue #1094): URL segmen di dalam rencana
+    // sudah absolut terhadap URL dasar itu, jadi body master identik
+    // dari host LAIN (failover mirror/ekstraksi ulang mengganti
+    // item.url untuk id yang sama) tak boleh memakai rencana lama —
+    // segmennya akan tetap diminta ke host asal; dan jam dinding yang
+    // dimundurkan membuat selisih umur negatif yang selalu <= TTL,
+    // jadi rencana tak pernah kedaluwarsa selama jam belum kembali.
     private data class CachedHlsPlan(
+        val baseUrl: String,
         val masterBody: String,
         val plan: HlsPlan,
         val atMs: Long
@@ -2557,8 +2566,9 @@ class DownloadEngine(appContext: Context) {
         // selain itu parse penuh dan simpan (peta dibatasi kasar: cache
         // ini hanya menolong retry beruntun, bukan katalog permanen).
         val cachedPlan = hlsPlanCache[item.id]
-        val plan = if (cachedPlan != null && cachedPlan.masterBody == master &&
-            System.currentTimeMillis() - cachedPlan.atMs <= HLS_PLAN_CACHE_TTL_MS
+        val plan = if (cachedPlan != null && cachedPlan.baseUrl == item.url &&
+            cachedPlan.masterBody == master &&
+            monotonicNow() - cachedPlan.atMs <= HLS_PLAN_CACHE_TTL_MS
         ) {
             cachedPlan.plan
         } else {
@@ -2566,7 +2576,7 @@ class DownloadEngine(appContext: Context) {
                 ?.also { fresh ->
                     if (hlsPlanCache.size >= 16) hlsPlanCache.clear()
                     hlsPlanCache[item.id] =
-                        CachedHlsPlan(master, fresh, System.currentTimeMillis())
+                        CachedHlsPlan(item.url, master, fresh, monotonicNow())
                 }
         }
         if (plan == null || plan.videoSegments.isEmpty()) {
