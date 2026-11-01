@@ -1620,7 +1620,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
             return writeUploadChunk(
                 session, id, name, storage, folderPath,
-                chunkIdx, chunks, length, offset
+                chunkIdx, chunks, length, offset, lock.chunkTracker
             )
         }
     }
@@ -1664,7 +1664,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         chunkIdx: Int,
         chunks: Int,
         length: Long,
-        offset: Long
+        offset: Long,
+        tracker: UploadChunkTracker
     ): Response {
         val tmp = File(context.cacheDir, "up_$id.tmp")
         return runCatching {
@@ -1676,6 +1677,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         raf.setLength(0)
                         copyUploadBody(session, length, RandomAccessOutputStream(raf))
                     }
+                    // Sesi baru: bukti kelengkapan mulai dari nol (#1036).
+                    tracker.reset(chunks)
+                    tracker.record(0, length)
                 }
                 !tmp.isFile -> {
                     appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks FAILED: must start from the first chunk")
@@ -1687,6 +1691,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     // Tulis di offset persis: retry potongan sama tidak menggandakan data.
                     // Tolak offset melampaui EOF: seek melewati ujung membuat lubang
                     // sparse berisi nol (file korup) saat ukuran chunk tak seragam.
+                    // Bukti kelengkapan (#1036): samakan sesi, lalu tanam
+                    // awalan pra-restart dari panjang tmp SEBELUM tulis ini.
+                    tracker.ensureSession(chunks)
+                    if (chunkIdx > 0) tracker.seedPrefix(chunkIdx, offset, tmp.length())
                     RandomAccessFile(tmp, "rw").use { raf ->
                         // Chunk 0 pada tmp yang SUDAH ada = unggahan dimulai
                         // ulang memakai ID sama: potong dulu, sisa ekor
@@ -1703,6 +1711,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         raf.seek(offset)
                         copyUploadBody(session, length, RandomAccessOutputStream(raf))
                     }
+                    // Tulis berhasil: catat chunk ini. Chunk 0 di cabang
+                    // ini = mulai ulang (#160), sesi dibuktikan dari nol.
+                    if (chunkIdx == 0) tracker.reset(chunks)
+                    tracker.record(chunkIdx, length)
                 }
             }
             if (chunkIdx == chunks - 1) {
@@ -1720,6 +1732,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     tmp.delete()
                     return jsonResponse(
                         JSONObject().put("ok", false).put("error", "Not enough storage for upload")
+                    )
+                }
+                // Gerbang kelengkapan (issue #1036): chunk terakhir tiba
+                // BUKAN bukti semua chunk tiba — tanpa ini berkas yang
+                // potongan tengahnya hilang terbit sebagai sukses. Tmp
+                // SENGAJA tak dihapus: klien masih bisa mengirim chunk
+                // yang kurang; yang ditolak hanya penerbitannya.
+                if (!tracker.isComplete(tmpLen)) {
+                    appendLog(
+                        "UPLOAD #$id chunk ${chunkIdx + 1}/$chunks REJECTED: " +
+                            "incomplete upload (${tracker.missingCount()} chunk(s) missing)"
+                    )
+                    return jsonResponse(
+                        JSONObject().put("ok", false).put("error", "Upload incomplete: missing chunk(s)")
                     )
                 }
                 val finalName = uploadUniqueName(name, folderPath)
@@ -4389,6 +4415,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private class UploadLock {
         val lock = Any()
         val lastUse = AtomicLong(System.currentTimeMillis())
+
+        // Bukti kelengkapan chunk sesi ini (issue #1036); hanya disentuh
+        // di bawah lock di atas.
+        val chunkTracker = UploadChunkTracker()
     }
 
     private class LoginAttempt {
