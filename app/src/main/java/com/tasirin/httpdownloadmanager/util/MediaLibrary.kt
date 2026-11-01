@@ -14,6 +14,7 @@ import android.provider.MediaStore
 import android.util.Base64
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
+import kotlin.concurrent.withLock
 
 object MediaLibrary {
 
@@ -39,7 +40,21 @@ object MediaLibrary {
     @Volatile
     private var scanCache: ScanCache? = null
     private var scanCacheFolderKey: List<String> = emptyList()
-    private val scanLock = Any()
+
+    // Kunci cache scan adalah ReentrantLock + Condition, BUKAN monitor
+    // yang ditahan selama scan (issue #1051): scan tak-tercache bisa
+    // berjalan detik-detik (walk filesystem TV box), dan invalidasi
+    // murah (notifyMediaChanged/invalidateScanCache dari jalur unduhan
+    // selesai) tak boleh mengantre di belakangnya. Scan berjalan di
+    // LUAR kunci; kunci hanya menjaga cache + giliran scan (Condition
+    // menunggu scan lain selesai agar dedupe tetap berlaku untuk
+    // sesama pemindai). scanCacheGeneration naik di tiap invalidasi:
+    // hasil scan yang dimulai sebelum invalidasi tak boleh diterbitkan
+    // sesudahnya (akan menghidupkan lagi cache yang baru dikosongkan).
+    private val scanLock = java.util.concurrent.locks.ReentrantLock()
+    private val scanDone = scanLock.newCondition()
+    private var scanInProgress = false
+    private var scanCacheGeneration = 0L
     @Volatile private var observerRegistered = false
     // Tahan ContentObserver seumur proses: observer lokal yang tak direferensikan
     // bisa dikumpulkan GC sehingga onChange berhenti dipanggil diam-diam dan
@@ -320,7 +335,7 @@ object MediaLibrary {
      *  supaya galeri langsung mendeteksi file yang baru ditulis aplikasi
      *  (download selesai, upload, pindah/rename dari file manager). */
     fun notifyMediaChanged(context: Context, vararg paths: String) {
-        synchronized(scanLock) { scanCache = null }
+        scanLock.withLock { scanCache = null; scanCacheGeneration++ }
         val valid = paths.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (valid.isEmpty()) return
         runCatching {
@@ -337,7 +352,7 @@ object MediaLibrary {
      *  bergantung pada ContentObserver yang ter-debounce 10 detik,
      *  jadi berkas baru bisa tak terlihat sampai TTL cache berakhir. */
     fun invalidateScanCache() {
-        synchronized(scanLock) { scanCache = null }
+        scanLock.withLock { scanCache = null; scanCacheGeneration++ }
     }
 
     /** Kondisi cache scan terpakai: masih dalam TTL dan (hasil lama memuat
@@ -460,29 +475,73 @@ object MediaLibrary {
 
     private fun scanCached(context: Context, maxEntries: Int, selectedFolders: List<String> = emptyList()): MediaScanResult {
         ensureObserver(context)
-        synchronized(scanLock) {
-            // Jam monotonik: TTL cache tidak goyah bila jam dinding berubah.
-            val now = android.os.SystemClock.elapsedRealtime()
-            val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
-            // Cache hanya valid bila folder selection sama (kosong = semua)
-            scanCache?.let { cached ->
-                if (scanCacheFolderKey == selectedFolders &&
-                    scanCacheUsable(now - cached.ts, cached.ttlMs, cached.items.size, cached.total, limit)) {
-                    // usedFallback ikut diteruskan dari cache — issue
-                    // #405: sebelumnya cache-hit mengembalikannya false
-                    // walau data yang sama datang dari fallback, membuat
-                    // kontrak hasil tak konsisten antar panggilan.
-                    return MediaScanResult(cached.items.take(limit), cached.total, cached.usedFallback)
+        val limit = maxEntries.coerceIn(1, GALLERY_MAX_ENTRIES)
+        // Fase kunci singkat: sajikan cache ATAU ambil giliran scan.
+        // Pemindai lain yang sedang berjalan ditunggu lewat Condition
+        // (dedupe tetap berlaku sesama pemindai); invalidasi tak pernah
+        // menunggu karena kuncinya hanya dipegang sesaat (issue #1051).
+        var genAtStart = -1L
+        var ownScan = false
+        scanLock.withLock {
+            while (true) {
+                // Jam monotonik: TTL cache tidak goyah bila jam dinding berubah.
+                val now = android.os.SystemClock.elapsedRealtime()
+                // Cache hanya valid bila folder selection sama (kosong = semua)
+                scanCache?.let { cached ->
+                    if (scanCacheFolderKey == selectedFolders &&
+                        scanCacheUsable(now - cached.ts, cached.ttlMs, cached.items.size, cached.total, limit)) {
+                        // usedFallback ikut diteruskan dari cache — issue
+                        // #405: sebelumnya cache-hit mengembalikannya false
+                        // walau data yang sama datang dari fallback, membuat
+                        // kontrak hasil tak konsisten antar panggilan.
+                        return MediaScanResult(cached.items.take(limit), cached.total, cached.usedFallback)
+                    }
+                }
+                if (!scanInProgress) {
+                    scanInProgress = true
+                    ownScan = true
+                    genAtStart = scanCacheGeneration
+                    break
+                }
+                try {
+                    scanDone.await()
+                } catch (_: InterruptedException) {
+                    // Terinterupsi saat menunggu giliran: beri hasil dari
+                    // scan sendiri TANPA menerbitkan cache (generasi tak
+                    // dipegang) dan tanpa merebut giliran pemilik scan.
+                    Thread.currentThread().interrupt()
+                    genAtStart = -1L
+                    break
                 }
             }
+        }
+        try {
+            // Scan berjalan di LUAR kunci: invalidasi + penyelesaian
+            // unduhan tak mengantre di belakangnya lagi.
             val result = scanUncached(context, selectedFolders)
-            scanCache = ScanCache(
-                now, result.items, result.total,
-                if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS,
-                result.usedFallback
-            )
-            scanCacheFolderKey = selectedFolders
+            if (ownScan) {
+                scanLock.withLock {
+                    // Terbitkan hanya bila tak ada invalidasi selama
+                    // scan berjalan (lihat scanCacheGeneration).
+                    if (scanCacheGeneration == genAtStart) {
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        scanCache = ScanCache(
+                            now, result.items, result.total,
+                            if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS,
+                            result.usedFallback
+                        )
+                        scanCacheFolderKey = selectedFolders
+                    }
+                }
+            }
             return MediaScanResult(result.items.take(limit), result.total, result.usedFallback)
+        } finally {
+            if (ownScan) {
+                scanLock.withLock {
+                    scanInProgress = false
+                    scanDone.signalAll()
+                }
+            }
         }
     }
 
@@ -503,7 +562,7 @@ object MediaLibrary {
                         val now = android.os.SystemClock.elapsedRealtime()
                         if (now - lastInvalidate > 10_000L) {
                             lastInvalidate = now
-                            synchronized(scanLock) { scanCache = null }
+                            scanLock.withLock { scanCache = null; scanCacheGeneration++ }
                         }
                     }
                 }
