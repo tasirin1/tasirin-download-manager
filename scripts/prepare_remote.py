@@ -331,11 +331,14 @@ def scan_remote() -> list:
 
 
 def scan_xml() -> list:
+    # <item> wajib menoleransi atribut (issue #1053): item plurals
+    # Android SELALU beratribut quantity, jadi pola <item> polos tak
+    # pernah cocok dan teks plurals lolos guard bahasa seluruhnya.
     hits = []
     for xml_path in sorted(VALUES_DIR.glob("*.xml")):
         text = read_utf8(xml_path)
         text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
-        for m in re.finditer(r"<string[^>]*>(.*?)</string>|<item>(.*?)</item>", text, re.S):
+        for m in re.finditer(r"<string[^>]*>(.*?)</string>|<item[^>]*>(.*?)</item>", text, re.S):
             value = (m.group(1) or m.group(2) or "")
             for word, _ in banned_hits(value):
                 hits.append(f"{xml_path.name}:{word}")
