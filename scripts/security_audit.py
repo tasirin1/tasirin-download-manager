@@ -386,6 +386,27 @@ def language_for(path: Path) -> str | None:
     return "text"
 
 
+def looks_like_text(path: Path) -> bool:
+    """True bila isi berkas terbaca sebagai teks UTF-8 polos (issue
+    #1122). Dipakai untuk berkas berekstensi biner yang dikenal:
+    ekstensi saja bukan bukti biner. Batas ukuran sama dengan
+    read_lines (MAX_FILE_BYTES) — berkas yang lebih besar memang
+    akan ditolak read_lines juga. Gagal baca = bukan teks (dilewati,
+    sama seperti perilaku lama untuk biner)."""
+    try:
+        with path.open("rb") as handle:
+            data = handle.read(MAX_FILE_BYTES + 1)
+    except OSError:
+        return False
+    if len(data) > MAX_FILE_BYTES or b"\x00" in data:
+        return False
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
 def repository_files(root: Path) -> list[Path]:
     import subprocess
 
@@ -430,7 +451,14 @@ def repository_files(root: Path) -> list[Path]:
         if relative in EXCLUDED_FILES:
             continue
         if language_for(relative) is None:
-            continue
+            # Ekstensi biner yang dikenal dilewati — TETAPI hanya
+            # bila isinya sungguh biner (issue #1122): berkas teks
+            # yang menyandang ekstensi biner (rename iseng atau
+            # sengaja) dulu lolos total tanpa jejak. Isi yang
+            # ter-decode UTF-8 utuh tanpa NUL adalah teks, apa pun
+            # ekstensinya, dan tetap dipindai aturan secret.
+            if not looks_like_text(absolute):
+                continue
         selected.append(absolute)
     return sorted(selected, key=lambda path: path.as_posix())
 
