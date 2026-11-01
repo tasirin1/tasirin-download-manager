@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 
-CODE_PREFIXES = ("app/src/main/", "scripts/", "tools/", "gradle/", ".github/", ".githooks/")
+CODE_PREFIXES = ("app/src/main/", "app/src/test/", "scripts/", "tools/", "gradle/", ".github/", ".githooks/")
 # .githooks/ ikut tercakup (issue #699): isinya skrip gerbang yang
 # dieksekusi pada tiap commit/push lokal — perubahan di sana kelas
 # yang sama dengan scripts/ dan tools/, jadi wajib entri CHANGELOG.
@@ -22,6 +22,14 @@ CODE_EXACT = (
     "app/build.gradle.kts",
     "build.gradle.kts",
     "settings.gradle.kts",
+    # gradle.properties AKAR + aturan R8 aplikasi (issue #1054):
+    # keduanya mengubah perilaku build/rilis (properti Gradle global;
+    # keep-rules release) tetapi dulu di luar cakupan — awalan "gradle/"
+    # hanya menaungi direktori gradle/, dan app/proguard-rules.pro tak
+    # diawali app/src/main/. app/src/test/ ikut tercakup lewat
+    # CODE_PREFIXES di atas: perubahan uji adalah perubahan kode.
+    "gradle.properties",
+    "app/proguard-rules.pro",
 )
 
 
@@ -198,8 +206,9 @@ def main():
                   "pada rentang ini authored dependabot[bot] (PR bot murni, "
                   "termasuk yang di-merge manual).")
             return 0
-        print("::error::Perubahan kode (app/src/main/, remote.src.html, "
-              "berkas Gradle, scripts/, tools/, gradle/, .github/, "
+        print("::error::Perubahan kode (app/src/main/, app/src/test/, "
+              "remote.src.html, berkas Gradle, gradle.properties, "
+              "proguard-rules.pro, scripts/, tools/, gradle/, .github/, "
               ".githooks/) wajib menyertakan update CHANGELOG.md")
         print("\n".join(needs))
         return 1
