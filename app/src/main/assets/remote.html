@@ -3707,7 +3707,8 @@ fActive: document.getElementById('fActive'),
 fDone: document.getElementById('fDone'),
 fAttention: document.getElementById('fAttention'),
 fSticky: document.getElementById('filtersSticky'),
-badge: document.getElementById('navDlBadge')
+badge: document.getElementById('navDlBadge'),
+sep: document.querySelector('#moreMenu .sep')
 };
 return toolbarEls;
 }
@@ -3728,9 +3729,8 @@ els.pauseAll.classList.toggle('hidden', active === 0);
 els.resumeAll.classList.toggle('hidden', pausedOrFailed === 0);
 els.retryFailed.classList.toggle('hidden', failed === 0);
 els.clearCompleted.classList.toggle('hidden', completed === 0);
-const sep1 = moreMenu ? moreMenu.querySelector('.sep') : null;
-if (sep1) {
-sep1.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
+if (els.sep) {
+els.sep.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
 }
 var total = items.length;
 if (els.fActive && els.fActive.textContent !== '' + active) els.fActive.textContent = active;

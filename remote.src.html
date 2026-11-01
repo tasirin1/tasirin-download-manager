@@ -6406,7 +6406,13 @@ function getToolbarEls() {
     fDone: document.getElementById('fDone'),
     fAttention: document.getElementById('fAttention'),
     fSticky: document.getElementById('filtersSticky'),
-    badge: document.getElementById('navDlBadge')
+    badge: document.getElementById('navDlBadge'),
+    // Pemisah pertama moreMenu ikut di-cache (issue #1067): elemennya
+    // statis seumur dokumen tetapi dulu dicari ulang via querySelector
+    // pada SETIAP updateToolbar (hingga 1x/detik + tiap push SSE).
+    // querySelector('#moreMenu .sep') mempertahankan semantik
+    // first-match yang sama seperti panggilan per-tick sebelumnya.
+    sep: document.querySelector('#moreMenu .sep')
   };
   return toolbarEls;
 }
@@ -6433,9 +6439,8 @@ function updateToolbar(items) {
   els.resumeAll.classList.toggle('hidden', pausedOrFailed === 0);
   els.retryFailed.classList.toggle('hidden', failed === 0);
   els.clearCompleted.classList.toggle('hidden', completed === 0);
-  const sep1 = moreMenu ? moreMenu.querySelector('.sep') : null;
-  if (sep1) {
-    sep1.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
+  if (els.sep) {
+    els.sep.classList.toggle('hidden', active === 0 && pausedOrFailed === 0 && failed === 0 && completed === 0);
   }
   // Hitungan strip kategori: Active/Done/Attention sejajar predikat
   // saringannya. Attention = pausedOrFailed (PAUSED + FAILED + CANCELLED,
