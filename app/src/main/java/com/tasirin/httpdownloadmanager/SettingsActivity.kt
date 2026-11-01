@@ -1009,13 +1009,28 @@ class SettingsActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
+        // Terapkan UA kustom dengan debounce (issue #1073): dulu tiap
+        // ketukan langsung menulis prefs + refresh engine, jadi
+        // mengetik UA 100+ karakter membayar 100+ antrean tulis disk
+        // dan 100+ refresh untuk nilai antara yang tak pernah dipakai.
+        // Pola debounce yang sama seperti pencarian Log (issue #803),
+        // jeda 450 ms sejajar debounce probe MainActivity.
+        val applyCustomUA = Runnable {
+            if (spinnerUA.selectedItemPosition == uaPresets.size - 1) {
+                StoragePrefs.setUserAgent(
+                    this@SettingsActivity,
+                    customUAInput.text?.toString().orEmpty()
+                )
+                runCatching { App.engine.refreshUserAgent() }
+            }
+        }
         customUAInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 if (spinnerUA.selectedItemPosition == uaPresets.size - 1) {
-                    StoragePrefs.setUserAgent(this@SettingsActivity, s?.toString().orEmpty())
-                    runCatching { App.engine.refreshUserAgent() }
+                    customUAInput.removeCallbacks(applyCustomUA)
+                    customUAInput.postDelayed(applyCustomUA, 450L)
                 }
             }
         })
