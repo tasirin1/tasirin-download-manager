@@ -63,10 +63,21 @@ def static_checks() -> tuple[Result, ...]:
     # meloloskan LICENSE/SECURITY.md/CONTRIBUTING.md yang terkosongkan
     # (checkout rusak / suntingan gagal) — kelas fail-open yang sudah
     # ditutup untuk bekas-hapusan.txt/remote.src.html di gerbang lain.
-    empty = [
-        name for name in REQUIRED_FILES
-        if (ROOT / name).is_file() and (ROOT / name).stat().st_size == 0
-    ]
+    # "Kosong" mencakup isi whitespace saja (issue #1104): berkas yang
+    # tertimpa menjadi hanya newline/spasi adalah kerusakan yang sama
+    # dengan 0 byte, tetapi pemeriksaan ukuran persis dulu
+    # meloloskannya. Berkas tak terbaca diperlakukan kosong juga —
+    # isinya tak bisa dibuktikan ada.
+    def _effectively_empty(name: str) -> bool:
+        path = ROOT / name
+        if not path.is_file():
+            return False
+        try:
+            return path.read_text(encoding="utf-8", errors="ignore").strip() == ""
+        except OSError:
+            return True
+
+    empty = [name for name in REQUIRED_FILES if _effectively_empty(name)]
     detail = "Semua file pengelolaan wajib ada."
     problems = []
     if missing:
