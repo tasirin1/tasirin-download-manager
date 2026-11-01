@@ -1036,11 +1036,15 @@ class SettingsActivity : AppCompatActivity() {
         // jeda 450 ms sejajar debounce probe MainActivity.
         val applyCustomUA = Runnable {
             if (spinnerUA.selectedItemPosition == uaPresets.size - 1) {
-                StoragePrefs.setUserAgent(
-                    this@SettingsActivity,
-                    customUAInput.text?.toString().orEmpty()
-                )
-                runCatching { App.engine.refreshUserAgent() }
+                val newUA = customUAInput.text?.toString().orEmpty()
+                // Penjaga nilai-sama sekelas #1100 (issue #1117):
+                // ketik lalu hapus kembali ke nilai asal tidak perlu
+                // membayar tulis disk + refresh engine untuk nilai
+                // yang identik.
+                if (newUA != StoragePrefs.getUserAgent(this@SettingsActivity)) {
+                    StoragePrefs.setUserAgent(this@SettingsActivity, newUA)
+                    runCatching { App.engine.refreshUserAgent() }
+                }
             }
         }
         customUAInput.addTextChangedListener(object : TextWatcher {
