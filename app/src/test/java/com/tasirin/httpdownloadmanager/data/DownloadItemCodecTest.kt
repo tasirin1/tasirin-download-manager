@@ -172,6 +172,60 @@ class DownloadItemCodecTest {
         assertEquals(0, it.addedAt)
     }
 
+    private fun decodeSegments(segmentsJson: String): List<DownloadSegment> {
+        val raw = """[{"id":"1","url":"https://a/x","fileName":"x","state":"PAUSED",""" +
+            """"bytesDownloaded":0,"totalBytes":200,"segments":$segmentsJson}]"""
+        return DownloadItemCodec.decode(raw)[0].segments
+    }
+
+    @Test
+    fun `decode - rencana segmen partisi persis dipertahankan dan diurutkan`() {
+        // Urutan blob terbalik pun diterima: validasi menilai himpunan,
+        // hasil dikembalikan terurut menurut indeks.
+        val segs = decodeSegments(
+            """[{"index":1,"start":100,"end":199,"downloaded":5},""" +
+                """{"index":0,"start":0,"end":99,"downloaded":40}]"""
+        )
+        assertEquals(2, segs.size)
+        assertEquals(0, segs[0].index)
+        assertEquals(40L, segs[0].downloaded)
+        assertEquals(1, segs[1].index)
+    }
+
+    @Test
+    fun `decode - indeks segmen duplikat membuang seluruh rencana`() {
+        // Issue #1042: dua entri index 0 = dua coroutine menulis
+        // .part.0 yang sama saat resume.
+        val segs = decodeSegments(
+            """[{"index":0,"start":0,"end":99,"downloaded":0},""" +
+                """{"index":0,"start":0,"end":99,"downloaded":0}]"""
+        )
+        assertTrue(segs.isEmpty())
+    }
+
+    @Test
+    fun `decode - indeks segmen hilang membuang seluruh rencana`() {
+        val segs = decodeSegments(
+            """[{"index":1,"start":100,"end":199,"downloaded":0},""" +
+                """{"index":2,"start":200,"end":299,"downloaded":0}]"""
+        )
+        assertTrue(segs.isEmpty())
+    }
+
+    @Test
+    fun `decode - rentang segmen tumpang tindih atau bercelah dibuang`() {
+        val overlap = decodeSegments(
+            """[{"index":0,"start":0,"end":99,"downloaded":0},""" +
+                """{"index":1,"start":50,"end":199,"downloaded":0}]"""
+        )
+        assertTrue(overlap.isEmpty())
+        val gap = decodeSegments(
+            """[{"index":0,"start":0,"end":99,"downloaded":0},""" +
+                """{"index":1,"start":150,"end":199,"downloaded":0}]"""
+        )
+        assertTrue(gap.isEmpty())
+    }
+
     @Test
     fun `encodeProgress - hanya menyimpan item aktif atau berprogres`() {
         val items = listOf(

@@ -167,7 +167,7 @@ object DownloadItemCodec {
     }
 
     private fun parseSegments(o: JSONObject): List<DownloadSegment> {
-        return runCatching {
+        val parsed = runCatching {
             val segArr = o.getJSONArray("segments")
             buildList {
                 for (j in 0 until segArr.length()) {
@@ -206,6 +206,37 @@ object DownloadItemCodec {
                 }
             }
         }.getOrDefault(emptyList())
+        // Validasi KESELURUHAN rencana (issue #1042): per-entri valid tak
+        // cukup — indeks duplikat membuat dua coroutine menulis berkas
+        // .part yang sama, indeks hilang/tak berurutan membuat merge
+        // mengambil parts yang salah, dan rentang tumpang tindih/gap
+        // menggandakan/menghilangkan byte di hasil gabungan. Rencana
+        // segmen sah selalu partisi persis [0,total): indeks 0..n-1 dan
+        // tiap segmen mulai tepat sesudah segmen sebelumnya berakhir.
+        // Rencana yang gagal dibuang SELURUHNYA (bukan diperbaiki
+        // sebagian): runSegmented memperlakukan daftar kosong sebagai
+        // "buat rencana baru", jadi resume mulai dari rencana bersih
+        // alih-alih menerbitkan berkas korup berstatus COMPLETED.
+        return if (isSegmentPlanValid(parsed)) parsed.sortedBy { it.index } else emptyList()
+    }
+
+    /** Rencana segmen sah = partisi persis: sesudah diurutkan menurut
+     *  indeks, indeksnya 0..n-1 tanpa celah/duplikat, segmen pertama
+     *  mulai di 0, dan tiap segmen mulai tepat di end+1 pendahulunya
+     *  (tanpa tumpang tindih, tanpa gap). */
+    private fun isSegmentPlanValid(segments: List<DownloadSegment>): Boolean {
+        if (segments.isEmpty()) return true
+        val sorted = segments.sortedBy { it.index }
+        var expectedStart = 0L
+        for ((pos, seg) in sorted.withIndex()) {
+            if (seg.index != pos) return false
+            if (seg.start != expectedStart) return false
+            if (pos < sorted.lastIndex) {
+                if (seg.end == Long.MAX_VALUE) return false
+                expectedStart = seg.end + 1
+            }
+        }
+        return true
     }
 
     /** Progres kompak (id -> bytes/total + downloaded per segmen) untuk
