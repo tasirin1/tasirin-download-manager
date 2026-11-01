@@ -105,7 +105,11 @@ object ZipCreator {
                 .ifEmpty { return 0 to 0 },
             usedNames
         )
-        if (!budget.tryTake()) return 0 to 0
+        // Budget diambil hanya saat entri SUNGGUH ditulis (issue #1062,
+        // menyelaraskan jalur token): folder perantara tak-kosong tak
+        // menjadi entri arsip, jadi mengambil budget untuknya membuat
+        // plafon 5000 entri menyusut efektif dan hitungan budget tak
+        // sebanding dengan entri tertulis yang dilaporkan.
         if (file.isDirectory) {
             // listFiles null = galat I/O, BUKAN folder kosong: menyamakan
             // keduanya mencatat folder berisi sebagai entri kosong
@@ -116,6 +120,7 @@ object ZipCreator {
                 throw IOException("Cannot list folder: " + file.name, e)
             } ?: throw IOException("Cannot list folder: " + file.name)
             if (children.isEmpty()) {
+                if (!budget.tryTake()) return 0 to 0
                 zos.putNextEntry(ZipEntry("$entryPath/"))
                 zos.closeEntry()
                 return 1 to 0
@@ -143,6 +148,14 @@ object ZipCreator {
             // listing dan buka tak boleh membunuh seluruh ZIP folder.
             val expected = file.length()
             val input = runCatching { file.inputStream() }.getOrNull() ?: return 0 to 1
+            // Budget diambil sesudah sumber terbukti bisa dibuka:
+            // berkas yang gagal buka (terlewat) tak menulis entri dan
+            // tak boleh memakan jatah (issue #1062). Penolakan budget
+            // adalah keputusan traversal (0 to 0), bukan terlewat.
+            if (!budget.tryTake()) {
+                runCatching { input.close() }
+                return 0 to 0
+            }
             // Kegagalan MENYALIN di tengah tetap TIDAK ditelan (issue
             // #846): entri tanpa ukuran/CRC di muka memakai data
             // descriptor, jadi salinan yang putus di tengah akan
