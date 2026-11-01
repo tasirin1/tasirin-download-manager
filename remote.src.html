@@ -7340,6 +7340,7 @@ async function shareItem(id) {
 }
 function closeShare() {
   shareViewSeq++;
+  if (shareLabelTimer) { clearInterval(shareLabelTimer); shareLabelTimer = null; }
   const wasHidden = shareModal.classList.contains('hidden');
   shareModal.classList.add('hidden');
   if (!wasHidden) popReturnFocus(); // issue #947
@@ -7419,10 +7420,35 @@ document.getElementById('shareOpen').addEventListener('click', function () {
 // dibuat pada sesi halaman lain — sebelumnya kuota 256 terkunci sampai
 // kedaluwarsa karena Revoke hanya tahu token sesi halaman ini.
 let shareListSeq = 0;
+// Label sisa share dihitung ulang berkala (issue #1065): jangkar
+// selisih jam server dari payload terakhir + jam lokal yang berjalan,
+// agar label tak membeku pada momen fetch selama modal dibiarkan
+// terbuka berjam-jam.
+let shareLabelTimer = null;
+let shareClockOffsetMs = 0;
+function shareLeftText(ms) {
+  return ms <= 0 ? 'expired'
+    : ('expires in ' + Math.floor(ms / 3600000) + 'h ' + Math.floor(ms % 3600000 / 60000) + 'm');
+}
+function tickShareLabels() {
+  const box = document.getElementById('shareList');
+  const labels = box ? box.querySelectorAll('[data-share-exp]') : [];
+  if (!labels.length) {
+    if (shareLabelTimer) { clearInterval(shareLabelTimer); shareLabelTimer = null; }
+    return;
+  }
+  const now = Date.now() + shareClockOffsetMs;
+  for (let i = 0; i < labels.length; i++) {
+    const el = labels[i];
+    el.textContent = (el.getAttribute('data-share-name') || '') + ' \u2014 ' +
+      shareLeftText(Number(el.getAttribute('data-share-exp')) - now);
+  }
+}
 async function refreshShareList() {
   const box = document.getElementById('shareList');
   if (!box) return;
   const seq = ++shareListSeq;
+  if (shareLabelTimer) { clearInterval(shareLabelTimer); shareLabelTimer = null; }
   box.textContent = '';
   let data = null;
   let loadFailed = false;
@@ -7459,16 +7485,16 @@ async function refreshShareList() {
   // menjadi galat label. Server menyertakan "now"-nya di payload ini;
   // fallback Date.now() hanya untuk payload tanpa field itu.
   const serverNow = data.now || Date.now();
+  shareClockOffsetMs = serverNow - Date.now();
   data.shares.forEach(function (s) {
     const row = document.createElement('div');
     row.className = 'cm-row';
     row.style.justifyContent = 'space-between';
     const label = document.createElement('span');
     label.className = 'cm-text';
-    const ms = (s.expiresAt || 0) - serverNow;
-    const left = ms <= 0 ? 'expired'
-      : ('expires in ' + Math.floor(ms / 3600000) + 'h ' + Math.floor(ms % 3600000 / 60000) + 'm');
-    label.textContent = (s.name || '') + ' \u2014 ' + left;
+    label.setAttribute('data-share-exp', String(s.expiresAt || 0));
+    label.setAttribute('data-share-name', s.name || '');
+    label.textContent = (s.name || '') + ' \u2014 ' + shareLeftText((s.expiresAt || 0) - serverNow);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn-ghost';
@@ -7478,6 +7504,7 @@ async function refreshShareList() {
     row.appendChild(btn);
     box.appendChild(row);
   });
+  shareLabelTimer = setInterval(tickShareLabels, 30000);
 }
 async function revokeShareSid(sid) {
   if (shareListRevoking.has(sid)) return;
