@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.update
 
 class DownloadService : Service() {
 
@@ -275,7 +276,10 @@ class DownloadService : Service() {
 
         /** Minta instance service yang hidup menilai ulang berhentinya. */
         fun requestReevaluate() {
-            reevaluateRequests.value += 1
+            // update{} = CAS atomik (issue #1114): value += 1 adalah
+            // baca-ubah-tulis yang bisa menelan satu sinyal bila dua
+            // kegagalan restart tiba bersamaan dari thread berbeda.
+            reevaluateRequests.update { it + 1 }
         }
 
         /** Pastikan DownloadService berjalan (issue #1028). Server mode

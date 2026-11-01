@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan internal: sinyal penilaian-ulang berhenti DownloadService kini dinaikkan secara atomik sehingga tidak bisa hilang bila dua kegagalan restart server tiba bersamaan (issue #1114).
 - Perbaikan: koneksi unduhan kini dilepas bila penulisan body POST atau pembacaan kode respons gagal di tengah pengalihan, tidak lagi meninggalkan soket terhubung menggantung sampai timeout (issue #1112).
 - Perbaikan internal: muxer HLS kini memakai fungsi bersama AdtsAac.durationUs untuk cap waktu audio AAC, bukan salinan rumus inline, sehingga keduanya tidak bisa berdivergensi diam-diam (issue #1111).
 - **chore(deps): AGP 9.4.1 → 9.5.0 (PR #1092)** -- Bump plugin Android Gradle satu langkah minor lewat Dependabot; AGENTS.md disinkronkan (guard admin menegaskan sebutan versi AGP terhadap katalog) dan `gradle/verification-metadata.xml` diregenerasi untuk checksum artefak baru (verifikasi dependensi strict).
