@@ -238,21 +238,38 @@ class LogActivity : AppCompatActivity() {
             R.plurals.remote_log_lines, lines, lines
         )
         val prevScroll = binding.logScroll.scrollY
-        binding.log.text = highlightLog(text)
-        binding.logScroll.post {
-            if (logAutoScroll) {
-                binding.logScroll.fullScroll(View.FOCUS_DOWN)
-            } else {
-                val max = binding.logScroll.getChildAt(0)?.height
-                    ?.minus(binding.logScroll.height) ?: 0
-                binding.logScroll.scrollTo(0, prevScroll.coerceIn(0, max.coerceAtLeast(0)))
+        // Pewarnaan log dikerjakan di latar (issue #1072): membangun
+        // SpannableStringBuilder atas snapshot s.d. +/-120 KB dan
+        // memindai tiap baris per karakter dulu membayar penuh di
+        // main thread pada SETIAP perubahan versi — jank justru saat
+        // server sibuk mencatat. Hasil yang selesai sesudah refresh
+        // lebih baru menilai versi/pencarian lain dibuang, bukan
+        // ditimpa mundur.
+        val versionAt = version
+        val searchAt = logSearch
+        lifecycleScope.launch {
+            val highlighted = withContext(Dispatchers.Default) {
+                highlightLog(text, searchAt)
+            }
+            if (versionAt != lastLogVersion || searchAt != lastLogSearch) {
+                return@launch
+            }
+            binding.log.text = highlighted
+            binding.logScroll.post {
+                if (logAutoScroll) {
+                    binding.logScroll.fullScroll(View.FOCUS_DOWN)
+                } else {
+                    val max = binding.logScroll.getChildAt(0)?.height
+                        ?.minus(binding.logScroll.height) ?: 0
+                    binding.logScroll.scrollTo(0, prevScroll.coerceIn(0, max.coerceAtLeast(0)))
+                }
             }
         }
     }
 
     /** Sorot baris GAGAL/ERROR merah dan kata kunci pencarian kuning. */
-    private fun highlightLog(text: String): CharSequence {
-        val q = logSearch.trim()
+    private fun highlightLog(text: String, search: String): CharSequence {
+        val q = search.trim()
         // Gerbang wajib sepeka pencocok barisnya (issue #950): pencocok
         // di lineContains memakai ignoreCase, jadi gerbang peka huruf
         // membuat baris 'failed' berhuru kecil tak pernah tersorot bila
