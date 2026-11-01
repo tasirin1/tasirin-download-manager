@@ -118,7 +118,8 @@ def check_minify_assumptions(src_text: str) -> list:
     tak bisa menangkapnya (--check membandingkan OUT dengan hasil
     fungsi minify yang sama; node --check hanya memeriksa sintaks).
     Kini pelanggarannya problem bernama: backtick di blok script,
-    atau baris berakhiran backslash (continuation)."""
+    baris berakhiran backslash (continuation), atau '<!--' di blok
+    script (pola ketiga ditambah issue #1102)."""
     problems = []
     for block in re.findall(r"<script[^>]*>(.*?)</script>", src_text, re.S):
         if "`" in block:
@@ -138,7 +139,16 @@ def check_minify_assumptions(src_text: str) -> list:
                     "isi string yang dilanjutkan; hindari continuation "
                     "di dalam string (issue #1069)"
                 )
-                return problems
+    for block in re.findall(r"<script[^>]*>(.*?)</script>", src_text, re.S):
+        if "<!--" in block:
+            problems.append(
+                "blok <script> memuat '<!--' \u2014 minify_html membuang "
+                "teks <!--...--> dari seluruh dokumen SEBELUM blok "
+                "script dilindungi, jadi isi string JS yang memuatnya "
+                "terpotong diam-diam; hindari '<!--' di dalam script "
+                "atau perbarui minifier dulu (issue #1102)"
+            )
+            break
     return problems
 
 
