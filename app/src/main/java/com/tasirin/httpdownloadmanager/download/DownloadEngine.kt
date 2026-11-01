@@ -340,8 +340,15 @@ class DownloadEngine(appContext: Context) {
                     val ex = _items.value.filter { cur ->
                         loaded.none { it.id == cur.id }
                     }
-                    _items.value = (loaded + ex)
-                        .sortedByDescending { it.addedAt }
+                    // Urutan blob ADALAH urutan pengguna (issue #1060):
+                    // encode menulis urutan daftar apa adanya dan
+                    // moveUp/moveDown mempersist tukarannya lewat
+                    // scheduleSave — mengurutkan ulang menurut addedAt
+                    // di sini membuang susunan manual itu tiap restart
+                    // proses. Extras (ditambahkan selama jendela muat)
+                    // adalah yang terbaru dan sudah berurutan tampil
+                    // di _items, jadi mereka tetap di depan tanpa sortir.
+                    _items.value = ex + loaded
                     ex
                 }
                 // Rekonsiliasi cadangan .replaced yatim (issue #237):
