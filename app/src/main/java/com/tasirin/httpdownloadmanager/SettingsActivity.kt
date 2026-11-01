@@ -38,6 +38,7 @@ import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.FileNames
+import com.tasirin.httpdownloadmanager.util.PinHash
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.Permissions
 import com.tasirin.httpdownloadmanager.util.Updater
@@ -235,7 +236,11 @@ class SettingsActivity : AppCompatActivity() {
         val header = findViewById<View>(spec.headerId)
         val chevron = findViewById<ImageView>(spec.chevronId)
         setSectionExpanded(section, header, chevron, true)
-        StoragePrefs.setSectionCollapsed(this, spec.key, false)
+        // Mengetuk chip seksi yang sudah terbuka tidak perlu
+        // menulis ulang prefs (issue #1118).
+        if (StoragePrefs.isSectionCollapsed(this, spec.key)) {
+            StoragePrefs.setSectionCollapsed(this, spec.key, false)
+        }
     }
 
     private fun scrollToSection(spec: SectionSpec) {
@@ -1158,10 +1163,17 @@ class SettingsActivity : AppCompatActivity() {
             withContext(Dispatchers.IO) {
                 val extra = normalizeFolderPaths(extraRaws, createMissing = true)
                 if (extra == null) extraInvalid = true
-                else StoragePrefs.setExtraFolders(this@SettingsActivity, extra)
+                // Penjaga nilai-sama sekelas #1100 (issue #1118):
+                // apply() menserialisasi seluruh berkas prefs, jadi
+                // daftar yang tak berubah tidak ditulis ulang.
+                else if (extra != StoragePrefs.getExtraFolders(this@SettingsActivity)) {
+                    StoragePrefs.setExtraFolders(this@SettingsActivity, extra)
+                }
                 val gallery = normalizeFolderPaths(galleryRaws, createMissing = false)
                 if (gallery == null) galleryInvalid = true
-                else StoragePrefs.setGalleryFolders(this@SettingsActivity, gallery)
+                else if (gallery != StoragePrefs.getGalleryFolders(this@SettingsActivity)) {
+                    StoragePrefs.setGalleryFolders(this@SettingsActivity, gallery)
+                }
             }
             if (extraInvalid || galleryInvalid) {
                 Toast.makeText(this, R.string.storage_text_folder_invalid, Toast.LENGTH_LONG).show()
@@ -1193,9 +1205,20 @@ class SettingsActivity : AppCompatActivity() {
                     // menyimpan ulang PIN yang sama diam-diam menendang
                     // semua sesi remote — melawan janji #375 yang
                     // setServerPin sendiri jaga dengan cek murni.
-                    val event =
-                        if (oldPinHash == null || !StoragePrefs.verifyStoredPin(oldPinHash, newPin)) "PIN SET" else null
-                    StoragePrefs.setServerPin(this@SettingsActivity, newPin)
+                    val pinUnchanged =
+                        oldPinHash != null && StoragePrefs.verifyStoredPin(oldPinHash, newPin)
+                    val event = if (pinUnchanged) null else "PIN SET"
+                    // setServerPin menjalankan verify yang sama lagi di
+                    // cek tak-berubahnya (issue #1118): PBKDF2 dibayar
+                    // dua kali per Simpan. Bila PIN terbukti tak berubah
+                    // di sini DAN hash tersimpan sudah format modern,
+                    // isi setServerPin tinggal no-op (tak ada migrasi
+                    // warisan yang tertunda) sehingga panggilan bisa
+                    // dilewati; jalur berubah dan warisan tetap lewat
+                    // setServerPin penuh.
+                    if (!pinUnchanged || !PinHash.isModern(oldPinHash!!)) {
+                        StoragePrefs.setServerPin(this@SettingsActivity, newPin)
+                    }
                     event
                 }
             }
@@ -1227,8 +1250,10 @@ class SettingsActivity : AppCompatActivity() {
             val newPort = requestedPort
             if (!portInvalid && newPort != null) {
                 val oldPort = StoragePrefs.serverPort(this)
-                StoragePrefs.setServerPort(this, newPort)
                 if (newPort != oldPort) {
+                    // Tulis hanya bila berubah (issue #1118): Simpan
+                    // tanpa mengubah port tidak menulis ulang prefs.
+                    StoragePrefs.setServerPort(this, newPort)
                     App.logEvent("PORT CHANGED: $oldPort -> $newPort")
                     // Inline seperti cabang PIN di atas (issue #801):
                     // restart tak boleh hilang karena coroutine lepas
