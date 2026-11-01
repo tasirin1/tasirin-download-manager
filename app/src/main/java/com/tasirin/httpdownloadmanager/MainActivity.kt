@@ -526,12 +526,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         return sha256Hex(raw)
     }
 
-    private fun lastIntentSig(): String? =
-        getSharedPreferences(PREFS_INTENT, MODE_PRIVATE).getString(KEY_INTENT_SIG, null)
+    // Sidik intent lewat StoragePrefs (issue #1076): berkas prefs
+    // terpisah "main_intent" yang dibaca mentah di main thread saat
+    // onCreate diganti cache prefs bersama storage_settings.
+    private fun lastIntentSig(): String? = StoragePrefs.lastIntentSig(this)
 
     private fun storeIntentSig(sig: String) {
-        getSharedPreferences(PREFS_INTENT, MODE_PRIVATE).edit()
-            .putString(KEY_INTENT_SIG, sig).apply()
+        StoragePrefs.storeIntentSig(this, sig)
     }
 
     private fun requestPermissionsIfNeeded() {
@@ -2164,8 +2165,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 .distinct()
                 .toList()
         private const val EXTRA_ADD_DOWNLOAD = "com.tasirin.httpdownloadmanager.ADD_DOWNLOAD"
-        private const val PREFS_INTENT = "main_intent"
-        private const val KEY_INTENT_SIG = "last_intent_sig"
         private val PRIORITY_VALUES = intArrayOf(-1, 0, 1)
     }
 }

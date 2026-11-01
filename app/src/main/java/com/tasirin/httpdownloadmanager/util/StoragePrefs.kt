@@ -60,6 +60,7 @@ object StoragePrefs {
     private const val KEY_SERVER_AUTOSTART = "server_autostart_boot"
     private const val KEY_SERVER_READ_ONLY = "server_read_only"
     private const val KEY_TEXT_FOLDER = "text_folder_path"
+    private const val KEY_INTENT_SIG = "last_intent_sig"
     private const val KEY_PENDING_MEDIASTORE_ROWS = "pending_mediastore_rows"
     private const val KEY_PENDING_FINAL_CLAIMS = "pending_final_claims"
     private const val KEY_AUTO_OPEN_COMPLETE = "auto_open_on_complete"
@@ -158,6 +159,20 @@ object StoragePrefs {
         prefs(context).edit {
             putBoolean(KEY_SERVER_BACKGROUND, enabled)
         }
+    }
+
+    /** Sidik intent peluncur terakhir yang ditangani MainActivity
+     *  (issue #845/#854). Dulu disimpan di berkas prefs terpisah
+     *  "main_intent" yang dibaca mentah via getSharedPreferences di
+     *  main thread saat onCreate (issue #1076); kini lewat cache prefs
+     *  bersama di sini. Konsekuensi migrasi: sidik lama tak terbawa,
+     *  jadi tepat sesudah upgrade satu intent redeliver bisa tertangani
+     *  sekali lagi sebelum sidik baru tersimpan. */
+    fun lastIntentSig(context: Context): String? =
+        prefs(context).safeString(KEY_INTENT_SIG, null)
+
+    fun storeIntentSig(context: Context, sig: String) {
+        prefs(context).edit().putString(KEY_INTENT_SIG, sig).apply()
     }
 
     fun getTextFolder(context: Context): String? =
