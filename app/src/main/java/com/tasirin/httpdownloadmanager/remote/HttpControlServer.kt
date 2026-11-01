@@ -571,7 +571,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             val nowZip = System.currentTimeMillis()
             zipDlTokens.entries.removeIf { it.value < nowZip }
         }
-        // mediaMetaCache: entry > 15 menit
+        // mediaMetaCache: entry melewati MEDIA_META_TTL_MS (60 dtk).
+        // Komentar menyebut nama konstantanya, bukan angka lepas, agar
+        // tak basi lagi saat TTL berubah (issue #1063: dulu tertulis
+        // '15 menit' padahal konstantanya 60 detik).
         if (mediaMetaCache.size > 8) {
             mediaMetaCache.entries.removeIf { now - it.value.first > MEDIA_META_TTL_MS }
         }
