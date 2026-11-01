@@ -384,7 +384,7 @@ object MediaLibrary {
         else runCatching { Environment.getExternalStorageDirectory().absolutePath }
             .getOrDefault("/storage/emulated/0")
 
-    /** Alias root penyimpanan primer Android 5-6: kolom DATA MediaStore kadang
+    /** Alias root penyimpanan primer Android 6: kolom DATA MediaStore kadang
      *  memakai symlink lama (/sdcard, /mnt/sdcard, /storage/emulated/legacy)
      *  padahal folder galeri disimpan dengan externalRoot (/storage/emulated/0).
      *  Suppress SdCardPath: daftar ini hanya dipakai untuk PENCARIAN prefix
@@ -458,7 +458,7 @@ object MediaLibrary {
         val relLc = folder.relLc ?: return false
         if (folder.isWholeRoot) return true // seluruh root dipilih
         for (alias in PRIMARY_STORAGE_ALIASES) {
-            // Prefix alias wajib case-insensitive seperti kode lama (DATA Android 5-6
+            // Prefix alias wajib case-insensitive seperti kode lama (DATA Android 6
             // kadang "/SDCARD/..."): regionMatches tanpa alokasi "$alias/" per entry.
             if (fp.length > alias.length &&
                 fp.regionMatches(0, alias, 0, alias.length, ignoreCase = true) &&
@@ -623,7 +623,7 @@ object MediaLibrary {
             )
         }
 
-        // 1) Folder teks (Android 5-7 / folder kustom lewat path)
+        // 1) Folder teks (Android 6-7 / folder kustom lewat path)
         StoragePrefs.getTextFolder(context)?.let { tf ->
             val videoFilter = java.io.FilenameFilter { _, name -> isGalleryVideo(name) }
             runCatching { File(tf).listFiles(videoFilter)?.forEach { addFile(it) } }
@@ -697,7 +697,7 @@ object MediaLibrary {
             // RELATIVE_PATH (kolom diindeks; DATA deprecated & sering null di
             // Android 11+ — LIKE di kolom null tidak menjaring apa pun dan
             // membuat video di luar folder terpilih ikut tampil). API < 29
-            // TIDAK memakai pre-filter SQL: kolom DATA di Android 5-6 kadang
+            // TIDAK memakai pre-filter SQL: kolom DATA di Android 6 kadang
             // memakai alias root (/sdcard, /mnt/sdcard) yang tidak cocok dengan
             // LIKE path absolut, jadi semua baris video diambil dan filter
             // final diserahkan ke pathMatchesFolder (alias + case-insensitive).
@@ -781,7 +781,7 @@ object MediaLibrary {
             }
         }
 
-        // 4b) MediaStore kosong/rusak (umum di Android 5-6 setelah file dicolok
+        // 4b) MediaStore kosong/rusak (umum di Android 6 setelah file dicolok
         //     via USB/PC — indeks tidak pernah ter-scan): fallback scan
         //     filesystem seluruh storage primer supaya mode "scan semua" tetap
         //     menemukan video tanpa bergantung pada baris MediaStore.
@@ -826,7 +826,7 @@ object MediaLibrary {
 
         // 6) Folder galeri terpilih dipindai LANGSUNG dari filesystem
         //    (rekursif). MediaStore kadang tidak mengindeks file yang dicolok
-        //    via USB/PC di Android 5-6, atau melaporkan kolom DATA dengan root
+        //    via USB/PC di Android 6, atau melaporkan kolom DATA dengan root
         //    berbeda dari folder yang diketik user — scan langsung menjamin
         //    video di folder pilihan tetap tampil apa pun isi MediaStore.
         //    Dedupe di bawah memakai filePath, jadi baris MediaStore yang sama

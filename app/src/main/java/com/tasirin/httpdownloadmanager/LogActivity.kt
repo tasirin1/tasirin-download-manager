@@ -75,9 +75,11 @@ class LogActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 logSearch = s?.toString().orEmpty()
-                // Debounce (issue #803): refresh per ketikan membangun
-                // ulang sorotan atas seluruh log (s.d. +/-120 KB) di main
-                // thread; tunda sampai ada jeda mengetik 250 ms.
+                // Debounce (issue #803): refresh per ketikan mem-parse
+                // ulang seluruh log (s.d. +/-120 KB) — pewarnaannya kini
+                // berjalan di Dispatchers.Default (issue #1072), tetapi
+                // parse ulangnya tetap sia-sia per ketikan; tunda sampai
+                // ada jeda mengetik 250 ms.
                 binding.logSearch.removeCallbacks(searchRefresh)
                 binding.logSearch.postDelayed(searchRefresh, SEARCH_DEBOUNCE_MS)
             }
