@@ -656,9 +656,15 @@ class SettingsActivity : AppCompatActivity() {
         // renderChecks berjalan dari onResume, jadi status terpulihkan
         // tiap kali pengguna kembali ke layar ini.
         val pmBattery = getSystemService(Context.POWER_SERVICE) as PowerManager
-        StoragePrefs.setBatteryExemptEnabled(
-            this, pmBattery.isIgnoringBatteryOptimizations(packageName)
-        )
+        val batteryExemptNow = pmBattery.isIgnoringBatteryOptimizations(packageName)
+        // Tulis hanya saat nilainya berubah (issue #1075): renderChecks
+        // berjalan dari onResume dan hampir semua handler ketuk, jadi
+        // penulisan tanpa syarat mengantrekan satu tulis disk (apply)
+        // per render untuk nilai yang sama, selamanya. Rekonsiliasi
+        // #523 tetap utuh: nilai berbeda dari sistem tetap ditulis.
+        if (StoragePrefs.isBatteryExemptEnabled(this) != batteryExemptNow) {
+            StoragePrefs.setBatteryExemptEnabled(this, batteryExemptNow)
+        }
         renderToggle(
             binding.checkBattery,
             StoragePrefs.isBatteryExemptEnabled(this),
