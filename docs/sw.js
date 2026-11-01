@@ -47,6 +47,11 @@ self.addEventListener('fetch', (event) => {
           if (res && res.ok) cache.put(req, res.clone());
           return res;
         }).catch(() => hit);
+        // Masa hidup event diperpanjang sampai refresh selesai
+        // (issue #1109): tanpa waitUntil, browser boleh menghentikan
+        // worker sesudah respons cache disajikan dan penyegaran
+        // terputus diam-diam — kunjungan berikut tetap basi.
+        event.waitUntil(refresh.catch(() => {}));
         return hit || refresh;
       }))
     );
