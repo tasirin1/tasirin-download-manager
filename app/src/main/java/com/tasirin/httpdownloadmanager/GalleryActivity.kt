@@ -316,7 +316,13 @@ class GalleryActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         adapter.release()
-        clearThumbCache()
+        // Cache thumbnail statis SENGAJA tak dibuang di sini (issue
+        // #1074): LRU s.d. 24 MB itu dibangun untuk dipakai ulang
+        // antar kunjungan — membuangnya tiap Galeri ditutup memaksa
+        // decode ulang semua thumbnail dari cache disk pada kunjungan
+        // berikutnya (scroll awal jank berulang di HP lemah).
+        // Pembuangan untuk tekanan memori sudah ditangani jalur
+        // onTrimMemory di atas, sesuai KDoc clearThumbCache sendiri.
         super.onDestroy()
     }
 
