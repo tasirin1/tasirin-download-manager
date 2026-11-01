@@ -257,7 +257,19 @@ try {
   process.exit(1);
 }
 
-setTimeout(() => {
+// Vonis menunggu SINYAL selesai, bukan jendela tetap 200 ms (issue
+// #1091): polling singkat menilai begitu pesan Done muncul, dengan
+// batas keras 5 detik untuk vonis gagal — runner CI yang terbebani
+// tak lagi gagal palsu, dan runner cepat tak membayar 200 ms penuh.
+const verdictDeadline = Date.now() + 5000;
+const verdictTimer = setInterval(() => {
+  const doneMsg = msgs.some((m) => m.text.indexOf('Done: 2 files uploaded') === 0);
+  if (!doneMsg && Date.now() < verdictDeadline) return;
+  clearInterval(verdictTimer);
+  verdict();
+}, 25);
+
+function verdict() {
   const uploads = requests.filter((r) => r.method === 'POST' && r.url.includes('/api/upload'));
   const csrfReady = uploads.every((r) => r.headers['X-Requested-With'] === 'XMLHttpRequest');
   const okDone = msgs.some((m) => m.text.indexOf('Done: 2 files uploaded') === 0);
@@ -348,4 +360,4 @@ setTimeout(() => {
   }
   console.log('SMOKE OK: upload 2 file selesai (' + uploads.length + ' chunk POST terlindungi)');
   process.exit(0);
-}, 200);
+}
