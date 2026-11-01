@@ -3647,7 +3647,7 @@ function stateLabel(s) {
 return STATE_LABELS[s] || s;
 }
 function stateBadge(s) {
-return '<span class="badge ' + (STATE_BADGE_CLS[s] || 'b-paused') + '">' + stateLabel(s) + '</span>';
+return '<span class="badge ' + (STATE_BADGE_CLS[s] || 'b-paused') + '">' + escapeHtml(stateLabel(s)) + '</span>';
 }
 function socialHost(url) {
 try {

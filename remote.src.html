@@ -6335,7 +6335,12 @@ function stateLabel(s) {
 }
 
 function stateBadge(s) {
-  return '<span class="badge ' + (STATE_BADGE_CLS[s] || 'b-paused') + '">' + stateLabel(s) + '</span>';
+  // Label state WAJIB diescape (issue #1066): stateLabel mengembalikan
+  // string mentah apa adanya untuk state tak dikenal, dan hasil badge
+  // ini masuk innerHTML saat rebuild daftar — satu-satunya sink HTML
+  // di jalur render daftar yang dulu tak lewat escapeHtml(). Kelas
+  // badge aman: dari peta tetap + default.
+  return '<span class="badge ' + (STATE_BADGE_CLS[s] || 'b-paused') + '">' + escapeHtml(stateLabel(s)) + '</span>';
 }
 
 function socialHost(url) {
