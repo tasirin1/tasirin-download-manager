@@ -2606,13 +2606,30 @@ let galleryCache = null; // {items, total, hasMore, at}
   // karena penugasan properti di sini menimpa handler atribut pada
   // slot handler yang sama — perilaku sembunyikan gambar rusak
   // harus hidup di cabang ini.
+  const inflight = new Set();
   function armThumb(img) {
-    img.onload = function() { active--; next(); };
+    inflight.add(img);
+    img.onload = function() { inflight.delete(img); active--; next(); };
     img.onerror = function() {
+      inflight.delete(img);
       try { img.classList.add('thumb-broken'); } catch (e) {}
       try { img.removeAttribute('src'); } catch (e) {}
       active--; next();
     };
+  }
+  // Netralkan muatan yang SEDANG JALAN milik img yang dibuang
+  // (issue #1099): pelepasan slot dulu hanya lewat handler img itu
+  // sendiri, jadi WebView yang tak menembakkan load/error untuk img
+  // yang tercabut dari DOM di tengah muat membocorkan slot active
+  // selamanya — tiga kali kejadian dan semua thumbnail berhenti
+  // sampai halaman dimuat ulang. Keanggotaan inflight adalah bukti
+  // slot itu masih terhitung, jadi pengembaliannya persis sekali.
+  function releaseInflight(img) {
+    if (!inflight.delete(img)) return false;
+    try { img.onload = img.onerror = null; } catch (e) {}
+    try { img.removeAttribute('src'); } catch (e) {}
+    active--;
+    return true;
   }
   function next() {
     if (!queue.length || active >= MAX_CONCURRENT) return;
@@ -2664,12 +2681,18 @@ let galleryCache = null; // {items, total, hasMore, at}
     for (let i = queue.length - 1; i >= 0; i--) {
       if (queue[i].img === img) queue.splice(i, 1);
     }
+    // Muatan berjalan milik cell ini ikut dinetralkan (issue #1099)
+    // dan slotnya langsung ditawarkan ke antrean.
+    if (releaseInflight(img)) next();
   };
   // Buang antrean thumbnail yang belum jalan (cell-nya sudah hancur saat
   // galeri reset/ganti filter): entri antrean belum set src sehingga aman
   // dibuang tanpa load sia-sia; yang sedang jalan dibiarkan selesai.
   window._thumbQueueClear = function() {
     queue.length = 0;
+    // Muatan berjalan milik cell yang hancur ikut dinetralkan
+    // (issue #1099): tanpa ini slot active bocor lintas reset galeri.
+    for (const img of Array.from(inflight)) releaseInflight(img);
     if (thumbObserver) {
       for (const img of thumbPending) { try { thumbObserver.unobserve(img); } catch (e) {} }
       thumbPending.clear();

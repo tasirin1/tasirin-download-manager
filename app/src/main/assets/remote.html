@@ -405,13 +405,23 @@ let galleryCache = null; // {items, total, hasMore, at}
 const MAX_CONCURRENT = 3;
 let active = 0;
 const queue = [];
+const inflight = new Set();
 function armThumb(img) {
-img.onload = function() { active--; next(); };
+inflight.add(img);
+img.onload = function() { inflight.delete(img); active--; next(); };
 img.onerror = function() {
+inflight.delete(img);
 try { img.classList.add('thumb-broken'); } catch (e) {}
 try { img.removeAttribute('src'); } catch (e) {}
 active--; next();
 };
+}
+function releaseInflight(img) {
+if (!inflight.delete(img)) return false;
+try { img.onload = img.onerror = null; } catch (e) {}
+try { img.removeAttribute('src'); } catch (e) {}
+active--;
+return true;
 }
 function next() {
 if (!queue.length || active >= MAX_CONCURRENT) return;
@@ -452,9 +462,11 @@ thumbPending.delete(img);
 for (let i = queue.length - 1; i >= 0; i--) {
 if (queue[i].img === img) queue.splice(i, 1);
 }
+if (releaseInflight(img)) next();
 };
 window._thumbQueueClear = function() {
 queue.length = 0;
+for (const img of Array.from(inflight)) releaseInflight(img);
 if (thumbObserver) {
 for (const img of thumbPending) { try { thumbObserver.unobserve(img); } catch (e) {} }
 thumbPending.clear();
