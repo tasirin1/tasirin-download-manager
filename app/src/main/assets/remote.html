@@ -405,16 +405,24 @@ let galleryCache = null; // {items, total, hasMore, at}
 const MAX_CONCURRENT = 3;
 let active = 0;
 const queue = [];
+function armThumb(img) {
+img.onload = function() { active--; next(); };
+img.onerror = function() {
+try { img.classList.add('thumb-broken'); } catch (e) {}
+try { img.removeAttribute('src'); } catch (e) {}
+active--; next();
+};
+}
 function next() {
 if (!queue.length || active >= MAX_CONCURRENT) return;
 const entry = queue.shift();
 if (!entry.img.isConnected) { next(); return; }
 active++;
-entry.img.onload = entry.img.onerror = function() { active--; next(); };
+armThumb(entry.img);
 entry.img.src = entry.src;
 }
 window._thumbQueue = function(img, src) {
-if (active < MAX_CONCURRENT) { active++; img.onload = img.onerror = function() { active--; next(); }; img.src = src; }
+if (active < MAX_CONCURRENT) { active++; armThumb(img); img.src = src; }
 else { queue.push({img: img, src: src}); }
 };
 let thumbObserver = null;
