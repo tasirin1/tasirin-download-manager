@@ -2053,6 +2053,7 @@ setTimeout(function () { a.remove(); }, 1000);
 let fsDlActive = false;
 let fsDlAbort = null;
 const ZIP_MEMORY_LIMIT = 96 * 1024 * 1024;
+const ZIP_STALL_MS = 30000;
 async function downloadZipWithProgress(url, label) {
 if (fsTaskBusy || fsDlActive) {
 mmShowToast('Another operation is already running', 2500, 'error');
@@ -2063,6 +2064,17 @@ fsTaskCancelBtn.disabled = false;
 showFsTask(label || 'Downloading ZIP');
 const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
 fsDlAbort = ac;
+let stalled = false;
+let stallTimer = null;
+function armStall() {
+if (!ac) return;
+clearTimeout(stallTimer);
+stallTimer = setTimeout(function () {
+stalled = true;
+try { ac.abort(); } catch (e) {}
+}, ZIP_STALL_MS);
+}
+armStall();
 let fallbackAnchor = false;
 try {
 const res = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ac ? ac.signal : undefined});
@@ -2086,6 +2098,7 @@ let received = 0;
 for (;;) {
 const r = await reader.read();
 if (r.done) break;
+armStall();
 chunks.push(r.value);
 received += r.value.length;
 if (len > 0) {
@@ -2120,13 +2133,17 @@ updateFsTask('Done \u2014 ' + fmt(received), 100);
 }
 }
 } catch (e) {
-if (e && e.name === 'AbortError') {
+if (e && e.name === 'AbortError' && stalled) {
+updateFsTask('Failed \u2014 connection stalled (no data for 30s)', 4);
+mmShowToast('ZIP download stalled', 3000, 'error');
+} else if (e && e.name === 'AbortError') {
 updateFsTask('Cancelled', 4);
 } else if (!fallbackAnchor) {
 updateFsTask('Failed \u2014 ' + (e && e.message ? e.message : e), 4);
 mmShowToast('ZIP download failed', 3000, 'error');
 }
 }
+clearTimeout(stallTimer);
 if (fallbackAnchor) {
 updateFsTask('Starting download\u2026', 8);
 await delayMs(400);
