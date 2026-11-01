@@ -107,6 +107,41 @@ def minify_js(js: str) -> str:
     return "\n".join(out)
 
 
+def check_minify_assumptions(src_text: str) -> list:
+    """Tegakkan asumsi keamanan minify_js (issue #1069).
+
+    Minifier baris itu membuang baris kosong, baris diawali //, dan
+    seluruh indentasi. Itu hanya aman bila JS sumber TANPA template
+    literal dan TANPA line-continuation di dalam string: isi string
+    multi-baris bisa memuat baris kosong / baris diawali // / spasi
+    penting yang akan dibuang/dipotong diam-diam, dan gerbang sinkron
+    tak bisa menangkapnya (--check membandingkan OUT dengan hasil
+    fungsi minify yang sama; node --check hanya memeriksa sintaks).
+    Kini pelanggarannya problem bernama: backtick di blok script,
+    atau baris berakhiran backslash (continuation)."""
+    problems = []
+    for block in re.findall(r"<script[^>]*>(.*?)</script>", src_text, re.S):
+        if "`" in block:
+            problems.append(
+                "blok <script> memuat backtick (template literal) — "
+                "minify_js tidak menjamin isi string multi-baris tetap "
+                "utuh; tulis ulang tanpa template literal atau "
+                "perbarui minifier dulu (issue #1069)"
+            )
+            break
+    for block in re.findall(r"<script[^>]*>(.*?)</script>", src_text, re.S):
+        for line in block.split("\n"):
+            if line.rstrip().endswith("\\"):
+                problems.append(
+                    "blok <script> memuat baris berakhiran backslash "
+                    "(line-continuation) — minify_js bisa mengubah "
+                    "isi string yang dilanjutkan; hindari continuation "
+                    "di dalam string (issue #1069)"
+                )
+                return problems
+    return problems
+
+
 def minify_html(html: str) -> str:
     # Komentar HTML dibuang (sumber readable tetap di remote.src.html).
     html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
@@ -565,6 +600,7 @@ def main() -> int:
             problems.append("string literal Kotlin memuat kata Indonesia: " + ", ".join(kt_hits))
 
         problems.extend(check_upload_call(src_text))
+        problems.extend(check_minify_assumptions(src_text))
 
         smoke_error = run_upload_smoke()
         if smoke_error:
@@ -581,6 +617,12 @@ def main() -> int:
         )
         return 0
 
+    asumsi = check_minify_assumptions(src_text)
+    if asumsi:
+        print("ERROR: asumsi minify dilanggar — remote.html TIDAK ditulis:")
+        for p_ in asumsi:
+            print(" -", p_)
+        return 1
     try:
         OUT.write_text(minified, encoding="utf-8")
     except OSError as exc:
