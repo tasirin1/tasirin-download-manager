@@ -3052,11 +3052,32 @@ function renderGalleryReset(items, total, hasMore) {
 function fetchTimeout(url, opts, ms) {
   if (typeof AbortController === 'undefined') return fetch(url, opts);
   const ac = new AbortController();
-  const timer = setTimeout(function () { try { ac.abort(); } catch (e) {} }, ms || 20000);
+  const limit = ms || 20000;
+  let timer = setTimeout(function () { try { ac.abort(); } catch (e) {} }, limit);
   const o = opts || {};
   o.signal = ac.signal;
-  return fetch(url, o).then(function (res) { clearTimeout(timer); return res; },
-    function (e) { clearTimeout(timer); throw e; });
+  return fetch(url, o).then(function (res) {
+    // Fase header selesai; batas yang sama kini menjaga fase BODY
+    // (issue #1045): dulu timer dimatikan di sini sehingga res.json()
+    // pada body yang berhenti di tengah menggantung selamanya. Metode
+    // baca body dibungkus agar timer mati saat body selesai/gagal
+    // dibaca; bila pembungkusan gagal di WebView aneh, timer yang
+    // berjalan tetap membatasi body (abort sesudah body tuntas tak
+    // berpengaruh apa pun).
+    clearTimeout(timer);
+    timer = setTimeout(function () { try { ac.abort(); } catch (e) {} }, limit);
+    try {
+      ['json', 'text', 'blob', 'arrayBuffer', 'formData'].forEach(function (m) {
+        if (typeof res[m] !== 'function') return;
+        const orig = res[m].bind(res);
+        res[m] = function () {
+          return orig().then(function (v) { clearTimeout(timer); return v; },
+            function (e) { clearTimeout(timer); throw e; });
+        };
+      });
+    } catch (e) {}
+    return res;
+  }, function (e) { clearTimeout(timer); throw e; });
 }
 
 async function loadGalleryRequest(reset) {
