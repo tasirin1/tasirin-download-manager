@@ -88,6 +88,20 @@ class App : Application() {
             // pernah aktif) dan auto-resume mati, semuanya senyap
             // seumur proses. onFailure dipasang di ujung rantai.
             val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            // Tanam keadaan awal dari snapshot sistem (issue #1043):
+            // tanpa jaringan sama sekali, callback tak pernah menembak
+            // (tak ada network untuk dilaporkan), jadi nilai awal true
+            // bertahan dan gerbang outage #952 buta pada start dingin
+            // mode pesawat — kegagalan connect pertama langsung masuk
+            // failover mirror yang membuang parsial. activeNetwork
+            // memberi keadaan sebenarnya saat proses mulai; callback
+            // memeliharanya sesudah itu. Gagal baca (izin/keanehan OEM)
+            // mempertahankan nilai awal.
+            runCatching {
+                synchronized(availableNetworks) {
+                    networkUp = cm.activeNetwork != null
+                }
+            }
             val request = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build()
@@ -152,8 +166,9 @@ class App : Application() {
 
         // Keadaan konektivitas terakhir dari NetworkCallback (issue #952):
         // engine membacanya untuk menahan failover mirror saat jaringan
-        // PERANGKAT mati. Mulai true (asumsi tersedia) agar tak pernah
-        // menggerbang sebelum callback pertama melaporkan keadaan.
+        // PERANGKAT mati. Nilai awal true hanya bertahan sampai
+        // registerNetworkCallback menanam snapshot activeNetwork saat
+        // App.onCreate (issue #1043); sesudah itu callback yang memelihara.
         @Volatile
         var networkUp: Boolean = true
             private set
