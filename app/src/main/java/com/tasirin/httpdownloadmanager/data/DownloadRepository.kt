@@ -75,6 +75,13 @@ class DownloadRepository(context: Context) {
             val o = arr.optJSONObject(i) ?: continue
             val id = o.optString("id")
             if (id.isBlank()) continue
+            // Duplikat id: pertahankan entri PERTAMA (issue #1059),
+            // sejajar dedupe codec #942. Menimpa tanpa syarat membuat
+            // peta kredensial berisi entri terakhir — preparePersist
+            // bisa menyuntikkan kredensial entri kedua ke item pertama
+            // yang bertahan (yang kredensialnya gagal decrypt), dan
+            // kredensial salah itu tersimpan permanen pada save berikut.
+            if (out.containsKey(id)) continue
             out[id] = Quad(
                 o.optString("username", ""),
                 o.optString("password", ""),
