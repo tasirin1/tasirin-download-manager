@@ -274,6 +274,78 @@ setTimeout(() => {
     console.error('FAIL: upload POST tidak membawa header anti-CSRF');
     process.exit(1);
   }
+  // Aseri urutan/identitas chunk + verify per berkas (issue #1070):
+  // vonis lama hanya menghitung POST dan pesan Done, jadi regresi
+  // yang mengirim chunk 0 berulang / salah urut / id tertukar antar
+  // berkas tetap lulus walau server nyata merakit berkas korup.
+  const CHUNK = (() => { try { return vm.runInContext('UPLOAD_CHUNK', sandbox); } catch (e) { return 2 * 1024 * 1024; } })();
+  const expectSize = { 'a.txt': 1000, 'b.bin': 5 * 1024 * 1024 + 12345 };
+  const byId = {};
+  uploads.forEach((r, i) => {
+    const u = new URL(r.url, 'http://x');
+    const id = u.searchParams.get('id');
+    (byId[id] = byId[id] || []).push({ r, i, u });
+  });
+  const ids = Object.keys(byId);
+  if (ids.length !== 2) {
+    console.error('FAIL: diharapkan 2 id upload berbeda, dapat ' + ids.length);
+    process.exit(1);
+  }
+  for (const id of ids) {
+    const list = byId[id];
+    const name = list[0].u.searchParams.get('name');
+    const chunks = parseInt(list[0].u.searchParams.get('chunks'), 10);
+    const wantChunks = Math.ceil(expectSize[name] / CHUNK);
+    if (chunks !== wantChunks || list.length !== chunks) {
+      console.error('FAIL: ' + name + ': jumlah chunk ' + list.length + '/' + chunks + ', diharapkan ' + wantChunks);
+      process.exit(1);
+    }
+    let sum = 0;
+    list.forEach((e, k) => {
+      const ci = parseInt(e.u.searchParams.get('chunk'), 10);
+      const off = parseInt(e.u.searchParams.get('offset'), 10);
+      if (ci !== k) {
+        console.error('FAIL: ' + name + ': chunk ke-' + k + ' berlabel ' + ci + ' (duplikat/salah urut)');
+        process.exit(1);
+      }
+      if (off !== ci * CHUNK) {
+        console.error('FAIL: ' + name + ': offset chunk ' + ci + ' = ' + off + ', diharapkan ' + (ci * CHUNK));
+        process.exit(1);
+      }
+      if (e.u.searchParams.get('name') !== name || e.u.searchParams.get('id') !== id) {
+        console.error('FAIL: ' + name + ': identitas chunk tidak konsisten dalam satu id');
+        process.exit(1);
+      }
+      const wantSize = ci === chunks - 1 ? expectSize[name] - ci * CHUNK : CHUNK;
+      if (e.r.bodySize !== wantSize) {
+        console.error('FAIL: ' + name + ': ukuran chunk ' + ci + ' = ' + e.r.bodySize + ', diharapkan ' + wantSize);
+        process.exit(1);
+      }
+      sum += e.r.bodySize;
+    });
+    if (sum !== expectSize[name]) {
+      console.error('FAIL: ' + name + ': total byte ' + sum + ' != ukuran berkas ' + expectSize[name]);
+      process.exit(1);
+    }
+    // Tepat satu GET upload_verify per berkas, membawa token dari
+    // respons chunk terakhir, dan terjadi SESUDAH chunk terakhir.
+    const vers = requests.map((r, i) => ({ r, i })).filter((e) =>
+      e.r.method === 'GET' && e.r.url.includes('/api/upload_verify') &&
+      new URL(e.r.url, 'http://x').searchParams.get('id') === id);
+    if (vers.length !== 1) {
+      console.error('FAIL: ' + name + ': GET upload_verify terjadi ' + vers.length + 'x, diharapkan 1x');
+      process.exit(1);
+    }
+    const vtok = new URL(vers[0].r.url, 'http://x').searchParams.get('verify');
+    if (vtok !== 'verify-' + id + '-' + (chunks - 1)) {
+      console.error('FAIL: ' + name + ': token verify ' + vtok + ' bukan token chunk terakhir');
+      process.exit(1);
+    }
+    if (vers[0].i < list[list.length - 1].i) {
+      console.error('FAIL: ' + name + ': verify terjadi sebelum chunk terakhir terkirim');
+      process.exit(1);
+    }
+  }
   console.log('SMOKE OK: upload 2 file selesai (' + uploads.length + ' chunk POST terlindungi)');
   process.exit(0);
 }, 200);
