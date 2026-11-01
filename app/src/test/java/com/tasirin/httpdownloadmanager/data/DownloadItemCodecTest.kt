@@ -106,6 +106,24 @@ class DownloadItemCodecTest {
     }
 
     @Test
+    fun `decode - byte progres absurd di blob utama dinolkan`() {
+        // Issue #1095: plafon #1058 (2^40) berlaku juga di parseItem,
+        // bukan hanya overlayProgress — nilai raksasa dari blob korup
+        // yang tetap lolos parse JSON tak boleh lolos ke item.
+        val raw = """
+            [{"id":"1","url":"https://a/x","fileName":"x","state":"PAUSED","bytesDownloaded":9223372036854775807,"totalBytes":9223372036854775807},
+             {"id":"2","url":"https://a/y","fileName":"y","state":"PAUSED","bytesDownloaded":500,"totalBytes":1000}]
+        """.trimIndent()
+        val decoded = DownloadItemCodec.decode(raw)
+        assertEquals(2, decoded.size)
+        assertEquals(0L, decoded[0].bytesDownloaded)
+        assertEquals(0L, decoded[0].totalBytes)
+        // Nilai wajar di entri sebelahnya tidak ikut tersapu.
+        assertEquals(500L, decoded[1].bytesDownloaded)
+        assertEquals(1_000L, decoded[1].totalBytes)
+    }
+
+    @Test
     fun `decode - id duplikat hanya entri pertama yang dipertahankan`() {
         // Issue #942: duplikat dari blob korup/asing akan membeku di
         // engine (first-match per id) dan remove-nya yatim berkas.

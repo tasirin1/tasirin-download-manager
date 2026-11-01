@@ -17,6 +17,15 @@ object DownloadItemCodec {
     // Plafon kelayakan byte progres tersimpan (issue #1058): 2^40.
     private const val MAX_PLAUSIBLE_PROGRESS_BYTES = 1L shl 40
 
+    // Nilai progres blob utama di luar 0..plafon pasti korup (issue
+    // #1095, menyelaraskan parseItem dengan overlayProgress #1058):
+    // nolkan agar tak lolos ke tampilan/engine dan tak ikut ter-encode
+    // ulang pada save berikutnya. Jalur resume sendiri sudah aman —
+    // resumeAction memvonis RESTART bila berkas parsial nyata lebih
+    // kecil dari catatan — jadi ini murni pengerasan parse.
+    private fun plausibleProgress(raw: Long): Long =
+        if (raw in 0..MAX_PLAUSIBLE_PROGRESS_BYTES) raw else 0
+
     fun encode(items: List<DownloadItem>): String {
         val arr = JSONArray()
         items.forEach { item ->
@@ -123,8 +132,8 @@ object DownloadItemCodec {
                 url = url,
                 fileName = o.optString("fileName", "unknown"),
                 state = state,
-                bytesDownloaded = o.optLong("bytesDownloaded", 0).coerceAtLeast(0),
-                totalBytes = o.optLong("totalBytes", 0).coerceAtLeast(0),
+                bytesDownloaded = plausibleProgress(o.optLong("bytesDownloaded", 0)),
+                totalBytes = plausibleProgress(o.optLong("totalBytes", 0)),
                 error = o.optString("error").ifEmpty { null },
                 contentUri = o.optString("contentUri").ifEmpty { null },
                 filePath = o.optString("filePath").ifEmpty { null },
