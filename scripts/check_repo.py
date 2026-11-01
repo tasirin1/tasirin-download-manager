@@ -320,6 +320,36 @@ def admin_consistency() -> Result:
             problems.append("pola versi AGP tak ditemukan di libs.versions.toml")
         elif not _re.search(r"AGP\s+" + _re.escape(agp_ver.group(1)) + r"\b", agents):
             problems.append(f"AGENTS.md tak menyebut AGP {agp_ver.group(1)}")
+        # Angka SDK (issue #1108): keluarga angka terakhir yang belum
+        # dijaga — mengubah targetSdk di build.gradle.kts dulu tak
+        # membunyikan gerbang mana pun walau AGENTS.md menyebutnya di
+        # banyak tempat dan keputusan perilaku bergantung padanya.
+        # Yang ditegaskan adalah baris ringkasan kanonik di struktur
+        # repo ("minSdk N / targetSdk N, compileSdk N") terhadap
+        # build.gradle.kts, fail-closed seperti #561. Sebutan historis
+        # di peta jalan (compileSdk 36, targetSdk 35, rencana 37)
+        # sengaja TIDAK dipolisi: itu catatan perjalanan, bukan klaim
+        # keadaan kini.
+        sdk_src = {
+            label: _re.search(label + r"\s*=\s*(\d+)", app_build)
+            for label in ("minSdk", "targetSdk", "compileSdk")
+        }
+        for label, found in sdk_src.items():
+            if found is None:
+                problems.append(f"pola {label} tak ditemukan di app/build.gradle.kts")
+        sdk_doc = _re.search(
+            r"minSdk\s+(\d+)\s*/\s*targetSdk\s+(\d+),\s*compileSdk\s+(\d+)", agents
+        )
+        if sdk_doc is None:
+            problems.append("baris ringkasan SDK tak ditemukan di AGENTS.md")
+        elif all(found is not None for found in sdk_src.values()):
+            doc_vals = dict(zip(("minSdk", "targetSdk", "compileSdk"), sdk_doc.groups()))
+            for label, found in sdk_src.items():
+                if doc_vals[label] != found.group(1):
+                    problems.append(
+                        f"AGENTS.md {label} {doc_vals[label]} tak sinkron dengan "
+                        f"app/build.gradle.kts {found.group(1)}"
+                    )
         jacoco = _re.search(r'minimum\s*=\s*"0\.(\d+)"', app_build)
         if jacoco is None:
             problems.append("pola ambang JaCoCo tak ditemukan di app/build.gradle.kts")
