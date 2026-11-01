@@ -123,13 +123,33 @@ object Crypto {
         return runCatching {
             val body = payload.removePrefix(PREFIX)
             val idx = body.indexOf(':')
-            if (idx <= 0) return@runCatching ""
+            if (idx <= 0) {
+                // Format v1: rusak (pemisah IV hilang): catat agar bisa
+                // dibedakan dari 'memang tak ada kredensial' (issue
+                // #1077). Payload TIDAK ikut dicatat (kredensial).
+                android.util.Log.w("Crypto", "decrypt: malformed v1 payload (missing IV separator)")
+                return@runCatching ""
+            }
             val iv = Base64.decode(body.substring(0, idx), Base64.NO_WRAP)
             val ct = Base64.decode(body.substring(idx + 1), Base64.NO_WRAP)
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
             String(cipher.doFinal(ct), Charsets.UTF_8)
-        }.getOrDefault("")
+        }.getOrElse { e ->
+            // Kegagalan dekripsi (blob korup, IV cacat, kunci Keystore
+            // terinvalidasi) dulu ditelan senyap menjadi "" sehingga
+            // pemanggil tak bisa membedakannya dari kredensial kosong
+            // dan unduhan berautentikasi gagal sebagai 401 generik
+            // tanpa jejak (issue #1077; sejajar log encrypt di berkas
+            // ini dan jalur cookie #221). Kontrak "" dipertahankan;
+            // yang berubah hanya jejaknya — kelas galat saja, tanpa
+            // payload.
+            android.util.Log.w(
+                "Crypto",
+                "decrypt failed (" + e.javaClass.simpleName + "), treating as empty"
+            )
+            ""
+        }
     }
 
     /** AES AndroidKeyStore tersedia sejak API 23 = minSdk aplikasi. */
