@@ -3,18 +3,18 @@ name: Gitleaks (deteksi secret)
 on:
   push:
     branches: ["main"]
-    # Push/PR docs-only tidak bisa memuat secret baru di kode — pola
-    # paths-ignore yang sama seperti build.yml (issue #701).
+    # Berbeda dari build.yml (issue #1123): scan secret itu murah
+    # dan secret bisa hidup di berkas .md/docs juga, jadi gitleaks
+    # TIDAK mengabaikan pola itu — push docs-only tetap terpindai
+    # di sini. Yang tersisa hanya berkas yang memang di luar jangkauan
+    # wajar secret (LICENSE, .gitignore). Pola build.yml yang
+    # mengabaikan docs-only (issue #701) tidak berubah.
     paths-ignore:
-      - "**.md"
       - "LICENSE"
-      - "docs/**"
       - ".gitignore"
   pull_request:
     paths-ignore:
-      - "**.md"
       - "LICENSE"
-      - "docs/**"
       - ".gitignore"
   workflow_dispatch:
 

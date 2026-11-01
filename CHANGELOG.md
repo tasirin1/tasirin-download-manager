@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan CI: pemindaian secret gitleaks kini tetap berjalan pada push yang hanya mengubah Markdown/docs, menutup jendela commit berisi secret di dokumen yang lolos tanpa gerbang apa pun (issue #1123).
 - Perbaikan perkakas: audit keamanan lokal tidak lagi melewati berkas hanya karena ekstensinya terdaftar biner; berkas yang isinya teks UTF-8 polos tetap dipindai aturan secret apa pun ekstensinya (issue #1122).
 - Perbaikan internal: KDoc Permissions tidak lagi menyebut Android 5 pada rentang perilaku izin; aplikasi mendukung mulai Android 6 (issue #1119).
 - Perbaikan: tombol Simpan di Pengaturan tidak lagi menulis ulang folder ekstra/galeri dan port yang tidak berubah, chip navigasi tidak menulis ulang keadaan seksi yang sudah terbuka, dan verifikasi PIN PBKDF2 tidak lagi dibayar dua kali per Simpan (issue #1118).
