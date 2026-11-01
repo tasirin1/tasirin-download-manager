@@ -191,8 +191,15 @@ object ServerSecurity {
         if (path.isBlank()) return false
         val target = runCatching { File(path).canonicalFile.absolutePath }.getOrNull()
             ?: return false
-        return canonicalRoots.any { rp -> target == rp || target.startsWith(rp + File.separator) }
+        return isCanonicalAllowed(target, canonicalRoots)
     }
+
+    /** Cek batas untuk path yang SUDAH kanonik: hasEscapingSymlink
+     *  meng-kanonikkan tiap direktori anak sendiri, jadi memanggil
+     *  isPathAllowedFast dari sana membayar canonicalize kedua yang
+     *  identik per anak (issue #1115). */
+    fun isCanonicalAllowed(canonicalTarget: String, canonicalRoots: List<String>): Boolean =
+        canonicalRoots.any { rp -> canonicalTarget == rp || canonicalTarget.startsWith(rp + File.separator) }
 
     /** True bila [canonicalTarget] PERSIS salah satu root yang diizinkan.
      *  Root itu sendiri adalah batas wilayah, bukan isi yang boleh
@@ -226,7 +233,7 @@ object ServerSecurity {
                 if (!child.isDirectory) continue
                 val canon = runCatching { child.canonicalFile.absolutePath }.getOrNull()
                     ?: return true
-                if (!isPathAllowedFast(canon, canonicalRoots)) return true
+                if (!isCanonicalAllowed(canon, canonicalRoots)) return true
                 if (visited.add(canon)) stack.add(child)
             }
         }
