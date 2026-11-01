@@ -40,6 +40,11 @@ ci:
       - .github/workflows/**
       - tools/**
       - scripts/cek-cepat.sh
+      - scripts/check_repo.py
+      - scripts/security_audit.py
+      - scripts/check_changelog.py
+      - scripts/check_readme_sync.py
+      - scripts/jacoco_summary.py
       - .github/dependabot.yml
       - .github/labeler.yml
       - .github/CODEOWNERS
