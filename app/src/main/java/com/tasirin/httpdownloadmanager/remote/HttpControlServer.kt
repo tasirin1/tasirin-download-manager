@@ -2383,7 +2383,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Open terbungkus (issue #827): berkas terhapus di antara
             // cek dan open dulu lolos sebagai 500 + CrashLog, bukan 404.
             stream = try { FileInputStream(file) } catch (_: Exception) { return notFound() }
-            total = file.length()
+            // Total dari FD yang dibuka (issue #1044, pola #792/#815):
+            // stat path bisa memberi total versi baru untuk byte versi
+            // lama bila berkas ditimpa di antara open dan length().
+            total = runCatching { stream.channel.size() }.getOrElse {
+                runCatching { stream.close() }
+                return notFound()
+            }
         } else if (!item.contentUri.isNullOrEmpty()) {
             val uri = item.contentUri.toUri()
             if (!isMediaUriAllowed(uri)) return notFound()
@@ -4314,7 +4320,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // Open terbungkus (issue #827): berkas terhapus di antara
             // cek dan open dulu lolos sebagai 500 + CrashLog, bukan 404.
             input = try { FileInputStream(file) } catch (_: Exception) { return notFound() }
-            total = file.length()
+            // Total dari FD yang dibuka (issue #1044, pola #792/#815):
+            // tautan share hidup 24 jam tanpa PIN — jendela timpaannya
+            // paling lebar di antara semua jalur serve.
+            total = runCatching { input.channel.size() }.getOrElse {
+                runCatching { input.close() }
+                return notFound()
+            }
         } else if (!item.contentUri.isNullOrEmpty()) {
             val uri = item.contentUri.toUri()
             if (!isMediaUriAllowed(uri)) return notFound()
