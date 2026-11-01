@@ -3732,6 +3732,20 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
+    /** Seperti ensurePublishedKept tetapi untuk berkas mentah hasil merge
+     *  SEBELUM publish (issue #1038): mergeSegments sudah menghapus semua
+     *  parts segmen, jadi ensureActive() di jendela merge->publish membuat
+     *  pause membuang seluruh progres 100% — berkas gabungan tertinggal
+     *  yatim tak terpakai resume segmen dan tiap segmen kena RESTART.
+     *  Finalisasi dituntaskan bila item masih ada (pola #780); item hilang
+     *  tetap membuang scrap + batal, persis ensureItemPresent. */
+    private fun ensureItemKept(id: String, vararg scrap: File) {
+        if (_items.value.none { it.id == id }) {
+            scrap.forEach { runCatching { it.delete() } }
+            throw CancellationException("item $id removed during finalize")
+        }
+    }
+
     /** Buang hasil publish yang yatim bila item hilang tepat di jendela
      *  publish/organize yang blocking (cancel/remove sudah lewat sehingga
      *  deleteFiles tak melihat file final): tanpa ini file tetap mendarat di
@@ -4106,7 +4120,7 @@ class DownloadEngine(appContext: Context) {
         verifySize(current.bytesDownloaded, current.totalBytes, current.fileName)
 
         val merged = saver.mergeSegments(fileName, segments.size)
-        ensureItemPresent(item.id, merged)
+        ensureItemKept(item.id, merged)
         val published0 = publishItem(saver, merged, fileName, item)
         val finalName = published0.fileName ?: fileName
         verifyChecksum(item.id, published0, saver)?.let {
