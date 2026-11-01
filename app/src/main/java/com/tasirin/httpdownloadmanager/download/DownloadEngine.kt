@@ -2528,9 +2528,9 @@ class DownloadEngine(appContext: Context) {
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
 
-        val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES, item.username, item.password)
+        val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES, item.username, item.password, trackId = item.id)
             ?: throw IOException("Cannot fetch HLS manifest")
-        val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang, item.username, item.password)
+        val plan = parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang, item.username, item.password, trackId = item.id)
         if (plan == null || plan.videoSegments.isEmpty()) {
             throw IOException("No HLS segments found")
         }
@@ -3387,7 +3387,12 @@ class DownloadEngine(appContext: Context) {
      *  tunggu (maksimum, bukan jumlah), bukan hasilnya. Pool kecil
      *  dibatasi 4 dan selalu dimatikan; daftar 0-1 URL tanpa pool. */
     private fun <T> fetchAllParallel(urls: List<String>, fetch: (String) -> T): List<Result<T>> {
-        if (urls.size <= 1) return urls.map { url -> runCatching { fetch(url) } }
+        // Jalur 1-URL pun wajib lewat pool + deadline bersama (issue
+        // #1040): pintasan inline sebelumnya menjalankan fetch TANPA
+        // batas waktu apa pun, jadi satu-satunya kandidat yang servernya
+        // menetes menggantungkan perencanaan tanpa batas (timeout soket
+        // per-read tak menolong aliran yang terus menetes).
+        if (urls.isEmpty()) return emptyList()
         val pool = Executors.newFixedThreadPool(minOf(4, urls.size))
         try {
             val futures = urls.map { url -> pool.submit(Callable { fetch(url) }) }
@@ -3431,7 +3436,7 @@ class DownloadEngine(appContext: Context) {
     }
 
     /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
-    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = "", username: String = "", password: String = ""): HlsPlan? {
+    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = "", username: String = "", password: String = "", trackId: String = ""): HlsPlan? {
         // Segmen terenkripsi yang diunduh mentah = file sampah berstatus
         // COMPLETED: gagal cepat dengan pesan jelas, bukan unduh sia-sia.
         if (isEncryptedHlsPlaylist(body)) {
@@ -3519,7 +3524,7 @@ class DownloadEngine(appContext: Context) {
         // prioritas, fatal pertama, kandidat pertama yang berhasil
         // menang) — yang berubah hanya waktu tunggunya, bukan hasilnya.
         val candidateResults = fetchAllParallel(candidates.map { it.url }) { url ->
-            mediaSegmentsWithDurations(url, headers, baseUrl, username, password)
+            mediaSegmentsWithDurations(url, headers, baseUrl, username, password, trackId)
         }
         for ((candidateIndex, candidate) in candidates.withIndex()) {
             val videoSegs = candidateResults[candidateIndex].getOrElse { e ->
@@ -3560,7 +3565,7 @@ class DownloadEngine(appContext: Context) {
                 // pemilihan tetap yang pertama berhasil menurut urutan
                 // prioritas di atas.
                 val renditionResults = fetchAllParallel(ordered.map { it.url }) { url ->
-                    mediaSegments(url, headers, baseUrl, username, password)
+                    mediaSegments(url, headers, baseUrl, username, password, trackId)
                 }
                 for ((renditionIndex, _) in ordered.withIndex()) {
                     val segs = renditionResults[renditionIndex].getOrElse { e ->
@@ -3625,7 +3630,8 @@ class DownloadEngine(appContext: Context) {
         headers: String = "",
         authAnchorUrl: String = playlistUrl,
         username: String = "",
-        password: String = ""
+        password: String = "",
+        trackId: String = ""
     ): List<Pair<String, Long>>? {
         // Ambil media playlist; gagal HTTP/exception = null agar kandidat berikut dicoba.
         val body: String? = try {
@@ -3633,6 +3639,10 @@ class DownloadEngine(appContext: Context) {
                 playlistUrl, method = "GET", username = username, password = password, headers = headers,
                 authAnchorUrl = authAnchorUrl
             )
+            // Koneksi playlist ikut terlacak (issue #1040): tanpa ini
+            // pause/cancel selama fetch playlist menunggu timeout soket,
+            // bukan disconnect seketika seperti koneksi segmen.
+            if (trackId.isNotEmpty()) trackConnection(trackId, conn)
             try {
                 val code = conn.responseCode
                 if (code !in 200..299) {
@@ -3640,7 +3650,10 @@ class DownloadEngine(appContext: Context) {
                 }
                 val b = readBounded(conn.inputStream, HLS_PROBE_MAX_BYTES)
                 b
-            } finally { conn.disconnect() }
+            } finally {
+                if (trackId.isNotEmpty()) untrackConnection(trackId, conn)
+                conn.disconnect()
+            }
         } catch (_: Exception) { null }
         if (body == null) return null
         // Playlist live (event/DVR sliding window) tidak punya EXT-X-ENDLIST:
@@ -3677,9 +3690,10 @@ class DownloadEngine(appContext: Context) {
         headers: String = "",
         authAnchorUrl: String = playlistUrl,
         username: String = "",
-        password: String = ""
+        password: String = "",
+        trackId: String = ""
     ): List<String>? =
-        mediaSegmentsWithDurations(playlistUrl, headers, authAnchorUrl, username, password)?.map { it.first }
+        mediaSegmentsWithDurations(playlistUrl, headers, authAnchorUrl, username, password, trackId)?.map { it.first }
 
     /** Estimasi byte video dari BANDWIDTH (bit/detik) x total durasi #EXTINF.
      *  Sumber: master playlist — tersedia sebelum segmen diunduh. */
@@ -3704,16 +3718,21 @@ class DownloadEngine(appContext: Context) {
         return safeMulDiv(totalUs, 128_000L, 8_000_000L)
     }
 
-    private fun fetchText(url: String, headers: String, maxBytes: Int, username: String = "", password: String = ""): String? {
+    private fun fetchText(url: String, headers: String, maxBytes: Int, username: String = "", password: String = "", trackId: String = ""): String? {
         return runCatching {
             val conn = openAuthenticatedConnection(
                 url, method = "GET", username = username, password = password, headers = headers
             )
+            // Sama seperti fetch playlist (issue #1040): fetch master
+            // playlist ikut terlacak agar pause/cancel memutusnya
+            // seketika, bukan menunggu timeout soket.
+            if (trackId.isNotEmpty()) trackConnection(trackId, conn)
             try {
                 val code = conn.responseCode
                 if (code !in 200..299) return null
                 readBounded(conn.inputStream, maxBytes)
             } finally {
+                if (trackId.isNotEmpty()) untrackConnection(trackId, conn)
                 conn.disconnect()
             }
         }.getOrNull()
