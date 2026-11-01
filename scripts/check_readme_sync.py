@@ -56,7 +56,10 @@ def headings(path: Path) -> list[int]:
             levels.append(len(bq.group(1)))
             prev_text = False
             continue
-        m = re.match(r"^(#{1,6})\s+", line)
+        # ATX boleh terindentasi 0-3 spasi menurut CommonMark
+        # (issue #1105): GitHub me-rendernya sebagai heading
+        # sungguhan, jadi jangkar kolom 0 buta terhadapnya.
+        m = re.match(r"^ {0,3}(#{1,6})\s+", line)
         if m:
             levels.append(len(m.group(1)))
             prev_text = False
@@ -65,7 +68,7 @@ def headings(path: Path) -> list[int]:
         # heading level 1, --- = level 2. Tanpa baris teks sebelumnya
         # (sesudah baris kosong/heading lain) --- adalah thematic
         # break dan === bukan apa-apa \u2014 keduanya bukan heading.
-        sx = re.match(r"^(=+|-+)\s*$", line)
+        sx = re.match(r"^ {0,3}(=+|-+)\s*$", line)
         if sx and prev_text:
             levels.append(1 if sx.group(1).startswith("=") else 2)
             prev_text = False
