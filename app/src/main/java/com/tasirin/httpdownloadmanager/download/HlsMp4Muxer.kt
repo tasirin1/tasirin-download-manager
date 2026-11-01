@@ -374,9 +374,9 @@ object HlsMp4Muxer {
         // (23.219 dari 23.219,95 mikrodetik pada 44,1 kHz) dan
         // galatnya tumbuh linear bila ditambahkan berulang — audio
         // tertinggal ~0,15 detik per jam dari timeline video. Rumus
-        // per frame ini sama dengan AdtsAac.durationUs sehingga
-        // kedua sisi konsisten dan galat tinggal di bawah 1
-        // mikrodetik.
+        // per frame ini adalah AdtsAac.durationUs itu sendiri
+        // (issue #1111) sehingga tak ada salinan kedua yang bisa
+        // berdivergensi dan galat tinggal di bawah 1 mikrodetik.
         var frameIndex = 0L
         stream.forEachFrame { frame ->
             if (frame.size > buffer.capacity()) {
@@ -385,11 +385,7 @@ object HlsMp4Muxer {
             buffer.clear()
             buffer.put(frame)
             buffer.flip()
-            val pts = if (stream.sampleRate > 0) {
-                frameIndex * AdtsAac.SAMPLES_PER_FRAME * 1_000_000L / stream.sampleRate
-            } else {
-                0L
-            }
+            val pts = AdtsAac.durationUs(frameIndex, stream.sampleRate)
             info.set(0, frame.size, pts, 0)
             muxer.writeSampleData(track, buffer, info)
             frameIndex++

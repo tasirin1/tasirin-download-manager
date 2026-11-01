@@ -306,7 +306,7 @@ object AdtsAac {
 
     /** Estimasi durasi (mikrodetik) jika semua frame berisi SAMPLES_PER_FRAME
      *  sampel pada sampleRate tertentu. */
-    fun durationUs(frameCount: Int, sampleRate: Int): Long {
+    fun durationUs(frameCount: Long, sampleRate: Int): Long {
         if (frameCount <= 0 || sampleRate <= 0) return 0L
         return frameCount * SAMPLES_PER_FRAME * 1_000_000L / sampleRate
     }
