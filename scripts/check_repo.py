@@ -324,6 +324,38 @@ def admin_consistency() -> Result:
     return Result("admin konsisten", True, 0.0, "stale/CODEOWNERS/labeler/toolchain sinkron.")
 
 
+def tool_syntax() -> Result:
+    """Sintaks perkakas yang tak dijalankan gerbang lain (issue #1055):
+    scripts/jacoco_summary.py hanya jalan di CI sesudah Gradle dan
+    tools/pasang-hook.sh tak dirujuk guard mana pun, jadi kesalahan
+    sintaks keduanya dulu lolos "SEMUA SEHAT" dan baru ketahuan di
+    langkah Coverage CI / saat memasang hook. compile() + bash -n
+    menangkapnya tanpa mengeksekusi logika apa pun."""
+    started = time.monotonic()
+    problems: list[str] = []
+    rel_py = "scripts/jacoco_summary.py"
+    try:
+        compile((ROOT / rel_py).read_text(encoding="utf-8"), rel_py, "exec")
+    except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+        problems.append(f"{rel_py}: {exc}")
+    if shutil.which("bash"):
+        proc = subprocess.run(
+            ["bash", "-n", str(ROOT / "tools/pasang-hook.sh")],
+            capture_output=True, text=True,
+        )
+        if proc.returncode != 0:
+            problems.append(
+                "tools/pasang-hook.sh: " +
+                (proc.stderr or proc.stdout).strip()
+            )
+    else:
+        problems.append("bash tak tersedia untuk memeriksa tools/pasang-hook.sh")
+    detail = ("jacoco_summary.py + pasang-hook.sh valid."
+              if not problems else "; ".join(problems))
+    return Result("sintaks perkakas", not problems,
+                  time.monotonic() - started, detail)
+
+
 def fast_checks() -> list[Result]:
     results = [no_local_sdk()]
     results += list(static_checks())
@@ -342,6 +374,7 @@ def fast_checks() -> list[Result]:
             python_tool("security audit", "scripts/security_audit.py"),
         ]
     )
+    results.append(tool_syntax())
     if shutil.which("git"):
         results.append(whitespace_result())
     else:

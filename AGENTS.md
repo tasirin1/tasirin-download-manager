@@ -279,7 +279,7 @@ kuat dan tanpa diskusi:
    `assets/remote.html` manual).
 8. **Guard terpusat**: jalankan `python3 scripts/check_repo.py` sebagai satu
    pintu pemeriksaan struktur repo, verifikasi path, cek cepat, remote web,
-   smoke upload, README, audit keamanan, dan whitespace. Jalankan juga
+   smoke upload, README, audit keamanan, sintaks perkakas, dan whitespace. Jalankan juga
    `python3 tools/verifikasi-path.py` + `bash scripts/cek-cepat.sh` sebelum
    push (atau pasang sekali per clone: `sh tools/pasang-hook.sh` agar tiap
    push otomatis terverifikasi dan batal bila GAGAL). Job `verify` di CI
