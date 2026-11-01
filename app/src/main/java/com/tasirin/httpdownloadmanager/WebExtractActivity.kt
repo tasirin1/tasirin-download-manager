@@ -118,6 +118,15 @@ class WebExtractActivity : AppCompatActivity() {
         // localStorage/sessionStorage; tanpa JS bridge sehingga JS halaman
         // tak bisa memanggil kode aplikasi (hanya dibaca via evaluateJavascript).
         settings.domStorageEnabled = true
+        // Akses file/konten lokal dimatikan eksplisit (issue #1081):
+        // WebView ini memuat situs pihak ketiga anti-bot dengan
+        // JavaScript aktif, dan default allowFileAccess adalah true
+        // pada API 23-29. Navigasi sudah dibatasi isAllowedTarget,
+        // tetapi pertahanan berlapisnya tak boleh bergantung pada
+        // satu gerbang: halaman asing tak punya urusan sah membaca
+        // file:/content: dari perangkat.
+        settings.allowFileAccess = false
+        settings.allowContentAccess = false
         settings.loadsImagesAutomatically = false
         settings.setSupportMultipleWindows(false)
         settings.cacheMode = WebSettings.LOAD_DEFAULT
