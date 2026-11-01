@@ -260,6 +260,8 @@
         <item quantity="one">%d download completed</item>
         <item quantity="other">%d downloads completed</item>
     </plurals>
+    <string name="notification_failed_title">Failed: %1$s</string>
+    <string name="notification_unknown_error">Unknown error</string>
 
     <string-array name="segment_options">
         <item>1 (no parallel)</item>

@@ -164,8 +164,20 @@ object NotificationHelper {
         ) return
         val success = item.state == DownloadState.COMPLETED
         val id = nextNotifId.getAndUpdate(::wrapNotifId)
-        val title = if (success) item.fileName else "Failed: ${item.fileName}"
-        val text = if (success) Formats.bytes(item.bytesDownloaded) else (item.error ?: "Unknown error")
+        // Judul gagal + galat tak dikenal lewat resource (issue #1078):
+        // dulu dua literal Kotlin ini satu-satunya teks notifikasi yang
+        // tak bisa dilokalkan, sementara seluruh teks lain di berkas
+        // ini lewat R.string.
+        val title = if (success) {
+            item.fileName
+        } else {
+            context.getString(R.string.notification_failed_title, item.fileName)
+        }
+        val text = if (success) {
+            Formats.bytes(item.bytesDownloaded)
+        } else {
+            item.error ?: context.getString(R.string.notification_unknown_error)
+        }
         val intent = Intent(context, MainActivity::class.java).setPackage(context.packageName)
         // requestCode stabil (bukan id unik): intent selalu sama (buka MainActivity
         // tanpa extra) sehingga satu PendingIntent dipakai ulang; requestCode unik
