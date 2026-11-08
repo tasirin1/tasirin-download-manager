@@ -75,8 +75,12 @@
     --card: #141E3D;
     --ink: #EAF0FF;
     --muted: #93A5CC;
-    --primary: #38BDF8;
-    --primary-2: #7DD3FC;
+    /* Biru diselaraskan ke keluarga --grad (issue #1334): sebelumnya
+       sky Tailwind #38BDF8/#7DD3FC; kini Material #42A5F5/#90CAF9.
+       Kontras teks terhitung ulang: primary 7,17/6,18/5,41, primary-2
+       10,84/9,36/8,19 (bg/card/primary-soft) — semua tetap >=4,5:1. */
+    --primary: #42A5F5;
+    --primary-2: #90CAF9;
     --primary-soft: #16265C;
     --grad: #1E88E5;
     --grad-shadow: rgba(30,136,229,.35);
@@ -84,15 +88,15 @@
     --accent-soft: #3a2410;
     --focus: #ff922b;
     --focus-ring: #3a2410;
-    --green-line: rgba(52,211,153,.45);
-    --primary-line: rgba(56,189,248,.4);
-    --amber-line: rgba(251,191,36,.45);
-    --red-line: rgba(248,113,113,.45);
-    --green: #34D399;
+    --green-line: rgba(102,187,106,.45);
+    --primary-line: rgba(66,165,245,.4);
+    --amber-line: rgba(255,202,40,.45);
+    --red-line: rgba(229,115,115,.45);
+    --green: #66BB6A;
     --green-bg: #0B2E22;
-    --red: #F87171;
+    --red: #E57373;
     --red-bg: #33181C;
-    --amber: #FBBF24;
+    --amber: #FFCA28;
     --amber-bg: #33270E;
     --blue-bg: #16265C;
     --line: #2A3757;
@@ -112,7 +116,7 @@
   }
 
   :root[data-theme="dark"] body {
- background: linear-gradient(180deg, #1B2A5E, #0D1738 45%, #0A0F24);
+ background: linear-gradient(180deg, var(--primary-soft), var(--bg-soft) 45%, var(--bg));
  background-attachment: fixed; }
 
   * {
