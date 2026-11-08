@@ -489,6 +489,10 @@ object SocialMediaExtractor {
             }
         }
 
+        // img_index dihitung SEBELUM strategi 2 (issue #1180): strategi
+        // itu membutuhkannya untuk memutuskan posisi video (lihat bawah).
+        val imgIndex = IG_IMG_INDEX_RE.find(url)?.groupValues?.get(1)?.toIntOrNull()
+
         // Strategi 2: halaman utama via Googlebot — hanya bila embed gagal
         if (options.isEmpty()) {
             val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", IG_HEADERS + user)
@@ -502,14 +506,26 @@ object SocialMediaExtractor {
                 }
                 val videoUrl = extractVideoFromPage(pageHtml)
                 if (videoUrl != null) {
-                    options.add(0, Result(videoUrl, "Instagram_${shortcode}.mp4",
-                        "Instagram $shortcode", "Video", MIME_MP4, cookies = pageCookies))
+                    val videoResult = Result(videoUrl, "Instagram_${shortcode}.mp4",
+                        "Instagram $shortcode", "Video", MIME_MP4, cookies = pageCookies)
+                    // Video disisipkan di depan HANYA bila tak ada
+                    // img_index (issue #1180): img_index menomori item
+                    // carousel, dan sisipan di indeks 0 menggeser nomor
+                    // semua foto sesudahnya sehingga pilihan pengguna
+                    // meleset satu. Dengan img_index, video ditambahkan
+                    // di akhir agar nomor foto hasil pindai halaman —
+                    // satu-satunya penomoran yang strategi ini punya —
+                    // tetap sejajar posisi carousel untuk foto.
+                    if (imgIndex == null) {
+                        options.add(0, videoResult)
+                    } else {
+                        options.add(videoResult)
+                    }
                 }
             }
         }
 
         // Dukungan img_index dari URL: pilih item tertentu di carousel
-        val imgIndex = IG_IMG_INDEX_RE.find(url)?.groupValues?.get(1)?.toIntOrNull()
         if (imgIndex != null && imgIndex > 0 && imgIndex <= options.size) {
             val selected = options[imgIndex - 1]
             return listOf(selected)
