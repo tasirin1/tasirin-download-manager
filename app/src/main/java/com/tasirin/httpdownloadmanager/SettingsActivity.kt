@@ -70,12 +70,25 @@ class SettingsActivity : AppCompatActivity() {
     private var cachedLanIpsAt: Long = 0
     private var lanIpGen = 0
 
+    // Nilai baris folder dinamis yang dipulihkan dari bundle keadaan
+    // (issue #1327): baris dibangun dari sini bila ada, bukan dari prefs.
+    private var restoredExtraFolders: List<String>? = null
+    private var restoredGalleryFolders: List<String>? = null
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Baris folder dinamis tak punya id unik sehingga pemulihan
+        // keadaan bawaan Android tak menjangkaunya: tanpa ini, path yang
+        // sudah diketik tetapi belum disimpan hilang senyap saat
+        // aktivitas dibuat ulang / proses mati (issue #1327).
+        restoredExtraFolders =
+            savedInstanceState?.getStringArrayList(STATE_EXTRA_FOLDERS)
+        restoredGalleryFolders =
+            savedInstanceState?.getStringArrayList(STATE_GALLERY_FOLDERS)
         binding = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
         applyEdgeToEdge(binding.root)
@@ -115,7 +128,8 @@ class SettingsActivity : AppCompatActivity() {
         }
         // Gallery folder rows (same pattern as extra folders)
         val galleryBox = findViewById<LinearLayout>(R.id.gallery_folders_container)
-        StoragePrefs.getGalleryFolders(this).forEach { addGalleryFolderRow(galleryBox, it) }
+        (restoredGalleryFolders ?: StoragePrefs.getGalleryFolders(this))
+            .forEach { addGalleryFolderRow(galleryBox, it) }
         findViewById<Button>(R.id.btn_add_gallery_folder).setOnClickListener {
             addGalleryFolderRow(galleryBox, "")
         }
@@ -512,6 +526,20 @@ class SettingsActivity : AppCompatActivity() {
             binding.urls.text = getString(R.string.remote_no_url)
             lanIpGen++
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Baca nilai baris SAAT INI dari view (belum tentu tersimpan ke
+        // prefs — Simpan mungkin belum ditekan).
+        outState.putStringArrayList(
+            STATE_EXTRA_FOLDERS,
+            ArrayList(folderInputValues(R.id.extra_folders_container))
+        )
+        outState.putStringArrayList(
+            STATE_GALLERY_FOLDERS,
+            ArrayList(folderInputValues(R.id.gallery_folders_container))
+        )
     }
 
     private fun wireServerSwitch() {
@@ -1109,7 +1137,8 @@ class SettingsActivity : AppCompatActivity() {
             }
         })
         val box = findViewById<LinearLayout>(R.id.extra_folders_container)
-        StoragePrefs.getExtraFolders(this).forEach { addExtraFolderRow(box, it) }
+        (restoredExtraFolders ?: StoragePrefs.getExtraFolders(this))
+            .forEach { addExtraFolderRow(box, it) }
         findViewById<Button>(R.id.btn_add_folder).setOnClickListener {
             addExtraFolderRow(box, "")
         }
@@ -1438,6 +1467,8 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val STATE_EXTRA_FOLDERS = "state_extra_folders"
+        private const val STATE_GALLERY_FOLDERS = "state_gallery_folders"
         private const val MIN_SERVER_PIN_LENGTH = 4
         private val PART_PATTERN = Regex("\\.part(\\.\\d+)?$")
     }
