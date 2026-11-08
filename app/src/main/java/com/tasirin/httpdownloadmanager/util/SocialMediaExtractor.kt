@@ -1445,7 +1445,7 @@ object SocialMediaExtractor {
             ?: HP_OG_TITLE_RE.find(html)?.groupValues?.get(1)
             ?: HP_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(titleSuffix)
             ?: defaultTitle
-        title = unescapePlayer(title.trim()).take(120)
+        title = FileNames.take(unescapePlayer(title.trim()), 120)
         if (title.isBlank()) title = defaultTitle
         val safeName = sanitizeFileName(title)
         val options = mutableListOf<Result>()
@@ -1526,7 +1526,7 @@ object SocialMediaExtractor {
         var title = HP_OG_TITLE_RE.find(html)?.groupValues?.get(1)
             ?: HP_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(" - Pornhub")
             ?: "Pornhub_video"
-        title = unescapePlayer(title.trim()).take(120)
+        title = FileNames.take(unescapePlayer(title.trim()), 120)
         if (title.isBlank()) title = "Pornhub_video"
         val safeName = sanitizeFileName(title)
         val found = LinkedHashMap<String, Int>()
@@ -1621,7 +1621,7 @@ object SocialMediaExtractor {
         var title = HP_OG_TITLE_RE.find(html)?.groupValues?.get(1)
             ?: HP_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(" - ")
             ?: "HentaiHaven_video"
-        title = unescapePlayer(title.trim()).take(120)
+        title = FileNames.take(unescapePlayer(title.trim()), 120)
         if (title.isBlank()) title = "HentaiHaven_video"
         val safeName = sanitizeFileName(title)
         val candidates = mutableListOf<Pair<String, Boolean>>()
