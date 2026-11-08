@@ -57,7 +57,10 @@ class FileSaver(context: Context) {
          *  sapuan yatim wajib melewatinya — salinan raksasa sah bisa
          *  berjalan lebih lama dari ambang umur sapuan 2 jam, dan
          *  penjaga nama+umur saja tak bisa membedakannya dari yatim.
-         *  Di companion agar lintas instance FileSaver. */
+         *  Di companion agar lintas instance FileSaver. Kunci berbentuk
+         *  "<uri pohon>|<nama staging>" (issue #1271): nama staging hanya
+         *  unik per direktori, jadi kunci nama polos menghalangi sapuan
+         *  yatim senama di pohon/subfolder lain. */
         private val inFlightStagingNames =
             java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
@@ -516,7 +519,7 @@ class FileSaver(context: Context) {
             unique = uniqueDocumentName(tree, fileName, avoidStaging = true)
             tree.createFile(MimeTypes.forFile(unique), "$unique.part")
         } ?: return null
-        inFlightStagingNames.add("$unique.part")
+        inFlightStagingNames.add(tree.uri.toString() + "|" + "$unique.part")
         try {
             val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
             if (output == null) {
@@ -534,7 +537,7 @@ class FileSaver(context: Context) {
                 return null
             }
         } finally {
-            inFlightStagingNames.remove("$unique.part")
+            inFlightStagingNames.remove(tree.uri.toString() + "|" + "$unique.part")
         }
         // URI otoritatif dari pohon, sama seperti writeCustomFolder:
         // objek hasil rename bisa menyimpan URI lama di sebagian provider.
@@ -564,7 +567,7 @@ class FileSaver(context: Context) {
         var staged: PublishResult? = null
         if (stagingDoc != null) {
             // Produsen staging SAF kedua (issue #1249): daftarkan juga.
-            inFlightStagingNames.add("$unique.part")
+            inFlightStagingNames.add(tree.uri.toString() + "|" + "$unique.part")
             try {
             val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
             if (output == null) {
@@ -595,7 +598,7 @@ class FileSaver(context: Context) {
                 null
             }
             } finally {
-                inFlightStagingNames.remove("$unique.part")
+                inFlightStagingNames.remove(tree.uri.toString() + "|" + "$unique.part")
             }
         }
         staged ?: writeCustomFolderDirect(tree, fileName, writer)
@@ -909,7 +912,7 @@ class FileSaver(context: Context) {
                                 val name = doc.name ?: continue
                                 if (!isPublishStagingName(name, finalNames)) continue
                                 // Sedang ditulis = bukan yatim (issue #1249).
-                                if (name in inFlightStagingNames) continue
+                                if ((tree.uri.toString() + "|" + name) in inFlightStagingNames) continue
                                 val modified = doc.lastModified()
                                 if (modified <= 0L ||
                                     now - modified <= 2L * 60 * 60 * 1000
