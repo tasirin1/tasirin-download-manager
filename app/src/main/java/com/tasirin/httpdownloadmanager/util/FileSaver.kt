@@ -1333,6 +1333,14 @@ class FileSaver(context: Context) {
                         val side = File(srcParent, srcFile.name + ext)
                         if (!side.exists()) continue
                         val ok = runCatching {
+                            // Dokumen senama di tujuan pasti yatim
+                            // (issue #1323): nama utamanya unik hasil
+                            // klaim sehingga induk sidecar itu tak ada.
+                            // Hapus dulu — createFile polos pada nama
+                            // yang sudah ada bisa mengembalikan dokumen
+                            // lama (lalu tertimpa) atau nama tersufiks
+                            // (sidecar tak terbaca) tergantung provider.
+                            runCatching { destDir.findFile(unique + ext)?.delete() }
                             val doc = destDir.createFile("text/plain", unique + ext)
                                 ?: error("createFile returned null")
                             val out = appContext.contentResolver
