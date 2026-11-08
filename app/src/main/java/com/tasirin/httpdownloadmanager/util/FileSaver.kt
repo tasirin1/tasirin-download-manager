@@ -1052,6 +1052,17 @@ class FileSaver(context: Context) {
         }
         if (!item.filePath.isNullOrEmpty()) {
             runCatching { File(item.filePath).delete() }
+            // Sidecar checksum ikut dihapus (issue #1221): tanpa ini
+            // sidecar basi tertinggal di sebelah nama yang sama dan
+            // meracuni verifikasi unduhan senama berikutnya dengan
+            // "Checksum mismatch" palsu (pembaca: sidecarChecksum).
+            val published = File(item.filePath)
+            val parent = published.parentFile
+            if (parent != null) {
+                for (ext in listOf(".sha256", ".sha1", ".md5")) {
+                    runCatching { File(parent, published.name + ext).delete() }
+                }
+            }
         }
         // Berkas yang terlihat galeri ikut terhapus di atas (issue #595):
         // tanpa invalidasi, blok galeri dari walk filesystem (SAF/folder
