@@ -772,18 +772,25 @@ class SettingsActivity : AppCompatActivity() {
         // adalah aksi eksplisit lewat tombol Remove PIN di bawah.
         binding.inputPin.setText("")
         binding.btnRemovePin.setOnClickListener {
+            // Hapus PIN + pref penegakan diterapkan SINKRON di main lebih
+            // dulu (issue #1294): pola sebelumnya menghapus PIN di dalam
+            // hop IO yang bisa batal — menekan Back di jendela itu membuat
+            // lifecycleScope batal sesudah PIN terhapus tetapi sebelum
+            // blok penegakan berjalan, sehingga server tetap hidup tanpa
+            // PIN wajib. Pola aman yang sama seperti handler penegakan
+            // lain di berkas ini: pref dulu, efek berat belakangan.
+            StoragePrefs.setServerPin(this, null)
+            App.logEvent("PIN REMOVED")
+            // Sama seperti blok penegakan di saveSettings: PIN wajib
+            // yang hilang mematikan server agar tak berjalan terbuka.
+            val enforceStop = StoragePrefs.isPinEnforced(this) &&
+                StoragePrefs.getServerPin(this).isNullOrEmpty()
+            if (enforceStop) {
+                StoragePrefs.setServerBackgroundEnabled(this, false)
+                StoragePrefs.setServerAutoStartEnabled(this, false)
+            }
             lifecycleScope.launch {
-                withContext(Dispatchers.IO) {
-                    StoragePrefs.setServerPin(this@SettingsActivity, null)
-                }
-                App.logEvent("PIN REMOVED")
-                // Sama seperti blok penegakan di saveSettings: PIN wajib
-                // yang hilang mematikan server agar tak berjalan terbuka.
-                if (StoragePrefs.isPinEnforced(this@SettingsActivity) &&
-                    StoragePrefs.getServerPin(this@SettingsActivity).isNullOrEmpty()
-                ) {
-                    StoragePrefs.setServerBackgroundEnabled(this@SettingsActivity, false)
-                    StoragePrefs.setServerAutoStartEnabled(this@SettingsActivity, false)
+                if (enforceStop) {
                     // NonCancellable (issue #832, kelas #823): PIN sudah
                     // terhapus dan pref sudah mati di atas; stop yang
                     // terbatalkan membuat server berjalan terbuka.
