@@ -30,6 +30,8 @@ import com.tasirin.httpdownloadmanager.util.readBounded
 import com.tasirin.httpdownloadmanager.util.decodePercentEncoded
 import com.tasirin.httpdownloadmanager.util.readBoundedFlagged
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -2872,6 +2874,12 @@ class DownloadEngine(appContext: Context) {
         temp.delete()
         File(temp.parent, temp.name + ".segs").delete()
         File(temp.parent, temp.name + ".spool").delete()
+        // Spool per-segmen unduh-awal (issue #1288) memakai awalan yang
+        // sama: sapu sisanya agar tak tertinggal yatim di jalur selesai.
+        val prefix = temp.name + ".spool."
+        temp.parentFile?.listFiles()?.forEach { f ->
+            if (f.name.startsWith(prefix)) runCatching { f.delete() }
+        }
     }
 
     /** Sidik jari rencana segmen untuk resume HLS (issue #385): hash
@@ -2942,34 +2950,72 @@ class DownloadEngine(appContext: Context) {
         // single-stream dan segmented yang memanggil throttle.reset
         // sesudah resume ditetapkan.
         throttle.reset(progress.downloaded)
+        // Posisi throttle BERSAMA unduh-awal (issue #1288): semua pekerja
+        // menagih byte ke satu penghitung yang hanya naik, sehingga
+        // limiter melihat total monoton seperti jalur multi-segmen
+        // berkas biasa — bukan baseline per-segmen yang saling mendahului.
+        val throttlePosition = AtomicLong(progress.downloaded)
+        val launchedSpools = mutableListOf<File>()
         try {
             BufferedOutputStream(FileOutputStream(target, startIndex > 0), BUFFER_SIZE).use { out ->
-                for (index in startIndex until urls.size) {
-                    val url = urls[index]
-                    coroutineContext.ensureActive()
-                    fetchHlsSegmentWithRetry(
-                        item, url, buffer, throttle, progress.downloaded, spool,
-                        fallbackQuery = fallbackQuery,
-                        notify = { segNow -> reportHlsProgress(item, progress, segNow) },
-                        onLength = { declared ->
-                            // Segmen referensi dari header Content-Length (ukuran
-                            // mentah) hanya untuk estimasi sisa; ukuran PASTI segmen
-                            // yang sudah selesai memakai hasil tulis riil di bawah
-                            // supaya konsisten dengan bytesDownloaded (audio di-strip
-                            // ID3 sehingga ukuran tulis bisa lebih kecil).
-                            if (progress.refSegBytes == 0L && declared >= HLS_REF_SEGMENT_MIN) {
-                                progress.refSegBytes = declared
+              coroutineScope {
+                // Unduh-awal terbatas (issue #1288): sampai
+                // HLS_PREFETCH_WINDOW segmen diunduh bersamaan ke spool
+                // per-segmen; penyalinan ke target, pembaruan progres,
+                // dan penanda .segs tetap BERURUTAN per indeks di bawah
+                // — sifat anti-korup #371 dan resume #385 tak berubah,
+                // yang berubah hanya segmen berikutnya tak lagi menunggu
+                // segmen ini selesai disalin.
+                val pending = HashMap<Int, Deferred<File>>()
+                var nextToFetch = startIndex
+                fun launchNext() {
+                    val idx = nextToFetch
+                    if (idx >= urls.size) return
+                    nextToFetch++
+                    val segSpool = File(spool.parentFile, spool.name + "." + idx)
+                    launchedSpools.add(segSpool)
+                    pending[idx] = async(Dispatchers.IO) {
+                        fetchHlsSegmentWithRetry(
+                            item, urls[idx], ByteArray(BUFFER_SIZE), throttle,
+                            throttlePosition, segSpool,
+                            fallbackQuery = fallbackQuery,
+                            notify = {
+                                reportHlsProgress(
+                                    item, progress,
+                                    (throttlePosition.get() - progress.downloaded)
+                                        .coerceAtLeast(0)
+                                )
+                            },
+                            onLength = { declared ->
+                                // Segmen referensi dari header Content-Length (ukuran
+                                // mentah) hanya untuk estimasi sisa; ukuran PASTI segmen
+                                // yang sudah selesai memakai hasil tulis riil di bawah
+                                // supaya konsisten dengan bytesDownloaded (audio di-strip
+                                // ID3 sehingga ukuran tulis bisa lebih kecil).
+                                if (progress.refSegBytes == 0L && declared >= HLS_REF_SEGMENT_MIN) {
+                                    progress.refSegBytes = declared
+                                }
                             }
-                        }
-                    )
-                    val written = BufferedInputStream(FileInputStream(spool)).use { segIn ->
+                        )
+                        segSpool
+                    }
+                }
+                for (index in startIndex until urls.size) {
+                    while (pending.size < HLS_PREFETCH_WINDOW && nextToFetch < urls.size) {
+                        launchNext()
+                    }
+                    coroutineContext.ensureActive()
+                    // Indeks berjalan selalu sudah diluncurkan jendela di
+                    // atas (nextToFetch hanya maju dari startIndex).
+                    val segFile = pending.remove(index)!!.await()
+                    val written = BufferedInputStream(FileInputStream(segFile)).use { segIn ->
                         if (stripId3Segments) {
                             AdtsAac.stripId3Stream(segIn, out)
                         } else {
                             segIn.copyTo(out, BUFFER_SIZE)
                         }
                     }
-                    spool.delete()
+                    segFile.delete()
                     progress.downloaded += written
                     progress.segmentsDone++
                     // Song referensi cadangan: bila header tidak memberi ukuran wajar,
@@ -2998,11 +3044,15 @@ class DownloadEngine(appContext: Context) {
                         sidecar.writeText("$fingerprint\n${index + 1}\n$fileWritten\n")
                     }
                 }
+              }
                 // Semua segmen selesai: penanda resume tak diperlukan lagi.
                 runCatching { sidecar.delete() }
             }
         } finally {
             spool.delete()
+            // Spool per-segmen milik pekerja yang batal/gagal ikut dibuang;
+            // yang sukses sudah dihapus konsumen sesudah disalin.
+            launchedSpools.forEach { f -> runCatching { f.delete() } }
         }
     }
 
@@ -3358,7 +3408,7 @@ class DownloadEngine(appContext: Context) {
         url: String,
         buffer: ByteArray,
         throttle: SpeedThrottle,
-        committed: Long,
+        throttlePosition: AtomicLong,
         spool: File,
         notify: (Long) -> Unit,
         onLength: (Long) -> Unit = {},
@@ -3371,7 +3421,7 @@ class DownloadEngine(appContext: Context) {
             coroutineContext.ensureActive()
             try {
                 return fetchHlsSegment(
-                    item, currentUrl, buffer, throttle, committed, spool, notify, onLength
+                    item, currentUrl, buffer, throttle, throttlePosition, spool, notify, onLength
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -3416,7 +3466,7 @@ class DownloadEngine(appContext: Context) {
         url: String,
         buffer: ByteArray,
         throttle: SpeedThrottle,
-        committed: Long,
+        throttlePosition: AtomicLong,
         spool: File,
         notify: (Long) -> Unit,
         onLength: (Long) -> Unit = {}
@@ -3483,7 +3533,11 @@ class DownloadEngine(appContext: Context) {
                             throw IOException("Not enough storage for HLS segment")
                         }
                         segOut.write(buffer, 0, read)
-                        throttle.sleepIfNeeded { committed + segBytes }
+                        // Tagih ke posisi bersama (issue #1288): total
+                        // yang dilihat limiter selalu naik walau segmen
+                        // diunduh bersamaan.
+                        val position = throttlePosition.addAndGet(read.toLong())
+                        throttle.sleepIfNeeded { position }
                         notify(segBytes)
                         // Cek kesehatan tiap 8 chunk, maks 1x/detik
                         // (issue #575): koneksi yang meneteskan byte
@@ -5297,6 +5351,10 @@ class DownloadEngine(appContext: Context) {
         }
         private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")
         private const val BUFFER_SIZE = 64 * 1024
+        /** Kedalaman unduh-awal segmen HLS (issue #1288): segmen
+         *  berikutnya diunduh bersamaan ke spool per-segmen sementara
+         *  penyalinan ke target tetap berurutan. */
+        private const val HLS_PREFETCH_WINDOW = 4
         private const val MAX_ZERO_READS = 64
         private const val MAX_REDIRECTS = 5
         private const val HLS_PROBE_MAX_BYTES = 1_000_000
