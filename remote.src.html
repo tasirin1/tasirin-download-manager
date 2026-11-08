@@ -2056,7 +2056,7 @@
   </button>
 </nav>
 
-<button id="fabNewBtn" class="fab" type="button" title="Add download">+</button>
+<button id="fabNewBtn" class="fab" type="button" title="Add download" aria-label="Add download"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 <button id="toTopBtn" class="to-top" type="button" title="Back to top" aria-label="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
 
 
@@ -2081,7 +2081,7 @@
         <div id="mmCtrlRow">
           <div id="mmTimePanel"><span id="mmTime">0:00 / 0:00</span></div>
           <div class="mm-side">
-          <button id="mmSpeedBtn" type="button" title="Playback speed">1&times;</button>
+          <button id="mmSpeedBtn" type="button" title="Playback speed">1×</button>
           <button id="mmTrackBtn" type="button" class="hidden" title="Audio track"></button>
           <div class="mm-vol-group">
             <button id="mmMuteBtn" type="button" title="Mute" aria-label="Toggle mute"></button>
@@ -2871,7 +2871,7 @@ function mmFmtTime(t) {
 
 const toastEl = document.getElementById('toast');
 var toastCloseBtn = document.getElementById('toastClose');
-const TOAST_GLYPHS = { ok: '\u2713', error: '\u2715', info: '\u2139' };
+const TOAST_GLYPHS = { ok: '\u2713', error: '\u00d7', info: '\u2139' };
 function toastRingStop() {
   if (typeof cancelAnimationFrame === 'function' && toastEl._raf) {
     cancelAnimationFrame(toastEl._raf);
