@@ -66,6 +66,11 @@ class BootResumeJobService : JobService() {
             val result = scheduler.schedule(builder.build())
             if (result <= 0) {
                 android.util.Log.w("BootResume", "JobScheduler.schedule failed (result=$result)")
+                // Ikut tercatat di log peristiwa aplikasi (issue #1137):
+                // kegagalan start di onStartJob sudah berjejak sejak
+                // #592, tetapi kegagalan schedule membuat autostart mati
+                // total tanpa satu pun jejak yang bisa dilihat pengguna.
+                App.logEvent("BOOT/JOB: schedule FAILED (result=$result)")
             }
         }
     }
