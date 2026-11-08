@@ -1416,7 +1416,11 @@ class DownloadEngine(appContext: Context) {
     private suspend fun monitorLoop() {
         while (true) {
             delay(MONITOR_INTERVAL_MS)
+            // CancellationException tak boleh tertelan runCatching
+            // (issue #1132): scope yang dibatalkan harus berhenti di
+            // putaran ini, bukan satu putaran terlambat.
             runCatching { checkForUpdates() }
+                .onFailure { if (it is CancellationException) throw it }
         }
     }
 
