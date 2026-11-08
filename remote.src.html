@@ -31,6 +31,12 @@
     --grad-shadow: rgba(21,101,192,.28);
     --accent: #F57C00;
     --accent-soft: #fde8d3;
+    /* Fokus (issue #1329): --accent hanya 2,70:1 di atas kartu terang,
+       di bawah standar non-teks 3:1; --focus oranye lebih gelap lolos
+       3,79:1 (kartu) dan 3,44:1 (latar). --focus-ring = cincin padat
+       warna yang sama agar halo kolom isian benar-benar terlihat. */
+    --focus: #E65100;
+    --focus-ring: #E65100;
     --green: #0b7a43;
     --green-bg: #e6f6ee;
     --red: #c4281f;
@@ -67,6 +73,8 @@
     --grad-shadow: rgba(30,136,229,.35);
     --accent: #ff922b;
     --accent-soft: #3a2410;
+    --focus: #ff922b;
+    --focus-ring: #3a2410;
     --green: #34D399;
     --green-bg: #0B2E22;
     --red: #F87171;
@@ -260,7 +268,7 @@
  font-size: 15px; padding: 11px 13px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; transition: border-color .15s ease, box-shadow .15s ease; }
 
   input:focus, select:focus {
- outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+ outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
 
   .form-row {
  display: flex; gap: 10px; }
@@ -515,10 +523,10 @@
  display: flex; }
 
   :focus-visible {
- outline: 3px solid var(--accent); outline-offset: 2px; }
+ outline: 3px solid var(--focus); outline-offset: 2px; }
 
   .item:focus-visible, .fs-row:focus-visible, .fs-root:focus-visible, .gal-cell:focus-visible {
- outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
+ outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 12px; }
 
   .tabbar {
  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 4px; padding: 5px 10px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--tabbar-bg); border-top: 1px solid var(--line); box-shadow: 0 -1px 8px rgba(23,32,58,.05); transition: transform .25s ease; }
@@ -946,7 +954,7 @@
  background: var(--bg-soft); }
 
   .mm-rel-row:focus-visible {
- outline: 3px solid var(--accent); outline-offset: 2px; }
+ outline: 3px solid var(--focus); outline-offset: 2px; }
 
   .mm-rel-thumb {
  flex: 0 0 auto; width: 150px; height: 84px; position: relative; background: var(--mm-thumb); border-radius: 8px; overflow: hidden; }
@@ -1344,7 +1352,7 @@
   .add-sheet textarea#url {
  min-height: 64px; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 15px; resize: vertical; box-sizing: border-box; width: 100%; font-family: inherit; box-shadow: inset 0 1px 3px rgba(10,15,30,.06); transition: border-color .15s ease; }
   .add-sheet textarea#url:focus {
- outline: 3px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+ outline: 3px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
   .add-sheet input[type="text"],
   .add-sheet input[type="url"],
   .add-sheet select,
