@@ -217,7 +217,7 @@
   .more-menu .sep {
  height: 1px; margin: 4px 8px; background: var(--line); }
 
- .menu-backdrop { position: fixed; inset: 0; z-index: 59; background: rgba(0,0,0,.18); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+ .menu-backdrop { position: fixed; inset: 0; z-index: 59; background: rgba(8,12,22,.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); opacity: 0; transition: opacity .2s ease; pointer-events: none; }
  .menu-backdrop.show { opacity: 1; pointer-events: auto; }
 
   .wrap {
@@ -1235,7 +1235,7 @@
  display: none !important; }
 
   .cm-overlay {
- position: fixed; inset: 0; z-index: 90; background: rgba(8,12,22,.5); display: flex; align-items: center; justify-content: center; padding: 22px; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+ position: fixed; inset: 0; z-index: 90; background: rgba(8,12,22,.5); display: flex; align-items: center; justify-content: center; padding: 22px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: sheetFade .18s ease; }
 
   /* Kunci gulir badan selama ada modal/sheet terbuka: tanpa ini halaman
      di belakang ikut bergeser saat area scrim disentuh dan posisi gulir
@@ -1244,7 +1244,14 @@
   body:has(.cm-overlay:not(.hidden)), body:has(.sheet:not(.hidden)) {
  overflow: hidden; }
 
+  /* Animasi masuk modal (issue #1341): sebelumnya modal pusat muncul
+     seketika tanpa animasi, satu-satunya permukaan dialog yang begitu. */
+  @keyframes cmPop {
+ from { opacity: 0; transform: translateY(8px) scale(.97); }
+ to { opacity: 1; transform: none; } }
+
   .cm-box {
+ animation: cmPop .18s ease;
  width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); max-height: calc(100vh - 44px); max-height: calc(100dvh - 44px); overflow-y: auto; }
 
   /* Daftar tautan share aktif bisa panjang: gulir di dalam kotak modal
@@ -1351,7 +1358,7 @@
  margin-top: 14px; }
 
   .sheet {
- position: fixed; inset: 0; z-index: 85; background: rgba(8,12,22,.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: flex-end; justify-content: center; }
+ position: fixed; inset: 0; z-index: 85; background: rgba(8,12,22,.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
 
   .sheet-box {
  width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -12px 32px rgba(0,0,0,.18); max-height: 88vh; max-height: 88dvh; overflow-y: auto; }
@@ -1806,6 +1813,7 @@
     .toast { animation: none; }
     .fill { transition: none; }
     .sheet:not(.hidden), .sheet:not(.hidden) .sheet-box { animation: none; }
+    .cm-overlay, .cm-box { animation: none; }
     .mm-spin::before { animation: none; }
   }
 </style>
