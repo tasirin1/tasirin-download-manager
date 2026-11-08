@@ -139,14 +139,7 @@
  display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 11.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
 
   .srv-chip i {
- width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-bg); flex: 0 0 auto; animation: pulseDot 2s ease-in-out infinite; }
-
-  @keyframes pulseDot {
- 0%, 100% {
- box-shadow: 0 0 0 2px var(--green-bg); }
- 50% {
- box-shadow: 0 0 0 6px var(--green-bg); }
- }
+ width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-bg); flex: 0 0 auto; }
 
   .srv-chip.hidden {
  display: none; }
@@ -402,25 +395,16 @@
   .fill {
  height: 100%; background: linear-gradient(90deg, #64B5F6, var(--primary)); width: 0; border-radius: 999px; transition: width .6s cubic-bezier(.4,0,.2,1); position: relative; overflow: hidden; }
 
-  /* Shimmer hanya pada bar yang sedang mengunduh: dulu ::after ini
-     beranimasi tanpa henti di SEMUA bar (termasuk jeda/selesai),
-     memaksa repaint terus-menerus saat daftar digulir di HP lemah. */
-  .bar.downloading .fill::after {
- content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); animation: shimmer 1.8s ease-in-out infinite; }
+  /* Bar progres polos tanpa shimmer dan garis miring: tampilan
+     sederhana dan elegan (permintaan owner 2026-11-08). */
 
-  @keyframes shimmer {
- 0% { transform: translateX(-100%); }
- 100% { transform: translateX(200%); }
- }
-
-  .bar.hls .fill { background: linear-gradient(90deg, #42A5F5, #1E88E5, #1565C0); } .bar.hls .fill::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(255,255,255,.12) 4px, rgba(255,255,255,.12) 8px); z-index: 1; }
-  .bar.downloading .fill { background: linear-gradient(90deg, #42A5F5, var(--primary), #0D47A1); } .bar.downloading .fill::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(255,255,255,.15) 4px, rgba(255,255,255,.15) 8px); z-index: 1; }
+  .bar.hls .fill { background: linear-gradient(90deg, #42A5F5, #1E88E5, #1565C0); }
+  .bar.downloading .fill { background: linear-gradient(90deg, #42A5F5, var(--primary), #0D47A1); }
   .bar.paused .fill { background: var(--amber); opacity: .7; }
   .err-text { font-weight: 600; }
   .err-dot { margin: 0 3px; color: var(--muted); }
   .err-status { color: var(--red); font-weight: 700; font-size: 11px; }
   .st-fail .bar-wrap { opacity: .55; }
-  .bar.paused .fill::after { animation: none; }
 
   .item-sub {
  padding-left: 46px; }
@@ -561,7 +545,7 @@
 
   @media (hover: hover) and (pointer: fine) {
   .gal-cell:hover {
- transform: translateY(-3px); box-shadow: 0 2px 4px rgba(23,32,58,.05), 0 14px 32px rgba(23,32,58,.10); }
+ box-shadow: var(--shadow-sm); }
   }
 
   .gal-thumb {
@@ -1602,28 +1586,8 @@
   .sk-cap {
  margin: 9px 11px 11px; display: flex; flex-direction: column; gap: 6px; }
 
-  .view-anim {
- animation: fadeSlide .26s ease; }
-
-  @keyframes fadeSlide {
- from {
- opacity: 0; transform: translateY(6px); }
- to {
- opacity: 1; transform: none; }
- }
-
-  @keyframes itemIn {
- from {
- opacity: 0; transform: translateY(10px); }
- to {
- opacity: 1; transform: none; }
- }
-
-  li.item.anim {
- animation: itemIn .28s cubic-bezier(.2,.7,.3,1) both; }
-
   @media (prefers-reduced-motion: reduce) {
- .view-anim, li.item.anim, .skeleton, .srv-chip i {
+ .skeleton {
  animation: none !important; }
  }
 
@@ -1763,10 +1727,9 @@
   @media (min-width: 601px) and (hover: hover) {
     }
 .thumb-broken{visibility:hidden}
-  /* Hormati preferensi gerak minim: matikan animasi berulang yang
-     paling mahal dilukis (shimmer bar progres + masuknya toast). */
+  /* Hormati preferensi gerak minim: matikan animasi toast dan
+     transisi bar progres. */
   @media (prefers-reduced-motion: reduce) {
-    .bar.downloading .fill::after { animation: none; }
     .toast { animation: none; }
     .fill { transition: none; }
   }
