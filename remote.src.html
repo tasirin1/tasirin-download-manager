@@ -586,7 +586,7 @@
  border-radius: 12px; }
 
   .tabbar {
- position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 4px; padding: 5px 10px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--tabbar-bg); border-top: 1px solid var(--line); box-shadow: 0 -1px 8px rgba(23,32,58,.05); transition: transform .25s ease; }
+ position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 4px; padding: 5px 10px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--tabbar-bg); border-top: 1px solid var(--line); box-shadow: 0 -1px 8px rgba(23,32,58,.05); transition: transform .25s ease, visibility 0s; }
 
   .tab {
  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 40px; padding: 4px 4px 3px; border: 0; border-radius: 14px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.2; cursor: pointer; transition: color .15s ease, background .15s ease; }
@@ -610,8 +610,11 @@
  background: var(--primary); color: #fff; box-shadow: 0 3px 8px var(--grad-shadow); }
   :root[data-theme="dark"] .tab.on .tab-ico { color: #212121; }
 
+  /* Saat tersembunyi tab bar juga keluar dari urutan fokus & ketuk
+     (issue #1365): visibility bertransisi tertunda .25s agar animasi
+     geser keluar tetap terlihat sebelum elemen tak kasatmata. */
   .tabbar.tab-hide {
- transform: translateY(calc(100% + 8px)); }
+ transform: translateY(calc(100% + 8px)); visibility: hidden; pointer-events: none; transition: transform .25s ease, visibility 0s .25s; }
 
   .gal-cell {
  display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; content-visibility: auto; contain: layout style paint; contain-intrinsic-size: auto 230px; }
