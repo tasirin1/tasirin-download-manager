@@ -3009,7 +3009,12 @@ class DownloadEngine(appContext: Context) {
         )
         try {
             val code = conn.responseCode
-            if (code !in 200..299) return false
+            if (code !in 200..299) {
+                // Badan galat tak dibaca (issue #1243): soket tak bisa
+                // kembali ke pool keep-alive — putuskan eksplisit.
+                runCatching { conn.disconnect() }
+                return false
+            }
             val total = contentLength(conn)
             // Anggaran byte sadar ruang kosong (issue #702): plafon
             // lama 512MB mentah menolak video adaptif panjang yang sah
@@ -3104,6 +3109,12 @@ class DownloadEngine(appContext: Context) {
             }
             progress.downloaded += target.length()
             return target.length() > 0L
+        } catch (e: Exception) {
+            // Jalur galat (issue #1243): badan respons belum tentu
+            // terbaca habis, jadi soket tak layak pool — putuskan
+            // sebelum lepas. Sukses penuh tak diputus (keep-alive).
+            runCatching { conn.disconnect() }
+            throw e
         } finally {
             untrackConnection(item.id, conn)
         }
@@ -3497,6 +3508,11 @@ class DownloadEngine(appContext: Context) {
                 runCatching { input.close() }
             }
             return segBytes
+        } catch (e: Exception) {
+            // Jalur galat (issue #1243): termasuk lemparan HTTP non-2xx
+            // — badan galat tak dibaca, soket tak layak pool.
+            runCatching { segConn.disconnect() }
+            throw e
         } finally {
             untrackConnection(item.id, segConn)
         }
