@@ -1857,7 +1857,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun fsZip(session: IHTTPSession): Response {
-        if (!consumeZipTokenIfPresent(session)) return forbiddenResponse()
+        // Token zt hanya menggerbang request yang BERGANTUNG padanya
+        // (tanpa sesi): request bersesi sah selalu dilayani, termasuk
+        // request Range lanjutan/resume sesudah token terpakai —
+        // gerbang konsumsi tanpa kecuali di sini menolaknya 403 dan
+        // mematahkan unduhan ZIP multi-request (regresi #1190,
+        // issue #1210). Replay tanpa sesi tetap tertolak karena
+        // konsumsi kedua gagal.
+        if (!pinOk(session) && !consumeZipTokenIfPresent(session)) return forbiddenResponse()
         val raw = session.param("path").orEmpty()
         if (raw.isEmpty()) return notFound()
         // Path tanpa awalan f:/m: bukan bentuk yang pernah dikirim klien
@@ -2254,7 +2261,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun mediaZip(session: IHTTPSession): Response {
-        if (!consumeZipTokenIfPresent(session)) return forbiddenResponse()
+        // Token zt hanya menggerbang request yang BERGANTUNG padanya
+        // (tanpa sesi): request bersesi sah selalu dilayani, termasuk
+        // request Range lanjutan/resume sesudah token terpakai —
+        // gerbang konsumsi tanpa kecuali di sini menolaknya 403 dan
+        // mematahkan unduhan ZIP multi-request (regresi #1190,
+        // issue #1210). Replay tanpa sesi tetap tertolak karena
+        // konsumsi kedua gagal.
+        if (!pinOk(session) && !consumeZipTokenIfPresent(session)) return forbiddenResponse()
         val requestedTokens = session.param("tokens").orEmpty()
             .split(",").filter { it.isNotBlank() }.distinct()
         // Path tiba sebagai parameter berulang (issue #849): format
