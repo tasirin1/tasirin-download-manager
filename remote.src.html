@@ -2320,9 +2320,16 @@ const dlPageHeadEl = document.getElementById('dlPageHead');
 const galToolbarEl = document.querySelector('#galleryView .gal-toolbar');
 const fsToolbarEl = document.querySelector('#fsView .gal-toolbar');
 const fabNewBtnEl = document.getElementById('fabNewBtn');
+const fsBatchEl = document.getElementById('fsBatch');
+const galBatchEl = document.getElementById('galBatch');
 const tabbarEl = document.getElementById('tabbar');
 function updateToTop() {
-  toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600);
+  // Bilah batch tampil = to-top ditekan (issue #1337): pada layar sempit
+  // bilah batch membungkus 2 baris dan tepi atasnya menembus pita to-top,
+  // sehingga lingkaran to-top menutupi tombol aksi batch di bawahnya.
+  const batchShown = (fsBatchEl && !fsBatchEl.classList.contains('hidden')) ||
+    (galBatchEl && !galBatchEl.classList.contains('hidden'));
+  toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600 && !batchShown);
 }
 function updateScrollShrink() {
   const y = window.scrollY || 0;
@@ -3491,6 +3498,7 @@ function toggleGalSelect(it, cell) {
 
 function updateGalBatch() {
   galBatch.classList.toggle('hidden', galSelected.size === 0);
+  updateToTop();
   document.getElementById('galBatchCount').textContent = galSelected.size + ' selected';
   let total = 0;
   galSelected.forEach(function (it) { total += it.size || 0; });
@@ -4426,6 +4434,7 @@ function toggleFsSelect(it, row) {
 
 function updateFsBatch() {
   fsBatch.classList.toggle('hidden', fsSelected.size === 0);
+  updateToTop();
   document.getElementById('fsBatchCount').textContent = fsSelected.size + ' selected';
   let total = 0;
   let approx = false;

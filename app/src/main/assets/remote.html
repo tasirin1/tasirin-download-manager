@@ -178,9 +178,13 @@ const dlPageHeadEl = document.getElementById('dlPageHead');
 const galToolbarEl = document.querySelector('#galleryView .gal-toolbar');
 const fsToolbarEl = document.querySelector('#fsView .gal-toolbar');
 const fabNewBtnEl = document.getElementById('fabNewBtn');
+const fsBatchEl = document.getElementById('fsBatch');
+const galBatchEl = document.getElementById('galBatch');
 const tabbarEl = document.getElementById('tabbar');
 function updateToTop() {
-toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600);
+const batchShown = (fsBatchEl && !fsBatchEl.classList.contains('hidden')) ||
+(galBatchEl && !galBatchEl.classList.contains('hidden'));
+toTopBtn.classList.toggle('show', (window.scrollY || 0) > 600 && !batchShown);
 }
 function updateScrollShrink() {
 const y = window.scrollY || 0;
@@ -1144,6 +1148,7 @@ updateGalBatch();
 }
 function updateGalBatch() {
 galBatch.classList.toggle('hidden', galSelected.size === 0);
+updateToTop();
 document.getElementById('galBatchCount').textContent = galSelected.size + ' selected';
 let total = 0;
 galSelected.forEach(function (it) { total += it.size || 0; });
@@ -1935,6 +1940,7 @@ updateFsBatch();
 }
 function updateFsBatch() {
 fsBatch.classList.toggle('hidden', fsSelected.size === 0);
+updateToTop();
 document.getElementById('fsBatchCount').textContent = fsSelected.size + ' selected';
 let total = 0;
 let approx = false;
