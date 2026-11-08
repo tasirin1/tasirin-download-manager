@@ -711,7 +711,27 @@ class DownloadEngine(appContext: Context) {
         disconnectActive(id)
         updateTransformed { daftar -> daftar.filterNot { it.id == id } }
         if (activeConns[id] == null) cancelledConns.remove(id)
-        fileSaver.deleteFiles(item)
+        // Penghapusan pendahulu yang penggantiannya sedang terparkir
+        // (issue #1287): berkas di path pendahulu saat ini milik PENERUS
+        // yang belum terverifikasi — menghapusnya di sini merusak
+        // finalisasi penerus (penerus COMPLETED menunjuk berkas hilang,
+        // atau rollback memulihkan berkas yang entri-nya sudah dibuang).
+        // Byte pendahulu yang sebenarnya adalah cadangan .replaced:
+        // hapus cadangan itu, lepas parkirannya (commit/rollback penerus
+        // menjadi no-op bersih), dan bersihkan sisanya lewat salinan
+        // tanpa filePath (pola commitReplacement) agar berkas terbit
+        // bersama + sidecar penerus tak tersentuh; parsial dan baris
+        // MediaStore pendahulu tetap terhapus.
+        val parkedKey = pendingReplacements.entries
+            .firstOrNull { it.value.predecessor.id == id }?.key
+        val parked = parkedKey?.let { pendingReplacements.remove(it) }
+        if (parked != null) {
+            runCatching { parked.backup.delete() }
+            parked.stale?.let { st -> runCatching { st.delete() } }
+            fileSaver.deleteFiles(item.copy(filePath = null))
+        } else {
+            fileSaver.deleteFiles(item)
+        }
         // Sama seperti cancel (issue #520): menghapus penerus monitor
         // menghidupkan lagi pemantauan pendahulu. Pause sengaja tidak
         // (penerus ter-pause + pendahulu hidup melahirkan penerus
