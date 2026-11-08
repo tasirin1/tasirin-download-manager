@@ -1949,7 +1949,12 @@ class DownloadEngine(appContext: Context) {
     // monitor=false sejak penerus dibuat, dan penerus yang tidak
     // COMPLETED tidak dinilai filter monitor siapa pun lagi.
     private fun hidupkanLagiMonitorPendahulu(item: DownloadItem) {
-        val predId = item.replacesItemId ?: return
+        // replacesItemId non-null (bawaan ""): penjaga kosong harus
+        // eksplisit — Elvis pada String non-null tak pernah terpicu,
+        // jadi item biasa dulu tetap mengalir ke updateItem("") yang
+        // no-op (issue #1129).
+        if (item.replacesItemId.isEmpty()) return
+        val predId = item.replacesItemId
         // Pengguna menyentuh flag pendahulu selama jendela penerus ini
         // (issue #521): keputusan terakhirnya menang — jangan hidupkan
         // paksa. Tanda dikonsumsi agar jendela penerus berikutnya
