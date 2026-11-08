@@ -23,6 +23,7 @@ di komentar/baris terdekat. Tidak ada mekanisme ignore global.
 from __future__ import annotations
 
 import argparse
+import codecs
 import json
 import re
 import sys
@@ -34,6 +35,9 @@ from typing import Callable, Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_FILE_BYTES = 2 * 1024 * 1024
+# Awalan yang diendus untuk berkas berekstensi biner yang terlalu
+# besar bagi uji isi penuh (issue #1125).
+PREFIX_SNIFF_BYTES = 64 * 1024
 IGNORE_RE = re.compile(r"audit-ignore\s*:\s*([A-Za-z0-9_,\s-]+)")
 NEXT_IGNORE_RE = re.compile(r"audit-ignore-next\s*:\s*([A-Za-z0-9_,\s-]+)")
 
@@ -407,6 +411,30 @@ def looks_like_text(path: Path) -> bool:
     return True
 
 
+def looks_like_text_prefix(path: Path) -> bool:
+    """True bila AWAL berkas terbaca sebagai teks UTF-8 polos (issue
+    #1125). Dipakai untuk berkas berekstensi biner yang terlalu besar
+    bagi looks_like_text: awalan yang bersih menandakan berkas itu
+    mungkin teks, jadi ia tidak boleh hilang senyap \u2014 pemilih tetap
+    memasukkannya dan scan_path mencatatnya file_unscanned seperti
+    berkas teks besar (prinsip #344). Decoder inkremental dipakai
+    agar karakter multibyte yang terpotong di ujung awalan tidak
+    dianggap galat."""
+    try:
+        with path.open("rb") as handle:
+            data = handle.read(PREFIX_SNIFF_BYTES)
+    except OSError:
+        return False
+    if b"\x00" in data:
+        return False
+    decoder = codecs.getincrementaldecoder("utf-8")()
+    try:
+        decoder.decode(data, final=False)
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
 def repository_files(root: Path) -> list[Path]:
     import subprocess
 
@@ -457,8 +485,24 @@ def repository_files(root: Path) -> list[Path]:
             # sengaja) dulu lolos total tanpa jejak. Isi yang
             # ter-decode UTF-8 utuh tanpa NUL adalah teks, apa pun
             # ekstensinya, dan tetap dipindai aturan secret.
-            if not looks_like_text(absolute):
+            if looks_like_text(absolute):
+                selected.append(absolute)
                 continue
+            # Berkas terlalu besar bagi uji isi penuh (issue #1125):
+            # bila awalannya bersih seperti teks, berkas ini mungkin
+            # teks besar yang menyandang ekstensi biner \u2014 jangan
+            # hilang senyap. Tetap dipilih agar scan_path mencatatnya
+            # file_unscanned (read_lines menolaknya karena ukuran),
+            # persis perlakuan berkas teks besar (prinsip #344).
+            # Biner besar sungguhan (awalan mengandung NUL / bukan
+            # UTF-8) tetap dilewati seperti sebelumnya.
+            try:
+                oversize = absolute.stat().st_size > MAX_FILE_BYTES
+            except OSError:
+                oversize = False
+            if oversize and looks_like_text_prefix(absolute):
+                selected.append(absolute)
+            continue
         selected.append(absolute)
     return sorted(selected, key=lambda path: path.as_posix())
 

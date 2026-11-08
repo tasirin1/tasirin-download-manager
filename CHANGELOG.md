@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan perkakas: audit keamanan lokal kini mencatat file_unscanned untuk berkas teks besar (>2MB) yang menyandang ekstensi biner, bukan melewatinya tanpa jejak; biner besar sungguhan tetap dilewati seperti sebelumnya (issue #1125).
 - Perbaikan dokumentasi: README folder screenshot dan komentar struktur AGENTS.md kini menyatakan keadaan sebenarnya (belum ada berkas screenshot; nama berkas adalah konvensi untuk saat ditambahkan), bukan seolah ketiganya sudah ada dan tampil di README (issue #1124).
 - Perbaikan CI: pemindaian secret gitleaks kini tetap berjalan pada push yang hanya mengubah Markdown/docs, menutup jendela commit berisi secret di dokumen yang lolos tanpa gerbang apa pun (issue #1123).
 - Perbaikan perkakas: audit keamanan lokal tidak lagi melewati berkas hanya karena ekstensinya terdaftar biner; berkas yang isinya teks UTF-8 polos tetap dipindai aturan secret apa pun ekstensinya (issue #1122).
