@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(remote): teks badge pornhub/tiktok digelapkan ke 4,88/4,94:1** -- Dua varian .platform-badge tema terang berada di bawah ambang 4,5:1 repo (3,79 dan 4,39); warna teks digelapkan sekeluarga, latar dan border tak berubah (issue #1275).
 - **fix(remote): .pill.primary tema gelap kini berlatar #1565C0 (5,75:1)** -- --grad gelap #1E88E5 membuat teks putih hanya 3,68:1 (hover 3,19); override komponen memakai nilai grad terang tanpa mengubah var global (issue #1274).
 - **fix(remote): .gal-check.on tema gelap kini berglyph gelap (7,52:1)** -- Komponen sejenis yang terlewat dari override #1251: centang putih di primer gelap #38BDF8 hanya 2,14:1 (issue #1273).
 - **fix(remote): pesan SSE yang gagal diterapkan kini dihitung sebagai kegagalan** -- Penanda sehat (sseFailCount/lastSseAt) dulu direset sebelum JSON.parse/render di dalam try bercatch kosong, jadi render yang melempar membuat SSE dinilai sehat selamanya dan daftar membeku (dugaan #1272, ditutup defensif). Penanda kini diset sesudah penerapan berhasil; catch menaikkan sseFailCount agar watchdog/polling mengambil alih (issue #1272).
