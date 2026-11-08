@@ -3053,6 +3053,8 @@ window.location.href = API + '/';
 });
 }, LOCK_MS);
 }
+let probeFailures = 0;
+function probe() {
 fetchTimeout(API + '/api/pin_enabled', undefined, 15000).then(function (r) { return r.json(); }).then(function (d) {
 if (!d || !d.enabled) return;
 arm();
@@ -3067,7 +3069,14 @@ document.addEventListener('mousemove', function () {
 const now = Date.now();
 if (now - lastMove > 1000) { lastMove = now; arm(); }
 }, { passive: true });
-}).catch(function () {});
+}).catch(function () {
+probeFailures++;
+if (probeFailures <= 3) {
+setTimeout(probe, [2000, 5000, 15000][probeFailures - 1]);
+}
+});
+}
+probe();
 })();
 function fsUploadJobsFrom(files) {
 return Array.from(files).map(function (f) {

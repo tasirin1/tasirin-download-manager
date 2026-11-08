@@ -5688,6 +5688,13 @@ window.addEventListener('beforeunload', function (e) {
   }
   // Berbatas waktu (issue #829): probe yang menggantung membuat
   // kunci-otomatis tak pernah terpasang selama sesi itu.
+  // Probe dengan retry (issue #1225): satu kegagalan sesaat — server
+  // restart tepat saat halaman dimuat — dulu tertelan catch kosong
+  // dan mematikan kunci-otomatis untuk seluruh sesi tanpa tanda apa
+  // pun. Kini dicoba lagi dengan jeda membesar, menyerah sesudah
+  // tiga kegagalan.
+  let probeFailures = 0;
+  function probe() {
   fetchTimeout(API + '/api/pin_enabled', undefined, 15000).then(function (r) { return r.json(); }).then(function (d) {
     if (!d || !d.enabled) return;
     arm();
@@ -5709,7 +5716,14 @@ window.addEventListener('beforeunload', function (e) {
       const now = Date.now();
       if (now - lastMove > 1000) { lastMove = now; arm(); }
     }, { passive: true });
-  }).catch(function () {});
+  }).catch(function () {
+    probeFailures++;
+    if (probeFailures <= 3) {
+      setTimeout(probe, [2000, 5000, 15000][probeFailures - 1]);
+    }
+  });
+  }
+  probe();
 })();
 
 function fsUploadJobsFrom(files) {
