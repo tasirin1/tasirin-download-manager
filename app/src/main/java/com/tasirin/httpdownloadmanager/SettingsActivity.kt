@@ -788,7 +788,14 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun wireDownloadSettings() {
         binding.checkBackground.setOnClickListener {
-            StoragePrefs.setBackgroundEnabled(this, !StoragePrefs.isBackgroundEnabled(this))
+            val next = !StoragePrefs.isBackgroundEnabled(this)
+            StoragePrefs.setBackgroundEnabled(this, next)
+            // Mematikan background ikut mematikan autostart (issue
+            // #1238): tanpa ini renderChecks menyembuhkan background
+            // kembali ON dan ketukan pengguna tampak ditolak tanpa
+            // penjelasan. Pasangan ditulis bersama, pola handler
+            // background server di berkas ini (#916).
+            if (!next) StoragePrefs.setAutoStartEnabled(this, false)
             renderChecks()
         }
         binding.checkAutostart.setOnClickListener {
