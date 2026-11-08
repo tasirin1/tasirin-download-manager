@@ -1682,7 +1682,22 @@ object SocialMediaExtractor {
     }
 
     private fun extractAllTwitter(url: String): List<Result> {
-        val cleanUrl = url.replace("https://x.com/", "https://twitter.com/")
+        // Deteksi rute menerima x.com TANPA skema (X_URL_RE membuat
+        // skema opsional), tetapi URL() melempar tanpa skema dan
+        // pengecualiannya tertelan pemanggil menjadi daftar kosong —
+        // tempelan "x.com/user/status/..." selalu gagal diam-diam
+        // (issue #1177). Samakan di pintu masuk: beri skema bila
+        // belum ada, petakan juga varian www.x.com seperti detektor.
+        val withScheme = if (url.startsWith("http://", ignoreCase = true) ||
+            url.startsWith("https://", ignoreCase = true)
+        ) {
+            url
+        } else {
+            "https://" + url
+        }
+        val cleanUrl = withScheme
+            .replace("https://www.x.com/", "https://twitter.com/")
+            .replace("https://x.com/", "https://twitter.com/")
         val path = URL(cleanUrl).path
         val json = httpGet("https://api.vxtwitter.com/twitter$path") ?: return emptyList()
         val obj = JSONObject(json)
