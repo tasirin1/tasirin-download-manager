@@ -5279,14 +5279,21 @@ class DownloadEngine(appContext: Context) {
         context.getSharedPreferences("cookies", android.content.Context.MODE_PRIVATE)
     }
     // Debounce cookie write: hindari I/O berlebih saat banyak download selesai simultan
-    private var cookieWriteJob: Job? = null
+    @Volatile private var cookieWriteJob: Job? = null
+    private val cookieWriteLock = Any()
 
     /** Simpan cookie ke SharedPreferences agar persist antar restart. */
     private fun persistCookies() {
-        cookieWriteJob?.cancel()
-        cookieWriteJob = scope.launch {
-            delay(COOKIE_WRITE_DEBOUNCE_MS)
-            persistCookiesImmediate()
+        // Cancel+pasang di bawah satu kunci (issue #1320): persistCookies
+        // dipanggil dari banyak thread penyelesaian unduhan; tanpa kunci,
+        // dua panggilan bisa saling timpa referensi job — job yang kalah
+        // tak terbatalkan dan debounce kalah oleh tulis ganda.
+        synchronized(cookieWriteLock) {
+            cookieWriteJob?.cancel()
+            cookieWriteJob = scope.launch {
+                delay(COOKIE_WRITE_DEBOUNCE_MS)
+                persistCookiesImmediate()
+            }
         }
     }
 
