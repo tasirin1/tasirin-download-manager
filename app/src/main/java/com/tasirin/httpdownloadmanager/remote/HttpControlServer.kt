@@ -2034,18 +2034,24 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         } ?: "u-null"
     }.getOrDefault("u-err")
 
-    /** Cap sumber folder MediaStore (issue #961): jumlah baris +
-     *  jumlah SIZE + DATE_MODIFIED terbesar di bawah folder, dari satu
-     *  kueri dengan seleksi LIKE yang sama seperti zipMedia.
-     *  Granularitas DATE_MODIFIED detik: perubahan isi berukuran sama
-     *  dalam detik yang sama masih bisa lolos — jendela basi menyusut
-     *  dari 60 detik menjadi sekitar satu detik. */
+    /** Cap sumber folder MediaStore (issue #961, diperkuat #1167):
+     *  jumlah baris + jumlah SIZE + DATE_MODIFIED terbesar + JUMLAH
+     *  DATE_MODIFIED + campuran _ID di bawah folder, dari satu kueri
+     *  dengan seleksi LIKE yang sama seperti zipMedia. Agregat lama
+     *  (count:sum:maxMod) buta terhadap penggantian berkas yang
+     *  mempertahankan ketiganya — mis. berkas hasil pemulihan
+     *  berstempel lama mengganti berkas bukan-termuda: sumMod menangkap
+     *  perubahan stempel baris mana pun dan idMix menangkap
+     *  hapus-buat-ulang. Granularitas DATE_MODIFIED detik: perubahan
+     *  isi berukuran sama dalam detik yang sama masih bisa lolos —
+     *  jendela basi menyusut dari 60 detik menjadi sekitar satu detik. */
     private fun zipMediaFolderStamp(relative: String): String {
         if (Build.VERSION.SDK_INT < 29) return "pre29"
         val base = relative.trim('/')
         val folder = base + "/"
         val collection = MediaLibrary.mediaCollectionForRoot(base)
         val projection = arrayOf(
+            MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DATE_MODIFIED
         )
@@ -2054,22 +2060,30 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return runCatching {
             context.contentResolver.query(collection, projection, selection, args, null)
                 ?.use { c ->
+                    val iId = c.getColumnIndex(MediaStore.MediaColumns._ID)
                     val iSize = c.getColumnIndex(MediaStore.MediaColumns.SIZE)
                     val iMod = c.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED)
                     var count = 0
                     var sum = 0L
                     var maxMod = 0L
+                    var sumMod = 0L
+                    var idMix = 0L
                     while (c.moveToNext()) {
                         count++
+                        if (iId >= 0) {
+                            val id = runCatching { c.getLong(iId) }.getOrDefault(0L)
+                            idMix = idMix * 31 + id
+                        }
                         if (iSize >= 0) {
                             sum += runCatching { c.getLong(iSize) }.getOrDefault(0L)
                         }
                         if (iMod >= 0) {
                             val m = runCatching { c.getLong(iMod) }.getOrDefault(0L)
+                            sumMod += m
                             if (m > maxMod) maxMod = m
                         }
                     }
-                    "m$count:$sum:$maxMod"
+                    "m$count:$sum:$maxMod:$sumMod:$idMix"
                 } ?: "m-null"
         }.getOrDefault("m-err")
     }
