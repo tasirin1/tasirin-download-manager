@@ -68,7 +68,12 @@ self.addEventListener('fetch', (event) => {
         // berikutnya. Cabang aset statis di atas sudah menjaga sama.
         if (res && res.ok) {
           const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
+          // Masa hidup event diperpanjang sampai tulis cache selesai
+          // (issue #1204, pola #1109 di cabang statis): tanpa
+          // waitUntil, browser boleh menghentikan worker sesudah
+          // respons disajikan dan salinan terbaru hilang diam-diam,
+          // sehingga fallback offline tetap menyajikan versi lama.
+          event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)));
         }
         return res;
       }).catch(() => caches.match(req).then((hit) => hit || caches.match('./')))
