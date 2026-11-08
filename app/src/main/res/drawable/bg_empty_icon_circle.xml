@@ -5,7 +5,7 @@
     <!-- Bayangan bawah: offset kecil + ~5% opasitas -->
     <item android:top="2dp">
         <shape android:shape="oval">
-            <solid android:color="#0D10141C" />
+            <solid android:color="#0D1565C0" />
         </shape>
     </item>
     <!-- Badan tonal flat -->

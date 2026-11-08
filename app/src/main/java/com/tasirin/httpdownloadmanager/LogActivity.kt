@@ -313,7 +313,7 @@ class LogActivity : AppCompatActivity() {
                 lineContains(text, lineStart, end, "FAILED")
             ) {
                 sb.setSpan(
-                    ForegroundColorSpan(0xFFF87171.toInt()), // merah palet tema gelap (issue #712), bukan Color.RED mentah
+                    ForegroundColorSpan(0xFFC62828.toInt()), // merah palet tema terang (issue #712), bukan Color.RED mentah
                     lineStart, end, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
             }

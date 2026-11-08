@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Tombol sekunder tema gelap: kaca transparan + garis tepi terang;
+<!-- Tombol sekunder tema terang: putih + garis tepi halus;
      fokus D-pad = ring aksen. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
@@ -11,7 +11,7 @@
     </item>
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <solid android:color="#26FFFFFF" />
+            <solid android:color="#1A1565C0" />
             <stroke android:width="1dp" android:color="@color/home_glass_stroke" />
             <corners android:radius="999dp" />
         </shape>

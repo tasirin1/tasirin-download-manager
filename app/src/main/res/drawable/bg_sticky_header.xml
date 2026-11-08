@@ -3,7 +3,7 @@
     <!-- Badan sticky header -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#E60D1738" />
+            <solid android:color="#E6F2F4F8" />
         </shape>
     </item>
     <!-- Garis bawah tipis -->
