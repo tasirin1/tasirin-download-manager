@@ -784,9 +784,11 @@ def scan_text(
     # bersarang ala foo() / COUNT(*) hasil formatter) boleh dilewati agar
     # bocoran multi-baris bersarang tetap tertangkap (issue #216).
     # Pola sarangnya DIBANGUN berjenjang oleh _pola_rentang_bersarang
-    # sampai ENAM tingkat: pola tulis-tangan berhenti di tiga dan
+    # sampai SEPULUH tingkat: pola tulis-tangan berhenti di tiga dan
     # sarang 4/5 lolos (issue #313; sejarah: #240 dua tingkat,
-    # #272 tiga tingkat).
+    # #272 tiga tingkat, #1309 enam -> sepuluh sesudah probe sarang
+    # 7 lolos). Sisa kelas yang diakui: sarang >10 dalam satu
+    # pernyataan multi-baris — di luar jangkauan formatter mana pun.
     # Alternatif pola tetap terpisah tegas menurut karakter pertama
     # (kurung buka vs bukan kurung) agar backtracking tetap linear.
     # Lintasan ini berjalan pada salinan yang isi literal string/char-nya
@@ -802,7 +804,7 @@ def scan_text(
         long_pattern = re.compile(
             rule.pattern.replace(
                 "[^;\\n]*",
-                _pola_rentang_bersarang(6),
+                _pola_rentang_bersarang(10),
             ),
             rule.flags,
         )
