@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Tombol utama kartu unduhan tema terang: gradasi biru Vaultwarden; fokus D-pad = ring aksen. -->
+<!-- Tombol utama kartu unduhan tema terang: biru solid Vaultwarden; fokus D-pad = ring aksen. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="0" android:startColor="#1E88E5" android:endColor="#1565C0" android:type="linear" />
+            <solid android:color="@color/primary" />
             <stroke android:width="3dp" android:color="@color/accent" /><corners android:radius="999dp" />
         </shape>
     </item>
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="0" android:startColor="#1565C0" android:endColor="#0D47A1" android:type="linear" />
+            <solid android:color="@color/primary_dark" />
             <corners android:radius="999dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="0" android:startColor="#1E88E5" android:endColor="#1565C0" android:type="linear" />
+            <solid android:color="@color/primary" />
             <corners android:radius="999dp" />
         </shape>
     </item>

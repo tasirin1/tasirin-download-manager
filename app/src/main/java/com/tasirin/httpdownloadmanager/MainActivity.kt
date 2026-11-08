@@ -22,7 +22,6 @@ import android.view.WindowManager
 import android.view.MenuItem
 import java.util.Locale
 import android.view.View
-import android.view.animation.AnimationUtils
 import androidx.core.view.isVisible
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.download.HlsRendition
@@ -368,20 +367,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     val showEmpty = items.isEmpty() && App.engine.isInitialLoadComplete()
                     binding.emptyView.visibility =
                         if (showEmpty) View.VISIBLE else View.GONE
-                    // Animasi jalan di anak (getChildAt(0)): guard wajib baca
-                    // animation anak yang sama — animation parent selalu null
-                    // sehingga pulse di-reload+restart tiap tick progres.
-                    val emptyChild = binding.emptyView.getChildAt(0)
-                    if (showEmpty && emptyChild?.animation == null) {
-                        runCatching {
-                            val pulse = AnimationUtils.loadAnimation(
-                                this@MainActivity, R.anim.pulse
-                            )
-                            emptyChild?.startAnimation(pulse)
-                        }
-                    } else if (!showEmpty) {
-                        emptyChild?.clearAnimation()
-                    }
+                    // Empty state statis tanpa animasi pulse (penyederhanaan
+                    // tampilan, permintaan owner 2026-11-08).
                     if (items.isEmpty() && !App.engine.isInitialLoadComplete() &&
                         emptyGateJob?.isActive != true
                     ) {
@@ -393,16 +380,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                             App.engine.awaitInitialLoad()
                             if (lastItems.isEmpty()) {
                                 binding.emptyView.visibility = View.VISIBLE
-                                val child = binding.emptyView.getChildAt(0)
-                                if (child?.animation == null) {
-                                    runCatching {
-                                        child?.startAnimation(
-                                            AnimationUtils.loadAnimation(
-                                                this@MainActivity, R.anim.pulse
-                                            )
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
