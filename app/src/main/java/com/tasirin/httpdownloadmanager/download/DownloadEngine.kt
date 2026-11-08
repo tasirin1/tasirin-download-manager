@@ -3339,7 +3339,13 @@ class DownloadEngine(appContext: Context) {
                 throw e
             } catch (e: Exception) {
                 val msg = e.message.orEmpty()
-                val denied = msg.contains("404") || msg.contains("403")
+                // Jangkar pada bentuk pesan status segmen sendiri
+                // (issue #1186): substring angka telanjang "404"/"403"
+                // atas seluruh pesan ikut menangkap pesan non-HTTP yang
+                // kebetulan memuat digit itu (mis. hitungan byte pesan
+                // terpotong "got 40312 of ...").
+                val denied = msg.startsWith("HLS segment HTTP 404") ||
+                    msg.startsWith("HLS segment HTTP 403")
                 if (denied && fallbackQuery.isNotEmpty() && !url.contains("?")) {
                     // Jangan mulai unduhan segmen baru dalam konteks yang
                     // sudah dibatalkan (pause): jalur langsung ini tidak
