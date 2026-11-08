@@ -587,18 +587,23 @@ object ZipCreator {
                 val iRel = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
                 val iSize = c.getColumnIndex(MediaStore.MediaColumns.SIZE)
                 while (c.moveToNext()) {
-                    if (!budget.tryTake()) {
-                        // Baris ini dan sisanya tak terkunjungi:
-                        // terhitung terlewat (selaras issue #884).
-                        if (c.count > 0) skipped += c.count - c.position
-                        break
+                    // Baris tersaring dihitung terlewat dan TIDAK memakan
+                    // budget (issue #1141, menyelaraskan doktrin #1062/
+                    // #884 di jalur lain berkas ini): saringan ini nyata —
+                    // LIKE SQL tak peka huruf sedangkan startsWith peka,
+                    // jadi baris beda kapital dari folder selalu ada.
+                    val relPath = c.getString(iRel)
+                    val name = c.getString(iName)
+                    if (relPath == null || name == null || !relPath.startsWith(folder)) {
+                        skipped++
+                        continue
                     }
-                    val relPath = c.getString(iRel) ?: continue
-                    val name = c.getString(iName) ?: continue
-                    if (!relPath.startsWith(folder)) continue
                     val dirPart = relPath.removePrefix(folder).trimEnd('/')
                     val rawEntry = safeEntryPath(if (dirPart.isEmpty()) name else "$dirPart/$name")
-                    if (rawEntry.isEmpty()) continue
+                    if (rawEntry.isEmpty()) {
+                        skipped++
+                        continue
+                    }
                     val entry = uniqueZipName(rawEntry, used)
                     // Gagal MEMBUKA entri = entri terlewat (selaras
                     // issue #857); gagal MENYALIN di tengah tetap fatal.
@@ -610,6 +615,16 @@ object ZipCreator {
                     if (input == null) {
                         skipped++
                     } else {
+                        // Budget diambil sesudah sumber terbukti bisa
+                        // dibuka dan hanya untuk entri yang sungguh akan
+                        // ditulis (pola zipFile, issue #1062). Penolakan
+                        // budget: stream wajib ditutup, baris ini dan
+                        // sisanya terhitung terlewat (issue #884).
+                        if (!budget.tryTake()) {
+                            runCatching { input.close() }
+                            if (c.count > 0) skipped += c.count - c.position
+                            break
+                        }
                         val expected = if (iSize >= 0) {
                             runCatching { c.getLong(iSize) }.getOrDefault(-1L)
                         } else {
