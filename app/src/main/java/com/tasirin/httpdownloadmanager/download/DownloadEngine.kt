@@ -2009,7 +2009,13 @@ class DownloadEngine(appContext: Context) {
         // utuh menggagalkan permanen URL asing yang query-nya memuat
         // string itu padahal 403-nya bisa sesaat.
         val itemHost = urlHostOf(item.url)
+        // Pesan segmen HLS dikecualikan (issue #1185): "HLS segment
+        // HTTP 403" berasal dari fetch segmen yang host-nya bisa beda
+        // dan 403-nya bisa sesaat (rate-limit CDN) — mengklasifikasikan
+        // nya sebagai blokir n-signature permanen membunuh item yang
+        // masih bisa pulih lewat retry/ekstraksi ulang.
         val ytSignatureBlocked = message?.contains("HTTP 403") == true &&
+            message?.startsWith("HLS segment HTTP") != true &&
             (itemHost == "googlevideo.com" || itemHost.endsWith(".googlevideo.com") ||
                 SocialMediaExtractor.isYouTubeUrl(item.url))
         if (ytSignatureBlocked) {
