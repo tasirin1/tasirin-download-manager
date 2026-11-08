@@ -433,6 +433,19 @@ class ServerSecurityTest {
     }
 
     @Test
+    fun loginNonce_terikatIpDanWaktu() {
+        // Issue #1219: nonce form login harus menolak IP lain, expiry
+        // lewat, secret salah, dan bentuk rusak.
+        val nonce = ServerSecurity.createLoginNonce("192.168.1.5", 10_000L, "secret")
+        assertTrue(ServerSecurity.isLoginNonceValid(nonce, "192.168.1.5", 9_999L, "secret"))
+        assertFalse(ServerSecurity.isLoginNonceValid(nonce, "192.168.1.6", 9_999L, "secret"))
+        assertFalse(ServerSecurity.isLoginNonceValid(nonce, "192.168.1.5", 10_001L, "secret"))
+        assertFalse(ServerSecurity.isLoginNonceValid(nonce, "192.168.1.5", 9_999L, "wrong"))
+        assertFalse(ServerSecurity.isLoginNonceValid(null, "192.168.1.5", 9_999L, "secret"))
+        assertFalse(ServerSecurity.isLoginNonceValid("garbage", "192.168.1.5", 9_999L, "secret"))
+    }
+
+    @Test
     fun partialToken_validDanKedaluwarsa() {
         val token = ServerSecurity.createPartialToken("abc", 1000L, "secret")
         assertTrue(ServerSecurity.isPartialTokenValid(token, "abc", 999L, "secret"))

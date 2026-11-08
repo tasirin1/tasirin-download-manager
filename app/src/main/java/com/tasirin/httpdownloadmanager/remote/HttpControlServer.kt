@@ -321,7 +321,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         "Not found"
                     )
                 }
-                session.method == Method.GET && session.uri == "/" -> loginPage("")
+                session.method == Method.GET && session.uri == "/" ->
+                    loginPage("", loginNonceFor(session.remoteIpAddress.ifEmpty { "unknown" }))
                 else -> unauthorized()
             }
         } catch (e: RejectedExecutionException) {
@@ -732,9 +733,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (ServerSecurity.isPinLocked(now, attempt.lockedUntil)) {
             val waitSec = ((attempt.lockedUntil - now) / 1000) + 1
             // Body POST tak dibaca saat terkunci: tutup koneksi agar tak desync.
-            return loginPage("Too many attempts. Try again in $waitSec seconds.").closeConnection()
+            return loginPage(
+                "Too many attempts. Try again in $waitSec seconds.", loginNonceFor(ip)
+            ).closeConnection()
         }
         val params = readForm(session)
+        // Nonce CSRF (issue #1219): tanpa nonce sah request ditolak
+        // SEBELUM verifikasi PIN, jadi auto-submit lintas-origin dari
+        // halaman jahat tak bisa menggerus throttle dan mengunci IP
+        // pemilik sendiri. Penolakan nonce tidak dihitung sebagai
+        // kegagalan PIN.
+        if (!ServerSecurity.isLoginNonceValid(
+                params["nonce"], ip, now, StoragePrefs.serverSessionSecret(context)
+            )
+        ) {
+            appendLog("LOGIN REJECTED: missing/invalid nonce (from $ip)")
+            return loginPage("Session expired, try again.", loginNonceFor(ip))
+        }
         val pin = params["pin"].orEmpty()
         val stored = storedPinHash()
         return if (stored != null && StoragePrefs.pinMatches(context, pin)) {
@@ -774,7 +789,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             } else {
                 appendLog("LOGIN FAILED: wrong PIN (attempt $failures, from $ip)")
             }
-            loginPage("Wrong PIN, try again.")
+            loginPage("Wrong PIN, try again.", loginNonceFor(ip))
         }
     }
 
@@ -801,7 +816,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return r
     }
 
-    private fun loginPage(error: String): Response {
+    /** Cetak nonce CSRF untuk halaman login dari [ip] peminta
+     *  (issue #1219). */
+    private fun loginNonceFor(ip: String): String =
+        ServerSecurity.createLoginNonce(
+            ip,
+            System.currentTimeMillis() + LOGIN_NONCE_TTL_MS,
+            StoragePrefs.serverSessionSecret(context)
+        )
+
+    private fun loginPage(error: String, nonce: String): Response {
         // Escape di titik tenggelam (issue #1031): semua pemanggil hari
         // ini mengisi konstanta/angka server sehingga belum ada XSS
         // aktif, tetapi interpolasi mentah berarti satu pemanggil masa
@@ -950,6 +974,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
   <h1>Tasirin Download Manager</h1>
   <p class="sub">Remote server locked &middot; enter the PIN to continue</p>
   <form method="POST" action="/api/login" autocomplete="off">
+    <input type="hidden" name="nonce" value="$nonce">
     <label for="pin">PIN</label>
     <div class="field">
       <input type="password" id="pin" name="pin" placeholder="&#9679;&#9679;&#9679;&#9679;" inputmode="numeric" autofocus>
@@ -4661,6 +4686,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         private const val MAX_LOGIN_ATTEMPT_ENTRIES = 512
         private const val MAX_SHARE_TOKENS = 256
         private const val ZIP_DL_TTL_MS = 120_000L
+        /** Umur nonce CSRF halaman login (issue #1219). */
+        private const val LOGIN_NONCE_TTL_MS = 600_000L
         private const val MAX_ZIP_DL_TOKENS = 16
         private const val MAX_MEDIA_ZIP_TOKENS = 256
         private const val FS_STATS_TTL_MS = 10_000L

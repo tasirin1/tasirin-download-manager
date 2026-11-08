@@ -18,6 +18,8 @@ object ServerSecurity {
      *  sehingga tanpa header ini bisa dipicu CSRF via tag img/media. */
     fun isStateChangeAllowed(method: String, uri: String, requestedWith: String?): Boolean {
         if (method.equals("POST", ignoreCase = true)) {
+            // Login dikecualikan dari syarat header (form polos), tetapi
+            // dilindungi nonce HMAC di handler-nya (issue #1219).
             if (uri == "/api/login") return true
             return requestedWith == "XMLHttpRequest"
         }
@@ -368,6 +370,29 @@ object ServerSecurity {
         if (expiresAt < now) return false
         val expected = hmacSha256Hex(secret, "upload:${parts[0]}.${parts[1]}")
         return StoragePrefs.constantEquals(parts[2], expected)
+    }
+
+    /** Nonce CSRF halaman login (issue #1219): token HMAC tanpa state
+     *  berbentuk "expiry.signature" dengan domain "login:". Form HTML
+     *  polos tak bisa memasang header X-Requested-With, jadi /api/login
+     *  dikecualikan dari syarat header itu — sebagai gantinya form
+     *  membawa nonce ini. Halaman jahat tak bisa MEMBACA halaman login
+     *  lintas-origin (SOP), jadi tak bisa memperoleh nonce; auto-submit
+     *  tebakannya tertolak sebelum menyentuh verifikasi PIN. HMAC
+     *  mengikat IP penerbit + expiry, jadi nonce curian dari klien lain
+     *  atau yang kedaluwarsa tak berlaku. */
+    fun createLoginNonce(ip: String, expiresAt: Long, secret: String): String =
+        "$expiresAt.${hmacSha256Hex(secret, "login:$ip.$expiresAt")}"
+
+    fun isLoginNonceValid(nonce: String?, ip: String, now: Long, secret: String): Boolean {
+        val clean = nonce?.trim().orEmpty()
+        if (clean.length > MAX_TOKEN_LEN) return false
+        val parts = clean.split('.')
+        if (parts.size != 2) return false
+        val expiresAt = parts[0].toLongOrNull() ?: return false
+        if (expiresAt < now) return false
+        val expected = hmacSha256Hex(secret, "login:$ip.${parts[0]}")
+        return StoragePrefs.constantEquals(parts[1], expected)
     }
 
     /** HMAC-SHA256 hex murni JVM (tanpa Android) supaya bisa diuji unit. */
