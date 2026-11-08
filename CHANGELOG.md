@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(build): kualifikasi Streams yang tak ada di fetchText** -- Perbaikan #1258 memanggil Streams.readBoundedFlagged padahal fungsi itu top-level yang diimpor langsung; CI merah "Unresolved reference 'Streams'". Kualifikasi dibuang (Refs #1258).
 - **test(util): uji untuk extractBalancedPlayerResponse** -- Pemindai kurung sadar-string/escape jalur YouTube-dari-halaman kini dikunci 8 kasus (bersarang, kurung dalam string, kutip ter-escape, awalan identifier lebih panjang, tak seimbang, bukan objek); ekspektasi dibuktikan port Python 1:1 sebelum ditulis (issue #1283).
 - **fix(ui): progressSig kini memuat progressPercentOverride** -- Flip override pada HLS 0-byte mengganti format label progres di adapter tetapi tak mengubah tanda tangan, jadi label tertahan sampai perubahan lain memicu kiriman (issue #1282).
 - **fix(ui): lapisan teks galeri dipergelap ke alfa 60% (5,14:1)** -- Nama/info putih di atas placeholder tanpa thumbnail hanya 2,90:1 pada alfa 40%; alfa 60% menembus ambang dan ikut menolong keterbacaan di atas thumbnail sungguhan (issue #1281).

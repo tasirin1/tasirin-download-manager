@@ -3929,7 +3929,7 @@ class DownloadEngine(appContext: Context) {
                 // penanda, playlist media sah > plafon divonis live palsu
                 // karena ENDLIST-nya hilang. Pemanggil lain tetap polos.
                 if (failOnTruncate) {
-                    val r = Streams.readBoundedFlagged(conn.inputStream, maxBytes)
+                    val r = readBoundedFlagged(conn.inputStream, maxBytes)
                     // Lemparan di dalam runCatching akan tertelan getOrNull,
                     // jadi keterpotongan dicatat ke penanda luar (pola
                     // httpError di fungsi ini) dan dilempar sesudahnya.
