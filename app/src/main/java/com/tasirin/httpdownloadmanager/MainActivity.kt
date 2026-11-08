@@ -89,6 +89,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private var summaryFailed = 0
     private var summaryDone = 0
     private var lastItems: List<DownloadItem> = emptyList()
+    /** Kedatangan ke section terlipat yang belum dilihat pengguna
+     *  (issue #1285): kunci section -> jumlah; dibersihkan saat section
+     *  dibuka. Hanya di memori (sesi berjalan). */
+    private val unseenSectionCounts = mutableMapOf<String, Int>()
+    /** State terakhir tiap item khusus pelacakan lencana di atas —
+     *  peta sendiri agar tak terikat cabang auto-open yang menahan
+     *  pembaruan lastItemStates selama di latar. */
+    private var lastStatesForUnseen = mutableMapOf<String, DownloadState>()
     // Throttle submitList: emisi StateFlow tiap detik tidak perlu rebuild penuh
     // bila struktur daftar sama; toolbar teks hanya update saat hitungan berubah.
     private var lastUiSubmitMs = 0L
@@ -302,6 +310,29 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             App.engine.items.collect { items ->
                 val sizeChanged = items.size != lastItems.size
                 lastItems = items
+                // Lencana section terlipat (issue #1285): transisi menuju
+                // COMPLETED/FAILED/CANCELLED saat section tujuannya
+                // sedang terlipat dihitung sebagai kedatangan yang belum
+                // dilihat — prev wajib ada agar muatan awal tidak ikut
+                // terhitung (pola gerbang auto-open).
+                for (item in items) {
+                    val prev = lastStatesForUnseen[item.id]
+                    if (prev != null && prev != item.state) {
+                        val key = when (item.state) {
+                            DownloadState.COMPLETED -> "section_completed"
+                            DownloadState.FAILED, DownloadState.CANCELLED -> "section_failed"
+                            else -> null
+                        }
+                        if (key != null && StoragePrefs.isSectionCollapsed(this@MainActivity, key)) {
+                            unseenSectionCounts[key] = (unseenSectionCounts[key] ?: 0) + 1
+                        }
+                    }
+                    lastStatesForUnseen[item.id] = item.state
+                }
+                if (lastStatesForUnseen.size > items.size * 2 + 16) {
+                    val keep = items.asSequence().map { it.id }.toSet()
+                    lastStatesForUnseen.keys.retainAll(keep)
+                }
                 // Auto-open file yang baru selesai (video → player; APK → installer).
                 // Hanya saat activity di depan (STARTED): collector ini jalan
                 // di lifecycleScope polos sehingga tetap aktif saat STOPPED,
@@ -335,7 +366,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     if (sizeChanged || (sig != lastProgressSig && now - lastUiSubmitMs >= 400L)) {
                         lastUiSubmitMs = now
                         lastProgressSig = sig
-                        adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items))
+                        adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items, unseenSectionCounts))
                     } else if (sig != lastProgressSig &&
                         trailingSubmitJob?.isActive != true
                     ) {
@@ -353,7 +384,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                                 lastProgressSig = latestSig
                                 adapter.submitList(
                                     DownloadAdapter.buildSections(
-                                        this@MainActivity, latest
+                                        this@MainActivity, latest, unseenSectionCounts
                                     )
                                 )
                             }
@@ -1621,7 +1652,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     override fun onToggleSection(key: String) {
         val collapsed = StoragePrefs.isSectionCollapsed(this, key)
         StoragePrefs.setSectionCollapsed(this, key, !collapsed)
-        adapter.submitList(DownloadAdapter.buildSections(this, lastItems))
+        // Membuka section = pengguna melihat isinya: lencana kedatangan
+        // untuk section itu gugur (issue #1285).
+        if (collapsed) unseenSectionCounts.remove(key)
+        adapter.submitList(DownloadAdapter.buildSections(this, lastItems, unseenSectionCounts))
         updateStickyHeader()
     }
 

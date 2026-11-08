@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -24,7 +25,11 @@ sealed class DownloadRow {
         val title: String,
         val count: Int,
         val collapsed: Boolean,
-        val key: String
+        val key: String,
+        // Item yang tiba di section ini SELAMA terlipat (issue #1285):
+        // tanpa lencana ini kedatangannya tak berjejak selain angka
+        // hitung yang naik diam-diam.
+        val unseen: Int = 0
     ) : DownloadRow()
     data class Item(val item: DownloadItem) : DownloadRow()
 }
@@ -92,6 +97,16 @@ class DownloadAdapter(private val listener: Listener) :
         val b = holder.binding
         b.textSectionTitle.text = row.title
         b.textSectionCount.text = row.count.toString()
+        // Lencana kedatangan selama terlipat (issue #1285).
+        if (row.unseen > 0) {
+            b.textSectionNew.isVisible = true
+            setTextIfChanged(
+                b.textSectionNew,
+                b.root.context.getString(R.string.section_new_badge, row.unseen)
+            )
+        } else {
+            b.textSectionNew.isVisible = false
+        }
         val chevron = if (row.collapsed) R.drawable.ic_chevron else R.drawable.ic_chevron_up
         b.sectionDot.backgroundTintList = cachedTint(b.root.context, sectionDotColor(row.key))
         b.sectionChevron.imageTintList = cachedTint(b.root.context, R.color.home_text_secondary)
@@ -349,14 +364,21 @@ class DownloadAdapter(private val listener: Listener) :
         /** Bangun daftar ber-section: Active → Paused → Completed → Failed.
          *  Section yang collapse (StoragePrefs.collapsed_sections) memakai
          *  header dan menyembunyikan item-nya. */
-        fun buildSections(context: android.content.Context, items: List<DownloadItem>): List<DownloadRow> {
+        fun buildSections(
+            context: android.content.Context,
+            items: List<DownloadItem>,
+            unseen: Map<String, Int> = emptyMap()
+        ): List<DownloadRow> {
             val rows = mutableListOf<DownloadRow>()
             // Kunci literal = hasil getResourceEntryName(section_*): hindari
             // lookup resource 4x per tick 400ms saat download aktif.
             fun addGroup(labelRes: Int, key: String, group: List<DownloadItem>) {
                 if (group.isEmpty()) return
                 val collapsed = StoragePrefs.isSectionCollapsed(context, key)
-                rows.add(DownloadRow.Header(context.getString(labelRes), group.size, collapsed, key))
+                // Lencana hanya untuk section terlipat, dibatasi jumlah
+                // grup agar tak mengklaim lebih dari yang ada (issue #1285).
+                val badge = if (collapsed) minOf(unseen[key] ?: 0, group.size) else 0
+                rows.add(DownloadRow.Header(context.getString(labelRes), group.size, collapsed, key, badge))
                 if (!collapsed) group.forEach { rows.add(DownloadRow.Item(it)) }
             }
             // Satu pass pengelompokan (bukan 4x filter): dipanggil pada tiap
