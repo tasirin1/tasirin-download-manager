@@ -1197,7 +1197,10 @@
   .mm-vol {
  -webkit-appearance: none; appearance: none; width: 105px; height: 26px; border-radius: 999px; background: transparent; outline: none; flex: 0 0 auto; touch-action: manipulation; }
 
-  @media (hover: hover) {
+  /* Slider hanya dilipat pada penunjuk presisi (issue #1363): perangkat
+     yang melaporkan hover tetapi dikendalikan D-pad/sentuh (peramban TV)
+     dulu menyembunyikan slider total sampai fokus kebetulan mendarat. */
+  @media (hover: hover) and (pointer: fine) {
     .mm-vol {
       width: 0;
       margin-left: -4px;
@@ -1210,6 +1213,16 @@
     .mm-vol-group:focus-within .mm-vol {
       width: 135px;
       margin-left: 2px;
+      opacity: 1;
+      overflow: visible;
+    }
+  }
+
+  /* Tanpa hover: slider tampil penuh dengan lebar normal (issue #1363). */
+  @media (hover: none) {
+    .mm-vol {
+      width: 105px;
+      margin-left: 0;
       opacity: 1;
       overflow: visible;
     }
