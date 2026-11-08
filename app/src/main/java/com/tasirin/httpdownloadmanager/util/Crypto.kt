@@ -111,11 +111,11 @@ object Crypto {
         return !payload.startsWith(PREFIX)
     }
 
-    /** Dekripsi; nilai lama tanpa prefix dianggap plaintext (data lama). */
     /** True bila payload berformat terenkripsi v1: (bukan plaintext/plain:). */
     fun isEncrypted(payload: String?): Boolean =
         payload?.startsWith(PREFIX) == true
 
+    /** Dekripsi; nilai lama tanpa prefix dianggap plaintext (data lama). */
     fun decrypt(payload: String?): String {
         if (payload.isNullOrEmpty()) return ""
         if (payload.startsWith(PLAIN_PREFIX)) return payload.removePrefix(PLAIN_PREFIX)
