@@ -925,8 +925,12 @@
   /* Ikut auto-hide chrome (issue #1340): meluncur bersama tab bar,
      bukan menggantung sendirian di atas ruang kosong. 68px = labuh
      bottom bilah (60px + celah) agar lenyap tuntas dari layar. */
+  /* Sembunyi tuntas seperti tab bar (issue #1366, kelas #1365):
+     visibility + pointer-events agar tombol bilah yang sedang
+     tersembunyi tidak bisa difokus/diketuk; visibility bertransisi
+     tertunda .25s agar animasi geser keluar tetap terlihat. */
   .fs-batch.batch-hide {
- transform: translateY(calc(100% + 68px)); }
+ transform: translateY(calc(100% + 68px)); visibility: hidden; pointer-events: none; transition: transform .25s ease, visibility 0s .25s; }
 
   .fs-batch .fs-batch-count-box {
  display: flex; align-items: center; gap: 8px; margin-right: auto; min-width: 0; }
