@@ -1722,12 +1722,14 @@
 
 .thumb-broken{visibility:hidden}
   /* Hormati preferensi gerak minim: matikan animasi toast, transisi
-     bar progres, dan animasi masuk bottom-sheet (sheetFade/sheetUp
-     dulu terlewat dari cakupan blok ini, issue #1201). */
+     bar progres, animasi masuk bottom-sheet (sheetFade/sheetUp
+     terlewat sampai #1201), dan putaran spinner pemilih media
+     (mmSpin terlewat sampai #1226). */
   @media (prefers-reduced-motion: reduce) {
     .toast { animation: none; }
     .fill { transition: none; }
     .sheet:not(.hidden), .sheet:not(.hidden) .sheet-box { animation: none; }
+    .mm-spin { animation: none; }
   }
 </style>
 </head>
