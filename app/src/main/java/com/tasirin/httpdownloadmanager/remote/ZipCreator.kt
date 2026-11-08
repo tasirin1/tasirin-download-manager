@@ -466,6 +466,25 @@ object ZipCreator {
                 if (shallowBudget > 0) {
                     val kidArr = queued.listFiles()
                     if (kidArr != null) {
+                        // Agregat atas SEMUA anak (issue #1223): seleksi
+                        // nama-terkecil di bawah hanya melipat sebagian
+                        // anak, jadi perubahan pada anak di luar seleksi
+                        // (urutan nama besar) tak menggerakkan cap.
+                        // Jumlah anak + total ukuran + mtime maksimum
+                        // murah dihitung dari array yang sudah diambil
+                        // ini (iterasi yang sama seperti seleksi heap)
+                        // dan menutup celah itu; isi cucu di kedalaman
+                        // >=2 tetap di luar jangkauan cap dangkal.
+                        var sizeSum = 0L
+                        var maxMtime = 0L
+                        for (kid in kidArr) {
+                            sizeSum += kid.length()
+                            val mt = kid.lastModified()
+                            if (mt > maxMtime) maxMtime = mt
+                        }
+                        hash = zipStampFold(hash, "kids:" + kidArr.size)
+                        hash = zipStampFold(hash, sizeSum.toString())
+                        hash = zipStampFold(hash, maxMtime.toString())
                         // Seleksi terbatas mengikuti sisa anggaran
                         // (issue #993): anak jauh melampaui anggaran
                         // jangan disortir penuh — cukup ambil yang
