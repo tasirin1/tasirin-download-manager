@@ -109,7 +109,7 @@
  max-width: 880px; margin: 0 auto; padding: 11px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
   .brand {
- display: flex; align-items: center; gap: 10px; margin-right: auto; cursor: pointer; }
+ display: flex; align-items: center; gap: 10px; margin-right: auto; cursor: pointer; text-decoration: none; color: inherit; }
 
   .brand-mark {
  width: 34px; height: 34px; flex: 0 0 auto; border-radius: 10px; background: var(--grad); color: #fff; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px var(--grad-shadow); }
@@ -1775,7 +1775,7 @@
 
 <div class="topbar">
   <div class="topbar-in">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9.2"/><path d="M7.5 9.8 12 14.3l4.5-4.5"/><path d="M5 19h14"/></svg></span><span class="brand-word"><span id="brandName">Tasirin Download Manager</span><small>Remote Control</small></span></div>
+    <a class="brand" href="#/" aria-label="Home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9.2"/><path d="M7.5 9.8 12 14.3l4.5-4.5"/><path d="M5 19h14"/></svg></span><span class="brand-word"><span id="brandName">Tasirin Download Manager</span><small>Remote Control</small></span></a>
     <span id="serverChip" class="srv-chip hidden"><i></i><span id="serverChipText">Server</span></span>
     <span id="roChip" class="ro-chip hidden"><i class="ro-dot"></i><span class="ro-txt">Read-only</span></span>
   </div>
