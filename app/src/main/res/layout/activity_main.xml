@@ -8,13 +8,13 @@
     android:orientation="vertical">
 
     <!-- Topbar ramping: logo ikon launcher + judul satu baris, tanpa
-         teks versi/build; latar transparan di atas gradasi navy root. -->
+         teks versi/build; latar biru Vaultwarden dari style toolbar
+         (permintaan owner 2026-11-08: topbar biru dikembalikan). -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         style="@style/Toolbar.Theme.HttpDownloadManager"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@android:color/transparent"
         android:elevation="0dp"
         app:navigationIcon="@drawable/ic_topbar_logo"
         app:title="@string/app_name"
