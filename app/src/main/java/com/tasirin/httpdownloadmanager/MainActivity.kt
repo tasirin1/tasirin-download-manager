@@ -313,7 +313,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
                 runCatching {
                     // Rebuild daftar dibatasi 400ms sekali kecuali jumlah item berubah;
-                    // lewati bila tak ada field tampil yang berubah (termasuk lipatan section).
+                    // lewati bila tak ada field tampil yang berubah.
                     val now = android.os.SystemClock.uptimeMillis()
                     val sig = progressSig(items)
                     if (sizeChanged || (sig != lastProgressSig && now - lastUiSubmitMs >= 400L)) {

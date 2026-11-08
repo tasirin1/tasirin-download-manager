@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **docs(ui): komentar basi soal lipatan section di kolektor daftar dihapus** -- Komentar gerbang rebuild masih menyebut lipatan section sebagai field tampil padahal section sudah dihapus dari daftar utama (issue #1305).
 - **refactor(ui): cabang cek Header mati di onSwiped dihapus** -- 'row !is DownloadRow.Item' tak bisa lagi salah sejak DownloadRow tinggal satu subkelas sesudah penghapusan section; baris kini diambil lewat cast langsung seperti onBindViewHolder (issue #1304).
 - **refactor(ui): field listLayoutManager yang tak pernah dibaca dihapus** -- Field hanya ditulis sekali lalu dipakai sebagai nilai sesaat; layout manager kini dibuat langsung pada penetapan recycler (sisa refactor daftar datar) (issue #1303).
 - **docs(storage): komentar cache collapsed_sections diperbarui sesudah daftar datar** -- Komentar masih menyebut biaya 'dibaca 4x per emisi StateFlow (buildSections)' padahal buildSections sudah dihapus bersama pengelompokan daftar; teks kini menjelaskan alasan cache yang masih berlaku (getStringSet menyalin tiap panggilan) (issue #1302).
