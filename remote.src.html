@@ -1675,6 +1675,10 @@
   .batch-mode .item-top { flex: 1; min-width: 0; }
   .batch-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 51; background: var(--tabbar-bg); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); gap: 8px; justify-content: center; flex-wrap: wrap; }
   .batch-toolbar.show { display: flex; }
+  /* Mode batch (issue #1338): toolbar 2 baris (±104px) melampaui cadangan
+     padding .wrap (88px) sehingga ekor item terakhir tertahan; cadangan
+     dinaikkan selama mode batch aktif (kelas batch-on di body). */
+  body.batch-on .wrap { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   .batch-toolbar button { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
   .batch-toolbar button:hover { border-color: var(--primary); color: var(--primary); }
   .batch-toolbar button.danger { color: var(--red); border-color: var(--red); }
@@ -3736,6 +3740,7 @@ function applyRoute() {
   lastRoute = route;
   const showDownloads = route === 'downloads';
   document.getElementById('batchToolbar').classList.toggle('show', showDownloads && batchMode);
+  document.body.classList.toggle('batch-on', showDownloads && batchMode);
   DOWNLOADS_VIEW.forEach(function (id) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('hidden', !showDownloads);
@@ -6831,6 +6836,7 @@ function toggleBatchMode() {
   document.getElementById('batchModeBtn').innerHTML = batchMode ? UI_ICONS.close + ' Cancel selection' : UI_ICONS.checksq + ' Select';
   document.getElementById('list').classList.toggle('batch-mode', batchMode);
   document.getElementById('batchToolbar').classList.toggle('show', batchMode);
+  document.body.classList.toggle('batch-on', batchMode);
   document.getElementById('fabNewBtn').classList.toggle('fab-batch', batchMode);
   updateBatchCount();
 }
