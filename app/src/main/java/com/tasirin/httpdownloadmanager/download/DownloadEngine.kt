@@ -4491,6 +4491,12 @@ class DownloadEngine(appContext: Context) {
             connection.setRequestProperty("Range", "bytes=${segment.start + downloaded}-${segment.end}")
         }
         trackOpenedConnection(id, conn)
+        // Aliran respons belum dibuka = galat pra-aliran (issue #1260):
+        // badan galat tak pernah dibaca sehingga soket tak bisa dipakai
+        // ulang — putus eksplisit di finally (pola #1243), jangan
+        // menunggu GC. Sesudah aliran dibuka, penutupan aliran di loop
+        // dan untrackConnection yang mengatur.
+        var streamOpened = false
         try {
             val code = conn.responseCode
             if (code != 206) throw IOException("Server does not support Range (HTTP $code)")
@@ -4518,6 +4524,7 @@ class DownloadEngine(appContext: Context) {
             }
 
             val input = conn.inputStream
+            streamOpened = true
             val output = BufferedOutputStream(FileOutputStream(partial, true), BUFFER_SIZE)
             val buffer = ByteArray(BUFFER_SIZE)
             var lastNotify = 0L
@@ -4594,6 +4601,7 @@ class DownloadEngine(appContext: Context) {
             if (!coroutineContext.isActive) throw CancellationException()
             throw e
         } finally {
+            if (!streamOpened) runCatching { conn.disconnect() }
             untrackConnection(id, conn)
         }
     }
