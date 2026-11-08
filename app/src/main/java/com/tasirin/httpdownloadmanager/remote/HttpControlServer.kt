@@ -231,7 +231,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val startedAt = System.currentTimeMillis()
         if (!ServerSecurity.isStateChangeAllowed(
                 session.method.name, session.uri, session.headers["x-requested-with"]
-            ) && !consumeZipDlTokenFor(session)
+            ) && !peekZipDlTokenFor(session)
         ) {
             val denied = newFixedLengthResponse(
                 Response.Status.FORBIDDEN,
@@ -1857,6 +1857,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun fsZip(session: IHTTPSession): Response {
+        if (!consumeZipTokenIfPresent(session)) return forbiddenResponse()
         val raw = session.param("path").orEmpty()
         if (raw.isEmpty()) return notFound()
         // Path tanpa awalan f:/m: bukan bentuk yang pernah dikirim klien
@@ -2253,6 +2254,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     }
 
     private fun mediaZip(session: IHTTPSession): Response {
+        if (!consumeZipTokenIfPresent(session)) return forbiddenResponse()
         val requestedTokens = session.param("tokens").orEmpty()
             .split(",").filter { it.isNotBlank() }.distinct()
         // Path tiba sebagai parameter berulang (issue #849): format
@@ -4226,6 +4228,31 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             )
         }
         return jsonResponse(JSONObject().put("ok", true).put("zt", token))
+    }
+
+    private fun forbiddenResponse(): Response = newFixedLengthResponse(
+        Response.Status.FORBIDDEN, "text/plain; charset=utf-8", "Forbidden"
+    )
+
+    /** Intip token `zt` tanpa mengonsumsi: dipakai gerbang awal serve()
+     *  (issue #1190). Konsumsi sungguhan baru terjadi di titik sajian
+     *  ZIP, jadi token tidak hangus oleh penolakan PIN (401) yang
+     *  dinilai sesudah gerbang. */
+    private fun peekZipDlTokenFor(session: IHTTPSession): Boolean {
+        if (session.method != Method.GET || !ServerSecurity.isZipSideEffectUri(session.uri)) return false
+        val token = session.param("zt")?.trim().orEmpty()
+        if (token.isEmpty()) return false
+        val expiresAt = zipDlTokens[token] ?: return false
+        return System.currentTimeMillis() <= expiresAt
+    }
+
+    /** Konsumsi zt di titik sajian ZIP bila request membawanya: request
+     *  jalur header (tanpa zt) lolos apa adanya; zt yang sudah terpakai/
+     *  kedaluwarsa ditolak di sini (gerbang hanya mengintip, issue #1190). */
+    private fun consumeZipTokenIfPresent(session: IHTTPSession): Boolean {
+        val token = session.param("zt")?.trim().orEmpty()
+        if (token.isEmpty()) return true
+        return consumeZipDlTokenFor(session)
     }
 
     /** Konsumsi token `zt` untuk request GET ZIP tanpa header: true = token ada,
