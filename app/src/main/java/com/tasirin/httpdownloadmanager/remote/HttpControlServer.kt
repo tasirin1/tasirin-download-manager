@@ -4046,16 +4046,37 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  selalu 404 walau daftarnya tampil. Endpoint ini sudah di belakang
      *  login PIN ([pinOk]), jadi menyajikan video yang memang terdaftar di
      *  galeri adalah perilaku yang benar. */
+    /** URI koleksi video MediaStore: segmen koleksi "video" pada
+     *  content://media/<volume>/video/... (galeri perangkat). */
+    private fun isVideoCollectionUri(uri: Uri): Boolean =
+        uri.pathSegments.getOrNull(1) == "video"
+
     private fun isMediaUriAllowed(uri: Uri): Boolean {
         return runCatching {
             when (uri.authority) {
                 MediaStore.AUTHORITY -> {
                     if (Build.VERSION.SDK_INT >= 29) {
-                        // URI ada (RELATIVE_PATH terbaca) = entri MediaStore valid.
-                        // Koleksi video boleh di folder mana pun; validasi baca
-                        // penuh tetap malas saat serve/thumbnail (openInputStream
+                        // Koleksi video galeri boleh di folder mana pun
+                        // (desain galeri perangkat); validasi baca penuh
+                        // tetap malas saat serve/thumbnail (openInputStream
                         // gagal -> notFound + invalidasi cache galeri).
-                        mediaStoreRelativePath(uri) != null
+                        // Koleksi LAIN (gambar/audio/unduhan) TIDAK ikut
+                        // dilonggarkan (issue #1289): token u: hanya Base64
+                        // polos sehingga klien bersesi bisa menempa token
+                        // untuk URI pribadi apa pun — koleksi lain wajib
+                        // di dalam root yang sama seperti jalur tulis,
+                        // atau tercakup izin baca persisten (berkas yang
+                        // dipilih pengguna untuk dibagikan).
+                        val relative = mediaStoreRelativePath(uri)
+                            ?: return@runCatching false
+                        isVideoCollectionUri(uri) ||
+                            ServerSecurity.isMediaStorePathAllowedFast(
+                                relative.trim('/'), canonicalFsRoots(),
+                                StoragePrefs.isFsFullAccessEnabled(context)
+                            ) ||
+                            context.contentResolver.persistedUriPermissions.any {
+                                it.isReadPermission && it.uri == uri
+                            }
                     } else {
                         // Di bawah API 29 MediaStore.Downloads belum ada; file sah
                         // aplikasi disimpan lewat path/SAF. Token u: MediaStore
