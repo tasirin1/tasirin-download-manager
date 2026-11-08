@@ -86,6 +86,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     /** Token unduh ZIP sekali-pakai untuk navigasi anchor fallback (tak bisa
      *  membawa header XHR): nilai = kedaluwarsa ms. Dipakai sekali lalu hangus. */
     private val zipDlTokens = ConcurrentHashMap<String, Long>()
+
+    /** Token zt yang sudah terbakar oleh request awalnya (issue #1240):
+     *  tetap dikenali sampai kedaluwarsa HANYA untuk request Range
+     *  lanjutan bersesi — nilai = kedaluwarsa ms, sama dengan token
+     *  hidupnya. Inisiasi baru dengan token terbakar ditolak. */
+    private val zipDlBurnedTokens = ConcurrentHashMap<String, Long>()
     private val lifecycleLock = Any()
     // Penanda generasi stop: startServer berjalan sebagian di LUAR
     // lifecycleLock (tidur antar-retry tak boleh memblokir request),
@@ -567,10 +573,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 now > it.value.expiresAt
             }
         }
-        // zipDlTokens: entry kedaluwarsa (TTL 120 dtk, single-use)
-        if (zipDlTokens.isNotEmpty()) {
+        // zipDlTokens + token terbakar: entry kedaluwarsa (TTL 120 dtk)
+        if (zipDlTokens.isNotEmpty() || zipDlBurnedTokens.isNotEmpty()) {
             val nowZip = System.currentTimeMillis()
             zipDlTokens.entries.removeIf { it.value < nowZip }
+            zipDlBurnedTokens.entries.removeIf { it.value < nowZip }
         }
         // mediaMetaCache: entry melewati MEDIA_META_TTL_MS (60 dtk).
         // Komentar menyebut nama konstantanya, bukan angka lepas, agar
@@ -647,6 +654,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         sseClients.clear()
         shareTokens.clear()
         zipDlTokens.clear()
+        zipDlBurnedTokens.clear()
         // Server bisa dimatikan lalu dinyalakan ulang (ganti port / stop-start
         // di Settings) — pool statistik ikut dihentikan; liveStatPool()
         // membuat pool baru otomatis saat dibutuhkan lagi.
@@ -1889,7 +1897,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // mematahkan unduhan ZIP multi-request (regresi #1190,
         // issue #1210). Replay tanpa sesi tetap tertolak karena
         // konsumsi kedua gagal.
-        if (!pinOk(session) && !consumeZipTokenIfPresent(session)) return forbiddenResponse()
+        if (!zipServeAllowed(session)) return forbiddenResponse()
         val raw = session.param("path").orEmpty()
         if (raw.isEmpty()) return notFound()
         // Path tanpa awalan f:/m: bukan bentuk yang pernah dikirim klien
@@ -2293,7 +2301,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // mematahkan unduhan ZIP multi-request (regresi #1190,
         // issue #1210). Replay tanpa sesi tetap tertolak karena
         // konsumsi kedua gagal.
-        if (!pinOk(session) && !consumeZipTokenIfPresent(session)) return forbiddenResponse()
+        if (!zipServeAllowed(session)) return forbiddenResponse()
         val requestedTokens = session.param("tokens").orEmpty()
             .split(",").filter { it.isNotBlank() }.distinct()
         // Path tiba sebagai parameter berulang (issue #849): format
@@ -4298,8 +4306,39 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (session.method != Method.GET || !ServerSecurity.isZipSideEffectUri(session.uri)) return false
         val token = session.param("zt")?.trim().orEmpty()
         if (token.isEmpty()) return false
-        val expiresAt = zipDlTokens[token] ?: return false
-        return System.currentTimeMillis() <= expiresAt
+        val now = System.currentTimeMillis()
+        val live = zipDlTokens[token]
+        if (live != null) return now <= live
+        // Token terbakar (issue #1240): hanya request Range lanjutan
+        // yang boleh lewat — inisiasi unduhan baru dengannya ditolak
+        // di sini, sehingga zt yang bocor tak bisa memulai unduhan.
+        val burned = zipDlBurnedTokens[token] ?: return false
+        if (now > burned) return false
+        return session.headers["range"] != null || session.headers["Range"] != null
+    }
+
+    /** Gerbang titik sajian ZIP (issue #1240, menyempurnakan #1210):
+     *  handler hanya terjangkau dari cabang pinOk dispatch, jadi sesi
+     *  sah selalu lolos — TETAPI token zt yang dibawa request awal
+     *  (tanpa Range) benar-benar dikonsumsi di sini agar klaim
+     *  sekali-pakai ditegakkan: zt bekas/kedaluwarsa ditolak walau
+     *  sesi sah, dan sesudah terbakar gerbang CSRF menolak replay-nya.
+     *  Request Range adalah lanjutan unduhan yang sudah terotorisasi
+     *  sesi, jadi tidak membakar token (regresi #1190/#1210). */
+    private fun zipServeAllowed(session: IHTTPSession): Boolean {
+        val hasRange = session.headers["range"] != null ||
+            session.headers["Range"] != null
+        if (hasRange) return true
+        val token = session.param("zt")?.trim().orEmpty()
+        if (token.isEmpty()) return true
+        // Kedaluwarsa ditangkap SEBELUM konsumsi menghapusnya.
+        val expiresAt = zipDlTokens[token]
+        if (!consumeZipTokenIfPresent(session)) return false
+        // Pindahkan ke peta terbakar (issue #1240): gerbang CSRF kini
+        // menolak inisiasi baru dengan token ini, tetapi Range
+        // lanjutan bersesi tetap dikenali sampai kedaluwarsa.
+        if (expiresAt != null) zipDlBurnedTokens[token] = expiresAt
+        return true
     }
 
     /** Konsumsi zt di titik sajian ZIP bila request membawanya: request
@@ -4324,6 +4363,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun pruneZipDlTokens() {
         val now = System.currentTimeMillis()
         zipDlTokens.entries.removeIf { it.value < now }
+        zipDlBurnedTokens.entries.removeIf { it.value < now }
     }
 
     // ---------- Berbagi file via tautan sementara ----------
