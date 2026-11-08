@@ -1405,6 +1405,10 @@ class SettingsActivity : AppCompatActivity() {
 
     /** Hentikan DownloadService bila tidak ada download aktif (server juga mati). */
     private fun stopServiceIfIdle() {
+        // Muatan awal belum selesai = items bisa kosong-palsu (dugaan
+        // #1263): service sendiri menahan diri dengan gerbang yang sama
+        // (keepAlive DownloadService), jadi di jendela itu anggap sibuk.
+        if (!App.engine.isInitialLoadComplete()) return
         val anyActive = App.engine.items.value.any {
             it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
         }
