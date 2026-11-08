@@ -273,6 +273,19 @@ class ZipCreatorTest {
                 if (shallowBudget > 0) {
                     val kidArr = queued.listFiles()
                     if (kidArr != null) {
+                        // Agregat semua anak (issue #1223): cerminkan
+                        // lipatan produksi persis — jumlah anak, total
+                        // ukuran, mtime maksimum, sebelum seleksi.
+                        var sizeSum = 0L
+                        var maxMtime = 0L
+                        for (kid in kidArr) {
+                            sizeSum += kid.length()
+                            val mt = kid.lastModified()
+                            if (mt > maxMtime) maxMtime = mt
+                        }
+                        hash = ZipCreator.zipStampFold(hash, "kids:" + kidArr.size)
+                        hash = ZipCreator.zipStampFold(hash, sizeSum.toString())
+                        hash = ZipCreator.zipStampFold(hash, maxMtime.toString())
                         val kids: List<java.io.File> = if (kidArr.size <= shallowBudget) {
                             kidArr.sortedWith(
                                 Comparator { a, b ->
