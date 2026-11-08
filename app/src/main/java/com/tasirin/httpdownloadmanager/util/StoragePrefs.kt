@@ -87,9 +87,9 @@ object StoragePrefs {
     private const val KEY_USER_AGENT = "user_agent"
     private const val KEY_GALLERY_FOLDERS = "gallery_folders"
 
-    // Cache set section collapsed: dibaca 4x per emisi StateFlow (buildSections
-    // tiap group) — getStringSet mengembalikan salinan baru setiap panggilan,
-    // jadi cache mencegah alokasi berulang saat progress download aktif.
+    // Cache set section collapsed: getStringSet mengembalikan salinan baru
+    // setiap panggilan, jadi cache mencegah alokasi berulang pada pembacaan
+    // status lipatan kartu (Settings + status header dulu).
     @Volatile private var collapsedCache: Set<String>? = null
 
     /** Seksi pengaturan yang sedang dilipat (kartu bisa dibuka/tutup). */
