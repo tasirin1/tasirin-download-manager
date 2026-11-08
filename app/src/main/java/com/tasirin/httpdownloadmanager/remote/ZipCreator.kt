@@ -333,7 +333,15 @@ object ZipCreator {
                 }
                 entriesWritten++
             }
-            outcome.exceptionOrNull()?.let { if (it is IOException) throw it }
+            // Lempar ulang eksepsi APA PUN (issue #1156): saringan lama
+            // yang hanya melempar IOException menelan eksepsi runtime
+            // provider (DeadObjectException/SecurityException) di tengah
+            // salin, sehingga finally tetap closeEntry dan entri
+            // terpotong terfinalisasi sebagai sukses — melanggar doktrin
+            // #846 di blok yang sama. Lewati-entri yang disengaja (gagal
+            // buka per token) sudah terbungkus runCatching di dalam blok,
+            // sejajar zipMedia.
+            outcome.exceptionOrNull()?.let { throw it }
         }
         return ZipTokensResult(entriesWritten, skippedItems)
     }

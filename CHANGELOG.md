@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(remote): zipTokens kini menggagalkan ZIP untuk eksepsi runtime provider, bukan memfinalkan entri terpotong** -- Saringan hasil blok hanya melempar ulang IOException, sehingga eksepsi runtime dari stream provider (DeadObjectException/SecurityException) di tengah salin tertelan sesudah putNextEntry dan finally tetap closeEntry: entri terpotong terbit sebagai ZIP sukses. Kini eksepsi apa pun dilempar ulang sejajar zipMedia, sesuai doktrin salinan-putus #846 (issue #1156).
 - Perbaikan kode mati: dua kondisi `contains` redundan di `isSocialMediaUrl` dibuang — cabang `cdninstagram.com`/`tiktokcdn.com` selalu terserap cabang tanpa `.com` di sebelahnya, jadi tak pernah menentukan hasil (issue #1155).
 - Perbaikan dokumentasi kode: empat komentar basi sisa era tema gelap/gradasi diluruskan mengikuti keadaan sekarang (petak ikon kini warna polos, badge status dan tema aplikasi kini terang) — kode di bawahnya sudah benar (issue #1154).
 - Perbaikan dokumentasi kode docs: kelas `.fi-purple` diganti nama menjadi `.fi-navy` — isinya sudah biru tua (#0D47A1) sejak penyelarasan palet, bukan ungu (issue #1153).
