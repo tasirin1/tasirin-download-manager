@@ -2026,6 +2026,30 @@ class DownloadEngine(appContext: Context) {
             if (finished != null) NotificationHelper.notifyItemFinished(context, finished)
             return
         }
+        // Format HLS struktural yang tak didukung (issue #1158):
+        // terenkripsi/byte-range/fMP4 adalah sifat playlist — untuk URL
+        // yang sama hasilnya deterministik, jadi retry generik penuh
+        // (bawaan 2x, maks 5x) hanya membuang fetch playlist berulang.
+        // Langsung FAILED terminal seperti klasifikasi permanen lain.
+        // "Live HLS" SENGAJA tak termasuk: playlist live bisa
+        // memperoleh EXT-X-ENDLIST kemudian, retry untuknya masuk akal.
+        if (isUnsupportedHlsError(message)) {
+            retryAttempts.remove(id)
+            App.logEvent("DOWNLOAD FAILED: ${item.fileName} — $message")
+            val finished = updateItem(id) {
+                it.copy(
+                    state = DownloadState.FAILED,
+                    error = message,
+                    autoResume = false,
+                    speedBps = 0,
+                    etaSeconds = 0
+                )
+            }
+            flushSave()
+            hidupkanLagiMonitorPendahulu(item)
+            if (finished != null) NotificationHelper.notifyItemFinished(context, finished)
+            return
+        }
         // Fitur mirror: gagal dari URL aktif -> pindah ke URL cadangan berikutnya.
         // Bila host GitHub tak terjangkau, buat mirror proxy otomatis.
         // Item berkredensial/header kustom TIDAK mendapat auto-mirror
@@ -2182,6 +2206,16 @@ class DownloadEngine(appContext: Context) {
             hidupkanLagiMonitorPendahulu(item)
             if (finishedElse != null) NotificationHelper.notifyItemFinished(context, finishedElse)
         }
+    }
+
+    /** Tiga galat format HLS struktural dari parseHlsPlan/
+     *  mediaSegmentsWithDurations (issue #1158): sifat format
+     *  playlist, deterministik untuk URL yang sama. */
+    private fun isUnsupportedHlsError(message: String?): Boolean {
+        if (message == null) return false
+        return message.contains("Encrypted HLS (EXT-X-KEY) not supported") ||
+            message.contains("Byte-range HLS (EXT-X-BYTERANGE) not supported") ||
+            message.contains("Fragmented MP4 HLS (EXT-X-MAP) not supported")
     }
 
     private fun isSlowError(message: String?): Boolean {
