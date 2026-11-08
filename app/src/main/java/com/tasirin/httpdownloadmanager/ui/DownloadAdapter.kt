@@ -58,12 +58,12 @@ class DownloadAdapter(private val listener: Listener) :
         position: Int,
         payloads: MutableList<Any>
     ) {
-        val row = getItem(position)
+        val item = (getItem(position) as DownloadRow.Item).item
         val h = holder as ItemHolder
         // Tick progres 400ms-1s hanya menyentuh bar/teks: jangan
         // rebind ikon/badge/tombol yang mahal (mime lookup, format).
-        if (payloads.contains(PAYLOAD_PROGRESS)) bindProgress(h, row.item)
-        else bindItem(h, row.item)
+        if (payloads.contains(PAYLOAD_PROGRESS)) bindProgress(h, item)
+        else bindItem(h, item)
     }
 
     // Cache hasil resolve warna: bind berjalan tiap tick progres (1 detik),
