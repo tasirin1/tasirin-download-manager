@@ -720,10 +720,12 @@
  display: flex; flex-direction: column; gap: 8px; }
 
   .fs-row {
- display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 12px; box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease; }
+ display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 12px; transition: border-color .15s ease, box-shadow .15s ease; }
 
+ /* Bayangan kartu daftar disamakan (issue #1350): dasar datar berbasis
+    border seperti li.item/.gal-cell; bayangan hanya saat hover. */
  .fs-row:hover {
- box-shadow: var(--shadow); }
+ box-shadow: var(--shadow-sm); }
 
   .fs-row.fs-dir {
  cursor: pointer; }
