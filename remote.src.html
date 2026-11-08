@@ -2341,6 +2341,11 @@ function openDlSearch(focus) {
   if (focus) setTimeout(function () { dlSearchInput.focus(); }, 60);
 }
 function closeDlSearch() {
+  // Batalkan debounce yang masih tertunda (issue #1196): tanpa ini,
+  // timer 220 ms menembak sesudah pencarian ditutup dan menerapkan
+  // lagi query basi ke daftar yang pencariannya sudah tertutup.
+  clearTimeout(dlSearchTimer);
+  dlSearchTimer = null;
   dlSearchOpen = false;
   dlSearchRow.classList.add('hidden');
   if (dlSearchQuery) {

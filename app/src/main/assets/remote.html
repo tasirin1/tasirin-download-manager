@@ -233,6 +233,8 @@ dlSearchRow.classList.remove('hidden');
 if (focus) setTimeout(function () { dlSearchInput.focus(); }, 60);
 }
 function closeDlSearch() {
+clearTimeout(dlSearchTimer);
+dlSearchTimer = null;
 dlSearchOpen = false;
 dlSearchRow.classList.add('hidden');
 if (dlSearchQuery) {
