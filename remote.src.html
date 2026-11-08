@@ -58,6 +58,10 @@
     --radius-sm: 10px;
     --shadow-sm: 0 1px 2px rgba(23,32,58,.06), 0 2px 12px rgba(23,32,58,.05);
     --shadow: 0 1px 2px rgba(23,32,58,.04), 0 10px 28px rgba(23,32,58,.07);
+    /* Elevasi permukaan melayang (issue #1349): sebelumnya ±15 nilai
+       hardcode sekali pakai dengan tiga rona berbeda. */
+    --shadow-lg: 0 8px 28px rgba(23,32,58,.20);
+    --shadow-up: 0 -12px 32px rgba(23,32,58,.18);
     --topbar-bg: #fbfcfe;
     --tabbar-bg: #fbfcfe;
     --track: #e9edf5;
@@ -103,6 +107,8 @@
     --field-line: #64769F;
     --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.45);
+    --shadow-lg: 0 8px 28px rgba(0,0,0,.5);
+    --shadow-up: 0 -12px 32px rgba(0,0,0,.5);
     --topbar-bg: #0D1738;
     --tabbar-bg: #0D1738;
     --track: #1E2A4A;
@@ -129,7 +135,7 @@
  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg); margin: 0; padding: 0 0 calc(60px + env(safe-area-inset-bottom, 0px)); color: var(--ink); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
 
   .topbar {
- position: sticky; top: 0; z-index: 40; background: var(--topbar-bg); border-bottom: 1px solid var(--line); box-shadow: 0 1px 8px rgba(23,32,58,.04); padding-top: env(safe-area-inset-top, 0px); }
+ position: sticky; top: 0; z-index: 40; background: var(--topbar-bg); border-bottom: 1px solid var(--line); box-shadow: var(--shadow-sm); padding-top: env(safe-area-inset-top, 0px); }
 
   .topbar-in {
  max-width: 880px; margin: 0 auto; padding: 11px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -304,7 +310,7 @@
  flex: 1; padding: 12px; border-radius: var(--radius-sm); border: 0; font-size: 15px; font-weight: 700; cursor: pointer; transition: all .15s ease; }
 
   .btn-main {
- background: var(--primary); color: #fff; box-shadow: 0 2px 6px rgba(21,101,192,.2); }
+ background: var(--primary); color: #fff; box-shadow: 0 2px 6px var(--grad-shadow); }
 
   .btn-main:hover {
  background: var(--primary-2); }
@@ -641,7 +647,7 @@
  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.14); }
 
  .gal-thumb .gal-play span {
- width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.92); box-shadow: 0 4px 14px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; transition: transform .18s ease, background .18s ease; }
+ width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.92); box-shadow: var(--shadow-lg); display: flex; align-items: center; justify-content: center; transition: transform .18s ease, background .18s ease; }
 
  .gal-thumb .gal-play span::before {
  content: ""; width: 0; height: 0; margin-left: 3px; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 12px solid var(--primary); }
@@ -899,7 +905,7 @@
  padding: 10px 14px;
  background: var(--topbar-bg);
  border-top: 1px solid var(--line); border-radius: 18px 18px 0 0;
- box-shadow: 0 -8px 24px rgba(23,32,58,.16); transition: transform .25s ease; }
+ box-shadow: var(--shadow-up); transition: transform .25s ease; }
 
   /* Ikut auto-hide chrome (issue #1340): meluncur bersama tab bar,
      bukan menggantung sendirian di atas ruang kosong. 68px = labuh
@@ -1372,7 +1378,7 @@
  position: fixed; inset: 0; z-index: 85; background: rgba(8,12,22,.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
 
   .sheet-box {
- width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--line); border-radius: 18px 18px 0 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -12px 32px rgba(0,0,0,.18); max-height: 88vh; max-height: 88dvh; overflow-y: auto; }
+ width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--line); border-radius: 18px 18px 0 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: var(--shadow-up); max-height: 88vh; max-height: 88dvh; overflow-y: auto; }
 
   .sheet:not(.hidden) {
  animation: sheetFade .18s ease; }
@@ -1548,7 +1554,7 @@
   .gal-size{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #fsList.compact .fs-row{padding:7px 10px}#fsList.compact .fs-ico{flex-basis:30px;width:30px;height:30px;border-radius:9px}#fsList.compact .fs-ico svg{width:15px;height:15px}#fsList.compact .fs-name{font-size:12px}#fsList.compact .fs-meta{font-size:10.5px;margin-top:1px}#fsList.compact .fs-ico-apk svg{width:20px;height:20px}
   .toast {
- position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 300; max-width: min(92vw, 420px); padding: 9px 14px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; display: flex; align-items: center; justify-content: center; gap: 8px; animation: toastSlideIn .25s ease; }
+ position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 300; max-width: min(92vw, 420px); padding: 9px 14px; border-radius: 999px; background: rgba(20,24,36,.92); color: #fff; font-size: 13px; font-weight: 600; text-align: center; box-shadow: var(--shadow-lg); pointer-events: none; display: flex; align-items: center; justify-content: center; gap: 8px; animation: toastSlideIn .25s ease; }
 
   .toast-close {
  flex: 0 0 auto; width: 32px; height: 32px; margin-left: 6px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff; font-size: 13px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; pointer-events: auto; }
@@ -1569,7 +1575,7 @@
  padding: 64px 16px; text-align: center; color: var(--muted); display: flex; flex-direction: column; align-items: center; }
 
   .empty .ico {
- position: relative; width: 88px; height: 88px; margin: 0 auto; border-radius: 28px; background: var(--primary-soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 28px rgba(21,101,192,.14); }
+ position: relative; width: 88px; height: 88px; margin: 0 auto; border-radius: 28px; background: var(--primary-soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-lg); }
 
   /* Tema gelap: gradasi navy lembut dari --primary-soft ke
      --hover-soft agar kotak ikon menyatu dengan halaman gelap
