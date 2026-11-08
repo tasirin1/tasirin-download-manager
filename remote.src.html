@@ -7815,8 +7815,15 @@ function probeSocialQuality() {
 document.getElementById('url').addEventListener('input', probeSocialQuality);
 probeSocialQuality();
 
+// Penjaga submit-ganda form Add Download (issue #1128): handler async
+// bisa berjalan lama (multi-URL, timeout 15 dtk per URL) dan server
+// tidak mendedupe URL, jadi ketukan ganda / Enter berulang membuat
+// unduhan duplikat. Bendera dipasang sesudah validasi awal dan dilepas
+// di finally blok try utama handler.
+let addInFlight = false;
 document.getElementById('addForm').addEventListener('submit', async function (e) {
   e.preventDefault();
+  if (addInFlight) return;
   const rawUrl = document.getElementById('url').value.trim();
   if (!rawUrl) return;
   // Pemisah hanya whitespace (issue #848): koma adalah karakter sah
@@ -7830,6 +7837,9 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
     return low.indexOf('http://') === 0 || low.indexOf('https://') === 0;
   });
   if (!urls.length) { showToast('No valid URLs found.', 3000, 'error'); return; }
+  addInFlight = true;
+  const addBtn = e.target.querySelector('button[type="submit"]');
+  if (addBtn) addBtn.disabled = true;
   // For social media quality, use first URL only
   const url = urls[0];
   const body = new URLSearchParams({url: url});
@@ -7985,6 +7995,9 @@ document.getElementById('addForm').addEventListener('submit', async function (e)
     refresh();
   } catch (err) {
     showToast('Failed to add download: ' + err.message, 3000, 'error');
+  } finally {
+    addInFlight = false;
+    if (addBtn) addBtn.disabled = false;
   }
 });
 

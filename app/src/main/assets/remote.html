@@ -4827,8 +4827,10 @@ socialPlatform = '';
 }
 document.getElementById('url').addEventListener('input', probeSocialQuality);
 probeSocialQuality();
+let addInFlight = false;
 document.getElementById('addForm').addEventListener('submit', async function (e) {
 e.preventDefault();
+if (addInFlight) return;
 const rawUrl = document.getElementById('url').value.trim();
 if (!rawUrl) return;
 const urls = rawUrl.split(/\s+/).filter(function (u) {
@@ -4836,6 +4838,9 @@ const low = u.toLowerCase();
 return low.indexOf('http://') === 0 || low.indexOf('https://') === 0;
 });
 if (!urls.length) { showToast('No valid URLs found.', 3000, 'error'); return; }
+addInFlight = true;
+const addBtn = e.target.querySelector('button[type="submit"]');
+if (addBtn) addBtn.disabled = true;
 const url = urls[0];
 const body = new URLSearchParams({url: url});
 const name = document.getElementById('name').value.trim();
@@ -4961,6 +4966,9 @@ toggleAddForm(false);
 refresh();
 } catch (err) {
 showToast('Failed to add download: ' + err.message, 3000, 'error');
+} finally {
+addInFlight = false;
+if (addBtn) addBtn.disabled = false;
 }
 });
 window.addEventListener('hashchange', applyRoute);
