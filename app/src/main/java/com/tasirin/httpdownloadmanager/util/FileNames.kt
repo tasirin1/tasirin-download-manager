@@ -108,6 +108,13 @@ object FileNames {
             cut
         }
 
+    /** Potong [text] sampai [max] satuan UTF-16 tanpa membelah
+     *  pasangan surrogate di batas (issue #1234): take() polos pada
+     *  judul kendali halaman/situs meninggalkan surrogate yatim yang
+     *  lolos safe() sampai nama berkas final. */
+    fun take(text: String, max: Int): String =
+        if (max <= 0) "" else text.take(safeCut(text, minOf(max, text.length)))
+
     private val RESERVED_NAMES = setOf(
         "CON", "PRN", "AUX", "NUL",
         "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",

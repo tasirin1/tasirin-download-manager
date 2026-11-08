@@ -1691,7 +1691,7 @@ object SocialMediaExtractor {
             if (!url.contains("/watch/")) continue
             if (url == excludeUrl) continue
             if (!seen.add(url)) continue
-            out.add(EpisodeLink(url, obj.optString("title").trim().take(80)))
+            out.add(EpisodeLink(url, FileNames.take(obj.optString("title").trim(), 80)))
         }
         return out
     }

@@ -45,6 +45,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tasirin.httpdownloadmanager.data.DownloadItem
+import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
@@ -191,7 +192,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 }
             }
             val title = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
-                ?.substringBefore(" - ").orEmpty().trim().take(80)
+                ?.substringBefore(" - ").orEmpty().trim().let { FileNames.take(it, 80) }
             App.engine.addDownload(
                 url = videoUrl,
                 fileName = title.takeIf { it.isNotBlank() },
@@ -954,7 +955,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         }
                     }
                     val epTitle = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
-                        ?.substringBefore(" - ").orEmpty().trim().take(80)
+                        ?.substringBefore(" - ").orEmpty().trim().let { FileNames.take(it, 80) }
                     val fileName: String? =
                         epTitle.takeIf { it.isNotBlank() } ?: next.title.takeIf { it.isNotBlank() }
                     App.engine.addDownload(url = video, fileName = fileName, headers = headers)
@@ -1013,7 +1014,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         headersInput.setText(if (cur.isBlank()) extra else cur + "\n" + extra)
                     }
                     val title = data?.getStringExtra(WebExtractActivity.EXTRA_TITLE)
-                        ?.substringBefore(" - ").orEmpty().trim().take(80)
+                        ?.substringBefore(" - ").orEmpty().trim().let { FileNames.take(it, 80) }
                     if (nameInput.text?.toString().isNullOrBlank() && title.isNotBlank()) {
                         nameInput.setText(title)
                     }

@@ -112,6 +112,17 @@ class FileNamesTest {
     }
 
     @Test
+    fun `take - potong aman surrogate di batas`() {
+        // Issue #1234: 79 huruf + emoji (indeks 79..80) — potong 80
+        // membelah pasangan, harus mundur ke 79; potong 81 utuh.
+        val s = "a".repeat(79) + "\uD83D\uDE00" + "zzz"
+        assertEquals("a".repeat(79), FileNames.take(s, 80))
+        assertEquals("a".repeat(79) + "\uD83D\uDE00", FileNames.take(s, 81))
+        assertEquals("abc", FileNames.take("abc", 80))
+        assertEquals("", FileNames.take("abc", 0))
+    }
+
+    @Test
     fun `unique - angka melompati yang sudah terpakai`() {
         val taken = setOf("f.txt", "f (1).txt", "f (3).txt")
         val result = FileNames.unique("f.txt") { it in taken }
