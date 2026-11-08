@@ -1845,6 +1845,9 @@
     .sheet:not(.hidden), .sheet:not(.hidden) .sheet-box { animation: none; }
     .cm-overlay, .cm-box { animation: none; }
     .mm-spin::before { animation: none; }
+    /* Transisi transform utama ikut dinetralkan (issue #1362):
+       chrome auto-hide, snap geser, FAB/to-top, dan kartu galeri. */
+    .tabbar, .fs-batch, li.item .swipe-content, .fab, .to-top, .gal-cell { transition: none; }
   }
 </style>
 </head>
@@ -2896,6 +2899,12 @@ function toastCssVal(name, val) {
 }
 function armToastRing(dur) {
   toastCssVal('--ring', '0deg');
+  // Reduced motion (issue #1362): cincin tampil penuh tanpa animasi sapuan rAF.
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    toastCssVal('--ring', '360deg');
+    return;
+  }
   if (typeof requestAnimationFrame !== 'function' || typeof performance !== 'object' || typeof performance.now !== 'function') return;
   var t0 = performance.now();
   function step(t) {
