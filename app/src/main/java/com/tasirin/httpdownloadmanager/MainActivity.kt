@@ -226,7 +226,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         try {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        applyEdgeToEdge(binding.root, darkBars = true)
+        applyEdgeToEdge(binding.root)
         setSupportActionBar(binding.toolbar)
         val overflowColor = ContextCompat.getColor(this, R.color.white)
         binding.toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.ic_more)?.mutate()
