@@ -456,11 +456,16 @@ def node_check() -> list:
             f.write(script)
             name = f.name
         try:
+            # Timeout (issue #1314): node yang macet tak boleh menggantung
+            # gerbang tanpa batas.
             proc = subprocess.run(
-                ["node", "--check", name], capture_output=True, text=True
+                ["node", "--check", name], capture_output=True, text=True,
+                timeout=30
             )
             if proc.returncode != 0:
                 errors.append(f"script #{i}: {proc.stderr.strip()}")
+        except subprocess.TimeoutExpired:
+            errors.append(f"script #{i}: node --check melewati batas 30 detik")
         except FileNotFoundError:
             errors.append("node tidak ditemukan di PATH (dibutuhkan untuk --check)")
         finally:
@@ -474,8 +479,11 @@ def run_upload_smoke() -> str:
     script = ROOT / "scripts" / "upload_smoke_test.js"
     try:
         proc = subprocess.run(
-            ["node", str(script)], capture_output=True, text=True, cwd=str(ROOT)
+            ["node", str(script)], capture_output=True, text=True, cwd=str(ROOT),
+            timeout=120
         )
+    except subprocess.TimeoutExpired:
+        return "smoke test upload melewati batas 120 detik (node macet?)"
     except FileNotFoundError:
         return "node tidak ditemukan di PATH (dibutuhkan untuk smoke test upload)"
     if proc.returncode != 0:
