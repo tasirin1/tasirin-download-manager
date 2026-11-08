@@ -1062,6 +1062,15 @@ class DownloadEngine(appContext: Context) {
      *  tetapi timeout FGS bukan inten pengguna — item harus lanjut
      *  sendiri pada start berikutnya seperti jalur proses mati. */
     fun pauseAll(keepAutoResume: Boolean = false) {
+        // Jeda paksa sistem adalah GANGGUAN BARU (issue #1295): segarkan
+        // gerbang sekali-pakai resumeInterrupted. Tanpa ini, korban
+        // timeout FGS di proses yang masih hidup tak pernah lanjut
+        // sendiri — resumeInterrupted pada start berikutnya no-op karena
+        // gerbangnya sudah terpakai di start pertama proses ini, dan
+        // resumeAutoPaused hanya berjalan dari callback jaringan.
+        // Aman: doResumeInterrupted hanya menghidupkan item ber-autoResume
+        // yang masih PAUSED/PENDING/DOWNLOADING (cek segar di dalam kunci).
+        if (keepAutoResume) interruptedResumed = false
         // Aksi massal wajib menunggu muatan awal (#264): menilai daftar
         // kosong di jendela muat membuat aksi pengguna batal diam-diam.
         if (!loadGate.isCompleted) {
