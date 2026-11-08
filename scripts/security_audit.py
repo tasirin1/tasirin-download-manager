@@ -724,6 +724,34 @@ def _pola_rentang_bersarang(kedalaman: int) -> str:
     return r"(?:" + pasangan + r"|[^();]){0,300}"
 
 
+# Pola aturan dikompilasi SEKALI per bahasa per proses (issue #1315):
+# scan_text dipanggil per berkas dan sebelumnya mengompilasi ulang
+# seluruh aturan (termasuk pola multi-baris) untuk tiap berkas.
+# Filter excluded_paths tetap per berkas (cek awalan murah).
+_compiled_by_language: dict = {}
+
+
+def _compiled_for(language: str) -> list:
+    got = _compiled_by_language.get(language)
+    if got is None:
+        got = []
+        for rule in RULES:
+            if language in rule.languages or "text" in rule.languages:
+                pattern = re.compile(rule.pattern, rule.flags)
+                long_pattern = None
+                if rule.multiline:
+                    long_pattern = re.compile(
+                        rule.pattern.replace(
+                            "[^;\\n]*",
+                            _pola_rentang_bersarang(10),
+                        ),
+                        rule.flags,
+                    )
+                got.append((rule, pattern, long_pattern))
+        _compiled_by_language[language] = got
+    return got
+
+
 def scan_text(
     relative_path: Path,
     lines: list[str],
@@ -731,12 +759,19 @@ def scan_text(
 ) -> list[dict[str, object]]:
     language = language_for(relative_path) or "text"
     relative_posix = relative_path.as_posix()
-    compiled = [
-        (rule, re.compile(rule.pattern, rule.flags))
-        for rule in rules
-        if (language in rule.languages or "text" in rule.languages)
-        and not any(relative_posix.startswith(prefix) for prefix in rule.excluded_paths)
-    ]
+    if rules is RULES:
+        compiled = [
+            (rule, pattern)
+            for rule, pattern, _long in _compiled_for(language)
+            if not any(relative_posix.startswith(prefix) for prefix in rule.excluded_paths)
+        ]
+    else:
+        compiled = [
+            (rule, re.compile(rule.pattern, rule.flags))
+            for rule in rules
+            if (language in rule.languages or "text" in rule.languages)
+            and not any(relative_posix.startswith(prefix) for prefix in rule.excluded_paths)
+        ]
     findings: list[dict[str, object]] = []
     seen: set[tuple[Path, int, str]] = set()
 
@@ -807,10 +842,19 @@ def scan_text(
     # Temuan dipetakan ke baris awal match dan didedupe terhadap hasil
     # per baris lewat `seen`.
     full = blank_literals("\n".join(lines))
+    # Peta pola multi-baris dari cache kompilasi (issue #1315); untuk
+    # aturan kustom (bukan RULES) dikompilasi di tempat seperti dulu.
+    long_by_id = {}
+    if rules is RULES:
+        long_by_id = {
+            rule.rule_id: long_pattern
+            for rule, _pattern, long_pattern in _compiled_for(language)
+            if long_pattern is not None
+        }
     for rule, pattern in compiled:
         if not rule.multiline:
             continue
-        long_pattern = re.compile(
+        long_pattern = long_by_id.get(rule.rule_id) or re.compile(
             rule.pattern.replace(
                 "[^;\\n]*",
                 _pola_rentang_bersarang(10),
