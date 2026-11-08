@@ -53,6 +53,14 @@ class FileSaver(context: Context) {
     }
 
     companion object {
+        /** Nama staging SAF yang SEDANG ditulis (issue #1249):
+         *  sapuan yatim wajib melewatinya — salinan raksasa sah bisa
+         *  berjalan lebih lama dari ambang umur sapuan 2 jam, dan
+         *  penjaga nama+umur saja tak bisa membedakannya dari yatim.
+         *  Di companion agar lintas instance FileSaver. */
+        private val inFlightStagingNames =
+            java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
         private val MERGE_LOCKS = Array(8) { Any() }
         private val WHITESPACE_RE = Regex("\\s+")
         /** Buffer salin 64KB: default copyTo 8KB lambat ~8x syscall untuk file GB. */
@@ -503,20 +511,25 @@ class FileSaver(context: Context) {
             unique = uniqueDocumentName(tree, fileName, avoidStaging = true)
             tree.createFile(MimeTypes.forFile(unique), "$unique.part")
         } ?: return null
-        val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
-        if (output == null) {
-            runCatching { stagingDoc.delete() }
-            return null
-        }
+        inFlightStagingNames.add("$unique.part")
         try {
-            output.use { copy(it) }
-        } catch (e: Exception) {
-            runCatching { stagingDoc.delete() }
-            throw e
-        }
-        if (!runCatching { stagingDoc.renameTo(unique) }.getOrDefault(false)) {
-            runCatching { stagingDoc.delete() }
-            return null
+            val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
+            if (output == null) {
+                runCatching { stagingDoc.delete() }
+                return null
+            }
+            try {
+                output.use { copy(it) }
+            } catch (e: Exception) {
+                runCatching { stagingDoc.delete() }
+                throw e
+            }
+            if (!runCatching { stagingDoc.renameTo(unique) }.getOrDefault(false)) {
+                runCatching { stagingDoc.delete() }
+                return null
+            }
+        } finally {
+            inFlightStagingNames.remove("$unique.part")
         }
         // URI otoritatif dari pohon, sama seperti writeCustomFolder:
         // objek hasil rename bisa menyimpan URI lama di sebagian provider.
@@ -545,6 +558,9 @@ class FileSaver(context: Context) {
         }
         var staged: PublishResult? = null
         if (stagingDoc != null) {
+            // Produsen staging SAF kedua (issue #1249): daftarkan juga.
+            inFlightStagingNames.add("$unique.part")
+            try {
             val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
             if (output == null) {
                 // Sama seperti jalur langsung: stream tak terbuka sesudah
@@ -572,6 +588,9 @@ class FileSaver(context: Context) {
                 // tulis langsung (perilaku lama) sebagai jalan terakhir.
                 runCatching { stagingDoc.delete() }
                 null
+            }
+            } finally {
+                inFlightStagingNames.remove("$unique.part")
             }
         }
         staged ?: writeCustomFolderDirect(tree, fileName, writer)
@@ -872,6 +891,8 @@ class FileSaver(context: Context) {
                                 if (!doc.isFile) continue
                                 val name = doc.name ?: continue
                                 if (!isPublishStagingName(name, finalNames)) continue
+                                // Sedang ditulis = bukan yatim (issue #1249).
+                                if (name in inFlightStagingNames) continue
                                 val modified = doc.lastModified()
                                 if (modified <= 0L ||
                                     now - modified <= 2L * 60 * 60 * 1000
