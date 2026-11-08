@@ -6484,7 +6484,6 @@ function updateToolbar(items) {
 }
 
 let lastStructSig = '';
-let lastIdListSig = '';
 let lastRowSig = {};
 
 // Cap URL murah untuk structSig (issue #822): panjang + hash djb2 —
@@ -6991,10 +6990,6 @@ function rebuildList(items) {
   const keepScroll = (lastRoute === 'downloads' && currentRoute() === 'downloads' && restoringRoute !== 'downloads')
     ? (window.scrollY || 0) : 0;
   list.innerHTML = '';
-  const idListSig = items.map(function (it) { return it.id + '|' + it.state; }).join(';');
-  const idsChanged = idListSig !== lastIdListSig;
-  const firstRender = lastIdListSig === '';
-  lastIdListSig = idListSig;
 
   items = items.slice().sort(function (a, b) {
     const actA = a.state === 'DOWNLOADING' || a.state === 'PENDING' ? 0 : 1;
@@ -7043,18 +7038,12 @@ function rebuildList(items) {
     }
     return;
   }
-  let idx = 0;
   for (const it of filtered) {
     const li = document.createElement('li');
     li.className = 'item';
     li.setAttribute('tabindex', '0');
     li.setAttribute('data-id', it.id);
     setItemStateCls(li, it.state);
-    if (firstRender || idsChanged) {
-      li.classList.add('anim');
-      li.style.animationDelay = Math.min(idx * 40, 400) + 'ms';
-    }
-    idx++;
     const err = it.error ? '<div class="err"><span class="err-text">' + escapeHtml(it.error) + '</span>' + (it.state === 'FAILED' ? ' <span class="err-dot">·</span> <span class="err-status">Failed</span>' : '') + '</div>' : '';
     // Aksi cepat sejajar aplikasi native: FAILED -> Retry, CANCELLED
     // -> Resume; keduanya menembak aksi resume yang sama lewat
