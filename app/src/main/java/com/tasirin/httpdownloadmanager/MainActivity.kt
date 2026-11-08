@@ -386,7 +386,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                                     DownloadAdapter.buildSections(
                                         this@MainActivity, latest, unseenSectionCounts
                                     )
-                                )
+                                ) { updateStickyHeader() }
                             }
                         }
                     }
@@ -1655,8 +1655,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // Membuka section = pengguna melihat isinya: lencana kedatangan
         // untuk section itu gugur (issue #1285).
         if (collapsed) unseenSectionCounts.remove(key)
-        adapter.submitList(DownloadAdapter.buildSections(this, lastItems, unseenSectionCounts))
-        updateStickyHeader()
+        // Sticky dinilai dari callback commit daftar baru, bukan daftar
+        // lama yang belum tertimpa diff (issue #1286).
+        adapter.submitList(
+            DownloadAdapter.buildSections(this, lastItems, unseenSectionCounts)
+        ) { updateStickyHeader() }
     }
 
     private fun showRenameDialog(item: DownloadItem) {
