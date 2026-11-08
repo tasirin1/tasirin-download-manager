@@ -3786,7 +3786,15 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun fetchText(url: String, headers: String, maxBytes: Int, username: String = "", password: String = "", trackId: String = ""): String? {
-        return runCatching {
+        // Kode HTTP non-2xx dicatat terpisah lalu dilempar sebagai
+        // IOException("HTTP <kode>") (issue #1131): dulu semua kegagalan
+        // — 404 permanen maupun putus jaringan — sama-sama jadi null,
+        // sehingga pesan akhir generik ("Cannot fetch HLS manifest")
+        // dan klasifikasi kegagalan tak bisa membedakan galat permanen
+        // dari jaringan (404 tetap di-retry penuh). Gagal jaringan
+        // tetap null seperti sebelumnya.
+        var httpError = -1
+        val body = runCatching {
             val conn = openAuthenticatedConnection(
                 url, method = "GET", username = username, password = password, headers = headers
             )
@@ -3796,13 +3804,18 @@ class DownloadEngine(appContext: Context) {
             if (trackId.isNotEmpty()) trackConnection(trackId, conn)
             try {
                 val code = conn.responseCode
-                if (code !in 200..299) return null
+                if (code !in 200..299) {
+                    httpError = code
+                    return@runCatching null
+                }
                 readBounded(conn.inputStream, maxBytes)
             } finally {
                 if (trackId.isNotEmpty()) untrackConnection(trackId, conn)
                 conn.disconnect()
             }
         }.getOrNull()
+        if (body == null && httpError > 0) throw IOException("HTTP $httpError")
+        return body
     }
 
     /** Batalkan finalize bila item sudah hilang dari antrean (cancel/remove/

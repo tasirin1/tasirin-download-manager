@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan mesin unduh: kegagalan HTTP saat mengambil manifest HLS kini membawa kode statusnya — `fetchText` melempar `HTTP <kode>` untuk respons non-2xx (gagal jaringan tetap null), jadi manifest yang 404/403 permanen tak lagi menyamar sebagai putus jaringan generik dan pesan galat akhir menyebut kodenya (issue #1131).
 - Perbaikan mesin unduh: unduhan POST tidak lagi dialihkan ke mode multi-segmen — segmen selalu memakai GET tanpa postBody sehingga hasilnya bukan respons POST; gerbang segmen kini mengecualikan item POST dan POST tetap di jalur tunggal (issue #1130).
 - Perbaikan mesin unduh: penjaga pendahulu monitor kini sungguh bekerja — `replacesItemId` yang non-null membuat Elvis lama tak pernah terpicu, sehingga item biasa mengalir ke pembaruan id kosong yang no-op; kini item tanpa pendahulu berhenti di awal (issue #1129).
 - Perbaikan web remote: form Add Download kini berpenjaga submit-ganda — tombol dinonaktifkan dan submit tumpang-tindih diabaikan selama pengiriman berjalan, sehingga ketukan ganda atau Enter berulang tidak lagi membuat unduhan duplikat untuk URL yang sama (issue #1128).
