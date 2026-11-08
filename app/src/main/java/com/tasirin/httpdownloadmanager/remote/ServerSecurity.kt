@@ -467,10 +467,19 @@ object ServerSecurity {
     /** Validasi nama file dari remote/native: tidak kosong, tanpa separator
      *  path, bukan traversal (".." / "../" / "..\\"), dan tanpa titik/spasi
      *  di akhir (filesystem FAT/SD memangkasnya sehingga "a. " bertabrakan
-     *  dengan "a" dan menimpa file lain). Satu definisi di sini agar endpoint
-     *  tidak memakai aturan inline yang berbeda-beda. */
+     *  dengan "a" dan menimpa file lain). Juga tanpa karakter kontrol dan
+     *  pemformat arah Unicode (U+200E/F, U+202A-202E, U+2066-2069): tak
+     *  terlihat tetapi bisa membalik tampilan nama dan menyamarkan
+     *  ekstensi — jalur upload sudah membuangnya, validator bersama ini
+     *  kini menolaknya untuk rename/mkdir juga (issue #1139). Satu
+     *  definisi di sini agar endpoint tidak memakai aturan inline yang
+     *  berbeda-beda. */
     fun isFileNameValid(name: String): Boolean =
         name.isNotBlank() && '/' !in name && '\\' !in name &&
         name != "." && name != ".." && !name.startsWith("../") && !name.startsWith("..\\") &&
-        !name.endsWith(" ") && !name.endsWith(".")
+        !name.endsWith(" ") && !name.endsWith(".") &&
+        name.none { c ->
+            c.isISOControl() || c in '\u200E'..'\u200F' || c in '\u202A'..'\u202E' ||
+                c in '\u2066'..'\u2069'
+        }
 }

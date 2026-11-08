@@ -622,4 +622,18 @@ class ServerSecurityTest {
         assertFalse(ServerSecurity.isFileNameValid("video "))
         assertFalse(ServerSecurity.isFileNameValid("..."))
     }
+
+    @Test
+    fun isFileNameValid_menolakKontrolDanPemformatArah() {
+        // Huruf Unicode biasa tetap sah (issue #1139 hanya menyasar
+        // kontrol + pemformat arah, selaras saringan nama upload).
+        assertTrue(ServerSecurity.isFileNameValid("vidéo.mp4"))
+        // U+202E membalik tampilan nama (ekstensi tersamar).
+        assertFalse(ServerSecurity.isFileNameValid("video\u202Emp4.exe"))
+        assertFalse(ServerSecurity.isFileNameValid("video\u200F.mp4"))
+        assertFalse(ServerSecurity.isFileNameValid("video\u2066.mp4"))
+        // Karakter kontrol ISO, termasuk baris baru dan DEL.
+        assertFalse(ServerSecurity.isFileNameValid("a\nb.mp4"))
+        assertFalse(ServerSecurity.isFileNameValid("video\u007F.mp4"))
+    }
 }
