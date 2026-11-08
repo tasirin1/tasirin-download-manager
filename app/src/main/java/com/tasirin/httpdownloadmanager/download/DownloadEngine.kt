@@ -2494,9 +2494,14 @@ class DownloadEngine(appContext: Context) {
                 val total = contentLength(probe)
                 val ranges = probe.getHeaderField("Accept-Ranges").equals("bytes", ignoreCase = true)
                 // Mirror (proxy GitHub) umumnya tidak mendukung Range, jadi
-                // lewati multi-segmen untuk URL cadangan.
+                // lewati multi-segmen untuk URL cadangan. Item POST juga
+                // dilewati: segmen selalu GET dan tak pernah mengirim
+                // postBody, jadi berkas hasilnya bukan respons POST —
+                // POST tetap jalur tunggal yang menghormati method+body
+                // (issue #1130).
                 if (ranges && total >= SEGMENT_MIN_BYTES &&
-                    StoragePrefs.segmentCount(context) > 1 && item.mirrors.isEmpty()
+                    StoragePrefs.segmentCount(context) > 1 && item.mirrors.isEmpty() &&
+                    item.method != "POST"
                 ) {
                     useSegments = true
                     segmentedTotal = total
