@@ -260,8 +260,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 val row = adapter.currentList.getOrNull(position) ?: return
                 // Pulihkan tampilan item setelah animasi swipe.
                 adapter.notifyItemChanged(position)
-                if (row !is DownloadRow.Item) return
-                val item = row.item
+                // DownloadRow kini hanya punya satu subkelas (Item)
+                // sesudah Header dihapus: cast langsung, pola yang sama
+                // seperti onBindViewHolder adapter.
+                val item = (row as DownloadRow.Item).item
                 when (direction) {
                     ItemTouchHelper.RIGHT -> when (item.state) {
                         DownloadState.DOWNLOADING, DownloadState.PENDING ->
