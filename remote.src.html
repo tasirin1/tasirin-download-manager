@@ -8126,7 +8126,13 @@ async function pollSnapshot() {
   try {
     const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
     if (!res.ok) {
-      if (res.status === 401) return;
+      if (res.status === 401) {
+        // Jangan telan diam-diam (issue #1195): refresh() dan galeri
+        // menampilkan pesan PIN untuk 401 yang sama; tanpa ini daftar
+        // membeku sesudah sesi kedaluwarsa tanpa penjelasan apa pun.
+        statusLine.textContent = 'PIN required. Reload the page to log in.';
+        return;
+      }
       throw new Error('HTTP ' + res.status);
     }
     const data = await res.json();

@@ -5047,7 +5047,10 @@ const mySeq = ++snapSeq;
 try {
 const res = await fetchTimeout(API + '/api/snapshot', undefined, 15000);
 if (!res.ok) {
-if (res.status === 401) return;
+if (res.status === 401) {
+statusLine.textContent = 'PIN required. Reload the page to log in.';
+return;
+}
 throw new Error('HTTP ' + res.status);
 }
 const data = await res.json();
