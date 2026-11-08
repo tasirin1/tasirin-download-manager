@@ -13,6 +13,7 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadRepository
 import com.tasirin.httpdownloadmanager.data.DownloadSegment
 import com.tasirin.httpdownloadmanager.data.DownloadState
+import com.tasirin.httpdownloadmanager.remote.ServerSecurity
 import com.tasirin.httpdownloadmanager.util.FileNames
 import com.tasirin.httpdownloadmanager.util.FileSaver
 import com.tasirin.httpdownloadmanager.util.Formats
@@ -1299,6 +1300,13 @@ class DownloadEngine(appContext: Context) {
         val clean = FileNames.unique(FileNames.safe(newName.trim())) { n ->
             n != item.fileName && _items.value.any { it.fileName == n }
         }
+        // Validator nama bersama (issue #1165, residu #1139): jalur
+        // remote sudah menolak kontrol ISO + pemformat arah Unicode
+        // lewat ServerSecurity.isFileNameValid, tetapi rename native
+        // hanya memakai FileNames.safe (buang C0+DEL saja) sehingga
+        // U+202E dkk. dan kontrol C1 tetap lolos ke nama tersimpan.
+        // Satu definisi nama untuk semua jalur: tolak di sini juga.
+        if (!ServerSecurity.isFileNameValid(clean)) return false
         if (clean.isBlank() || clean == item.fileName) return false
         val renamed = fileSaver.rename(item, clean)
         if (renamed != null) {
