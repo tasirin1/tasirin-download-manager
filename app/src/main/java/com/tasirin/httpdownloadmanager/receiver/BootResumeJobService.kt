@@ -54,7 +54,10 @@ class BootResumeJobService : JobService() {
             // ditolak sistem dan autostart mati total.
             App.logEvent("BOOT/JOB: autostart FAILED: ${started.exceptionOrNull()?.message ?: "unknown error"}")
         }
-        jobFinished(params, false)
+        // Start gagal sesaat tak boleh mematikan autostart sampai
+        // reboot berikutnya (issue #1264): minta sistem menjadwalkan
+        // ulang dengan backoff-nya; sukses/pref-mati tetap selesai.
+        jobFinished(params, started.isFailure)
         return false
     }
 
