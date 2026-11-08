@@ -132,6 +132,9 @@
 
   .pill.primary {
  background: var(--grad); border-color: transparent; color: #fff; box-shadow: 0 4px 12px var(--grad-shadow); }
+  /* Tema gelap (issue #1274): --grad gelap #1E88E5 hanya 3,68:1 untuk
+     teks putih; pakai nilai terang #1565C0 (5,75:1) khusus komponen ini. */
+  :root[data-theme="dark"] .pill.primary { background: #1565C0; }
 
   .pill.primary:hover {
  filter: brightness(1.08); color: #fff; }
