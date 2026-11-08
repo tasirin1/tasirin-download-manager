@@ -3019,6 +3019,21 @@ class DownloadEngine(appContext: Context) {
                         "${Formats.bytes(total)}, available ${Formats.bytes(freeAtStart)}"
                 )
             }
+            // Volume TUJUAN terbit ikut dicek di muka (issue #1160):
+            // tiga jalur lain memakai destinationFreeBytes lintas
+            // volume, jalur adaptive dulu hanya volume temp — folder
+            // tujuan di volume lain (SD card) yang sempit baru ketahuan
+            // ENOSPC sesudah unduh+remux tuntas, dan berkas adaptive
+            // tak bisa di-resume sehingga retry mengulang dari nol.
+            if (total > 0) {
+                val destFree = fileSaver.destinationFreeBytes(item.folderPath)
+                if (total > destFree - MIN_FREE_BYTES) {
+                    throw IOException(
+                        "Not enough storage at destination for adaptive file: need " +
+                            "${Formats.bytes(total)}, available ${Formats.bytes(destFree)}"
+                    )
+                }
+            }
             val byteCap = (freeAtStart - MIN_FREE_BYTES).coerceAtLeast(0)
             BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
                 val input = conn.inputStream
