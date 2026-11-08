@@ -4314,7 +4314,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // di sini, sehingga zt yang bocor tak bisa memulai unduhan.
         val burned = zipDlBurnedTokens[token] ?: return false
         if (now > burned) return false
-        return session.headers["range"] != null || session.headers["Range"] != null
+        // Lanjutan sungguhan berarti offset > 0 (issue #1266): Range
+        // bytes=0- adalah unduhan utuh dari awal, bukan lanjutan.
+        return zipRangeStart(session) > 0
+    }
+
+    /** Offset awal header Range sesi: -1 bila header tak ada, 0 bila
+     *  ada tetapi mulai dari nol / sufiks / tak terurai (ketiganya
+     *  setara unduhan dari awal), selain itu offset-nya. Dipakai
+     *  gerbang token ZIP agar "lanjutan" dinilai dari offset, bukan
+     *  sekadar keberadaan header (issue #1266). */
+    private fun zipRangeStart(session: IHTTPSession): Long {
+        val h = session.headers["range"] ?: session.headers["Range"] ?: return -1L
+        val v = h.trim()
+        if (!v.startsWith("bytes=")) return 0L
+        val start = v.removePrefix("bytes=").substringBefore('-').trim()
+        if (start.isEmpty()) return 0L // bentuk sufiks bytes=-N
+        return start.toLongOrNull() ?: 0L
     }
 
     /** Gerbang titik sajian ZIP (issue #1240, menyempurnakan #1210):
@@ -4326,9 +4342,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  Request Range adalah lanjutan unduhan yang sudah terotorisasi
      *  sesi, jadi tidak membakar token (regresi #1190/#1210). */
     private fun zipServeAllowed(session: IHTTPSession): Boolean {
-        val hasRange = session.headers["range"] != null ||
-            session.headers["Range"] != null
-        if (hasRange) return true
+        // Range dengan offset > 0 = lanjutan; Range dari nol setara
+        // tanpa Range (inisiasi) dan ikut membakar token (issue #1266)
+        // — pemutar/download manager yang membuka dengan bytes=0-
+        // tak lagi membuat zt-nya abadi sampai kedaluwarsa.
+        if (zipRangeStart(session) > 0) return true
         val token = session.param("zt")?.trim().orEmpty()
         if (token.isEmpty()) return true
         // Kedaluwarsa ditangkap SEBELUM konsumsi menghapusnya.
