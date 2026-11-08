@@ -186,6 +186,14 @@ object AdtsAac {
         var runStart = 0
         while (pos < data.size) {
             val tag = id3TagSize(data, pos)
+            if (tag <= 0 && data[pos] != ID3_MAGIC[0]) {
+                // Lompat ke kandidat 'I' berikutnya (issue #1297):
+                // id3TagSize hanya bisa >0 pada byte 0x49.
+                var next = pos + 1
+                while (next < data.size && data[next] != ID3_MAGIC[0]) next++
+                pos = next
+                continue
+            }
             if (tag > 0) {
                 out.write(data, runStart, pos - runStart)
                 // Tag terpotong di ekor data (issue #634): header
@@ -290,7 +298,15 @@ object AdtsAac {
                     }
                     runStart = pos
                 } else {
-                    pos++
+                    // Lompat ke kandidat 'I' berikutnya (issue #1297):
+                    // id3TagSize hanya bisa >0 pada byte 0x49, jadi byte
+                    // lain pasti bukan awal tag. Semantik identik — run
+                    // yang ditulis dan titik tahan tepi (isId3PrefixAt di
+                    // kepala loop) tak berubah; kesetaraan dengan
+                    // stripId3 tetap dijaga uji unit yang sama.
+                    var next = pos + 1
+                    while (next < pending.size && pending[next] != ID3_MAGIC[0]) next++
+                    pos = next
                 }
             }
             if (runStart < pos) {
