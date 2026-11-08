@@ -438,8 +438,10 @@
  width: 44px; height: 44px; }
  .fs-row .fs-stream-btn {
  margin-left: auto; margin-right: -3px; }
+ /* Mode ringkas: target sentuh tombol baris tetap 40px (issue #1358) —
+    30px rawan salah sentuh antara Putar dan Menu yang berdampingan. */
  #fsList.compact .fs-more-btn, #fsList.compact .fs-stream-btn {
- width: 30px; height: 30px; font-size: 14px; }
+ width: 40px; height: 40px; font-size: 14px; }
 
   .fs-stream-btn {
  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; align-self: center; transition: color .15s ease, border-color .15s ease, background .15s ease; }
