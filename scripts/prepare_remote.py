@@ -67,6 +67,34 @@ BANNED_ID = [
 ]
 
 
+def shield_calc(css: str, protected: list) -> str:
+    """Ganti tiap calc(...) utuh (kurung seimbang) dengan penanda
+    perisai yang sama seperti shield() pada minify_css."""
+    out = []
+    i = 0
+    while True:
+        j = css.find("calc(", i)
+        if j < 0:
+            out.append(css[i:])
+            break
+        out.append(css[i:j])
+        depth = 0
+        k = j
+        while k < len(css):
+            if css[k] == "(":
+                depth += 1
+            elif css[k] == ")":
+                depth -= 1
+                if depth == 0:
+                    k += 1
+                    break
+            k += 1
+        protected.append(css[j:k])
+        out.append("\x00%d\x00" % (len(protected) - 1))
+        i = k
+    return "".join(out)
+
+
 def minify_css(css: str) -> str:
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     protected = []
@@ -77,7 +105,12 @@ def minify_css(css: str) -> str:
 
     # Lindungi url(), calc(), dan string dulu supaya isinya tidak diubah.
     css = re.sub(r"url\([^)]*\)", shield, css)
-    css = re.sub(r"calc\([^)]*\)", shield, css)
+    # calc() dilindungi dengan pemindai sadar kurung (issue #1312):
+    # regex [^)]* berhenti di kurung tutup var(--x) pertama sehingga
+    # sisa ekspresi (+ 10px) lolos dari perisai dan spasinya di sekitar
+    # +/- dibuang langkah di bawah — calc yang dihasilkan tidak valid
+    # (CSS mewajibkan spasi di sekitar + dan -).
+    css = shield_calc(css, protected)
     css = re.sub(r"'[^']*'", shield, css)
     css = re.sub(r'"[^"]*"', shield, css)
     css = re.sub(r"\s+", " ", css)
