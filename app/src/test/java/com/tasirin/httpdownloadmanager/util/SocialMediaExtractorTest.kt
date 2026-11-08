@@ -431,6 +431,18 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `decodeUnicodeEscapes - heksa huruf kecil dan campuran terdekode`() {
+        // Ekspektasi dibuktikan port Python 1:1 dari regex yang sama (7 kasus).
+        assertEquals("https://a.b/c/d", SocialMediaExtractor.decodeUnicodeEscapes("https://a.b/c\\u002fd"))
+        assertEquals("https://a.b/c/d", SocialMediaExtractor.decodeUnicodeEscapes("https://a.b/c\\u002Fd"))
+        assertEquals("x&y", SocialMediaExtractor.decodeUnicodeEscapes("x\\u0026y"))
+        assertEquals("a=b", SocialMediaExtractor.decodeUnicodeEscapes("a\\u003db"))
+        assertEquals("aAb", SocialMediaExtractor.decodeUnicodeEscapes("a\\u0041b"))
+        assertEquals("tetap \\u12 dan \\uzzzz", SocialMediaExtractor.decodeUnicodeEscapes("tetap \\u12 dan \\uzzzz"))
+        assertEquals("https://a.b/c", SocialMediaExtractor.unescapeJsToken("https:\\u002fa.b\\u002fc"))
+    }
+
+    @Test
     fun `unescapeJsToken - unescape token contextJSON Instagram`() {
         assertEquals(
             "https://example.com/a/b?x=1&y=2",

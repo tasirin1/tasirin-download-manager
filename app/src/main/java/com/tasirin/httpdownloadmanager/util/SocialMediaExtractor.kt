@@ -1485,9 +1485,7 @@ object SocialMediaExtractor {
     /** Unescape URL/judul dari JS/HTML (`\\/`, `\\u0026`, `&amp;`) — dipakai
      *  bersama ekstraktor Instagram & Pornhub/XNXX agar satu definisi. */
     private fun unescapePlayer(raw: String): String {
-        return raw.replace("\\/", "/")
-            .replace("\\u002F", "/")
-            .replace("\\u0026", "&")
+        return decodeUnicodeEscapes(raw.replace("\\/", "/"))
             .replace("&amp;", "&")
     }
 
@@ -1495,11 +1493,23 @@ object SocialMediaExtractor {
      *  untuk `contextJSON`/`token` Instagram — satu definisi untuk 3 format.
      *  Internal agar logika murni ini teruji langsung (Murni). */
     internal fun unescapeJsToken(raw: String): String {
-        return raw.replace("\\u002F", "/")
-            .replace("\\u0026", "&")
+        return decodeUnicodeEscapes(raw)
             .replace("\\\"", "\"")
             .replace("\\/", "/")
     }
+
+    private val UNICODE_ESCAPE_RE = Regex("\\u([0-9a-fA-F]{4})")
+
+    // Dekode escape unicode JSON/JS secara umum (issue #1325):
+    // penggantian harfiah lama hanya mengenal dua kode dalam ejaan
+    // huruf besar, padahal heksa JSON tak peka huruf — encoder yang
+    // memancarkan ejaan huruf kecil membiarkan escape-nya utuh di
+    // URL/token hasil. Pola yang sama seperti unescapeFb (#283).
+    // Internal agar teruji langsung.
+    internal fun decodeUnicodeEscapes(raw: String): String =
+        UNICODE_ESCAPE_RE.replace(raw) { m ->
+            m.groupValues[1].toInt(16).toChar().toString()
+        }
 
     // ── Pornhub ─────────────────────────────────────────────────────
     // Halaman watch (`/view_video.php?viewkey=...`) memuat varian di JSON
