@@ -912,7 +912,13 @@ class FileSaver(context: Context) {
                                 val name = doc.name ?: continue
                                 if (!isPublishStagingName(name, finalNames)) continue
                                 // Sedang ditulis = bukan yatim (issue #1249).
-                                if ((tree.uri.toString() + "|" + name) in inFlightStagingNames) continue
+                                // Kunci memakai URI DIREKTORI PEMILIK berkas
+                                // (issue #1300): pendaftaran in-flight memakai
+                                // tree folder tujuan tulis — untuk subfolder
+                                // (mis. hasil organize) itu URI subfolder,
+                                // bukan tree akar sapuan; kunci akar di sini
+                                // membuat penjaga buta di semua subfolder.
+                                if ((dir.uri.toString() + "|" + name) in inFlightStagingNames) continue
                                 val modified = doc.lastModified()
                                 if (modified <= 0L ||
                                     now - modified <= 2L * 60 * 60 * 1000
