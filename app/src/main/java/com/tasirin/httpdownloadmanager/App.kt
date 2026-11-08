@@ -22,10 +22,11 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Tema gelap menyeluruh (keputusan owner 2026-10-30): paksa mode
-        // malam AppCompat agar dialog/menu/kontrol bawaan ikut gelap di
-        // semua perangkat, apa pun mode sistemnya.
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        // Tema terang biru-putih menyeluruh gaya Vaultwarden Host
+        // (keputusan owner 2026-11-08): paksa mode siang AppCompat agar
+        // dialog/menu/kontrol bawaan ikut terang di semua perangkat,
+        // apa pun mode sistemnya.
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         installCrashLogger()
         SocialMediaExtractor.init(this)
         httpServer = HttpControlServer(this)

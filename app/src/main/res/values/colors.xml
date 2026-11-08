@@ -1,78 +1,82 @@
 <resources>
-    <!-- Palet utama: biru modern + aksen jingga, tema gelap navy menyeluruh. -->
-    <color name="primary">#3D8BFD</color>
-    <color name="primary_dark">#1D4ED8</color>
+    <!-- Palet utama: biru-putih elegan gaya Vaultwarden Host (keputusan
+         owner 2026-11-08, menggantikan tema gelap navy menyeluruh
+         2026-10-30): latar abu-biru muda, kartu putih, biru #1565C0. -->
+    <color name="primary">#1565C0</color>
+    <color name="primary_dark">#0D47A1</color>
     <color name="accent">#F57C00</color>
     <color name="white">#FFFFFF</color>
-    <color name="window_bg">#0A0F24</color>
+    <color name="window_bg">#F2F4F8</color>
     <color name="ic_launcher_background">#1565C0</color>
-    <color name="text_primary">#EAF0FF</color>
-    <color name="text_secondary">#93A5CC</color>
-    <color name="text_hint">#71809F</color>
-    <color name="card_bg">#141E3D</color>
-    <color name="line">#2A3757</color>
-    <color name="chip_pressed">#27365E</color>
-    <color name="gallery_thumb_bg">#141E3D</color>
-    <color name="gallery_ext_text">#71809F</color>
+    <color name="text_primary">#1B1F27</color>
+    <color name="text_secondary">#666D7B</color>
+    <color name="text_hint">#646E7A</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="line">#E5E9F0</color>
+    <color name="chip_pressed">#E3F0FB</color>
+    <color name="gallery_thumb_bg">#E8EEF6</color>
+    <color name="gallery_ext_text">#5F6B7A</color>
     <color name="gallery_overlay">#6610182A</color>
-    <color name="chip_pressed_blue">#3338BDF8</color>
+    <color name="chip_pressed_blue">#331565C0</color>
     <!-- Kontainer tonal modern (gaya M3): tombol sekunder, kartu ringkasan. -->
-    <color name="primary_container">#1E2A4A</color>
-    <color name="primary_container_pressed">#27365E</color>
+    <color name="primary_container">#D8E7FC</color>
+    <color name="primary_container_pressed">#C2D9F8</color>
 
     <!-- Settings: badge server & section accent -->
-    <color name="badge_on_text">#34D399</color>
-    <color name="badge_off_text">#F87171</color>
-    <color name="section_accent_server">#4C9AFF</color>
-    <color name="section_accent_download">#34D399</color>
-    <color name="section_accent_storage">#F57C00</color>
-    <color name="section_accent_other">#C084FC</color>
-    <!-- Tema gelap layar utama (desain persetujuan owner 2026-10-30):
-         latar navy gradasi, kartu kaca, petak ikon gradasi per jenis berkas.
-         Awalnya khusus layar utama; sejak tema gelap menyeluruh, token
-         bernuansa sama dipakai bersama palet gelap di semua layar. -->
-    <color name="home_bg_top">#1B2A5E</color>
-    <color name="home_bg_mid">#0D1738</color>
-    <color name="home_bg_bottom">#0A0F24</color>
-    <color name="home_glass_fill">#14FFFFFF</color>
-    <color name="home_glass_stroke">#2EFFFFFF</color>
-    <color name="home_text">#EAF0FF</color>
-    <color name="home_text_secondary">#93A5CC</color>
-    <color name="home_ghost_text">#BFE0FF</color>
-    <color name="home_stat_active">#7DD3FC</color>
-    <color name="home_stat_done">#34D399</color>
-    <color name="home_stat_attention">#FCA5A5</color>
-    <color name="home_error">#FCA5A5</color>
-    <color name="home_prog_active">#38BDF8</color>
-    <color name="home_prog_done">#34D399</color>
-    <color name="home_prog_failed">#F87171</color>
-    <color name="home_prog_idle">#94A3B8</color>
-    <color name="home_prog_track">#26FFFFFF</color>
-    <color name="home_badge_done_bg">#34D399</color>
-    <color name="home_badge_done_text">#052E1B</color>
-    <color name="home_badge_failed_bg">#5B2126</color>
-    <color name="home_badge_failed_text">#FCA5A5</color>
-    <color name="home_dot_paused">#FBBF24</color>
+    <color name="badge_on_text">#2E7D32</color>
+    <color name="badge_off_text">#C62828</color>
+    <color name="section_accent_server">#1565C0</color>
+    <color name="section_accent_download">#0288D1</color>
+    <color name="section_accent_storage">#2E7D32</color>
+    <color name="section_accent_other">#546E7A</color>
+    <!-- Tema terang layar utama (desain ulang biru-putih 2026-11-08):
+         latar abu-biru muda gradasi halus, kartu putih bergaris halus,
+         petak ikon nuansa biru per jenis berkas. Token bernuansa sama
+         dipakai bersama palet terang di semua layar. -->
+    <color name="home_bg_top">#FFFFFF</color>
+    <color name="home_bg_mid">#F2F4F8</color>
+    <color name="home_bg_bottom">#E8EEF6</color>
+    <color name="home_glass_fill">#FFFFFF</color>
+    <color name="home_glass_stroke">#E5E9F0</color>
+    <color name="home_text">#1B1F27</color>
+    <color name="home_text_secondary">#666D7B</color>
+    <color name="home_ghost_text">#1565C0</color>
+    <color name="home_stat_active">#1565C0</color>
+    <color name="home_stat_done">#2E7D32</color>
+    <color name="home_stat_attention">#C62828</color>
+    <color name="home_error">#C62828</color>
+    <color name="home_prog_active">#1565C0</color>
+    <color name="home_prog_done">#2E7D32</color>
+    <color name="home_prog_failed">#C62828</color>
+    <color name="home_prog_idle">#9AA0A6</color>
+    <color name="home_prog_track">#E5E9F0</color>
+    <color name="home_badge_done_bg">#2E7D32</color>
+    <color name="home_badge_done_text">#FFFFFF</color>
+    <color name="home_badge_failed_bg">#FDECEA</color>
+    <color name="home_badge_failed_text">#C62828</color>
+    <color name="home_dot_paused">#F57C00</color>
 
-    <!-- Pasangan gradasi petak ikon per jenis berkas + segmen statistik. -->
-    <color name="tile_apk_start">#3DDC84</color>
-    <color name="tile_apk_end">#00B248</color>
-    <color name="tile_video_start">#8B5CF6</color>
-    <color name="tile_video_end">#EC4899</color>
-    <color name="tile_audio_start">#EC4899</color>
-    <color name="tile_audio_end">#F43F5E</color>
-    <color name="tile_image_start">#06B6D4</color>
-    <color name="tile_image_end">#0EA5E9</color>
-    <color name="tile_archive_start">#F59E0B</color>
-    <color name="tile_archive_end">#F97316</color>
-    <color name="tile_doc_start">#3B82F6</color>
-    <color name="tile_doc_end">#6366F1</color>
-    <color name="tile_generic_start">#64748B</color>
-    <color name="tile_generic_end">#475569</color>
-    <color name="tile_active_start">#2563EB</color>
-    <color name="tile_active_end">#38BDF8</color>
-    <color name="tile_done_start">#059669</color>
-    <color name="tile_done_end">#34D399</color>
-    <color name="tile_attention_start">#DC2626</color>
-    <color name="tile_attention_end">#FB7185</color>
+    <!-- Pasangan gradasi petak ikon per jenis berkas + segmen statistik:
+         semua keluarga biru (biru bahan, biru langit, teal, slate);
+         hijau/merah hanya untuk status selesai/perhatian. -->
+    <color name="tile_apk_start">#42A5F5</color>
+    <color name="tile_apk_end">#1E88E5</color>
+    <color name="tile_video_start">#1E88E5</color>
+    <color name="tile_video_end">#1565C0</color>
+    <color name="tile_audio_start">#039BE5</color>
+    <color name="tile_audio_end">#0277BD</color>
+    <color name="tile_image_start">#00ACC1</color>
+    <color name="tile_image_end">#00838F</color>
+    <color name="tile_archive_start">#78909C</color>
+    <color name="tile_archive_end">#546E7A</color>
+    <color name="tile_doc_start">#64B5F6</color>
+    <color name="tile_doc_end">#42A5F5</color>
+    <color name="tile_generic_start">#90A4AE</color>
+    <color name="tile_generic_end">#607D8B</color>
+    <color name="tile_active_start">#1565C0</color>
+    <color name="tile_active_end">#0D47A1</color>
+    <color name="tile_done_start">#2E7D32</color>
+    <color name="tile_done_end">#43A047</color>
+    <color name="tile_attention_start">#C62828</color>
+    <color name="tile_attention_end">#E53935</color>
 </resources>
