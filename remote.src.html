@@ -1346,7 +1346,7 @@
   .add-sheet textarea {
  width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 14px; box-sizing: border-box; }
   .adv-toggle {
- padding: 10px 0; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
+ padding: 10px 0; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; background: none; border: 0; font-family: inherit; text-align: left; }
   .adv-toggle:hover { color: var(--ink); }
   .adv-section {
  display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
@@ -2273,7 +2273,9 @@ function toggleAddForm(show) {
     qualitySelect.classList.add('hidden'); photoSelect.classList.add('hidden'); socialPlatform = ''; socialVideoOptions = []; socialPhotoOptions = [];
     document.getElementById('platformBadge').classList.add('hidden');
     document.getElementById('advSection').classList.add('hidden');
-    document.getElementById('advToggle').textContent = 'Advanced options';
+    var advT = document.getElementById('advToggle');
+    advT.textContent = 'Advanced options';
+    advT.setAttribute('aria-expanded', 'false');
   }
   if (show) setTimeout(function () { document.getElementById('url').focus(); }, 60);
 }
@@ -2495,7 +2497,8 @@ document.getElementById('advToggle').addEventListener('click', function () {
   var sec = document.getElementById('advSection');
   var isHidden = sec.classList.contains('hidden');
   sec.classList.toggle('hidden', !isHidden);
-  this.textContent = isHidden ? 'Advanced options ▾' : 'Advanced options';
+  this.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+  this.textContent = isHidden ? 'Advanced options \u25be' : 'Advanced options';
 });
 addSheet.addEventListener('click', function (e) {
   if (e.target === addSheet) toggleAddForm(false);
