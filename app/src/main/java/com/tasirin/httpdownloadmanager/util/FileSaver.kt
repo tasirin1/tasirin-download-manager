@@ -968,7 +968,11 @@ class FileSaver(context: Context) {
                     // filesystem (issue #719): jangan salin langsung ke
                     // nama final — salin lengkap ke staging, hapus klaim
                     // kosong, lalu rename staging ke nama yang kosong.
-                    val staging = uniqueTargetFile(File(dir, fileName + ".part"))
+                    // Staging diturunkan dari nama KLAIM (target.name),
+                    // bukan nama mentah (issue #1222, pola
+                    // writePlainFileStaged): nama mentah menempatkan
+                    // staging di namespace partial unduhan senama.
+                    val staging = uniqueTargetFile(File(dir, target.name + ".part"))
                     try {
                         staging.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
                         target.delete()
@@ -986,7 +990,7 @@ class FileSaver(context: Context) {
                     partial.delete()
                 }
             } else {
-                val staging = uniqueTargetFile(File(dir, fileName + ".part"))
+                val staging = uniqueTargetFile(File(dir, target.name + ".part"))
                 try {
                     staging.outputStream().use { out -> partial.inputStream().use { it.copyTo(out, IO_BUF) } }
                     if (staging.renameTo(target)) {
