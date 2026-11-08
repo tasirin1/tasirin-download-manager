@@ -1848,6 +1848,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun fsZip(session: IHTTPSession): Response {
         val raw = session.param("path").orEmpty()
         if (raw.isEmpty()) return notFound()
+        // Path tanpa awalan f:/m: bukan bentuk yang pernah dikirim klien
+        // sah (issue #1138): penjaga di bawah hanya berlaku untuk path
+        // berawalan, jadi path absolut polos dulu lolos penjaga endpoint
+        // dan dijawab 200 + ZIP kosong (isi berkas tetap tertahan cek
+        // kanonik ZipCreator, tetapi responsnya tidak jujur dan siklus
+        // pembuatan ZIP terbuang). Kini 404 seperti path terlarang lain.
+        if (!raw.startsWith(FS_PREFIX) && !raw.startsWith(MS_PREFIX)) return notFound()
         if (raw.startsWith(FS_PREFIX) && !isFsPathAllowed(raw.removePrefix(FS_PREFIX))) {
             return notFound()
         }
