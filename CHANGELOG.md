@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(docs): ujung terang gradien h1 digelapkan ke 3,68:1** -- --accent3 #42A5F5 di atas putih hanya 2,65:1, di bawah ambang teks besar 3:1, dan animasi gradShift membuatnya berkala nyaris tak terbaca. Nilai baru #1E88E5 tetap menjadi ujung terang gradien (issue #1257).
 - **fix(remote): latar .toast-dot digelapkan agar glyph status terbaca (4,65-5,27:1)** -- Glyph ✓/✕/ℹ putih 8px di atas biru/hijau/merah terang hanya 2,21-2,87:1, di bawah ambang non-teks 3:1 sekalipun. Ketiga warna digelapkan sekeluarga (issue #1256).
 - **fix(remote): #mmMuteBtn dan #mmSeek kini berlabel aksesibel** -- Tombol bisu hanya berisi ikon SVG tanpa nama dan slider seek tanpa aria-label, sementara #mmVol sebarisnya lengkap. Keduanya kini membawa title + aria-label (issue #1255).
 - **fix(remote): chip breadcrumb kini tombol yang terjangkau keyboard di kedua perender** -- .fs-crumb dulu span + click saja di renderFsCrumbs dan renderMoveCrumbs. Chip navigasi kini <button> (listener lama melekat apa adanya); chip posisi saat ini tetap span dengan aria-current (issue #1254).
