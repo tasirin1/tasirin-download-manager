@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan kode mati: dua kondisi `contains` redundan di `isSocialMediaUrl` dibuang — cabang `cdninstagram.com`/`tiktokcdn.com` selalu terserap cabang tanpa `.com` di sebelahnya, jadi tak pernah menentukan hasil (issue #1155).
 - Perbaikan dokumentasi kode: empat komentar basi sisa era tema gelap/gradasi diluruskan mengikuti keadaan sekarang (petak ikon kini warna polos, badge status dan tema aplikasi kini terang) — kode di bawahnya sudah benar (issue #1154).
 - Perbaikan dokumentasi kode docs: kelas `.fi-purple` diganti nama menjadi `.fi-navy` — isinya sudah biru tua (#0D47A1) sejak penyelarasan palet, bukan ungu (issue #1153).
 - Perbaikan kode mati docs: tiga variabel CSS yatim di situs dokumentasi dibuang (`--bg2`, `--radius-sm`, `--shadow` — terdefinisi tetapi tak pernah dipakai) (issue #1152).

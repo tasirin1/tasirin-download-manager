@@ -317,8 +317,10 @@ object SocialMediaExtractor {
             !lower.contains("hentaihaven") && !lower.contains("drive.google.com") &&
             !lower.contains("facebook.com") && !lower.contains("fb.watch")
         ) return false
-        if (lower.contains("cdninstagram.com") || lower.contains("cdninstagram")) return false
-        if (lower.contains("tiktokcdn.com") || lower.contains("tiktokcdn")) return false
+        // Varian ".com" tak perlu disebut terpisah (issue #1155):
+        // "cdninstagram.com" selalu mengandung "cdninstagram".
+        if (lower.contains("cdninstagram")) return false
+        if (lower.contains("tiktokcdn")) return false
         return TT_HOST_RE.containsMatchIn(lower) ||
                 IG_HOST_RE.containsMatchIn(lower) ||
                 TW_HOST_RE.containsMatchIn(lower) ||
