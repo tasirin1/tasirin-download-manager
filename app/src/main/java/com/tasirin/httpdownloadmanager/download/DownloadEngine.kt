@@ -2630,7 +2630,7 @@ class DownloadEngine(appContext: Context) {
         val freeNow = saver.freeBytes()
         if (freeNow < MIN_FREE_BYTES) throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
 
-        val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES, item.username, item.password, trackId = item.id)
+        val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES, item.username, item.password, trackId = item.id, failOnTruncate = true)
             ?: throw IOException("Cannot fetch HLS manifest")
         // Pakai ulang rencana segar bila master tak berubah (#1061);
         // selain itu parse penuh dan simpan (peta dibatasi kasar: cache
@@ -3892,7 +3892,7 @@ class DownloadEngine(appContext: Context) {
         return safeMulDiv(totalUs, 128_000L, 8_000_000L)
     }
 
-    private fun fetchText(url: String, headers: String, maxBytes: Int, username: String = "", password: String = "", trackId: String = ""): String? {
+    private fun fetchText(url: String, headers: String, maxBytes: Int, username: String = "", password: String = "", trackId: String = "", failOnTruncate: Boolean = false): String? {
         // Kode HTTP non-2xx dicatat terpisah lalu dilempar sebagai
         // IOException("HTTP <kode>") (issue #1131): dulu semua kegagalan
         // — 404 permanen maupun putus jaringan — sama-sama jadi null,
@@ -3901,6 +3901,7 @@ class DownloadEngine(appContext: Context) {
         // dari jaringan (404 tetap di-retry penuh). Gagal jaringan
         // tetap null seperti sebelumnya.
         var httpError = -1
+        var truncatedFetch = false
         val body = runCatching {
             val conn = openAuthenticatedConnection(
                 url, method = "GET", username = username, password = password, headers = headers
@@ -3915,12 +3916,26 @@ class DownloadEngine(appContext: Context) {
                     httpError = code
                     return@runCatching null
                 }
-                readBounded(conn.inputStream, maxBytes)
+                // failOnTruncate (issue #1258): pemanggil yang memvonis isi
+                // (parser playlist) wajib tahu badan terpotong — tanpa
+                // penanda, playlist media sah > plafon divonis live palsu
+                // karena ENDLIST-nya hilang. Pemanggil lain tetap polos.
+                if (failOnTruncate) {
+                    val r = Streams.readBoundedFlagged(conn.inputStream, maxBytes)
+                    // Lemparan di dalam runCatching akan tertelan getOrNull,
+                    // jadi keterpotongan dicatat ke penanda luar (pola
+                    // httpError di fungsi ini) dan dilempar sesudahnya.
+                    if (r.truncated) truncatedFetch = true
+                    r.text
+                } else {
+                    readBounded(conn.inputStream, maxBytes)
+                }
             } finally {
                 if (trackId.isNotEmpty()) untrackConnection(trackId, conn)
                 conn.disconnect()
             }
         }.getOrNull()
+        if (truncatedFetch) throw IOException("HLS playlist too large")
         if (body == null && httpError > 0) throw IOException("HTTP $httpError")
         return body
     }
