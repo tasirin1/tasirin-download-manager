@@ -3828,7 +3828,15 @@ class DownloadEngine(appContext: Context) {
                 if (trackId.isNotEmpty()) untrackConnection(trackId, conn)
                 conn.disconnect()
             }
-        } catch (_: Exception) { null }
+        } catch (e: Exception) {
+            // Vonis playlist terlalu besar (#1241) bersifat final untuk
+            // semua kandidat (plafonnya sama), jadi jangan ditelan jadi
+            // null seperti gagal jaringan (issue #1259): teruskan agar
+            // sampai ke pengguna, bukan berakhir sebagai "No HLS
+            // segments found" yang generik.
+            if (e is IOException && e.message?.startsWith("HLS playlist too large") == true) throw e
+            null
+        }
         if (body == null) return null
         // Playlist live (event/DVR sliding window) tidak punya EXT-X-ENDLIST:
         // gagal cepat dengan pesan jelas, bukan mengunduh snapshot window
