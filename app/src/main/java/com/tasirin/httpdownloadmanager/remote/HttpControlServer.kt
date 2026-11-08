@@ -1546,7 +1546,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         finalizingUploads[id]?.let { pendingName ->
             val drained = drainBody(session)
             appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks finalizing -> pending")
-            val resp = jsonResponse(JSONObject().put("ok", true).put("pending", true).put("name", pendingName))
+            // Token verify WAJIB ikut (issue #1290): cabang ini terpicu
+            // persis saat respons chunk terakhir hilang dan klien retry —
+            // klien itu belum memegang token apa pun, dan tanpa token di
+            // sini pollFinalize-nya ditolak gerbang uploadVerify selamanya
+            // sampai vonis gagal palsu, padahal berkas selesai di server.
+            // Token bersifat HMAC tanpa-state per id, aman diterbitkan ulang.
+            val resp = jsonResponse(
+                JSONObject().put("ok", true).put("pending", true).put("name", pendingName)
+                    .put(
+                        "verify",
+                        ServerSecurity.createUploadVerifyToken(
+                            id,
+                            System.currentTimeMillis() + 24L * 60 * 60 * 1000L,
+                            StoragePrefs.partialStreamSecret(context)
+                        )
+                    )
+            )
             return if (drained) resp else resp.closeConnection()
         }
         if (length <= 0 || length > MAX_UPLOAD_BYTES) {
