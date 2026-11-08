@@ -638,7 +638,7 @@
  display: none; }
 
   .fs-crumb {
- display: inline-flex; align-items: center; min-height: 28px; padding: 4px 8px; border-radius: 999px; background: var(--bg-soft); border: 1px solid var(--line); font-weight: 600; font-size: 11.5px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+ display: inline-flex; align-items: center; min-height: 28px; padding: 4px 8px; border-radius: 999px; background: var(--bg-soft); border: 1px solid var(--line); font-weight: 600; font-size: 11.5px; font-family: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
 
   .fs-crumb:hover {
  color: var(--primary); border-color: var(--primary); }
@@ -3823,7 +3823,9 @@ function renderFsCrumbs(p) {
     if (part.dots) {
       return '<span class="fs-crumb-dots">\u2026</span>' + (last ? '' : '<span class="fs-crumb-sep">\u203A</span>');
     }
-    const chip = '<span class="fs-crumb' + (last ? ' on' : '') + '" data-path="' + encodeURIComponent(part.path) + '">' + escapeHtml(part.label) + '</span>';
+    const chip = last
+      ? '<span class="fs-crumb on" aria-current="location">' + escapeHtml(part.label) + '</span>'
+      : '<button type="button" class="fs-crumb" data-path="' + encodeURIComponent(part.path) + '">' + escapeHtml(part.label) + '</button>';
     return chip + (last ? '' : '<span class="fs-crumb-sep">\u203A</span>');
   }).join('');
   fsPathEl.querySelectorAll('.fs-crumb[data-path]').forEach(function (chip) {
@@ -5038,7 +5040,7 @@ function closeMovePicker() {
 
 function renderMoveCrumbs(p, el) {
   if (!p) {
-    el.innerHTML = '<span class="fs-crumb on">Storage roots</span>';
+    el.innerHTML = '<span class="fs-crumb on" aria-current="location">Storage roots</span>';
     return;
   }
   const parts = collapseCrumbs(fsCrumbParts(p));
@@ -5047,7 +5049,9 @@ function renderMoveCrumbs(p, el) {
     if (part.dots) {
       return '<span class="fs-crumb-dots">\u2026</span>' + (last ? '' : '<span class="fs-crumb-sep">\u203A</span>');
     }
-    const chip = '<span class="fs-crumb' + (last ? ' on' : '') + '" data-path="' + encodeURIComponent(part.path) + '">' + escapeHtml(part.label) + '</span>';
+    const chip = last
+      ? '<span class="fs-crumb on" aria-current="location">' + escapeHtml(part.label) + '</span>'
+      : '<button type="button" class="fs-crumb" data-path="' + encodeURIComponent(part.path) + '">' + escapeHtml(part.label) + '</button>';
     return chip + (last ? '' : '<span class="fs-crumb-sep">\u203A</span>');
   }).join('');
   el.querySelectorAll('.fs-crumb[data-path]').forEach(function (chip) {
