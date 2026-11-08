@@ -1725,8 +1725,9 @@
 .thumb-broken{visibility:hidden}
   /* Hormati preferensi gerak minim: matikan animasi toast, transisi
      bar progres, animasi masuk bottom-sheet (sheetFade/sheetUp
-     terlewat sampai #1201), dan putaran spinner pemilih media
-     (mmSpin terlewat sampai #1226). */
+     terlewat sampai #1201), dan putaran spinner pemilih media —
+     animasi mmSpin hidup di ::before (aturan #1226 menyasar elemen
+     induknya dan tidak efektif; dikoreksi #1236). */
   @media (prefers-reduced-motion: reduce) {
     .toast { animation: none; }
     .fill { transition: none; }
