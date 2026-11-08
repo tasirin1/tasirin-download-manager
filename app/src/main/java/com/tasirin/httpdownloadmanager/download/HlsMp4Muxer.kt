@@ -50,7 +50,11 @@ object HlsMp4Muxer {
 
             muxer.start()
             val videoBuf = videoBufferSize(vFormat)
-            val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
+            // Hitung frame hanya bila durasi benar-benar terpakai
+            // (issue #1245): daftar semua-nol dari playlist tanpa
+            // EXTINF selalu dialihkan writeAll ke fallback PTS, jadi
+            // pindaian penuh .ts untuknya selalu terbuang.
+            val videoFrameCount = if (segmentDurationsUs.any { it > 0L }) {
                 countVideoFrames(videoTs)
             } else 0
             // Nol sampel video = masukan korup total (issue #1217):
@@ -101,7 +105,11 @@ object HlsMp4Muxer {
 
             muxer.start()
             val videoBuf = videoBufferSize(vFormat)
-            val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
+            // Hitung frame hanya bila durasi benar-benar terpakai
+            // (issue #1245): daftar semua-nol dari playlist tanpa
+            // EXTINF selalu dialihkan writeAll ke fallback PTS, jadi
+            // pindaian penuh .ts untuknya selalu terbuang.
+            val videoFrameCount = if (segmentDurationsUs.any { it > 0L }) {
                 countVideoFrames(videoTs)
             } else 0
             // Kedua track wajib menghasilkan sampel (issue #1217):
