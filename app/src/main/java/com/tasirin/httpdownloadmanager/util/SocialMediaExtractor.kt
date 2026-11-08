@@ -1724,6 +1724,9 @@ object SocialMediaExtractor {
         val text = tweet.optString("text", "")
         val media = tweet.optJSONArray("media") ?: return emptyList()
         val options = mutableListOf<Result>()
+        // Sanitasi nama pengguna sekali di luar loop (issue #1205,
+        // kelas #1178): inputnya sama untuk semua item media.
+        val safeUser = sanitizeFileName(user)
 
         // Tweet multi-media: beri nomor urut pada nama (issue #397) —
         // sebelumnya semua video/foto satu tweet bernama persis sama dan
@@ -1740,13 +1743,13 @@ object SocialMediaExtractor {
                 "video", "gif" -> {
                     val directUrl = item.optString("url")
                     if (directUrl.startsWith("http")) {
-                        options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}$suffix.mp4", text, "Video", MIME_MP4))
+                        options.add(Result(directUrl, "Twitter_${safeUser}$suffix.mp4", text, "Video", MIME_MP4))
                     }
                 }
                 "photo" -> {
                     val directUrl = item.optString("url")
                     if (directUrl.startsWith("http")) {
-                        options.add(Result(directUrl, "Twitter_${sanitizeFileName(user)}$suffix.jpg", text, "Photo", "image/jpeg"))
+                        options.add(Result(directUrl, "Twitter_${safeUser}$suffix.jpg", text, "Photo", "image/jpeg"))
                     }
                 }
             }
