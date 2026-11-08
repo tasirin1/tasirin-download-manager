@@ -830,8 +830,9 @@
   .fs-load-more {
  width: 100%; padding: 10px 12px; font-size: 13px; font-weight: 600; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; transition: all .15s ease; }
 
+  /* Isi kini pola .empty berikon dari emptyHtml() (issue #1364). */
   .fs-noresults {
- padding: 26px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+ padding: 8px 0; }
 
   .fs-load-more:hover {
  border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
@@ -4133,16 +4134,19 @@ async function loadFs() {
       return;
     }
     fsMsg('Failed to load: ' + e, true);
-    fsList.innerHTML = emptyHtml('warn', 'Failed to load folder', String(e));
+    fsList.innerHTML = emptyHtml('warn', 'Failed to load folder', String(e), 'Retry');
+    const fsRb = fsList.querySelector('.cta button');
+    if (fsRb) fsRb.addEventListener('click', function () { loadFs(); });
   }
 }
 
 function showFsSkeleton() {
   fsRowCache = {};
   let html = '<div class="sk-list">';
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 3; i++) {
     html += '<div class="sk-item"><div class="sk-ico skeleton"></div><div class="sk-lines">' +
-      '<div class="sk-line w60 skeleton"></div><div class="sk-line w40 skeleton"></div></div></div>';
+      '<div class="sk-line w60 skeleton"></div><div class="sk-line w40 skeleton"></div>' +
+      '<div class="sk-line w80 skeleton"></div></div></div>';
   }
   fsList.innerHTML = html + '</div>';
 }
@@ -4370,7 +4374,6 @@ function fsSetSearch(q) {
     noRes = document.createElement('div');
     noRes.id = 'fsNoResults';
     noRes.className = 'fs-noresults hidden';
-    noRes.textContent = 'No files match your search.';
     fsList.appendChild(noRes);
   }
   const showNoRes = !!fsSearchQuery && fsItems.length > 0 && visible === 0;
@@ -4380,9 +4383,9 @@ function fsSetSearch(q) {
   // menjangkau sisanya (baris baru ikut tersaring saat dimuat, :3858).
   const hasUnloaded = fsTotal > fsItems.length;
   if (showNoRes && hasUnloaded) {
-    noRes.textContent = 'No matches in loaded items. Load more to search the rest.';
+    noRes.innerHTML = emptyHtml('search', 'No matches in loaded items', 'Load more to search the rest.');
   } else {
-    noRes.textContent = 'No files match your search.';
+    noRes.innerHTML = emptyHtml('search', 'No files match your search', 'Try a different search.');
   }
   noRes.classList.toggle('hidden', !showNoRes);
   const lm = document.getElementById('fsLoadMoreBtn');
