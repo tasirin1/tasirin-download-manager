@@ -39,6 +39,50 @@ object AdtsAac {
         val csd0: ByteArray,
         private val frames: () -> Iterator<ByteArray>
     ) {
+        /** Iterator frame dengan frame berpayload nol disaring
+         *  keluar (issue #1244): frame ADTS frameLen == headerLen
+         *  lolos penjaga kedua produsen dan akan menjadi sampel
+         *  0 byte di MediaMuxer; ia juga tak memuat sampel audio
+         *  sama sekali, jadi tak boleh dihitung indeks PTS.
+         *  Closeable diteruskan ke iterator asal. */
+        private fun filteredFrames(): Iterator<ByteArray> {
+            val src = frames()
+            return object : Iterator<ByteArray>, Closeable {
+                private var pending: ByteArray? = null
+                private var loaded = false
+
+                private fun load() {
+                    if (loaded) return
+                    loaded = true
+                    pending = null
+                    while (src.hasNext()) {
+                        val f = src.next()
+                        if (f.isNotEmpty()) {
+                            pending = f
+                            break
+                        }
+                    }
+                }
+
+                override fun hasNext(): Boolean {
+                    load()
+                    return pending != null
+                }
+
+                override fun next(): ByteArray {
+                    load()
+                    val f = pending ?: throw NoSuchElementException()
+                    loaded = false
+                    pending = null
+                    return f
+                }
+
+                override fun close() {
+                    (src as? Closeable)?.close()
+                }
+            }
+        }
+
         /** Jumlah frame AAC (menghitung dengan iterasi penuh sumber).
          *
          *  ACUAN UJI (issue #704) — bukan jalur produksi; produksi
@@ -47,7 +91,7 @@ object AdtsAac {
          *  jangan dipakai di jalur remux (issue #1134). */
         val frameCount: Int
             get() {
-                val it = frames()
+                val it = filteredFrames()
                 try {
                     var n = 0
                     while (it.hasNext()) {
@@ -63,7 +107,7 @@ object AdtsAac {
         /** true bila tidak ada frame AAC sama sekali. */
         val isEmpty: Boolean
             get() {
-                val it = frames()
+                val it = filteredFrames()
                 try {
                     return !it.hasNext()
                 } finally {
@@ -73,7 +117,7 @@ object AdtsAac {
 
         /** Jalankan `action` untuk tiap frame AAC (payload tanpa header ADTS). */
         fun forEachFrame(action: (ByteArray) -> Unit) {
-            val it = frames()
+            val it = filteredFrames()
             try {
                 while (it.hasNext()) action(it.next())
             } finally {
