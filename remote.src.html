@@ -888,7 +888,13 @@
  padding: 10px 14px;
  background: var(--topbar-bg);
  border-top: 1px solid var(--line); border-radius: 16px 16px 0 0;
- box-shadow: 0 -8px 24px rgba(23,32,58,.16); }
+ box-shadow: 0 -8px 24px rgba(23,32,58,.16); transition: transform .25s ease; }
+
+  /* Ikut auto-hide chrome (issue #1340): meluncur bersama tab bar,
+     bukan menggantung sendirian di atas ruang kosong. 68px = labuh
+     bottom bilah (60px + celah) agar lenyap tuntas dari layar. */
+  .fs-batch.batch-hide {
+ transform: translateY(calc(100% + 68px)); }
 
   .fs-batch .fs-batch-count-box {
  display: flex; align-items: center; gap: 8px; margin-right: auto; min-width: 0; }
@@ -2378,11 +2384,11 @@ let lastChromeY = window.scrollY || 0;
 function updateChromeHide() {
   const y = window.scrollY || 0;
   if (fabNewBtnEl) fabNewBtnEl.classList.toggle('fab-hide', y > 180 && y > lastChromeY + 6);
-  if (tabbarEl) {
-    const keyFocused = !!(tabbarEl.contains && tabbarEl.contains(document.activeElement));
-    const hide = !keyFocused && y > 260 && y > lastChromeY + 8;
-    tabbarEl.classList.toggle('tab-hide', hide);
-  }
+  const keyFocused = !!(tabbarEl && tabbarEl.contains && tabbarEl.contains(document.activeElement));
+  const hide = !keyFocused && y > 260 && y > lastChromeY + 8;
+  if (tabbarEl) tabbarEl.classList.toggle('tab-hide', hide);
+  if (fsBatchEl) fsBatchEl.classList.toggle('batch-hide', hide);
+  if (galBatchEl) galBatchEl.classList.toggle('batch-hide', hide);
   lastChromeY = y;
 }
 // Satu listener scroll untuk ketiga updater chrome, di belakang
