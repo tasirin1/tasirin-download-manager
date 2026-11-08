@@ -40,6 +40,16 @@ class StreamsTest {
     }
 
     @Test
+    fun `decodePercentEncoded - plus literal dan charset dihormati`() {
+        // Issue #1242: '+' BUKAN spasi di RFC 5987 (URLDecoder salah).
+        assertEquals("a+b c.txt", decodePercentEncoded("a+b%20c.txt", "UTF-8"))
+        // Charset label menentukan decode byte %E9: e-acute di Latin-1.
+        assertEquals("caf\u00E9.txt", decodePercentEncoded("caf%E9.txt", "ISO-8859-1"))
+        // Persen rusak dibiarkan apa adanya, bukan gagal total.
+        assertEquals("100%zz", decodePercentEncoded("100%zz", "UTF-8"))
+    }
+
+    @Test
     fun `baca nol beruntun tak gantung - kembalikan parsial`() {
         // Kontrak InputStream membolehkan read() = 0: helper wajib gagal cepat
         // (pola guard HttpBody), bukan busy-loop selamanya.

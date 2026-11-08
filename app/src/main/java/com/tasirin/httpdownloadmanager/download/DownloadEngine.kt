@@ -27,6 +27,7 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.readBounded
+import com.tasirin.httpdownloadmanager.util.decodePercentEncoded
 import com.tasirin.httpdownloadmanager.util.readBoundedFlagged
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -55,7 +56,6 @@ import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import javax.net.ssl.HttpsURLConnection
 import java.net.URL
-import java.net.URLDecoder
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -4988,9 +4988,13 @@ class DownloadEngine(appContext: Context) {
             val value = star.groupValues[1].trim()
             val idx = value.indexOf("''")
             if (idx >= 0) {
-                val decoded = runCatching {
-                    URLDecoder.decode(value.substring(idx + 2), "UTF-8")
-                }.getOrNull()
+                // RFC 5987 (issue #1242): charset dari label nilai,
+                // '+' literal — URLDecoder salah untuk keduanya.
+                val charsetName = value.substring(0, idx)
+                    .ifBlank { "UTF-8" }
+                val decoded = decodePercentEncoded(
+                    value.substring(idx + 2), charsetName
+                )
                 if (!decoded.isNullOrBlank()) return decoded
             }
         }

@@ -16,6 +16,31 @@ private const val MAX_ZERO_READS = 32
  *  menjanjikan "lalu tutup" membuat pemanggil baru bisa lupa menutup
  *  dan membocorkan koneksi. Dipindah ke sini agar bisa diuji unit di
  *  CI (murni JVM). */
+/** Decode nilai persen-enkode dengan charset bernama (dipakai
+ *  filename* RFC 5987, issue #1242): TIDAK seperti URLDecoder,
+ *  '+' adalah literal di sini (bukan spasi) dan charset dari label
+ *  nilai dihormati, bukan dipaksa UTF-8. Urutan persen rusak
+ *  dibiarkan apa adanya. */
+fun decodePercentEncoded(encoded: String, charsetName: String): String? =
+    runCatching {
+        val bytes = java.io.ByteArrayOutputStream(encoded.length)
+        var i = 0
+        while (i < encoded.length) {
+            val c = encoded[i]
+            if (c == '%' && i + 2 < encoded.length) {
+                val v = encoded.substring(i + 1, i + 3).toIntOrNull(16)
+                if (v != null) {
+                    bytes.write(v)
+                    i += 3
+                    continue
+                }
+            }
+            bytes.write(c.code and 0xFF)
+            i++
+        }
+        String(bytes.toByteArray(), charset(charsetName))
+    }.getOrNull()
+
 fun readBounded(input: InputStream, max: Int): String =
     readBoundedFlagged(input, max).text
 
