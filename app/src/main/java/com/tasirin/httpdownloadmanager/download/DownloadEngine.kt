@@ -2604,9 +2604,17 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun isHlsManifestUrl(url: String): Boolean {
-        return url.contains("manifest.googlevideo.com") ||
-            url.contains("/api/manifest/hls") ||
-            url.contains(".m3u8", ignoreCase = true)
+        if (url.contains("manifest.googlevideo.com") ||
+            url.contains("/api/manifest/hls")
+        ) return true
+        // Akhiran path saja (issue #1159): substring ".m3u8" atas URL
+        // utuh juga menangkap tautan berkas biasa yang query/path-nya
+        // memuat ".m3u8" (mis. ?file=clip.m3u8) dan selalu
+        // mengarahkannya ke jalur HLS sampai FAILED "No HLS segments
+        // found" — kelas kesalahan #843/#844. Query/fragment dibuang
+        // dulu, lalu akhiran path yang dinilai.
+        val pathOnly = url.substringBefore('?').substringBefore('#')
+        return pathOnly.endsWith(".m3u8", ignoreCase = true)
     }
 
     /** Unduh HLS (m3u8): pilih varian terbaik, unduh semua segmen .ts lalu
