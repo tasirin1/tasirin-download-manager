@@ -355,7 +355,10 @@ object HlsParser {
             // bila basis rusak; hanya http/https yang diizinkan).
             val scheme = cleanBase.substringBefore("://", "https").lowercase(Locale.ROOT)
                 .takeIf { it == "http" || it == "https" } ?: "https"
-            return "$scheme:$relative"
+            // Segmen titik ikut dinormalkan (issue #1187): cabang ini
+            // terlewat saat #1163 menormalkan tiga cabang gabung lain,
+            // sehingga "//cdn/x/../y.ts" lolos mentah ke server.
+            return normalizeDotSegments("$scheme:$relative")
         }
         if (relative.startsWith("/")) {
             // Root-relative butuh host valid; base rusak -> kembalikan

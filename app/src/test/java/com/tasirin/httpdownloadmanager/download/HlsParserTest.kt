@@ -201,6 +201,19 @@ class HlsParserTest {
             "https://cdn.example.com/a/b/d/e.ts",
             HlsParser.resolveUrl("https://cdn.example.com/a/b/pl.m3u8", "d/./e.ts")
         )
+        // Protocol-relative ikut dinormalkan (issue #1187).
+        assertEquals(
+            "https://cdn.example.com/y.ts",
+            HlsParser.resolveUrl("https://a.com/pl/list.m3u8", "//cdn.example.com/x/../y.ts")
+        )
+        assertEquals(
+            "http://cdn.example.com/a/b.ts",
+            HlsParser.resolveUrl("http://a.com/pl/list.m3u8", "//cdn.example.com/a/./b.ts")
+        )
+        assertEquals(
+            "https://cdn.example.com/x/y.ts",
+            HlsParser.resolveUrl("https://a.com/pl/list.m3u8", "//cdn.example.com/x/y.ts")
+        )
     }
 
     @Test
