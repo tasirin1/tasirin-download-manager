@@ -113,7 +113,8 @@ class App : Application() {
             // network yang berhenti jadi default tak pernah dilaporkan
             // hilang, jadi entri himpunannya basi menetap dan networkUp
             // macet true. Di jalur default, onAvailable MENGGANTI isi
-            // himpunan dan onLost mengosongkannya.
+            // himpunan dan onLost mengosongkannya bila yang hilang
+            // memang isi himpunan saat ini (issue #1164).
             val defaultCallback = Build.VERSION.SDK_INT >= 24
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
@@ -132,7 +133,19 @@ class App : Application() {
                     // networkUp tetap true (issue #954).
                     synchronized(availableNetworks) {
                         if (defaultCallback) {
-                            availableNetworks.clear()
+                            // Kosongkan hanya bila yang hilang adalah
+                            // isi himpunan saat ini (issue #1164):
+                            // platform bisa mengirim onAvailable(default
+                            // baru) SEBELUM onLost(default lama) saat
+                            // default berganti — mengosongkan buta
+                            // memasang networkUp=false palsu dan menahan
+                            // failover mirror tanpa batas sampai
+                            // pergantian jaringan berikutnya. Kabar
+                            // hilang untuk network yang bukan isi
+                            // himpunan adalah kabar basi, abaikan.
+                            if (availableNetworks.contains(network)) {
+                                availableNetworks.clear()
+                            }
                         } else {
                             availableNetworks.remove(network)
                         }
