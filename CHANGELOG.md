@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(ui): progressSig kini memuat progressPercentOverride** -- Flip override pada HLS 0-byte mengganti format label progres di adapter tetapi tak mengubah tanda tangan, jadi label tertahan sampai perubahan lain memicu kiriman (issue #1282).
 - **fix(ui): lapisan teks galeri dipergelap ke alfa 60% (5,14:1)** -- Nama/info putih di atas placeholder tanpa thumbnail hanya 2,90:1 pada alfa 40%; alfa 60% menembus ambang dan ikut menolong keterbacaan di atas thumbnail sungguhan (issue #1281).
 - **fix(ui): text_hint digelapkan ke #59626E (4,93:1 di kolom tak berfokus)** -- Hint AppInput hanya 4,13:1 di atas latar kolom bawaan; keadaan berfokus ikut naik ke 6,18:1 (issue #1280).
 - **fix(ui): text_secondary digelapkan ke #5A6270 (4,91:1 di kartu seksi)** -- Label seksi sosial dialog Add Download hanya 4,15:1 di atas bg_card_section; nilai baru menaikkan kontras di semua permukaan pemakai warna ini (issue #1279).

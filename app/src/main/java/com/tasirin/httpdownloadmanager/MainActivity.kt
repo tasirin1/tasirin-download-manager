@@ -1768,6 +1768,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             // tertahan gerbang throttle, dan daftar menampilkan lokasi
             // lama (Open menembak berkas yang sudah dipindah).
             h = h * 31 + (it.contentUri?.hashCode() ?: 0)
+            // Override persen ikut ditandatangani (issue #1282): flip
+            // -1 ke 0 pada HLS 0-byte mengganti format label progres di
+            // bind adapter, tetapi tanpa baris ini sig tak berubah dan
+            // format baru tertahan tanpa kiriman trailing.
+            h = h * 31 + it.progressPercentOverride
             h = h * 31 + (it.filePath?.hashCode() ?: 0)
             h = h * 31 + (if (it.checksumVerified) 1 else 0)
             h = h * 31 + (if (it.monitor) 1 else 0)
