@@ -1996,7 +1996,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             mime = "application/zip",
             input = input,
             total = total,
-            rangeHeader = session.headers["range"] ?: session.headers["Range"],
+            rangeHeader = session.headers["range"],
             download = true
         )
         if (fsSkipped > 0) response.addHeader("X-Zip-Skipped", fsSkipped.toString())
@@ -2398,7 +2398,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             mime = "application/zip",
             input = input,
             total = total,
-            rangeHeader = session.headers["range"] ?: session.headers["Range"],
+            rangeHeader = session.headers["range"],
             download = true
         )
         // Pilihan yang gugur — path pra-tokenisasi (#849) maupun item
@@ -2533,7 +2533,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 mime = mime,
                 input = stream,
                 total = total,
-                rangeHeader = session.headers["range"] ?: session.headers["Range"],
+                rangeHeader = session.headers["range"],
                 download = download
             )
         } catch (e: Exception) {
@@ -2587,7 +2587,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 mime = mime,
                 input = chain,
                 total = chain.totalLength,
-                rangeHeader = session.headers["range"] ?: session.headers["Range"],
+                rangeHeader = session.headers["range"],
                 download = false
             )
         }
@@ -2610,7 +2610,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             mime = mime,
             input = input,
             total = total,
-            rangeHeader = session.headers["range"] ?: session.headers["Range"],
+            rangeHeader = session.headers["range"],
             download = false
         )
     }
@@ -2690,7 +2690,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (token.isEmpty()) return notFound()
         val raw = MediaLibrary.decodeToken(token) ?: return notFound()
         val download = session.param("dl") == "1"
-        val rangeHeader = session.headers["range"] ?: session.headers["Range"]
+        val rangeHeader = session.headers["range"]
         val total: Long
         when {
             raw.startsWith("f:") -> {
@@ -4392,7 +4392,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  gerbang token ZIP agar "lanjutan" dinilai dari offset, bukan
      *  sekadar keberadaan header (issue #1266). */
     private fun zipRangeStart(session: IHTTPSession): Long {
-        val h = session.headers["range"] ?: session.headers["Range"] ?: return -1L
+        val h = session.headers["range"] ?: return -1L
         val v = h.trim()
         if (!v.startsWith("bytes=")) return 0L
         val start = v.removePrefix("bytes=").substringBefore('-').trim()
@@ -4638,7 +4638,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 mime = MimeTypes.forFile(item.fileName),
                 input = input,
                 total = total,
-                rangeHeader = session.headers["range"] ?: session.headers["Range"],
+                rangeHeader = session.headers["range"],
                 download = true
             )
         } catch (e: Exception) {
