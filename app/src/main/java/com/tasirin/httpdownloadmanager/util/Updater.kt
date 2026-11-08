@@ -41,21 +41,25 @@ object Updater {
         // Daftar dulu: rilis latest kadang mapping-only tanpa APK sehingga
         // cache basi tersaji sebagai update. Daftar 20 rilis menemukan APK
         // terbaru yang sebenarnya; gagal jaringan baru pakai cache.
+        var listChecked = false
         get(context, LIST_API)?.let { body ->
-            // Satu parse: daftar sukses tapi tanpa APK = fakta baru (bukan
-            // gagal jaringan) sehingga jangan sajikan cache basi; body
-            // bukan-array = respons aneh sehingga fallback cache.
+            // Satu parse: body bukan-array = respons aneh sehingga fallback
+            // cache. Daftar sukses tapi tanpa APK BUKAN fakta final: 20
+            // rilis teratas bisa penuh prerelease/draft/mapping-only,
+            // jadi lanjut ke endpoint latest di bawah sebelum menyimpulkan
+            // tak ada update (issue #1136) — tetap tanpa cache basi.
             // Sebelumnya body di-parse 2x (bestFromReleasesList + isReleasesList).
             val arr = runCatching { org.json.JSONArray(body) }.getOrNull()
                 ?: return loadCached(context)
+            listChecked = true
             val best = runCatching { bestFromReleasesList(arr) }.getOrNull()
             if (best != null) {
                 saveCached(context, best)
                 return best
             }
-            return null
         }
-        val body = get(context, LATEST_API) ?: return loadCached(context)
+        val body = get(context, LATEST_API)
+            ?: return if (listChecked) null else loadCached(context)
         val best = runCatching { bestFromRelease(JSONObject(body)) }.getOrNull()
         if (best != null) {
             saveCached(context, best)
