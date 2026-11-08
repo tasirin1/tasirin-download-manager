@@ -927,4 +927,31 @@ class SocialMediaExtractorTest {
         assertEquals(null, SocialMediaExtractor.parseContentDispositionFileName(null))
         assertEquals(null, SocialMediaExtractor.parseContentDispositionFileName("attachment"))
     }
+
+    @Test
+    fun `extractBalancedPlayerResponse - kurung seimbang sadar string`() {
+        // Issue #1283: pemindai jalur YouTube-dari-halaman ini logika
+        // murni tanpa uji. Ekspektasi dibuktikan port Python 1:1.
+        assertEquals("{\"a\":1}",
+            SocialMediaExtractor.extractBalancedPlayerResponse("ytInitialPlayerResponse = {\"a\":1};"))
+        // Bersarang dalam tak terpotong di kurung tutup pertama.
+        assertEquals("{\"a\":{\"b\":{\"c\":1}},\"d\":2}",
+            SocialMediaExtractor.extractBalancedPlayerResponse("x ytInitialPlayerResponse={\"a\":{\"b\":{\"c\":1}},\"d\":2}; var"))
+        // Kurung di dalam string bukan penutup.
+        assertEquals("{\"t\":\"} not end {\"}",
+            SocialMediaExtractor.extractBalancedPlayerResponse("ytInitialPlayerResponse = {\"t\":\"} not end {\"};"))
+        // Kutip ter-escape tak mengakhiri string.
+        assertEquals("{\"t\":\"a\\\"}b\"}",
+            SocialMediaExtractor.extractBalancedPlayerResponse("ytInitialPlayerResponse = {\"t\":\"a\\\"}b\"};"))
+        // Identifier lebih panjang dengan awalan sama ditolak.
+        assertEquals(null,
+            SocialMediaExtractor.extractBalancedPlayerResponse("ytInitialPlayerResponseFoo = {\"a\":1};"))
+        assertEquals(null,
+            SocialMediaExtractor.extractBalancedPlayerResponse("no key here {\"a\":1}"))
+        // Tak seimbang dan bukan objek: null.
+        assertEquals(null,
+            SocialMediaExtractor.extractBalancedPlayerResponse("ytInitialPlayerResponse = {\"a\":1;"))
+        assertEquals(null,
+            SocialMediaExtractor.extractBalancedPlayerResponse("ytInitialPlayerResponse = 42;"))
+    }
 }
