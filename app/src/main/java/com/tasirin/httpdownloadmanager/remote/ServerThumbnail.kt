@@ -114,7 +114,13 @@ private fun thumbSourceStamp(ctx: Context, raw: String): String = when {
             ),
             null, null, null
         )?.use { c ->
-            if (c.moveToFirst()) "${c.getLong(0)}:${c.getLong(1)}" else ""
+            // DATE_MODIFIED MediaStore dalam DETIK: samakan ke
+            // milidetik seperti cap f: di atas (issue #1171) agar
+            // penilaian jendela bertumbuh isThumbStampGrowing —
+            // yang membandingkan dengan jam milidetik — bisa menilai
+            // sumber u: juga. (Kunci cache u: berubah sekali karena
+            // satuan cap berubah; thumbnail dibuat ulang sekali.)
+            if (c.moveToFirst()) "${c.getLong(0) * 1000}:${c.getLong(1)}" else ""
         } ?: ""
     }.getOrDefault("")
     else -> ""
@@ -174,7 +180,14 @@ internal fun getOrCreateThumb(
     // berinode baru, jadi thumbnail berkas lama di slot tidak tersaji
     // untuknya — slot dibuat ulang sekali untuk inode baru.
     val stamp = thumbSourceStamp(ctx, raw)
-    val growing = raw.startsWith("f:") && isThumbStampGrowing(stamp, System.currentTimeMillis())
+    // Sumber u: ikut perlakuan bertumbuh sejak #1171 (dulu dibatasi
+    // f:): video MediaStore yang sedang ditulis aplikasi lain
+    // mengorbankan satu .jpg yatim per perubahan cap persis seperti
+    // berkas. Slot path-saja untuk u: tanpa penjaga inode (tak ada
+    // stat path) — hanya jendela 20 detik yang menjaganya; sesudah
+    // berkas diam kunci bercap berlaku lagi dan thumbnail dibuat
+    // ulang sekali dari isi final, sama seperti f:.
+    val growing = isThumbStampGrowing(stamp, System.currentTimeMillis())
     val fileInode: Long? = if (raw.startsWith("f:")) thumbFileInode(raw) else null
     // Berkas diam pun membawa inode dalam capnya (issue #897):
     // mtime+ukuran saja bisa identik pada penggantian ber-cap
