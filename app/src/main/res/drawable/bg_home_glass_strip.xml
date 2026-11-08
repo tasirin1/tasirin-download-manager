@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Kartu kaca tema gelap: isi putih transparan + garis tepi terang tipis. -->
+<!-- Strip kartu tema terang: isi putih padat + garis tepi halus. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <solid android:color="@color/home_glass_fill" />
