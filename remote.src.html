@@ -3190,7 +3190,6 @@ function galTopPad() {
 function trimGalleryTop() {
   const cells = galleryGrid.querySelectorAll('.gal-cell');
   if (cells.length <= GAL_MAX_CELLS) return;
-  let h = 0;
   const drop = cells.length - GAL_MAX_CELLS;
   // Sel terfokus yang ikut dibuang menyeret fokus ke body diam-diam
   // (issue #985): catat posisinya agar fokus dipindah ke sel pertama
@@ -3200,11 +3199,13 @@ function trimGalleryTop() {
     active.classList.contains('gal-cell') &&
     Array.prototype.indexOf.call(cells, active) >= 0 &&
     Array.prototype.indexOf.call(cells, active) < drop);
-  // Baca dulu semuanya, hapus belakangan: baca-tulis selang-seling memaksa
-  // reflow sinkron per cell (layout thrash) sehingga scroll jank di WebView tua.
-  for (let i = 0; i < drop; i++) {
-    h += cells[i].offsetHeight + GAL_ROW_GAP;
-  }
+  // Tinggi yang hilang diukur dari pergeseran sel pertama yang BERTAHAN
+  // (issue #1183): grid berisi 2-6 kolom, jadi menjumlah tinggi per sel
+  // seperti dulu mengompensasi sebanyak faktor kolom. Selisih offsetTop
+  // jangkar sebelum/sesudah penghapusan adalah tinggi baris yang benar-
+  // benar hilang, berapa pun jumlah kolom dan baris parsialnya.
+  const anchor = cells[drop];
+  const anchorTop = anchor ? anchor.offsetTop : 0;
   for (let i = 0; i < drop; i++) {
     const imgs = cells[i].querySelectorAll('img');
     for (let j = 0; j < imgs.length; j++) {
@@ -3212,6 +3213,7 @@ function trimGalleryTop() {
     }
     cells[i].remove();
   }
+  const h = anchor ? Math.max(0, anchorTop - anchor.offsetTop) : 0;
   galTopHidden += drop;
   galleryGrid.style.paddingTop = (galTopPad() + h) + 'px';
   if (focusDropped) {
@@ -3243,11 +3245,23 @@ function restoreGalleryTop() {
   }
   if (!count) return;
   const first = galleryGrid.querySelector('.gal-cell');
+  const firstTop = first ? first.offsetTop : 0;
   galleryGrid.insertBefore(frag, first);
-  const cells = galleryGrid.querySelectorAll('.gal-cell');
+  // Kebalikan trim (issue #1183): tinggi yang kembali = pergeseran sel
+  // pertama lama. Tanpa jangkar (grid kosong), jumlahkan per BARIS dari
+  // sel yang disisipkan (sel pertama tiap baris menurut offsetTop).
   let h = 0;
-  for (let k = 0; k < count && k < cells.length; k++) {
-    h += cells[k].offsetHeight + GAL_ROW_GAP;
+  if (first) {
+    h = Math.max(0, first.offsetTop - firstTop);
+  } else {
+    const cells = galleryGrid.querySelectorAll('.gal-cell');
+    let lastTop = null;
+    for (let k = 0; k < count && k < cells.length; k++) {
+      if (cells[k].offsetTop !== lastTop) {
+        h += cells[k].offsetHeight + GAL_ROW_GAP;
+        lastTop = cells[k].offsetTop;
+      }
+    }
   }
   galTopHidden -= count;
   if (galTopHidden <= 0) {

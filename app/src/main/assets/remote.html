@@ -927,16 +927,14 @@ return (parseInt(galleryGrid.style.paddingTop || '0', 10) || 0);
 function trimGalleryTop() {
 const cells = galleryGrid.querySelectorAll('.gal-cell');
 if (cells.length <= GAL_MAX_CELLS) return;
-let h = 0;
 const drop = cells.length - GAL_MAX_CELLS;
 const active = document.activeElement;
 const focusDropped = !!(active && active.classList &&
 active.classList.contains('gal-cell') &&
 Array.prototype.indexOf.call(cells, active) >= 0 &&
 Array.prototype.indexOf.call(cells, active) < drop);
-for (let i = 0; i < drop; i++) {
-h += cells[i].offsetHeight + GAL_ROW_GAP;
-}
+const anchor = cells[drop];
+const anchorTop = anchor ? anchor.offsetTop : 0;
 for (let i = 0; i < drop; i++) {
 const imgs = cells[i].querySelectorAll('img');
 for (let j = 0; j < imgs.length; j++) {
@@ -944,6 +942,7 @@ if (window._thumbRelease) window._thumbRelease(imgs[j]);
 }
 cells[i].remove();
 }
+const h = anchor ? Math.max(0, anchorTop - anchor.offsetTop) : 0;
 galTopHidden += drop;
 galleryGrid.style.paddingTop = (galTopPad() + h) + 'px';
 if (focusDropped) {
@@ -972,11 +971,20 @@ count++;
 }
 if (!count) return;
 const first = galleryGrid.querySelector('.gal-cell');
+const firstTop = first ? first.offsetTop : 0;
 galleryGrid.insertBefore(frag, first);
-const cells = galleryGrid.querySelectorAll('.gal-cell');
 let h = 0;
+if (first) {
+h = Math.max(0, first.offsetTop - firstTop);
+} else {
+const cells = galleryGrid.querySelectorAll('.gal-cell');
+let lastTop = null;
 for (let k = 0; k < count && k < cells.length; k++) {
+if (cells[k].offsetTop !== lastTop) {
 h += cells[k].offsetHeight + GAL_ROW_GAP;
+lastTop = cells[k].offsetTop;
+}
+}
 }
 galTopHidden -= count;
 if (galTopHidden <= 0) {
