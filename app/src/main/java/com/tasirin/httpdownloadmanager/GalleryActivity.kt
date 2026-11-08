@@ -471,12 +471,20 @@ private class GalleryAdapter(
     // kali saat scroll, membuat SimpleDateFormat per bind itu alokasi sia-sia.
     // (SimpleDateFormat tidak thread-safe, tapi bind selalu di main thread.)
     private var dateFormat: java.text.SimpleDateFormat? = null
+    private var dateFormatLocale: java.util.Locale? = null
 
     private fun formatDate(ms: Long): String {
         if (ms <= 0) return ""
-        val fmt = dateFormat ?: java.text.SimpleDateFormat(
-            "dd MMM yyyy", java.util.Locale.getDefault()
-        ).also { dateFormat = it }
+        // Locale diingat bersama formatter (issue #1306): komentar di
+        // atas menjanjikan cache per-locale, tetapi kode lama menyimpan
+        // formatter pertama selamanya — perubahan bahasa sistem saat
+        // aplikasi hidup membuat singkatan bulan basi sampai proses mati.
+        val locale = java.util.Locale.getDefault()
+        val fmt = dateFormat?.takeIf { dateFormatLocale == locale }
+            ?: java.text.SimpleDateFormat("dd MMM yyyy", locale).also {
+                dateFormat = it
+                dateFormatLocale = locale
+            }
         return fmt.format(java.util.Date(ms))
     }
 
