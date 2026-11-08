@@ -178,6 +178,14 @@ class App : Application() {
     /** Start server + service penjaga proses di thread latar. */
     private fun startServerAndService() {
         Thread {
+            // Nilai ulang gerbang di dalam badan utas (dugaan #1265):
+            // kedua situs panggil menilai pref sebelum lompatan utas;
+            // tanpa penilaian ulang ini, perubahan pref di antaranya
+            // (mis. penegakan PIN) bisa menyalakan server melawan pref
+            // terakhir. Semantik situs panggil tak berubah.
+            if (!StoragePrefs.isServerBackgroundEnabled(this@App) ||
+                !StoragePrefs.isServerStartAllowed(this@App)
+            ) return@Thread
             // Wajib lewat helper berkunci yang sama dengan jalur
             // lain (#286): start langsung bisa menyela
             // restartHttpServer yang sedang menukar instance,
