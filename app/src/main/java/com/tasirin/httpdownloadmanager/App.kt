@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import com.tasirin.httpdownloadmanager.download.DownloadEngine
 import com.tasirin.httpdownloadmanager.download.DownloadService
 import com.tasirin.httpdownloadmanager.remote.HttpControlServer
+import com.tasirin.httpdownloadmanager.remote.ShareEntry
 import com.tasirin.httpdownloadmanager.util.CrashLog
 import com.tasirin.httpdownloadmanager.util.MediaLibrary
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
@@ -234,6 +235,15 @@ class App : Application() {
         // Sejak #286 kunci yang sama juga membungkus start/stop langsung.
         private val restartServerLock = Any()
 
+        /** Tautan share yang dibawa melewati stop-start manual
+         *  (issue #1166): stopServer mengosongkan shareTokens, jadi
+         *  stopHttpServer men-snapshot-nya di sini dan startHttpServer
+         *  mengembalikannya — sejajar snapshot/restore jalur ganti
+         *  port di restartHttpServer, agar link /share 24 jam tak
+         *  mati hanya karena saklar server di Settings dimatikan
+         *  lalu dinyalakan lagi. */
+        private var sharesKeptAcrossStop: Map<String, ShareEntry> = emptyMap()
+
         // Penghitung operasi start/restart server yang sedang berjalan
         // (issue #488): bendera serverStartPending milik DownloadService
         // hanya menyala untuk start dari onCreate service sendiri,
@@ -303,7 +313,17 @@ class App : Application() {
             serverStartOps.incrementAndGet()
             try {
                 return synchronized(restartServerLock) {
-                    runCatching { httpServer.startServer() }.isSuccess
+                    val ok = runCatching { httpServer.startServer() }.isSuccess
+                    // Kembalikan tautan share yang disimpan stop manual
+                    // sebelumnya (issue #1166); restoreShares membuang
+                    // yang sudah kedaluwarsa.
+                    if (ok && sharesKeptAcrossStop.isNotEmpty()) {
+                        val kept = sharesKeptAcrossStop
+                        sharesKeptAcrossStop = emptyMap()
+                        runCatching { httpServer.restoreShares(kept) }
+                        logEvent("SERVER START: kept ${kept.size} share links across stop")
+                    }
+                    ok
                 }
             } finally {
                 serverStartOps.decrementAndGet()
@@ -313,6 +333,14 @@ class App : Application() {
         /** Stop server di bawah kunci siklus hidup yang sama (#286). */
         fun stopHttpServer(): Boolean =
             synchronized(restartServerLock) {
+                // Snapshot share SEBELUM stop (issue #1166), hanya bila
+                // server hidup: stop atas server yang sudah mati adalah
+                // no-op dan tak boleh menimpa snapshot stop sebelumnya
+                // dengan peta kosong hasil stopServer yang sudah jalan.
+                if (httpServer.isAlive) {
+                    sharesKeptAcrossStop =
+                        runCatching { httpServer.snapshotShares() }.getOrDefault(emptyMap())
+                }
                 runCatching { httpServer.stopServer() }.isSuccess
             }
 
