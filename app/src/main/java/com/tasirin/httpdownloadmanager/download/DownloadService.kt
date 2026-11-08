@@ -218,8 +218,11 @@ class DownloadService : Service() {
     /** Android 15+: dataSync FGS dibatasi enam jam saat aplikasi di latar. */
     @RequiresApi(35)
     override fun onTimeout(startId: Int, fgsType: Int) {
-        App.logEvent("SERVICE TIMEOUT: foreground type=$fgsType; pausing work")
-        runCatching { App.engine.pauseAll() }
+        App.logEvent("SERVICE TIMEOUT: foreground type=$fgsType; pausing work (autoResume kept)")
+        // Jeda paksa sistem, bukan inten pengguna (issue #1218):
+        // autoResume dipertahankan agar unduhan lanjut sendiri pada
+        // start berikutnya, sama seperti jalur proses mati mendadak.
+        runCatching { App.engine.pauseAll(keepAutoResume = true) }
         App.stopHttpServer()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf(startId)

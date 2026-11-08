@@ -1034,17 +1034,21 @@ class DownloadEngine(appContext: Context) {
         throw IOException("Too many redirects")
     }
 
-    fun pauseAll() {
+    /** [keepAutoResume] untuk jeda paksa SISTEM (issue #1218): jeda
+     *  inten pengguna mencabut autoResume (semantik jeda permanen),
+     *  tetapi timeout FGS bukan inten pengguna — item harus lanjut
+     *  sendiri pada start berikutnya seperti jalur proses mati. */
+    fun pauseAll(keepAutoResume: Boolean = false) {
         // Aksi massal wajib menunggu muatan awal (#264): menilai daftar
         // kosong di jendela muat membuat aksi pengguna batal diam-diam.
         if (!loadGate.isCompleted) {
-            deferUntilLoaded("pauseAll") { doPauseAll() }
+            deferUntilLoaded("pauseAll") { doPauseAll(keepAutoResume) }
             return
         }
-        doPauseAll()
+        doPauseAll(keepAutoResume)
     }
 
-    private fun doPauseAll() {
+    private fun doPauseAll(keepAutoResume: Boolean = false) {
         val targets = _items.value.filter {
             it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PENDING
         }
@@ -1073,7 +1077,7 @@ class DownloadEngine(appContext: Context) {
                 if (stillTarget) {
                     item.copy(
                         state = DownloadState.PAUSED,
-                        autoResume = false,
+                        autoResume = keepAutoResume && item.autoResume,
                         speedBps = 0,
                         etaSeconds = 0
                     )
