@@ -27,6 +27,7 @@ import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.readBounded
+import com.tasirin.httpdownloadmanager.util.readBoundedFlagged
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -3796,8 +3797,17 @@ class DownloadEngine(appContext: Context) {
                 if (code !in 200..299) {
                     return null
                 }
-                val b = readBounded(conn.inputStream, HLS_PROBE_MAX_BYTES)
-                b
+                val b = readBoundedFlagged(conn.inputStream, HLS_PROBE_MAX_BYTES)
+                if (b.truncated) {
+                    // Playlist raksasa terpotong plafon probe (issue
+                    // #1241): #EXT-X-ENDLIST hidup di ekor, jadi
+                    // memvonisnya live dari badan terpotong adalah
+                    // bohong — gagal dengan alasan yang benar.
+                    throw IOException(
+                        "HLS playlist too large (> ${HLS_PROBE_MAX_BYTES / 1000} KB)"
+                    )
+                }
+                b.text
             } finally {
                 if (trackId.isNotEmpty()) untrackConnection(trackId, conn)
                 conn.disconnect()

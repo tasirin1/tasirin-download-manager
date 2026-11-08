@@ -16,7 +16,16 @@ private const val MAX_ZERO_READS = 32
  *  menjanjikan "lalu tutup" membuat pemanggil baru bisa lupa menutup
  *  dan membocorkan koneksi. Dipindah ke sini agar bisa diuji unit di
  *  CI (murni JVM). */
-fun readBounded(input: InputStream, max: Int): String {
+fun readBounded(input: InputStream, max: Int): String =
+    readBoundedFlagged(input, max).text
+
+/** Hasil baca terbatas + penanda terpotong batas (issue #1241):
+ *  pemanggil yang memvonis isi dari EKOR badan (mis. #EXT-X-ENDLIST
+ *  di playlist HLS) wajib membedakan "isi memang tak ada" dari
+ *  "isi terpotong plafon", kalau tidak vonisnya bohong. */
+class BoundedRead(val text: String, val truncated: Boolean)
+
+fun readBoundedFlagged(input: InputStream, max: Int): BoundedRead {
     val buf = ByteArray(16 * 1024)
     // Kapasitas awal kecil lalu tumbuh: ByteArrayOutputStream(max) mengalokasi
     // penuh di muka (s.d. 16MB) untuk tiap probe walau body aslinya kecil.
@@ -37,5 +46,9 @@ fun readBounded(input: InputStream, max: Int): String {
         out.write(buf, 0, n)
         remaining -= n
     }
-    return String(out.toByteArray(), Charsets.UTF_8)
+    // Plafon tercapai persis: satu byte probe membedakan aliran yang
+    // memang habis dari yang terpotong batas kita.
+    val truncated = remaining == 0 &&
+        runCatching { input.read() }.getOrDefault(0) != -1
+    return BoundedRead(String(out.toByteArray(), Charsets.UTF_8), truncated)
 }
