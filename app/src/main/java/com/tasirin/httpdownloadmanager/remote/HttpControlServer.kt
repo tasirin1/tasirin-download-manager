@@ -3264,7 +3264,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                             val relPath = c.getString(iRel) ?: continue
                             if (folder.isNotEmpty() && !relPath.startsWith(folder)) continue
                             val rest = relPath.removePrefix(folder).trim('/')
-                            if (rest.isEmpty() || !rest.contains('/')) {
+                            // RELATIVE_PATH adalah path DIREKTORI berkas:
+                            // rest kosong = berkas langsung di folder ini;
+                            // rest tak kosong (dengan atau tanpa '/') =
+                            // berkas di subfolder, yang tercatat sebagai
+                            // entri dir dari segmen pertamanya. Syarat lama
+                            // `!rest.contains('/')` salah mengklasifikasikan
+                            // berkas subfolder tingkat pertama (rest =
+                            // "Anime") sebagai berkas folder induk dan
+                            // subfoldernya tak pernah muncul (issue #1182).
+                            if (rest.isEmpty()) {
                                 val name = c.getString(iName) ?: continue
                                 val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
                                 found.add(
