@@ -4355,7 +4355,20 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // Pindahkan ke peta terbakar (issue #1240): gerbang CSRF kini
         // menolak inisiasi baru dengan token ini, tetapi Range
         // lanjutan bersesi tetap dikenali sampai kedaluwarsa.
-        if (expiresAt != null) zipDlBurnedTokens[token] = expiresAt
+        if (expiresAt != null) {
+            // Peta terbakar ikut dibatasi (issue #1267): prune yang
+            // kedaluwarsa dulu, lalu buang yang paling cepat kedaluwarsa
+            // sampai di bawah cap — siklus cetak-bakar sesi sah tak
+            // boleh menumbuhkannya tanpa batas di jendela TTL.
+            synchronized(zipDlBurnedTokens) {
+                pruneZipDlTokens()
+                while (zipDlBurnedTokens.size >= MAX_ZIP_DL_BURNED_TOKENS) {
+                    val oldest = zipDlBurnedTokens.entries.minByOrNull { it.value } ?: break
+                    zipDlBurnedTokens.remove(oldest.key)
+                }
+                zipDlBurnedTokens[token] = expiresAt
+            }
+        }
         return true
     }
 
@@ -4747,6 +4760,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         /** Umur nonce CSRF halaman login (issue #1219). */
         private const val LOGIN_NONCE_TTL_MS = 600_000L
         private const val MAX_ZIP_DL_TOKENS = 16
+        private const val MAX_ZIP_DL_BURNED_TOKENS = 64
         private const val MAX_MEDIA_ZIP_TOKENS = 256
         private const val FS_STATS_TTL_MS = 10_000L
         /** Plafon entri yang dihitung fsStats rekursif (issue #398):
