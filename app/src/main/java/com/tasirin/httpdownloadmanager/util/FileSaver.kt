@@ -707,7 +707,12 @@ class FileSaver(context: Context) {
         val file = File(path)
         val parent = file.parentFile ?: return null
         val base = file.name
-        val algos = mapOf(".md5" to "MD5", ".sha1" to "SHA-1", ".sha256" to "SHA-256")
+        // Urutan dari yang terkuat (issue #1142): loop di bawah berhenti
+        // pada sidecar PERTAMA yang ada, dan berkas boleh membawa
+        // beberapa sidecar sekaligus — MD5 dulu membuat checksum lemah
+        // menang atas SHA-256 untuk berkas yang sama, berlawanan dengan
+        // preferensi Checksums.parseDigestHeader (sha-256 dipilih dulu).
+        val algos = mapOf(".sha256" to "SHA-256", ".sha1" to "SHA-1", ".md5" to "MD5")
         for ((ext, algo) in algos) {
             val side = File(parent, base + ext)
             if (side.exists()) {
