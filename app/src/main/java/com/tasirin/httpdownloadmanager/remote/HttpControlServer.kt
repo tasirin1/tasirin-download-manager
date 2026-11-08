@@ -4246,10 +4246,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     runCatching {
                         val now = System.currentTimeMillis()
                         val frameHash = frameHash64(payloadText)
-                        if (frameHash != sseLastFrameHash || now - sseLastPushAt > SSE_HEARTBEAT_MS) {
+                        val changed = frameHash != sseLastFrameHash
+                        if (changed || now - sseLastPushAt > SSE_HEARTBEAT_MS) {
                             sseLastFrameHash = frameHash
                             sseLastPushAt = now
-                            val frame = "data: $payloadText\n\n"
+                            // Heartbeat tanpa perubahan memakai frame
+                            // komentar SSE ringan (issue #1307): payload
+                            // penuh (daftar item + status) sebelumnya
+                            // dikirim ulang utuh tiap 3 detik ke semua
+                            // klien walau identik. Frame komentar
+                            // diabaikan EventSource secara spesifikasi,
+                            // cukup untuk menjaga koneksi tetap hidup.
+                            val frame = if (changed) "data: $payloadText\n\n" else ": hb\n\n"
                             val closed = sseClients.filter { it.isClosed }
                             if (closed.isNotEmpty()) sseClients.removeAll(closed)
                             sseClients.forEach { it.push(frame) }
