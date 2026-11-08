@@ -41,6 +41,10 @@ class FileSaverSweepTest {
         assertFalse(isPublishStagingName("film.mp4.part.0", known))
         assertFalse(isPublishStagingName("film.mp4", known))
         assertFalse(isPublishStagingName("film (1).mp4.part", known))
+        // Sufiks bertumpuk dari jalur kalah-lomba ikut cocok (issue #1193).
+        assertTrue(isPublishStagingName("film.mp4 (1) (1).part", known))
+        assertTrue(isPublishStagingName("film.mp4 (1) (2).part", setOf("film.mp4 (1)")))
+        assertFalse(isPublishStagingName("lain.mp4 (1) (1).part", known))
     }
 
     @Test

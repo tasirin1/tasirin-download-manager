@@ -1611,6 +1611,14 @@ internal fun isPublishStagingName(name: String, knownFinalNames: Set<String>): B
     if (!name.endsWith(".part")) return false
     val base = name.removeSuffix(".part")
     if (base in knownFinalNames) return true
-    val stripped = UNIQUE_SUFFIX_RE.find(base)?.groupValues?.get(1) ?: return false
-    return stripped in knownFinalNames
+    // Kupas sufiks unik BERULANG (issue #1193): jalur kalah-lomba
+    // uniqueTargetFile bisa membangkitkan sufiks bertumpuk
+    // ("film.mp4 (1) (1).part"); satu kupasan saja membuat staging
+    // seperti itu tak pernah cocok dan yatim selamanya tak tersapu.
+    var stripped = base
+    while (true) {
+        val m = UNIQUE_SUFFIX_RE.find(stripped) ?: return false
+        stripped = m.groupValues[1]
+        if (stripped in knownFinalNames) return true
+    }
 }
