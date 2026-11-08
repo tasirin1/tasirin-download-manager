@@ -62,8 +62,14 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy));
+        // Hanya respons OK yang masuk cache (issue #1175): tanpa
+        // penjaga ini halaman galat sesaat (404/500 origin) menimpa
+        // salinan baik dan disajikan sebagai fallback offline
+        // berikutnya. Cabang aset statis di atas sudah menjaga sama.
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
         return res;
       }).catch(() => caches.match(req).then((hit) => hit || caches.match('./')))
     );
