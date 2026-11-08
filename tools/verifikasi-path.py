@@ -1205,14 +1205,38 @@ def nama_fun_hilang(diff, lewati_berkas=()):
     return hilang
 
 
+# Korpus sumber dibaca SEKALI per proses (issue #1313): sebelumnya
+# masih_didefinisikan + pemanggil memindai + mengupas seluruh repo
+# untuk SETIAP nama fungsi yang hilang — O(nama x repo). Alat ini
+# berjalan satu kali per keadaan pohon, jadi cache tak bisa basi.
+_korpus_sumber = None
+
+
+def _korpus():
+    global _korpus_sumber
+    if _korpus_sumber is None:
+        mentah = {}
+        for path in jalan_repo(os.path.join("app", "src", "main", "java"), ext=(".kt", ".java")):
+            mentah[path] = baca(path)
+        bersih = {}
+        for path in jalan_repo("app", ext=(".kt", ".java", ".xml")):
+            bersih[path] = (
+                kupas_kode_jaga_baris(baca(path), kosongkan_string=True)
+                if path.endswith((".kt", ".java")) else baca(path)
+            )
+        _korpus_sumber = (mentah, bersih)
+    return _korpus_sumber
+
+
 def masih_didefinisikan(nama):
     # Bentuk simetris dengan nama_fun_hilang (issue #510): definisi
     # ekstensi "fun Receiver.nama(...)" juga berarti nama masih hidup.
     pola = re.compile(
         r"\bfun\s+(?:<[^>]*>\s*)?(?:[\w<][\w<>, ?]*\.)?%s\s*[\(<]"
         % re.escape(nama))
-    for path in jalan_repo(os.path.join("app", "src", "main", "java"), ext=(".kt", ".java")):
-        if pola.search(baca(path)):
+    mentah, _ = _korpus()
+    for teks in mentah.values():
+        if pola.search(teks):
             return True
     return False
 
@@ -1220,14 +1244,15 @@ def masih_didefinisikan(nama):
 def pemanggil(nama):
     pola = re.compile(r"\b%s\s*\(" % re.escape(nama))
     temu = []
-    for path in jalan_repo("app", ext=(".kt", ".java", ".xml")):
+    _, bersih_map = _korpus()
+    for path, bersih in bersih_map.items():
         # Komentar dikupas dulu (nomor baris dipertahankan): sebutan
         # nama di komentar bukan panggilan (issue #471 — insiden
         # "cache (" putaran 14 yang memaksa redaksi 5 komentar).
         # Pengupas sadar template (issue #483) + isi string ikut
         # dikosongkan (issue #484): sebutan nama di dalam string bukan
         # panggilan; ekspresi template tetap kode dan tetap terhitung.
-        bersih = kupas_kode_jaga_baris(baca(path), kosongkan_string=True) if path.endswith((".kt", ".java")) else baca(path)
+        # (Pengupasan kini terjadi sekali di _korpus, bukan per nama.)
         for i, baris in enumerate(bersih.splitlines(), 1):
             if pola.search(baris):
                 temu.append("%s:%d" % (path, i))
