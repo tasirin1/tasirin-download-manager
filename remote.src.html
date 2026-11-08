@@ -420,6 +420,11 @@
   .bar.hls .fill { background: linear-gradient(90deg, #42A5F5, #1E88E5, #1565C0); }
   .bar.downloading .fill { background: linear-gradient(90deg, #42A5F5, var(--primary), #0D47A1); }
   .bar.paused .fill { background: var(--amber); opacity: .7; }
+  /* Tema gelap (issue #1331): ujung hardcode #1565C0/#0D47A1 hanya
+     2,46:1/1,64:1 vs track gelap sehingga titik progres menyatu;
+     ujung kini token --primary-2 (>=8:1 vs track gelap). */
+  :root[data-theme="dark"] .bar.hls .fill { background: linear-gradient(90deg, #42A5F5, var(--primary-2)); }
+  :root[data-theme="dark"] .bar.downloading .fill { background: linear-gradient(90deg, #42A5F5, var(--primary-2)); }
   .err-text { font-weight: 600; }
   .err-dot { margin: 0 3px; color: var(--muted); }
   .err-status { color: var(--red); font-weight: 700; font-size: 11px; }
