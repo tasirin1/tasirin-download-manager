@@ -513,35 +513,63 @@ class FileSaver(context: Context) {
         tree: DocumentFile,
         fileName: String,
         copy: (OutputStream) -> Unit
-    ): Pair<DocumentFile, String>? {
+    ): Pair<DocumentFile, String>? =
+        when (val r = stageIntoDoc(tree, fileName, copy)) {
+            is StageResult.Ok -> r.doc to r.unique
+            else -> null
+        }
+
+    /** Hasil tarian staging bersama: dibedakan karena kedua pemanggil
+     *  memperlakukan kegagalan stream dan kegagalan rename secara
+     *  berbeda (writeCustomFolder: stream gagal = hasil null, rename
+     *  gagal = jatuh ke tulis langsung). */
+    private sealed class StageResult {
+        class Ok(val doc: DocumentFile, val unique: String) : StageResult()
+        object OpenFailed : StageResult()
+        object Unavailable : StageResult()
+    }
+
+    /** Tarian staging SAF bersama (issue #1301): klaim nama unik + buat
+     *  dokumen staging di dalam kunci nama, daftarkan in-flight, tulis
+     *  lewat stream, rename ke nama final, ambil URI otoritatif dari
+     *  pohon. Dokumen staging dibuang pada semua jalan gagal; galat
+     *  tulis dilempar ke pemanggil sesudah staging dibuang. Dipakai
+     *  copyToStagingDoc (publish gabungan) dan writeCustomFolder —
+     *  sebelumnya kedua aliran ini salinan nyaris identik yang bisa
+     *  membusuk terpisah. */
+    private fun stageIntoDoc(
+        tree: DocumentFile,
+        fileName: String,
+        write: (OutputStream) -> Unit
+    ): StageResult {
         var unique = ""
         val stagingDoc = synchronized(mergeLockFor(FileNames.safe(fileName))) {
             unique = uniqueDocumentName(tree, fileName, avoidStaging = true)
             tree.createFile(MimeTypes.forFile(unique), "$unique.part")
-        } ?: return null
+        } ?: return StageResult.Unavailable
         inFlightStagingNames.add(tree.uri.toString() + "|" + "$unique.part")
         try {
             val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
             if (output == null) {
                 runCatching { stagingDoc.delete() }
-                return null
+                return StageResult.OpenFailed
             }
             try {
-                output.use { copy(it) }
+                output.use { write(it) }
             } catch (e: Exception) {
                 runCatching { stagingDoc.delete() }
                 throw e
             }
             if (!runCatching { stagingDoc.renameTo(unique) }.getOrDefault(false)) {
                 runCatching { stagingDoc.delete() }
-                return null
+                return StageResult.Unavailable
             }
         } finally {
             inFlightStagingNames.remove(tree.uri.toString() + "|" + "$unique.part")
         }
-        // URI otoritatif dari pohon, sama seperti writeCustomFolder:
-        // objek hasil rename bisa menyimpan URI lama di sebagian provider.
-        return (tree.findFile(unique) ?: stagingDoc) to unique
+        // URI otoritatif dari pohon: objek hasil rename bisa menyimpan
+        // URI lama di sebagian provider.
+        return StageResult.Ok(tree.findFile(unique) ?: stagingDoc, unique)
     }
 
     private fun writeCustomFolder(
@@ -559,49 +587,18 @@ class FileSaver(context: Context) {
         // pola claimCustomDoc yang menahan kunci melewati createFile):
         // kunci yang dilepas di antaranya membiarkan dua tulis paralel
         // bernama sama sama-sama membuat/memakai staging yang sama.
-        var unique = ""
-        val stagingDoc = synchronized(mergeLockFor(FileNames.safe(fileName))) {
-            unique = uniqueDocumentName(tree, fileName, avoidStaging = true)
-            tree.createFile(MimeTypes.forFile(unique), "$unique.part")
+        // Tarian staging kini bersama stageIntoDoc (issue #1301);
+        // perlakuan gagalnya dipertahankan persis: stream staging tak
+        // terbuka = hasil null; dokumen/rename gagal = jatuh ke tulis
+        // langsung (perilaku lama) sebagai jalan terakhir.
+        when (val r = stageIntoDoc(tree, fileName, writer)) {
+            is StageResult.Ok -> PublishResult(
+                contentUri = r.doc.uri.toString(),
+                fileName = r.unique
+            )
+            StageResult.OpenFailed -> return null
+            StageResult.Unavailable -> writeCustomFolderDirect(tree, fileName, writer)
         }
-        var staged: PublishResult? = null
-        if (stagingDoc != null) {
-            // Produsen staging SAF kedua (issue #1249): daftarkan juga.
-            inFlightStagingNames.add(tree.uri.toString() + "|" + "$unique.part")
-            try {
-            val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
-            if (output == null) {
-                // Sama seperti jalur langsung: stream tak terbuka sesudah
-                // dokumen dibuat -> buang dokumen baru, hasil null.
-                runCatching { stagingDoc.delete() }
-                return null
-            }
-            try {
-                output.use { writer(it) }
-            } catch (e: Exception) {
-                runCatching { stagingDoc.delete() }
-                throw e
-            }
-            staged = if (runCatching { stagingDoc.renameTo(unique) }.getOrDefault(false)) {
-                // URI otoritatif diambil ulang dari pohon: objek dokumen
-                // hasil rename bisa menyimpan URI lama pada sebagian
-                // provider, jadi findFile adalah sumber kebenarannya.
-                val finalDoc = tree.findFile(unique)
-                PublishResult(
-                    contentUri = (finalDoc ?: stagingDoc).uri.toString(),
-                    fileName = unique
-                )
-            } else {
-                // Provider menolak rename: buang staging dan jatuh ke
-                // tulis langsung (perilaku lama) sebagai jalan terakhir.
-                runCatching { stagingDoc.delete() }
-                null
-            }
-            } finally {
-                inFlightStagingNames.remove(tree.uri.toString() + "|" + "$unique.part")
-            }
-        }
-        staged ?: writeCustomFolderDirect(tree, fileName, writer)
     }.getOrNull().also {
         // Jalur SAF tak melewati MediaStore/notifyMediaChanged, jadi
         // scanCache galeri wajib diinvalidasi eksplisit (issue #569):
