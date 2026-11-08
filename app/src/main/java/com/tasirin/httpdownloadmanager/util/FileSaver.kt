@@ -838,6 +838,38 @@ class FileSaver(context: Context) {
                         }
                     }
             }
+            // Pohon SAF folder kustom (issue #1220): staging dokumen
+            // "<nama>.part" dari publish/upload SAF tak terjangkau
+            // sapuan File di atas karena DocumentFile bukan
+            // java.io.File — proses mati di tengah salin meninggalkannya
+            // yatim permanen. Aturan sama persis dengan sapuan folder
+            // tujuan: hanya nama staging yang basisnya nama final item
+            // dikenal dan berumur >2 jam. lastModified 0 (provider tak
+            // memberi cap waktu) TIDAK disapu: lebih aman yatim
+            // tertinggal daripada menghapus staging yang sedang hidup.
+            // Tujuan move() sekali-pakai tak tersimpan URI-nya, jadi di
+            // luar jangkauan sapuan ini (batas yang disadari).
+            customFolderUri()?.let { uri ->
+                runCatching {
+                    val tree = DocumentFile.fromTreeUri(appContext, uri)
+                    if (tree != null) {
+                        val now = System.currentTimeMillis()
+                        tree.listFiles().forEach { doc ->
+                            if (!doc.isFile) return@forEach
+                            val name = doc.name ?: return@forEach
+                            if (!isPublishStagingName(name, finalNames)) return@forEach
+                            val modified = doc.lastModified()
+                            if (modified <= 0L ||
+                                now - modified <= 2L * 60 * 60 * 1000
+                            ) return@forEach
+                            runCatching {
+                                val size = doc.length()
+                                if (doc.delete()) freed += size
+                            }
+                        }
+                    }
+                }
+            }
             val downloadCanon = runCatching { downloadDir.canonicalFile }.getOrNull()
             namesByDir.forEach { (dir, dirNames) ->
                 if (!dir.isDirectory) return@forEach
