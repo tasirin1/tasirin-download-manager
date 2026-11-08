@@ -189,23 +189,6 @@
             android:focusableInTouchMode="true"
             android:paddingBottom="80dp" />
 
-        <!-- Header section sticky: judul section saat scroll + garis bawah. -->
-        <TextView
-            android:id="@+id/text_section_sticky"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:background="@drawable/bg_sticky_header"
-            android:paddingStart="18dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="18dp"
-            android:paddingBottom="6dp"
-            android:textColor="@color/home_text"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:visibility="gone"
-            tools:text="Active" />
-
         <LinearLayout
             android:id="@+id/empty_view"
             android:layout_width="320dp"

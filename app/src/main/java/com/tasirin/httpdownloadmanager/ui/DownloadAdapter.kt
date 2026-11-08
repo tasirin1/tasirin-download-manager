@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
-import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -14,23 +13,12 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.util.Formats
 import com.tasirin.httpdownloadmanager.util.MimeTypes
-import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.databinding.ItemDownloadBinding
-import com.tasirin.httpdownloadmanager.databinding.ItemSectionHeaderBinding
 import java.io.File
 
-/** Baris daftar: header grup status atau item download. */
+/** Baris daftar utama: satu item download (daftar datar tanpa
+ *  pengelompokan section — keputusan owner 2026-11-08). */
 sealed class DownloadRow {
-    data class Header(
-        val title: String,
-        val count: Int,
-        val collapsed: Boolean,
-        val key: String,
-        // Item yang tiba di section ini SELAMA terlipat (issue #1285):
-        // tanpa lencana ini kedatangannya tak berjejak selain angka
-        // hitung yang naik diam-diam.
-        val unseen: Int = 0
-    ) : DownloadRow()
     data class Item(val item: DownloadItem) : DownloadRow()
 }
 
@@ -43,14 +31,9 @@ class DownloadAdapter(private val listener: Listener) :
         fun onAction(item: DownloadItem, action: Action)
         fun onTap(item: DownloadItem)
         fun onLongPress(item: DownloadItem)
-        fun onToggleSection(key: String)
     }
 
     class ItemHolder(val binding: ItemDownloadBinding) : RecyclerView.ViewHolder(binding.root)
-    class HeaderHolder(val binding: ItemSectionHeaderBinding) : RecyclerView.ViewHolder(binding.root) {
-        var bindToggle: (() -> Unit)? = null
-    }
-
     private fun progressColor(state: DownloadState): Int = when (state) {
         DownloadState.PENDING, DownloadState.DOWNLOADING -> R.color.home_prog_active
         DownloadState.COMPLETED -> R.color.home_prog_done
@@ -58,18 +41,12 @@ class DownloadAdapter(private val listener: Listener) :
         DownloadState.PAUSED, DownloadState.CANCELLED -> R.color.home_prog_idle
     }
 
-    override fun getItemViewType(position: Int): Int =
-        if (getItem(position) is DownloadRow.Header) TYPE_HEADER else TYPE_ITEM
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        val inflater = LayoutInflater.from(parent.context)
-        return if (viewType == TYPE_HEADER) {
-            HeaderHolder(ItemSectionHeaderBinding.inflate(inflater, parent, false))
-        } else {
-            val binding = ItemDownloadBinding.inflate(inflater, parent, false)
-            binding.progressBar.max = 100
-            ItemHolder(binding)
-        }
+        val binding = ItemDownloadBinding.inflate(
+            LayoutInflater.from(parent.context), parent, false
+        )
+        binding.progressBar.max = 100
+        return ItemHolder(binding)
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
@@ -81,41 +58,12 @@ class DownloadAdapter(private val listener: Listener) :
         position: Int,
         payloads: MutableList<Any>
     ) {
-        when (val row = getItem(position)) {
-            is DownloadRow.Header -> bindHeader(holder as HeaderHolder, row)
-            is DownloadRow.Item -> {
-                val h = holder as ItemHolder
-                // Tick progres 400ms-1s hanya menyentuh bar/teks: jangan
-                // rebind ikon/badge/tombol yang mahal (mime lookup, format).
-                if (payloads.contains(PAYLOAD_PROGRESS)) bindProgress(h, row.item)
-                else bindItem(h, row.item)
-            }
-        }
-    }
-
-    private fun bindHeader(holder: HeaderHolder, row: DownloadRow.Header) {
-        val b = holder.binding
-        b.textSectionTitle.text = row.title
-        b.textSectionCount.text = row.count.toString()
-        // Lencana kedatangan selama terlipat (issue #1285).
-        if (row.unseen > 0) {
-            b.textSectionNew.isVisible = true
-            setTextIfChanged(
-                b.textSectionNew,
-                b.root.context.getString(R.string.section_new_badge, row.unseen)
-            )
-        } else {
-            b.textSectionNew.isVisible = false
-        }
-        val chevron = if (row.collapsed) R.drawable.ic_chevron else R.drawable.ic_chevron_up
-        b.sectionDot.backgroundTintList = cachedTint(b.root.context, sectionDotColor(row.key))
-        b.sectionChevron.imageTintList = cachedTint(b.root.context, R.color.home_text_secondary)
-        b.sectionChevron.setImageResource(chevron)
-        b.sectionChevron.visibility = if (row.count > 0) View.VISIBLE else View.INVISIBLE
-        b.sectionHeaderRoot.setOnClickListener { holder.bindToggle?.invoke() }
-        holder.bindToggle = {
-            listener.onToggleSection(row.key)
-        }
+        val row = getItem(position)
+        val h = holder as ItemHolder
+        // Tick progres 400ms-1s hanya menyentuh bar/teks: jangan
+        // rebind ikon/badge/tombol yang mahal (mime lookup, format).
+        if (payloads.contains(PAYLOAD_PROGRESS)) bindProgress(h, row.item)
+        else bindItem(h, row.item)
     }
 
     // Cache hasil resolve warna: bind berjalan tiap tick progres (1 detik),
@@ -333,14 +281,6 @@ class DownloadAdapter(private val listener: Listener) :
         }
     }
 
-    /** Warna titik penanda header seksi (kunci = nama resource seksi). */
-    private fun sectionDotColor(key: String): Int = when (key) {
-        "section_paused" -> R.color.home_dot_paused
-        "section_completed" -> R.color.home_prog_done
-        "section_failed" -> R.color.home_prog_failed
-        else -> R.color.home_prog_active
-    }
-
     /** Pilih ikon tipe file berdasarkan mime (satu lookup per bind). */
     private fun fileIconRes(mime: String): Int {
         return when {
@@ -357,60 +297,17 @@ class DownloadAdapter(private val listener: Listener) :
     }
 
     companion object {
-        private const val TYPE_HEADER = 0
-        private const val TYPE_ITEM = 1
         private const val PAYLOAD_PROGRESS = "progress"
 
-        /** Bangun daftar ber-section: Active → Paused → Completed → Failed.
-         *  Section yang collapse (StoragePrefs.collapsed_sections) memakai
-         *  header dan menyembunyikan item-nya. */
-        fun buildSections(
-            context: android.content.Context,
-            items: List<DownloadItem>,
-            unseen: Map<String, Int> = emptyMap()
-        ): List<DownloadRow> {
-            val rows = mutableListOf<DownloadRow>()
-            // Kunci literal = hasil getResourceEntryName(section_*): hindari
-            // lookup resource 4x per tick 400ms saat download aktif.
-            fun addGroup(labelRes: Int, key: String, group: List<DownloadItem>) {
-                if (group.isEmpty()) return
-                val collapsed = StoragePrefs.isSectionCollapsed(context, key)
-                // Lencana hanya untuk section terlipat, dibatasi jumlah
-                // grup agar tak mengklaim lebih dari yang ada (issue #1285).
-                val badge = if (collapsed) minOf(unseen[key] ?: 0, group.size) else 0
-                rows.add(DownloadRow.Header(context.getString(labelRes), group.size, collapsed, key, badge))
-                if (!collapsed) group.forEach { rows.add(DownloadRow.Item(it)) }
-            }
-            // Satu pass pengelompokan (bukan 4x filter): dipanggil pada tiap
-            // emisi StateFlow (progress/download aktif), hemat alokasi.
-            val active = ArrayList<DownloadItem>(items.size)
-            val paused = ArrayList<DownloadItem>()
-            val completed = ArrayList<DownloadItem>()
-            val failed = ArrayList<DownloadItem>()
-            for (item in items) {
-                when (item.state) {
-                    DownloadState.DOWNLOADING, DownloadState.PENDING -> active.add(item)
-                    DownloadState.PAUSED -> paused.add(item)
-                    DownloadState.COMPLETED -> completed.add(item)
-                    DownloadState.FAILED, DownloadState.CANCELLED -> failed.add(item)
-                }
-            }
-            addGroup(R.string.section_active, "section_active", active)
-            addGroup(R.string.section_paused, "section_paused", paused)
-            addGroup(R.string.section_completed, "section_completed", completed)
-            addGroup(R.string.section_failed, "section_failed", failed)
-            return rows
-        }
+        /** Bungkus item jadi baris daftar datar (urutan engine apa
+         *  adanya, tanpa pengelompokan section). */
+        fun rowsOf(items: List<DownloadItem>): List<DownloadRow> =
+            items.map { DownloadRow.Item(it) }
 
         private val DIFF = object : DiffUtil.ItemCallback<DownloadRow>() {
             override fun areItemsTheSame(oldItem: DownloadRow, newItem: DownloadRow): Boolean {
-                return when {
-                    oldItem is DownloadRow.Header && newItem is DownloadRow.Header ->
-                        oldItem.key == newItem.key
-                    oldItem is DownloadRow.Item && newItem is DownloadRow.Item ->
-                        oldItem.item.id == newItem.item.id
-                    else -> false
-                }
+                return oldItem is DownloadRow.Item && newItem is DownloadRow.Item &&
+                    oldItem.item.id == newItem.item.id
             }
 
             override fun areContentsTheSame(oldItem: DownloadRow, newItem: DownloadRow): Boolean =

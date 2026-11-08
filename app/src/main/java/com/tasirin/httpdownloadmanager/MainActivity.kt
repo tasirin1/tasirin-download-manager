@@ -89,14 +89,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private var summaryFailed = 0
     private var summaryDone = 0
     private var lastItems: List<DownloadItem> = emptyList()
-    /** Kedatangan ke section terlipat yang belum dilihat pengguna
-     *  (issue #1285): kunci section -> jumlah; dibersihkan saat section
-     *  dibuka. Hanya di memori (sesi berjalan). */
-    private val unseenSectionCounts = mutableMapOf<String, Int>()
-    /** State terakhir tiap item khusus pelacakan lencana di atas —
-     *  peta sendiri agar tak terikat cabang auto-open yang menahan
-     *  pembaruan lastItemStates selama di latar. */
-    private var lastStatesForUnseen = mutableMapOf<String, DownloadState>()
     // Throttle submitList: emisi StateFlow tiap detik tidak perlu rebuild penuh
     // bila struktur daftar sama; toolbar teks hanya update saat hitungan berubah.
     private var lastUiSubmitMs = 0L
@@ -109,7 +101,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
      *  engine berhenti sesudahnya. */
     private var trailingSubmitJob: Job? = null
     private var emptyGateJob: Job? = null
-    private var lastStickyTitle: String? = null
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* hasil izin tidak wajib untuk fungsi inti */ }
@@ -251,12 +242,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // + tahan cache agar scroll-balik tidak rebind/inflate ulang.
         binding.recycler.setHasFixedSize(true)
         binding.recycler.setItemViewCacheSize(20)
-        binding.recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                updateStickyHeader()
-            }
-        })
-
         binding.fabAdd.setOnClickListener { showAddDialog() }
         binding.emptyAddButton.setOnClickListener { showAddDialog() }
         binding.emptyPasteButton.setOnClickListener { pasteFromClipboard() }
@@ -270,15 +255,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 viewHolder: RecyclerView.ViewHolder,
                 target: RecyclerView.ViewHolder
             ): Boolean = false
-
-            override fun getSwipeDirs(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder
-            ): Int {
-                // Header section tidak boleh digeser.
-                if (viewHolder is DownloadAdapter.HeaderHolder) return 0
-                return super.getSwipeDirs(recyclerView, viewHolder)
-            }
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.bindingAdapterPosition
@@ -310,29 +286,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             App.engine.items.collect { items ->
                 val sizeChanged = items.size != lastItems.size
                 lastItems = items
-                // Lencana section terlipat (issue #1285): transisi menuju
-                // COMPLETED/FAILED/CANCELLED saat section tujuannya
-                // sedang terlipat dihitung sebagai kedatangan yang belum
-                // dilihat — prev wajib ada agar muatan awal tidak ikut
-                // terhitung (pola gerbang auto-open).
-                for (item in items) {
-                    val prev = lastStatesForUnseen[item.id]
-                    if (prev != null && prev != item.state) {
-                        val key = when (item.state) {
-                            DownloadState.COMPLETED -> "section_completed"
-                            DownloadState.FAILED, DownloadState.CANCELLED -> "section_failed"
-                            else -> null
-                        }
-                        if (key != null && StoragePrefs.isSectionCollapsed(this@MainActivity, key)) {
-                            unseenSectionCounts[key] = (unseenSectionCounts[key] ?: 0) + 1
-                        }
-                    }
-                    lastStatesForUnseen[item.id] = item.state
-                }
-                if (lastStatesForUnseen.size > items.size * 2 + 16) {
-                    val keep = items.asSequence().map { it.id }.toSet()
-                    lastStatesForUnseen.keys.retainAll(keep)
-                }
                 // Auto-open file yang baru selesai (video → player; APK → installer).
                 // Hanya saat activity di depan (STARTED): collector ini jalan
                 // di lifecycleScope polos sehingga tetap aktif saat STOPPED,
@@ -366,7 +319,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     if (sizeChanged || (sig != lastProgressSig && now - lastUiSubmitMs >= 400L)) {
                         lastUiSubmitMs = now
                         lastProgressSig = sig
-                        adapter.submitList(DownloadAdapter.buildSections(this@MainActivity, items, unseenSectionCounts))
+                        adapter.submitList(DownloadAdapter.rowsOf(items))
                     } else if (sig != lastProgressSig &&
                         trailingSubmitJob?.isActive != true
                     ) {
@@ -382,15 +335,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                                 lastUiSubmitMs =
                                     android.os.SystemClock.uptimeMillis()
                                 lastProgressSig = latestSig
-                                adapter.submitList(
-                                    DownloadAdapter.buildSections(
-                                        this@MainActivity, latest, unseenSectionCounts
-                                    )
-                                ) { updateStickyHeader() }
+                                adapter.submitList(DownloadAdapter.rowsOf(latest))
                             }
                         }
                     }
-                    updateStickyHeader()
                     // Kosong hanya dinilai sesudah muatan awal selesai
                     // (issue #978): emisi pertama selalu daftar kosong
                     // selama parse+dekripsi antrean berjalan, dan tanpa
@@ -1649,19 +1597,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .show()
     }
 
-    override fun onToggleSection(key: String) {
-        val collapsed = StoragePrefs.isSectionCollapsed(this, key)
-        StoragePrefs.setSectionCollapsed(this, key, !collapsed)
-        // Membuka section = pengguna melihat isinya: lencana kedatangan
-        // untuk section itu gugur (issue #1285).
-        if (collapsed) unseenSectionCounts.remove(key)
-        // Sticky dinilai dari callback commit daftar baru, bukan daftar
-        // lama yang belum tertimpa diff (issue #1286).
-        adapter.submitList(
-            DownloadAdapter.buildSections(this, lastItems, unseenSectionCounts)
-        ) { updateStickyHeader() }
-    }
-
     private fun showRenameDialog(item: DownloadItem) {
         val input = EditText(this)
         input.isFocusable = true
@@ -1781,13 +1716,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             .show()
     }
 
-    /** Hash murah field yang tampil di daftar + status lipatan section. */
+    /** Hash murah field yang tampil di daftar. */
     private fun progressSig(items: List<com.tasirin.httpdownloadmanager.data.DownloadItem>): Int {
-        var h = items.size * 31 +
-            (if (StoragePrefs.isSectionCollapsed(this, "section_active")) 1 else 0) * 7 +
-            (if (StoragePrefs.isSectionCollapsed(this, "section_paused")) 1 else 0) * 13 +
-            (if (StoragePrefs.isSectionCollapsed(this, "section_completed")) 1 else 0) * 17 +
-            (if (StoragePrefs.isSectionCollapsed(this, "section_failed")) 1 else 0) * 19
+        var h = items.size * 31
         for (it in items) {
             h = h * 31 + it.id.hashCode()
             h = h * 31 + it.state.hashCode()
@@ -1871,33 +1802,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             failed > 0 -> getString(R.string.summary_failed_label)
             paused > 0 -> getString(R.string.summary_paused_label)
             else -> getString(R.string.summary_attention)
-        }
-    }
-
-    /** Header section sticky: tampilkan judul section yang sedang di-scroll. */
-    private fun updateStickyHeader() {
-        val first = listLayoutManager.findFirstVisibleItemPosition()
-        val scrolled = binding.recycler.canScrollVertically(-1)
-        var title: String? = null
-        if (first != RecyclerView.NO_POSITION) {
-            // Cari dari posisi terlihat ke atas: biasanya hanya perlu 1-2 item
-            // untuk menemukan Header section terakhir — lebih cepat daripada
-            // memindai 0..first (O(n) per scroll pada daftar panjang).
-            for (i in first downTo 0) {
-                val row = adapter.currentList.getOrNull(i) ?: break
-                if (row is DownloadRow.Header) {
-                    title = row.title
-                    break
-                }
-            }
-        }
-        binding.textSectionSticky.isVisible = scrolled && title != null
-        // setText memicu layout ulang tiap tick progres: tulis hanya bila berubah.
-        if (title != null && title != lastStickyTitle) {
-            lastStickyTitle = title
-            binding.textSectionSticky.text = title
-        } else if (title == null) {
-            lastStickyTitle = null
         }
     }
 

@@ -51,7 +51,6 @@
     <color name="home_badge_done_text">#FFFFFF</color>
     <color name="home_badge_failed_bg">#FDECEA</color>
     <color name="home_badge_failed_text">#C62828</color>
-    <color name="home_dot_paused">#F57C00</color>
 
     <!-- Warna polos petak ikon per jenis berkas + segmen statistik:
          semua keluarga biru (biru bahan, biru langit, teal, slate);

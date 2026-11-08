@@ -86,11 +86,6 @@
     <string name="confirm_delete">Delete this download and its file?</string>
     <string name="summary_failed_label">failed</string>
     <string name="summary_paused_label">paused</string>
-    <string name="section_active">Active</string>
-    <string name="section_paused">Paused</string>
-    <string name="section_failed">Failed</string>
-    <string name="section_completed">Completed</string>
-    <string name="section_new_badge">+%1$d new</string>
     <string name="no_app_to_open">No app found to open this file</string>
     <string name="speed_and_eta">%1$s · ETA %2$s</string>
 
