@@ -623,6 +623,16 @@ class SettingsActivity : AppCompatActivity() {
         ) {
             StoragePrefs.setServerBackgroundEnabled(this, true)
         }
+        // Rekonsiliasi yang sama untuk pasangan unduhan (issue #1209):
+        // kelas #914/#916 tidak pernah dicerminkan ke sini — autostart
+        // unduhan true + auto-resume (background) false membuat job
+        // boot men-start service tanpa ada yang dilanjutkan, dan item
+        // PENDING menggantungkan service tanpa pernah jalan.
+        if (StoragePrefs.isAutoStartEnabled(this) &&
+            !StoragePrefs.isBackgroundEnabled(this)
+        ) {
+            StoragePrefs.setBackgroundEnabled(this, true)
+        }
         renderToggle(
             binding.checkServerAutostart,
             StoragePrefs.isServerAutoStartEnabled(this),
@@ -798,7 +808,15 @@ class SettingsActivity : AppCompatActivity() {
             renderChecks()
         }
         binding.checkAutostart.setOnClickListener {
-            StoragePrefs.setAutoStartEnabled(this, !StoragePrefs.isAutoStartEnabled(this))
+            val next = !StoragePrefs.isAutoStartEnabled(this)
+            StoragePrefs.setAutoStartEnabled(this, next)
+            // Autostart hanya bermakna bila unduhan boleh lanjut di
+            // latar: resumeInterrupted dan doResumeAutoPaused sama-sama
+            // bergerbang pref background (issue #1209, pola #914 pada
+            // pasangan server). Mencentang autostart ikut mengaktifkan
+            // background agar toggle ini tidak mati senyap; mematikan
+            // autostart tidak menyentuh background.
+            if (next) StoragePrefs.setBackgroundEnabled(this, true)
             renderChecks()
         }
         binding.checkBattery.setOnClickListener {
