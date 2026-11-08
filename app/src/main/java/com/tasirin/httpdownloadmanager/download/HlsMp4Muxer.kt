@@ -324,7 +324,16 @@ object HlsMp4Muxer {
         while (true) {
             buffer.clear()
             var size = ext.readSampleData(buffer, 0)
-            if (size < 0) break
+            if (size < 0) {
+                // Sampel korup di tengah aliran, bukan selalu EOS
+                // (doktrin #320, issue #1188): advance() false = EOS
+                // sungguhan; true = sampel ini terlewati dan track
+                // berlanjut. Tanpa pembedaan ini satu sampel rusak
+                // memotong sisa track diam-diam sementara remux tetap
+                // dilaporkan sukses.
+                if (!ext.advance()) break
+                continue
+            }
             // Sampel lebih besar dari buffer tetap 1 MiB (keyframe besar):
             // baca ulang dengan buffer lebih besar TANPA advance (sampel
             // sama), pola yang sama seperti jalur video di berkas ini.
@@ -335,7 +344,11 @@ object HlsMp4Muxer {
                 }
                 buffer = ByteBuffer.allocate(size)
                 size = ext.readSampleData(buffer, 0)
-                if (size < 0) break
+                if (size < 0) {
+                    // Sama seperti cabang korup utama di atas.
+                    if (!ext.advance()) break
+                    continue
+                }
             }
             buffer.position(0)
             buffer.limit(size)
