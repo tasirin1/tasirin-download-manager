@@ -76,7 +76,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: DownloadAdapter
-    private lateinit var listLayoutManager: LinearLayoutManager
     private var pendingMoveId: String? = null
     // Penjaga re-entry cek update dari dialog About (issue #853,
     // pola #524 di SettingsActivity).
@@ -235,8 +234,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // 2026-10-30); versi tetap tampil di dialog About.
 
         adapter = DownloadAdapter(this)
-        listLayoutManager = LinearLayoutManager(this)
-        binding.recycler.layoutManager = listLayoutManager
+        binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
         // Item berukuran seragam: matikan re-measure tiap tick progres 400ms
         // + tahan cache agar scroll-balik tidak rebind/inflate ulang.
