@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan dokumentasi kode docs: kelas `.fi-purple` diganti nama menjadi `.fi-navy` — isinya sudah biru tua (#0D47A1) sejak penyelarasan palet, bukan ungu (issue #1153).
 - Perbaikan kode mati docs: tiga variabel CSS yatim di situs dokumentasi dibuang (`--bg2`, `--radius-sm`, `--shadow` — terdefinisi tetapi tak pernah dipakai) (issue #1152).
 - Perbaikan web remote: tema terang kini mendeklarasikan `color-scheme: light` (blok gelap sudah punya padanannya) — kontrol bawaan peramban seperti popup select dan scrollbar tidak lagi berisiko dirender gelap saat tema terang dipilih di perangkat mode gelap (issue #1151).
 - Perbaikan kode mati web remote: blok `@media (min-width: 601px) and (hover: hover)` yang kosong dibuang dari akhir CSS — sisa penghapusan aturan hover yang tidak tuntas (issue #1150).
