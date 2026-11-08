@@ -285,8 +285,14 @@ class FileSaver(context: Context) {
     private fun sweepStaleFinalClaims() {
         val now = System.currentTimeMillis()
         StoragePrefs.finalClaimEntries(appContext).forEach { entry ->
-            val path = entry.substringBefore('|')
-            val notedAt = entry.substringAfter('|', "").toLongOrNull() ?: 0L
+            // Pisah pada '|' TERAKHIR (issue #1140): stempel waktu di
+            // akhir entri tak pernah berisi '|', sedangkan path berkas
+            // sah bisa memuatnya ("a|b.txt") — substringBefore lama
+            // memotong path di tengah sehingga sapuan menilai berkas
+            // lain (bisa menghapus berkas kosong tak terkait) dan
+            // klaim yatim yang sebenarnya tak pernah tersapu.
+            val path = entry.substringBeforeLast('|')
+            val notedAt = entry.substringAfterLast('|', "").toLongOrNull() ?: 0L
             if (now - notedAt < 2L * 60 * 60 * 1000) return@forEach
             val f = File(path)
             when {
@@ -413,8 +419,8 @@ class FileSaver(context: Context) {
         val resolver = appContext.contentResolver
         val now = System.currentTimeMillis()
         StoragePrefs.pendingMediaStoreRowEntries(appContext).forEach { entry ->
-            val uriStr = entry.substringBefore('|')
-            val notedAt = entry.substringAfter('|', "").toLongOrNull() ?: 0L
+            val uriStr = entry.substringBeforeLast('|')
+            val notedAt = entry.substringAfterLast('|', "").toLongOrNull() ?: 0L
             if (now - notedAt < 2L * 60 * 60 * 1000) return@forEach
             runCatching {
                 val uri = Uri.parse(uriStr)

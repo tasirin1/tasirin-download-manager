@@ -559,7 +559,7 @@ object StoragePrefs {
             // terakhir, bukan insert pertama — penulis yang masih aktif
             // menyegarkan catatan ini berkala lewat aliran tulisnya.
             val kept = pendingMediaStoreRowEntries(context)
-                .filterNot { it.substringBefore('|') == uri }
+                .filterNot { it.substringBeforeLast('|') == uri }
             val entry = uri + "|" + System.currentTimeMillis()
             prefs(context).edit {
                 putString(KEY_PENDING_MEDIASTORE_ROWS, (kept + entry).joinToString("\n"))
@@ -570,7 +570,7 @@ object StoragePrefs {
     fun forgetPendingMediaStoreRow(context: Context, uri: String) {
         synchronized(prefsLock) {
             val entries = pendingMediaStoreRowEntries(context)
-            val kept = entries.filterNot { it.substringBefore('|') == uri }
+            val kept = entries.filterNot { it.substringBeforeLast('|') == uri }
             if (kept.size == entries.size) return
             prefs(context).edit {
                 putString(KEY_PENDING_MEDIASTORE_ROWS, kept.joinToString("\n"))
@@ -592,8 +592,10 @@ object StoragePrefs {
 
     fun noteFinalClaim(context: Context, path: String) {
         synchronized(prefsLock) {
+            // Pemisahan entri selalu pada '|' terakhir (issue #1140):
+            // path boleh memuat '|', stempel waktu di akhir tidak.
             val kept = finalClaimEntries(context)
-                .filterNot { it.substringBefore('|') == path }
+                .filterNot { it.substringBeforeLast('|') == path }
             val entry = path + "|" + System.currentTimeMillis()
             prefs(context).edit {
                 putString(KEY_PENDING_FINAL_CLAIMS, (kept + entry).joinToString("\n"))
@@ -604,7 +606,7 @@ object StoragePrefs {
     fun forgetFinalClaim(context: Context, path: String) {
         synchronized(prefsLock) {
             val entries = finalClaimEntries(context)
-            val kept = entries.filterNot { it.substringBefore('|') == path }
+            val kept = entries.filterNot { it.substringBeforeLast('|') == path }
             if (kept.size == entries.size) return
             prefs(context).edit {
                 putString(KEY_PENDING_FINAL_CLAIMS, kept.joinToString("\n"))
