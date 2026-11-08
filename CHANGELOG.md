@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(remote): #mmMuteBtn dan #mmSeek kini berlabel aksesibel** -- Tombol bisu hanya berisi ikon SVG tanpa nama dan slider seek tanpa aria-label, sementara #mmVol sebarisnya lengkap. Keduanya kini membawa title + aria-label (issue #1255).
 - **fix(remote): chip breadcrumb kini tombol yang terjangkau keyboard di kedua perender** -- .fs-crumb dulu span + click saja di renderFsCrumbs dan renderMoveCrumbs. Chip navigasi kini <button> (listener lama melekat apa adanya); chip posisi saat ini tetap span dengan aria-current (issue #1254).
 - **fix(remote): #advToggle kini tombol sungguhan dengan aria-expanded** -- Pengalih "Advanced options" dulu div klik-saja (kelas #1230 di remote sendiri). Kini <button> dengan aria-expanded/aria-controls yang disinkronkan handler dan reset form; tampilan identik lewat reset CSS (issue #1253).
 - **fix(remote): teks chip .gal-resume kini gelap (5,29:1)** -- Putih di atas oranye rgba(247,103,7,.96) hanya ±3,0:1 untuk teks 10,5px; pola teks gelap yang sama seperti #1231/#1250 (issue #1252).
