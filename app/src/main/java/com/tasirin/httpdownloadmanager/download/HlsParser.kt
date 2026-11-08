@@ -345,7 +345,14 @@ object HlsParser {
         if (relative.isBlank()) return base
         if (relative.startsWith("http://", ignoreCase = true) ||
             relative.startsWith("https://", ignoreCase = true)
-        ) return relative
+        ) {
+            // Absolut pun dinormalkan (issue #1216): cabang ini sisa
+            // terakhir seri #1163/#1187 yang mengembalikan URL mentah,
+            // sehingga segmen titik pada URL absolut lolos ke server
+            // yang menolak path tak ternormalisasi. Query/fragment
+            // tak disentuh oleh helper-nya.
+            return normalizeDotSegments(relative)
+        }
         // URI absolut berskema asing (ftp:, rtmp:, data:, ...) dikembalikan
         // apa adanya: menempelkannya ke direktori basis menghasilkan URL
         // rusak yang justru lolos saringan startsWith("http") di

@@ -161,6 +161,24 @@ class HlsParserTest {
     }
 
     @Test
+    fun `resolveUrl - URL absolut ikut dinormalkan segmen titiknya`() {
+        // Issue #1216: cabang absolut dulu mengembalikan URL mentah.
+        val base = "https://cdn.example.com/pl/master.m3u8"
+        assertEquals(
+            "https://cdn.example.com/a/c.ts",
+            HlsParser.resolveUrl(base, "https://cdn.example.com/a/b/../c.ts")
+        )
+        assertEquals(
+            "https://cdn.example.com/a/b.ts?next=/../x",
+            HlsParser.resolveUrl(base, "https://cdn.example.com/a/./b.ts?next=/../x")
+        )
+        assertEquals(
+            "https://cdn.example.com/a/b.ts",
+            HlsParser.resolveUrl(base, "https://cdn.example.com/a/b.ts")
+        )
+    }
+
+    @Test
     fun `resolveUrl - segmen titik dinormalkan sesuai RFC 3986`() {
         // Ekspektasi dibuktikan dulu lewat port Python 1:1 dari
         // algoritma remove_dot_segments RFC 3986 pasal 5.2.4.
