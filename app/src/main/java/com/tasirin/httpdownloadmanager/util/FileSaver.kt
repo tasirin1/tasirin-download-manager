@@ -61,6 +61,11 @@ class FileSaver(context: Context) {
         private val inFlightStagingNames =
             java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
+        /** Penghitung rotasi sapuan SAF (issue #1269): digeser tiap
+         *  sapuan agar cap kunjungan tak selalu menghabiskan jatah di
+         *  irisan pohon yang sama. */
+        @Volatile private var sweepRotation = 0
+
         private val MERGE_LOCKS = Array(8) { Any() }
         private val WHITESPACE_RE = Regex("\\s+")
         /** Buffer salin 64KB: default copyTo 8KB lambat ~8x syscall untuk file GB. */
@@ -880,9 +885,21 @@ class FileSaver(context: Context) {
                         // mencapainya. Batas kunjungan menjaga pohon
                         // provider raksasa tetap murah.
                         var visited = 0
+                        // Rotasi titik mulai per sapuan (issue #1269):
+                        // urutan listFiles provider deterministik, jadi
+                        // tanpa rotasi entri di ekor urutan tak pernah
+                        // mencapai giliran sebelum cap 2048 habis di
+                        // setiap sapuan. Offset yang bergeser membuat
+                        // irisan yang tercakup berganti antar-sapuan.
+                        val rotation = ++sweepRotation
                         fun sweepDoc(dir: DocumentFile, depth: Int) {
                             if (depth > 6 || visited > 2048) return
-                            for (doc in dir.listFiles()) {
+                            val children = dir.listFiles()
+                            val ordered = if (children.size > 1) {
+                                val off = rotation % children.size
+                                children.drop(off) + children.take(off)
+                            } else children.toList()
+                            for (doc in ordered) {
                                 if (++visited > 2048) return
                                 if (doc.isDirectory) {
                                     sweepDoc(doc, depth + 1)
