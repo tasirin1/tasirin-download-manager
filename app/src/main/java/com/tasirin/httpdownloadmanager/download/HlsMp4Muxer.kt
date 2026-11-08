@@ -264,7 +264,11 @@ object HlsMp4Muxer {
             }
             buffer.position(0)
             buffer.limit(size)
-            val pts = frameIndex * totalUs / videoFrameCount
+            // safeMulDiv, bukan perkalian mentah (issue #1189): EXTINF
+            // menggelembung (dijepit 24 jam/segmen) x jumlah frame besar
+            // bisa meluapkan Long ke PTS negatif dan remux gagal
+            // permanen; helper ini menjenuhkan di Long.MAX.
+            val pts = safeMulDiv(frameIndex, totalUs, videoFrameCount.toLong())
             val flags = if (ext.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
                 MediaCodec.BUFFER_FLAG_KEY_FRAME
             } else {
