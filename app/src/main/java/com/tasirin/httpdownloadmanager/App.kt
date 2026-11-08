@@ -1,5 +1,6 @@
 package com.tasirin.httpdownloadmanager
 
+import android.app.Activity
 import android.app.Application
 import android.annotation.SuppressLint
 import android.content.Context
@@ -8,6 +9,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
+import android.os.Bundle
 import androidx.appcompat.app.AppCompatDelegate
 import com.tasirin.httpdownloadmanager.download.DownloadEngine
 import com.tasirin.httpdownloadmanager.download.DownloadService
@@ -50,21 +52,24 @@ class App : Application() {
                 if (ok) StoragePrefs.setThumbCleanupDone(this, System.currentTimeMillis())
             }.start()
         }
-        // Server dinyalakan langsung dari Application supaya tetap jalan
-        // walau halaman utama gagal terbuka (mis. crash di Activity).
+        // Server dinyalakan dari Application supaya tetap jalan walau
+        // halaman utama gagal terbuka (mis. crash di Activity) — tetapi
+        // hanya pada start yang memang dikehendaki (issue #1208):
+        // onCreate juga berjalan saat proses dibuat demi broadcast boot
+        // atau job, dan selalu mendahului BootReceiver, jadi start
+        // tanpa syarat di sini menembus toggle "auto-start server on
+        // boot" yang mati — server menyala sesudah reboot walau
+        // pengguna mematikannya. Autostart menyala -> nyalakan
+        // sekarang (semantik boot); mati -> tunda sampai aktivitas
+        // pertama benar-benar dibuka pengguna.
         if (StoragePrefs.isServerBackgroundEnabled(this) &&
             StoragePrefs.isServerStartAllowed(this)
         ) {
-            Thread {
-                // Wajib lewat helper berkunci yang sama dengan jalur
-                // lain (#286): start langsung di sini bisa menyela
-                // restartHttpServer yang sedang menukar instance,
-                // server berakhir menyala pada instance yang salah.
-                startHttpServer()
-                // Mode background: service-lah yang menjaga proses
-                // (dan server ini) tetap hidup di latar (issue #1028).
-                DownloadService.ensureRunning(this@App)
-            }.start()
+            if (StoragePrefs.isServerAutoStartEnabled(this)) {
+                startServerAndService()
+            } else {
+                deferServerStartToFirstActivity()
+            }
         }
         registerNetworkCallback()
         logEvent(
@@ -163,6 +168,45 @@ class App : Application() {
         }.onFailure {
             logEvent("NETWORK CALLBACK REGISTRATION FAILED: ${it.message?.take(80)}")
         }
+    }
+
+    /** Start server + service penjaga proses di thread latar. */
+    private fun startServerAndService() {
+        Thread {
+            // Wajib lewat helper berkunci yang sama dengan jalur
+            // lain (#286): start langsung bisa menyela
+            // restartHttpServer yang sedang menukar instance,
+            // server berakhir menyala pada instance yang salah.
+            startHttpServer()
+            // Mode background: service-lah yang menjaga proses
+            // (dan server ini) tetap hidup di latar (issue #1028).
+            DownloadService.ensureRunning(this@App)
+        }.start()
+    }
+
+    /** Tunda start server sampai aktivitas pertama dibuka pengguna
+     *  (issue #1208): pembuatan proses oleh broadcast/job tidak
+     *  menghasilkan aktivitas, jadi server tetap mati sesudah boot
+     *  bila autostart-nya mati. Callback sekali-pakai: lepas sendiri
+     *  sesudah menembak, dan pref dinilai ulang saat itu juga. */
+    private fun deferServerStartToFirstActivity() {
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+                unregisterActivityLifecycleCallbacks(this)
+                if (StoragePrefs.isServerBackgroundEnabled(this@App) &&
+                    StoragePrefs.isServerStartAllowed(this@App)
+                ) {
+                    startServerAndService()
+                }
+            }
+
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
     }
 
     private fun installCrashLogger() {

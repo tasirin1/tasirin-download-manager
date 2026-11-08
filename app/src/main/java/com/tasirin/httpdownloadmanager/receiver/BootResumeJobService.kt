@@ -31,6 +31,10 @@ class BootResumeJobService : JobService() {
         }
         App.logEvent("BOOT/JOB: autostart download=$downloadAutostart, server=$serverAutostart")
         val started = runCatching {
+            // Tandai asal boot (issue #1208): onCreate service memakai
+            // penanda ini agar start server-nya menghormati autostart
+            // server walau job ini hanya diizinkan autostart unduhan.
+            DownloadService.nextStartFromBoot = true
             val intent = Intent(context, DownloadService::class.java)
             if (Build.VERSION.SDK_INT >= 26) {
                 context.startForegroundService(intent)

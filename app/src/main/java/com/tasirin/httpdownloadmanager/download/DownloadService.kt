@@ -68,8 +68,12 @@ class DownloadService : Service() {
         if (StoragePrefs.isBackgroundEnabled(this)) {
             App.engine.resumeInterrupted()
         }
+        // Konsumsi penanda boot di awal onCreate (issue #1208).
+        val fromBoot = nextStartFromBoot
+        nextStartFromBoot = false
         if (StoragePrefs.isServerBackgroundEnabled(this) &&
-            StoragePrefs.isServerStartAllowed(this) && !App.httpServer.isAlive
+            StoragePrefs.isServerStartAllowed(this) && !App.httpServer.isAlive &&
+            (!fromBoot || StoragePrefs.isServerAutoStartEnabled(this))
         ) {
             serverStartPending = true
             scope.launch(Dispatchers.IO) {
@@ -262,6 +266,15 @@ class DownloadService : Service() {
     // NetworkCallback/retry -> emisi -> re-acquire di bawah.
     companion object {
         const val WAKELOCK_TIMEOUT_MS = 60 * 60 * 1000L
+
+        // Penanda start berikutnya berasal dari jalur boot (issue
+        // #1208): diisi BootResumeJobService tepat sebelum
+        // startForegroundService dan dikonsumsi onCreate instance
+        // yang lahir darinya. Start boot hanya boleh menyalakan
+        // server bila autostart server menyala; start ulang lengket
+        // (sticky) dan start dari interaksi pengguna tidak terpengaruh.
+        @Volatile
+        var nextStartFromBoot = false
 
         // Sinyal penilaian ulang berhenti (issue #1039): restart server
         // yang GAGAL (mis. ganti port, port baru terpakai) tak menghasilkan
