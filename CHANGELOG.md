@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- Perbaikan web remote: chip status server kini sungguh mengecil jadi titik sesudah 6 detik — timer perkecilnya dulu tereset oleh setiap push status server (yang tiba terus-menerus selama unduhan aktif), kini timer hanya dimulai saat pemasangan pertama dan oleh interaksi pengguna (issue #1146).
 - Perbaikan web remote: dua sisa primer indigo lama #4353e6 di JavaScript diselaraskan — warna tema peramban runtime kini #1565C0 (terang) / #0D1738 (gelap, sesuai topbar) dan isian ikon berkas video menjadi biru primer (issue #1145).
 - Perbaikan kode mati web remote: rebuild daftar unduhan tidak lagi menulis kelas `anim` + `animationDelay` yang tak punya aturan CSS (sisa animasi masuk yang sudah dibuang), beserta rantai pelacak tanda-tangan id yang hanya ada untuk menggerbanginya (issue #1144).
 - Perbaikan kode mati web remote: helper `restartAnim` dibuang — animasi masuk tampilan sudah dihapus pada penyederhanaan, sehingga helper itu operasi kosong yang tetap memaksa reflow layout di setiap pergantian tab (issue #1143).

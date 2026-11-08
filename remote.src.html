@@ -2493,8 +2493,15 @@ function armChipMin() {
       ch.addEventListener('touchstart', chipMinReset, {passive: true});
       ch.addEventListener('focusin', chipMinReset);
     });
+    // Timer perkecil hanya dimulai saat pemasangan pertama (issue
+    // #1146): applyServerStatus memanggil fungsi ini pada SETIAP push
+    // status (SSE/snapshot), jadi chipMinReset yang tak bersyarat
+    // membuat hitung mundur 6 detik mulai dari nol terus selama
+    // unduhan aktif dan chip tak pernah menjadi titik. Sesudah
+    // terpasang, hanya interaksi pengguna (listener di atas) yang
+    // memanggil chipMinReset lagi.
+    chipMinReset();
   }
-  chipMinReset();
 }
 function chipMinReset() {
   var c = document.getElementById('serverChip');
