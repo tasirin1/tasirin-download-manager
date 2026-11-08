@@ -3715,9 +3715,14 @@ class DownloadEngine(appContext: Context) {
                         // #565), sejajar fatalError jalur video; kegagalan
                         // jaringan/404 per-rendition tetap degradasi
                         // seperti dulu.
-                        if (audioFatal == null &&
-                            e.message?.contains("not supported") == true
-                        ) {
+                        // Jangkar pada predikat frasa persis yang sama
+                        // dengan jalur video (issue #1211): substring
+                        // telanjang "not supported" ikut menangkap
+                        // "Live HLS not supported" — padahal live
+                        // sengaja BUKAN terminal (#1158) dan audio live
+                        // harusnya degradasi video-only, bukan membuang
+                        // kandidat yang videonya sehat.
+                        if (audioFatal == null && isUnsupportedHlsError(e.message)) {
                             audioFatal = e
                         }
                         null
