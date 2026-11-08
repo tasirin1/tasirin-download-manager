@@ -101,6 +101,17 @@ class FileNamesTest {
     }
 
     @Test
+    fun `safeCut - tak membelah pasangan surrogate`() {
+        assertEquals(3, FileNames.safeCut("abc", 3))
+        assertEquals(3, FileNames.safeCut("abcdef", 3))
+        // Emoji menempati indeks UTF-16 2..3: potong di 3 membelahnya.
+        val s = "ab\uD83D\uDE00cd"
+        assertEquals(2, FileNames.safeCut(s, 3))
+        assertEquals(4, FileNames.safeCut(s, 4))
+        assertEquals(0, FileNames.safeCut(s, 0))
+    }
+
+    @Test
     fun `unique - angka melompati yang sudah terpakai`() {
         val taken = setOf("f.txt", "f (1).txt", "f (3).txt")
         val result = FileNames.unique("f.txt") { it in taken }

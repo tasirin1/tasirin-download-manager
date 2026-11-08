@@ -101,7 +101,7 @@ object FileNames {
      *  tinggi (issue #941) — jalur byte di safe() sudah sadar-pasangan
      *  (bobot 4), jalur char kini menyamainya agar nama terbit tak
      *  memuat surrogate yatim yang menjadi '?' di disk. */
-    private fun safeCut(s: String, cut: Int): Int =
+    fun safeCut(s: String, cut: Int): Int =
         if (cut > 0 && cut < s.length && s[cut - 1].isHighSurrogate()) {
             cut - 1
         } else {

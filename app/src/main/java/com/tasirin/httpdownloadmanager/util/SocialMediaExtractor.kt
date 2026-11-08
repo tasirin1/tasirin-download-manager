@@ -1376,9 +1376,13 @@ object SocialMediaExtractor {
 
     private fun sanitizeFileName(name: String): String {
         // FileNames.safe menangani slash/trim/nama kosong; aturan ketat sosmed lanjut di sini.
-        return FileNames.safe(name).replace(SANITIZE_BAD_CHARS_RE, "_")
+        val cleaned = FileNames.safe(name).replace(SANITIZE_BAD_CHARS_RE, "_")
             .replace(SANITIZE_WS_RE, "_")
-            .take(80)
+        // Potongan 80 lewat safeCut (issue #1206): take(80) polos bisa
+        // membelah pasangan surrogate tepat di batas, menyisakan
+        // surrogate yatim di nama berkas (FileNames.safe sendiri sudah
+        // sadar-pasangan sejak #941; potongan terakhir ini yang polos).
+        return cleaned.take(FileNames.safeCut(cleaned, minOf(80, cleaned.length)))
     }
 
     // ── XVideos & XNXX ────────────────────────────────────────────────────
