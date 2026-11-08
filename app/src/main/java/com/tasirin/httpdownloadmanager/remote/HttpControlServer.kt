@@ -3251,12 +3251,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 // folder dari request: escape wildcard LIKE agar "%"/"_" tidak melebar ke folder lain.
                 val selection = if (folder.isEmpty()) null else "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? ESCAPE '\\'"
                 val selArgs = if (folder.isEmpty()) null else arrayOf(ServerSecurity.escapeLike(folder) + "%")
+                // Urutan kueri deterministik (issue #1191): tanpa
+                // sortOrder, urutan kursor adalah urutan internal
+                // provider yang tak dijamin stabil antar-kueri.
+                val sortOrder = "${MediaStore.MediaColumns.DISPLAY_NAME} COLLATE NOCASE ASC, " +
+                    "${MediaStore.MediaColumns._ID} ASC"
                 val dirs = LinkedHashSet<String>()
                 // Entri file ringan dulu; JSONObject + token Base64 baru dibuat
                 // untuk halaman aktif (hemat alokasi saat folder ribuan file).
                 val found = mutableListOf<FsMediaEntry>()
                 runCatching {
-                    resolver.query(collection, projection, selection, selArgs, null)?.use { c ->
+                    resolver.query(collection, projection, selection, selArgs, sortOrder)?.use { c ->
                         val iId = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                         val iName = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                         val iSize = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
@@ -3294,7 +3299,19 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     }
                 }
                 dirNames = dirs.sortedWith(String.CASE_INSENSITIVE_ORDER)
-                files = found
+                // Urutan TOTAL atas berkas (issue #1191): paginasi jalur
+                // MediaStore bersifat posisional (offset), jadi urutan
+                // harus identik di setiap pembangunan ulang daftar agar
+                // jendela halaman tak bergeser di antara kedaluwarsa
+                // cache. Sortir di memori adalah jaminan (provider bisa
+                // mengabaikan sortOrder kueri): nama abaikan-kapital,
+                // lalu peka-kapital, lalu uri unik sebagai pemutus seri
+                // terakhir (pola urutan total #1169).
+                files = found.sortedWith(
+                    compareBy<FsMediaEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
+                        .thenBy { it.name }
+                        .thenBy { it.uri }
+                )
                 // Cache hanya daftar berukuran wajar; folder raksasa tidak ditahan di RAM.
                 if (files.size <= FS_MEDIA_CACHE_MAX_FILES) {
                     fsMediaCache[base] = now to (dirNames to files)
