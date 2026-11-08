@@ -1072,10 +1072,13 @@ class FileSaver(context: Context) {
      *  sendiri. */
     private fun renameSidecars(from: File, to: File) {
         val parent = from.parentFile ?: return
+        // Tujuan boleh beda folder (organizeByType, issue #1268):
+        // sidecar mengikuti folder berkasnya, bukan folder sumber.
+        val dstParent = to.parentFile ?: parent
         for (ext in listOf(".sha256", ".sha1", ".md5")) {
             val src = File(parent, from.name + ext)
             if (!src.exists()) continue
-            val dst = File(parent, to.name + ext)
+            val dst = File(dstParent, to.name + ext)
             runCatching {
                 if (dst.exists()) src.delete() else src.renameTo(dst)
             }
@@ -1603,6 +1606,10 @@ class FileSaver(context: Context) {
                     if (!subDir.isDirectory && !subDir.mkdirs()) return result
                     val target = uniqueTargetFile(File(subDir, file.name))
                     if (file.renameTo(target)) {
+                        // Sidecar checksum ikut pindah folder (issue
+                        // #1268): tanpa ini berkas kehilangan verifikasi
+                        // dan sidecar yatim tertinggal di folder induk.
+                        renameSidecars(file, target)
                         // Berkas berpindah folder: tanpa notify, baris
                         // MediaStore tetap menunjuk path lama (entri
                         // tertapis keterbacaan galeri) dan scanCache
