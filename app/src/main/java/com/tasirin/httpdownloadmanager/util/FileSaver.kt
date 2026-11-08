@@ -1266,6 +1266,32 @@ class FileSaver(context: Context) {
             }
             val target = claimResult.first
             val unique = claimResult.second
+            // Sidecar checksum ikut pindah (issue #1248): tanpa ini
+            // berkas tiba di tujuan tanpa verifikasi sementara
+            // deleteFiles di bawah menghapus sidecar di sumber —
+            // pasangan terpisah permanen. Nama memakai nama final
+            // unik hasil klaim, bukan nama asal.
+            runCatching {
+                val srcPath = item.filePath
+                if (!srcPath.isNullOrEmpty()) {
+                    val srcFile = File(srcPath)
+                    val srcParent = srcFile.parentFile
+                    val destDir = target.parentFile
+                    if (srcParent != null && destDir != null) {
+                        for (ext in listOf(".sha256", ".sha1", ".md5")) {
+                            val side = File(srcParent, srcFile.name + ext)
+                            if (!side.exists()) continue
+                            val doc = destDir.createFile("text/plain", unique + ext)
+                                ?: continue
+                            val out = appContext.contentResolver
+                                .openOutputStream(doc.uri, "wt") ?: continue
+                            out.use { dst ->
+                                side.inputStream().use { it.copyTo(dst) }
+                            }
+                        }
+                    }
+                }
+            }
             deleteFiles(item)
             // Duplikat tertinggal wajib terlacak (issue #492): deleteFiles
             // menelan semua kegagalan, jadi pindah yang "berhasil" bisa
