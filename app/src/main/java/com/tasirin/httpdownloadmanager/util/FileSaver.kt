@@ -854,19 +854,35 @@ class FileSaver(context: Context) {
                     val tree = DocumentFile.fromTreeUri(appContext, uri)
                     if (tree != null) {
                         val now = System.currentTimeMillis()
-                        tree.listFiles().forEach { doc ->
-                            if (!doc.isFile) return@forEach
-                            val name = doc.name ?: return@forEach
-                            if (!isPublishStagingName(name, finalNames)) return@forEach
-                            val modified = doc.lastModified()
-                            if (modified <= 0L ||
-                                now - modified <= 2L * 60 * 60 * 1000
-                            ) return@forEach
-                            runCatching {
-                                val size = doc.length()
-                                if (doc.delete()) freed += size
+                        // Telusur rekursif berbatas (issue #1246):
+                        // staging organizeByType hidup di SUBFOLDER
+                        // pohon ini (Videos/, Music/, ...), bukan di
+                        // akar — sapuan datar #1220 tak pernah
+                        // mencapainya. Batas kunjungan menjaga pohon
+                        // provider raksasa tetap murah.
+                        var visited = 0
+                        fun sweepDoc(dir: DocumentFile, depth: Int) {
+                            if (depth > 6 || visited > 2048) return
+                            for (doc in dir.listFiles()) {
+                                if (++visited > 2048) return
+                                if (doc.isDirectory) {
+                                    sweepDoc(doc, depth + 1)
+                                    continue
+                                }
+                                if (!doc.isFile) continue
+                                val name = doc.name ?: continue
+                                if (!isPublishStagingName(name, finalNames)) continue
+                                val modified = doc.lastModified()
+                                if (modified <= 0L ||
+                                    now - modified <= 2L * 60 * 60 * 1000
+                                ) continue
+                                runCatching {
+                                    val size = doc.length()
+                                    if (doc.delete()) freed += size
+                                }
                             }
                         }
+                        sweepDoc(tree, 0)
                     }
                 }
             }
