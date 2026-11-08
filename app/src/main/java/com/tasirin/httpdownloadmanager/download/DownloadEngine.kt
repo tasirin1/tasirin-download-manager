@@ -5819,8 +5819,18 @@ private class SpeedThrottle(
         // Early-return di atas menjaga download tanpa batas tetap tanpa biaya scan.
         val total = totalDownloaded()
         val delayMs = synchronized(lock) {
-            val delta = (total - lastSeen).coerceAtLeast(0L)
-            lastSeen = total
+            // Total yang MUNDUR tak boleh menggerakkan lastSeen mundur
+            // (issue #1296): total gabungan beberapa aliran (segmen
+            // paralel) bisa terlihat mundur antar-panggilan, dan lastSeen
+            // yang mundur membuat rentang yang sama ditagih dua kali ke
+            // limiter global (delta positif palsu di panggilan berikutnya).
+            val delta = if (total > lastSeen) {
+                val d = total - lastSeen
+                lastSeen = total
+                d
+            } else {
+                0L
+            }
             val g = shared
             if (g != null) {
                 if (delta <= 0) 0L else g.waitFor(delta)
