@@ -190,6 +190,13 @@ class DownloadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Konsumsi penanda boot juga di sini (issue #1239): service
+        // yang sudah berjalan tak melewati onCreate saat job boot
+        // men-start-nya, jadi tanpa ini penanda bertahan true dan
+        // salah atribut ke start dingin non-boot berikutnya. Nilai
+        // tak dipakai di jalur ini — keputusan server untuk proses
+        // ini sudah dibuat di onCreate-nya.
+        nextStartFromBoot = false
         val action = intent?.action
         when (action) {
             NotificationHelper.ACTION_PAUSE_ALL -> App.engine.pauseAll()

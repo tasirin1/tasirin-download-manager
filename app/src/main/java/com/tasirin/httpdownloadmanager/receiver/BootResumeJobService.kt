@@ -43,6 +43,11 @@ class BootResumeJobService : JobService() {
             }
         }
         if (started.isFailure) {
+            // Penanda boot tak boleh basi (issue #1239): start gagal
+            // berarti tak ada onCreate yang mengonsumsinya; tanpa
+            // reset ini start dingin non-boot berikutnya dinilai
+            // sebagai start boot oleh gerbang server.
+            DownloadService.nextStartFromBoot = false
             // Kegagalan start wajib berjejak (issue #592): log autostart
             // di atas ditulis SEBELUM percobaan, jadi tanpa baris ini
             // log justru menyiratkan autostart berjalan padahal start
