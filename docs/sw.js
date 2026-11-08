@@ -5,6 +5,13 @@
    sampai ke pengguna terpasang (issue #1090). */
 const CACHE = 'tasirin-dm-v1';
 const PRECACHE = [
+  // Dokumen root ikut di-precache (issue #1232): tanpanya fallback
+  // offline navigasi caches.match('./') bisa kosong pada kunjungan
+  // offline pertama yang dikendalikan SW, sebelum sempat ada
+  // navigasi online yang menulisnya ke cache. Entri '.' di bawah
+  // dipetakan pemasang menjadi './.' yang ternormalisasi ke URL
+  // dokumen root — kunci yang sama dengan yang dicari fallback.
+  '.',
   'site.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png'
