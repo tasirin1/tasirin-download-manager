@@ -39,7 +39,12 @@ object AdtsAac {
         val csd0: ByteArray,
         private val frames: () -> Iterator<ByteArray>
     ) {
-        /** Jumlah frame AAC (menghitung dengan iterasi penuh sumber). */
+        /** Jumlah frame AAC (menghitung dengan iterasi penuh sumber).
+         *
+         *  ACUAN UJI (issue #704) — bukan jalur produksi; produksi
+         *  menghitung PTS dari indeks frame saat forEachFrame berjalan.
+         *  Tiap akses membuka + mengiterasi ulang seluruh berkas, jadi
+         *  jangan dipakai di jalur remux (issue #1134). */
         val frameCount: Int
             get() {
                 val it = frames()
