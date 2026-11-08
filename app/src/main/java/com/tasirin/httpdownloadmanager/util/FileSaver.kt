@@ -1041,6 +1041,26 @@ class FileSaver(context: Context) {
         return PublishResult(filePath = target.absolutePath, fileName = target.name)
     }
 
+    /** Pindahkan sidecar checksum mengikuti ganti nama berkas File
+     *  (issue #1247): sidecar tertinggal bernama lama membuat berkas
+     *  bernama baru kehilangan verifikasinya, dan bisa terbaca
+     *  sebagai checksum sahih oleh unduhan lain yang kelak memakai
+     *  nama lama itu (pembaca: sidecarChecksum). Bila nama tujuan
+     *  sudah punya sidecar sendiri, sidecar kita dihapus — menimpa
+     *  milik berkas lain lebih buruk daripada kehilangan milik
+     *  sendiri. */
+    private fun renameSidecars(from: File, to: File) {
+        val parent = from.parentFile ?: return
+        for (ext in listOf(".sha256", ".sha1", ".md5")) {
+            val src = File(parent, from.name + ext)
+            if (!src.exists()) continue
+            val dst = File(parent, to.name + ext)
+            runCatching {
+                if (dst.exists()) src.delete() else src.renameTo(dst)
+            }
+        }
+    }
+
     fun deleteFiles(item: DownloadItem) {
         partialFiles(item).forEach { runCatching { it.delete() } }
         // Temp HLS + scratch remux/adaptive item ikut dihapus sekarang
@@ -1175,6 +1195,7 @@ class FileSaver(context: Context) {
                     // peringatan — file item lain bisa hilang diam-diam.
                     val target = uniqueTargetFile(File(file.parentFile, clean))
                     if (file.exists() && file.renameTo(target)) {
+                        renameSidecars(file, target)
                         MediaLibrary.notifyMediaChanged(appContext, file.absolutePath, target.absolutePath)
                         PublishResult(filePath = target.absolutePath, fileName = target.name)
                     } else {
