@@ -53,7 +53,11 @@ object HlsMp4Muxer {
             val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
                 countVideoFrames(videoTs)
             } else 0
-            writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount)
+            // Nol sampel video = masukan korup total (issue #1217):
+            // tanpa cek ini remux "sukses" menghasilkan MP4 kosong.
+            if (writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount) <= 0) {
+                throw IOException("remux: no video samples in source")
+            }
             audio?.let { stream ->
                 writeAacFrames(muxer, audioTrack, stream)
             }
@@ -100,8 +104,15 @@ object HlsMp4Muxer {
             val videoFrameCount = if (segmentDurationsUs.isNotEmpty()) {
                 countVideoFrames(videoTs)
             } else 0
-            writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount)
-            writeTrackPts(audioExt, muxer, audioTrack)
+            // Kedua track wajib menghasilkan sampel (issue #1217):
+            // track kosong berarti berkas sumber korup; menggabungkan
+            // apa adanya menghasilkan MP4 hilang-track berstatus sukses.
+            if (writeAll(videoExt, muxer, videoTrack, videoBuf, segmentDurationsUs, videoFrameCount) <= 0) {
+                throw IOException("remuxWithAudioFile: no video samples in source")
+            }
+            if (writeTrackPts(audioExt, muxer, audioTrack) <= 0) {
+                throw IOException("remuxWithAudioFile: no audio samples in source")
+            }
             muxer.stop()
             return true
         } catch (t: Throwable) {
@@ -138,8 +149,13 @@ object HlsMp4Muxer {
             val audioTrack = muxer.addTrack(openedAudio.second)
 
             muxer.start()
-            writeTrackPts(videoExt, muxer, videoTrack)
-            writeTrackPts(audioExt, muxer, audioTrack)
+            // Kedua track wajib menghasilkan sampel (issue #1217).
+            if (writeTrackPts(videoExt, muxer, videoTrack) <= 0) {
+                throw IOException("remuxMp4s: no video samples in source")
+            }
+            if (writeTrackPts(audioExt, muxer, audioTrack) <= 0) {
+                throw IOException("remuxMp4s: no audio samples in source")
+            }
             muxer.stop()
             return true
         } catch (t: Throwable) {
@@ -208,7 +224,7 @@ object HlsMp4Muxer {
         bufferSize: Int,
         segmentDurationsUs: List<Long>,
         videoFrameCount: Int
-    ) {
+    ): Int {
         var buffer = ByteBuffer.allocate(bufferSize)
         val info = MediaCodec.BufferInfo()
         if (segmentDurationsUs.isEmpty() ||
@@ -220,8 +236,7 @@ object HlsMp4Muxer {
             // menghasilkan 0 per segmen dari parser) ikut jatuh ke
             // sini (issue #1215): menjumlahkannya memberi totalUs=1
             // sehingga PTS semua frame runtuh ke 0 di jalur seragam.
-            writeTrackPts(ext, muxer, track)
-            return
+            return writeTrackPts(ext, muxer, track)
         }
 
         // PTS MPEG-TS YouTube tidak bisa diandalkan (restart per segmen, span
@@ -237,6 +252,7 @@ object HlsMp4Muxer {
         // dari total EXTINF (sampai ~0,3 dtk pada video 2 jam/60fps) dan
         // desync terhadap audio yang kini eksak per frame (#638).
         var frameIndex = 0L
+        var written = 0
         while (true) {
             buffer.clear()
             var size = ext.readSampleData(buffer, 0)
@@ -282,9 +298,11 @@ object HlsMp4Muxer {
             }
             info.set(0, size, pts, flags)
             muxer.writeSampleData(track, buffer, info)
+            written++
             if (!ext.advance()) break
             frameIndex++
         }
+        return written
     }
 
     /** Hitung jumlah frame video pada file .ts (pass terpisah, extractor baru
@@ -321,12 +339,13 @@ object HlsMp4Muxer {
         ext: MediaExtractor,
         muxer: MediaMuxer,
         track: Int
-    ) {
+    ): Int {
         var buffer = ByteBuffer.allocate(1 shl 20)
         val info = MediaCodec.BufferInfo()
         // Penanda boolean terpisah (issue #944): sampleTime sah bisa -1,
         // jadi sentinel -1 pada firstPts menelan sampel pertama dan
         // menjadikan sampel kedua basis — menghasilkan PTS-sama.
+        var written = 0
         var hasFirstPts = false
         var firstPts = 0L
         var lastPts = -1L
@@ -382,8 +401,10 @@ object HlsMp4Muxer {
             }
             info.set(0, size, normalized, flags)
             muxer.writeSampleData(track, buffer, info)
+            written++
             if (!ext.advance()) break
         }
+        return written
     }
 
     /** Tulis frame AAC murni (tanpa header ADTS) dengan PTS kontinu — tiap
