@@ -1720,11 +1720,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     tracker.record(chunkIdx, length)
                 }
             }
-            if (chunkIdx == chunks - 1) {
-                // Baca panjang sekali: stat ganda untuk file yang sama hanya
-                // membuang syscall, dan nilai tunggal menjamin cek ruang dan
-                // impor memakai ukuran yang sama.
-                val tmpLen = tmp.length()
+            // Baca panjang sekali: stat ganda untuk file yang sama hanya
+            // membuang syscall, dan nilai tunggal menjamin cek kelengkapan,
+            // cek ruang, dan impor memakai ukuran yang sama.
+            val tmpLen = tmp.length()
+            // Finalisasi dinilai saat chunk terakhir tiba ATAU saat chunk
+            // mana pun melengkapi set (issue #1168): pengirim tak
+            // berurutan yang chunk terakhirnya sudah ditolak "incomplete"
+            // bisa melengkapi sesi lewat chunk susulan — tanpa penilaian
+            // ulang di sini sesi lengkap tak pernah terbit sampai chunk
+            // terakhir dikirim ulang. Klien resmi berurutan tak berubah:
+            // chunk bukan-terakhir tak pernah melengkapi set lebih dulu.
+            if (chunkIdx == chunks - 1 || tracker.isComplete(tmpLen)) {
                 if (tmpLen > MAX_UPLOAD_BYTES) {
                     tmp.delete()
                     return jsonResponse(
