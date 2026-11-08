@@ -1312,26 +1312,40 @@ class FileSaver(context: Context) {
             // deleteFiles di bawah menghapus sidecar di sumber —
             // pasangan terpisah permanen. Nama memakai nama final
             // unik hasil klaim, bukan nama asal.
-            runCatching {
-                val srcPath = item.filePath
-                if (!srcPath.isNullOrEmpty()) {
-                    val srcFile = File(srcPath)
-                    val srcParent = srcFile.parentFile
-                    val destDir = target.parentFile
-                    if (srcParent != null && destDir != null) {
-                        for (ext in listOf(".sha256", ".sha1", ".md5")) {
-                            val side = File(srcParent, srcFile.name + ext)
-                            if (!side.exists()) continue
+            // Kegagalan salin tak lagi senyap (issue #1270): dulu
+            // runCatching + continue menelan semuanya sementara
+            // deleteFiles tetap menghapus sidecar sumber, sehingga
+            // jaminan #1248 gugur tanpa jejak di provider aneh.
+            val failedSidecars = mutableListOf<String>()
+            val srcPath = item.filePath
+            if (!srcPath.isNullOrEmpty()) {
+                val srcFile = File(srcPath)
+                val srcParent = srcFile.parentFile
+                val destDir = target.parentFile
+                if (srcParent != null && destDir != null) {
+                    for (ext in listOf(".sha256", ".sha1", ".md5")) {
+                        val side = File(srcParent, srcFile.name + ext)
+                        if (!side.exists()) continue
+                        val ok = runCatching {
                             val doc = destDir.createFile("text/plain", unique + ext)
-                                ?: continue
+                                ?: error("createFile returned null")
                             val out = appContext.contentResolver
-                                .openOutputStream(doc.uri, "wt") ?: continue
+                                .openOutputStream(doc.uri, "wt")
+                                ?: error("openOutputStream returned null")
                             out.use { dst ->
                                 side.inputStream().use { it.copyTo(dst) }
                             }
-                        }
+                        }.isSuccess
+                        if (!ok) failedSidecars.add(ext)
                     }
                 }
+            }
+            if (failedSidecars.isNotEmpty()) {
+                android.util.Log.w(
+                    "FileSaver",
+                    "move(): sidecar copy failed for ${item.fileName} " +
+                        "(${failedSidecars.joinToString()}), verification lost"
+                )
             }
             deleteFiles(item)
             // Duplikat tertinggal wajib terlacak (issue #492): deleteFiles
