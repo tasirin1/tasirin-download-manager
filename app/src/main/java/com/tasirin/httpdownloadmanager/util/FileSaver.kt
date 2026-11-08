@@ -299,8 +299,18 @@ class FileSaver(context: Context) {
                 !f.exists() || f.length() > 0L ->
                     StoragePrefs.forgetFinalClaim(appContext, path)
                 else -> {
+                    // Staging hidup = dokumen staging milik klaim INI:
+                    // persis "<final>.part" atau varian uniknya
+                    // "<final> (n).part" (issue #1170). Predikat lama
+                    // (startsWith + contains ".part") juga cocok dengan
+                    // berkas klaim itu SENDIRI bila nama finalnya memuat
+                    // ".part" (mis. film.part.mp4) — klaim 0-byte-nya tak
+                    // pernah tersapu dan namanya selamanya kena sufiks
+                    // (1) — dan dengan staging milik unduhan lain yang
+                    // nama finalnya berawalan sama.
                     val stagingAlive = f.parentFile?.listFiles()?.any {
-                        it.name.startsWith(f.name) && it.name.contains(".part")
+                        it.name == f.name + ".part" ||
+                            (it.name.startsWith(f.name + " (") && it.name.endsWith(".part"))
                     } ?: false
                     if (!stagingAlive && runCatching { f.delete() }.getOrDefault(false)) {
                         StoragePrefs.forgetFinalClaim(appContext, path)
