@@ -1426,6 +1426,11 @@
   .fab.fab-hide {
  opacity: 0; transform: translateY(24px) scale(.9); pointer-events: none; }
 
+  /* Mode batch Downloads (issue #1336): FAB disembunyikan total agar
+     tidak menutupi tombol batch toolbar di bawahnya. */
+  .fab.fab-batch {
+ display: none !important; }
+
   .to-top {
  display: flex; position: fixed; right: 26px; bottom: calc(124px + env(safe-area-inset-bottom, 0px)); z-index: 54; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 18px; line-height: 1; box-shadow: var(--shadow-sm); cursor: pointer; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transform: translateY(6px); transition: opacity .2s ease, transform .2s ease, color .15s ease, box-shadow .15s ease; }
 
@@ -6790,6 +6795,7 @@ function toggleBatchMode() {
   document.getElementById('batchModeBtn').innerHTML = batchMode ? UI_ICONS.close + ' Cancel selection' : UI_ICONS.checksq + ' Select';
   document.getElementById('list').classList.toggle('batch-mode', batchMode);
   document.getElementById('batchToolbar').classList.toggle('show', batchMode);
+  document.getElementById('fabNewBtn').classList.toggle('fab-batch', batchMode);
   updateBatchCount();
 }
 // Id yang sedang tampil sesudah filter/pencarian Downloads (diisi
