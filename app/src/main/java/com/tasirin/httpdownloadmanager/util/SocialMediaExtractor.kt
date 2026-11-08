@@ -1163,12 +1163,18 @@ object SocialMediaExtractor {
         }.getOrDefault(false)
     }
 
+    // Urutan = urutan coba; instans terverifikasi hidup didahulukan.
+    // Probe 2026-11-08 (issue #1326): projectsegfau.lt menjawab 200,
+    // adminforge.de 301 (hidup); kavin.rocks menjawab 526 dan instans
+    // utamanya memang sudah ditutup — dibuang dari daftar. leptons.xyz
+    // (502 sesaat), founderweb.com, dan api.piped.yt (tak terjangkau
+    // dari jaringan probe) dipertahankan: satu probe tak cukup untuk
+    // memvonis mati dan cap tahap membatasi biaya instans yang gagal.
     private val PIPED_INSTANCES = listOf(
+        "pipedapi.in.projectsegfau.lt/streams/",
         "pipedapi.adminforge.de/streams/",
-        "pipedapi.kavin.rocks/streams/",
         "pipedapi.leptons.xyz/streams/",
         "pipedapi.video.founderweb.com/streams/",
-        "pipedapi.in.projectsegfau.lt/streams/",
         "api.piped.yt/streams/"
     )
 
