@@ -40,6 +40,28 @@ class AdtsAacTest {
     }
 
     @Test
+    fun `frame berpayload nol disaring dari hitungan dan iterasi`() {
+        // Issue #1244: frame header-saja (payload 0) tak boleh terhitung
+        // frameCount, tak boleh membuat stream tampak berisi, dan tak
+        // boleh terkirim ke MediaMuxer sebagai sampel 0 byte.
+        val data = adtsFrame(1, 7, 2, 0) + adtsFrame(1, 7, 2, 100) + adtsFrame(1, 7, 2, 0)
+        val stream = AdtsAac.parse(data)!!
+        assertEquals(1, stream.frameCount)
+        assertFalse(stream.isEmpty)
+        val sizes = mutableListOf<Int>()
+        stream.forEachFrame { sizes.add(it.size) }
+        assertEquals(listOf(100), sizes)
+    }
+
+    @Test
+    fun `stream seluruhnya frame kosong divonis kosong`() {
+        // Issue #1244: isEmpty kini bermakna "tak ada frame BERpayload".
+        val stream = AdtsAac.parse(adtsFrame(1, 7, 2, 0) + adtsFrame(1, 7, 2, 0))!!
+        assertEquals(0, stream.frameCount)
+        assertTrue(stream.isEmpty)
+    }
+
+    @Test
     fun `id3 tag di awal dilewati`() {
         val data = id3 + adtsFrame(1, 7, 2, 100)
         assertEquals(10, AdtsAac.id3TagSize(data, 0))

@@ -19,6 +19,12 @@ import java.nio.ByteBuffer
  *  is-adts/sample ber-header yang tidak bisa langsung ditulis ke MP4. */
 object HlsMp4Muxer {
 
+    /** Gerbang hitung frame (issue #1245): hitungan hanya dibaca
+     *  writeAll bila ada durasi segmen positif; daftar kosong/semua-nol
+     *  selalu jatuh ke fallback PTS. Diekstrak agar teruji (issue #1262). */
+    internal fun durationsWorthCounting(segmentDurationsUs: List<Long>): Boolean =
+        segmentDurationsUs.any { it > 0L }
+
     fun remux(
         videoTs: File,
         audio: AdtsAac.Stream?,
@@ -54,7 +60,7 @@ object HlsMp4Muxer {
             // (issue #1245): daftar semua-nol dari playlist tanpa
             // EXTINF selalu dialihkan writeAll ke fallback PTS, jadi
             // pindaian penuh .ts untuknya selalu terbuang.
-            val videoFrameCount = if (segmentDurationsUs.any { it > 0L }) {
+            val videoFrameCount = if (durationsWorthCounting(segmentDurationsUs)) {
                 countVideoFrames(videoTs)
             } else 0
             // Nol sampel video = masukan korup total (issue #1217):
@@ -109,7 +115,7 @@ object HlsMp4Muxer {
             // (issue #1245): daftar semua-nol dari playlist tanpa
             // EXTINF selalu dialihkan writeAll ke fallback PTS, jadi
             // pindaian penuh .ts untuknya selalu terbuang.
-            val videoFrameCount = if (segmentDurationsUs.any { it > 0L }) {
+            val videoFrameCount = if (durationsWorthCounting(segmentDurationsUs)) {
                 countVideoFrames(videoTs)
             } else 0
             // Kedua track wajib menghasilkan sampel (issue #1217):
