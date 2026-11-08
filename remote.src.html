@@ -274,6 +274,12 @@
   input:focus, select:focus {
  outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
 
+  /* Placeholder dikunci tema (issue #1332): tanpa aturan ini warnanya
+     100% bawaan UA (model Firefox terang hanya ±3,55:1); --muted lolos
+     4,93:1 (terang) dan 7,68:1 (gelap) di atas latar kolom. */
+  input::placeholder, textarea::placeholder {
+ color: var(--muted); opacity: 1; }
+
   .form-row {
  display: flex; gap: 10px; }
 
