@@ -1311,7 +1311,6 @@ closeMoreMenu();
 closeFsToolsMenu();
 restoringRoute = route;
 if (route === 'gallery') {
-restartAnim(galleryView);
 toggleAddForm(false);
 if (galleryCacheFresh()) {
 setGalleryStatus('');
@@ -1321,7 +1320,6 @@ restoreRouteScroll('gallery');
 loadGallery(true).then(function () { restoreRouteScroll('gallery'); });
 }
 } else if (route === 'files') {
-restartAnim(fsView);
 toggleAddForm(false);
 resetFsSelection();
 if (!fsPath && localStorage.getItem(FS_LAST_PATH_KEY)) {
@@ -1331,7 +1329,6 @@ fsRestoredOnce = true;
 loadFsLocations();
 loadFs();
 } else {
-restartAnim(dlList);
 if (pendingAddForm) {
 pendingAddForm = false;
 toggleAddForm(true);
@@ -1343,12 +1340,6 @@ restoringRoute = '';
 restoreRouteScroll('downloads');
 });
 }
-}
-function restartAnim(el) {
-if (!el) return;
-el.classList.remove('view-anim');
-void el.offsetWidth;
-el.classList.add('view-anim');
 }
 function updateStickyTop() {
 const tb = document.querySelector('.topbar');
