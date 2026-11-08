@@ -880,8 +880,12 @@
   .fs-batch {
  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
  position: fixed; left: 0; right: 0; z-index: 51;
- bottom: calc(56px + env(safe-area-inset-bottom, 0px));
- padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+ /* Labuh tepat di atas tab bar (issue #1339): 60px = tinggi tab bar
+    nyata (padding 5 + isi tab ±49 + padding bawah 6 + border 1);
+    inset dihitung SEKALI di sini — padding bilah sendiri polos,
+    sebelumnya inset terhitung ganda di bottom dan padding. */
+ bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+ padding: 10px 14px;
  background: var(--topbar-bg);
  border-top: 1px solid var(--line); border-radius: 16px 16px 0 0;
  box-shadow: 0 -8px 24px rgba(23,32,58,.16); }
