@@ -30,6 +30,19 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `extractYouTubeId - bentuk live embed dan v dikenali`() {
+        // Ekspektasi dibuktikan port Python 1:1 dari keempat regex (9 kasus).
+        assertEquals("dQw4w9WgXcQ", SocialMediaExtractor.extractYouTubeId("https://www.youtube.com/live/dQw4w9WgXcQ?si=abc"))
+        assertEquals("dQw4w9WgXcQ", SocialMediaExtractor.extractYouTubeId("https://www.youtube.com/embed/dQw4w9WgXcQ"))
+        assertEquals("dQw4w9WgXcQ", SocialMediaExtractor.extractYouTubeId("https://youtube.com/v/dQw4w9WgXcQ?version=3"))
+        assertEquals("dQw4w9WgXcQ", SocialMediaExtractor.extractYouTubeId("https://www.youtube.com/shorts/dQw4w9WgXcQ"))
+        assertEquals("dQw4w9WgXcQ", SocialMediaExtractor.extractYouTubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1"))
+        assertEquals("dQw4w9WgXcQ", SocialMediaExtractor.extractYouTubeId("https://youtu.be/dQw4w9WgXcQ"))
+        assertNull(SocialMediaExtractor.extractYouTubeId("https://www.youtube.com/live/pendek"))
+        assertNull(SocialMediaExtractor.extractYouTubeId("https://www.youtube.com/feed/subscriptions"))
+    }
+
+    @Test
     fun `isSocialMediaUrl - deteksi URL beranda sosial`() {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.youtube.com/watch?v=abc"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://youtu.be/abc"))

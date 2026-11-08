@@ -162,6 +162,11 @@ object SocialMediaExtractor {
     }
 
     private val YT_ID_SHORTS_RE = Regex("/shorts/([A-Za-z0-9_-]{11})")
+    // Bentuk path lain yang membawa ID langsung (issue #1291): tautan
+    // Share siaran langsung/premiere (/live/), sematan (/embed/), dan
+    // bentuk lama (/v/) — tanpa ini host lolos deteksi tetapi ekstraksi
+    // langsung kosong dan unduhan gagal total tanpa penjelasan.
+    private val YT_ID_PATH_RE = Regex("/(?:live|embed|v)/([A-Za-z0-9_-]{11})")
     private val YT_ID_V_RE = Regex("[?&]v=([A-Za-z0-9_-]{11})")
     private val YT_ID_YOUTU_RE = Regex("youtu\\.be/([A-Za-z0-9_-]{11})")
     private val HP_URL_HIGH_RE = Regex("""setVideoUrlHigh\s*\(\s*['"](https?://[^'"]+)['"]""")
@@ -1364,12 +1369,15 @@ object SocialMediaExtractor {
         return null
     }
 
-    private fun extractYouTubeId(url: String): String? {
+    // Internal agar bentuk-bentuk ID teruji langsung (pola parser murni).
+    internal fun extractYouTubeId(url: String): String? {
         YT_ID_SHORTS_RE.find(url)
             ?.groupValues?.get(1)?.let { return it }
         YT_ID_V_RE.find(url)
             ?.groupValues?.get(1)?.let { return it }
         YT_ID_YOUTU_RE.find(url)
+            ?.groupValues?.get(1)?.let { return it }
+        YT_ID_PATH_RE.find(url)
             ?.groupValues?.get(1)?.let { return it }
         return null
     }
