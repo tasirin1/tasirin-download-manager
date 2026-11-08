@@ -88,11 +88,6 @@ object AdtsAac {
 
     const val SAMPLES_PER_FRAME = 1024L
 
-    /** Batas atas ukuran satu frame AAC — frame 96 kHz stereo 1024 sampel
-     *  hanya ~4 KB; batas ini cuma pengaman agar file rusak tidak membuang
-     *  memori dengan alokasi raksasa. */
-    private const val MAX_FRAME_BYTES = 1 shl 16
-
     /** Batas baca 0-byte beruntun: kontrak InputStream membolehkan read() = 0
      *  (bukan EOF); tanpa guard stream macet membuat readExact loop selamanya
      *  menahan thread muxing — pola sama seperti HttpBody dan readBounded. */
@@ -413,8 +408,12 @@ object AdtsAac {
         // gagal, padahal jalur ByteArray berhenti dengan anggun.
         if (h.buffered < h.headerLen) return null
         val pre = h.buffered - h.headerLen
+        // Tak ada penjaga ukuran payload di sini: frameLen adalah field
+        // 13-bit header ADTS (maks 8191), jadi payloadLen terikat format
+        // pada ±8 KB dan alokasi raksasa memang mustahil. Penjaga
+        // MAX_FRAME_BYTES lama (64 KB) tak pernah bisa terpicu dan
+        // komentarnya menyesatkan — dibuang (issue #1135).
         val payloadLen = h.frameLen - h.headerLen
-        if (payloadLen > MAX_FRAME_BYTES) return null
         // Frame lebih pendek dari jendela kandidat (issue #619):
         // kelebihan byte di hdr adalah AWAL frame berikutnya yang
         // sudah terlanjur terbaca. Dulu keadaan ini mengembalikan
