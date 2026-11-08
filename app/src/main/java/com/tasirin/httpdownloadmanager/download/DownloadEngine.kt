@@ -5319,10 +5319,18 @@ internal fun isHttpMirrorFailoverError(message: String?): Boolean {
  *  transient seperti putus jaringan — partial tetap valid, jadi setelah retry
  *  habis jangan FAILED melainkan PAUSED agar auto-lanjut saat koneksi pulih.
  *  Murni agar bisa di-unit-test. */
+/** Pola pesan segmen terpotong milik sendiri (issue #1213). */
+private val SEGMENT_INCOMPLETE_RE = Regex("Segment \\d+ incomplete")
+
 internal fun isTailIncompleteError(message: String?): Boolean {
     if (message.isNullOrBlank()) return false
-    return message.contains("Size mismatch", ignoreCase = true) ||
-        message.contains("incomplete", ignoreCase = true)
+    // Berjangkar pada dua bentuk pesan produsen sendiri (issue #1213,
+    // kelas #1186): substring telanjang "incomplete" atas seluruh
+    // pesan ikut mengubah galat asing yang kebetulan memuat kata itu
+    // menjadi PAUSED auto-lanjut, sehingga kegagalan permanen tak
+    // pernah tampil sebagai FAILED.
+    return message.startsWith("Size mismatch") ||
+        SEGMENT_INCOMPLETE_RE.containsMatchIn(message)
 }
 
 /** Ukuran file hasil re-extract wajib sama dengan file lama agar resume segmen

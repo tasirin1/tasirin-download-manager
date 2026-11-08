@@ -61,6 +61,7 @@ class RangeRejectResumeTest {
     @Test fun tailIncompleteDetected() {
         assertTrue(isTailIncompleteError("Size mismatch: expected 90474052 (Content-Length), received 89618157"))
         assertTrue(isTailIncompleteError("Segment 3 incomplete"))
+        assertFalse(isTailIncompleteError("Gateway returned an incomplete response"))
         assertFalse(isTailIncompleteError("Server does not support Range (HTTP 200)"))
         assertFalse(isTailIncompleteError(null))
     }
