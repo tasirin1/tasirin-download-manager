@@ -560,7 +560,15 @@
  outline: 3px solid var(--focus); outline-offset: 2px; }
 
   .item:focus-visible, .fs-row:focus-visible, .fs-root:focus-visible, .gal-cell:focus-visible {
- outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 12px; }
+ outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  /* Radius cincin fokus mengikuti radius kartunya (issue #1346):
+     kartu daftar 16px, .fs-root memang 12px. */
+  .item:focus-visible, .fs-row:focus-visible, .gal-cell:focus-visible {
+ border-radius: var(--radius); }
+
+  .fs-root:focus-visible {
+ border-radius: 12px; }
 
   .tabbar {
  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 4px; padding: 5px 10px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--tabbar-bg); border-top: 1px solid var(--line); box-shadow: 0 -1px 8px rgba(23,32,58,.05); transition: transform .25s ease; }
