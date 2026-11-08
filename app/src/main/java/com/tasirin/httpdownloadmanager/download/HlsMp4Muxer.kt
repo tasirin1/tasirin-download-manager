@@ -150,11 +150,11 @@ object HlsMp4Muxer {
         }
     }
 
-    /** Ukuran buffer video dari format track (satu tempat, tiga remux memakai sama). */
     /** Batas frame tunggal saat buffer tumbuh: klaim ukuran bohong di atas
      *  ini digagalkan aman (outer catch menghapus partial), bukan OOM. */
     private const val MAX_MUX_FRAME_BYTES = 64 shl 20
 
+    /** Ukuran buffer video dari format track (satu tempat, tiga remux memakai sama). */
     private fun videoBufferSize(vFormat: MediaFormat): Int {
         return runCatching {
             vFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
