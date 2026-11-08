@@ -1721,11 +1721,13 @@
   .old-browser.hidden { display: none; }
 
 .thumb-broken{visibility:hidden}
-  /* Hormati preferensi gerak minim: matikan animasi toast dan
-     transisi bar progres. */
+  /* Hormati preferensi gerak minim: matikan animasi toast, transisi
+     bar progres, dan animasi masuk bottom-sheet (sheetFade/sheetUp
+     dulu terlewat dari cakupan blok ini, issue #1201). */
   @media (prefers-reduced-motion: reduce) {
     .toast { animation: none; }
     .fill { transition: none; }
+    .sheet:not(.hidden), .sheet:not(.hidden) .sheet-box { animation: none; }
   }
 </style>
 </head>
