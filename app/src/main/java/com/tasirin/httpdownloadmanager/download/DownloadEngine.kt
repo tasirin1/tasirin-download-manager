@@ -2611,20 +2611,6 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun isHlsManifestUrl(url: String): Boolean {
-        if (url.contains("manifest.googlevideo.com") ||
-            url.contains("/api/manifest/hls")
-        ) return true
-        // Akhiran path saja (issue #1159): substring ".m3u8" atas URL
-        // utuh juga menangkap tautan berkas biasa yang query/path-nya
-        // memuat ".m3u8" (mis. ?file=clip.m3u8) dan selalu
-        // mengarahkannya ke jalur HLS sampai FAILED "No HLS segments
-        // found" — kelas kesalahan #843/#844. Query/fragment dibuang
-        // dulu, lalu akhiran path yang dinilai.
-        val pathOnly = url.substringBefore('?').substringBefore('#')
-        return pathOnly.endsWith(".m3u8", ignoreCase = true)
-    }
-
     /** Unduh HLS (m3u8): pilih varian terbaik, unduh semua segmen .ts lalu
      *  gabung jadi satu file dapat diputar. Tidak butuh ffmpeg — segmen dari
      *  YouTube HLS sudah berisi video+audio gabungan (MPEG-TS). */
@@ -5365,6 +5351,23 @@ internal fun redirectTarget(base: String, location: String?): String? {
 /** Host URL ternormalisasi (huruf kecil, tanpa titik akhir); "" bila
  *  tak ter-parse. Dasar klasifikasi platform berbasis host di engine
  *  (issue #843/#844) — jangan kembali ke substring atas URL utuh. */
+internal fun isHlsManifestUrl(url: String): Boolean {
+    // Pengecualian dinilai dari host/path sungguhan (issue #1184):
+    // substring atas URL utuh juga menangkap tautan berkas biasa
+    // yang QUERY-nya kebetulan memuat string itu.
+    if (urlHostOf(url) == "manifest.googlevideo.com") return true
+    // Akhiran path saja (issue #1159): substring ".m3u8" atas URL
+    // utuh juga menangkap tautan berkas biasa yang query/path-nya
+    // memuat ".m3u8" (mis. ?file=clip.m3u8) dan selalu
+    // mengarahkannya ke jalur HLS sampai FAILED "No HLS segments
+    // found" — kelas kesalahan #843/#844. Query/fragment dibuang
+    // dulu, lalu path yang dinilai (pola /api/manifest/hls juga
+    // hanya berlaku pada path).
+    val pathOnly = url.substringBefore('?').substringBefore('#')
+    if (pathOnly.contains("/api/manifest/hls")) return true
+    return pathOnly.endsWith(".m3u8", ignoreCase = true)
+}
+
 internal fun urlHostOf(url: String): String =
     runCatching {
         java.net.URL(url).host?.trim()?.trimEnd('.')?.lowercase(Locale.ROOT) ?: ""
