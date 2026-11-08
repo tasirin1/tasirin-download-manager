@@ -126,7 +126,7 @@ a:hover{color:#0D47A1}
 /* ── FAQ ── */
 .faq{max-width:640px;margin:0 auto}
 .faq-item{border-bottom:1px solid var(--card-border);padding:18px 0}
-.faq-q{font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.95rem;transition:color .2s}
+.faq-q{font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.95rem;transition:color .2s;background:none;border:0;padding:0;width:100%;text-align:left;font-family:inherit;color:inherit}
 .faq-q:hover{color:var(--accent)}
 .faq-q::after{content:'+';font-size:1.2rem;color:var(--dim);transition:transform .25s;font-weight:300}
 .faq-item.open .faq-q::after{transform:rotate(45deg)}
@@ -263,23 +263,23 @@ a:hover{color:#0D47A1}
   <h2 class="section-title" data-i18n="faq_title">Pertanyaan Umum</h2>
   <div class="faq">
     <div class="faq-item">
-      <div class="faq-q" data-i18n="faq1_q">Apakah ini benar-benar gratis?</div>
+      <button type="button" class="faq-q" aria-expanded="false" data-i18n="faq1_q">Apakah ini benar-benar gratis?</button>
       <div class="faq-a" data-i18n="faq1_a">Ya. Aplikasi ini open-source di bawah lisensi MIT tanpa iklan, tanpa pelacakan, dan tanpa pembelian dalam aplikasi.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" data-i18n="faq2_q">Apakah mendukung resume?</div>
+      <button type="button" class="faq-q" aria-expanded="false" data-i18n="faq2_q">Apakah mendukung resume?</button>
       <div class="faq-a" data-i18n="faq2_a">Ya. Unduhan otomatis dilanjutkan setelah gangguan menggunakan HTTP Range. File parsial tetap disimpan.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" data-i18n="faq3_q">Bisakah saya kendalikan dari PC?</div>
+      <button type="button" class="faq-q" aria-expanded="false" data-i18n="faq3_q">Bisakah saya kendalikan dari PC?</button>
       <div class="faq-a" data-i18n="faq3_a">Ya. Aktifkan server remote di Pengaturan, lalu buka URL yang ditampilkan di browser manapun di jaringan yang sama.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" data-i18n="faq4_q">Platform apa saja yang didukung?</div>
+      <button type="button" class="faq-q" aria-expanded="false" data-i18n="faq4_q">Platform apa saja yang didukung?</button>
       <div class="faq-a" data-i18n="faq4_a">YouTube, TikTok, Instagram, dan URL langsung apapun. YouTube menggunakan HLS dengan merge audio-video. Tautan media sosial terdeteksi otomatis.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" data-i18n="faq5_q">Bagaimana cara update?</div>
+      <button type="button" class="faq-q" aria-expanded="false" data-i18n="faq5_q">Bagaimana cara update?</button>
       <div class="faq-a" data-i18n="faq5_a">Aplikasi mengecek rilis baru di GitHub. Ketuk "Periksa pembaruan" di Pengaturan, lalu unduh dan instal secara manual.</div>
     </div>
   </div>
@@ -407,7 +407,10 @@ fetch('https://api.github.com/repos/tasirin1/tasirin-download-manager/releases?p
 
 /* ── FAQ toggle ── */
 document.querySelectorAll('.faq-q').forEach(function(q){
-  q.addEventListener('click',function(){q.parentElement.classList.toggle('open')});
+  q.addEventListener('click',function(){
+    var open=q.parentElement.classList.toggle('open');
+    q.setAttribute('aria-expanded',open?'true':'false');
+  });
 });
 
 /* ── Scroll reveal ── */

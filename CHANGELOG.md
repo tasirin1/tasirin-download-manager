@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(docs): pertanyaan FAQ kini tombol sungguhan yang bisa dibuka via keyboard** -- .faq-q dulu div + click saja tanpa tabindex/role/aria, tak terjangkau keyboard dan tak terbaca sebagai kontrol. Kelima pertanyaan kini <button> dengan aria-expanded yang disinkronkan handler toggle; gaya visual identik lewat reset CSS (issue #1230).
 - Perbaikan dokumentasi kode: komentar basi #f1edff di override .empty .ico tema gelap ditulis ulang sesuai keadaan sesudah #1202 (warna itu kini tak ada di kode mana pun; tema terang datar, tema gelap gradasi navy antar-var) (issue #1229).
 - **fix(remote): .retry-badge kini memakai var(--amber) (4,86:1), bukan hardcode 3,94:1** -- Token yang lulus standar sudah tersedia di palet yang sama; hardcode #b26a00 menyimpang tanpa alasan (issue #1228).
 - **fix(remote): kontras teks lencana .f-type t-audio/t-img tema terang dinaikkan ke atas 4,5:1** -- Pasangan hardcode lama 4,27:1 dan 4,06:1, di bawah standar repo. Warna teks digelapkan sekeluarga (audio #026DA5 = 5,01:1; img #00707C = 5,22:1, terhitung WCAG) (issue #1227).
