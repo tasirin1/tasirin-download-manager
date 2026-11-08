@@ -106,6 +106,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // galeri kosong.
     @Volatile private var lastGalleryEmptyLog = 0L
     private val loginAttempts = ConcurrentHashMap<String, LoginAttempt>()
+    // Cache vonis izin URI media (issue #1299): cabang MediaStore
+    // menjalankan query RELATIVE_PATH + pindai izin persisten untuk
+    // SETIAP request media/thumb (termasuk zap galeri), jadi vonis
+    // per-URI disimpan sebentar. TTL pendek membatasi jeda pencabutan.
+    private val mediaUriAllowedCache = ConcurrentHashMap<String, Pair<Boolean, Long>>()
+    private val mediaUriAllowedCacheTtlMs = 5_000L
+
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Triple<Int, Long, Boolean>>>()
     private val fsStatsCacheTtlMs = 60_000L
     // Cache listing folder media per root (MediaStore): membrowse halaman demi
@@ -4068,6 +4075,21 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         uri.pathSegments.getOrNull(1) == "video"
 
     private fun isMediaUriAllowed(uri: Uri): Boolean {
+        if (uri.authority == MediaStore.AUTHORITY) {
+            val key = uri.toString()
+            val now = System.currentTimeMillis()
+            mediaUriAllowedCache[key]?.let { (allowed, at) ->
+                if (now - at < mediaUriAllowedCacheTtlMs) return allowed
+            }
+            val allowed = isMediaUriAllowedFresh(uri)
+            if (mediaUriAllowedCache.size > 1024) mediaUriAllowedCache.clear()
+            mediaUriAllowedCache[key] = allowed to now
+            return allowed
+        }
+        return isMediaUriAllowedFresh(uri)
+    }
+
+    private fun isMediaUriAllowedFresh(uri: Uri): Boolean {
         return runCatching {
             when (uri.authority) {
                 MediaStore.AUTHORITY -> {
