@@ -287,7 +287,14 @@ object AdtsAac {
     fun open(file: File): Stream? {
         // Pushback: readFrame mengembalikan kelebihan byte jendela
         // kandidat milik frame berikutnya (issue #619).
-        val input = PushbackInputStream(BufferedInputStream(FileInputStream(file)), 16)
+        // Konstruksi stream ikut dijaga (issue #1133): berkas hilang/
+        // terkunci harus menjadi null sesuai kontrak KDoc di atas,
+        // bukan FileNotFoundException yang lolos ke pemanggil.
+        val input = try {
+            PushbackInputStream(BufferedInputStream(FileInputStream(file)), 16)
+        } catch (e: Exception) {
+            return null
+        }
         try {
             val first = readFrame(input) ?: return null
             val h = first.header
