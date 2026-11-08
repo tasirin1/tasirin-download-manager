@@ -83,7 +83,7 @@ object SocialMediaExtractor {
      *  lolos deteksi dan halaman pembungkus diambil dengan header user —
      *  Cookie akun bisa terkirim ke host pembungkus. */
     private val YT_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.|m\.|music\.)?youtube\.com/|youtu\.be/)""")
-    private val TT_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.|m\.)?tiktok\.com/|vm\.tiktok\.com/)""")
+    private val TT_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.|m\.)?tiktok\.com/|vm\.tiktok\.com/|vt\.tiktok\.com/)""")
     private val IG_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.)?instagram\.com/(?:p|reel|tv)/|instagr\.am/(?:p|reel)/)""")
     private val TW_HOST_RE = Regex("""\A(?:https?://)(?:www\.)?twitter\.com/""")
     private val IG_BROAD_HOST_RE = Regex("""\A(?:https?://)(?:(?:www\.)?instagram\.com/|instagr\.am/)""")

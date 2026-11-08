@@ -48,6 +48,7 @@ class SocialMediaExtractorTest {
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://youtu.be/abc"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.tiktok.com/@user/video/123"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://vm.tiktok.com/abc/"))
+        assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://vt.tiktok.com/abc/"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.instagram.com/p/abc/"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://www.instagram.com/reel/abc/"))
         assertTrue(SocialMediaExtractor.isSocialMediaUrl("https://x.com/username/status/123"))
