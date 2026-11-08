@@ -782,6 +782,10 @@ object SocialMediaExtractor {
             muxedFormats?.let { for (i in 0 until it.length()) it.optJSONObject(i)?.let { f -> allFormats.add(f) } }
             if (allFormats.isEmpty() && adaptiveFormats == null) return emptyList()
             val options = mutableListOf<Result>()
+            // Nama aman dihitung SEKALI di luar loop (issue #1178):
+            // sanitasi judul yang sama tak perlu diulang per format
+            // dan per stream adaptif.
+            val safeName = sanitizeFileName(title)
 
             for (fmt in allFormats) {
                 val videoUrl = fmt.optString("url", "")
@@ -789,7 +793,6 @@ object SocialMediaExtractor {
                     val quality = fmt.optString("qualityLabel", "Unknown")
                     val mimeType = fmt.optString("mimeType", MIME_MP4)
                     val ext = if (mimeType.contains("webm")) "webm" else "mp4"
-                    val safeName = sanitizeFileName(title)
                     options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
                 }
             }
@@ -809,7 +812,6 @@ object SocialMediaExtractor {
                     val quality = fmt.optString("qualityLabel", "Unknown")
                     val mimeType = fmt.optString("mimeType", MIME_MP4)
                     val ext = if (mimeType.contains("webm")) "webm" else "mp4"
-                    val safeName = sanitizeFileName(title)
                     if (isVideoOnlyMime(mimeType)) {
                         if (audioAd.isEmpty()) continue
                         options.add(
@@ -1201,13 +1203,13 @@ object SocialMediaExtractor {
                 // berstatus COMPLETED.
                 val audioPair = bestPipedAudioUrl(obj.optJSONArray("audioStreams"))
                 val options = mutableListOf<Result>()
+                val safeName = sanitizeFileName(title)
                 for (i in 0 until streams.length()) {
                     val s = streams.optJSONObject(i) ?: continue
                     val u = s.optString("url", "")
                     if (u.startsWith("http")) {
                         val mime = s.optString("mimeType", MIME_MP4)
                         val ext = if (mime.contains("webm")) "webm" else "mp4"
-                        val safeName = sanitizeFileName(title)
                         val quality = s.optString("quality", "Unknown")
                         // mimeType harus mime stream itu sendiri: ekstensi
                         // sudah diturunkan darinya, jadi berkas .webm yang
