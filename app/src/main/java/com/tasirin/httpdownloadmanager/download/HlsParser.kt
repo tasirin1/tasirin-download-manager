@@ -239,6 +239,12 @@ object HlsParser {
             } ?: 0
             val codecs = CODECS_RE.find(ln)?.groupValues?.get(1).orEmpty()
             val fps = FRAME_RATE_RE.find(polosLn)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt() ?: 0
+            // Grup audio ikut diekstrak seperti parseMaster (issue
+            // #1214): hardcode null di sini membuat master yang hanya
+            // lolos fallback lenient kehilangan rendisi audionya —
+            // hasil terbit bisu berstatus COMPLETED tanpa jejak.
+            val audioGroup = if (ln.contains("AUDIO")) AUDIO_RE
+                .find(ln)?.groupValues?.get(1) else null
             // Label tanpa RESOLUTION (issue #476): "$h p" memburuk jadi
             // "0 p" untuk semua varian master tak umum (yang justru
             // terjangkau dialog berkat #465) — tak bisa dibedakan dan
@@ -255,7 +261,7 @@ object HlsParser {
             // menghasilkan nama persis sama — tak bisa dibedakan di
             // pemilih dan nama berkas hasil pilihan ikut bertabrakan.
             label = labelUnik(label, out)
-            out.add(HlsVariant(label, resolveUrl(baseUrl, next), bw, codecs, null, fps, h))
+            out.add(HlsVariant(label, resolveUrl(baseUrl, next), bw, codecs, audioGroup, fps, h))
         }
         return if (out.isEmpty()) null else out.sortedByDescending { it.bandwidth }
     }

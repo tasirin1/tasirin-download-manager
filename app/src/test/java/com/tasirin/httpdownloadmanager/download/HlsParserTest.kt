@@ -292,6 +292,20 @@ class HlsParserTest {
     }
 
     @Test
+    fun `parseMasterLenient - audioGroupId dari atribut AUDIO`() {
+        // Issue #1214: fallback lenient dulu meng-hardcode null sehingga
+        // master yang hanya lolos jalur ini kehilangan rendisi audio.
+        val master = """
+            #EXTM3U
+            #EXT-X-MEDIA:URI="audio.m3u8",TYPE=AUDIO,GROUP-ID="aud",NAME="Default",DEFAULT=YES
+            #EXT-X-STREAM-INF:BANDWIDTH=1280000,RESOLUTION=1280x720,AUDIO="aud"
+            https://cdn.example.com/videos/720.m3u8
+        """.trimIndent()
+        val variants = HlsParser.parseMasterLenient(master, "https://cdn.example.com/videos/master.m3u8")!!
+        assertEquals("aud", variants[0].audioGroupId)
+    }
+
+    @Test
     fun `parse master - audioGroupId dari atribut AUDIO`() {
         val master = """
             #EXTM3U
