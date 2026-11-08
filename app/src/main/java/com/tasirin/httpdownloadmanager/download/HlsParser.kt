@@ -364,7 +364,7 @@ object HlsParser {
                 val u = java.net.URL(cleanBase)
                 "${u.protocol}://${u.host}${if (u.port > 0) ":${u.port}" else ""}"
             }.getOrNull() ?: return relative
-            return root + relative
+            return normalizeDotSegments(root + relative)
         }
         // Direktori = sampai '/' terakhir, tapi harus di belakang otoritas:
         // pada base tanpa path (mis. "https://host") lastIndexOf jatuh di
@@ -372,7 +372,66 @@ object HlsParser {
         val schemeEnd = cleanBase.indexOf("://")
         val authEnd = if (schemeEnd >= 0) schemeEnd + 3 else 0
         val idx = cleanBase.lastIndexOf('/')
-        if (idx < authEnd) return "$cleanBase/$relative"
-        return cleanBase.substring(0, idx + 1) + relative
+        if (idx < authEnd) return normalizeDotSegments("$cleanBase/$relative")
+        return normalizeDotSegments(cleanBase.substring(0, idx + 1) + relative)
+    }
+
+    /** Normalisasi segmen titik pada bagian path URL hasil gabungan
+     *  (RFC 3986 pasal 5.2.4, issue #1163): penggabungan direktori
+     *  polos membiarkan "../shared/seg.ts" menjadi "/720p/../shared/"
+     *  mentah yang ditolak server ketat. Query/fragment tak disentuh;
+     *  segmen ".." di atas akar dibuang sesuai RFC. */
+    private fun normalizeDotSegments(url: String): String {
+        val cut = listOf(url.indexOf('?'), url.indexOf('#'))
+            .filter { it >= 0 }.minOrNull() ?: url.length
+        val head = url.substring(0, cut)
+        val tail = url.substring(cut)
+        val schemeEnd = head.indexOf("://")
+        if (schemeEnd < 0) return url
+        val pathStart = head.indexOf('/', schemeEnd + 3)
+        if (pathStart < 0) return url
+        return head.substring(0, pathStart) +
+            removeDotSegments(head.substring(pathStart)) + tail
+    }
+
+    /** Algoritma remove_dot_segments RFC 3986 pasal 5.2.4 persis:
+     *  hanya segmen "." dan ".." harfiah yang diproses (segmen kosong
+     *  dari "//" dan segmen berkode persen dibiarkan). */
+    private fun removeDotSegments(path: String): String {
+        val out = StringBuilder()
+        var input = path
+        fun dropLastSegment() {
+            val i = out.lastIndexOf('/')
+            out.setLength(if (i >= 0) i else 0)
+        }
+        while (input.isNotEmpty()) {
+            when {
+                input.startsWith("../") -> input = input.substring(3)
+                input.startsWith("./") -> input = input.substring(2)
+                input.startsWith("/./") -> input = "/" + input.substring(3)
+                input == "/." -> input = "/"
+                input.startsWith("/../") -> {
+                    input = "/" + input.substring(4)
+                    dropLastSegment()
+                }
+                input == "/.." -> {
+                    input = "/"
+                    dropLastSegment()
+                }
+                input == "." || input == ".." -> input = ""
+                else -> {
+                    val start = if (input.startsWith("/")) 1 else 0
+                    val next = input.indexOf('/', start)
+                    if (next < 0) {
+                        out.append(input)
+                        input = ""
+                    } else {
+                        out.append(input.substring(0, next))
+                        input = input.substring(next)
+                    }
+                }
+            }
+        }
+        return out.toString()
     }
 }

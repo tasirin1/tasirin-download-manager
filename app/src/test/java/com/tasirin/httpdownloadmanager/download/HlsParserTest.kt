@@ -161,6 +161,49 @@ class HlsParserTest {
     }
 
     @Test
+    fun `resolveUrl - segmen titik dinormalkan sesuai RFC 3986`() {
+        // Ekspektasi dibuktikan dulu lewat port Python 1:1 dari
+        // algoritma remove_dot_segments RFC 3986 pasal 5.2.4.
+        val base = "https://cdn.example.com/videos/720p/pl.m3u8"
+        // Segmen bersama di folder induk (pola packager yang sah).
+        assertEquals(
+            "https://cdn.example.com/videos/shared/seg1.ts",
+            HlsParser.resolveUrl(base, "../shared/seg1.ts")
+        )
+        assertEquals(
+            "https://cdn.example.com/videos/720p/seg2.ts",
+            HlsParser.resolveUrl(base, "./seg2.ts")
+        )
+        assertEquals(
+            "https://cdn.example.com/a/seg.ts",
+            HlsParser.resolveUrl("https://cdn.example.com/a/b/c/pl.m3u8", "../../seg.ts")
+        )
+        // ".." di atas akar dibuang, bukan dipertahankan mentah.
+        assertEquals(
+            "https://cdn.example.com/seg.ts",
+            HlsParser.resolveUrl("https://cdn.example.com/a/pl.m3u8", "../../../seg.ts")
+        )
+        assertEquals(
+            "https://cdn.example.com/a/b/seg.ts",
+            HlsParser.resolveUrl("https://cdn.example.com/a/b/pl.m3u8", "x/../seg.ts")
+        )
+        // Query milik relatif dipertahankan; hanya path yang dinormalkan.
+        assertEquals(
+            "https://cdn.example.com/a/seg.ts?tok=1",
+            HlsParser.resolveUrl("https://cdn.example.com/a/b/pl.m3u8", "../seg.ts?tok=1")
+        )
+        // Root-relative ber-segmen titik ikut dinormalkan.
+        assertEquals(
+            "https://cdn.example.com/y.ts",
+            HlsParser.resolveUrl("https://cdn.example.com/a/b/pl.m3u8", "/x/../y.ts")
+        )
+        assertEquals(
+            "https://cdn.example.com/a/b/d/e.ts",
+            HlsParser.resolveUrl("https://cdn.example.com/a/b/pl.m3u8", "d/./e.ts")
+        )
+    }
+
+    @Test
     fun `resolveUrl - query basis tidak merusak direktori`() {
         assertEquals(
             "https://cdn.example.com/videos/low.m3u8",
