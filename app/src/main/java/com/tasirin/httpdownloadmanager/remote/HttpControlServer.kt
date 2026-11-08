@@ -3035,6 +3035,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 // (issue #186).
                 compareBy<File> { !it.isDirectory }.thenComparator { a, b ->
                     a.name.compareTo(b.name, ignoreCase = true)
+                }.thenComparator { a, b ->
+                    // Pemutus seri peka huruf (issue #1169): tanpa ini
+                    // pasangan nama beda kapital (Clip.mp4/clip.mp4 di
+                    // FS peka huruf) urutannya tak tentu dan predikat
+                    // kursor keyset tak bisa membedakan posisinya.
+                    a.name.compareTo(b.name)
                 }
             ) ?: return null
         if (entries.size <= FS_LISTING_CACHE_MAX) {
@@ -3104,8 +3110,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             // yang berubah antar-halaman tidak lagi menggeser jendela —
             // entri tidak terlewat/terduplikasi seperti offset (issue #169).
             // Kursor yang sudah terhapus pun tetap menunjuk posisi sisip
-            // yang benar. Nama yang hanya beda huruf besar/kecil + jenis
-            // sama dianggap posisi yang sama (kasus tepi sangat sempit).
+            // yang benar. Nama beda huruf besar/kecil semata BUKAN posisi
+            // yang sama (issue #1169): urutan totalnya diputuskan
+            // perbandingan peka huruf sebagai pemutus seri — sama
+            // seperti sortir di cachedDirectoryListing — jadi pasangan
+            // Clip.mp4/clip.mp4 yang terbelah batas halaman tak ada
+            // yang hilang dari semua halaman.
             val start = if (after != null) {
                 listing?.second?.indexOfFirst { e ->
                     // Kelompok yang sama dengan sortir + kind: folder dulu,
@@ -3115,7 +3125,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     if (grupE != grupKursor) {
                         grupE > grupKursor
                     } else {
-                        e.name.compareTo(after, ignoreCase = true) > 0
+                        val cmpNama = e.name.compareTo(after, ignoreCase = true)
+                        if (cmpNama != 0) {
+                            cmpNama > 0
+                        } else {
+                            e.name.compareTo(after) > 0
+                        }
                     }
                 }?.let { if (it < 0) total else it } ?: 0
             } else {
