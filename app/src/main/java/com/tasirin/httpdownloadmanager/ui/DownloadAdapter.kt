@@ -132,7 +132,7 @@ class DownloadAdapter(private val listener: Listener) :
         // Satu lookup mime per bind (sebelumnya 2x via fileIconRes + circle).
         val mime = MimeTypes.forFile(item.fileName)
         b.fileIcon.setImageResource(fileIconRes(mime))
-        // Ikon putih di atas petak gradasi; khusus APK tint dimatikan karena
+        // Ikon putih di atas petak warna polos; khusus APK tint dimatikan karena
         // vektor robot Android membawa dua warnanya sendiri.
         b.fileIcon.imageTintList =
             if (mime == "application/vnd.android.package-archive") null
@@ -282,8 +282,8 @@ class DownloadAdapter(private val listener: Listener) :
         }
     }
 
-    /** Warna latar badge status tema gelap: Completed hijau solid,
-     *  gagal/batal merah gelap lembut, aktif biru utama, jeda abu. */
+    /** Warna latar badge status tema terang: Completed hijau solid,
+     *  gagal/batal merah muda lembut, aktif biru utama, jeda abu. */
     private fun badgeBgColor(state: DownloadState): Int = when (state) {
         DownloadState.COMPLETED -> R.color.home_badge_done_bg
         DownloadState.FAILED, DownloadState.CANCELLED -> R.color.home_badge_failed_bg
@@ -303,7 +303,7 @@ class DownloadAdapter(private val listener: Listener) :
         if (bar.progress != to) bar.progress = to
     }
 
-    /** Petak gradasi ikon per tipe file (tema gelap layar utama). */
+    /** Petak warna polos ikon per tipe file (layar utama). */
     private fun fileTileRes(mime: String): Int {
         return when {
             mime.startsWith("video") -> R.drawable.bg_home_tile_video
