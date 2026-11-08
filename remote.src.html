@@ -2437,7 +2437,12 @@ document.addEventListener('keydown', function (e) {
   }
 });
 // FS compact toggle
-var fsCompact = localStorage.getItem('fs_compact') === '1';
+// Akses localStorage di titik kritis dibungkus try/catch (issue #1194):
+// di WebView yang melempar saat penyimpanan diblokir/penuh, lemparan di
+// top-level membunuh seluruh skrip utama. Pola yang sama seperti situs
+// tema/filter di atas.
+var fsCompact = false;
+try { fsCompact = localStorage.getItem('fs_compact') === '1'; } catch (e) {}
 function applyFsCompact() {
   document.getElementById('fsList').classList.toggle('compact', fsCompact);
   var btn = document.getElementById('fsCompactToggle');
@@ -2445,7 +2450,7 @@ function applyFsCompact() {
 }
 document.getElementById('fsCompactToggle').addEventListener('click', function () {
   fsCompact = !fsCompact;
-  localStorage.setItem('fs_compact', fsCompact ? '1' : '0');
+  try { localStorage.setItem('fs_compact', fsCompact ? '1' : '0'); } catch (e) {}
   applyFsCompact();
 });
 applyFsCompact();
@@ -3684,9 +3689,13 @@ function applyRoute() {
   } else if (route === 'files') {
     toggleAddForm(false);
     resetFsSelection();
-    if (!fsPath && localStorage.getItem(FS_LAST_PATH_KEY)) {
-      fsPath = localStorage.getItem(FS_LAST_PATH_KEY);
-      fsRestoredOnce = true;
+    if (!fsPath) {
+      let savedFsPath = null;
+      try { savedFsPath = localStorage.getItem(FS_LAST_PATH_KEY); } catch (e) {}
+      if (savedFsPath) {
+        fsPath = savedFsPath;
+        fsRestoredOnce = true;
+      }
     }
     loadFsLocations();
     loadFs();
@@ -3940,8 +3949,12 @@ async function loadFs() {
     fsSetAfterCursor();
     fsTotal = data.total || fsItems.length;
     fsCount.textContent = fsTotal ? fsTotal + ' item' : '';
-    if (fsPath) localStorage.setItem(FS_LAST_PATH_KEY, fsPath);
-    else localStorage.removeItem(FS_LAST_PATH_KEY);
+    // Dibungkus (issue #1194): lemparan di sini dulu tertangkap catch
+    // loadFs dan salah terdiagnosis sebagai gagal muat folder.
+    try {
+      if (fsPath) localStorage.setItem(FS_LAST_PATH_KEY, fsPath);
+      else localStorage.removeItem(FS_LAST_PATH_KEY);
+    } catch (e) {}
     if (!fsPath && !fsLocationsLoaded) loadFsLocations();
     renderFs(fsItems);
     fsRestoreScroll();
@@ -3950,7 +3963,7 @@ async function loadFs() {
     if (fsRestoredOnce && fsPath) {
       fsPath = '';
       fsRestoredOnce = false;
-      localStorage.removeItem(FS_LAST_PATH_KEY);
+      try { localStorage.removeItem(FS_LAST_PATH_KEY); } catch (e) {}
       // Lompatan ke root adalah penggantian konteks (issue #983):
       // tanpa reset, mode pilih tersangkut di root — tombol Select
       // tersembunyi di sana dan kelas fs-selecting tertinggal.
@@ -6550,7 +6563,8 @@ function emptyHtml(kind, title, sub, cta) {
     '</div>';
 }
 
-var compactMode = localStorage.getItem('dl_compact') === '1';
+var compactMode = false;
+try { compactMode = localStorage.getItem('dl_compact') === '1'; } catch (e) {}
 function applyCompact() {
   var l = document.getElementById('list');
   if (l) l.classList.toggle('compact', compactMode);
@@ -6559,7 +6573,7 @@ function applyCompact() {
 }
 document.getElementById('compactToggleBtn').addEventListener('click', function () {
   compactMode = !compactMode;
-  localStorage.setItem('dl_compact', compactMode ? '1' : '0');
+  try { localStorage.setItem('dl_compact', compactMode ? '1' : '0'); } catch (e) {}
   applyCompact();
 });
 
