@@ -151,6 +151,26 @@ object StoragePrefs {
         }
     }
 
+    /** Sembuhkan keadaan divergen warisan kedua pasangan
+     *  autostart/background (server #916, unduhan #1209): autostart
+     *  true + background false membuat autostart mati senyap sesudah
+     *  boot. Arah sembuh mengikuti janji yang terlihat pengguna —
+     *  mencentang autostart memang mengaktifkan background (#914).
+     *  Dipanggil App.onCreate agar jalur boot ikut sembuh (issue
+     *  #1237): dulu rekonsiliasi ini hanya hidup di renderChecks
+     *  SettingsActivity, jadi divergensi tak pernah sembuh sampai
+     *  pengguna membuka Settings sekali. */
+    fun healDivergedTogglePairs(context: Context) {
+        if (isServerAutoStartEnabled(context) &&
+            !isServerBackgroundEnabled(context)
+        ) {
+            setServerBackgroundEnabled(context, true)
+        }
+        if (isAutoStartEnabled(context) && !isBackgroundEnabled(context)) {
+            setBackgroundEnabled(context, true)
+        }
+    }
+
     fun isServerBackgroundEnabled(context: Context): Boolean =
         prefs(context)
             .safeBoolean(KEY_SERVER_BACKGROUND, false)

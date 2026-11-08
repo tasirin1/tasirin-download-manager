@@ -30,6 +30,11 @@ class App : Application() {
         // dialog/menu/kontrol bawaan ikut terang di semua perangkat,
         // apa pun mode sistemnya.
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        // Sembuhkan divergensi autostart/background warisan di tiap
+        // awal proses (issue #1237): jalur boot membaca pref ini
+        // sebelum Settings sempat dirender, jadi penyembuhan yang
+        // hanya hidup di UI tak pernah menolong sesudah reboot.
+        StoragePrefs.healDivergedTogglePairs(this)
         installCrashLogger()
         SocialMediaExtractor.init(this)
         httpServer = HttpControlServer(this)

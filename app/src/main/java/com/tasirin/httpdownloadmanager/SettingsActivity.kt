@@ -611,28 +611,12 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun renderChecks() {
-        // Rekonsiliasi pasangan autostart/background server (issue
-        // #916), mengikuti pola baterai #523 di fungsi ini juga:
-        // keadaan divergen warisan versi lama (autostart true,
-        // background false) membuat autostart mati senyap sesudah
-        // boot. Sembuhkan ke arah janji yang terlihat pengguna —
-        // mencentang autostart memang mengaktifkan background (#914) —
-        // tiap kali layar ini dirender (termasuk dari onResume).
-        if (StoragePrefs.isServerAutoStartEnabled(this) &&
-            !StoragePrefs.isServerBackgroundEnabled(this)
-        ) {
-            StoragePrefs.setServerBackgroundEnabled(this, true)
-        }
-        // Rekonsiliasi yang sama untuk pasangan unduhan (issue #1209):
-        // kelas #914/#916 tidak pernah dicerminkan ke sini — autostart
-        // unduhan true + auto-resume (background) false membuat job
-        // boot men-start service tanpa ada yang dilanjutkan, dan item
-        // PENDING menggantungkan service tanpa pernah jalan.
-        if (StoragePrefs.isAutoStartEnabled(this) &&
-            !StoragePrefs.isBackgroundEnabled(this)
-        ) {
-            StoragePrefs.setBackgroundEnabled(this, true)
-        }
+        // Rekonsiliasi pasangan autostart/background (server #916,
+        // unduhan #1209) kini satu sumber di StoragePrefs dan juga
+        // berjalan di App.onCreate untuk jalur boot (issue #1237);
+        // di sini ia menjamin render selalu menampilkan keadaan
+        // yang sudah sembuh.
+        StoragePrefs.healDivergedTogglePairs(this)
         renderToggle(
             binding.checkServerAutostart,
             StoragePrefs.isServerAutoStartEnabled(this),
