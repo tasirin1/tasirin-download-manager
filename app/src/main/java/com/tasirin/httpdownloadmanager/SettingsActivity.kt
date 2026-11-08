@@ -90,6 +90,15 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, LogActivity::class.java))
         }
         binding.btnCleanup.setOnClickListener {
+            // Gerbang muatan awal (issue #1293): selama parse+dekripsi
+            // antrean belum selesai, daftar item kosong-palsu dan cleanup
+            // akan menilai semua .part sebagai yatim — progres unduhan
+            // jeda/antre bisa terhapus. Pola gerbang yang sama dengan
+            // stopServiceIfIdle di berkas ini.
+            if (!App.engine.isInitialLoadComplete()) {
+                binding.cleanupResult.setText(R.string.cleanup_wait_load)
+                return@setOnClickListener
+            }
             binding.btnCleanup.isEnabled = false
             binding.cleanupResult.setText(R.string.cleanup_running)
             lifecycleScope.launch {
@@ -409,6 +418,10 @@ class SettingsActivity : AppCompatActivity() {
      *  menggantung di atas addGalleryFolderRow — dipindah ke sini pada
      *  issue #1025.) */
     private fun cleanupJunkFiles(): Pair<Int, Long> {
+        // Sabuk pengaman di fungsi destruktifnya sendiri (issue #1293):
+        // pemanggil mana pun tak boleh menilai yatim dari daftar yang
+        // belum termuat.
+        if (!App.engine.isInitialLoadComplete()) return 0 to 0
         var files = 0
         var bytes = 0L
         fun deleteIf(f: File) {
