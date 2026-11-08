@@ -1487,8 +1487,10 @@
   .empty .ico {
  position: relative; width: 88px; height: 88px; margin: 0 auto; border-radius: 28px; background: var(--primary-soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 28px rgba(21,101,192,.14); }
 
-  /* Tema gelap: ujung gradasi #f1edff hampir putih membuat kotak ikon
-     tampilan kosong menyala di halaman gelap; akhiri di navy lembut. */
+  /* Tema gelap: gradasi navy lembut dari --primary-soft ke
+     --hover-soft agar kotak ikon menyatu dengan halaman gelap
+     (tema terang datar sejak #1202; gradasi lama berujung nyaris
+     putih membuat kotak ini menyala di halaman gelap). */
   :root[data-theme="dark"] .empty .ico {
  background: linear-gradient(135deg, var(--primary-soft), var(--hover-soft)); }
 
