@@ -553,7 +553,16 @@
     }
   }
 
+  /* Layar lebar (issue #1360): wadah utama diperlebar menyamai .gal-wrap
+     (1200px) supaya tepi topbar/konten sejajar tepi galeri, dan grid
+     6 kolom baru mulai di 1600px agar kartu tidak melebar berlebihan. */
   @media (min-width: 1400px) {
+    .wrap, .topbar-in {
+      max-width: 1200px;
+    }
+  }
+
+  @media (min-width: 1600px) {
     .gal-grid {
       grid-template-columns: repeat(6, 1fr);
     }
