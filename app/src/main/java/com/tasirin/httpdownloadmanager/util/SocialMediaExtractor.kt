@@ -1512,7 +1512,7 @@ object SocialMediaExtractor {
             .replace("\\/", "/")
     }
 
-    private val UNICODE_ESCAPE_RE = Regex("\\u([0-9a-fA-F]{4})")
+    private val UNICODE_ESCAPE_RE = Regex("\\\\u([0-9a-fA-F]{4})")
 
     // Dekode escape unicode JSON/JS secara umum (issue #1325):
     // penggantian harfiah lama hanya mengenal dua kode dalam ejaan
