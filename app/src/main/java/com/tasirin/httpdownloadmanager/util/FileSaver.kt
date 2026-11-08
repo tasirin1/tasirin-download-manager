@@ -500,7 +500,7 @@ class FileSaver(context: Context) {
     ): Pair<DocumentFile, String>? {
         var unique = ""
         val stagingDoc = synchronized(mergeLockFor(FileNames.safe(fileName))) {
-            unique = uniqueDocumentName(tree, fileName)
+            unique = uniqueDocumentName(tree, fileName, avoidStaging = true)
             tree.createFile(MimeTypes.forFile(unique), "$unique.part")
         } ?: return null
         val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
@@ -540,7 +540,7 @@ class FileSaver(context: Context) {
         // bernama sama sama-sama membuat/memakai staging yang sama.
         var unique = ""
         val stagingDoc = synchronized(mergeLockFor(FileNames.safe(fileName))) {
-            unique = uniqueDocumentName(tree, fileName)
+            unique = uniqueDocumentName(tree, fileName, avoidStaging = true)
             tree.createFile(MimeTypes.forFile(unique), "$unique.part")
         }
         var staged: PublishResult? = null
@@ -1261,8 +1261,23 @@ class FileSaver(context: Context) {
         throw IOException("Cannot allocate unique file in ${parent?.absolutePath}")
     }
 
-    private fun uniqueDocumentName(tree: DocumentFile, fileName: String): String {
-        return FileNames.unique(fileName) { tree.findFile(it) != null }
+    private fun uniqueDocumentName(
+        tree: DocumentFile,
+        fileName: String,
+        avoidStaging: Boolean = false
+    ): String {
+        // avoidStaging (issue #1192): kandidat juga ditolak bila dokumen
+        // staging "<nama>.part" miliknya sudah ada. Tanpa ini, dua
+        // publish paralel bernama sama sama-sama memilih nama yang
+        // finalnya belum ada lalu sama-sama membuat staging yang sama
+        // (pada provider yang mengembalikan dokumen lama untuk nama
+        // duplikat, kedua salinan menulis ke satu staging). Pemanggil
+        // claimCustomDoc SENGAJA tanpa penolakan ini: kontraknya
+        // memang menemukan dokumen final yang sudah ada untuk digabung.
+        return FileNames.unique(fileName) { candidate ->
+            tree.findFile(candidate) != null ||
+                (avoidStaging && tree.findFile("$candidate.part") != null)
+        }
     }
 
     private fun mediaRelativePath(uri: Uri): String? = runCatching {
