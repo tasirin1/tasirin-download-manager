@@ -47,7 +47,12 @@ self.addEventListener('fetch', (event) => {
   // secepatnya, tetapi setiap fetch juga menyegarkan cache dari
   // jaringan di latar — aset baru mendarat pada kunjungan
   // berikutnya tanpa ritual naik versi nama cache.
-  if (PRECACHE.some((p) => url.pathname.endsWith('/' + p))) {
+  // Entri '.' dikecualikan dari uji SWR (issue #1318): pathname URL
+  // selalu ternormalisasi sehingga tak pernah berakhiran '/.' —
+  // cabang untuk '.' tak bisa cocok. Entri itu sendiri TETAP di
+  // PRECACHE: ia melayani precache dokumen root untuk fallback
+  // offline navigasi (#1232), bukan jalur SWR ini.
+  if (PRECACHE.some((p) => p !== '.' && url.pathname.endsWith('/' + p))) {
     event.respondWith(
       caches.open(CACHE).then((cache) => cache.match(req).then((hit) => {
         const refresh = fetch(req).then((res) => {
