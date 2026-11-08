@@ -808,6 +808,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // depan yang meneruskan teks request langsung jadi XSS
         // terefleksi di halaman pra-auth. Escape di sini menutup
         // kelasnya untuk semua pemanggil.
+        // Input PIN SENGAJA tanpa maxlength (issue #1181): PIN native
+        // hanya punya panjang minimum 4 tanpa batas atas, jadi cap 10
+        // yang dulu ada di form membuat PIN 11+ karakter mustahil
+        // diketik utuh dan login web selalu gagal sampai IP terkunci.
         val safeError = error
             .replace("&", "&amp;")
             .replace("<", "&lt;")
@@ -948,7 +952,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
   <form method="POST" action="/api/login" autocomplete="off">
     <label for="pin">PIN</label>
     <div class="field">
-      <input type="password" id="pin" name="pin" placeholder="&#9679;&#9679;&#9679;&#9679;" inputmode="numeric" maxlength="10" autofocus>
+      <input type="password" id="pin" name="pin" placeholder="&#9679;&#9679;&#9679;&#9679;" inputmode="numeric" autofocus>
     </div>
     <button type="submit">Log in &rarr;</button>
   </form>
