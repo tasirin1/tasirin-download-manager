@@ -47,6 +47,12 @@ class StreamsTest {
         assertEquals("caf\u00E9.txt", decodePercentEncoded("caf%E9.txt", "ISO-8859-1"))
         // Persen rusak dibiarkan apa adanya, bukan gagal total.
         assertEquals("100%zz", decodePercentEncoded("100%zz", "UTF-8"))
+        // Issue #1261: persen BERTANDA bukan heksa — "%-1"/"%+2" tak boleh
+        // jadi byte 0xFF/0x02 lewat parseInt; dibiarkan literal. "%2B"
+        // sungguhan tetap ter-decode menjadi '+'.
+        assertEquals("a%-1b", decodePercentEncoded("a%-1b", "UTF-8"))
+        assertEquals("a%+2b", decodePercentEncoded("a%+2b", "UTF-8"))
+        assertEquals("a+b", decodePercentEncoded("a%2Bb", "UTF-8"))
     }
 
     @Test

@@ -28,7 +28,12 @@ fun decodePercentEncoded(encoded: String, charsetName: String): String? =
         while (i < encoded.length) {
             val c = encoded[i]
             if (c == '%' && i + 2 < encoded.length) {
-                val v = encoded.substring(i + 1, i + 3).toIntOrNull(16)
+                // Hanya digit heksa sungguhan: toIntOrNull mengikuti
+                // parseInt yang menerima tanda, jadi "%-1"/"%+2" akan
+                // ter-decode jadi byte bila tak disaring dulu (issue #1261).
+                val hex = encoded.substring(i + 1, i + 3)
+                val v = if (hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' })
+                    hex.toIntOrNull(16) else null
                 if (v != null) {
                     bytes.write(v)
                     i += 3
