@@ -4244,6 +4244,10 @@ fsSearchBtn.addEventListener('click', function () {
   } else {
     fsSearchRow.classList.add('hidden');
     fsSearchInput.value = '';
+    // Batalkan debounce yang menggantung (issue #1224, kembaran
+    // #1196 di pencarian unduhan): tanpa ini timer yatim menerapkan
+    // query basi sesudah pencarian ditutup.
+    clearTimeout(fsSearchTimer); fsSearchTimer = null;
     fsSetSearch('');
   }
 });

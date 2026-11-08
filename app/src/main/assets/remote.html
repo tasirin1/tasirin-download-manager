@@ -1803,6 +1803,7 @@ fsSearchInput.focus();
 } else {
 fsSearchRow.classList.add('hidden');
 fsSearchInput.value = '';
+clearTimeout(fsSearchTimer); fsSearchTimer = null;
 fsSetSearch('');
 }
 });
