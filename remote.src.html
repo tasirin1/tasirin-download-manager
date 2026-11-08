@@ -8091,14 +8091,13 @@ function connectEvents() {
   lastSseAt = Date.now();
   sse.onopen = function () { sseFailCount = 0; hideConnBanner(); };
   sse.onmessage = function (ev) {
-    sseFailCount = 0;
-    sseSilentReconnects = 0;
-    lastSseAt = Date.now();
     hasLoadedItems = true;
     try {
       const data = JSON.parse(ev.data);
       if (data.shutdown) {
-        showConnBanner('Server stopped or port changed. Check the app → Remote (HTTP) for the new address.');
+        sseFailCount = 0;
+        lastSseAt = Date.now();
+        showConnBanner('Server stopped or port changed. Check the app \u2192 Remote (HTTP) for the new address.');
         return;
       }
       // Push SSE adalah state terbaru menurut definisi: naikkan penanda
@@ -8108,7 +8107,16 @@ function connectEvents() {
       lastItems = items;
       if (data.status) applyServerStatus(data.status);
       if (currentRoute() === 'downloads') render(items); else updateToolbar(items);
-    } catch (e) {}
+      // Penanda sehat hanya sesudah pesan BERHASIL diterapkan (issue
+      // #1272): dulu direset sebelum parse/render, jadi render yang
+      // melempar tertelan catch kosong dan SSE dinilai sehat selamanya
+      // — polling tak pernah mengambil alih dan daftar membeku.
+      sseFailCount = 0;
+      sseSilentReconnects = 0;
+      lastSseAt = Date.now();
+    } catch (e) {
+      sseFailCount++;
+    }
   };
   sse.onerror = function () {
     sseFailCount++;
