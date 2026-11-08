@@ -211,9 +211,15 @@ object HlsMp4Muxer {
     ) {
         var buffer = ByteBuffer.allocate(bufferSize)
         val info = MediaCodec.BufferInfo()
-        if (segmentDurationsUs.isEmpty() || videoFrameCount <= 1) {
+        if (segmentDurationsUs.isEmpty() ||
+            segmentDurationsUs.all { it <= 0L } || videoFrameCount <= 1
+        ) {
             // Playlist tanpa EXTINF atau frame tidak terhitung (jarang):
-            // fallback ke PTS dengan drift agar tetap naik.
+            // fallback ke PTS dengan drift agar tetap naik. Daftar
+            // TIDAK kosong tetapi semua nol (playlist tanpa EXTINF
+            // menghasilkan 0 per segmen dari parser) ikut jatuh ke
+            // sini (issue #1215): menjumlahkannya memberi totalUs=1
+            // sehingga PTS semua frame runtuh ke 0 di jalur seragam.
             writeTrackPts(ext, muxer, track)
             return
         }
