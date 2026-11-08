@@ -166,6 +166,26 @@ def merges_clean(base):
             brought |= got
         if not merged <= brought:
             return False
+        # Isi tiap berkas hasil merge wajib sama persis dengan isi di
+        # salah satu induknya (issue #1311): perbandingan nama saja
+        # membiarkan "evil merge" menulis ulang ISI berkas yang
+        # namanya memang dibawa cabang bot. Resolusi konflik yang
+        # menghasilkan isi ketiga akan dinyatakan tidak bersih —
+        # arah aman: pengecualian dependabot gugur dan cek CHANGELOG
+        # biasa berlaku, bukan sebaliknya.
+        def blob(rev, path):
+            proc = subprocess.run(
+                ["git", "rev-parse", "-q", "--verify", rev + ":" + path],
+                capture_output=True, text=True)
+            return proc.stdout.strip() if proc.returncode == 0 else None
+
+        for path in merged:
+            hasil = blob(sha, path)
+            if hasil == blob(first, path):
+                continue
+            if any(hasil == blob(other, path) for other in others):
+                continue
+            return False
     return True
 
 
