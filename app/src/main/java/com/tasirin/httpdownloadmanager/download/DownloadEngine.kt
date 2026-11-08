@@ -3329,11 +3329,13 @@ class DownloadEngine(appContext: Context) {
         fallbackQuery: String = ""
     ): Long {
         var attempts = 0
+        var currentUrl = url
+        var tokenTried = false
         while (true) {
             coroutineContext.ensureActive()
             try {
                 return fetchHlsSegment(
-                    item, url, buffer, throttle, committed, spool, notify, onLength
+                    item, currentUrl, buffer, throttle, committed, spool, notify, onLength
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -3346,18 +3348,21 @@ class DownloadEngine(appContext: Context) {
                 // terpotong "got 40312 of ...").
                 val denied = msg.startsWith("HLS segment HTTP 404") ||
                     msg.startsWith("HLS segment HTTP 403")
-                if (denied && fallbackQuery.isNotEmpty() && !url.contains("?")) {
-                    // Jangan mulai unduhan segmen baru dalam konteks yang
-                    // sudah dibatalkan (pause): jalur langsung ini tidak
-                    // melewati ensureActive kepala loop lagi (issue #743).
-                    coroutineContext.ensureActive()
+                if (denied && !tokenTried && fallbackQuery.isNotEmpty() && !url.contains("?")) {
                     // CDN signed-URL: segmen relatif tanpa token ditolak —
-                    // coba sekali lagi dengan query token playlist varian.
+                    // alihkan URL kerja ke varian bertoken lalu lanjutkan
+                    // LEWAT loop (issue #1212): return langsung seperti
+                    // dulu membuat galat jaringan sesaat pada percobaan
+                    // bertoken meledakkan seluruh unduhan tanpa jatah
+                    // retry percobaan biasa. tokenTried memastikan
+                    // pengalihan hanya sekali; penolakan kedua jatuh ke
+                    // penilaian attempts di bawah. ensureActive di sini
+                    // menjaga #743 (jangan mulai segmen baru saat batal).
+                    coroutineContext.ensureActive()
+                    tokenTried = true
+                    currentUrl = url + fallbackQuery
                     App.logEvent("HLS: segment 404/403, retrying with playlist query")
-                    return fetchHlsSegment(
-                        item, url + fallbackQuery, buffer, throttle,
-                        committed, spool, notify, onLength
-                    )
+                    continue
                 }
                 attempts++
                 if (attempts >= 2 || !isNetworkError(e.message)) throw e
