@@ -197,8 +197,17 @@ RULES = [
         "unsafe_blank_window",
         "error",
         "New browser window/tab opened without opener isolation",
-        r"\bwindow\.open\s*\((?!.*noopener)",
+        # Jendela argumen terbatas + sadar kurung (issue #1310): pola lama
+        # `(?!.*noopener)` fail-open pada baris raksasa hasil minify
+        # (noopener milik panggilan LAIN di baris yang sama menekan
+        # temuan) dan false-positive pada panggilan sah yang dipecah
+        # formatter. Kini: lookahead hanya memindai rentang argumen
+        # panggilan ini sendiri (<=200 char, satu tingkat sarang), lalu
+        # pola wajib mencapai kurung tutup panggilan — panggilan yang
+        # terpecah baris dinilai lintasan multi-baris.
+        r"\bwindow\.open\s*\((?!(?:[^()]|\([^()]*\)){0,200}noopener)(?:[^()]|\([^()]*\)){0,200}\)",
         frozenset({"javascript", "html"}),
+        multiline=True,
     ),
     Rule(
         "cleartext_base_config",
