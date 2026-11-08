@@ -676,6 +676,7 @@ di bawah heading ini; urutan dan isi entri tak diubah.
 - **feat: Clear Completed hanya muncul bila ada item selesai** -- Tombol Clear Completed di titik tiga hanya tampil saat ada item COMPLETED. Tambah dialog konfirmasi sebelum menghapus.
 - **feat: check update langsung download versi terbaru** -- Tombol Check Update kini langsung mengunduh APK terbaru tanpa dialog konfirmasi. Hapus string `update_message` yang tidak terpakai.
 ## [Unreleased]
+- **fix(remote): aturan reduced-motion spinner KINI benar-benar menyasar ::before** -- Audit putaran 10 membuktikan komit #1236 hanya mengubah komentar tanpa menyentuh aturannya, sehingga spinner tetap berputar bagi pengguna gerak-minim. Aturan kini `.mm-spin::before` dan klaim di komentar blok dikoreksi; terverifikasi di sumber maupun hasil generasi (issue #1277, residu #1236).
 - **fix(remote): brand header kini tautan beranda sungguhan** -- .brand dulu div klik-saja yang tak terjangkau keyboard; kini <a href="#/"> dengan reset gaya agar tampilan identik, handler klik lama tetap bekerja (issue #1276).
 - **fix(remote): teks badge pornhub/tiktok digelapkan ke 4,88/4,94:1** -- Dua varian .platform-badge tema terang berada di bawah ambang 4,5:1 repo (3,79 dan 4,39); warna teks digelapkan sekeluarga, latar dan border tak berubah (issue #1275).
 - **fix(remote): .pill.primary tema gelap kini berlatar #1565C0 (5,75:1)** -- --grad gelap #1E88E5 membuat teks putih hanya 3,68:1 (hover 3,19); override komponen memakai nilai grad terang tanpa mengubah var global (issue #1274).

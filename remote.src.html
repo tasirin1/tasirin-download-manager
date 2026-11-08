@@ -1741,12 +1741,14 @@
      bar progres, animasi masuk bottom-sheet (sheetFade/sheetUp
      terlewat sampai #1201), dan putaran spinner pemilih media —
      animasi mmSpin hidup di ::before (aturan #1226 menyasar elemen
-     induknya dan tidak efektif; dikoreksi #1236). */
+     induknya dan tidak efektif; komit #1236 ternyata hanya mengubah
+     komentar ini tanpa menyentuh aturannya — dikoreksi sungguhan
+     oleh #1277). */
   @media (prefers-reduced-motion: reduce) {
     .toast { animation: none; }
     .fill { transition: none; }
     .sheet:not(.hidden), .sheet:not(.hidden) .sheet-box { animation: none; }
-    .mm-spin { animation: none; }
+    .mm-spin::before { animation: none; }
   }
 </style>
 </head>
