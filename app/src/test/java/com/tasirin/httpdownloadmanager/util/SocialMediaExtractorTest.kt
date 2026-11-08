@@ -932,6 +932,14 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `isAudioOnlyMime - hanya mime audio murni`() {
+        assertTrue(SocialMediaExtractor.isAudioOnlyMime("audio/mp4"))
+        assertTrue(SocialMediaExtractor.isAudioOnlyMime("audio/webm; codecs=\"opus\""))
+        assertFalse(SocialMediaExtractor.isAudioOnlyMime("video/mp4; codecs=\"avc1.64\""))
+        assertFalse(SocialMediaExtractor.isAudioOnlyMime(""))
+    }
+
+    @Test
     fun `isVideoOnlyMime - codecs tanpa komponen audio`() {
         // Issue #537: deteksi video-only pada format adaptif halaman WEB.
         assertTrue(SocialMediaExtractor.isVideoOnlyMime("video/mp4; codecs=\"avc1.640028\""))

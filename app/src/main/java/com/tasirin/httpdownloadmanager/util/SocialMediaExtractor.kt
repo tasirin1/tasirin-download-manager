@@ -822,8 +822,11 @@ object SocialMediaExtractor {
             // formats progresif sehingga ditawarkan sebagai unduhan
             // utuh yang bisu. Kini video-only hanya masuk sebagai
             // pasangan adaptif dengan audio terbaik dari daftar yang
-            // sama; tanpa pasangan, ia dilewati. Entri non-video-only
-            // (termasuk audio) mengikuti perilaku lama.
+            // sama; tanpa pasangan, ia dilewati. Entri audio-only juga
+            // dilewati sebagai opsi mandiri (issue #1324): tempatnya
+            // hanya sebagai pasangan adaptif — menawarkannya sebagai
+            // unduhan "video" .mp4 yang isinya hanya suara adalah
+            // jebakan untuk pengguna.
             if (adaptiveFormats != null) {
                 val audioAd = bestAdaptivePair(streamingData).second
                 for (i in 0 until adaptiveFormats.length()) {
@@ -841,7 +844,7 @@ object SocialMediaExtractor {
                                 cookies = ytCookies, videoUrl = videoUrl, audioUrl = audioAd
                             )
                         )
-                    } else {
+                    } else if (!isAudioOnlyMime(mimeType)) {
                         options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
                     }
                 }
@@ -1197,6 +1200,11 @@ object SocialMediaExtractor {
     /** Format video tanpa komponen audio pada daftar codecs
      *  mimeType-nya = video-only (issue #537). mimeType tanpa daftar
      *  codecs tidak ditebak (false: perlakukan sebagai utuh). */
+    /** Mime audio murni: entri adaptiveFormats berjenis ini hanya
+     *  berguna sebagai pasangan video adaptif (bestAdaptivePair). */
+    internal fun isAudioOnlyMime(mimeType: String): Boolean =
+        mimeType.startsWith("audio/")
+
     internal fun isVideoOnlyMime(mimeType: String): Boolean {
         if (!mimeType.startsWith("video/")) return false
         val codecs = mimeType.substringAfter("codecs=", "").trim().trim('"')
