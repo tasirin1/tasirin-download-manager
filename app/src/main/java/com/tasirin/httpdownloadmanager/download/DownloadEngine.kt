@@ -2536,6 +2536,11 @@ class DownloadEngine(appContext: Context) {
         activeThrottles[item.id] = throttle
         coroutineContext[Job]?.invokeOnCompletion { activeThrottles.remove(item.id, throttle) }
 
+        // Hasil HEAD blok segmen disimpan untuk dipakai ulang jalur segar
+        // (issue #1373): diisi hanya bila probe segmen menjawab 2xx.
+        var segFreshHeaders: ServerHeaders? = null
+        var segFreshTotal = -1L
+        var segFreshRanges = false
         if (item.segments.isNotEmpty()) {
             // Verifikasi identitas resource dulu (issue #543): jalur
             // resume segmen dulu langsung menggabung segmen lokal
@@ -2551,6 +2556,11 @@ class DownloadEngine(appContext: Context) {
                 if (segProbe.responseCode in 200..299) {
                     val h = headersOf(segProbe)
                     segHeaders = h
+                    captureHeaderChecksum(item, segProbe)
+                    segFreshHeaders = h
+                    segFreshTotal = contentLength(segProbe)
+                    segFreshRanges = segProbe.getHeaderField("Accept-Ranges")
+                        .equals("bytes", ignoreCase = true)
                     invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, h.etag)
                     val probedEtag = h.etag?.takeIf { it.isNotBlank() }
                     if (probedEtag != null) {
@@ -2576,47 +2586,66 @@ class DownloadEngine(appContext: Context) {
         var useSegments = false
         var segmentedTotal = 0L
         var probeHeaders: ServerHeaders? = null
-        val probe = openAuthenticatedConnection(
-            item.url, method = "HEAD",
-            username = item.username,
-            password = item.password,
-            headers = item.headers
-        )
-        try {
-            val code = probe.responseCode
-            if (code in 200..299) {
-                captureHeaderChecksum(item, probe)
-                probeHeaders = headersOf(probe)
-                invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, probeHeaders.etag)
-                // Rekam ETag probe ke item SEKARANG (issue #543):
-                // dulu etag hanya ditulis saat COMPLETED, jadi selama
-                // unduhan pertama berjalan penjaga invalidateChangedResume
-                // tidak pernah bersenjata (etag tersimpan selalu kosong)
-                // dan resume pertama selalu lolos tanpa perbandingan.
-                val probedEtag = probeHeaders.etag?.takeIf { it.isNotBlank() }
-                if (probedEtag != null) {
-                    updateItem(item.id) { it.copy(etag = probedEtag) }
+        var freshTotal = -1L
+        var freshRanges = false
+        if (segFreshHeaders != null) {
+            // HEAD kedua dilewati (issue #1373): segmen dibatalkan oleh
+            // invalidateChangedResume sesudah resource berubah, tetapi
+            // hasil HEAD segmen di atas BARU saja dibaca pada attempt dan
+            // URL yang sama (item.url tak berubah di antara kedua blok),
+            // jadi etag/total/Accept-Ranges/checksum-nya identik dengan
+            // yang akan dibaca ulang — membuka HEAD kedua hanya membuang
+            // satu RTT + koneksi terautentikasi (dengan redirect penuh).
+            probeHeaders = segFreshHeaders
+            freshTotal = segFreshTotal
+            freshRanges = segFreshRanges
+        } else {
+            val probe = openAuthenticatedConnection(
+                item.url, method = "HEAD",
+                username = item.username,
+                password = item.password,
+                headers = item.headers
+            )
+            try {
+                val code = probe.responseCode
+                if (code in 200..299) {
+                    captureHeaderChecksum(item, probe)
+                    probeHeaders = headersOf(probe)
+                    freshTotal = contentLength(probe)
+                    freshRanges = probe.getHeaderField("Accept-Ranges")
+                        .equals("bytes", ignoreCase = true)
                 }
-                val total = contentLength(probe)
-                val ranges = probe.getHeaderField("Accept-Ranges").equals("bytes", ignoreCase = true)
-                // Mirror (proxy GitHub) umumnya tidak mendukung Range, jadi
-                // lewati multi-segmen untuk URL cadangan. Item POST juga
-                // dilewati: segmen selalu GET dan tak pernah mengirim
-                // postBody, jadi berkas hasilnya bukan respons POST —
-                // POST tetap jalur tunggal yang menghormati method+body
-                // (issue #1130).
-                if (ranges && total >= SEGMENT_MIN_BYTES &&
-                    StoragePrefs.segmentCount(context) > 1 && item.mirrors.isEmpty() &&
-                    item.method != "POST"
-                ) {
-                    useSegments = true
-                    segmentedTotal = total
-                }
+            } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut dengan GET biasa)
+                // HEAD tidak didukung; lanjut dengan GET biasa
+            } finally {
+                probe.disconnect()
             }
-        } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut dengan GET biasa)
-            // HEAD tidak didukung; lanjut dengan GET biasa
-        } finally {
-            probe.disconnect()
+        }
+        val freshHeaders = probeHeaders
+        if (freshHeaders != null) {
+            invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, freshHeaders.etag)
+            // Rekam ETag probe ke item SEKARANG (issue #543):
+            // dulu etag hanya ditulis saat COMPLETED, jadi selama
+            // unduhan pertama berjalan penjaga invalidateChangedResume
+            // tidak pernah bersenjata (etag tersimpan selalu kosong)
+            // dan resume pertama selalu lolos tanpa perbandingan.
+            val probedEtag = freshHeaders.etag?.takeIf { it.isNotBlank() }
+            if (probedEtag != null) {
+                updateItem(item.id) { it.copy(etag = probedEtag) }
+            }
+            // Mirror (proxy GitHub) umumnya tidak mendukung Range, jadi
+            // lewati multi-segmen untuk URL cadangan. Item POST juga
+            // dilewati: segmen selalu GET dan tak pernah mengirim
+            // postBody, jadi berkas hasilnya bukan respons POST —
+            // POST tetap jalur tunggal yang menghormati method+body
+            // (issue #1130).
+            if (freshRanges && freshTotal >= SEGMENT_MIN_BYTES &&
+                StoragePrefs.segmentCount(context) > 1 && item.mirrors.isEmpty() &&
+                item.method != "POST"
+            ) {
+                useSegments = true
+                segmentedTotal = freshTotal
+            }
         }
         coroutineContext.ensureActive()
 
