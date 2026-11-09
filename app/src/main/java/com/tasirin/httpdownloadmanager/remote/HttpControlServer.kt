@@ -2641,18 +2641,31 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             if (thumb == null) {
                 notFound()
             } else {
-                newFixedLengthResponse(
-                    Response.Status.OK,
-                    "image/jpeg",
-                    FileInputStream(thumb),
-                    thumb.length()
-                // max-age pendek (issue #755): URL thumbnail adalah
-                // fungsi murni path, jadi cache peramban 24 jam
-                // mengalahkan invalidasi sisi server (#399/#735) saat
-                // berkas di path yang sama diganti isinya — galeri
-                // menampilkan thumbnail lama sampai sehari. 300 detik
-                // tetap menghemat request dalam satu sesi telusur.
-                ).also { it.addHeader("Cache-Control", "public, max-age=300") }
+                // Total dari FD yang dibuka (issue #1385, pola #792/#815/
+                // #1044 di jalur serve lain): thumb.length() adalah stat
+                // path terpisah dari stream yang disajikan — berkas yang
+                // ditimpa di antara keduanya membuat Content-Length tak
+                // cocok dengan byte yang mengalir. Gagal baca ukuran FD:
+                // tutup stream, jawab 404.
+                val input = FileInputStream(thumb)
+                val total = runCatching { input.channel.size() }.getOrDefault(-1L)
+                if (total < 0) {
+                    runCatching { input.close() }
+                    notFound()
+                } else {
+                    newFixedLengthResponse(
+                        Response.Status.OK,
+                        "image/jpeg",
+                        input,
+                        total
+                    // max-age pendek (issue #755): URL thumbnail adalah
+                    // fungsi murni path, jadi cache peramban 24 jam
+                    // mengalahkan invalidasi sisi server (#399/#735) saat
+                    // berkas di path yang sama diganti isinya — galeri
+                    // menampilkan thumbnail lama sampai sehari. 300 detik
+                    // tetap menghemat request dalam satu sesi telusur.
+                    ).also { it.addHeader("Cache-Control", "public, max-age=300") }
+                }
             }
         } ?: notFound()
     }
