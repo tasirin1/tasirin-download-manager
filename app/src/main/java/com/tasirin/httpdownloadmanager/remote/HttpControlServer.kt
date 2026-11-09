@@ -2455,6 +2455,38 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return jsonResponse(JSONObject().put("ok", true))
     }
 
+    /** Buka stream item berbasis contentUri beserta totalnya (issue #1382):
+     *  blok ini dulu ditulis dua kali (serveFile + serveShare) dengan isi
+     *  yang sama persis. null = URI tak diizinkan/basi/gagal dibuka —
+     *  pemanggil menjawab 404; invalidasi cache galeri untuk URI basi
+     *  sudah dilakukan di sini seperti kedua jalur lama. */
+    private fun openContentUriStream(item: DownloadItem): Pair<InputStream, Long>? {
+        val uri = item.contentUri?.toUri() ?: return null
+        if (!isMediaUriAllowed(uri)) return null
+        val resolver = context.contentResolver
+        // URI MediaStore basi (file dihapus di luar app saat kolom DATA null
+        // sehingga lolos scan): openInputStream melempar, bukan null —
+        // jadikan 404 + invalidasi cache galeri agar entri basi hilang saat
+        // daftar dimuat ulang (tanpa probe per-baris saat scan).
+        val rawStream = runCatching { resolver.openInputStream(uri) }.getOrNull()
+            ?: run { invalidateGalleryCache(); return null }
+        // AFD bisa melempar setelah stream terbuka (URI basi): tanpa ini
+        // descriptor input bocor + respons jadi 500, bukan 404.
+        var len = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L }.getOrElse {
+            runCatching { rawStream.close() }
+            invalidateGalleryCache()
+            return null
+        }
+        if (len < 0) {
+            len = runCatching {
+                resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getLong(0) else -1L
+                }
+            }.getOrNull() ?: -1L
+        }
+        return rawStream to len
+    }
+
     private fun serveFile(session: IHTTPSession): Response {
         val id = session.uri.removePrefix("/file/")
         val item = App.engine.items.value.find {
@@ -2484,31 +2516,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 return notFound()
             }
         } else if (!item.contentUri.isNullOrEmpty()) {
-            val uri = item.contentUri.toUri()
-            if (!isMediaUriAllowed(uri)) return notFound()
-            val resolver = context.contentResolver
-            // URI MediaStore basi (file dihapus di luar app saat kolom DATA null
-            // sehingga lolos scan): openInputStream melempar, bukan null —
-            // jadikan 404 + invalidasi cache galeri agar entri basi hilang saat
-            // daftar dimuat ulang (tanpa probe per-baris saat scan).
-            val rawStream = runCatching { resolver.openInputStream(uri) }.getOrNull()
-                ?: run { invalidateGalleryCache(); return notFound() }
-            // AFD bisa melempar setelah stream terbuka (URI basi): tanpa ini
-            // descriptor input bocor + respons jadi 500, bukan 404.
-            var len = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L }.getOrElse {
-                runCatching { rawStream.close() }
-                invalidateGalleryCache()
-                return notFound()
-            }
-            if (len < 0) {
-                len = runCatching {
-                    resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
-                        if (c.moveToFirst()) c.getLong(0) else -1L
-                    }
-                }.getOrNull() ?: -1L
-            }
-            stream = rawStream
-            total = len
+            val opened = openContentUriStream(item) ?: return notFound()
+            stream = opened.first
+            total = opened.second
         } else {
             return notFound()
         }
@@ -4602,27 +4612,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 return notFound()
             }
         } else if (!item.contentUri.isNullOrEmpty()) {
-            val uri = item.contentUri.toUri()
-            if (!isMediaUriAllowed(uri)) return notFound()
-            val resolver = context.contentResolver
-            // Pola sama seperti serveFile: AFD bisa melempar setelah stream terbuka
-            // (URI basi) — tanpa ini descriptor bocor + respons jadi 500, bukan 404.
-            val rawStream = runCatching { resolver.openInputStream(uri) }.getOrNull()
-                ?: run { invalidateGalleryCache(); return notFound() }
-            var shareLen = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L }.getOrElse {
-                runCatching { rawStream.close() }
-                invalidateGalleryCache()
-                return notFound()
-            }
-            if (shareLen < 0) {
-                shareLen = runCatching {
-                    resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
-                        if (c.moveToFirst()) c.getLong(0) else -1L
-                    }
-                }.getOrNull() ?: -1L
-            }
-            total = shareLen
-            input = rawStream
+            val opened = openContentUriStream(item) ?: return notFound()
+            input = opened.first
+            total = opened.second
         } else {
             return notFound()
         }
