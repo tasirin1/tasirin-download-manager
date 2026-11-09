@@ -2862,7 +2862,7 @@ class DownloadEngine(appContext: Context) {
                 deleteHlsTempWithSidecar(videoTs)
                 deleteHlsTempWithSidecar(audioAdts)
                 adaptiveAudioFile?.delete()
-                finishHls(item, progress.downloaded, published, finalName)
+                finishHls(item, progress.downloaded.get(), published, finalName)
                 return
             }
 
@@ -2889,7 +2889,7 @@ class DownloadEngine(appContext: Context) {
             // berhasil (issue #430) — videoTs sendiri adalah sumber
             // yang diterbitkan, bukan temp yang dihapus di sini.
             deleteHlsTempWithSidecar(audioAdts)
-            finishHls(item, progress.downloaded, published, finalName)
+            finishHls(item, progress.downloaded.get(), published, finalName)
         } catch (e: Exception) {
             // Temp video/audio dipertahankan untuk resume (issue #385) —
             // termasuk jalur pause (CancellationException): membuangnya
@@ -2903,15 +2903,20 @@ class DownloadEngine(appContext: Context) {
     }
 
     private class HlsProgress {
-        var downloaded = 0L
-        var lastNotify = 0L
+        // Tiga penghitung ini disentuh pekerja unduh-awal, thread konsumen,
+        // dan callback progres secara bersamaan (issue #1374): baca-tulis
+        // Long polos bisa kehilangan imbuhan dan check-then-set lastNotify
+        // bisa lolos ganda, jadi atomik. Field lain hanya disentuh thread
+        // konsumen/pemanggil sehingga tetap polos.
+        val downloaded = AtomicLong(0)
+        val lastNotify = AtomicLong(0)
         var totalSegments = 0
         var segmentsDone = 0
         var avgSegBytes = 0L
         /** Jumlah Content-Length pasti segmen yang sudah di-fetch (mutlak). */
         var exactBytes = 0L
         /** Ukuran segmen referensi stabil (dari segmen pertama yang berukuran wajar). */
-        var refSegBytes = 0L
+        val refSegBytes = AtomicLong(0)
         /** Total mutlak akhir bila semua segmen sudah punya ukuran pasti; else estimasi. */
         var exactTotal = 0L
         /** Estimasi awal total dari BANDWIDTH x durasi (dipakai sebelum segmen
@@ -2988,7 +2993,7 @@ class DownloadEngine(appContext: Context) {
             ) {
                 startIndex = done
                 fileWritten = writtenBytes
-                progress.downloaded += writtenBytes
+                progress.downloaded.addAndGet(writtenBytes)
                 progress.segmentsDone += done
                 progress.exactBytes += writtenBytes
                 if (done > 0) {
@@ -3005,12 +3010,12 @@ class DownloadEngine(appContext: Context) {
         // resume di awal kelanjutan — pola yang sama seperti jalur
         // single-stream dan segmented yang memanggil throttle.reset
         // sesudah resume ditetapkan.
-        throttle.reset(progress.downloaded)
+        throttle.reset(progress.downloaded.get())
         // Posisi throttle BERSAMA unduh-awal (issue #1288): semua pekerja
         // menagih byte ke satu penghitung yang hanya naik, sehingga
         // limiter melihat total monoton seperti jalur multi-segmen
         // berkas biasa — bukan baseline per-segmen yang saling mendahului.
-        val throttlePosition = AtomicLong(progress.downloaded)
+        val throttlePosition = AtomicLong(progress.downloaded.get())
         val launchedSpools = mutableListOf<File>()
         try {
             BufferedOutputStream(FileOutputStream(target, startIndex > 0), BUFFER_SIZE).use { out ->
@@ -3038,7 +3043,7 @@ class DownloadEngine(appContext: Context) {
                             notify = {
                                 reportHlsProgress(
                                     item, progress,
-                                    (throttlePosition.get() - progress.downloaded)
+                                    (throttlePosition.get() - progress.downloaded.get())
                                         .coerceAtLeast(0)
                                 )
                             },
@@ -3048,8 +3053,8 @@ class DownloadEngine(appContext: Context) {
                                 // yang sudah selesai memakai hasil tulis riil di bawah
                                 // supaya konsisten dengan bytesDownloaded (audio di-strip
                                 // ID3 sehingga ukuran tulis bisa lebih kecil).
-                                if (progress.refSegBytes == 0L && declared >= HLS_REF_SEGMENT_MIN) {
-                                    progress.refSegBytes = declared
+                                if (progress.refSegBytes.get() == 0L && declared >= HLS_REF_SEGMENT_MIN) {
+                                    progress.refSegBytes.compareAndSet(0L, declared)
                                 }
                             }
                         )
@@ -3072,15 +3077,15 @@ class DownloadEngine(appContext: Context) {
                         }
                     }
                     segFile.delete()
-                    progress.downloaded += written
+                    progress.downloaded.addAndGet(written)
                     progress.segmentsDone++
                     // Song referensi cadangan: bila header tidak memberi ukuran wajar,
                     // pakai ukuran tulis riil segmen data pertama.
-                    if (progress.refSegBytes == 0L && written >= HLS_REF_SEGMENT_MIN) {
-                        progress.refSegBytes = written
+                    if (progress.refSegBytes.get() == 0L && written >= HLS_REF_SEGMENT_MIN) {
+                        progress.refSegBytes.compareAndSet(0L, written)
                     }
                     if (progress.segmentsDone > 0) {
-                        progress.avgSegBytes = progress.downloaded / progress.segmentsDone
+                        progress.avgSegBytes = progress.downloaded.get() / progress.segmentsDone
                     }
                     // Total mendekati mutlak: jumlah ukuran riil segmen selesai +
                     // estimasi stabil (refSegBytes x sisa), supaya angka tidak bergoyang.
@@ -3088,8 +3093,8 @@ class DownloadEngine(appContext: Context) {
                     progress.exactBytes = known
                     val remaining = progress.totalSegments - progress.segmentsDone
                     progress.exactTotal = known +
-                        (if (remaining > 0 && progress.refSegBytes > 0) {
-                            progress.refSegBytes * remaining
+                        (if (remaining > 0 && progress.refSegBytes.get() > 0) {
+                            progress.refSegBytes.get() * remaining
                         } else 0L)
                     // Catat progres per berkas untuk resume (issue #385):
                     // sesudah segmen ini utuh di target, penanda .segs
@@ -3204,7 +3209,7 @@ class DownloadEngine(appContext: Context) {
                             throw IOException("adaptive file exceeds available storage")
                         }
                         out.write(buffer, 0, read)
-                        throttle.sleepIfNeeded { progress.downloaded + bytes }
+                        throttle.sleepIfNeeded { progress.downloaded.get() + bytes }
                         reportHlsProgress(item, progress, bytes, total)
                         if ((adaptiveIters++ and 7) == 0) {
                             val now = monotonicNow()
@@ -3233,7 +3238,7 @@ class DownloadEngine(appContext: Context) {
             if (total > 0 && writtenBytes < total) {
                 throw IOException("adaptive file truncated: got $writtenBytes of $total bytes")
             }
-            progress.downloaded += target.length()
+            progress.downloaded.addAndGet(target.length())
             return target.length() > 0L
         } catch (e: Exception) {
             // Jalur galat (issue #1243): badan respons belum tentu
@@ -3341,7 +3346,7 @@ class DownloadEngine(appContext: Context) {
             commitReplacement(item.id)
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
-            finishHls(item, progress.downloaded, published, finalName)
+            finishHls(item, progress.downloaded.get(), published, finalName)
         } catch (e: Exception) {
             runCatching { videoMp4.delete() }
             runCatching { audioM4a.delete() }
@@ -3360,10 +3365,12 @@ class DownloadEngine(appContext: Context) {
         segNow: Long,
         total: Long = 0
     ) {
-        val totalNow = progress.downloaded + segNow
+        val totalNow = progress.downloaded.get() + segNow
         val now = monotonicNow()
-        if (now - progress.lastNotify >= 1000) {
-            progress.lastNotify = now
+        val lastNotifySeen = progress.lastNotify.get()
+        if (now - lastNotifySeen >= 1000 &&
+            progress.lastNotify.compareAndSet(lastNotifySeen, now)
+        ) {
             // Total HLS asli tidak diketahui (segmen tidak punya Content-Length
             // konsisten). Persentase dihitung dari jumlah segmen (progressPercentOverride)
             // supaya bar bergerak tanpa menampilkan total palsu di UI.
@@ -3381,7 +3388,7 @@ class DownloadEngine(appContext: Context) {
             // File adaptive (video/audio MP4): Content-Length riil, total
             // kumulatif = byte yang sudah selesai + ukuran file aktif.
             val effTotal = if (total > 0) {
-                progress.downloaded + total
+                progress.downloaded.get() + total
             } else {
                 // HLS segmen: pakai total pasti (Content-Length segmen selesai +
                 // refSegBytes x sisa) bila sudah ada; sebelum segmen pertama
