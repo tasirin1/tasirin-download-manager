@@ -484,17 +484,24 @@ class DownloadEngine(appContext: Context) {
     }
 
     private fun untrackConnection(id: String, connection: HttpURLConnection) {
-        activeConns[id]?.remove(connection)
-        activeConns.remove(id, emptySet())
-        // Bendera batal dibuang saat koneksi terakhir id ini lepas, TANPA
-        // memindai seluruh daftar item seperti sebelumnya (issue #373):
-        // jalur panas per-segmen tidak boleh membayar O(jumlah item).
-        // Aman karena perlindungan koneksi yatim job yang dibatalkan
-        // tidak lagi bergantung pada bendera ini — trackOpenedConnection
-        // menilai identitas job coroutine lewat ensureActive (#200), dan
-        // launchItem selalu membersihkan bendera sebelum job baru mulai.
-        val wasCancelled = cancelledConns.containsKey(id)
-        if (activeConns[id] == null) cancelledConns.remove(id)
+        // Kunci yang sama dengan trackConnection (issue #1370): tanpa ini
+        // pelepasan bisa menyela getOrPut di dalam kunci sehingga koneksi
+        // yang baru terdaftar mendarat di set yatim yang sudah tak terdaftar
+        // di map — disconnectActive tak akan pernah menemukannya.
+        val wasCancelled = synchronized(activeConns) {
+            activeConns[id]?.remove(connection)
+            activeConns.remove(id, emptySet())
+            // Bendera batal dibuang saat koneksi terakhir id ini lepas, TANPA
+            // memindai seluruh daftar item seperti sebelumnya (issue #373):
+            // jalur panas per-segmen tidak boleh membayar O(jumlah item).
+            // Aman karena perlindungan koneksi yatim job yang dibatalkan
+            // tidak lagi bergantung pada bendera ini — trackOpenedConnection
+            // menilai identitas job coroutine lewat ensureActive (#200), dan
+            // launchItem selalu membersihkan bendera sebelum job baru mulai.
+            val cancelled = cancelledConns.containsKey(id)
+            if (activeConns[id] == null) cancelledConns.remove(id)
+            cancelled
+        }
         // Sukses jangan disconnect: biarkan socket keep-alive dipakai ulang.
         // Cancel/pause tetap diputus via disconnectActive().
         if (wasCancelled) runCatching { connection.disconnect() }
