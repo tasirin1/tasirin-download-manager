@@ -147,9 +147,6 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // Cache itemsJson berdasarkan signature; satu Pair agar sig & JSON tidak
     // pernah terbaca sebagai versi campuran saat request server paralel.
     @Volatile private var cachedItems: Pair<Long, JSONArray>? = null
-    // Fix #4: cache terpisah untuk bytes/speed yang berubah tiap detik
-    // tanpa rebuild struktur JSON (hemat ~30% CPU saat polling aktif).
-    @Volatile private var lastDynamicUpdate = 0L
     // Cache statusObject: jarang berubah (port, readOnly, versi).
     @Volatile private var cachedStatusJson: JSONObject? = null
     // Statistik folder dihitung paralel: listing folder dengan banyak subfolder
@@ -593,11 +590,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         if (mediaMetaCache.size > 8) {
             mediaMetaCache.entries.removeIf { now - it.value.first > MEDIA_META_TTL_MS }
         }
-        // cachedItems: force refresh setiap 30 detik supaya bytes/speed update
-        if (cachedItems != null && now - lastDynamicUpdate > 30_000L) {
-            cachedItems = null
-            lastDynamicUpdate = now
-        }
+        // cachedItems TIDAK dibuang berkala di sini (issue #1380):
+        // signature itemsJson sudah mencakup bytesDownloaded/speedBps/
+        // etaSeconds, jadi cache membatalkan dirinya tepat saat nilai
+        // dinamis berubah. Blok pembuangan 30 detik lama membaca
+        // lastDynamicUpdate yang tak pernah diperbarui jalur mana pun
+        // (selalu 0), sehingga syaratnya selalu benar dan cache dibuang
+        // di setiap siklus cleanup — memaksa bangun ulang tanpa perubahan.
     }
 
     /** Snapshot tautan share aktif untuk dibawa ke instance baru saat ganti
