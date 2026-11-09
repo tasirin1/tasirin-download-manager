@@ -3523,13 +3523,25 @@ class DownloadEngine(appContext: Context) {
         var tokenTried = false
         while (true) {
             coroutineContext.ensureActive()
+            // Tagihan throttle percobaan ini (issue #1376): byte yang
+            // ditagih percobaan yang GAGAL harus dikembalikan — spool
+            // ditulis ulang dari nol pada percobaan berikut, jadi tanpa
+            // pengembalian posisi bersama terhitung ganda (limiter menagih
+            // utang palsu dan segNow progres membengkak) walau byte riil
+            // yang terunduh hanya sekali. Dihitung per percobaan di dalam
+            // fetchHlsSegment karena posisi bersama juga ditagih pekerja
+            // segmen lain — selisih posisi global bukan milik percobaan ini.
+            val attemptCharge = AtomicLong(0)
             try {
                 return fetchHlsSegment(
-                    item, currentUrl, buffer, throttle, throttlePosition, spool, notify, onLength
+                    item, currentUrl, buffer, throttle, throttlePosition, spool, notify, onLength,
+                    attemptCharge
                 )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                val charged = attemptCharge.get()
+                if (charged > 0) throttlePosition.addAndGet(-charged)
                 val msg = e.message.orEmpty()
                 // Jangkar pada bentuk pesan status segmen sendiri
                 // (issue #1186): substring angka telanjang "404"/"403"
@@ -3573,7 +3585,8 @@ class DownloadEngine(appContext: Context) {
         throttlePosition: AtomicLong,
         spool: File,
         notify: (Long) -> Unit,
-        onLength: (Long) -> Unit = {}
+        onLength: (Long) -> Unit = {},
+        attemptCharge: AtomicLong = AtomicLong(0)
     ): Long {
         val segConn = trackOpenedConnection(
             item.id,
@@ -3639,8 +3652,11 @@ class DownloadEngine(appContext: Context) {
                         segOut.write(buffer, 0, read)
                         // Tagih ke posisi bersama (issue #1288): total
                         // yang dilihat limiter selalu naik walau segmen
-                        // diunduh bersamaan.
+                        // diunduh bersamaan. Catat juga tagihan percobaan
+                        // ini agar pemanggil bisa mengembalikannya bila
+                        // percobaan gagal (issue #1376).
                         val position = throttlePosition.addAndGet(read.toLong())
+                        attemptCharge.addAndGet(read.toLong())
                         throttle.sleepIfNeeded { position }
                         notify(segBytes)
                         // Cek kesehatan tiap 8 chunk, maks 1x/detik
