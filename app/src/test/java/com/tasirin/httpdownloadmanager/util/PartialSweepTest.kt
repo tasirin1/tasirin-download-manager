@@ -66,6 +66,32 @@ class PartialSweepTest {
     }
 
     @Test
+    fun `pola sapu mencakup spool per-segmen HLS`() {
+        // Issue #1371; nilai harapan dibuktikan port Python 1:1
+        // (maraton 12, port-1371) sebelum asersi ditulis.
+        assertTrue(isSweepablePartial("~1video.video.part.spool.0"))
+        assertTrue(isSweepablePartial("~1video.video.part.spool.137"))
+        // Ekor bukan digit / pola tidak di ekor: bukan sampah internal.
+        assertFalse(isSweepablePartial("video.mp4.part.spool.abc"))
+        assertFalse(isSweepablePartial("video.mp4.part.spool.3.mp4"))
+        assertFalse(isSweepablePartial("film.part.1.mp4"))
+    }
+
+    @Test
+    fun `spool per-segmen item dikenal ikut terlindungi`() {
+        // Pasangan pola sapu #1371: spool segmen temp HLS item yang masih
+        // hidup tak boleh tersapu walau berumur >2 jam; indeks berapa pun.
+        val protected = protectedPartialNames(item("video.mp4"))
+        assertTrue(isProtectedPartialName("~1video.video.part.spool.0", protected))
+        assertTrue(isProtectedPartialName("~1video.video.part.spool.999", protected))
+        assertTrue(isProtectedPartialName("~1video.audio.part.spool.12", protected))
+        assertTrue(isProtectedPartialName("~1video.video.part", protected))
+        assertFalse(isProtectedPartialName("zzz.video.part.spool.2", protected))
+        assertFalse(isProtectedPartialName("~1video.video.part.spool.abc", protected))
+        assertFalse(isProtectedPartialName("~1video.video.part.spool.", protected))
+    }
+
+    @Test
     fun `temp HLS nama tepi mengikuti derivasi engine`() {
         // #443: derivasi harus meniru urutan engine (buang sufiks dari
         // nama mentah, safe() pada gabungan). Nama reserved: engine

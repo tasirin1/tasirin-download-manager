@@ -799,7 +799,7 @@ class FileSaver(context: Context) {
             }
             downloadDir.listFiles()?.forEach { f ->
                 val name = f.name
-                if (isSweepablePartial(name) && name !in expected) {
+                if (isSweepablePartial(name) && !isProtectedPartialName(name, expected)) {
                     // Hapus file .part yang sudah tua (>2jam) supaya tidak menghapus
                     // file .part yang sedang aktif di-download.
                     val age = System.currentTimeMillis() - f.lastModified()
@@ -1134,6 +1134,21 @@ class FileSaver(context: Context) {
             }
         }
         extraNames.forEach { name -> runCatching { File(downloadDir, name).delete() } }
+        // Spool per-segmen unduh-awal HLS (issue #1371): namanya berindeks
+        // tak terbatas sehingga tak bisa disebut persis di extraNames —
+        // sapu berdasar AWALAN spool item ini, meniru deleteHlsTempWithSidecar
+        // di engine, agar menghapus item ikut membebaskan spool pendahulunya.
+        val spoolPrefixes = protectedPartialNames(item)
+            .filter { it.endsWith(".spool") }.map { "$it." }
+        if (spoolPrefixes.isNotEmpty()) {
+            runCatching {
+                downloadDir.listFiles()?.forEach { f ->
+                    if (spoolPrefixes.any { f.name.startsWith(it) }) {
+                        runCatching { f.delete() }
+                    }
+                }
+            }
+        }
         if (!item.contentUri.isNullOrEmpty()) {
             runCatching { appContext.contentResolver.delete(item.contentUri.toUri(), null, null) }
         }
@@ -1768,19 +1783,44 @@ internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.Do
 
 private val PART_SEGMENT_TAIL_RE = Regex("""\.part\.\d+$""")
 private val MERGE_STAGING_TAIL_RE = Regex("""\.merge\.\d+$""")
+private val HLS_SEGMENT_SPOOL_TAIL_RE = Regex("""\.part\.spool\.\d+$""")
 
 /** File internal yang boleh disapu bila yatim: partial segmen/basis plus
  *  staging merge (`.merge.<nanoTime>`) yang tertinggal bila proses mati di
- *  tengah merge, spool segmen HLS (`.part.spool`, issue #401) dan penanda
- *  resume HLS (`.part.segs`, #385) yang finally-nya hanya berjalan bila
- *  proses masih hidup. Pola WAJIB terjangkar di ekor nama: pola longgar
- *  ".part." di tengah nama ikut menyapu file FINAL selesai seperti
- *  `film.part.1.mp4` atau `game.part.2.rar` (pola nama arsip pecahan
- *  yang umum). Murni agar bisa di-unit-test. */
+ *  tengah merge, spool segmen HLS (`.part.spool`, issue #401), spool
+ *  PER-SEGMEN unduh-awal HLS (`.part.spool.<idx>`, issue #1371 — finally
+ *  penghapusnya hanya menjangkau spool segmen yang sempat di-launch dalam
+ *  umur proses itu) dan penanda resume HLS (`.part.segs`, #385) yang
+ *  finally-nya hanya berjalan bila proses masih hidup. Pola WAJIB
+ *  terjangkar di ekor nama: pola longgar ".part." di tengah nama ikut
+ *  menyapu file FINAL selesai seperti `film.part.1.mp4` atau
+ *  `game.part.2.rar` (pola nama arsip pecahan yang umum). Murni agar
+ *  bisa di-unit-test. */
 internal fun isSweepablePartial(name: String): Boolean =
     name.endsWith(".part") || PART_SEGMENT_TAIL_RE.containsMatchIn(name) ||
         MERGE_STAGING_TAIL_RE.containsMatchIn(name) ||
-        name.endsWith(".part.spool") || name.endsWith(".part.segs")
+        name.endsWith(".part.spool") || name.endsWith(".part.segs") ||
+        HLS_SEGMENT_SPOOL_TAIL_RE.containsMatchIn(name)
+
+/** Nama partial ini milik item yang dikenal? Nama persis dari
+ *  [protectedPartialNames] selalu ya; selain itu spool PER-SEGMEN
+ *  (`<temp>.part.spool.<idx>`) dari spool item yang dikenal juga ya —
+ *  indeksnya tak terbatas sehingga tak bisa dienumerasi ke himpunan nama
+ *  persis, tetapi tanpa perlindungan ini sapuan yatim berumur >2 jam bisa
+ *  menghapus spool unduhan HLS yang masih hidup (pasangan sweepable baru
+ *  issue #1371). Murni agar bisa di-unit-test. */
+internal fun isProtectedPartialName(name: String, protectedNames: Set<String>): Boolean {
+    if (name in protectedNames) return true
+    for (spool in protectedNames) {
+        if (!spool.endsWith(".spool")) continue
+        val prefix = "$spool."
+        if (name.startsWith(prefix)) {
+            val tail = name.substring(prefix.length)
+            if (tail.isNotEmpty() && tail.all { it.isDigit() }) return true
+        }
+    }
+    return false
+}
 
 private val UNIQUE_SUFFIX_RE = Regex("""^(.+) \([^()]+\)$""")
 
