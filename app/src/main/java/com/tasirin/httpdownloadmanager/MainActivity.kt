@@ -88,6 +88,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     private var summaryFailed = 0
     private var summaryDone = 0
     private var lastItems: List<DownloadItem> = emptyList()
+    // Id seluruh item yang terakhir diserahkan ke adapter: dasar deteksi
+    // "kepala daftar berisi item yang benar-benar baru" untuk auto-scroll
+    // ke item terbaru (lihat submitRows).
+    private var submittedIds: Set<String> = emptySet()
     // Throttle submitList: emisi StateFlow tiap detik tidak perlu rebuild penuh
     // bila struktur daftar sama; toolbar teks hanya update saat hitungan berubah.
     private var lastUiSubmitMs = 0L
@@ -319,7 +323,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     if (sizeChanged || (sig != lastProgressSig && now - lastUiSubmitMs >= 400L)) {
                         lastUiSubmitMs = now
                         lastProgressSig = sig
-                        adapter.submitList(DownloadAdapter.rowsOf(items))
+                        submitRows(items)
                     } else if (sig != lastProgressSig &&
                         trailingSubmitJob?.isActive != true
                     ) {
@@ -335,7 +339,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                                 lastUiSubmitMs =
                                     android.os.SystemClock.uptimeMillis()
                                 lastProgressSig = latestSig
-                                adapter.submitList(DownloadAdapter.rowsOf(latest))
+                                submitRows(latest)
                             }
                         }
                     }
@@ -1714,6 +1718,23 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 )
             }
             .show()
+    }
+
+    /** Serahkan daftar ke adapter. Bila item teratasnya benar-benar baru
+     *  (id-nya belum pernah ada di daftar yang diserahkan sebelumnya),
+     *  lompat ke posisi 0 sesudah diff diterapkan: tanpa ini RecyclerView
+     *  menahan jangkar gulir pada item yang sedang dilihat, sehingga
+     *  unduhan terbaru masuk tersembunyi di atas area terlihat
+     *  ("tenggelam di atas", laporan owner). Penghapusan item tidak
+     *  memicu lompatan karena kepala barunya selalu id yang sudah dikenal. */
+    private fun submitRows(items: List<DownloadItem>) {
+        val head = items.firstOrNull()
+        val isNewHead = head != null && submittedIds.isNotEmpty() &&
+            head.id !in submittedIds
+        adapter.submitList(DownloadAdapter.rowsOf(items)) {
+            if (isNewHead) binding.recycler.scrollToPosition(0)
+        }
+        submittedIds = items.mapTo(HashSet()) { it.id }
     }
 
     /** Hash murah field yang tampil di daftar. */
