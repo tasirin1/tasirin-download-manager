@@ -4125,6 +4125,7 @@ class DownloadEngine(appContext: Context) {
 
         val lengthHeader = contentLength(conn)
         var total = if (lengthHeader > 0) lengthHeader else 0L
+        var rangeBudget: Long? = null
         if (code == 206) {
             // Verifikasi server benar-benar melanjutkan dari posisi kita.
             val cr = conn.getHeaderField("Content-Range")
@@ -4137,6 +4138,7 @@ class DownloadEngine(appContext: Context) {
             }
             val crTotal = cr?.substringAfter('/')?.trim()?.toLongOrNull()?.takeIf { it > 0 }
             total = crTotal ?: (total + downloaded)
+            rangeBudget = singleStreamRangeBudget(code, crTotal, downloaded)
         } else if (downloaded > 0) {
             // Server tidak mendukung resume (minta lanjut, dikirim dari awal):
             // progres terpaksa dibuang — catat eksplisit agar tidak terlihat
@@ -4180,8 +4182,19 @@ class DownloadEngine(appContext: Context) {
                     continue
                 }
                 zeroStreak = 0
-                output.write(buffer, 0, read)
-                downloaded += read
+                // Resume 206 bertotal Content-Range otoritatif: pangkas
+                // tulis ke sisa rentang dan berhenti bersih saat rentang
+                // habis — byte ekstra server tak boleh menempel ke berkas
+                // final (issue #1369). Tanpa budget (klaim Content-Length)
+                // tulis penuh seperti sebelumnya.
+                val budget = rangeBudget
+                val toWrite = if (budget == null) read else cappedSegmentWrite(read, budget)
+                output.write(buffer, 0, toWrite)
+                downloaded += toWrite
+                if (budget != null) {
+                    rangeBudget = budget - toWrite
+                    if (rangeBudget <= 0L) break
+                }
                 throttle.sleepIfNeeded { downloaded }
                 // Cek jam tiap 8 chunk (512KB): baca jam per iterasi boros.
                 if ((iters++ and 7) != 0) continue
@@ -5418,6 +5431,23 @@ internal fun isSegmentEndAllowed(returnedEnd: Long?, requestedEnd: Long): Boolea
  *  eksplisit, bukan menyerap byte korup. Murni agar bisa di-unit-test. */
 internal fun cappedSegmentWrite(read: Int, budgetLeft: Long): Int =
     minOf(read.toLong(), budgetLeft.coerceAtLeast(0)).toInt()
+
+/** Budget tulis resume single-stream (issue #1369): hanya respons 206 yang
+ *  totalnya berasal dari Content-Range yang bersifat otoritatif — sisanya
+ *  (total - sudah terunduh) boleh ditulis, selebihnya byte ekstra server.
+ *  Respons lain / 206 tanpa total rentang -> null (tanpa budget): total di
+ *  sana diturunkan dari klaim Content-Length yang bisa basi dan verifySize
+ *  memang mentoleransinya. Murni agar bisa di-unit-test. */
+internal fun singleStreamRangeBudget(
+    responseCode: Int,
+    contentRangeTotal: Long?,
+    alreadyDownloaded: Long
+): Long? =
+    if (responseCode == 206 && contentRangeTotal != null && contentRangeTotal > 0) {
+        (contentRangeTotal - alreadyDownloaded).coerceAtLeast(0)
+    } else {
+        null
+    }
 
 /** Partial dipertahankan bila Range ditolak SETELAH ada progres: penolakan di
  *  tengah jalan = link kedaluwarsa/transien, bukan server tanpa-Range.

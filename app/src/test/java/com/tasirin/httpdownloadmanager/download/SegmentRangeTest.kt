@@ -72,4 +72,18 @@ class SegmentRangeTest {
         assertEquals(0, cappedSegmentWrite(100, 0))
         assertEquals(0, cappedSegmentWrite(100, -50))
     }
+
+    @Test
+    fun `budget resume single-stream hanya dari total Content-Range respons 206`() {
+        // Nilai harapan dibuktikan port Python 1:1 (maraton 12, port-1369).
+        assertEquals(600L, singleStreamRangeBudget(206, 1000, 400))
+        assertEquals(0L, singleStreamRangeBudget(206, 1000, 1000))
+        // Catatan basi melebihi total -> budget 0, bukan negatif.
+        assertEquals(0L, singleStreamRangeBudget(206, 1000, 1200))
+        // 200 = klaim Content-Length (bisa basi) -> tanpa budget.
+        assertEquals(null, singleStreamRangeBudget(200, 1000, 0))
+        // 206 tanpa total rentang -> tanpa budget.
+        assertEquals(null, singleStreamRangeBudget(206, null, 400))
+        assertEquals(null, singleStreamRangeBudget(206, 0, 400))
+    }
 }
