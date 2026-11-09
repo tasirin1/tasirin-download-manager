@@ -39,4 +39,17 @@ class ServerThumbnailTest {
         assertFalse(isThumbFailureFresh(now - ttl - 5000, now, ttl))
         assertFalse(isThumbFailureFresh(0, now, ttl))
     }
+
+    @Test
+    fun `stempel kegagalan di masa depan tidak segar`() {
+        // Issue #1389; nilai harapan dibuktikan port Python 1:1
+        // (maraton 12, port-1389). Jam mundur sesudah stempel ditulis
+        // tak boleh menahan percobaan ulang.
+        val ttl = 30L * 60 * 1000
+        val now = 10_000_000L
+        assertFalse(isThumbFailureFresh(now + 1, now, ttl))
+        assertFalse(isThumbFailureFresh(now + 60_000, now, ttl))
+        assertFalse(isThumbFailureFresh(now + 86_400_000, now, ttl))
+        assertTrue(isThumbFailureFresh(now, now, ttl))
+    }
 }

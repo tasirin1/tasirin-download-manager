@@ -79,12 +79,20 @@ class ServerVideoDurations(
             return cache
         }
 
-        /** true bila kegagalan probe masih dalam TTL (belum perlu dicoba lagi). */
+        /** true bila kegagalan probe masih dalam TTL (belum perlu dicoba lagi).
+         *  Selisih negatif (storedAt di masa depan — jam mundur) TIDAK
+         *  throttled (issue #1389): bentuk lama selalu benar untuk
+         *  selisih negatif sehingga stempel masa depan menahan probe
+         *  ulang sampai jam melewati storedAt + TTL. */
         fun isProbeFailureThrottled(
             storedAt: Long?,
             now: Long,
             ttlMs: Long = PROBE_FAILURE_TTL_MS
-        ): Boolean = storedAt != null && now - storedAt < ttlMs
+        ): Boolean {
+            if (storedAt == null) return false
+            val age = now - storedAt
+            return age >= 0 && age < ttlMs
+        }
 
         // Mesin simpan milik PROSES, bukan instance (issue #826):
         // berkas video_durations.json + staging-nya dipakai semua

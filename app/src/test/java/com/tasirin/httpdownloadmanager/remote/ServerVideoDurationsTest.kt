@@ -99,5 +99,9 @@ class ServerVideoDurationsTest {
         assertTrue(ServerVideoDurations.isProbeFailureThrottled(now - 1000, now, ttl))
         assertFalse(ServerVideoDurations.isProbeFailureThrottled(now - ttl - 1, now, ttl))
         assertFalse(ServerVideoDurations.isProbeFailureThrottled(null, now, ttl))
+        // Issue #1389: stempel di masa depan (jam mundur) tidak
+        // menahan probe ulang; port Python port-1389 membuktikannya.
+        assertFalse(ServerVideoDurations.isProbeFailureThrottled(now + 60_000, now, ttl))
+        assertTrue(ServerVideoDurations.isProbeFailureThrottled(now, now, ttl))
     }
 }

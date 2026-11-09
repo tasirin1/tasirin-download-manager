@@ -51,12 +51,20 @@ private fun thumbFileInode(raw: String): Long? = runCatching {
     android.system.Os.stat(raw.substring(2)).st_ino
 }.getOrNull()
 
-/** true bila kegagalan thumbnail masih dalam masa TTL (belum perlu dicoba lagi). */
+/** true bila kegagalan thumbnail masih dalam masa TTL (belum perlu dicoba lagi).
+ *  Selisih negatif (storedAt di masa depan — jam perangkat mundur sesudah
+ *  stempel ditulis) dianggap TIDAK segar (issue #1389): bentuk lama
+ *  `now - storedAt < ttl` selalu benar untuk selisih negatif, sehingga
+ *  satu stempel masa depan menahan percobaan ulang sampai jam melewati
+ *  storedAt + TTL. */
 internal fun isThumbFailureFresh(
     storedAt: Long,
     now: Long,
     ttlMs: Long = THUMB_FAILURE_TTL_MS
-): Boolean = now - storedAt < ttlMs
+): Boolean {
+    val age = now - storedAt
+    return age >= 0 && age < ttlMs
+}
 
 /** Satu lock per media mencegah banyak permintaan thumbnail awal men-decode
  *  video yang sama secara paralel (hemat CPU/RAM di device kelas bawah).
