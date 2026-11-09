@@ -2448,8 +2448,49 @@ class DownloadEngine(appContext: Context) {
                         // Tandai URL HLS sebagai gagal supaya resume/retry tidak
                         // mengulang HLS yang sama — re-extract dari YouTube URL.
                         rememberFailedHlsUrl(result.directUrl)
-                        // Fallback: coba ekstrak non-HLS (page/Piped/Invidious).
                         App.logEvent("HLS: download failed (${e.message?.take(50)}), trying non-HLS fallback")
+                        // Pasangan adaptive dari ekstraksi yang SAMA dulu
+                        // (issue #1375): Result HLS membawa videoUrl/audioUrl
+                        // dari streamingData yang sama — memakainya sekarang
+                        // menghindari ekstraksi ulang penuh (halaman +
+                        // Piped/Invidious/Cobalt) yang hasilnya pasangan
+                        // yang sama. Re-ekstraksi hanya bila pasangan ini
+                        // kosong atau gagal dipakai.
+                        if (result.videoUrl.isNotEmpty() && result.audioUrl.isNotEmpty()) {
+                            val pairBase = sanitizeFileName(result.fileName ?: item.fileName)
+                            val pairName = if (!item.nameIsCustom) {
+                                when {
+                                    pairBase.endsWith(".ts", ignoreCase = true) ->
+                                        pairBase.dropLast(3) + ".mp4"
+                                    pairBase.endsWith(".mp4", ignoreCase = true) -> pairBase
+                                    else -> "$pairBase.mp4"
+                                }
+                            } else {
+                                item.fileName
+                            }
+                            updateItem(item.id) {
+                                it.copy(
+                                    url = result.videoUrl,
+                                    fileName = if (!item.nameIsCustom) pairName else item.fileName,
+                                    headers = hlsHeaders
+                                )
+                            }
+                            val pairItem = item.copy(
+                                url = result.videoUrl, fileName = pairName, headers = hlsHeaders
+                            )
+                            var pairDone = false
+                            try {
+                                App.logEvent("SOCIAL: non-HLS adaptive pair (same extraction) → merging video+audio into MP4")
+                                downloadAdaptiveMuxed(pairItem, result.videoUrl, result.audioUrl, pairName)
+                                pairDone = true
+                            } catch (e2: CancellationException) {
+                                throw e2
+                            } catch (e2: Exception) {
+                                App.logEvent("HLS: same-extraction adaptive pair failed (${e2.message?.take(50)}), re-extracting")
+                            }
+                            if (pairDone) return
+                        }
+                        // Fallback: coba ekstrak non-HLS (page/Piped/Invidious).
                         val fallback = SocialMediaExtractor.extractNonHlsYouTube(item.url, item.headers)
                         if (fallback != null && fallback.directUrl != item.url && !fallback.isHls) {
                             // Sama seperti di atas (issue #951): catat host saja.
