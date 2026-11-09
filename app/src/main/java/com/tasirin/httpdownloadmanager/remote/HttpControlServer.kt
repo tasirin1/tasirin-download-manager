@@ -1963,7 +1963,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 )
             }
         }
-        val (input, total) = openZipStream(key) {
+        val (input, total, zipCreated) = openZipStream(key) {
             val created = createTempZip { zos ->
                 // Hitungan kedua cabang dicatat dengan mekanisme yang
                 // sama seperti mediaZip (issue #886): ditulis di dalam
@@ -1982,10 +1982,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             created
         } ?: return notFound()
         val fsSkipped = zipWrittenCounts[key]?.second ?: 0
-        appendLog(
-            "ZIP CREATED: $folderName.zip (${Formats.bytes(total)})" +
-                if (fsSkipped > 0) " — $fsSkipped skipped" else ""
-        )
+        // Log pembuatan hanya saat ZIP benar-benar dibuat request ini
+        // (issue #1384): cache hit dan request Range lanjutan dulu ikut
+        // mencatat "ZIP CREATED" sehingga log mengklaim pembuatan ulang
+        // yang tak pernah terjadi.
+        if (zipCreated) {
+            appendLog(
+                "ZIP CREATED: $folderName.zip (${Formats.bytes(total)})" +
+                    if (fsSkipped > 0) " — $fsSkipped skipped" else ""
+            )
+        }
         val response = streamMedia(
             name = "$folderName.zip",
             mime = "application/zip",
@@ -2026,11 +2032,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
      *  masih memetakan berkas yang sama, bukan pemetaan yang lebih baru)
      *  lalu pembuatan dicoba sekali lagi. Total dari channel FD kebal
      *  unlink; null berarti tak ada ZIP atau ZIP sungguh kosong. */
+    /** Stream ZIP + total + apakah ZIP-nya dibuat oleh request ini
+     *  (komponen ketiga, diteruskan dari zipCached — issue #1384). */
     private fun openZipStream(
         key: String, create: () -> File?
-    ): Pair<java.io.InputStream, Long>? {
+    ): Triple<java.io.InputStream, Long, Boolean>? {
         repeat(2) {
-            val tmp = zipCached(key, create) ?: return null
+            val (tmp, created) = zipCached(key, create) ?: return null
             val input = runCatching { FileInputStream(tmp) }.getOrNull()
             if (input == null) {
                 zipCache.entries.removeIf {
@@ -2051,7 +2059,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 runCatching { tmp.delete() }
                 return null
             }
-            return input to total
+            return Triple(input, total, created)
         }
         return null
     }
@@ -2158,12 +2166,16 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrDefault("m-err")
     }
 
-    private fun zipCached(key: String, create: () -> File?): File? {
+    /** File ZIP untuk [key] + apakah request ini yang MEMBUATnya
+     *  (issue #1384): pasangan kedua false berarti cache hit — pemanggil
+     *  yang mencatat log pembuatan wajib membedakannya agar log tak
+     *  mengklaim ZIP dibuat ulang pada tiap request Range/cache hit. */
+    private fun zipCached(key: String, create: () -> File?): Pair<File, Boolean>? {
         val now = System.currentTimeMillis()
         synchronized(zipLockFor(key)) {
             zipCache[key]?.let { (createdAt, file, _) ->
                 if (now - createdAt < ZIP_CACHE_TTL_MS && file.isFile && file.length() > 0) {
-                    return file
+                    return file to false
                 }
                 zipCache.remove(key)
                 runCatching { file.delete() }
@@ -2192,7 +2204,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 // strip lock agar map kunci tidak tumbuh tanpa batas.
                 zipCache[key] = Triple(now, file, size)
                 pruneZipCache(now, key)
-                return file
+                return file to true
             } finally {
                 zipInFlight.remove(key)
             }
