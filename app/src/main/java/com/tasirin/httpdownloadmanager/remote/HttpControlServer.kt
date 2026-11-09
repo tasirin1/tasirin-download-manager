@@ -256,8 +256,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }
         // Rate-limit per-IP untuk endpoint polling/cache yang sering: mencegah
         // klien/script hammering menguras CPU server saat banyak device meloop.
-        if (session.method == Method.GET && session.uri == "/api/snapshot") {
-            if (!pinOk(session)) {
+        // pinOk untuk snapshot dinilai SEKALI per request (issue #1383):
+        // hasilnya dipakai gerbang throttle ini DAN cabang dispatch di
+        // bawah — dulu fungsi yang sama (baca prefs + cek sesi) dipanggil
+        // dua kali untuk request yang sama.
+        val isSnapshot = session.method == Method.GET && session.uri == "/api/snapshot"
+        var snapshotPinOk = false
+        if (isSnapshot) {
+            snapshotPinOk = pinOk(session)
+            if (!snapshotPinOk) {
                 val un = unauthorized()
                 secureHeaders(session.uri, un)
                 appendRequestLog(session, un, System.currentTimeMillis() - startedAt)
@@ -299,7 +306,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     serveShare(session)
                 session.method == Method.GET && session.uri.startsWith("/stream_part/") ->
                     servePartial(session)
-                pinOk(session) -> when {
+                // Snapshot memakai nilai pinOk yang sudah dinilai di
+                // gerbang throttle (issue #1383); route lain menilai di sini.
+                (isSnapshot && snapshotPinOk) || pinOk(session) -> when {
                     session.method == Method.GET && session.uri == "/" -> htmlPage()
                     session.method == Method.GET && session.uri == "/api/pin_enabled" ->
                         jsonResponse(JSONObject().put("enabled", pinEnabled()))
