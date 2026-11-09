@@ -2835,6 +2835,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         )
         val arr = JSONArray()
         var extracted = 0
+        // Durasi baru yang BENAR-BENAR tercache pada request ini
+        // (issue #1386): penentu saveAsync di akhir — bukan jumlah
+        // percobaan probe.
+        var newCachedDurations = 0
         var matched = 0
         var pageCount = 0
         // Anggaran probe durasi bersama seluruh request (issue #783):
@@ -2871,14 +2875,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         // probe yang benar-benar berjalan dan gagal.
                         val probed = probeGalleryDuration(e.token, probeDeadline)
                         if (probed != null) {
+                            // Hanya probe yang menyimpulkan yang memakan
+                            // jatah extracted (issue #1386): hasil null
+                            // (tak bisa disimpulkan, #809) dulu ikut
+                            // menghitung sehingga jatah 20 cepat habis
+                            // oleh probe yang tak menghasilkan apa pun,
+                            // dan extracted>0 memicu saveAsync walau tak
+                            // ada durasi baru yang tercache.
+                            extracted++
                             if (probed > 0) {
                                 d = probed
-                                videoDurations.cacheDurationIfCurrent(dKey, probed, gen)
+                                if (videoDurations.cacheDurationIfCurrent(dKey, probed, gen)) {
+                                    newCachedDurations++
+                                }
                             } else {
                                 videoDurations.recordProbeFailureIfCurrent(dKey, gen)
                             }
                         }
-                        extracted++
                     }
                     o.put("durationMs", d)
                 }
@@ -2888,7 +2901,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             matched++
         }
         // Async (issue #817): tulis disk cache durasi tak menahan respons.
-        if (extracted > 0) videoDurations.saveAsync()
+        // Hanya bila request ini sungguh mencache durasi baru (issue
+        // #1386): probe gagal/null tak mengubah cache disk, jadi
+        // menulis ulang berkas cache-nya mubazir.
+        if (newCachedDurations > 0) videoDurations.saveAsync()
         // Filter nama (param legacy q): matched = hitungan yang cocok, bukan
         // hitungan scan — bandingkan dengan pageEnd agar halaman terakhir hasil
         // filter tak mengklaim hasMore lalu memicu fetch halaman kosong sia-sia.
