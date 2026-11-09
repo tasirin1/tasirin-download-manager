@@ -66,6 +66,19 @@ class ServerVideoDurations(
             return cache
         }
 
+        /** Tulis durasi dengan penyegaran posisi eviksi (issue #1388):
+         *  prune() mengevakuasi menurut urutan sisip JSONObject, dan put
+         *  pada kunci yang sudah ada TIDAK memindahkan posisinya — entri
+         *  yang baru saja di-probe ulang bisa tetap tereviksi lebih dulu
+         *  daripada entri lama yang tak tersentuh. Remove-then-put
+         *  memindahkan kunci lama ke ekor (posisi paling baru).
+         *  Murni agar bisa di-unit-test. */
+        fun putRefreshed(cache: JSONObject, token: String, ms: Long): JSONObject {
+            if (cache.has(token)) cache.remove(token)
+            cache.put(token, ms)
+            return cache
+        }
+
         /** true bila kegagalan probe masih dalam TTL (belum perlu dicoba lagi). */
         fun isProbeFailureThrottled(
             storedAt: Long?,
@@ -145,7 +158,10 @@ class ServerVideoDurations(
     fun cacheDurationIfCurrent(token: String, ms: Long, expectedGeneration: Long): Boolean {
         synchronized(lock) {
             if (generation != expectedGeneration) return false
-            prune(cacheLocked()).put(token, ms)
+            // Put menyegarkan posisi eviksi (issue #1388): entri yang
+            // di-probe ulang adalah entri yang sedang dipakai — tanpa
+            // ini posisinya tetap di urutan sisip pertamanya.
+            putRefreshed(prune(cacheLocked()), token, ms)
             probeFailAt.remove(token)
             return true
         }

@@ -38,6 +38,42 @@ class ServerVideoDurationsTest {
     }
 
     @Test
+    fun `putRefreshed memindahkan kunci lama ke ekor urutan eviksi`() {
+        // Issue #1388: prune mengevakuasi dari depan urutan sisip.
+        val cache = JSONObject()
+        cache.put("a", 1L)
+        cache.put("b", 2L)
+        cache.put("c", 3L)
+        ServerVideoDurations.putRefreshed(cache, "b", 22L)
+        val keys = mutableListOf<String>()
+        val iter = cache.keys()
+        while (iter.hasNext()) keys.add(iter.next())
+        assertEquals(listOf("a", "c", "b"), keys)
+        assertEquals(22L, cache.optLong("b"))
+        // Kunci baru tetap di ekor tanpa mengubah urutan yang ada.
+        ServerVideoDurations.putRefreshed(cache, "d", 4L)
+        val keys2 = mutableListOf<String>()
+        val iter2 = cache.keys()
+        while (iter2.hasNext()) keys2.add(iter2.next())
+        assertEquals(listOf("a", "c", "b", "d"), keys2)
+    }
+
+    @Test
+    fun `entri yang disegarkan lolos prune berikutnya`() {
+        // Entri tertua yang baru di-probe ulang tak boleh jadi korban
+        // eviksi pertama: sesudah disegarkan ia di ekor, jadi prune
+        // membuang entri kedua-tertua lebih dulu.
+        val cache = JSONObject()
+        repeat(ServerVideoDurations.MAX_ENTRIES + 2) { cache.put("token-$it", it.toLong()) }
+        ServerVideoDurations.putRefreshed(cache, "token-0", 999L)
+        val pruned = ServerVideoDurations.prune(cache)
+        assertEquals(ServerVideoDurations.TARGET_ENTRIES, pruned.length())
+        assertTrue(pruned.has("token-0"))
+        assertFalse(pruned.has("token-1"))
+        assertEquals(999L, pruned.optLong("token-0"))
+    }
+
+    @Test
     fun `keyFor memasang cap ubah pada token`() {
         // #417: cap berubah -> kunci berubah -> durasi lama tak terwarisi.
         // #441: ukuran ikut dikunci — cap sama tetapi ukuran beda
