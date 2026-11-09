@@ -2176,9 +2176,20 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             retryAttempts.remove(id)
+            // Jeda 1,5 dtk WAJIB didaftarkan sebagai token retry (issue
+            // #1372): cabang ini berjalan di dalam job attempt yang gagal,
+            // dan begitu handleFailure kembali, invokeOnCompletion langsung
+            // memanggil startQueued — tanpa token, item PENDING ini mulai
+            // seketika dan launch tertunda menjadi no-op. Pola generasi
+            // sama dengan retry biasa (#865): token hanya dicabut oleh
+            // jadwal yang mendaftarkannya.
+            val mirrorToken = retryTokenSeq.incrementAndGet()
+            pendingRetryTokens[id] = mirrorToken
             scope.launch {
                 delay(1_500)
-                if (_items.value.find { it.id == id }?.state == DownloadState.PENDING) {
+                if (pendingRetryTokens.remove(id, mirrorToken) &&
+                    _items.value.find { it.id == id }?.state == DownloadState.PENDING
+                ) {
                     attemptStart(id)
                 }
             }
