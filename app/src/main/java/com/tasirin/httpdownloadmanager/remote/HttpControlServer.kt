@@ -1088,62 +1088,35 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // jadi membacanya di luar kunci aman.
         val oldCache = synchronized(itemsCacheLock) { cachedItems }
         if (oldCache != null && oldCache.first == sig) return oldCache.second
-        // Build JSON sekali; untuk item yang sudah ada di cache lama, pertahankan
-        // JSONObject statis (url, fileName, addedAt) dan update hanya field dinamis.
-        val oldArr = oldCache?.second
+        // Satu jalur bangun untuk semua item (issue #1379): dua blok put()
+        // lama (reuse-cache vs dari-nol) menulis himpunan field yang sama
+        // persis — satu-satunya beda adalah addedAt yang di jalur reuse
+        // dibaca kembali dari objek cache. addedAt kini selalu langsung
+        // dari item (nilainya tak berubah seumur item), jadi blok ganda
+        // dan pembacaan cache per indeks tak diperlukan lagi.
         val arr = JSONArray()
-        items.forEachIndexed { idx, item ->
-            val cachedObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
-            if (cachedObj != null && cachedObj.optString("id") == item.id) {
-                // Bangun objek baru tanpa iterasi keys(): semua field dinamis
-                // ditulis ulang, hanya addedAt yang dipertahankan dari cache.
-                // Hemat iterator + get(k) per key pada poll 1-2x/detik; aman
-                // dari race karena cache lama tak pernah dimutasi in-place.
-                val oldObj = JSONObject()
-                oldObj.put("id", item.id)
-                oldObj.put("fileName", item.fileName)
-                oldObj.put("url", item.url)
-                oldObj.put("addedAt", cachedObj.optLong("addedAt", item.addedAt))
-                oldObj.put("state", item.state.name)
-                oldObj.put("bytesDownloaded", item.bytesDownloaded)
-                oldObj.put("totalBytes", item.totalBytes)
-                oldObj.put("progress", item.progressPercent)
-                oldObj.put("speedBps", item.speedBps)
-                oldObj.put("etaSeconds", item.etaSeconds)
-                oldObj.put("speedLimitKbps", item.speedLimitKbps)
-                oldObj.put("finishedAt", item.finishedAt)
-                oldObj.put("priority", item.priority)
-                oldObj.put("retryCount", item.retryCount)
-                oldObj.put("checksumVerified", item.checksumVerified)
-                oldObj.put("progressPercentOverride", item.progressPercentOverride)
-                // Objek baru tiap bangun ulang: tak ada error basi dari cache
-                // yang perlu dihapus — cukup tulis error bila masih ada.
-                if (item.error != null) {
-                    oldObj.put("error", item.error)
-                }
-                arr.put(oldObj)
-            } else {
-                // Item baru / order berubah — build dari nol
-                val o = JSONObject()
-                o.put("id", item.id)
-                o.put("fileName", item.fileName)
-                o.put("url", item.url)
-                o.put("state", item.state.name)
-                o.put("bytesDownloaded", item.bytesDownloaded)
-                o.put("totalBytes", item.totalBytes)
-                o.put("progress", item.progressPercent)
-                o.put("speedBps", item.speedBps)
-                o.put("etaSeconds", item.etaSeconds)
-                o.put("speedLimitKbps", item.speedLimitKbps)
-                o.put("priority", item.priority)
-                o.put("retryCount", item.retryCount)
-                o.put("checksumVerified", item.checksumVerified)
-                o.put("progressPercentOverride", item.progressPercentOverride)
-                o.put("addedAt", item.addedAt)
-                o.put("finishedAt", item.finishedAt)
-                item.error?.let { o.put("error", it) }
-                arr.put(o)
+        for (item in items) {
+            val o = JSONObject()
+            o.put("id", item.id)
+            o.put("fileName", item.fileName)
+            o.put("url", item.url)
+            o.put("addedAt", item.addedAt)
+            o.put("state", item.state.name)
+            o.put("bytesDownloaded", item.bytesDownloaded)
+            o.put("totalBytes", item.totalBytes)
+            o.put("progress", item.progressPercent)
+            o.put("speedBps", item.speedBps)
+            o.put("etaSeconds", item.etaSeconds)
+            o.put("speedLimitKbps", item.speedLimitKbps)
+            o.put("finishedAt", item.finishedAt)
+            o.put("priority", item.priority)
+            o.put("retryCount", item.retryCount)
+            o.put("checksumVerified", item.checksumVerified)
+            o.put("progressPercentOverride", item.progressPercentOverride)
+            if (item.error != null) {
+                o.put("error", item.error)
             }
+            arr.put(o)
         }
         // Simpan hanya bila cache belum bergerak ke signature lain selama
         // bangun (issue #1378): menimpa hasil thread lain yang lebih segar
