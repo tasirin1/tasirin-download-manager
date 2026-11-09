@@ -32,3 +32,4 @@ isPathAllowed
 isBrowseableAncestor
 setTextFolder
 saveFolder
+isMediaStorePathAllowed

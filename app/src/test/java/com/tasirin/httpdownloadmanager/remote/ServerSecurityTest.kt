@@ -227,8 +227,12 @@ class ServerSecurityTest {
         assertTrue(ServerSecurity.isPathAllowedFast(dalam, canonical))
         assertFalse(ServerSecurity.isPathAllowedFast(luar, canonical))
         // Cabang MediaStore (tanpa sentuh filesystem): segmen buruk ditolak.
+        // Wrapper List<File> dihapus pada issue #1387; yang diuji kini
+        // konsistensi jalur canonicalisasi Fast itu sendiri.
         assertEquals(
-            ServerSecurity.isMediaStorePathAllowed("Download/x.mp4", roots, false),
+            ServerSecurity.isMediaStorePathAllowedFast(
+                "Download/x.mp4", ServerSecurity.canonicalRootPaths(roots), false
+            ),
             ServerSecurity.isMediaStorePathAllowedFast("Download/x.mp4", canonical, false)
         )
         assertFalse(ServerSecurity.isMediaStorePathAllowedFast("a/../b", canonical, false))
@@ -536,12 +540,16 @@ class ServerSecurityTest {
     fun isMediaStorePathAllowed_hanya_diDalamRoot() {
         val root = tmp.newFolder("storage", "emulated", "0", "Download")
         val mediaRoot = tmp.root.resolve("storage/emulated/0").absolutePath
-        assertTrue(ServerSecurity.isMediaStorePathAllowed("Download/sub", listOf(root), false, mediaRoot))
-        assertFalse(ServerSecurity.isMediaStorePathAllowed("Movies/private.mp4", listOf(root), false, mediaRoot))
-        assertFalse(ServerSecurity.isMediaStorePathAllowed("", listOf(root), false, mediaRoot))
-        assertFalse(ServerSecurity.isMediaStorePathAllowed("../Rahasia", listOf(root), false, mediaRoot))
-        assertFalse(ServerSecurity.isMediaStorePathAllowed("Download//x", listOf(root), false, mediaRoot))
-        assertTrue(ServerSecurity.isMediaStorePathAllowed("Movies/private.mp4", listOf(root), true, mediaRoot))
+        // Varian Fast langsung (issue #1387): canonicalRootPaths adalah
+        // langkah yang sama yang dulu dijalankan wrapper yang dihapus,
+        // jadi nilai harapannya tak berubah.
+        val canonical = ServerSecurity.canonicalRootPaths(listOf(root))
+        assertTrue(ServerSecurity.isMediaStorePathAllowedFast("Download/sub", canonical, false, mediaRoot))
+        assertFalse(ServerSecurity.isMediaStorePathAllowedFast("Movies/private.mp4", canonical, false, mediaRoot))
+        assertFalse(ServerSecurity.isMediaStorePathAllowedFast("", canonical, false, mediaRoot))
+        assertFalse(ServerSecurity.isMediaStorePathAllowedFast("../Rahasia", canonical, false, mediaRoot))
+        assertFalse(ServerSecurity.isMediaStorePathAllowedFast("Download//x", canonical, false, mediaRoot))
+        assertTrue(ServerSecurity.isMediaStorePathAllowedFast("Movies/private.mp4", canonical, true, mediaRoot))
     }
 
     @Test

@@ -300,16 +300,11 @@ object ServerSecurity {
     }
 
     /** Path relatif MediaStore hanya boleh dipakai bila berada di bawah root
-     *  file yang sama; mode akses penuh tetap memvalidasi bentuk path. */
-    fun isMediaStorePathAllowed(
-        relativePath: String,
-        roots: List<File>,
-        fullAccess: Boolean,
-        mediaRoot: String = "/storage/emulated/0"
-    ): Boolean =
-        isMediaStorePathAllowedFast(relativePath, canonicalRootPaths(roots), fullAccess, mediaRoot)
-
-    /** Varian cepat isMediaStorePathAllowed (root sudah di-canonical). */
+     *  file yang sama; mode akses penuh tetap memvalidasi bentuk path.
+     *  Root diteruskan SUDAH di-canonical ([canonicalRootPaths]) agar
+     *  pemanggil berulang tak membayar canonicalize per panggilan — varian
+     *  List<File> yang mendelegasikan ke sini dihapus pada issue #1387
+     *  (tak ada pemanggil produksi; polanya sama dengan #1017). */
     fun isMediaStorePathAllowedFast(
         relativePath: String,
         canonicalRoots: List<String>,
