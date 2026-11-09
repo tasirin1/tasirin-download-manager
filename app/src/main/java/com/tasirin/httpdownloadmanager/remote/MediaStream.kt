@@ -20,7 +20,9 @@ internal fun streamMedia(
     total: Long,
     rangeHeader: String?,
     download: Boolean,
-    prepositioned: Boolean = false
+    prepositioned: Boolean = false,
+    parsedRange: Pair<Long, Long>? = null,
+    rangeParsed: Boolean = false
 ): NanoHTTPD.Response {
     val fallbackName = buildString {
         name.forEach { char ->
@@ -35,8 +37,18 @@ internal fun streamMedia(
     } else {
         "inline; filename=\"$fallbackName\"; filename*=UTF-8''$encodedName"
     }
-    // Parse sekali: pemanggilan ganda berarti regex matchEntire 2x per request.
-    val range = if (total > 0) parseRange(rangeHeader, total) else null
+    // Hasil parse pemanggil dipakai apa adanya bila sudah diparse
+    // (issue #1381: serveMedia mem-parse untuk memosisikan stream lalu
+    // meneruskannya ke sini — tanpa ini regex matchEntire berjalan 2x
+    // per request). rangeParsed=false (pemanggil lain) = parse di sini,
+    // perilaku lama persis. parsedRange null + rangeParsed true berarti
+    // "sudah diparse, hasilnya tak ada rentang" — jalur 416 di bawah
+    // tetap menilai header-nya sendiri.
+    val range = when {
+        rangeParsed -> parsedRange
+        total > 0 -> parseRange(rangeHeader, total)
+        else -> null
+    }
     if (range == null && total > 0 && rangeHeader != null && isSatisfiableRange(rangeHeader, total)) {
         runCatching { input.close() }
         return NanoHTTPD.newFixedLengthResponse(

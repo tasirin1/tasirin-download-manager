@@ -2718,7 +2718,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         total = total,
                         rangeHeader = rangeHeader,
                         download = download,
-                        prepositioned = true
+                        prepositioned = true,
+                        // Hasil parse di atas diteruskan (issue #1381):
+                        // streamMedia tak mem-parse ulang header yang sama.
+                        parsedRange = range,
+                        rangeParsed = true
                     )
                 } catch (e: Exception) {
                     runCatching { stream.close() }
@@ -2749,7 +2753,11 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         total = total,
                         rangeHeader = rangeHeader,
                         download = download,
-                        prepositioned = true
+                        prepositioned = true,
+                        // Hasil parse di atas diteruskan (issue #1381):
+                        // streamMedia tak mem-parse ulang header yang sama.
+                        parsedRange = range,
+                        rangeParsed = true
                     )
                 } catch (e: Exception) {
                     runCatching { stream.close() }
