@@ -137,7 +137,12 @@ object DownloadItemCodec {
                 error = o.optString("error").ifEmpty { null },
                 contentUri = o.optString("contentUri").ifEmpty { null },
                 filePath = o.optString("filePath").ifEmpty { null },
-                addedAt = o.optLong("addedAt", 0),
+                // Blob tanpa addedAt / bernilai tak positif (korup atau
+                // format lama) diganti waktu decode (issue #1391):
+                // default model adalah waktu pembuatan, jadi 0 di sini
+                // membuat item tampil berumur sejak epoch di UI/sortir.
+                addedAt = o.optLong("addedAt", 0).takeIf { it > 0 }
+                    ?: System.currentTimeMillis(),
                 finishedAt = o.optLong("finishedAt", 0),
                 nameIsCustom = o.optBoolean("nameIsCustom", false),
                 autoResume = o.optBoolean("autoResume", false),

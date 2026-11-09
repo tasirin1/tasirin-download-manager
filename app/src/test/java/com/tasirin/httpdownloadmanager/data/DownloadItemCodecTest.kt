@@ -187,7 +187,30 @@ class DownloadItemCodecTest {
         assertTrue(it.mirrors.isEmpty())
         assertTrue(it.segments.isEmpty())
         assertEquals(false, it.monitor)
-        assertEquals(0, it.addedAt)
+        // addedAt yang hilang tak lagi 0 sejak issue #1391 — diuji
+        // khusus di tes addedAt di bawah.
+    }
+
+    @Test
+    fun `decode - addedAt hilang atau tak positif diganti waktu sekarang`() {
+        // Issue #1391: default model adalah System.currentTimeMillis();
+        // codec lama mengembalikan 0 sehingga item tampil berumur
+        // sejak epoch.
+        val before = System.currentTimeMillis()
+        val missing = DownloadItemCodec.decode(
+            """[{"id":"1","url":"https://a/x","fileName":"x","state":"PAUSED"}]"""
+        )[0]
+        val negative = DownloadItemCodec.decode(
+            """[{"id":"1","url":"https://a/x","fileName":"x","state":"PAUSED","addedAt":-5}]"""
+        )[0]
+        val after = System.currentTimeMillis()
+        assertTrue(missing.addedAt in before..after)
+        assertTrue(negative.addedAt in before..after)
+        // Nilai positif yang sah dipertahankan apa adanya.
+        val kept = DownloadItemCodec.decode(
+            """[{"id":"1","url":"https://a/x","fileName":"x","state":"PAUSED","addedAt":12345}]"""
+        )[0]
+        assertEquals(12345L, kept.addedAt)
     }
 
     private fun decodeSegments(segmentsJson: String): List<DownloadSegment> {
