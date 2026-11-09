@@ -718,29 +718,46 @@ class DownloadEngine(appContext: Context) {
         clearSegProgress(id)
         jobs.remove(id)?.cancel()
         disconnectActive(id)
+        // Keputusan parkiran + penghapusan berkas diserialkan terhadap
+        // commitReplacement lewat monitor yang sama (issue #1377):
+        // commit menahan monitor dari pengambilan parkiran sampai
+        // pendahulu terhapus dari daftar, jadi di dalam blok ini vonis
+        // "parkiran tak ada" hanya punya dua arti yang bisa dibedakan —
+        // memang tak pernah ada parkiran (item masih di daftar), atau
+        // commit sudah selesai lebih dulu (item sudah dibuang commit
+        // dari daftar dan berkas di path bersama kini milik penerus
+        // terverifikasi). Keduanya menuntut perlakuan berbeda.
+        synchronized(pendingReplacements) {
+            // Penghapusan pendahulu yang penggantiannya sedang terparkir
+            // (issue #1287): berkas di path pendahulu saat ini milik PENERUS
+            // yang belum terverifikasi — menghapusnya di sini merusak
+            // finalisasi penerus (penerus COMPLETED menunjuk berkas hilang,
+            // atau rollback memulihkan berkas yang entri-nya sudah dibuang).
+            // Byte pendahulu yang sebenarnya adalah cadangan .replaced:
+            // hapus cadangan itu, lepas parkirannya (commit/rollback penerus
+            // menjadi no-op bersih), dan bersihkan sisanya lewat salinan
+            // tanpa filePath (pola commitReplacement) agar berkas terbit
+            // bersama + sidecar penerus tak tersentuh; parsial dan baris
+            // MediaStore pendahulu tetap terhapus.
+            val parkedKey = pendingReplacements.entries
+                .firstOrNull { it.value.predecessor.id == id }?.key
+            val parked = parkedKey?.let { pendingReplacements.remove(it) }
+            when {
+                parked != null -> {
+                    runCatching { parked.backup.delete() }
+                    parked.stale?.let { st -> runCatching { st.delete() } }
+                    fileSaver.deleteFiles(item.copy(filePath = null))
+                }
+                _items.value.none { it.id == id } -> {
+                    // Commit selesai lebih dulu (kasus kedua di atas):
+                    // bersihkan seperti jalur parkiran, tanpa filePath.
+                    fileSaver.deleteFiles(item.copy(filePath = null))
+                }
+                else -> fileSaver.deleteFiles(item)
+            }
+        }
         updateTransformed { daftar -> daftar.filterNot { it.id == id } }
         if (activeConns[id] == null) cancelledConns.remove(id)
-        // Penghapusan pendahulu yang penggantiannya sedang terparkir
-        // (issue #1287): berkas di path pendahulu saat ini milik PENERUS
-        // yang belum terverifikasi — menghapusnya di sini merusak
-        // finalisasi penerus (penerus COMPLETED menunjuk berkas hilang,
-        // atau rollback memulihkan berkas yang entri-nya sudah dibuang).
-        // Byte pendahulu yang sebenarnya adalah cadangan .replaced:
-        // hapus cadangan itu, lepas parkirannya (commit/rollback penerus
-        // menjadi no-op bersih), dan bersihkan sisanya lewat salinan
-        // tanpa filePath (pola commitReplacement) agar berkas terbit
-        // bersama + sidecar penerus tak tersentuh; parsial dan baris
-        // MediaStore pendahulu tetap terhapus.
-        val parkedKey = pendingReplacements.entries
-            .firstOrNull { it.value.predecessor.id == id }?.key
-        val parked = parkedKey?.let { pendingReplacements.remove(it) }
-        if (parked != null) {
-            runCatching { parked.backup.delete() }
-            parked.stale?.let { st -> runCatching { st.delete() } }
-            fileSaver.deleteFiles(item.copy(filePath = null))
-        } else {
-            fileSaver.deleteFiles(item)
-        }
         // Sama seperti cancel (issue #520): menghapus penerus monitor
         // menghidupkan lagi pemantauan pendahulu. Pause sengaja tidak
         // (penerus ter-pause + pendahulu hidup melahirkan penerus
@@ -1907,23 +1924,30 @@ class DownloadEngine(appContext: Context) {
 
     /** Verifikasi penerus lolos: pensiunkan pendahulu (#215). */
     private fun commitReplacement(successorId: String) {
-        val pending = pendingReplacements.remove(successorId) ?: return
-        val predecessor = pending.predecessor
-        runCatching { pending.backup.delete() }
-        pending.stale?.let { s -> runCatching { s.delete() } }
-        // Baris MediaStore pendahulu menunjuk path lama yang kini ditempati
-        // penerus; hapus HANYA baris URI-nya (filePath dikosongkan agar
-        // berkas penerus tidak ikut terhapus).
-        if (!predecessor.contentUri.isNullOrEmpty()) {
-            deletePublished(
-                FileSaver.PublishResult(
-                    contentUri = predecessor.contentUri,
-                    filePath = null,
-                    fileName = predecessor.fileName
+        // Monitor yang sama dengan keputusan parkiran di remove()
+        // (issue #1377): ditahan dari pengambilan parkiran sampai
+        // pendahulu terhapus dari daftar, agar remove() tak bisa menyela
+        // di tengah dan salah vonis "parkiran tak ada" lalu menghapus
+        // berkas penerus di path bersama.
+        synchronized(pendingReplacements) {
+            val pending = pendingReplacements.remove(successorId) ?: return
+            val predecessor = pending.predecessor
+            runCatching { pending.backup.delete() }
+            pending.stale?.let { s -> runCatching { s.delete() } }
+            // Baris MediaStore pendahulu menunjuk path lama yang kini ditempati
+            // penerus; hapus HANYA baris URI-nya (filePath dikosongkan agar
+            // berkas penerus tidak ikut terhapus).
+            if (!predecessor.contentUri.isNullOrEmpty()) {
+                deletePublished(
+                    FileSaver.PublishResult(
+                        contentUri = predecessor.contentUri,
+                        filePath = null,
+                        fileName = predecessor.fileName
+                    )
                 )
-            )
+            }
+            updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
         }
-        updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
     }
 
     /** Verifikasi penerus gagal: pulihkan berkas pendahulu (#215). */
