@@ -92,6 +92,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
     // "kepala daftar berisi item yang benar-benar baru" untuk auto-scroll
     // ke item terbaru (lihat submitRows).
     private var submittedIds: Set<String> = emptySet()
+    // Id kepala terakhir yang diserahkan: disimpan ke instance state
+    // (issue #1392) agar deteksi kepala-baru selamat dari rekreasi —
+    // tanpa ini submittedIds mulai kosong lagi, gerbang isNotEmpty di
+    // submitRows menelan kepala baru yang tiba selama activity hancur.
+    private var lastSubmittedHeadId: String? = null
     // Throttle submitList: emisi StateFlow tiap detik tidak perlu rebuild penuh
     // bila struktur daftar sama; toolbar teks hanya update saat hitungan berubah.
     private var lastUiSubmitMs = 0L
@@ -218,6 +223,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // (Rotasi sendiri kini tidak me-rekreasi MainActivity sama sekali
         // berkat configChanges di manifest; jalur ini untuk proses mati.)
         outState.putString(STATE_PENDING_MOVE_ID, pendingMoveId)
+        // Kepala terakhir untuk deteksi item-baru submitRows (issue #1392).
+        outState.putString(STATE_SUBMITTED_HEAD_ID, lastSubmittedHeadId)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -226,6 +233,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         setTheme(R.style.Theme_HttpDownloadManager)
         super.onCreate(savedInstanceState)
         pendingMoveId = savedInstanceState?.getString(STATE_PENDING_MOVE_ID)
+        // Pulihkan kepala terakhir sebagai himpunan awal submittedIds
+        // (issue #1392): kepala yang sama tak memicu lompatan, kepala
+        // berbeda (item tiba selama activity hancur) terdeteksi baru.
+        savedInstanceState?.getString(STATE_SUBMITTED_HEAD_ID)?.let { headId ->
+            lastSubmittedHeadId = headId
+            submittedIds = setOf(headId)
+        }
         try {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -1735,6 +1749,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             if (isNewHead) binding.recycler.scrollToPosition(0)
         }
         submittedIds = items.mapTo(HashSet()) { it.id }
+        lastSubmittedHeadId = head?.id
     }
 
     /** Hash murah field yang tampil di daftar. */
@@ -2093,6 +2108,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     companion object {
         private const val STATE_PENDING_MOVE_ID = "state_pending_move_id"
+        private const val STATE_SUBMITTED_HEAD_ID = "state_submitted_head_id"
         private val AUTO_OPEN_VIDEO_EXTS = setOf("mp4", "mkv", "webm", "ts", "avi", "mov", "flv")
         // Tak peka huruf pada skema (issue #1014): gerbang engine sendiri
         // menerima skema tak peka huruf, jadi URL tempelan HTTPS:// yang
