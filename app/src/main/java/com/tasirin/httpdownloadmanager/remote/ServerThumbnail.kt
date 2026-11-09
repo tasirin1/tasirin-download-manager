@@ -266,6 +266,20 @@ internal fun getOrCreateThumb(
                     }
                 }
             }
+            // Sumber u: TANPA cap yang terbaca tak boleh dipersist ke
+            // kunci path-saja (issue #1390): cap kosong berarti identitas
+            // isi tak diketahui, dan untuk u: tak ada penjaga inode
+            // seperti f: — JPEG yang tersimpan di bawah kunci itu akan
+            // tersaji walau isi di balik URI berganti, sampai pembersih
+            // disk membuangnya. Hasil generate tetap disajikan lewat
+            // berkas sekali-pakai unik (bukan kunci cache; jalur baca di
+            // atas tak pernah menemukannya, dan pembersih disk folder
+            // thumbs yang sama menyapunya seperti berkas cache lain).
+            val serveTarget = if (raw.startsWith("u:") && stamp.isEmpty()) {
+                File(dir, "$key.once-${System.nanoTime()}.jpg")
+            } else {
+                cached
+            }
             runCatching {
                 // Tulis via staging lalu rename: gagal di tengah tak boleh
                 // menyisakan file setengah jadi yang dikira cache valid.
@@ -276,9 +290,9 @@ internal fun getOrCreateThumb(
                             throw IOException("Thumbnail compress failed")
                         }
                     }
-                    if (!staging.renameTo(cached)) {
-                        runCatching { cached.delete() }
-                        if (!staging.renameTo(cached) || cached.length() <= 0) {
+                    if (!staging.renameTo(serveTarget)) {
+                        runCatching { serveTarget.delete() }
+                        if (!staging.renameTo(serveTarget) || serveTarget.length() <= 0) {
                             throw IOException("Thumbnail finalize failed")
                         }
                     }
@@ -286,9 +300,9 @@ internal fun getOrCreateThumb(
                     runCatching { bmp.recycle() }
                     if (staging.exists()) runCatching { staging.delete() }
                 }
-                cached
+                serveTarget
             }.getOrElse {
-                runCatching { cached.delete() }
+                runCatching { serveTarget.delete() }
                 null
             }
         }
