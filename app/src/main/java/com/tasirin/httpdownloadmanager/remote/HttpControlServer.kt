@@ -1080,11 +1080,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun itemsJson(): JSONArray {
         val items = App.engine.items.value
         val sig = itemsSignature(items)
-        synchronized(itemsCacheLock) {
-        cachedItems?.let { (cachedSig, json) -> if (cachedSig == sig) return json }
+        // Kunci hanya untuk membaca/menyimpan cache (issue #1378):
+        // pembangunan JSONArray di bawah berjalan DI LUAR kunci — menahan
+        // kunci selama seluruh bangun menyeret semua thread server lain
+        // yang butuh cache (poll snapshot 1-2x/detik) di belakang satu
+        // bangun penuh. Objek cache lama tak pernah dimutasi in-place,
+        // jadi membacanya di luar kunci aman.
+        val oldCache = synchronized(itemsCacheLock) { cachedItems }
+        if (oldCache != null && oldCache.first == sig) return oldCache.second
         // Build JSON sekali; untuk item yang sudah ada di cache lama, pertahankan
         // JSONObject statis (url, fileName, addedAt) dan update hanya field dinamis.
-        val oldArr = cachedItems?.second
+        val oldArr = oldCache?.second
         val arr = JSONArray()
         items.forEachIndexed { idx, item ->
             val cachedObj = if (idx < (oldArr?.length() ?: 0)) oldArr?.optJSONObject(idx) else null
@@ -1139,9 +1145,17 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 arr.put(o)
             }
         }
-        cachedItems = sig to arr
-        return arr
+        // Simpan hanya bila cache belum bergerak ke signature lain selama
+        // bangun (issue #1378): menimpa hasil thread lain yang lebih segar
+        // dengan snapshot ini membuat cache mundur. Hasil bangun tetap
+        // dikembalikan — isinya konsisten dengan signature snapshot ini.
+        synchronized(itemsCacheLock) {
+            val currentSig = cachedItems?.first
+            if (currentSig == null || currentSig == oldCache?.first) {
+                cachedItems = sig to arr
+            }
         }
+        return arr
     }
 
     private fun addDownload(session: IHTTPSession): Response {
