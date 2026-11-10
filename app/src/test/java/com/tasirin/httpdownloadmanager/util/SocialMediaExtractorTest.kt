@@ -945,7 +945,8 @@ class SocialMediaExtractorTest {
             options[0].directUrl
         )
         assertEquals("HD", options[0].quality)
-        assertEquals("Facebook_1020806507787076.mp4", options[0].fileName)
+        // Nama memuat label kualitas sejak issue #1523.
+        assertEquals("Facebook_1020806507787076_HD.mp4", options[0].fileName)
         assertEquals("c_user=1", options[0].cookies)
         // Unescape SD tetap terverifikasi lewat halaman SD-saja.
         // Pad dibuat cukup panjang agar halaman lolos penjaga produksi
@@ -960,11 +961,73 @@ class SocialMediaExtractorTest {
             sdOptions[0].directUrl
         )
         assertEquals("SD", sdOptions[0].quality)
+        assertEquals("Facebook_1020806507787076_SD.mp4", sdOptions[0].fileName)
         // Halaman hanya berisi redirect lookaside = tidak ada media sah.
         val lookasideOnly = """{"u":"https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1020806507787076","pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
         assertTrue(SocialMediaExtractor.parseFacebookPage(lookasideOnly, "1", "").isEmpty())
         // Halaman terlalu pendek ditolak.
         assertTrue(SocialMediaExtractor.parseFacebookPage("{}", "1", "").isEmpty())
+    }
+
+    @Test
+    fun `numberFileNameCollisions - nama pertama utuh, tabrakan bernomor sebelum ekstensi`() {
+        // Nilai harapan dibuktikan port Python 1:1
+        // (audit-dm-r19/port_number_collisions.py, 11 kasus cocok).
+        assertEquals(emptyList<String>(), SocialMediaExtractor.numberFileNameCollisions(emptyList()))
+        assertEquals(
+            listOf("a.mp4"),
+            SocialMediaExtractor.numberFileNameCollisions(listOf("a.mp4"))
+        )
+        assertEquals(
+            listOf("a.mp4", "a-2.mp4", "a-3.mp4"),
+            SocialMediaExtractor.numberFileNameCollisions(listOf("a.mp4", "a.mp4", "a.mp4"))
+        )
+        assertEquals(
+            listOf("a.mp4", "b.mp4", "a-2.mp4"),
+            SocialMediaExtractor.numberFileNameCollisions(listOf("a.mp4", "b.mp4", "a.mp4"))
+        )
+        assertEquals(
+            listOf("Judul_1080p.mp4", "Judul_1080p-2.mp4"),
+            SocialMediaExtractor.numberFileNameCollisions(
+                listOf("Judul_1080p.mp4", "Judul_1080p.mp4")
+            )
+        )
+        assertEquals(
+            listOf("tanpa ekstensi", "tanpa ekstensi-2"),
+            SocialMediaExtractor.numberFileNameCollisions(
+                listOf("tanpa ekstensi", "tanpa ekstensi")
+            )
+        )
+        assertEquals(
+            listOf(".mp4", ".mp4-2"),
+            SocialMediaExtractor.numberFileNameCollisions(listOf(".mp4", ".mp4"))
+        )
+        assertEquals(
+            listOf("a.b.mp4", "a.b-2.mp4"),
+            SocialMediaExtractor.numberFileNameCollisions(listOf("a.b.mp4", "a.b.mp4"))
+        )
+        // Peka huruf: nama berbeda kapital dianggap nama berbeda.
+        assertEquals(
+            listOf("A.mp4", "a.mp4"),
+            SocialMediaExtractor.numberFileNameCollisions(listOf("A.mp4", "a.mp4"))
+        )
+    }
+
+    @Test
+    fun `parseFacebookPage - banyak opsi sekualitas bernama berlabel dan bernomor`() {
+        // Dua URL HD berbeda dari lintasan hd_src yang sama (issue
+        // #1523): label sama -> nama kedua diberi nomor tabrakan.
+        val html = """{"a":{"hd_src":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/hd1.mp4?_nc_cat=108\u0026oe=66F0"},"b":{"hd_src":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/hd2.mp4?_nc_cat=109\u0026oe=66F1"},"pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
+        val options = SocialMediaExtractor.parseFacebookPage(html, "123", "")
+        assertEquals(2, options.size)
+        assertEquals("Facebook_123_HD.mp4", options[0].fileName)
+        assertEquals("Facebook_123_HD-2.mp4", options[1].fileName)
+        // Dua URL SD dari dua lintasan SD berbeda juga bernomor.
+        val sdHtml = """{"a":{"sd_src":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/sd1.mp4?_nc_cat=108\u0026oe=66F0"},"b":{"browser_native_sd_url":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/sd2.mp4?_nc_cat=109\u0026oe=66F1"},"pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
+        val sdOptions = SocialMediaExtractor.parseFacebookPage(sdHtml, "123", "")
+        assertEquals(2, sdOptions.size)
+        assertEquals("Facebook_123_SD.mp4", sdOptions[0].fileName)
+        assertEquals("Facebook_123_SD-2.mp4", sdOptions[1].fileName)
     }
 
     @Test

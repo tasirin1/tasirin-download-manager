@@ -1038,6 +1038,31 @@ object SocialMediaExtractor {
         return if (tag.isEmpty()) "$safeName.$ext" else "${safeName}_$tag.$ext"
     }
 
+    /** Penomoran tabrakan nama berkas di dalam SATU daftar opsi
+     *  (murni, pola #1491; dipakai Facebook #1523 dan YouTube #1524):
+     *  nama pertama dipertahankan apa adanya; kemunculan ke-2 dst dari
+     *  nama yang sama persis diberi akhiran "-2"/"-3" SEBELUM ekstensi
+     *  ("Judul_1080p.mp4" -> "Judul_1080p-2.mp4"). Nama tanpa ekstensi
+     *  (tak ada titik, atau titik hanya di awal) diberi akhiran di
+     *  ujung. Urutan dan panjang daftar dipertahankan. */
+    internal fun numberFileNameCollisions(names: List<String>): List<String> {
+        val used = mutableMapOf<String, Int>()
+        return names.map { name ->
+            val n = (used[name] ?: 0) + 1
+            used[name] = n
+            if (n == 1) {
+                name
+            } else {
+                val dot = name.lastIndexOf('.')
+                if (dot > 0) {
+                    name.substring(0, dot) + "-" + n + name.substring(dot)
+                } else {
+                    "$name-$n"
+                }
+            }
+        }
+    }
+
     /** Hasil mentah player VISIONOS: data streaming terparse + judul
      *  + cookie halaman sumber (untuk ditempel ke Result pemanggil). */
     private data class VisionosPlayer(
@@ -2618,8 +2643,20 @@ object SocialMediaExtractor {
                 found.putIfAbsent(mediaUrl, q)
             }
         }
-        return found.map { (mediaUrl, quality) ->
-            Result(mediaUrl, "Facebook_$videoId.mp4", "Facebook $videoId", quality, MIME_MP4, cookies)
+        // Nama berkas memuat label kualitas + penomoran tabrakan
+        // (issue #1523): dulu SEMUA opsi bernama persis sama
+        // "Facebook_<id>.mp4" walau kualitasnya berbeda, sehingga
+        // unduhan multi-opsi dari video yang sama tak terbedakan.
+        // Tag dari qualityFileTag (label "" -> tanpa akhiran, persis
+        // nama lama); nama yang masih sama dalam daftar ini diberi
+        // nomor -2/-3 oleh numberFileNameCollisions (pola #1491).
+        val baseNames = found.map { (_, quality) ->
+            val tag = qualityFileTag(quality)
+            if (tag.isEmpty()) "Facebook_$videoId.mp4" else "Facebook_${videoId}_$tag.mp4"
+        }
+        val names = numberFileNameCollisions(baseNames)
+        return found.entries.mapIndexed { i, (mediaUrl, quality) ->
+            Result(mediaUrl, names[i], "Facebook $videoId", quality, MIME_MP4, cookies)
         }
     }
 
