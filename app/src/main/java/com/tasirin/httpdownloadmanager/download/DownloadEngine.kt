@@ -990,6 +990,47 @@ class DownloadEngine(appContext: Context) {
         throw IOException("Too many redirects")
     }
 
+    /** Buka koneksi attempt dari URL efektif tangkapan probe (issue
+     *  #1446): [startUrl] adalah URL final rantai redirect [anchorUrl]
+     *  yang baru saja dibuktikan koneksi pertama attempt ini. Jangkar
+     *  autentikasi tetap [anchorUrl] agar gerbang kredensial beda-origin
+     *  (issue #340) menilai persis seperti penelusuran dari URL item —
+     *  melompat langsung ke hop terakhir tidak boleh melebarkan siapa
+     *  yang menerima kredensial. Bila membuka dari [startUrl] gagal
+     *  (mis. signed URL kedaluwarsa di antara probe dan koneksi ini),
+     *  jatuh kembali ke [anchorUrl] dan telusuri ulang rantainya utuh
+     *  seperti sebelum #1446. */
+    private fun openAttemptConnection(
+        startUrl: String,
+        anchorUrl: String,
+        method: String,
+        username: String,
+        password: String,
+        headers: String,
+        presetRange: Long? = null,
+        configure: (HttpURLConnection, String, String) -> Unit = { _, _, _ -> }
+    ): HttpURLConnection {
+        if (startUrl == anchorUrl) {
+            return openAuthenticatedConnection(
+                startUrl, method, username, password, headers, presetRange,
+                configure = configure
+            )
+        }
+        return try {
+            openAuthenticatedConnection(
+                startUrl, method, username, password, headers, presetRange,
+                authAnchorUrl = anchorUrl, configure = configure
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            openAuthenticatedConnection(
+                anchorUrl, method, username, password, headers, presetRange,
+                configure = configure
+            )
+        }
+    }
+
     /** [keepAutoResume] untuk jeda paksa SISTEM (issue #1218): jeda
      *  inten pengguna mencabut autoResume (semantik jeda permanen),
      *  tetapi timeout FGS bukan inten pengguna — item harus lanjut
@@ -2410,6 +2451,11 @@ class DownloadEngine(appContext: Context) {
         // Hasil HEAD blok segmen disimpan untuk dipakai ulang jalur segar
         // (issue #1373): diisi hanya bila probe segmen menjawab 2xx.
         var segFreshHeaders: ServerHeaders? = null
+        // URL efektif rantai redirect item.url pada attempt ini (issue
+        // #1446): ditangkap koneksi pertama yang berhasil (probe), lalu
+        // dipakai ulang koneksi berikutnya — rantai yang sama tidak
+        // ditelusuri ulang oleh tiap segmen / koneksi tunggal.
+        var capturedAttemptUrl: String? = null
         var segFreshTotal = -1L
         var segFreshRanges = false
         if (item.segments.isNotEmpty()) {
@@ -2425,6 +2471,7 @@ class DownloadEngine(appContext: Context) {
             var segHeaders: ServerHeaders? = null
             try {
                 if (segProbe.responseCode in 200..299) {
+                    capturedAttemptUrl = segProbe.url?.toString()
                     val h = headersOf(segProbe)
                     segHeaders = h
                     captureHeaderChecksum(item, segProbe)
@@ -2447,7 +2494,10 @@ class DownloadEngine(appContext: Context) {
             if (currentSeg.segments.isNotEmpty()) {
                 // segHeaders diteruskan agar etag hasil probe tidak
                 // terhapus lagi oleh penulisan penyelesaian runSegmented.
-                runSegmented(currentSeg, saver, throttle, currentSeg.totalBytes, segHeaders)
+                runSegmented(
+                    currentSeg, saver, throttle, currentSeg.totalBytes, segHeaders,
+                    capturedAttemptUrl
+                )
                 return
             }
             // Resource berubah dan segmen sudah dibatalkan oleh
@@ -2480,6 +2530,7 @@ class DownloadEngine(appContext: Context) {
             try {
                 val code = probe.responseCode
                 if (code in 200..299) {
+                    capturedAttemptUrl = probe.url?.toString()
                     captureHeaderChecksum(item, probe)
                     probeHeaders = headersOf(probe)
                     freshTotal = contentLength(probe)
@@ -2540,7 +2591,7 @@ class DownloadEngine(appContext: Context) {
             // runSegmented akan melewatkan cabang pembuatan segmen
             // (satu-satunya penulis totalBytes) dan verifySize jadi buta.
             val freshItem = _items.value.find { it.id == item.id } ?: item
-            runSegmented(freshItem, saver, throttle, segmentedTotal, probeHeaders)
+            runSegmented(freshItem, saver, throttle, segmentedTotal, probeHeaders, capturedAttemptUrl)
             return
         }
 
@@ -2563,8 +2614,10 @@ class DownloadEngine(appContext: Context) {
             )
             return
         }
-        val conn = openAuthenticatedConnection(
-            item.url, method = if (item.method == "POST") "POST" else "GET",
+        val conn = openAttemptConnection(
+            attemptConnectionUrl(item.url, item.url, capturedAttemptUrl),
+            anchorUrl = item.url,
+            method = if (item.method == "POST") "POST" else "GET",
             username = item.username,
             password = item.password,
             headers = item.headers,
@@ -3462,7 +3515,8 @@ class DownloadEngine(appContext: Context) {
         saver: FileSaver,
         throttle: SpeedThrottle,
         total: Long,
-        headers: ServerHeaders?
+        headers: ServerHeaders?,
+        capturedAttemptUrl: String? = null
     ) {
         coroutineContext.ensureActive()
         var fileName = item.fileName
@@ -3514,7 +3568,10 @@ class DownloadEngine(appContext: Context) {
             coroutineScope {
                 segments.forEach { seg ->
                     launch {
-                        downloadSegment(item.id, fileName, seg, saver, throttle)
+                        downloadSegment(
+                            item.id, fileName, seg, saver, throttle,
+                            item.url, capturedAttemptUrl
+                        )
                     }
                 }
             }
@@ -3580,8 +3637,10 @@ class DownloadEngine(appContext: Context) {
                 // utama). openConn mentah mengikuti redirect otomatis sistem
                 // dan mengirim ulang Authorization/Cookie ke host asing.
                 // UA/Accept/Referer/YouTube-Instagram sudah dipasang di dalam.
-                val fallbackConn = openAuthenticatedConnection(
-                    item.url, method = "GET",
+                val fallbackConn = openAttemptConnection(
+                    attemptConnectionUrl(item.url, item.url, capturedAttemptUrl),
+                    anchorUrl = item.url,
+                    method = "GET",
                     username = item.username, password = item.password, headers = item.headers
                 )
                 try {
@@ -3696,7 +3755,9 @@ class DownloadEngine(appContext: Context) {
         fileName: String,
         segment: DownloadSegment,
         saver: FileSaver,
-        throttle: SpeedThrottle
+        throttle: SpeedThrottle,
+        attemptOriginUrl: String,
+        capturedAttemptUrl: String?
     ) {
         val item = _items.value.find { it.id == id } ?: return
         val partial = saver.partialFile(fileName)
@@ -3733,8 +3794,16 @@ class DownloadEngine(appContext: Context) {
             return
         }
         coroutineContext.ensureActive()
-        val conn = openAuthenticatedConnection(
-            item.url, method = "GET",
+        // URL efektif tangkapan probe attempt (issue #1446): dipakai
+        // hanya bila URL item belum berubah sejak awal attempt. Jangkar
+        // autentikasi mengikuti URL awal koneksi: tangkapan dinilai
+        // terhadap origin attempt; URL item yang sudah berganti memakai
+        // jangkar dirinya sendiri seperti sebelum #1446.
+        val segStartUrl = attemptConnectionUrl(item.url, attemptOriginUrl, capturedAttemptUrl)
+        val conn = openAttemptConnection(
+            segStartUrl,
+            anchorUrl = if (segStartUrl == capturedAttemptUrl) attemptOriginUrl else segStartUrl,
+            method = "GET",
             username = item.username,
             password = item.password,
             headers = item.headers
@@ -4707,6 +4776,24 @@ internal fun muxMergePercent(copiedBytes: Long, totalBytes: Long, startPercent: 
     val copied = copiedBytes.coerceIn(0L, totalBytes)
     return start + safeMulDiv(copied, (99 - start).toLong(), totalBytes).toInt()
 }
+
+/** URL koneksi untuk attempt berjalan (issue #1446): URL efektif hasil
+ *  redirect yang ditangkap koneksi pertama attempt (probe) dipakai ulang
+ *  koneksi-koneksi berikutnya pada attempt yang sama, supaya rantai
+ *  redirect yang sama tidak dipecahkan ulang oleh probe + tiap segmen +
+ *  tiap retry. Tangkapan hanya berlaku selama URL item belum berubah
+ *  sejak awal attempt ([currentItemUrl] masih sama dengan
+ *  [attemptOriginUrl]) — URL item yang diganti di tengah attempt (mis.
+ *  re-extract URL segar) membuat tangkapan basi dan harus dibuang.
+ *  Murni agar bisa di-unit-test; nilai harapan dibuktikan port Python
+ *  1:1 (audit-dm-r15/port-1446.py). */
+internal fun attemptConnectionUrl(
+    currentItemUrl: String,
+    attemptOriginUrl: String,
+    capturedUrl: String?
+): String =
+    if (!capturedUrl.isNullOrEmpty() && currentItemUrl == attemptOriginUrl) capturedUrl
+    else currentItemUrl
 
 /** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
  *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able
