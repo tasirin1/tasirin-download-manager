@@ -2376,7 +2376,7 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
         }
         val key = "tokens:" + sortedTokens.joinToString(",") + "|s:" + tokenStamp
-        val (input, total) = openZipStream(key) {
+        val (input, total, zipCreated) = openZipStream(key) {
             val created = createTempZip { zos ->
                 val r = ZipCreator.zipTokens(zos, tokens, context, ::isFsPathAllowed, ::isMediaUriAllowed)
                 // Hitungan ditulis DI DALAM lambda pembuat (issue
@@ -2399,7 +2399,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         val counts = zipWrittenCounts[key]
         val written = counts?.first ?: tokens.size
         val skippedInZip = counts?.second ?: (tokens.size - written)
-        appendLog("ZIP MEDIA: $written file (${Formats.bytes(total)})")
+        // Log hanya saat ZIP benar-benar dibuat request ini (issue
+        // #1416, pola #1384 di fsZip): cache hit dan tiap sub-request
+        // Range dulu ikut mencatat baris yang sama berulang kali.
+        if (zipCreated) {
+            appendLog("ZIP MEDIA: $written file (${Formats.bytes(total)})")
+        }
         val response = streamMedia(
             name = "gallery-$written-files.zip",
             mime = "application/zip",
