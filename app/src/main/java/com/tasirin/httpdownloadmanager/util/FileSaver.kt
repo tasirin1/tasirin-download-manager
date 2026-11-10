@@ -747,7 +747,13 @@ class FileSaver(context: Context) {
         return null
     }
 
-    fun cleanupOrphanPartials(items: List<DownloadItem>): Long {
+    /** Sapu berkas parsial/staging yatim. [includeExternalDirs] = false
+     *  membatasi sapuan ke folder staging internal saja (issue #1445):
+     *  fan-out listFiles folder tujuan luar (Download publik, folder
+     *  teks, folder induk item) dan traversal pohon SAF dilewati —
+     *  pemanggil start dingin menjadwalkan sapuan penuh terpisah
+     *  sesudah start reda. */
+    fun cleanupOrphanPartials(items: List<DownloadItem>, includeExternalDirs: Boolean = true): Long {
         var freed = 0L
         var deletedInternal = false
         // Baris MediaStore pending yatim milik sendiri (issue #734) disapu
@@ -841,7 +847,7 @@ class FileSaver(context: Context) {
             // tertinggal daripada menghapus staging yang sedang hidup.
             // Tujuan move() sekali-pakai tak tersimpan URI-nya, jadi di
             // luar jangkauan sapuan ini (batas yang disadari).
-            customFolderUri()?.let { uri ->
+            if (includeExternalDirs) customFolderUri()?.let { uri ->
                 runCatching {
                     val tree = DocumentFile.fromTreeUri(appContext, uri)
                     if (tree != null) {
@@ -899,7 +905,7 @@ class FileSaver(context: Context) {
                 }
             }
             val downloadCanon = runCatching { downloadDir.canonicalFile }.getOrNull()
-            namesByDir.forEach { (dir, dirNames) ->
+            if (includeExternalDirs) namesByDir.forEach { (dir, dirNames) ->
                 if (!dir.isDirectory) return@forEach
                 if (downloadCanon != null &&
                     runCatching { dir.canonicalFile }.getOrNull() == downloadCanon

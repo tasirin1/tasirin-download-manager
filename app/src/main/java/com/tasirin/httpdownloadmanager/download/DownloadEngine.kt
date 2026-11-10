@@ -60,6 +60,7 @@ import java.util.Locale
 import java.util.UUID
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 import java.net.HttpCookie
@@ -1241,7 +1242,26 @@ class DownloadEngine(appContext: Context) {
             App.logEvent("ORPHAN CLEANUP SKIPPED: stored queue unreadable, keeping partial files")
             return
         }
-        fileSaver.cleanupOrphanPartials(_items.value)
+        // Start dingin hanya menyapu folder staging internal (issue
+        // #1445): listFiles folder Download pengguna + folder induk item
+        // dan traversal pohon SAF ditunda ke sapuan terjadwal di bawah.
+        fileSaver.cleanupOrphanPartials(_items.value, includeExternalDirs = false)
+        scheduleDeferredExternalSweep()
+    }
+
+    private val externalSweepScheduled = AtomicBoolean(false)
+
+    /** Sapuan folder luar tertunda (issue #1445), sekali per proses:
+     *  staging publish yatim di folder tujuan luar + pohon SAF tetap
+     *  dibersihkan — hanya tidak di jalur start dingin. Sapuan tekanan
+     *  storage (StorageCleanup) tetap menjalankan sapuan penuh seketika
+     *  seperti sebelumnya. */
+    private fun scheduleDeferredExternalSweep() {
+        if (!externalSweepScheduled.compareAndSet(false, true)) return
+        scope.launch {
+            delay(EXTERNAL_SWEEP_DELAY_MS)
+            runCatching { fileSaver.cleanupOrphanPartials(_items.value) }
+        }
     }
 
     fun freeSpaceBytes(): Long = fileSaver.destinationFreeBytes()
@@ -4392,6 +4412,7 @@ class DownloadEngine(appContext: Context) {
         private const val MIN_FREE_BYTES = 2L * 1024 * 1024
         private const val SAVE_DEBOUNCE_MS = 400L
         private const val PROGRESS_SAVE_INTERVAL_MS = 2_000L
+        private const val EXTERNAL_SWEEP_DELAY_MS = 60_000L
         private val CHECKSUM_HEADER_NAMES = listOf(
             "Digest", "X-Checksum-Sha256", "X-Checksum-Sha1",
             "X-Checksum-MD5", "Content-MD5"
