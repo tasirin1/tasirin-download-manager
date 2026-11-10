@@ -24,7 +24,6 @@ import java.util.Locale
 import android.view.View
 import androidx.core.view.isVisible
 import com.tasirin.httpdownloadmanager.download.DownloadService
-import com.tasirin.httpdownloadmanager.download.HlsRendition
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -555,8 +554,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val socialQualitySpinner = view.findViewById<Spinner>(R.id.spinner_social_quality)
         val socialCarouselSection = view.findViewById<View>(R.id.social_carousel_section)
         val socialCarouselSpinner = view.findViewById<Spinner>(R.id.spinner_social_carousel)
-        val socialAudioSection = view.findViewById<View>(R.id.social_audio_section)
-        val socialAudioSpinner = view.findViewById<Spinner>(R.id.spinner_social_audio)
         val speedKbps = SpeedOptions.SPEED_KBPS
         val spinnerSpeedPer = view.findViewById<Spinner>(R.id.spinner_speed_limit_per)
         setupSpinner(
@@ -608,7 +605,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // pilihan sosial hanya boleh dihormati submitDownload bila
         // pemiliknya sama dengan URL yang tertulis di field saat itu.
         var socialProbedUrl: String = ""
-        var socialAudioLanguages: List<HlsRendition> = emptyList()
         var socialJob: Job? = null
         var socialDebounce: Job? = null
         fun platformLabelFrom(url: String): String {
@@ -661,8 +657,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialVideoOptions = emptyList()
                 socialPhotoOptions = emptyList()
                 socialYoutubeHeights = intArrayOf()
-                socialAudioLanguages = emptyList()
-                socialAudioSection.isVisible = false
                 socialQualitySection.isVisible = false
                 socialCarouselSection.isVisible = false
                 platformBadge.isVisible = false
@@ -677,8 +671,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialVideoOptions = emptyList()
                 socialPhotoOptions = emptyList()
                 socialYoutubeHeights = intArrayOf()
-                socialAudioLanguages = emptyList()
-                socialAudioSection.isVisible = false
                 socialQualitySection.isVisible = false
                 socialCarouselSection.isVisible = false
                 platformBadge.isVisible = false
@@ -695,8 +687,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialVideoOptions = emptyList()
                 socialPhotoOptions = emptyList()
                 socialYoutubeHeights = intArrayOf()
-                socialAudioLanguages = emptyList()
-                socialAudioSection.isVisible = false
                 socialQualitySection.isVisible = false
                 socialCarouselSection.isVisible = false
                 return
@@ -716,48 +706,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 setupSpinner(this@MainActivity, socialQualitySpinner, labels)
                 socialQualitySection.isVisible = true
                 socialCarouselSection.isVisible = false
-                // Probe bahasa audio dari manifest HLS (background, tidak memblokir):
-                // spinner kualitas langsung tampil, audio terisi saat siap.
-                socialAudioLanguages = emptyList()
-                socialAudioSection.isVisible = false
-                socialJob = lifecycleScope.launch {
-                    val probeTarget = target
-                    // Ambil Result utuh: cookie dari ekstraksi wajib diteruskan ke
-                    // probe manifest (URL VISIONOS sering butuh cookie).
-                    val master = withContext(Dispatchers.IO) {
-                        runCatching { SocialMediaExtractor.extract(target) }
-                            .getOrNull()
-                            ?.takeIf { it.isHls && it.directUrl.isNotBlank() }
-                    }
-                    val probeHeaders = master?.cookies
-                        ?.takeIf { it.isNotBlank() }
-                        ?.let { "Cookie: $it" }
-                        .orEmpty()
-                    val langs = if (master != null) {
-                        withContext(Dispatchers.IO) {
-                            App.engine.probeHlsAudioLanguages(master.directUrl, probeHeaders)
-                        }
-                    } else emptyList()
-                    // Hasil basi dari probe URL lama dibuang bila URL sudah berubah
-                    // (socialJob menunjuk job terbaru; job lama di-cancel).
-                    if (socialJob !== coroutineContext[Job] ||
-                        extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull() != probeTarget
-                    ) return@launch
-                    socialAudioLanguages = langs
-                    if (langs.isNotEmpty()) {
-                        val audioLabels = listOf(getString(R.string.social_audio_auto)) +
-                            langs.map { r ->
-                                buildString {
-                                    append(r.language.ifEmpty { "?" })
-                                    if (r.name.isNotBlank()) append(" — ").append(r.name)
-                                }
-                            }
-                        setupSpinner(this@MainActivity, socialAudioSpinner, audioLabels)
-                        socialAudioSection.isVisible = true
-                    } else {
-                        socialAudioSection.isVisible = false
-                    }
-                }
+                socialJob = null
                 return
             }
             socialYoutubeHeights = intArrayOf()
@@ -772,13 +721,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             socialProbedUrl = ""
             socialQualitySection.isVisible = false
             socialCarouselSection.isVisible = false
-            // Audio ikut dibersihkan (issue #508): audio hanya milik
-            // YouTube; tanpa ini section bahasa audio basi dari video
-            // YouTube sebelumnya tetap tampil untuk URL non-YouTube
-            // (jalur datanya memang sudah aman oleh gerbang #502,
-            // tampilannya yang membingungkan).
-            socialAudioLanguages = emptyList()
-            socialAudioSection.isVisible = false
             socialJob = lifecycleScope.launch {
                 val probeTarget = target
                 val options = withContext(Dispatchers.IO) {
@@ -790,7 +732,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialOptions = options
                 socialProbedUrl = probeTarget
                 // Pisahkan opsi video dan foto
-                socialVideoOptions = options.filter { it.mimeType.startsWith("video") || it.isHls }
+                socialVideoOptions = options.filter { it.mimeType.startsWith("video") }
                 socialPhotoOptions = options.filter { it.mimeType.startsWith("image") }
                 val hasVideo = socialVideoOptions.isNotEmpty()
                 val hasPhotos = socialPhotoOptions.isNotEmpty()
@@ -864,7 +806,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         fun addYoutubeWithHeight(
             urls: List<String>,
             height: Int,
-            audioLang: String,
             name: String,
             username: String,
             password: String,
@@ -885,8 +826,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     priority = priority,
                     checksum = if (index == 0) checksum else "",
                     mirrors = if (index == 0) mirrors else emptyList(),
-                    preferredHeight = height,
-                    preferredAudioLang = audioLang
+                    preferredHeight = height
                 )
             }
         }
@@ -1025,8 +965,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     socialVideoOptions = emptyList()
                     socialPhotoOptions = emptyList()
                     socialYoutubeHeights = intArrayOf()
-                    socialAudioLanguages = emptyList()
-                    socialAudioSection.isVisible = false
                     socialQualitySection.isVisible = false
                     socialCarouselSection.isVisible = false
                     platformBadge.isVisible = false
@@ -1101,13 +1039,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialYoutubeHeights.isNotEmpty() &&
                 socialSel in 1..socialYoutubeHeights.size
             ) socialYoutubeHeights[socialSel - 1] else 0
-            val audioSel = socialAudioSpinner.selectedItemPosition
-            val selectedAudioLang = if (
-                socialMilikUrlIni &&
-                socialAudioSection.isVisible &&
-                socialAudioLanguages.isNotEmpty() &&
-                audioSel in 1..socialAudioLanguages.size
-            ) socialAudioLanguages[audioSel - 1].language else ""
             val carouselSel = socialCarouselSpinner.selectedItemPosition
             // Pilihan video eksplisit menang atas default "All": tanpa ini,
             // konten campuran (video + foto) selalu mengunduh foto saja dan
@@ -1138,7 +1069,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 addYoutubeWithHeight(
                     urls = urls,
                     height = selectedYtHeight,
-                    audioLang = selectedAudioLang,
                     name = name,
                     username = username,
                     password = password,
@@ -1180,37 +1110,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                     checksum = checksum,
                     mirrors = parseMirrors()
                 )
-            } else if (urls.size == 1 && urls[0].contains("m3u8", ignoreCase = true)) {
-                lifecycleScope.launch {
-                    val variants = withContext(Dispatchers.IO) {
-                        runCatching {
-                            App.engine.probeHlsVariants(urls[0], username, password, headers)
-                        }.getOrNull()
-                    }
-                    if (variants.isNullOrEmpty()) {
-                        addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
-                    } else {
-                        // Penjaga umur activity (pola #300, issue #343):
-                        // probe jaringan di atas bisa berdetik-detik dan
-                        // pengguna bisa menekan Back selama itu; show()
-                        // pada activity yang finishing melempar
-                        // BadTokenException.
-                        if (isFinishing || isDestroyed) return@launch
-                        showHlsPicker(
-                            variants = variants,
-                            originalUrl = urls[0],
-                            name = name,
-                            username = username,
-                            password = password,
-                            headers = headers,
-                            perSpeed = perSpeed,
-                            priority = priority,
-                            checksum = checksum,
-                            mirrors = parseMirrors(),
-                            audioLang = selectedAudioLang
-                        )
-                    }
-                }
             } else {
                 addAll(urls, name, username, password, headers, perSpeed, priority, checksum, parseMirrors())
             }
@@ -1253,46 +1152,6 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             submitDownload()
         }
         dialog.show()
-    }
-
-    private fun showHlsPicker(
-        variants: List<com.tasirin.httpdownloadmanager.download.HlsVariant>,
-        originalUrl: String,
-        name: String,
-        username: String,
-        password: String,
-        headers: String,
-        perSpeed: Int,
-        priority: Int,
-        checksum: String,
-        mirrors: List<String> = emptyList(),
-        audioLang: String = ""
-    ) {
-        val labels = variants.map { it.name } + getString(R.string.hls_direct)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.hls_quality_title)
-            .setItems(labels.toTypedArray()) { _, which ->
-                val target = if (which < variants.size) variants[which].url else originalUrl
-                val chosenName = if (which < variants.size) {
-                    variants[which].name.replace(' ', '_') + ".m3u8"
-                } else {
-                    name
-                }
-                App.engine.addDownload(
-                    url = target,
-                    fileName = chosenName,
-                    username = username,
-                    password = password,
-                    headers = headers,
-                    speedLimitKbps = perSpeed,
-                    priority = priority,
-                    checksum = checksum,
-                    mirrors = mirrors,
-                    preferredAudioLang = audioLang
-                )
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
