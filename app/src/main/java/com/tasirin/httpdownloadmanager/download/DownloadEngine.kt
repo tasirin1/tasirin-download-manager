@@ -149,7 +149,11 @@ class DownloadEngine(appContext: Context) {
         val baseUrl: String,
         val masterBody: String,
         val plan: HlsPlan,
-        val atMs: Long
+        val atMs: Long,
+        /** Preferensi yang ikut membentuk rencana (issue #1409): rencana
+         *  hanya sah dipakai ulang untuk preferensi yang sama. */
+        val preferredHeight: Int,
+        val preferredAudioLang: String
     )
 
     private val hlsPlanCache = ConcurrentHashMap<String, CachedHlsPlan>()
@@ -2801,6 +2805,8 @@ class DownloadEngine(appContext: Context) {
         val cachedPlan = hlsPlanCache[item.id]
         val plan = if (cachedPlan != null && cachedPlan.baseUrl == item.url &&
             cachedPlan.masterBody == master &&
+            cachedPlan.preferredHeight == item.preferredHeight &&
+            cachedPlan.preferredAudioLang == item.preferredAudioLang &&
             monotonicNow() - cachedPlan.atMs <= HLS_PLAN_CACHE_TTL_MS
         ) {
             cachedPlan.plan
@@ -2808,8 +2814,10 @@ class DownloadEngine(appContext: Context) {
             parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang, item.username, item.password, trackId = item.id)
                 ?.also { fresh ->
                     if (hlsPlanCache.size >= 16) hlsPlanCache.clear()
-                    hlsPlanCache[item.id] =
-                        CachedHlsPlan(item.url, master, fresh, monotonicNow())
+                    hlsPlanCache[item.id] = CachedHlsPlan(
+                        item.url, master, fresh, monotonicNow(),
+                        item.preferredHeight, item.preferredAudioLang
+                    )
                 }
         }
         if (plan == null || plan.videoSegments.isEmpty()) {
