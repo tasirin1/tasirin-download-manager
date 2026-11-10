@@ -78,7 +78,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │       │   ├── DownloadItem.kt       # Model + state download
 │       │   └── DownloadRepository.kt # Persistensi daftar download
 │       ├── download/
-│       │   ├── DownloadEngine.kt     # Inti unduhan: Range, multi-segmen, HLS, retry, mirror
+│       │   ├── DownloadEngine.kt     # Inti unduhan: Range, multi-segmen, retry, mirror
 │       │   └── DownloadService.kt    # Foreground service + notifikasi + lanjut otomatis
 │       ├── receiver/BootReceiver.kt  # Auto-start saat boot (download & server)
 │       ├── remote/HttpControlServer.kt # Server HTTP remote (nanohttpd) + endpoint API
@@ -97,7 +97,7 @@ Panduan lengkap yang lain (fitur, cara pakai, troubleshooting) ada di
 │           ├── Spinners.kt, Streams.kt  # Helper spinner + baca stream terbatas
 │           ├── MimeTypes.kt, Crypto.kt, Formats.kt, FileNames.kt,
 │           ├── NotificationHelper.kt, TlsCompat.kt            # Pendukung
-├── app/src/test/                     # Unit test JVM (junit4): download queue/HLS/resume/speed,
+├── app/src/test/                     # Unit test JVM (junit4): download queue/resume/speed,
 │                                     # item codec, formats/names/mime/hex/pin,
 │                                     # checksums, streams, scan cache, server log/security/stream
 ├── gradle/verification-metadata.xml  # Checksum sha256 semua dependensi (verifikasi strict di CI)
@@ -113,7 +113,7 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
   (`remote.html` satu file, dipakai server langsung dari `assets`).
 - **DownloadEngine** (inti): tiap item = state (antre/menunggu/aktif/jeda/gagal/
   selesai) + monitor kecepatan & ETA; multi-segmen via HTTP Range; fallback
-  single-stream saat Range ditolak; HLS/m3u8 probe; mirror & blacklist URL.
+  single-stream saat Range ditolak; mirror & blacklist URL.
 - **Ekstraksi situs/media sosial** (HentaiHaven/Cloudflare, Pornhub best-effort):
   fetch server bisa 403/404 (proteksi hotlink/sesi), jadi `WebExtractActivity`
   (WebView sistem) membuka halaman watch, auto-grab URL video + cookie, lalu
@@ -121,7 +121,7 @@ Catatan: `widget/SpeedChartView.kt` tidak ada lagi. Kecepatan ditampilkan sebaga
   unduh langsung. Parser murni (`parseHentaiHavenPage`/`extractAllHentaiHaven`,
   `parsePornhubPage` via `SocialMediaExtractor`) tetap ada sebagai fallback
   bila challenge longgar; probe server di-skip untuk URL HH di dialog tambah,
-  dan unduhan Pornhub mengutamakan MP4 progresif (HLS hanya fallback).
+  dan unduhan Pornhub mengutamakan MP4 progresif.
 - **DownloadService** menjalankan engine di *foreground service*; `NetworkCallback`
   (Android 7+) / broadcast (5–6) untuk melanjutkan download saat koneksi pulih.
 - **HttpControlServer** (nanohttpd, port default `8080`): endpoint JSON + SSE
@@ -460,7 +460,7 @@ dipakai CI bukan yang resmi — perbaiki sebelum rilis.
 
 ## Menambah/mengubah fitur — file mana yang disentuh
 
-- **Perilaku unduhan (segment, retry, fallback Range, HLS)** → `DownloadEngine.kt`
+- **Perilaku unduhan (segment, retry, fallback Range)** → `DownloadEngine.kt`
   (+ `DownloadService.kt` bila menyangkut foreground service/notifikasi).
 - **Endpoint API / halaman remote** → `HttpControlServer.kt` (endpoint) +
   `remote.src.html` (lalu jalankan `scripts/prepare_remote.py`).
@@ -559,7 +559,7 @@ jangan digabung dengan PR fitur lain.
    bar stuck, jangan tambahkan `invalidate()` di UI; cari root cause-nya
    (StateFlow tidak emit karena copy tidak berubah).
 6. **Tambah unit test bila memungkinkan** — terutama untuk logika murni
-   (`ServerSecurity`, `Checksums`, `AdtsAac`, `HlsParser`, `DownloadItemCodec`).
+   (`ServerSecurity`, `Checksums`, `DownloadItemCodec`).
    Jalankan `python3 scripts/check_repo.py --android` untuk verifikasi.
 7. **Jangan hapus unit test yang ada** — kalau test gagal karena kode berubah,
    fix test-nya, bukan hapus test-nya.

@@ -50,9 +50,9 @@ fun readBounded(input: InputStream, max: Int): String =
     readBoundedFlagged(input, max).text
 
 /** Hasil baca terbatas + penanda terpotong batas (issue #1241):
- *  pemanggil yang memvonis isi dari EKOR badan (mis. #EXT-X-ENDLIST
- *  di playlist HLS) wajib membedakan "isi memang tak ada" dari
- *  "isi terpotong plafon", kalau tidak vonisnya bohong. */
+ *  pemanggil yang memvonis isi dari EKOR badan wajib membedakan
+ *  "isi memang tak ada" dari "isi terpotong plafon", kalau tidak
+ *  vonisnya bohong. */
 class BoundedRead(val text: String, val truncated: Boolean)
 
 fun readBoundedFlagged(input: InputStream, max: Int): BoundedRead {
@@ -67,7 +67,7 @@ fun readBoundedFlagged(input: InputStream, max: Int): BoundedRead {
         if (n < 0) break
         if (n == 0) {
             // Stream macet: kembalikan parsial yang sudah terkumpul, bukan
-            // gantung selamanya. Pemanggil (probe HLS/ekstraktor) memperlakukan
+            // gantung selamanya. Pemanggil (ekstraktor) memperlakukan
             // body terpotong sebagai gagal parse seperti biasa.
             if (++zeroStreak >= MAX_ZERO_READS) break
             continue

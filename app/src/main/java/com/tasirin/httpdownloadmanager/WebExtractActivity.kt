@@ -262,7 +262,7 @@ class WebExtractActivity : AppCompatActivity() {
 
     /** Cari URL video di DOM utama + iframe: tag video/source (termasuk
      *  `data-src` lazy-load), meta og:video/twitter stream, lalu pindaian
-     *  `.mp4` (diutamakan) / `.m3u8` pada HTML + pola JS `file:`/`src:`. */
+     *  `.mp4` pada HTML + pola JS `file:`/`src:`. */
     private fun runGrabScript() {
         if (finished) return
         // Skrip dibaca dari assets/extract.js (bukan string inline): dex tak lagi

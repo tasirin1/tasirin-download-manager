@@ -124,7 +124,7 @@ class DownloadAdapter(private val listener: Listener) :
             val size = if (item.totalBytes > 0) item.totalBytes else item.bytesDownloaded
             "100%  " + Formats.bytes(size)
         } else if (item.totalBytes > 0) {
-            // HLS: totalBytes bisa berupa estimasi (BANDWIDTH x durasi) —
+            // Unduhan termux: totalBytes bisa berupa estimasi —
             // tandai dengan "~" supaya jelas bukan angka pasti.
             val totalTxt = if (item.totalBytesEstimated) {
                 "~" + Formats.bytes(item.totalBytes)
@@ -134,7 +134,7 @@ class DownloadAdapter(private val listener: Listener) :
             item.progressPercent.toString() + "%  " +
                 Formats.bytes(item.bytesDownloaded) + " / " + totalTxt
         } else if (item.progressPercentOverride >= 0) {
-            // HLS: total asli tidak diketahui — persen + byte riil tanpa denominator palsu.
+            // Total asli tidak diketahui — persen + byte riil tanpa denominator palsu.
             item.progressPercent.toString() + "%  " +
                 Formats.bytes(item.bytesDownloaded)
         } else {

@@ -1644,7 +1644,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             // lama (Open menembak berkas yang sudah dipindah).
             h = h * 31 + (it.contentUri?.hashCode() ?: 0)
             // Override persen ikut ditandatangani (issue #1282): flip
-            // -1 ke 0 pada HLS 0-byte mengganti format label progres di
+            // -1 ke 0 pada unduhan 0-byte mengganti format label progres di
             // bind adapter, tetapi tanpa baris ini sig tak berubah dan
             // format baru tertahan tanpa kiriman trailing.
             h = h * 31 + it.progressPercentOverride

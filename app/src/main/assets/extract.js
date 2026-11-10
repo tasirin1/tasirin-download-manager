@@ -9,15 +9,15 @@ try{for(var fi=0;fi<window.frames.length;fi++){
 try{var fd=window.frames[fi].document;if(fd)docs.push(fd);}catch(fe){}}}catch(ie){}
 function abs(u){try{if(u.indexOf('//')===0)return location.protocol+u;
 return new URL(u,location.href).href;}catch(e){return u;}}
-var mp4=[],hls=[],hasVideo=false;
+var mp4=[],hasVideo=false;
 window.__hhBlob=false;
 function collect(u){u=(u||'').trim();if(!u)return;
 if(u.indexOf('blob:')===0){window.__hhBlob=true;return;}
 if(u.indexOf('//')===0)u=location.protocol+u;
 if(u.indexOf('http')!==0)return;
 u=abs(u);
-if(/\.m3u8/i.test(u)){if(hls.indexOf(u)<0)hls.push(u);}
-else{if(mp4.indexOf(u)<0)mp4.push(u);}}
+if(/\.m3u8/i.test(u))return;
+if(mp4.indexOf(u)<0)mp4.push(u);}
 docs.forEach(function(doc){try{
 var vs=doc.getElementsByTagName('video');
 for(var i=0;i<vs.length;i++){hasVideo=true;
@@ -35,22 +35,21 @@ var t=doc.querySelector('meta[name="twitter:player:stream"],meta[property="twitt
 if(t)collect(t.content);
 var ls=doc.getElementsByTagName('link');
 for(var k=0;k<ls.length;k++){var hr=ls[k].getAttribute('href')||'';
-if(/\.mp4|\.m3u8/.test(hr))collect(hr);}
+if(/\.mp4/.test(hr))collect(hr);}
 }catch(e){}});
-var mp42=[],hls2=[];
+var mp42=[];
 function bucket2(u){u=abs((u||'').trim());if(u.indexOf('http')!==0)return;
-if(/\.m3u8/i.test(u)){if(hls2.indexOf(u)<0)hls2.push(u);}else{if(mp42.indexOf(u)<0)mp42.push(u);}}
+if(/\.m3u8/i.test(u))return;
+if(mp42.indexOf(u)<0)mp42.push(u);}
 var h='';
 try{h=document.documentElement.innerHTML.slice(0,1000000).replace(/\\\//g,'/');}catch(e){}
-var fm=h.match(/(?:file|src|source)\s*:\s*["'](https?:[^"']+?\.(?:mp4|m3u8)[^"']*)["']/gi)||[];
+var fm=h.match(/(?:file|src|source)\s*:\s*["'](https?:[^"']+?\.(?:mp4)[^"']*)["']/gi)||[];
 for(var f=0;f<fm.length;f++){var fu=fm[f].replace(/^[^"']*["']/, '').replace(/["'].*$/, '');
 bucket2(fu);}
 var a=h.match(/https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/gi)||[];
 for(var p=0;p<a.length;p++)bucket2(a[p]);
-var b=h.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/gi)||[];
-for(var q=0;q<b.length;q++)bucket2(b[q]);
-mp4=mp4.concat(mp42);hls=hls.concat(hls2);
-var src=mp4.length>0?mp4[0]:(hls.length>0?hls[0]:'');
+mp4=mp4.concat(mp42);
+var src=mp4.length>0?mp4[0]:'';
 var eps=[],seenEps={};
 docs.forEach(function(doc){try{
 var links=doc.getElementsByTagName('a');
