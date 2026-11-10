@@ -8,6 +8,10 @@
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary_dark</item>
         <item name="colorAccent">@color/accent</item>
+        <!-- Dialog peringatan memakai overlay sendiri (lihat gaya di
+             bawah): tombolnya biru primer, bukan oranye colorAccent
+             tema induk yang khusus fokus D-pad. -->
+        <item name="alertDialogTheme">@style/Theme.HttpDownloadManager.AlertDialog</item>
         <item name="android:windowBackground">@color/window_bg</item>
         <item name="android:colorBackground">@color/window_bg</item>
         <item name="colorControlActivated">@color/primary</item>
@@ -18,6 +22,14 @@
              highlight fokus otomatis). -->
         <item name="android:colorControlHighlight">@color/accent</item>
         <item name="colorControlHighlight">@color/accent</item>
+    </style>
+
+    <!-- Overlay tema AlertDialog: colorAccent biru primer agar tombol
+         dialog (OK/Cancel/Delete/dsb.) tampil biru #1565C0 seperti
+         dialog kustom, bukan oranye aksen fokus D-pad. Overlay hanya
+         berlaku di dalam dialog; colorAccent tema induk tidak berubah. -->
+    <style name="Theme.HttpDownloadManager.AlertDialog" parent="ThemeOverlay.AppCompat.Dialog.Alert">
+        <item name="colorAccent">@color/primary</item>
     </style>
 
     <!-- Toolbar biru Vaultwarden dengan teks putih. -->

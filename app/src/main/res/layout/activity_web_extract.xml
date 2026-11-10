@@ -10,7 +10,8 @@
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="4dp"
-        android:indeterminate="true" />
+        android:indeterminate="true"
+        android:indeterminateTint="@color/primary" />
 
     <WebView
         android:id="@+id/web_extract_view"
