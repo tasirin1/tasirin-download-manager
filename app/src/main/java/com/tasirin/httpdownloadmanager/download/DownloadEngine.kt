@@ -2238,14 +2238,19 @@ class DownloadEngine(appContext: Context) {
         }
         if (maxRetries > 0 && attempts <= maxRetries && item.autoResume) {
             retryAttempts[id] = attempts
-            updateItem(id) { it.copy(retryCount = attempts) }
             val baseBackoff = (RETRY_DELAY_1_MS shl (attempts - 1))
                 .coerceAtMost(RETRY_DELAY_MAX_MS)
             // Jitter 0-25% agar beberapa item tidak retry serentak (thundering herd).
             val backoff = baseBackoff + Random.nextLong(0, (baseBackoff / 4) + 1)
             val retryInfo = "Failed (attempt $attempts/$maxRetries) — retrying in ${Formats.eta(backoff / 1000)}"
             App.logEvent("DOWNLOAD FAILED: ${item.fileName} — ${message ?: "?"} ($retryInfo)")
-            updateItem(id) { it.copy(state = DownloadState.PENDING, error = retryInfo) }
+            // Satu updateItem gabungan (issue #1464): dulu retryCount dan
+            // state/error ditulis lewat dua updateItem berurutan — dua
+            // salinan daftar + dua emisi StateFlow + dua peluncuran ulang
+            // debounce simpan untuk satu transisi yang sama.
+            updateItem(id) {
+                it.copy(retryCount = attempts, state = DownloadState.PENDING, error = retryInfo)
+            }
             val retryToken = retryTokenSeq.incrementAndGet()
             pendingRetryTokens[id] = retryToken
             scope.launch {
