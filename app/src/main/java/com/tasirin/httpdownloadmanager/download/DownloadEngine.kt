@@ -565,7 +565,6 @@ class DownloadEngine(appContext: Context) {
             it.copy(state = DownloadState.PAUSED, autoResume = false, speedBps = 0, etaSeconds = 0)
         }
         clearSegProgress(id)
-        scheduleSave()
         return true
     }
 
@@ -671,7 +670,6 @@ class DownloadEngine(appContext: Context) {
         // agar membatalkan unduhan pembaruan tidak membunuh langganan
         // pemantauan secara diam-diam. No-op untuk item biasa.
         hidupkanLagiMonitorPendahulu(target)
-        scheduleSave()
         return true
     }
 
@@ -1121,7 +1119,6 @@ class DownloadEngine(appContext: Context) {
                 }
             }
         }
-        scheduleSave()
     }
 
     fun resumeAll() {
@@ -1197,7 +1194,6 @@ class DownloadEngine(appContext: Context) {
         // Nilai balik jujur (issue #935): false = no-op (sudah di
         // tepi), agar pemanggil tidak mengklaim berhasil pindah.
         val name = movedName ?: return false
-        scheduleSave()
         App.logEvent("DOWNLOAD MOVED UP: $name")
         return true
     }
@@ -1219,7 +1215,6 @@ class DownloadEngine(appContext: Context) {
             }
         }
         val name = movedName ?: return false
-        scheduleSave()
         App.logEvent("DOWNLOAD MOVED DOWN: $name")
         return true
     }
@@ -1421,7 +1416,6 @@ class DownloadEngine(appContext: Context) {
         // berubah di antaranya membuat flag gagal terpasang pada item
         // yang baru COMPLETED (issue #882).
         updateItem(id) { it.copy(monitor = enabled && it.state == DownloadState.COMPLETED) }
-        scheduleSave()
     }
 
     private fun shouldInvalidateResume(item: DownloadItem, currentEtag: String?): Boolean {
@@ -1565,7 +1559,6 @@ class DownloadEngine(appContext: Context) {
                         // pemulihan #512/#518/#520 terblokir pada
                         // kegagalan penerus pertama.
                         monitorSentuhanPengguna.remove(item.id)
-                        scheduleSave()
                     }
                 }
             }
