@@ -229,6 +229,14 @@ class DownloadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Start baru = service diminta hidup lagi (issue #1515): latch
+        // stopSelfDone (#1490) wajib direset di dalam monitor yang
+        // sama. Tanpa reset, instance yang hidup lagi lewat start ini
+        // sesudah stopSelf() tak bisa berhenti untuk kedua kalinya —
+        // penilai berikutnya menerima true dari latch TANPA
+        // stopForeground/stopSelf dijalankan, dan kolektor berhenti
+        // memperbarui notifikasi.
+        synchronized(stopDecisionGuard) { stopSelfDone = false }
         // Konsumsi penanda boot juga di sini (issue #1239): service
         // yang sudah berjalan tak melewati onCreate saat job boot
         // men-start-nya, jadi tanpa ini penanda bertahan true dan
