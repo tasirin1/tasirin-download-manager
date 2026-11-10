@@ -867,7 +867,7 @@ class DownloadEngine(appContext: Context) {
                     )
                 }
             } finally {
-                conn.disconnect()
+                releaseProbeConnection(conn, headCode in 200..299)
             }
             if (headProbe != null) return headProbe
             if (headCode in 200..299) return null
@@ -988,6 +988,20 @@ class DownloadEngine(appContext: Context) {
             current = next
         }
         throw IOException("Too many redirects")
+    }
+
+    /** Akhiri koneksi probe HEAD (issue #1449): HEAD tidak berbadan,
+     *  jadi probe yang BERHASIL cukup menutup stream-nya agar soket
+     *  kembali ke pool keep-alive dan bisa dipakai ulang koneksi
+     *  berikutnya pada attempt yang sama — disconnect tanpa syarat
+     *  membuangnya. Probe GAGAL (kode non-2xx / pengecualian) tetap
+     *  di-disconnect: keadaannya tak terverifikasi bersih. */
+    private fun releaseProbeConnection(conn: HttpURLConnection, success: Boolean) {
+        if (success) {
+            runCatching { conn.inputStream.close() }
+        } else {
+            runCatching { conn.disconnect() }
+        }
     }
 
     /** Buka koneksi attempt dari URL efektif tangkapan probe (issue
@@ -2469,6 +2483,7 @@ class DownloadEngine(appContext: Context) {
                 username = item.username, password = item.password, headers = item.headers
             )
             var segHeaders: ServerHeaders? = null
+            var segProbeOk = false
             try {
                 if (segProbe.responseCode in 200..299) {
                     capturedAttemptUrl = segProbe.url?.toString()
@@ -2484,11 +2499,12 @@ class DownloadEngine(appContext: Context) {
                     if (probedEtag != null) {
                         updateItem(item.id) { it.copy(etag = probedEtag) }
                     }
+                    segProbeOk = true
                 }
             } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut resume apa adanya)
                 // HEAD tidak didukung; lanjut resume apa adanya.
             } finally {
-                segProbe.disconnect()
+                releaseProbeConnection(segProbe, segProbeOk)
             }
             val currentSeg = _items.value.find { it.id == item.id } ?: item
             if (currentSeg.segments.isNotEmpty()) {
@@ -2527,6 +2543,7 @@ class DownloadEngine(appContext: Context) {
                 password = item.password,
                 headers = item.headers
             )
+            var probeOk = false
             try {
                 val code = probe.responseCode
                 if (code in 200..299) {
@@ -2536,11 +2553,12 @@ class DownloadEngine(appContext: Context) {
                     freshTotal = contentLength(probe)
                     freshRanges = probe.getHeaderField("Accept-Ranges")
                         .equals("bytes", ignoreCase = true)
+                    probeOk = true
                 }
             } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut dengan GET biasa)
                 // HEAD tidak didukung; lanjut dengan GET biasa
             } finally {
-                probe.disconnect()
+                releaseProbeConnection(probe, probeOk)
             }
         }
         val freshHeaders = probeHeaders
@@ -3747,13 +3765,15 @@ class DownloadEngine(appContext: Context) {
                     username = item.username, password = item.password, headers = item.headers
                 )
             }.getOrNull() ?: return null
+            var probeOk = false
             try {
                 if (probe.responseCode !in 200..299) return null
                 if (!isFreshResumeSizeValid(item.totalBytes, contentLength(probe))) return null
+                probeOk = true
             } catch (_: Exception) {
                 return null
             } finally {
-                probe.disconnect()
+                releaseProbeConnection(probe, probeOk)
             }
         }
         return result.directUrl
