@@ -5002,6 +5002,8 @@ if (!aRes.ok || !aData || !aData.ok) allFailed++;
 else socialPhotoAddedUrls.add(cOpt.url);
 }
 if (allFailed) throw new Error(allFailed + ' of ' + attempted + ' photos failed to add');
+socialPhotoAddedSig = '';
+socialPhotoAddedUrls = new Set();
 } else {
 const res = await fetchTimeout(API + '/api/add', {
 method: 'POST',
