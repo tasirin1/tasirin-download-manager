@@ -1014,8 +1014,12 @@ class DownloadEngine(appContext: Context) {
      *  yang menerima kredensial. Bila membuka dari [startUrl] gagal
      *  (mis. signed URL kedaluwarsa di antara probe dan koneksi ini),
      *  jatuh kembali ke [anchorUrl] dan telusuri ulang rantainya utuh
-     *  seperti sebelum #1446. */
-    private fun openAttemptConnection(
+     *  seperti sebelum #1446 — tetapi HANYA bila attempt masih hidup:
+     *  putus-paksa batal/jeda dari disconnectActive membuat percobaan
+     *  pertama gagal dengan SocketException biasa, dan menelusuri ulang
+     *  rantai penuh untuk job yang sudah mati hanya membuang satu
+     *  rantai redirect utuh (issue #1480). */
+    private suspend fun openAttemptConnection(
         startUrl: String,
         anchorUrl: String,
         method: String,
@@ -1039,6 +1043,11 @@ class DownloadEngine(appContext: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            // Job sudah dibatalkan (batal/jeda): kegagalan ini akibat
+            // putus-paksa soket, bukan vonis atas URL efektif — jangan
+            // fallback, sampaikan sebagai pembatalan (pola penilaian
+            // identitas job #200, bukan bendera bersama).
+            if (!coroutineContext.isActive) throw CancellationException()
             openAuthenticatedConnection(
                 anchorUrl, method, username, password, headers, presetRange,
                 configure = configure
