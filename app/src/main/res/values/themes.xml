@@ -27,7 +27,18 @@
     <!-- Overlay tema AlertDialog: colorAccent biru primer agar tombol
          dialog (OK/Cancel/Delete/dsb.) tampil biru #1565C0 seperti
          dialog kustom, bukan oranye aksen fokus D-pad. Overlay hanya
-         berlaku di dalam dialog; colorAccent tema induk tidak berubah. -->
+         berlaku di dalam dialog; colorAccent tema induk tidak berubah.
+         CAKUPAN RESMI overlay ini (didokumentasikan issue #1504):
+         colorAccent di dalam dialog tidak hanya mewarnai tombol —
+         widget AppCompat di dalam dialog yang membaca colorAccent
+         ikut biru primer, dan itu DISENGAJA serta konsisten tema:
+         (1) tombol dialog positif/negatif/netral; (2) kursor dan
+         gagang seleksi EditText di dalam dialog (mis. kolom Rename
+         dan Add Download); (3) ProgressBar indeterminate di dalam
+         dialog. Jangan mempersempit overlay ini hanya demi tombol:
+         widget dialog yang kembali oranye justru inkonsistensi.
+         Di luar dialog, colorAccent induk (@color/accent oranye)
+         tetap berlaku penuh untuk fokus D-pad dan widget layar. -->
     <style name="Theme.HttpDownloadManager.AlertDialog" parent="ThemeOverlay.AppCompat.Dialog.Alert">
         <item name="colorAccent">@color/primary</item>
     </style>
