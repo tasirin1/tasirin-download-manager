@@ -8,6 +8,15 @@ import java.util.Collections
 class DownloadRepository(context: Context) {
 
     private val prefs = context.getSharedPreferences("downloads", Context.MODE_PRIVATE)
+    // Berkas prefs TERPISAH khusus progres (issue #1433): commit
+    // SharedPreferences menulis ulang SELURUH berkas, jadi progres kecil
+    // yang di-commit tiap ±2 dtk dulu ikut menulis ulang blob antrean
+    // penuh (KEY_ITEMS) + fsync tiap kalinya. Di berkas sendiri, commit
+    // progres hanya membayar ukuran progres itu sendiri. Koordinasi
+    // snapshot-vs-progres tetap lewat monitor kelas ini + nomor urut
+    // progressVersion (lihat saveProgress/writePrepared).
+    private val progressPrefs =
+        context.getSharedPreferences("downloads_progress", Context.MODE_PRIVATE)
     // Cache hasil enkripsi kredensial per kombinasi empat field sensitif: menghindari AES
     // + IV acak diulang tiap kali save penuh (hot path download aktif).
     // synchronizedMap: save bisa dipanggil dari thread UI (flush) dan IO (job).
@@ -64,7 +73,28 @@ class DownloadRepository(context: Context) {
             Crypto.isWeakStorage(q.first) || Crypto.isWeakStorage(q.second) ||
                 Crypto.isWeakStorage(q.third) || Crypto.isWeakStorage(q.fourth)
         }
-        return DownloadItemCodec.overlayProgress(items, prefs.getString(KEY_PROGRESS, null))
+        return DownloadItemCodec.overlayProgress(items, readProgressRaw())
+    }
+
+    /** Progres mentah dari berkas progres baru; migrasi satu kali dari
+     *  berkas lama (issue #1433): instalasi pra-pemisahan menyimpan
+     *  KEY_PROGRESS di berkas "downloads" — nilai itu dipindah ke berkas
+     *  progres (ditulis ke berkas baru, lalu dihapus dari berkas lama)
+     *  agar resume sesudah upgrade tak kehilangan progres terakhir.
+     *  Hanya dipanggil dari load yang @Synchronized. */
+    private fun readProgressRaw(): String? {
+        val newRaw = progressPrefs.getString(KEY_PROGRESS, null)
+        val legacyRaw = if (newRaw == null) prefs.getString(KEY_PROGRESS, null) else null
+        return when (progressSource(newRaw != null, legacyRaw != null)) {
+            ProgressSource.NEW_FILE -> newRaw
+            ProgressSource.LEGACY_MIGRATE -> {
+                val value = legacyRaw!!
+                progressPrefs.edit(commit = true) { putString(KEY_PROGRESS, value) }
+                prefs.edit(commit = true) { remove(KEY_PROGRESS) }
+                value
+            }
+            ProgressSource.NONE -> null
+        }
     }
 
     /** Baca kredensial tersimpan (masih terenkripsi) per id dari array yang
@@ -96,17 +126,20 @@ class DownloadRepository(context: Context) {
      *  larik `s`, sejak issue #648) tanpa enkripsi; dipanggil berkala selama
      *  download aktif. Commit sinkron (bukan
      *  apply): apply async bisa mendarat SETELAH commit snapshot penuh
-     *  (persistItems + remove KEY_PROGRESS) sehingga progres basi menimpa
-     *  data segar saat load. Dipanggil dari thread IO engine, bukan main. */
+     *  (persistItems + penghapusan progres) sehingga progres basi menimpa
+     *  data segar saat load. Menulis ke berkas progres sendiri (issue
+     *  #1433) agar commit ±2 dtk ini tak menulis ulang blob antrean.
+     *  Dipanggil dari thread IO engine, bukan main. */
     // Sinkron dengan persistItems/load: tanpa lock, commit progres bisa
     // mendarat SEBELUM commit snapshot penuh yang di-encode lebih dulu
-    // (persistItems + remove KEY_PROGRESS), sehingga progres segar terhapus
+    // (persistItems + penghapusan progres), sehingga progres segar terhapus
     // dan load memakai byte satu tick lebih tua. Satu monitor mengurutkan
-    // commit sesuai urutan encode.
+    // commit sesuai urutan encode — kini lintas dua berkas prefs, dengan
+    // progressVersion sebagai penengahnya (lihat writePrepared).
     @Synchronized
     fun saveProgress(items: List<DownloadItem>) {
         progressVersion++
-        prefs.edit(commit = true) {
+        progressPrefs.edit(commit = true) {
             putString(KEY_PROGRESS, DownloadItemCodec.encodeProgress(items))
         }
     }
@@ -195,10 +228,18 @@ class DownloadRepository(context: Context) {
         if (prepared.seq < writtenPersistSeq) return
         prefs.edit(commit = blocking) {
             putString(KEY_ITEMS, prepared.encoded)
-            // Snapshot penuh memuat progres saat ia di-encode -> hapus
-            // progres ringan hanya bila belum ada progres yang lebih
-            // baru mendarat sesudah encode itu.
-            if (progressVersion == prepared.progressVersion) remove(KEY_PROGRESS)
+        }
+        // Snapshot penuh memuat progres saat ia di-encode -> hapus
+        // progres ringan hanya bila belum ada progres yang lebih
+        // baru mendarat sesudah encode itu. Progres kini di berkas
+        // sendiri (issue #1433): penghapusan adalah commit terpisah,
+        // tetapi tetap di dalam monitor yang sama dengan saveProgress
+        // sehingga tak ada progres baru yang bisa menyelinap di antara
+        // cek versi dan penghapusan; putus proses di antara kedua
+        // commit hanya menyisakan progres senilai encode snapshot itu
+        // sendiri, yang overlay-nya ke snapshot adalah no-op.
+        if (progressVersion == prepared.progressVersion) {
+            progressPrefs.edit(commit = blocking) { remove(KEY_PROGRESS) }
         }
         writtenPersistSeq = prepared.seq
     }
@@ -270,3 +311,15 @@ internal fun shouldRestoreStored(currentPlain: String, storedEnc: String?): Bool
  *  korup), kecuali penghapusan eksplisit pengguna. Murni agar bisa diuji. */
 internal fun shouldBlockEmptySave(itemsEmpty: Boolean, degraded: Boolean, userCleared: Boolean): Boolean =
     itemsEmpty && degraded && !userCleared
+
+/** Sumber progres saat load (issue #1433): berkas progres baru selalu
+ *  menang; warisan di berkas antrean lama hanya dipakai (dan dimigrasi)
+ *  bila berkas baru belum punya progres. Murni agar bisa diuji; nilai
+ *  harapan dibuktikan port Python 1:1 (audit-dm-r14/port-1433.py). */
+internal enum class ProgressSource { NEW_FILE, LEGACY_MIGRATE, NONE }
+
+internal fun progressSource(newHas: Boolean, legacyHas: Boolean): ProgressSource = when {
+    newHas -> ProgressSource.NEW_FILE
+    legacyHas -> ProgressSource.LEGACY_MIGRATE
+    else -> ProgressSource.NONE
+}
