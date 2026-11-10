@@ -3116,6 +3116,15 @@ class DownloadEngine(appContext: Context) {
         // limiter melihat total monoton seperti jalur multi-segmen
         // berkas biasa — bukan baseline per-segmen yang saling mendahului.
         val throttlePosition = AtomicLong(progress.downloaded.get())
+        // Anggaran ruang BERSAMA unduh-awal (issue #1411): potret ruang
+        // bebas volume spool diambil SEKALI di sini, lalu dibagi rata ke
+        // slot jendela sebagai plafon per segmen yang diteruskan ke
+        // fetchHlsSegment — cadangan MIN_FREE_BYTES dikurangkan sekali
+        // di muka dan tak boleh dimakan slot mana pun.
+        val segmentByteCap = hlsSegmentByteCap(
+            spool.absoluteFile.parentFile?.usableSpace ?: Long.MAX_VALUE,
+            MIN_FREE_BYTES, HLS_PREFETCH_WINDOW
+        )
         val launchedSpools = mutableListOf<File>()
         try {
             BufferedOutputStream(FileOutputStream(target, startIndex > 0), BUFFER_SIZE).use { out ->
@@ -3139,6 +3148,7 @@ class DownloadEngine(appContext: Context) {
                         fetchHlsSegmentWithRetry(
                             item, urls[idx], ByteArray(BUFFER_SIZE), throttle,
                             throttlePosition, segSpool,
+                            byteCap = segmentByteCap,
                             fallbackQuery = fallbackQuery,
                             notify = {
                                 reportHlsProgress(
@@ -3575,7 +3585,8 @@ class DownloadEngine(appContext: Context) {
         spool: File,
         notify: (Long) -> Unit,
         onLength: (Long) -> Unit = {},
-        fallbackQuery: String = ""
+        fallbackQuery: String = "",
+        byteCap: Long = Long.MAX_VALUE
     ): Long {
         var attempts = 0
         var currentUrl = url
@@ -3594,7 +3605,7 @@ class DownloadEngine(appContext: Context) {
             try {
                 return fetchHlsSegment(
                     item, currentUrl, buffer, throttle, throttlePosition, spool, notify, onLength,
-                    attemptCharge
+                    attemptCharge, byteCap
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -3645,7 +3656,8 @@ class DownloadEngine(appContext: Context) {
         spool: File,
         notify: (Long) -> Unit,
         onLength: (Long) -> Unit = {},
-        attemptCharge: AtomicLong = AtomicLong(0)
+        attemptCharge: AtomicLong = AtomicLong(0),
+        byteCap: Long = Long.MAX_VALUE
     ): Long {
         val segConn = trackOpenedConnection(
             item.id,
@@ -3666,16 +3678,18 @@ class DownloadEngine(appContext: Context) {
             // Anggaran byte segmen sadar ruang kosong (issue #836,
             // pola #702): plafon mentah 64 MB membunuh segmen sah dari
             // CDN bersegmen panjang padahal segmen di-stream ke disk,
-            // bukan ditampung di RAM. Batas kini mengikuti ruang bebas
-            // volume spool dikurangi cadangan MIN_FREE_BYTES, dan
-            // Content-Length yang dikenal dicek di muka dengan pesan
-            // ruang yang jelas.
-            val freeAtStart = spool.absoluteFile.parentFile?.usableSpace ?: Long.MAX_VALUE
-            val byteCap = (freeAtStart - MIN_FREE_BYTES).coerceAtLeast(0)
+            // bukan ditampung di RAM. Plafon kini jatah segmen ini dari
+            // anggaran bersama unduh-awal: ruang bebas dipotret SEKALI
+            // oleh pemanggil dan dibagi rata ke slot jendela (issue
+            // #1411) — dulu tiap pekerja menilai dari potret
+            // usableSpace-nya sendiri, jadi segmen chunked tanpa
+            // Content-Length bisa gabungan menulis melewati ruang yang
+            // tersedia. Content-Length yang dikenal dicek di muka
+            // dengan pesan ruang yang jelas.
             if (declared != null && declared > byteCap) {
                 throw IOException(
                     "Not enough storage for HLS segment: need " +
-                        "${Formats.bytes(declared)}, available ${Formats.bytes(freeAtStart)}"
+                        "${Formats.bytes(declared)}, segment budget ${Formats.bytes(byteCap)}"
                 )
             }
             var segBytes = 0L
@@ -5647,6 +5661,17 @@ internal fun segmentLength(start: Long, end: Long): Long {
 
 internal fun isSegmentComplete(start: Long, end: Long, downloaded: Long): Boolean =
     downloaded >= segmentLength(start, end)
+
+/** Jatah byte per segmen unduh-awal HLS (issue #1411): anggaran ruang
+ *  bersama — ruang bebas yang dipotret SEKALI dikurangi cadangan
+ *  `minFreeBytes` (dijepit >= 0) — dibagi rata ke slot jendela, agar
+ *  pekerja yang berjalan bersamaan tak bisa gabungan menulis melewati
+ *  anggaran (dulu tiap pekerja menilai plafon dari potret
+ *  usableSpace-nya sendiri). Murni agar bisa di-unit-test. */
+internal fun hlsSegmentByteCap(freeBytes: Long, minFreeBytes: Long, window: Int): Long {
+    val budget = (freeBytes - minFreeBytes).coerceAtLeast(0)
+    return if (window > 0) budget / window else budget
+}
 
 /** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
  *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able
