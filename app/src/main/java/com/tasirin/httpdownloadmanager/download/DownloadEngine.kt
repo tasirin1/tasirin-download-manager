@@ -3378,7 +3378,9 @@ class DownloadEngine(appContext: Context) {
                     // bisa dibatalkan palsu 'Storage almost full'.
                     // Baca gagal = lewati cek tick ini; kesalahan tulis
                     // sungguhan tetap muncul dari jalur tulisnya sendiri.
-                    val freeNow = saver.freeBytesOrNull()
+                    // Varian memo ±1 detik (issue #1458): vonis ruang
+                    // dalam jendela singkat dipakai bersama antar item.
+                    val freeNow = saver.freeBytesOrNullMemoized()
                     if (freeNow != null && freeNow < MIN_FREE_BYTES) {
                         throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
                     }
@@ -3947,7 +3949,9 @@ class DownloadEngine(appContext: Context) {
                         // sebagai pesan OS mentah dan volume bisa
                         // terdorong ke 0 byte (issue #926). Baca gagal
                         // (freeBytesOrNull null) = lewati cek tick ini.
-                        val freeNow = saver.freeBytesOrNull()
+                        // Varian memo ±1 detik (issue #1458): hingga 8
+                        // segmen item yang sama berbagi satu StatFs.
+                        val freeNow = saver.freeBytesOrNullMemoized()
                         if (freeNow != null && freeNow < MIN_FREE_BYTES) {
                             throw IOException(
                                 "Storage almost full (free ${Formats.bytes(freeNow)})"

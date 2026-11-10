@@ -682,6 +682,29 @@ class FileSaver(context: Context) {
         StatFs(downloadDir.absolutePath).availableBytes
     }.getOrNull()
 
+    /** Memo ruang bebas downloadDir untuk PENJAGA RUANG BERJALAN saja
+     *  (issue #1458): penjaga di loop segmen + single-stream menilai
+     *  ruang 1x/detik PER SEGMEN (hingga 8x/detik per item) atas path
+     *  yang sama, jadi vonis dalam jendela ±1 detik boleh dipakai
+     *  bersama. Sengaja BUKAN di dalam freeBytesOrNull/destinationFreeBytes:
+     *  pemanggil pra-terbang dan pemeriksa mutlak lain (cek awal
+     *  attempt, freeSpaceBytesFor upload, StorageCleanup) wajib tetap
+     *  segar. Kegagalan StatFs (null) TIDAK di-memo — tick berikutnya
+     *  mencoba lagi, persis perilaku lama. Jam monoton (nanoTime) agar
+     *  perubahan jam dinding tak memperpanjang umur memo. */
+    @Volatile
+    private var freeBytesMemo: Pair<Long, Long>? = null
+
+    fun freeBytesOrNullMemoized(): Long? {
+        val nowMs = System.nanoTime() / 1_000_000
+        freeBytesMemo?.let { (value, at) ->
+            if (freeBytesMemoFresh(nowMs - at)) return value
+        }
+        val value = freeBytesOrNull() ?: return null
+        freeBytesMemo = value to nowMs
+        return value
+    }
+
     fun destinationFreeBytes(folderPath: String = ""): Long {
         // Partial download ditulis di downloadDir internal dan tmp upload di
         // cacheDir; folder teks hanya salah satu tujuan publish. Guard
@@ -1821,6 +1844,16 @@ internal fun adaptiveTempsProtected(state: DownloadState): Boolean =
  *  (bug-99/port-temp-policy.py). */
 internal fun adaptiveTempsDisposable(state: DownloadState): Boolean =
     state == DownloadState.FAILED || state == DownloadState.CANCELLED
+
+/** TTL memo ruang bebas penjaga berjalan (issue #1458). */
+internal const val FREE_BYTES_MEMO_TTL_MS = 1_000L
+
+/** Entri memo segar hanya pada umur [0, TTL): umur negatif (jam
+ *  monoton tak pernah mundur, jadi ini pertahanan murah) dan umur
+ *  >= TTL sama-sama basi. Murni; dibuktikan port Python 1:1
+ *  (audit-dm-r15/port-1458.py). */
+internal fun freeBytesMemoFresh(ageMs: Long): Boolean =
+    ageMs >= 0 && ageMs < FREE_BYTES_MEMO_TTL_MS
 
 private val PART_SEGMENT_TAIL_RE = Regex("""\.part\.\d+$""")
 private val MERGE_STAGING_TAIL_RE = Regex("""\.merge\.\d+$""")
