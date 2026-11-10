@@ -9,6 +9,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -74,6 +75,17 @@ class SettingsActivity : AppCompatActivity() {
             setTint(ContextCompat.getColor(this@SettingsActivity, R.color.text_secondary))
         }
     }
+
+    /** Instance drawable per tombol dari templat ter-cache di atas
+     *  (issue #1475): satu instance Drawable hanya punya satu pemilik
+     *  bounds/callback, jadi templat yang sama tak boleh dipasang
+     *  sebagai compound drawable belasan tombol sekaligus (ikon bisa
+     *  hilang/melompat antar-tombol). newDrawable dari constantState
+     *  templat murah (tanpa muat resource dan tint ulang) dan tiap
+     *  tombol memegang instansnya sendiri; keadaan templat tak pernah
+     *  diubah sesudah dibuat, jadi berbagi constantState aman. */
+    private fun freshToggleIcon(template: Drawable?): Drawable? =
+        template?.constantState?.newDrawable()?.mutate()
 
     private var activeStorageInput: EditText? = null
     private var storagePathEdited = false
@@ -651,14 +663,14 @@ class SettingsActivity : AppCompatActivity() {
         if (on) {
             btn.setBackgroundResource(R.drawable.bg_btn_filled)
             btn.setTextColor(ContextCompat.getColor(this, R.color.white))
-            toggleCheckIcon?.let { icon ->
+            freshToggleIcon(toggleCheckIcon)?.let { icon ->
                 btn.setCompoundDrawablesRelative(null, null, icon, null)
                 btn.compoundDrawablePadding = 12
             }
         } else {
             btn.setBackgroundResource(R.drawable.bg_btn_tv)
             btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
-            toggleCloseIcon?.let { icon ->
+            freshToggleIcon(toggleCloseIcon)?.let { icon ->
                 btn.setCompoundDrawablesRelative(null, null, icon, null)
                 btn.compoundDrawablePadding = 12
             }
