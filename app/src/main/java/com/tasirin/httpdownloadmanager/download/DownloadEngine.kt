@@ -929,10 +929,12 @@ class DownloadEngine(appContext: Context) {
             conn.setRequestProperty("User-Agent", ua)
             conn.setRequestProperty("Accept", "*/*")
             conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
-            try {
-                val origin = java.net.URL(current).let { "${it.protocol}://${it.host}" }
-                conn.setRequestProperty("Referer", "$origin/")
-            } catch (_: Exception) { /* Referer opsional, tidak wajib */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (Referer opsional: URL tak ter-parse tidak boleh menggagalkan koneksi)
+            // Referer asal otomatis (issue #1488): port non-bawaan ikut
+            // ditulis — bentuk lama membuangnya sehingga server yang
+            // memvalidasi Referer ketat (host:port) menolak unduhan
+            // dari origin berport kustom. Referer tetap opsional: URL
+            // tak ter-parse menghasilkan null dan header dilewati.
+            originRefererOf(current)?.let { conn.setRequestProperty("Referer", it) }
             // YouTube/Instagram CDN butuh Referer + Origin agar HTTP 403 tidak muncul.
             // Klasifikasi berbasis host ter-parse (issue #844): substring
             // atas URL utuh — terutama 'scontent' tanpa konteks host —
@@ -5206,6 +5208,23 @@ internal fun buangSufiksEkstensi(nama: String, vararg sufiks: String): String {
     return hasil
 }
 
+
+/** Referer asal otomatis untuk koneksi unduhan (issue #1488):
+ *  "skema://host[:port]/" — port hanya ditulis bila dinyatakan
+ *  eksplisit di URL dan BUKAN port bawaan skemanya (80 http /
+ *  443 https). Bentuk lama membuang port sepenuhnya, sehingga
+ *  server yang memvalidasi Referer secara ketat terhadap host:port
+ *  bisa menolak unduhan dari origin berport kustom. Null bila URL
+ *  tak ter-parse — Referer opsional dan tak boleh menggagalkan
+ *  koneksi. Murni agar bisa di-unit-test; nilai harapan dibuktikan
+ *  port Python 1:1 (audit-dm-r17/port_1488.py). */
+internal fun originRefererOf(url: String): String? = runCatching {
+    val u = URL(url)
+    if (u.host.isNullOrEmpty()) return@runCatching null
+    val defaultPort = if (u.protocol == "https") 443 else 80
+    val portPart = if (u.port >= 0 && u.port != defaultPort) ":${u.port}" else ""
+    "${u.protocol}://${u.host}$portPart/"
+}.getOrNull()
 
 internal fun isSameOrigin(first: String, second: String): Boolean = runCatching {
     val firstUrl = URL(first)

@@ -8,6 +8,24 @@ import org.junit.Test
 
 class RedirectSafetyTest {
     @Test
+    fun `referer asal menyertakan port non-bawaan saja`() {
+        // Issue #1488: nilai harapan dibuktikan port Python 1:1
+        // (audit-dm-r17/port_1488.py).
+        assertEquals("http://example.com/", originRefererOf("http://example.com/file"))
+        assertEquals("http://example.com/", originRefererOf("http://example.com:80/file"))
+        assertEquals("http://example.com:8080/", originRefererOf("http://example.com:8080/file"))
+        assertEquals("https://example.com/", originRefererOf("https://example.com/x"))
+        assertEquals("https://example.com/", originRefererOf("https://example.com:443/x"))
+        assertEquals("https://example.com:8443/", originRefererOf("https://example.com:8443/x"))
+        assertEquals(
+            "http://192.168.1.5:5000/",
+            originRefererOf("http://192.168.1.5:5000/a/b?x=1")
+        )
+        assertNull(originRefererOf("bukan-url"))
+        assertNull(originRefererOf(""))
+    }
+
+    @Test
     fun `redirect target resolves relative location and blocks non-http`() {
         assertEquals(
             "https://example.com/file.bin",
