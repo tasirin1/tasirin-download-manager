@@ -212,6 +212,32 @@ object MediaLibrary {
         return "uri:" + (contentUri ?: token)
     }
 
+    /** Dedupe hasil scan per kunci (issue #1423): entri PERTAMA per
+     *  kunci dipertahankan (identik distinctBy), tetapi durationMs-nya
+     *  diadopsi dari duplikat bila entri pertama tak punya durasi dan
+     *  duplikat punya. Durasi hanya dibawa baris MediaStore, sedangkan
+     *  blok filesystem yang mengisi daftar lebih dulu selalu
+     *  ber-durationMs 0 — distinctBy polos membuang baris MediaStore
+     *  beserta durasinya untuk berkas yang ditemukan filesystem lebih
+     *  dulu, melanggar niat desain blok 6. Urutan hasil = urutan
+     *  kemunculan pertama per kunci. Murni agar bisa di-unit-test. */
+    internal fun dedupeGaleri(
+        entries: List<MediaEntry>,
+        keyOf: (MediaEntry) -> String
+    ): List<MediaEntry> {
+        val byKey = LinkedHashMap<String, MediaEntry>()
+        for (e in entries) {
+            val k = keyOf(e)
+            val existing = byKey[k]
+            if (existing == null) {
+                byKey[k] = e
+            } else if (existing.durationMs <= 0 && e.durationMs > 0) {
+                byKey[k] = existing.copy(durationMs = e.durationMs)
+            }
+        }
+        return byKey.values.toList()
+    }
+
     /** Bangun pre-filter SQL (selection + args) kueri MediaStore dari
      *  folder terpilih. Mengembalikan null bila pre-filter TIDAK boleh
      *  membatasi kueri: daftar kosong, atau ada folder yang rel-nya
@@ -895,8 +921,7 @@ object MediaLibrary {
         // dipotong per halaman di scanCached/scan.
         // Total = distinct penuh SEBELUM take: total terpotong membuat
         // hasMore selalu false dan load-more berhenti di 3000 walau masih ada sisa.
-        val allDistinct = list
-            .distinctBy {
+        val allDistinct = dedupeGaleri(list) {
                 kunciDedupeGaleri(
                     it.filePath, it.relativePath, it.name,
                     it.contentUri, it.token, galleryRoot,
