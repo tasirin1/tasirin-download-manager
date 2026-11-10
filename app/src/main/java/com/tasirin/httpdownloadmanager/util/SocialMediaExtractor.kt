@@ -743,15 +743,30 @@ object SocialMediaExtractor {
         // Kedua strategi dibungkus cap tahap (#266): fetch pemblokir tidak
         // patuh withTimeoutOrNull, jadi tanpa cap satu strategi bisa
         // menduduki thread IO jauh melewati batas total 60 detik.
-        val vision = runStageCapped(24_000L) { extractYouTubeViaVisionos(videoId, user) }
+        val (vision, visionPage) = runStageCapped(24_000L) {
+            extractYouTubeViaVisionos(videoId, user)
+        } ?: (null to null)
         if (vision != null) {
             return listOf(vision)
         }
 
         // Strategi 2: halaman WEB (ytInitialPlayerResponse) + fallback Piped/Invidious.
-        return runStageCapped(30_000L) { extractYouTubeFromPage(url, videoId, user) }
-            ?: emptyList()
+        // Halaman yang sudah diunduh strategi VISIONOS untuk visitorData
+        // dipasok sebagai prefetchedPage (issue #1429, memasok seam
+        // #1413): satu unduhan halaman per ekstraksi bila isinya cukup;
+        // strategi halaman tetap mengunduh halaman watch sendiri bila
+        // halaman pakai-ulang tak memuat player response.
+        return runStageCapped(30_000L) {
+            extractYouTubeFromPage(url, videoId, user, prefetchedPage = visionPage)
+        } ?: emptyList()
     }
+
+    /** ytInitialPlayerResponse dari HTML halaman: ekstraksi seimbang
+     *  lebih dulu, lalu dua regex cadangan. Null bila tak ditemukan. */
+    private fun findPlayerResponseJson(pageHtml: String): String? =
+        extractBalancedPlayerResponse(pageHtml)
+            ?: YT_PLAYER_RESP_RE.find(pageHtml)?.groupValues?.get(1)
+            ?: YT_PLAYER_RESP_LAX_RE.find(pageHtml)?.groupValues?.get(1)
 
     private fun extractYouTubeFromPage(
         url: String,
@@ -762,29 +777,32 @@ object SocialMediaExtractor {
         // Awal tahap untuk anggaran probe #824: kedua pemanggil
         // membungkus fungsi ini dengan runStageCapped(30_000L).
         val stageStartNanos = System.nanoTime()
-        // Halaman watch hasil unduhan strategi sebelumnya dipakai ulang
-        // bila diberikan (issue #1413): isinya halaman desktop yang sama,
-        // jadi unduhan ratusan KB itu tak perlu diulang.
-        val httpResult = prefetchedPage ?: httpGetWithCookies(
+        fun downloadWatchPage(): HttpResult? = httpGetWithCookies(
             "https://www.youtube.com/watch?v=$videoId",
             mapOf(
                 "User-Agent" to YT_PAGE_UA,
                 "Accept-Language" to YT_LANG
             ) + user,
             timeoutMs = PAGE_TIMEOUT_MS
-        ) ?: return emptyList()
+        )
+        // Halaman hasil unduhan strategi sebelumnya dipakai ulang bila
+        // diberikan (issue #1413): unduhan ratusan KB itu tak perlu
+        // diulang. Bila halaman pakai-ulang tak memuat player response
+        // (issue #1429: sumbernya halaman shorts VISIONOS yang bisa
+        // bervarian ringkas), halaman watch tetap diunduh sekali sebagai
+        // cadangan agar strategi ini tak kehilangan peluang lamanya.
+        var httpResult = prefetchedPage ?: downloadWatchPage() ?: return emptyList()
+        var playerJson = findPlayerResponseJson(httpResult.body)
+        if (playerJson == null && prefetchedPage != null) {
+            httpResult = downloadWatchPage() ?: return emptyList()
+            playerJson = findPlayerResponseJson(httpResult.body)
+        }
         val pageHtml = httpResult.body
         val ytCookies = httpResult.cookies
-
-        val playerJson = extractBalancedPlayerResponse(pageHtml)
-            ?: YT_PLAYER_RESP_RE.find(pageHtml)?.groupValues?.get(1)
-            ?: YT_PLAYER_RESP_LAX_RE.find(pageHtml)?.groupValues?.get(1)
-            ?: run {
-                return emptyList()
-            }
+        val playerJsonText = playerJson ?: return emptyList()
 
         try {
-            val data = JSONObject(playerJson)
+            val data = JSONObject(playerJsonText)
             // Judul TIDAK ada di level atas player response — ia di
             // videoDetails (atau microformat); membaca "title" di level
             // atas selalu jatuh ke nama generik (issue #433).
@@ -897,13 +915,22 @@ object SocialMediaExtractor {
         val cookies: String
     )
 
+    /** Hasil fetch VISIONOS lengkap: player terparse (null bila strategi
+     *  ini gagal di tahap mana pun) + halaman sumber visitorData, yang
+     *  tetap berguna sebagai prefetchedPage strategi halaman walau
+     *  player-nya gagal (issue #1429). */
+    private data class VisionosFetch(
+        val player: VisionosPlayer?,
+        val page: HttpResult?
+    )
+
     /** Ambil visitorData dari [pageUrl] lalu POST ke player API
      *  VISIONOS (#281). */
     private fun fetchVisionosPlayer(
         pageUrl: String,
         videoId: String,
         user: Map<String, String>
-    ): VisionosPlayer? {
+    ): VisionosFetch {
         // Butuh visitorData + cookies dari halaman agar API tidak LOGIN_REQUIRED.
         val page = httpGetWithCookies(
             pageUrl,
@@ -912,10 +939,10 @@ object SocialMediaExtractor {
                 "Accept-Language" to YT_LANG
             ) + user,
             timeoutMs = PAGE_TIMEOUT_MS
-        ) ?: return null
+        ) ?: return VisionosFetch(null, null)
         val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
             ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
-            ?: return null
+            ?: return VisionosFetch(null, page)
 
         val body = buildString {
             append("{\"context\":{\"client\":{")
@@ -942,26 +969,32 @@ object SocialMediaExtractor {
                 "X-YouTube-Client-Version" to "1.02"
             ) + user),
             timeoutMs = PAGE_TIMEOUT_MS
-        ) ?: return null
-        return runCatching {
+        ) ?: return VisionosFetch(null, page)
+        val player = runCatching {
             val obj = JSONObject(json)
-            if (obj.optJSONObject("playabilityStatus")?.optString("status") != "OK") return null
+            if (obj.optJSONObject("playabilityStatus")?.optString("status") != "OK") {
+                return@runCatching null
+            }
             val title = obj.optJSONObject("videoDetails")?.optString("title")
                 ?: "YouTube_$videoId"
             VisionosPlayer(obj.optJSONObject("streamingData"), title, page.cookies)
         }.getOrNull()
+        return VisionosFetch(player, page)
     }
 
     /** Strategi VISIONOS: player API mengembalikan URL adaptif tanpa
-     *  n-signature, sehingga bisa langsung di-download (tidak HTTP 403). */
+     *  n-signature, sehingga bisa langsung di-download (tidak HTTP 403).
+     *  Mengembalikan hasil + halaman sumber visitorData (untuk dipakai
+     *  ulang strategi halaman sebagai prefetchedPage, issue #1429). */
     private fun extractYouTubeViaVisionos(
         videoId: String,
         user: Map<String, String> = emptyMap()
-    ): Result? {
-        val player = fetchVisionosPlayer(
+    ): Pair<Result?, HttpResult?> {
+        val fetch = fetchVisionosPlayer(
             "https://www.youtube.com/shorts/$videoId", videoId, user
-        ) ?: return null
-        return runCatching {
+        )
+        val player = fetch.player ?: return null to fetch.page
+        val result = runCatching {
             val title = player.title
             val streamingData = player.streamingData
             val safeName = sanitizeFileName(title)
@@ -994,6 +1027,7 @@ object SocialMediaExtractor {
             }
             null
         }.getOrNull()
+        return result to fetch.page
     }
 
 /** Cari objek format adaptive berdasarkan URL (untuk mengambil mime/quality
