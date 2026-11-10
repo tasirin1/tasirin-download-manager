@@ -2504,33 +2504,44 @@ class DownloadEngine(appContext: Context) {
             // tanpa pernah bertanya ke server — bila berkas di URL
             // yang sama sudah diganti penerbit, segmen lama + baru
             // tercampur menjadi berkas korup berstatus COMPLETED.
-            val segProbe = openAuthenticatedConnection(
-                item.url, method = "HEAD",
-                username = item.username, password = item.password, headers = item.headers
-            )
+            // Pembukaan probe dibungkus runCatching (issue #1505):
+            // openAuthenticatedConnection ikut menyambung + membaca
+            // responseCode saat redirect, jadi kegagalan MEMBUKA koneksi
+            // (server menolak HEAD di tingkat koneksi, blip jaringan)
+            // harus berarti "probe tak ok" — sama seperti kegagalan
+            // membaca respons di try bawah — bukan menggagalkan seluruh
+            // attempt. Pola yang sama seperti refreshExpiredCdnUrl.
+            val segProbe = runCatching {
+                openAuthenticatedConnection(
+                    item.url, method = "HEAD",
+                    username = item.username, password = item.password, headers = item.headers
+                )
+            }.getOrNull()
             var segHeaders: ServerHeaders? = null
             var segProbeOk = false
-            try {
-                if (segProbe.responseCode in 200..299) {
-                    capturedAttemptUrl = segProbe.url?.toString()
-                    val h = headersOf(segProbe)
-                    segHeaders = h
-                    captureHeaderChecksum(item, segProbe)
-                    segFreshHeaders = h
-                    segFreshTotal = contentLength(segProbe)
-                    segFreshRanges = segProbe.getHeaderField("Accept-Ranges")
-                        .equals("bytes", ignoreCase = true)
-                    invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, h.etag)
-                    val probedEtag = h.etag?.takeIf { it.isNotBlank() }
-                    if (probedEtag != null) {
-                        updateItem(item.id) { it.copy(etag = probedEtag) }
+            if (segProbe != null) {
+                try {
+                    if (segProbe.responseCode in 200..299) {
+                        capturedAttemptUrl = segProbe.url?.toString()
+                        val h = headersOf(segProbe)
+                        segHeaders = h
+                        captureHeaderChecksum(item, segProbe)
+                        segFreshHeaders = h
+                        segFreshTotal = contentLength(segProbe)
+                        segFreshRanges = segProbe.getHeaderField("Accept-Ranges")
+                            .equals("bytes", ignoreCase = true)
+                        invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, h.etag)
+                        val probedEtag = h.etag?.takeIf { it.isNotBlank() }
+                        if (probedEtag != null) {
+                            updateItem(item.id) { it.copy(etag = probedEtag) }
+                        }
+                        segProbeOk = true
                     }
-                    segProbeOk = true
+                } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut resume apa adanya)
+                    // HEAD tidak didukung; lanjut resume apa adanya.
+                } finally {
+                    releaseProbeConnection(segProbe, segProbeOk)
                 }
-            } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut resume apa adanya)
-                // HEAD tidak didukung; lanjut resume apa adanya.
-            } finally {
-                releaseProbeConnection(segProbe, segProbeOk)
             }
             val currentSeg = _items.value.find { it.id == item.id } ?: item
             if (currentSeg.segments.isNotEmpty()) {
@@ -2563,28 +2574,36 @@ class DownloadEngine(appContext: Context) {
             freshTotal = segFreshTotal
             freshRanges = segFreshRanges
         } else {
-            val probe = openAuthenticatedConnection(
-                item.url, method = "HEAD",
-                username = item.username,
-                password = item.password,
-                headers = item.headers
-            )
+            // Pembukaan probe dibungkus runCatching (issue #1505),
+            // sama seperti blok segmen di atas: kegagalan membuka
+            // koneksi HEAD berarti "probe tak ok" (lanjut GET biasa),
+            // bukan menggagalkan seluruh attempt.
+            val probe = runCatching {
+                openAuthenticatedConnection(
+                    item.url, method = "HEAD",
+                    username = item.username,
+                    password = item.password,
+                    headers = item.headers
+                )
+            }.getOrNull()
             var probeOk = false
-            try {
-                val code = probe.responseCode
-                if (code in 200..299) {
-                    capturedAttemptUrl = probe.url?.toString()
-                    captureHeaderChecksum(item, probe)
-                    probeHeaders = headersOf(probe)
-                    freshTotal = contentLength(probe)
-                    freshRanges = probe.getHeaderField("Accept-Ranges")
-                        .equals("bytes", ignoreCase = true)
-                    probeOk = true
+            if (probe != null) {
+                try {
+                    val code = probe.responseCode
+                    if (code in 200..299) {
+                        capturedAttemptUrl = probe.url?.toString()
+                        captureHeaderChecksum(item, probe)
+                        probeHeaders = headersOf(probe)
+                        freshTotal = contentLength(probe)
+                        freshRanges = probe.getHeaderField("Accept-Ranges")
+                            .equals("bytes", ignoreCase = true)
+                        probeOk = true
+                    }
+                } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut dengan GET biasa)
+                    // HEAD tidak didukung; lanjut dengan GET biasa
+                } finally {
+                    releaseProbeConnection(probe, probeOk)
                 }
-            } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (HEAD tak didukung adalah hasil sah: lanjut dengan GET biasa)
-                // HEAD tidak didukung; lanjut dengan GET biasa
-            } finally {
-                releaseProbeConnection(probe, probeOk)
             }
         }
         val freshHeaders = probeHeaders
