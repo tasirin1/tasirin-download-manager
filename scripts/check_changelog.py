@@ -227,6 +227,36 @@ def check_structure() -> str | None:
     return None
 
 
+def check_unreleased_bullets(lines) -> str | None:
+    """Satu bullet [Unreleased] = satu entri (issue #1531): Maraton
+    18 menghasilkan SATU baris bullet 10.172 karakter berisi 16
+    rujukan issue karena tiap commit MENGGANTI baris bullet pertama
+    yang sama alih-alih menambah baris baru — gerbang lama (hanya
+    menilai berkas berubah) tak menangkapnya. Ambang di sini BUKAN
+    ">1 rujukan": riwayat berkas ini memuat bullet sah yang merujuk
+    silang 1-2 issue terkait (maks teramati 2), jadi yang digagalkan
+    adalah bullet dengan LEBIH DARI 3 rujukan issue BERBEDA —
+    tanda entri menyatu yang tumbuh satu rujukan per commit. Hanya
+    seksi [Unreleased] yang dinilai; riwayat rilis lama di luar
+    cakupan."""
+    in_unreleased = False
+    for lineno, line in enumerate(lines, 1):
+        if line.startswith("## "):
+            in_unreleased = line.strip() == "## [Unreleased]"
+            continue
+        if in_unreleased and line.startswith("- "):
+            refs = set(re.findall(r"issue #(\d+)", line))
+            if len(refs) > 3:
+                return ("bullet [Unreleased] baris " + str(lineno) +
+                        " memuat " + str(len(refs)) + " rujukan issue "
+                        "berbeda (" +
+                        ", ".join("#" + r for r in
+                                  sorted(refs, key=int)) +
+                        ") — satu bullet wajib satu entri; entri "
+                        "menyatu terdeteksi (issue #1531)")
+    return None
+
+
 def main():
     # Struktur dinilai lebih dulu dan tanpa syarat (issue #1087):
     # vonis diff di bawah boleh melewatkan guard pada push pertama,
@@ -235,6 +265,17 @@ def main():
     if struktur_error:
         print("::error::" + struktur_error)
         return 1
+    # Struktur per-entri [Unreleased] (issue #1531): dinilai tanpa
+    # syarat juga, dari berkas saat ini (bukan dari diff).
+    try:
+        lines_now = open("CHANGELOG.md", encoding="utf-8").read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        lines_now = None
+    if lines_now is not None:
+        bullet_error = check_unreleased_bullets(lines_now)
+        if bullet_error:
+            print("::error::" + bullet_error)
+            return 1
     base = sys.argv[1] if len(sys.argv) > 1 else ""
     before = sys.argv[2] if len(sys.argv) > 2 else ""
     if not base or base == "null":
