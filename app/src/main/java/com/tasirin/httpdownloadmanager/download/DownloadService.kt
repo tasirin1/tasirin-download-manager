@@ -52,6 +52,19 @@ class DownloadService : Service() {
     @Volatile
     private var serverStartPending = false
 
+    // Gerbang penilaian berhenti (issue #1490): tiga penilai
+    // stopSelfIfNoWork (kolektor items, penilaian penutup start
+    // server, kolektor reevaluate) berjalan di thread IO terpisah.
+    // Tanpa serialisasi, pasangan posting -> cabut notifikasi bisa
+    // berhimpit: penilai B memposting SESUDAH penilai A
+    // men-stopForeground(REMOVE), meninggalkan notifikasi basi di
+    // shade. Monitor + flag check-and-set membuat urutan
+    // posting -> cabut -> stopSelf terjadi atomik dan hanya sekali.
+    private val stopDecisionGuard = Any()
+
+    @Volatile
+    private var stopSelfDone = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -183,9 +196,16 @@ class DownloadService : Service() {
         serverActive: Boolean
     ): Boolean {
         if (active || serverActive) return false
-        NotificationHelper.updateNotification(this, items, serverActive)
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        // Serial + hanya sekali (issue #1490): penilai kedua yang
+        // berhimpit tak lagi memposting ulang notifikasi sesudah
+        // pencabutan pertama — service memang sudah berhenti.
+        synchronized(stopDecisionGuard) {
+            if (stopSelfDone) return true
+            stopSelfDone = true
+            NotificationHelper.updateNotification(this, items, serverActive)
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
         return true
     }
 
