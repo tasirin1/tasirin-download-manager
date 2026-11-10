@@ -58,6 +58,11 @@ object SocialMediaExtractor {
     private const val FALLBACK_RESERVE_MS = 8_000L
     private const val MIN_PROBE_BUDGET_MS = 2_000L
 
+    // Balapan fallback lapis ketiga (issue #1430): tiga layanan dicoba
+    // konkuren; batas total + interval sapuan prioritasnya.
+    private const val FALLBACK_RACE_BUDGET_MS = 20_000L
+    private const val FALLBACK_RACE_POLL_MS = 50L
+
     /** Timeout HTTP halaman/API per request (dipakai 5+ situs, satu tempat). */
     private const val PAGE_TIMEOUT_MS = 20000
 
@@ -884,17 +889,9 @@ object SocialMediaExtractor {
             val alive = if (probeBudgetMs < MIN_PROBE_BUDGET_MS) options
                 else filterForbidden(options, probeBudgetMs)
             if (alive.isEmpty()) {
-                val piped = extractYouTubeViaPiped(videoId)
-                if (piped.isNotEmpty()) {
-                    return piped
-                }
-                val invidious = runCatching { extractYouTubeViaInvidious(videoId) }.getOrNull()
-                if (invidious != null) {
-                    return listOf(invidious)
-                }
-                val cobalt = runCatching { extractYouTubeViaCobalt(videoId) }.getOrNull()
-                if (cobalt != null) {
-                    return listOf(cobalt)
+                val raced = extractYouTubeViaFallbackRace(videoId)
+                if (raced.isNotEmpty()) {
+                    return raced
                 }
                 // Semua fallback kosong: kembalikan opsi halaman apa
                 // adanya sebagai upaya terakhir (perilaku lama).
@@ -1156,6 +1153,66 @@ object SocialMediaExtractor {
                 conn.responseCode == 403
             } finally { conn.disconnect() }
         }.getOrDefault(false)
+    }
+
+    /** Balapan fallback lapis ketiga (issue #1430): Piped, Invidious,
+     *  dan Cobalt dicoba KONKUREN — satu tugas per layanan di
+     *  stageExecutor (pola yang sama dengan probe filterForbidden);
+     *  tiap layanan tetap mengiterasi instansnya sendiri secara
+     *  sekuensial. Sebelumnya rantai sekuensial 5+6+1 instans bisa
+     *  membayar belasan timeout berurutan sebelum menyerah.
+     *  Hasil sah PERTAMA yang tiba menang dan tugas lain dibatalkan;
+     *  bila beberapa hasil tiba pada sapuan periksa yang sama, urutan
+     *  prioritas Piped > Invidious > Cobalt yang menentukan. Balapan
+     *  dibatasi FALLBACK_RACE_BUDGET_MS; cap tahap pemanggil tetap
+     *  menjadi pagar terluar. */
+    private fun extractYouTubeViaFallbackRace(videoId: String): List<Result> {
+        val racers: List<() -> List<Result>> = listOf(
+            { extractYouTubeViaPiped(videoId) },
+            { extractYouTubeViaInvidious(videoId)?.let { listOf(it) } ?: emptyList() },
+            { extractYouTubeViaCobalt(videoId)?.let { listOf(it) } ?: emptyList() }
+        )
+        val futures = racers.map { racer ->
+            try {
+                stageExecutor.submit(
+                    Callable { runCatching { racer() }.getOrDefault(emptyList()) }
+                )
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val deadline = System.nanoTime() + FALLBACK_RACE_BUDGET_MS * 1_000_000L
+        val settled = BooleanArray(futures.size) { futures[it] == null }
+        var settledCount = settled.count { it }
+        while (System.nanoTime() < deadline) {
+            // Sapuan prioritas: periksa dari prioritas tertinggi, jadi
+            // hasil yang tiba bersamaan dimenangkan prioritasnya; hasil
+            // sah pertama pada sapuan mana pun langsung menang.
+            for (i in futures.indices) {
+                val f = futures[i] ?: continue
+                if (settled[i] || !f.isDone) continue
+                settled[i] = true
+                settledCount++
+                val result = try {
+                    f.get()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                if (result.isNotEmpty()) {
+                    futures.forEach { it?.cancel(true) }
+                    return result
+                }
+            }
+            if (settledCount >= futures.size) return emptyList()
+            try {
+                Thread.sleep(FALLBACK_RACE_POLL_MS)
+            } catch (_: InterruptedException) {
+                futures.forEach { it?.cancel(true) }
+                return emptyList()
+            }
+        }
+        futures.forEach { it?.cancel(true) }
+        return emptyList()
     }
 
     // Urutan = urutan coba; instans terverifikasi hidup didahulukan.
