@@ -2624,8 +2624,12 @@ yesBtn.disabled = false;
 }
 const count = res.done;
 closeMovePicker();
-if (res.failed) {
-mmShowToast('Move failed \u2014 check the status message', 3000, 'error');
+if (res.done && res.failedCount) {
+mmShowToast('Moved ' + count + (count === 1 ? ' item' : ' items') +
+' \u2014 ' + res.failedCount + (res.failedCount === 1 ? ' item' : ' items') + ' failed' +
+(res.error ? ': ' + res.error : ''), 3000, 'error');
+} else if (res.failed) {
+mmShowToast('Move failed \u2014 ' + (res.error || 'check the status message'), 3000, 'error');
 } else if (res.cancelled) {
 mmShowToast('Move cancelled \u2014 ' + count + (count === 1 ? ' item' : ' items') + ' moved', 3000, 'error');
 } else {
