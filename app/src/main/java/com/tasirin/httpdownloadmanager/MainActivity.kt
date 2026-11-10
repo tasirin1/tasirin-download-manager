@@ -1545,6 +1545,11 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     private fun showRenameDialog(item: DownloadItem) {
         val input = EditText(this)
+        // Gaya input resmi (konsistensi tampilan): latar kartu
+        // bg_input_tv + padding setara AppInput; sebelumnya EditText
+        // polos bergaris bawah bawaan dan teks menempel tepi dialog.
+        input.setBackgroundResource(R.drawable.bg_input_tv)
+        input.setPadding(dp(12), dp(10), dp(12), dp(10))
         input.isFocusable = true
         input.isFocusableInTouchMode = true
         input.setText(item.fileName)
