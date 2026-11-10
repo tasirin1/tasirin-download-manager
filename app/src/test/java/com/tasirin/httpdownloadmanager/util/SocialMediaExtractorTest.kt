@@ -183,6 +183,16 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `tikTokNamePrefix - author absen tak jadi literal null`() {
+        assertEquals("TikTok_budi_123", SocialMediaExtractor.tikTokNamePrefix("budi", "123"))
+        assertEquals("TikTok_123", SocialMediaExtractor.tikTokNamePrefix(null, "123"))
+        assertEquals("TikTok_123", SocialMediaExtractor.tikTokNamePrefix("", "123"))
+        assertEquals("TikTok_budi", SocialMediaExtractor.tikTokNamePrefix("budi", ""))
+        assertEquals("TikTok", SocialMediaExtractor.tikTokNamePrefix(null, ""))
+        assertEquals("TikTok_budi_123", SocialMediaExtractor.tikTokNamePrefix("  budi  ", " 123 "))
+    }
+
+    @Test
     fun `parseHentaiHavenPage - tag video dan judul`() {
         val html = "<html><head><title>Muchuu no Tou Episode 1 - Hentai Haven</title></head><body>" +
             "<video src=\"https://cdn.example.com/vid123.mp4\"></video></body></html>"

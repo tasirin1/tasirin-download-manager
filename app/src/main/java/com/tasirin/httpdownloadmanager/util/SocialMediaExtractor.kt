@@ -451,11 +451,12 @@ object SocialMediaExtractor {
         }
         val data = obj?.optJSONObject("data") ?: return emptyList()
         val title = data.optString("title", "")
-        val author = try {
-            data.optJSONObject("author")?.optString("unique_id", "")
-        } catch (_: Exception) { "" }
+        // optJSONObject/optString tak pernah melempar (try/catch lama kode
+        // mati, issue #1466); objek author yang absen menghasilkan null
+        // yang dulu ter-render harfiah "null" ke nama berkas.
+        val author = data.optJSONObject("author")?.optString("unique_id", "")
         val id = data.optString("id", "")
-        val namePrefix = "TikTok_${author}_$id".trim('_')
+        val namePrefix = tikTokNamePrefix(author, id)
         val options = mutableListOf<Result>()
 
         val hdUrl = data.optString("hdplay", "")
@@ -472,6 +473,15 @@ object SocialMediaExtractor {
         }
         return options
     }
+
+    /** Awalan nama berkas TikTok (murni, issue #1466): komponen kosong/
+     *  absen dibuang sehingga nama tak memuat literal "null" dan tak
+     *  meninggalkan underscore ganda; author + id lengkap menghasilkan
+     *  bentuk lama "TikTok_<author>_<id>". */
+    internal fun tikTokNamePrefix(author: String?, id: String): String =
+        listOf("TikTok", author?.trim().orEmpty(), id.trim())
+            .filter { it.isNotBlank() }
+            .joinToString("_")
 
     // ── Instagram ────────────────────────────────────────────────────────
 
