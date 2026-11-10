@@ -748,13 +748,17 @@ object SocialMediaExtractor {
             // Strategi 0: coba adaptiveFormats dari VISIONOS (URL langsung tanpa HLS)
             // Cap tahap juga di sini (#266): jalur ini tidak punya
             // withTimeoutOrNull sama sekali, jadi dulu benar-benar tak berbatas.
+            // Halaman watch diunduh SEKALI untuk seluruh rantai (issue
+            // #1413): strategi VISIONOS adaptive melaporkannya lewat
+            // callback, strategi halaman memakainya ulang.
+            var watchPage: HttpResult? = null
             val visionAdaptive = runStageCapped(24_000L) {
-                extractYouTubeViaVisionosAdaptive(videoId, user)
+                extractYouTubeViaVisionosAdaptive(videoId, user) { watchPage = it }
             }
             if (visionAdaptive != null) return@withContext visionAdaptive
             // Strategi 1: halaman WEB + Piped/Invidious/Cobalt
             val results = runStageCapped(30_000L) {
-                extractYouTubeFromPage(url, videoId, user)
+                extractYouTubeFromPage(url, videoId, user, watchPage)
             } ?: emptyList()
             results.firstOrNull { it.directUrl.startsWith("http") }
         } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
@@ -763,12 +767,16 @@ object SocialMediaExtractor {
     private fun extractYouTubeFromPage(
         url: String,
         videoId: String,
-        user: Map<String, String> = emptyMap()
+        user: Map<String, String> = emptyMap(),
+        prefetchedPage: HttpResult? = null
     ): List<Result> {
         // Awal tahap untuk anggaran probe #824: kedua pemanggil
         // membungkus fungsi ini dengan runStageCapped(30_000L).
         val stageStartNanos = System.nanoTime()
-        val httpResult = httpGetWithCookies(
+        // Halaman watch hasil unduhan strategi sebelumnya dipakai ulang
+        // bila diberikan (issue #1413): isinya halaman desktop yang sama,
+        // jadi unduhan ratusan KB itu tak perlu diulang.
+        val httpResult = prefetchedPage ?: httpGetWithCookies(
             "https://www.youtube.com/watch?v=$videoId",
             mapOf(
                 "User-Agent" to YT_PAGE_UA,
@@ -907,7 +915,8 @@ object SocialMediaExtractor {
     private fun fetchVisionosPlayer(
         pageUrl: String,
         videoId: String,
-        user: Map<String, String>
+        user: Map<String, String>,
+        onPageFetched: ((HttpResult) -> Unit)? = null
     ): VisionosPlayer? {
         // Butuh visitorData + cookies dari halaman agar API tidak LOGIN_REQUIRED.
         val page = httpGetWithCookies(
@@ -918,6 +927,10 @@ object SocialMediaExtractor {
             ) + user,
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
+        // Halaman yang baru diunduh ditawarkan ke pemanggil (issue
+        // #1413): rantai non-HLS meneruskannya ke strategi halaman agar
+        // halaman watch yang sama tidak diunduh dua kali.
+        onPageFetched?.invoke(page)
         val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
             ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
             ?: return null
@@ -1017,10 +1030,11 @@ object SocialMediaExtractor {
      *  tanpa lewat HLS (menghindari media playlist 404). */
     private fun extractYouTubeViaVisionosAdaptive(
         videoId: String,
-        user: Map<String, String> = emptyMap()
+        user: Map<String, String> = emptyMap(),
+        onPageFetched: ((HttpResult) -> Unit)? = null
     ): Result? {
         val player = fetchVisionosPlayer(
-            "https://www.youtube.com/watch?v=$videoId", videoId, user
+            "https://www.youtube.com/watch?v=$videoId", videoId, user, onPageFetched
         ) ?: return null
         return runCatching {
             val title = player.title
