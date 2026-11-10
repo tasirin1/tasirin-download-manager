@@ -2570,6 +2570,17 @@ class DownloadEngine(appContext: Context) {
         // adaptif tanpa Content-Length di 0% permanen.
         val downloaded = AtomicLong(0)
         val lastNotify = AtomicLong(0)
+        // Total Content-Length per sisi (diagnosis bug-99 A3): diisi
+        // downloadAdaptiveFile begitu total sisinya dikenal, agar
+        // penyebut persen gabungan bisa dikunci ke jumlah kedua berkas
+        // oleh muxEffectiveTotal — bukan total berkas yang kebetulan
+        // sedang melapor saja (persen melonjak/mundur antar pelapor).
+        val videoTotal = AtomicLong(0)
+        val audioTotal = AtomicLong(0)
+        // Throttle laporan fase gabung (remux) — terpisah dari lastNotify
+        // fase unduh agar flush final unduhan tak menelan laporan gabung
+        // pertama, dan sebaliknya.
+        val lastMergeNotify = AtomicLong(0)
     }
 
     /** Unduh satu file adaptive (audio M4A / video MP4) dari URL VISIONOS ke
@@ -2584,7 +2595,8 @@ class DownloadEngine(appContext: Context) {
         buffer: ByteArray,
         throttle: SpeedThrottle,
         progress: MuxProgress,
-        mayResume: Boolean = true
+        mayResume: Boolean = true,
+        totalSink: AtomicLong? = null
     ): Boolean {
         if (url.isBlank()) return false
         val existing = if (mayResume && target.isFile) target.length() else 0L
@@ -2612,6 +2624,7 @@ class DownloadEngine(appContext: Context) {
                     // 416 + total server == ukuran temp: berkas sudah
                     // utuh dari attempt sebelumnya, tak ada yang diunduh.
                     runCatching { conn.disconnect() }
+                    totalSink?.set(existing)
                     progress.downloaded.addAndGet(existing)
                     return existing > 0
                 }
@@ -2622,7 +2635,8 @@ class DownloadEngine(appContext: Context) {
                     runCatching { conn.disconnect() }
                     target.delete()
                     return downloadAdaptiveFile(
-                        item, url, target, buffer, throttle, progress, mayResume = false
+                        item, url, target, buffer, throttle, progress,
+                        mayResume = false, totalSink = totalSink
                     )
                 }
                 AdaptiveResumeAction.FAIL -> {
@@ -2653,6 +2667,9 @@ class DownloadEngine(appContext: Context) {
                 respLen > 0 -> respLen
                 else -> 0L
             }
+            // Daftarkan total sisi ini begitu dikenal (diagnosis bug-99
+            // A3): penyebut progres gabungan dikunci dari kedua total.
+            if (total > 0) totalSink?.set(total)
             // Anggaran byte sadar ruang kosong (issue #702): plafon
             // lama 512MB mentah menolak video adaptif panjang yang sah
             // padahal ruang sehat. Batas kini mengikuti ruang bebas
@@ -2815,10 +2832,11 @@ class DownloadEngine(appContext: Context) {
         // akan saling menimpa antar-coroutine); kegagalan sisi ini memutus
         // koneksi item agar sisi lain berhenti segera — bukan menunggu
         // read-timeout soketnya — lalu coroutineScope membatalkan job-nya.
-        suspend fun fetchAdaptive(url: String, target: File, label: String) {
+        suspend fun fetchAdaptive(url: String, target: File, label: String, totalSink: AtomicLong) {
             try {
                 val ok = downloadAdaptiveFile(
-                    item, url, target, ByteArray(BUFFER_SIZE), throttle, progress
+                    item, url, target, ByteArray(BUFFER_SIZE), throttle, progress,
+                    totalSink = totalSink
                 )
                 if (!ok) throw IOException("adaptive $label download failed")
             } catch (e: Exception) {
@@ -2834,12 +2852,38 @@ class DownloadEngine(appContext: Context) {
             // (kunci internal, pola segmen). Gagal satu sisi membatalkan
             // sisi lain lewat coroutineScope.
             coroutineScope {
-                launch { fetchAdaptive(adaptiveVideoUrl, videoMp4, "video") }
-                launch { fetchAdaptive(adaptiveAudioUrl, audioM4a, "audio") }
+                launch { fetchAdaptive(adaptiveVideoUrl, videoMp4, "video", progress.videoTotal) }
+                launch { fetchAdaptive(adaptiveAudioUrl, audioM4a, "audio", progress.audioTotal) }
             }
             coroutineContext.ensureActive()
-            val remuxed = AdaptiveMp4Muxer.remuxMp4s(videoMp4, audioM4a, mp4)
-            if (!remuxed) throw IOException("adaptive remux failed")
+            // Pancarkan byte final fase unduh TANPA throttle sebelum remux
+            // (diagnosis bug-99 A1): laporan per-chunk terakhir hampir
+            // selalu tertelan throttle 1 detik, jadi tanpa flush ini
+            // tampilan membeku di ±99% selama remux berjalan — dan di
+            // perangkat lambat remux bisa ber menit-menit.
+            val mergeStartPercent = flushMuxProgress(item, progress)
+            try {
+                AdaptiveMp4Muxer.remuxMp4s(
+                    videoMp4, audioM4a, mp4,
+                    onProgress = { copied, total ->
+                        reportMuxMergeProgress(item, progress, copied, total, mergeStartPercent)
+                    },
+                    isCancelled = { !coroutineContext.isActive }
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Kegagalan remux tak lagi ditelan boolean bisu (diagnosis
+                // bug-99 A2): penyebab masuk log server DAN menjadi pesan
+                // gagal item yang terlihat pengguna. Retry handleFailure
+                // tetap boleh mencoba ulang, tetapi tiap kegagalan kini
+                // tercatat — bukan siklus remux bisu yang berputar di 99%.
+                App.logEvent(
+                    "SOCIAL: adaptive remux failed for ${item.fileName}: ${e.message?.take(180)}"
+                )
+                updateItem(item.id, persist = false) { it.copy(progressPercentOverride = -1) }
+                throw IOException("Adaptive merge failed: ${e.message ?: "muxer error"}")
+            }
             val fileName = "$baseName.mp4"
             videoMp4.delete()
             audioM4a.delete()
@@ -2885,11 +2929,16 @@ class DownloadEngine(appContext: Context) {
         ) {
             // Total gabungan hanya dari Content-Length riil (issue #1428):
             // byte berkas yang sudah selesai + Content-Length berkas yang
-            // sedang diunduh. Tanpa Content-Length total dibiarkan 0 =
-            // tak diketahui secara jujur: UI menampilkan byte terunduh
-            // saja (persen dari byte/total hanya bila total dikenal),
-            // bukan estimasi palsu yang mengunci tampilan di 0%.
-            val effTotal = muxEffectiveTotal(progress.downloaded.get(), total)
+            // sedang diunduh; begitu KEDUA total sisi dikenal, penyebut
+            // dikunci ke jumlah keduanya (diagnosis bug-99 A3). Tanpa
+            // Content-Length total dibiarkan 0 = tak diketahui secara
+            // jujur: UI menampilkan byte terunduh saja (persen dari
+            // byte/total hanya bila total dikenal), bukan estimasi palsu
+            // yang mengunci tampilan di 0%.
+            val effTotal = muxEffectiveTotal(
+                progress.downloaded.get(), total,
+                progress.videoTotal.get(), progress.audioTotal.get()
+            )
             val (speed, eta) = speedTracker.sample(item.id, totalNow, effTotal)
             updateItem(item.id, persist = false) {
                 it.copy(
@@ -2903,6 +2952,67 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             scheduleProgressSave()
+        }
+    }
+
+    /** Pancarkan progres fase unduh FINAL jalur muxed tanpa throttle,
+     *  tepat sebelum remux mulai (diagnosis bug-99 A1): byte terakhir
+     *  kedua sisi sudah lengkap di [MuxProgress.downloaded], tetapi
+     *  laporan per-chunk terakhir hampir selalu tertelan throttle
+     *  1 detik reportMuxProgress sehingga UI tak pernah melihatnya.
+     *  Mengembalikan persen tampilan di akhir fase unduh sebagai titik
+     *  awal pita persen fase gabung (muxMergePercent). */
+    private fun flushMuxProgress(item: DownloadItem, progress: MuxProgress): Int {
+        val downloaded = progress.downloaded.get()
+        val effTotal = muxEffectiveTotal(
+            downloaded, 0, progress.videoTotal.get(), progress.audioTotal.get()
+        )
+        val (speed, eta) = speedTracker.sample(item.id, downloaded, effTotal)
+        updateItem(item.id, persist = false) {
+            it.copy(
+                state = DownloadState.DOWNLOADING,
+                bytesDownloaded = downloaded,
+                totalBytes = effTotal,
+                progressPercentOverride = -1,
+                totalBytesEstimated = false,
+                speedBps = speed,
+                etaSeconds = eta
+            )
+        }
+        scheduleProgressSave()
+        progress.lastNotify.set(monotonicNow())
+        return if (effTotal > 0) {
+            ((downloaded * 100) / effTotal).toInt().coerceIn(0, 100)
+        } else {
+            0
+        }
+    }
+
+    /** Laporan progres fase gabung (remux) jalur muxed: persen dipetakan
+     *  fungsi murni muxMergePercent ke pita [startPercent..99] dan
+     *  dipasang lewat progressPercentOverride — mekanisme penanda persen
+     *  yang sama yang sudah dibaca UI native, remote, dan codec. Tanpa
+     *  ini fase remux bisu total (diagnosis bug-99 A1): tampilan membeku
+     *  di persen akhir unduhan selama remux berjalan. Throttle 500 ms
+     *  terpisah dari throttle fase unduh. */
+    private fun reportMuxMergeProgress(
+        item: DownloadItem,
+        progress: MuxProgress,
+        copiedBytes: Long,
+        totalBytes: Long,
+        startPercent: Int
+    ) {
+        val now = monotonicNow()
+        val lastSeen = progress.lastMergeNotify.get()
+        if (now - lastSeen < 500) return
+        if (!progress.lastMergeNotify.compareAndSet(lastSeen, now)) return
+        updateItem(item.id, persist = false) {
+            it.copy(
+                state = DownloadState.DOWNLOADING,
+                progressPercentOverride = muxMergePercent(copiedBytes, totalBytes, startPercent),
+                speedBps = 0,
+                etaSeconds = 0
+            )
         }
     }
 
@@ -4534,13 +4644,40 @@ internal fun adaptiveResumeAction(
     else -> AdaptiveResumeAction.FAIL
 }
 
-/** Total efektif progres adaptif (issue #1428): byte berkas yang sudah
- *  selesai ditambah Content-Length berkas yang sedang diunduh. Content-
- *  Length tak dikenal (0/-1) menghasilkan 0 = total tak diketahui secara
- *  jujur — bukan estimasi. Murni agar bisa di-unit-test; nilai harapan
- *  dibuktikan port Python 1:1 (audit-dm-r14/port-1428.py). */
-internal fun muxEffectiveTotal(completedBytes: Long, currentFileTotal: Long): Long =
-    if (currentFileTotal > 0) completedBytes + currentFileTotal else 0L
+/** Total efektif progres adaptif (issue #1428, diperluas diagnosis
+ *  bug-99 A3): bila total KEDUA berkas (video + audio) sudah dikenal,
+ *  penyebut dikunci ke jumlah keduanya — laporan dari sisi mana pun
+ *  tak lagi membuat persen melonjak/mundur karena penyebut berganti
+ *  per pelapor, dan byte selesai tak dihitung ganda. Bila baru satu
+ *  sisi yang dikenal, perilaku #1428 berlaku: byte berkas selesai +
+ *  Content-Length berkas yang sedang diunduh. Content-Length tak
+ *  dikenal (0/-1) menghasilkan 0 = total tak diketahui secara jujur —
+ *  bukan estimasi. Murni agar bisa di-unit-test; nilai harapan
+ *  dibuktikan port Python 1:1 (bug-99/port-mux-progress.py). */
+internal fun muxEffectiveTotal(
+    completedBytes: Long,
+    currentFileTotal: Long,
+    videoTotal: Long,
+    audioTotal: Long
+): Long = when {
+    videoTotal > 0 && audioTotal > 0 -> videoTotal + audioTotal
+    currentFileTotal > 0 -> completedBytes + currentFileTotal
+    else -> 0L
+}
+
+/** Persen tampilan fase gabung (remux) adaptif: byte sampel tersalin
+ *  dipetakan linear ke pita [startPercent..99] — persen tak pernah
+ *  mundur dari akhir fase unduh, dan 100 hanya lahir dari state
+ *  COMPLETED (finishMuxed). Total sumber tak dikenal menghasilkan
+ *  startPercent: fase gabung tampil diam di persen awalnya, bukan
+ *  angka palsu. Murni agar bisa di-unit-test; nilai harapan dibuktikan
+ *  port Python 1:1 (bug-99/port-mux-progress.py). */
+internal fun muxMergePercent(copiedBytes: Long, totalBytes: Long, startPercent: Int): Int {
+    val start = startPercent.coerceIn(0, 99)
+    if (totalBytes <= 0) return start
+    val copied = copiedBytes.coerceIn(0L, totalBytes)
+    return start + safeMulDiv(copied, (99 - start).toLong(), totalBytes).toInt()
+}
 
 /** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
  *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able
