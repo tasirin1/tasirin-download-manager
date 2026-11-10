@@ -329,6 +329,9 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                         }
                     }
                 }
+                // Pangkas peta state di semua cabang (issue #1394),
+                // bukan hanya jalur autoOpenCompleted.
+                pruneLastItemStates(items)
                 runCatching {
                     // Rebuild daftar dibatasi 400ms sekali kecuali jumlah item berubah;
                     // lewati bila tak ada field tampil yang berubah.
@@ -1914,7 +1917,17 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
             if (prev != item.state) lastItemStates[item.id] = item.state
         }
-        // Id yang hilang dari daftar dibuang hanya bila peta membengkak.
+        pruneLastItemStates(items)
+    }
+
+    /** Buang id yang hilang dari daftar dari peta state — hanya bila
+     *  peta membengkak (issue #1394). Dipanggil collector untuk SEMUA
+     *  cabang: cabang konsumsi-transisi (pref auto-open mati) menambah
+     *  entri tanpa pernah memangkas, jadi peta tumbuh tak terbatas
+     *  selama pref mati. Membuang hanya id yang sudah tak ada di
+     *  daftar, jadi deteksi transisi item yang masih ada (termasuk
+     *  tangkapan #149 saat kembali ke depan) tak terpengaruh. */
+    private fun pruneLastItemStates(items: List<DownloadItem>) {
         if (lastItemStates.size > items.size * 2 + 16) {
             val keep = items.asSequence().map { it.id }.toSet()
             lastItemStates.keys.retainAll(keep)
