@@ -607,6 +607,98 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         var socialProbedUrl: String = ""
         var socialJob: Job? = null
         var socialDebounce: Job? = null
+        // Memo hasil probe per URL (issue #1473): URL yang sama dalam
+        // satu sesi dialog tak diekstrak ulang dari jaringan hanya
+        // karena kolom URL disunting lalu kembali seperti semula.
+        var socialProbeMemo: Pair<String, List<SocialMediaExtractor.Result>>? = null
+        // URL pemilik label yang SEDANG tampil di tiap spinner sosial +
+        // memo label terpilih per URL: setupSpinner memasang adapter
+        // baru yang me-reset pilihan ke Default, jadi sebelum adapter
+        // diganti pilihan lama dicatat per URL pemiliknya dan dipulihkan
+        // bila label untuk URL itu dipasang lagi (issue #1473). URL
+        // yang belum pernah dipilih mulai dari Default seperti biasa.
+        var socialQualityShownUrl: String = ""
+        var socialCarouselShownUrl: String = ""
+        val socialQualitySelMemo = mutableMapOf<String, String>()
+        val socialCarouselSelMemo = mutableMapOf<String, String>()
+        fun setupQualitySpinner(labels: List<String>, target: String) {
+            val curLabel = socialQualitySpinner.selectedItem?.toString()
+            if (socialQualityShownUrl.isNotEmpty() && curLabel != null) {
+                socialQualitySelMemo[socialQualityShownUrl] = curLabel
+            }
+            setupSpinner(this@MainActivity, socialQualitySpinner, labels)
+            socialQualityShownUrl = target
+            val prev = socialQualitySelMemo[target]
+            if (prev != null) {
+                val idx = labels.indexOf(prev)
+                if (idx > 0) socialQualitySpinner.setSelection(idx)
+            }
+        }
+        fun setupCarouselSpinner(labels: List<String>, target: String) {
+            val curLabel = socialCarouselSpinner.selectedItem?.toString()
+            if (socialCarouselShownUrl.isNotEmpty() && curLabel != null) {
+                socialCarouselSelMemo[socialCarouselShownUrl] = curLabel
+            }
+            setupSpinner(this@MainActivity, socialCarouselSpinner, labels)
+            socialCarouselShownUrl = target
+            val prev = socialCarouselSelMemo[target]
+            if (prev != null) {
+                val idx = labels.indexOf(prev)
+                if (idx > 0) socialCarouselSpinner.setSelection(idx)
+            }
+        }
+        // Terapkan hasil probe ke state + spinner (dipakai jalur jaringan
+        // dan jalur memo): pisahkan opsi video/foto, tampilkan section
+        // yang relevan. Pilihan spinner dipulihkan helper di atas.
+        fun applySocialProbeResult(probeTarget: String, options: List<SocialMediaExtractor.Result>) {
+            socialOptions = options
+            socialProbedUrl = probeTarget
+            // Pisahkan opsi video dan foto
+            socialVideoOptions = options.filter { it.mimeType.startsWith("video") }
+            socialPhotoOptions = options.filter { it.mimeType.startsWith("image") }
+            val hasVideo = socialVideoOptions.isNotEmpty()
+            val hasPhotos = socialPhotoOptions.isNotEmpty()
+            socialQualitySection.isVisible = false
+            socialCarouselSection.isVisible = false
+            if (!hasVideo && !hasPhotos) {
+                platformBadge.isVisible = false
+                return
+            }
+            // Section kualitas video
+            if (hasVideo) {
+                val labels = listOf(getString(R.string.social_quality_default)) +
+                    socialVideoOptions.map { opt ->
+                        if (opt.quality.isBlank()) {
+                            opt.mimeType.takeIf { it.isNotBlank() } ?: "Video"
+                        } else {
+                            opt.quality
+                        }
+                    }
+                setupQualitySpinner(labels, probeTarget)
+                socialQualitySection.isVisible = true
+            }
+            // Section pemilihan foto carousel
+            if (hasPhotos) {
+                val photoLabels = if (socialPhotoOptions.size > 1) {
+                    listOf(getString(R.string.social_carousel_all, socialPhotoOptions.size)) +
+                        socialPhotoOptions.mapIndexed { i, opt ->
+                            val label = opt.quality.takeIf { it.isNotBlank() }
+                                ?: opt.mimeType.takeIf { it.isNotBlank() }
+                                ?: "Photo"
+                            "${i + 1}. $label"
+                        }
+                } else {
+                    listOf(getString(R.string.social_quality_default)) +
+                        socialPhotoOptions.map { opt ->
+                            opt.quality.takeIf { it.isNotBlank() }
+                                ?: opt.mimeType.takeIf { it.isNotBlank() }
+                                ?: "Photo"
+                        }
+                }
+                setupCarouselSpinner(photoLabels, probeTarget)
+                socialCarouselSection.isVisible = true
+            }
+        }
         fun platformLabelFrom(url: String): String {
             val host = runCatching { url.toUri().host.orEmpty() }.getOrDefault("").lowercase(Locale.ROOT)
             fun matches(vararg domains: String): Boolean =
@@ -703,10 +795,20 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 socialProbedUrl = target
                 val labels = listOf(getString(R.string.social_quality_default)) +
                     socialYoutubeHeights.map { "${it}p" }
-                setupSpinner(this@MainActivity, socialQualitySpinner, labels)
+                setupQualitySpinner(labels, target)
                 socialQualitySection.isVisible = true
                 socialCarouselSection.isVisible = false
                 socialJob = null
+                return
+            }
+            // Memo (issue #1473): URL ini sudah pernah diekstrak dalam
+            // sesi dialog ini — terapkan hasil simpanan, jangan tembak
+            // jaringan lagi. Pilihan spinner ikut dipulihkan helper.
+            val memo = socialProbeMemo
+            if (memo != null && memo.first == target) {
+                socialJob = null
+                socialYoutubeHeights = intArrayOf()
+                applySocialProbeResult(target, memo.second)
                 return
             }
             socialYoutubeHeights = intArrayOf()
@@ -729,53 +831,8 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 if (socialJob !== coroutineContext[Job] ||
                     extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull() != probeTarget
                 ) return@launch
-                socialOptions = options
-                socialProbedUrl = probeTarget
-                // Pisahkan opsi video dan foto
-                socialVideoOptions = options.filter { it.mimeType.startsWith("video") }
-                socialPhotoOptions = options.filter { it.mimeType.startsWith("image") }
-                val hasVideo = socialVideoOptions.isNotEmpty()
-                val hasPhotos = socialPhotoOptions.isNotEmpty()
-                socialQualitySection.isVisible = false
-                socialCarouselSection.isVisible = false
-                if (!hasVideo && !hasPhotos) {
-                    platformBadge.isVisible = false
-                    return@launch
-                }
-                // Section kualitas video
-                if (hasVideo) {
-                    val labels = listOf(getString(R.string.social_quality_default)) +
-                        socialVideoOptions.map { opt ->
-                            if (opt.quality.isBlank()) {
-                                opt.mimeType.takeIf { it.isNotBlank() } ?: "Video"
-                            } else {
-                                opt.quality
-                            }
-                        }
-                    setupSpinner(this@MainActivity, socialQualitySpinner, labels)
-                    socialQualitySection.isVisible = true
-                }
-                // Section pemilihan foto carousel
-                if (hasPhotos) {
-                    val photoLabels = if (socialPhotoOptions.size > 1) {
-                        listOf(getString(R.string.social_carousel_all, socialPhotoOptions.size)) +
-                            socialPhotoOptions.mapIndexed { i, opt ->
-                                val label = opt.quality.takeIf { it.isNotBlank() }
-                                    ?: opt.mimeType.takeIf { it.isNotBlank() }
-                                    ?: "Photo"
-                                "${i + 1}. $label"
-                            }
-                    } else {
-                        listOf(getString(R.string.social_quality_default)) +
-                            socialPhotoOptions.map { opt ->
-                                opt.quality.takeIf { it.isNotBlank() }
-                                    ?: opt.mimeType.takeIf { it.isNotBlank() }
-                                    ?: "Photo"
-                            }
-                    }
-                    setupSpinner(this@MainActivity, socialCarouselSpinner, photoLabels)
-                    socialCarouselSection.isVisible = true
-                }
+                socialProbeMemo = probeTarget to options
+                applySocialProbeResult(probeTarget, options)
             }
         }
         fun probeSocialQuality() {
