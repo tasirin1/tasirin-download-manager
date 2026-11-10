@@ -993,6 +993,13 @@ object SocialMediaExtractor {
                     // jangan lempar agar fallback HLS/adaptif lain tetap jalan.
                     val url = best.optString("url", "")
                     if (url.isEmpty()) return@runCatching null
+                    // Pasangan audio WAJIB ada (issue #1412, rasional
+                    // #537): format adaptive selalu video-only, jadi
+                    // audioAd kosong (audio hanya WebM/opus yang tak bisa
+                    // di-mux) akan menghasilkan unduhan bisu yang tampak
+                    // utuh — lewati strategi ini, samakan dengan
+                    // penolakan jalur halaman.
+                    if (audioAd.isEmpty()) return@runCatching null
                     val mime = best.optString("mimeType", MIME_MP4)
                     val quality = best.optString("qualityLabel", "Unknown")
                     val ext = if (mime.contains("webm")) "webm" else "mp4"
@@ -1024,6 +1031,10 @@ object SocialMediaExtractor {
             // cadangan terakhir karena muxer MP4 tidak menerima VP9/opus.
             val (videoAd, audioAd) = bestAdaptivePair(streamingData)
             val best = adaptiveFormatByUrl(adaptive, videoAd) ?: return null
+            // Pasangan audio WAJIB ada (issue #1412, rasional #537):
+            // audioAd kosong berarti unduhan video-only bisu — gagalkan
+            // strategi ini agar rantai fallback yang menilai.
+            if (audioAd.isEmpty()) return null
             val url = best.getString("url")
             val mime = best.optString("mimeType", MIME_MP4)
             val quality = best.optString("qualityLabel", "Unknown")
