@@ -309,9 +309,14 @@ object StoragePrefs {
         // Hash yang bocor tidak boleh dipakai sebagai PIN: hanya terima hash
         // SHA-256 dari input, jangan pernah bandingkan input langsung dengan
         // nilai tersimpan 64-hex (itu membuat hash menjadi password).
+        // Migrasi format TANPA rotate secret sesi (issue #1499),
+        // menyamai jalur migrasi setServerPin: rotate di sini
+        // menendang semua sesi remote lain pada login pertama sesudah
+        // upgrade format — bertentangan dengan janji "tanpa memaksa
+        // logout" di atas. PIN-nya sendiri tidak berubah, jadi tak
+        // ada alasan keamanan untuk merotasi secret.
         if (!verifyStoredPin(stored, pin)) return false
         prefs(context).edit { putString(KEY_SERVER_PIN, PinHash.hash(pin)) }
-        rotateServerSessionSecret(context)
         return true
     }
 
