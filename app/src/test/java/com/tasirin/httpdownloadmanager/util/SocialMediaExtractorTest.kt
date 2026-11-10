@@ -388,6 +388,28 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parsePornhubPage - kualitas sama diberi nomor tabrakan`() {
+        // Issue #1491: dua URL berbeda berkualitas sama (mis.
+        // mediaDefinitions + flashvars) dulu berlabel dan bernama
+        // berkas persis sama. Ekspektasi dibuktikan port_1491.py.
+        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
+            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":\"720\"}," +
+            "{\"videoUrl\":\"https://cdn.ph.com/b.mp4\",\"quality\":\"720\"}," +
+            "{\"videoUrl\":\"https://cdn.ph.com/c.mp4\",\"quality\":\"720\"}]}" +
+            "</script></body></html>"
+        val opts = SocialMediaExtractor.parsePornhubPage(html)
+        assertEquals(3, opts.size)
+        assertEquals("720p", opts[0].quality)
+        assertEquals("720p-2", opts[1].quality)
+        assertEquals("720p-3", opts[2].quality)
+        assertTrue(opts[0].fileName!!.endsWith("_720p.mp4"))
+        assertTrue(opts[1].fileName!!.endsWith("_720p-2.mp4"))
+        assertTrue(opts[2].fileName!!.endsWith("_720p-3.mp4"))
+        // Nama berkas ketiganya berbeda satu sama lain.
+        assertEquals(3, opts.map { it.fileName }.toSet().size)
+    }
+
+    @Test
     fun `parsePornhubPage - flashvars dan fallback og`() {
         val html = "<html><head>" +
             "<meta property=\"og:title\" content=\"OG Title\"/>" +

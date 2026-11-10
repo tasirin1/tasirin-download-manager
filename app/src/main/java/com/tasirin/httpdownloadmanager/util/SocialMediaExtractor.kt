@@ -1833,6 +1833,7 @@ object SocialMediaExtractor {
         }
         // Kandidat manifes (m3u8) dibuang: aplikasi hanya mengunduh
         // yang ditawarkan hanya berkas MP4 progresif langsung.
+        val usedLabels = mutableMapOf<String, Int>()
         return found.entries.sortedByDescending { it.value }
             .filter { (url, _) -> !url.contains(".m3u8") }
             .map { (url, quality) ->
@@ -1840,10 +1841,20 @@ object SocialMediaExtractor {
                 // label "HD" bersama untuk semua >= 720 membuat 720p
                 // dan 1080p tak terbedakan di daftar opsi maupun nama
                 // berkas.
-                val label = when {
+                val baseLabel = when {
                     quality > 0 -> "${quality}p"
                     else -> "Video"
                 }
+                // Tabrakan label dalam daftar yang sama (issue #1491):
+                // dua URL berbeda bisa berkualitas sama (lintasan
+                // mediaDefinitions vs flashvars, atau cadangan generik
+                // kualitas-0) — label + nama berkas adalah fungsi murni
+                // kualitas, jadi tanpa penomoran keduanya persis sama
+                // dan tak terbedakan. Kemunculan ke-2 dst diberi
+                // akhiran -2/-3, pola penomoran #1465 di HentaiHaven.
+                val n = (usedLabels[baseLabel] ?: 0) + 1
+                usedLabels[baseLabel] = n
+                val label = if (n > 1) "$baseLabel-$n" else baseLabel
                 Result(url, "Pornhub_${safeName}_${label}.mp4", title, label, MIME_MP4, cookies = cookies)
             }
     }
