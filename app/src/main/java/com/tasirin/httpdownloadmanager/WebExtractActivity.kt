@@ -166,6 +166,15 @@ class WebExtractActivity : AppCompatActivity() {
                 !isAllowedTarget(request.url.toString())
 
             override fun onPageFinished(view: WebView, url: String) {
+                // Batas halaman = batas akumulasi episode (issue
+                // #1533): lastEpisodesJson tak pernah direset, jadi
+                // navigasi dalam-WebView ke halaman LAIN pada host
+                // yang sama (diizinkan isAllowedTarget) bisa
+                // menempelkan daftar episode halaman sebelumnya ke
+                // hasil halaman baru lewat penerusan #1512. Reset di
+                // sini aman untuk satu halaman: akumulasi memang
+                // dimulai dari tick sesudah halaman termuat.
+                lastEpisodesJson = ""
                 statusText.text = getString(R.string.web_extract_ready)
                 startGrabLoop()
             }
