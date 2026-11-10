@@ -1257,29 +1257,29 @@ class FileSaver(context: Context) {
                         // Klaim nama + update terkunci (issue #658), kunci yang
                         // sama dengan saveToMediaStore.
                         withMediaStoreClaimLock(clean) {
-                            val finalName = if (rel != null) {
-                                // Cek keunikan di koleksi tempat berkas BENAR-
-                                // BENAR hidup (issue #403): default Downloads
-                                // membuat nama yang sudah dipakai di Movies
-                                // (koleksi Video) dinyatakan bebas, sehingga
-                                // rename menghasilkan dua berkas bernama sama
-                                // persis di folder yang sama. Pola sama seperti
-                                // saveToMediaStore yang meneruskan koleksinya.
-                                // Koleksi dibaca dari URI berkas itu sendiri
-                                // (issue #444): turunan mime nama LAMA (#411)
-                                // masih menyimpang pada rename KEDUA — sesudah
-                                // .mp4 -> .bin, "nama lama" adalah .bin yang
-                                // mime-nya bukan video, padahal berkas tetap
-                                // hidup di koleksi Video (rename tidak
-                                // memindahkan antar-koleksi). URI adalah
-                                // satu-satunya sumber yang selalu benar.
-                                uniqueMediaStoreName(
-                                    clean, rel,
-                                    MediaLibrary.mediaCollectionForUri(uri)
-                                )
-                            } else {
-                                clean
-                            }
+                            // Cek keunikan di koleksi tempat berkas BENAR-
+                            // BENAR hidup (issue #403): default Downloads
+                            // membuat nama yang sudah dipakai di Movies
+                            // (koleksi Video) dinyatakan bebas, sehingga
+                            // rename menghasilkan dua berkas bernama sama
+                            // persis di folder yang sama. Pola sama seperti
+                            // saveToMediaStore yang meneruskan koleksinya.
+                            // Koleksi dibaca dari URI berkas itu sendiri
+                            // (issue #444): turunan mime nama LAMA (#411)
+                            // masih menyimpang pada rename KEDUA — sesudah
+                            // .mp4 -> .bin, "nama lama" adalah .bin yang
+                            // mime-nya bukan video, padahal berkas tetap
+                            // hidup di koleksi Video (rename tidak
+                            // memindahkan antar-koleksi). URI adalah
+                            // satu-satunya sumber yang selalu benar.
+                            // RELATIVE_PATH tak terbaca (rel null, issue
+                            // #1478): jangan pakai nama mentah — cek
+                            // keunikan konservatif di seluruh koleksi
+                            // (uniqueMediaStoreName tanpa saringan folder).
+                            val finalName = uniqueMediaStoreName(
+                                clean, rel,
+                                MediaLibrary.mediaCollectionForUri(uri)
+                            )
                             val values = ContentValues().apply {
                                 put(MediaStore.Downloads.DISPLAY_NAME, finalName)
                             }
