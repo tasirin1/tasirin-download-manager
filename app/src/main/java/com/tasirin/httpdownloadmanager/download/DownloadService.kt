@@ -152,6 +152,25 @@ class DownloadService : Service() {
                         val now = android.os.SystemClock.elapsedRealtime()
                         if (!membershipChanged && now - lastUiUpdate < 1000) return@runCatching
                         lastUiUpdate = now
+                        // Nilai ulang keadaan SEGAR tepat sebelum posting
+                        // (issue #1510): stopSelfIfNoWork di atas menilai
+                        // snapshot emisi ini, tetapi penilai berhenti lain
+                        // bisa sudah menyelesaikan rangkaian berhentinya
+                        // (posting final -> stopForeground(REMOVE) ->
+                        // stopSelf) dari snapshot yang lebih baru di
+                        // antara cek itu dan posting ini. Memposting
+                        // snapshot basi sesudah pencabutan melahirkan
+                        // notifikasi ongoing mandiri yang tak ada yang
+                        // mencabutnya. Bila keadaan segar sudah tak punya
+                        // pekerjaan aktif dan server tak aktif, lewati
+                        // posting progres — penilai yang menang sudah
+                        // menangani notifikasi akhirnya.
+                        val freshItems = App.engine.items.value
+                        val freshActive = freshItems.any {
+                            it.state == DownloadState.DOWNLOADING ||
+                                it.state == DownloadState.PENDING
+                        }
+                        if (!freshActive && !isServerActive()) return@runCatching
                         NotificationHelper.updateNotification(this@DownloadService, items, serverActive)
                     }
                 }
