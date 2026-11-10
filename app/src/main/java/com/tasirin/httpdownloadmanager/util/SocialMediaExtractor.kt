@@ -2542,8 +2542,15 @@ object SocialMediaExtractor {
     private fun extractAllFacebook(url: String, user: Map<String, String>): List<Result> {
         // Tiap strategi punya jatah waktu sendiri (#246): tanpa jatah,
         // tahap pertama yang lambat menghabiskan seluruh anggaran total
-        // 60 detik dan cadangan tidak pernah dicoba.
-        val (html, cookies) = runStageCapped(24_000L) {
+        // 60 detik dan cadangan tidak pernah dicoba. Jumlah cap tahap
+        // WAJIB di bawah cap total EXTRACT_TOTAL_TIMEOUT_MS (issue
+        // #1525): 20+12+12+12 = 56 dtk menyisakan ±4 dtk untuk parse +
+        // perakitan antar-tahap yang berjalan di luar cap tahap tetapi
+        // di dalam cap total — sebelumnya 24+12+12+12 = tepat 60 dtk
+        // sehingga hasil strategi terakhir yang sah di dalam cap-nya
+        // sendiri bisa dibuang timeout luar. Pola cadangan yang sama
+        // dengan FALLBACK_RESERVE_MS jalur YouTube (#824).
+        val (html, cookies) = runStageCapped(20_000L) {
             facebookPage(url, FB_HEADERS + user)
         } ?: ("" to "")
         val videoId = parseFacebookVideoId(url, html)
