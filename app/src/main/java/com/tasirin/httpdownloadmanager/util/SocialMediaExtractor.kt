@@ -188,6 +188,12 @@ object SocialMediaExtractor {
     private val PH_MEDIA_QUALITY_RE = Regex("\"quality\"\\s*:\\s*\"?(\\d+)")
     private val PH_FLASHVARS_Q_RE = Regex("\"quality_(\\d+)p\"\\s*:\\s*\"(https?:[^\"]+)\"")
     private val PH_VIDEO_URL_RE = Regex("\"video_url\"\\s*:\\s*\"(https?:[^\"]+)\"")
+    private val HH_RES_TAG_RE = Regex(
+        """(?<![0-9])(2160|1440|1080|720|480|360|240)p(?![0-9A-Za-z])""",
+        RegexOption.IGNORE_CASE
+    )
+    private val HH_DIM_TAG_RE = Regex("""(?<![0-9])([0-9]{3,4})x([0-9]{3,4})(?![0-9])""")
+    private val HH_HOST_TAG_RE = Regex("""://([^/?#]+)""")
     private val HH_VIDEO_TAG_RE = Regex("""<video[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
     private val HH_SOURCE_TAG_RE = Regex("""<source[^>]+src\s*=\s*["'](https?://[^"']+)["']""")
     private val HH_DATA_SRC_RE = Regex("""<(?:video|source)[^>]+data-(?:src|video|source)\s*=\s*["'](https?://[^"']+)["']""")
@@ -1833,9 +1839,34 @@ object SocialMediaExtractor {
         val seen = mutableSetOf<String>()
         val distinct = candidates
             .filter { url -> url.startsWith("http") && seen.add(url) }
-        return distinct.map { url ->
-            Result(url, "HentaiHaven_${safeName}.mp4", title, "Video", MIME_MP4)
+        if (distinct.size <= 1) {
+            return distinct.map { url ->
+                Result(url, "HentaiHaven_${safeName}.mp4", title, "Video", MIME_MP4)
+            }
         }
+        // Lebih dari satu rendisi (issue #1465): dulu semua kandidat
+        // bernama + berlabel persis sama sehingga tak terbedakan di
+        // daftar opsi dan bisa saling menimpa nama berkas. Beri pembeda
+        // rendisi dari URL (resolusi, lalu host); tag yang bertabrakan
+        // diberi nomor urut. Kandidat tunggal tak berubah (terkunci uji).
+        val usedTags = mutableMapOf<String, Int>()
+        return distinct.map { url ->
+            val base = hhRenditionTag(url)
+            val n = (usedTags[base] ?: 0) + 1
+            usedTags[base] = n
+            val tag = if (n > 1) "$base-$n" else base
+            Result(url, "HentaiHaven_${safeName}_$tag.mp4", title, "Video $tag", MIME_MP4)
+        }
+    }
+
+    /** Pembeda rendisi kandidat HentaiHaven dari URL-nya (murni):
+     *  pola resolusi baku "<n>p", lalu pola WxH (pakai tinggi), lalu
+     *  host (port ':' menjadi '_' agar aman di nama berkas). */
+    internal fun hhRenditionTag(url: String): String {
+        HH_RES_TAG_RE.find(url)?.let { return it.groupValues[1] + "p" }
+        HH_DIM_TAG_RE.find(url)?.let { return it.groupValues[2] + "p" }
+        val host = HH_HOST_TAG_RE.find(url)?.groupValues?.get(1) ?: "cdn"
+        return host.replace(':', '_')
     }
 
     /** Bersihkan URL media HH: unescape JS/HTML + pangkas buntut sintaks. */

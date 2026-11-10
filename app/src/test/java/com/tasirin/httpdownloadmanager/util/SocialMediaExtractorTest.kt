@@ -196,6 +196,35 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parseHentaiHavenPage - banyak kandidat diberi pembeda rendisi`() {
+        val html = "<html><head><title>Multi - Hentai Haven</title></head><body>" +
+            "<video src=\"https://cdn1.example.com/v/720p/a.mp4\"></video>" +
+            "<source src=\"https://cdn2.example.com/v/1080p/a.mp4\"/>" +
+            "</body></html>"
+        val opts = SocialMediaExtractor.parseHentaiHavenPage(html)
+        assertEquals(2, opts.size)
+        assertEquals("Video 720p", opts[0].quality)
+        assertEquals("Video 1080p", opts[1].quality)
+        assertTrue(opts[0].fileName!!.endsWith("_720p.mp4"))
+        assertTrue(opts[1].fileName!!.endsWith("_1080p.mp4"))
+    }
+
+    @Test
+    fun `hhRenditionTag - resolusi, dimensi, host, dan tabrakan`() {
+        assertEquals("720p", SocialMediaExtractor.hhRenditionTag("https://cdn.example.com/v/720p/a.mp4"))
+        assertEquals("1080p", SocialMediaExtractor.hhRenditionTag("https://cdn.example.com/vid_1920x1080.mp4"))
+        assertEquals("720p", SocialMediaExtractor.hhRenditionTag("https://cdn.example.com/vid_1280x720.mp4"))
+        assertEquals(
+            "cdn-a.example.com",
+            SocialMediaExtractor.hhRenditionTag("https://cdn-a.example.com/v.mp4")
+        )
+        assertEquals(
+            "cdn.example.com_8443",
+            SocialMediaExtractor.hhRenditionTag("https://cdn.example.com:8443/v.mp4")
+        )
+    }
+
+    @Test
     fun `parseHentaiHavenPage - data-src dan twitter stream`() {
         val html = "<html><head><title>Data Test - Hentai Haven</title>" +
             "<meta name=\"twitter:player:stream\" content=\"https://cdn.example.com/tw.mp4\"/>" +
