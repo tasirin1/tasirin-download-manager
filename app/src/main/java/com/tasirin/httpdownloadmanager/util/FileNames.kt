@@ -16,7 +16,22 @@ object FileNames {
         if (i <= UNIQUE_MAX_SUFFIX) return "$base ($i)$ext"
         val fallback = "$base (${java.util.UUID.randomUUID().toString().take(8)})$ext"
         if (!taken(fallback)) return fallback
-        return "$base (${System.nanoTime()})$ext"
+        // Jalur terakhir pun WAJIB lolos taken() (issue #1398): dulu
+        // kandidat nanoTime dikembalikan buta — satu-satunya jalur
+        // yang melanggar kontrak unique. Kini kandidat acak dicoba
+        // terbatas, masing-masing diverifikasi; sesudahnya penghitung
+        // menaik (ruang nama tak terbatas, taken() menyatakan berkas
+        // nyata yang jumlahnya terhingga — loop pasti berhenti).
+        repeat(100) {
+            val candidate = "$base (${System.nanoTime()})$ext"
+            if (!taken(candidate)) return candidate
+        }
+        var counter = 1
+        while (true) {
+            val candidate = "$base (u$counter)$ext"
+            if (!taken(candidate)) return candidate
+            counter++
+        }
     }
 
     // Sanitasi nama file: buang separator, karakter kontrol, karakter

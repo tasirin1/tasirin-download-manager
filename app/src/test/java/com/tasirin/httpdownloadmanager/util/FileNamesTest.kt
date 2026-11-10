@@ -95,9 +95,20 @@ class FileNamesTest {
 
     @Test
     fun `unique - tabrakan masif tetap selesai dengan fallback`() {
-        val result = FileNames.unique("f.txt") { true }
-        assertTrue(result.startsWith("f"))
-        assertTrue(result.endsWith(".txt"))
+        // Tabrakan masif: semua nama ditolak kecuali satu kandidat
+        // penghitung jauh — fungsi tetap selesai di kandidat bebas itu.
+        val result = FileNames.unique("f.txt") { it != "f (u7).txt" }
+        assertEquals("f (u7).txt", result)
+    }
+
+    @Test
+    fun `unique - tak pernah mengembalikan nama yang taken walau sufiks baku habis`() {
+        // Issue #1398: nama asli, (1)..(999), fallback UUID, dan semua
+        // kandidat nanoTime ditolak — hasil tetap nama yang lolos
+        // taken() (jalur terakhir dulu mengembalikan kandidat buta).
+        // Dibuktikan port-1398.py (kasus C/D).
+        val result = FileNames.unique("video.mp4") { it != "video (u7).mp4" }
+        assertEquals("video (u7).mp4", result)
     }
 
     @Test
