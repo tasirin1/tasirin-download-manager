@@ -76,6 +76,14 @@ class WebExtractActivity : AppCompatActivity() {
             if (finished) return
             loopStarted = true
             if (grabTries >= MAX_GRAB_TRIES) {
+                // Rantai habis: bebaskan kait loop + reset hitungan
+                // (issue #1422). Tanpa ini loopStarted tetap true dan
+                // grabTries tetap penuh, jadi onPageFinished berikutnya
+                // (mis. muat-ulang sesudah challenge lolos belakangan)
+                // ditolak startGrabLoop dan ekstraksi otomatis mati
+                // permanen untuk sisa umur activity.
+                loopStarted = false
+                grabTries = 0
                 if (lastEpisodesJson.isNotBlank() && lastEpisodesJson != "[]") {
                     onEpisodesOnly(lastEpisodesJson, webView.title.orEmpty())
                 } else {
