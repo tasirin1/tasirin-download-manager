@@ -318,6 +318,41 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `qualityFileTag - sanitasi label kualitas YouTube`() {
+        // Issue #1511: hanya [A-Za-z0-9] dipertahankan; kosong atau
+        // bawaan tak dikenal ("Unknown") = tanpa tag. Ekspektasi
+        // dibuktikan port Python 1:1 (port_1511_qualitytag.py).
+        assertEquals("720p", SocialMediaExtractor.qualityFileTag("720p"))
+        assertEquals("1080p60", SocialMediaExtractor.qualityFileTag("1080p60"))
+        assertEquals("hd720", SocialMediaExtractor.qualityFileTag("hd720"))
+        assertEquals("720p60HDR", SocialMediaExtractor.qualityFileTag("720p60 HDR"))
+        assertEquals("", SocialMediaExtractor.qualityFileTag("Unknown"))
+        assertEquals("", SocialMediaExtractor.qualityFileTag("unknown"))
+        assertEquals("", SocialMediaExtractor.qualityFileTag(""))
+        assertEquals("", SocialMediaExtractor.qualityFileTag("???"))
+    }
+
+    @Test
+    fun `youtubeFileName - nama memuat kualitas, tanpa tag sama dengan nama lama`() {
+        assertEquals(
+            "Judul_Video_720p.mp4",
+            SocialMediaExtractor.youtubeFileName("Judul_Video", "720p", "mp4")
+        )
+        assertEquals(
+            "Judul_Video_360p.mp4",
+            SocialMediaExtractor.youtubeFileName("Judul_Video", "360p", "mp4")
+        )
+        assertEquals(
+            "Judul_Video.mp4",
+            SocialMediaExtractor.youtubeFileName("Judul_Video", "Unknown", "mp4")
+        )
+        assertEquals(
+            "Judul_Video_1080p.webm",
+            SocialMediaExtractor.youtubeFileName("Judul_Video", "1080p", "webm")
+        )
+    }
+
+    @Test
     fun `parseHentaiHavenPage - data-src dan twitter stream`() {
         val html = "<html><head><title>Data Test - Hentai Haven</title>" +
             "<meta name=\"twitter:player:stream\" content=\"https://cdn.example.com/tw.mp4\"/>" +

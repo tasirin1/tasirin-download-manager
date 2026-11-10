@@ -900,7 +900,7 @@ object SocialMediaExtractor {
                     val quality = fmt.optString("qualityLabel", "Unknown")
                     val mimeType = fmt.optString("mimeType", MIME_MP4)
                     val ext = if (mimeType.contains("webm")) "webm" else "mp4"
-                    options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
+                    options.add(Result(videoUrl, youtubeFileName(safeName, quality, ext), title, quality, mimeType, cookies = ytCookies))
                 }
             }
             // Entri adaptiveFormats dinilai terpisah (issue #537):
@@ -926,12 +926,12 @@ object SocialMediaExtractor {
                         if (audioAd.isEmpty()) continue
                         options.add(
                             Result(
-                                videoUrl, "${safeName}.$ext", title, quality, mimeType,
+                                videoUrl, youtubeFileName(safeName, quality, ext), title, quality, mimeType,
                                 cookies = ytCookies, videoUrl = videoUrl, audioUrl = audioAd
                             )
                         )
                     } else if (!isAudioOnlyMime(mimeType)) {
-                        options.add(Result(videoUrl, "${safeName}.$ext", title, quality, mimeType, cookies = ytCookies))
+                        options.add(Result(videoUrl, youtubeFileName(safeName, quality, ext), title, quality, mimeType, cookies = ytCookies))
                     }
                 }
             }
@@ -969,6 +969,29 @@ object SocialMediaExtractor {
             // Gagal mem-parse halaman/response YouTube — biarkan fallback lain lanjut.
         }
         return emptyList()
+    }
+
+    /** Tag kualitas untuk nama berkas opsi YouTube (issue #1511):
+     *  hanya [A-Za-z0-9] dari label kualitas mentah yang dipertahankan
+     *  ("720p", "1080p60", "hd720"); label kosong atau bawaan tak
+     *  dikenal ("Unknown" saat qualityLabel absen) menghasilkan string
+     *  kosong = tanpa akhiran. Murni agar teruji langsung. */
+    internal fun qualityFileTag(qualityLabel: String): String {
+        val tag = qualityLabel.filter {
+            it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9'
+        }
+        return if (tag.isEmpty() || tag.equals("Unknown", ignoreCase = true)) "" else tag
+    }
+
+    /** Nama berkas opsi YouTube (issue #1511): "<judul>[_<tag>].<ext>"
+     *  — tag kualitas dari [qualityFileTag]; tanpa tag, bentuknya
+     *  persis nama lama. Sebelumnya semua kualitas dalam satu daftar
+     *  berbagi nama yang sama sehingga berkas 360p dan 1080p dari
+     *  video yang sama tak terbedakan dari namanya (kelas cacat yang
+     *  diperbaiki Pornhub lewat #1461/#1491). */
+    internal fun youtubeFileName(safeName: String, qualityLabel: String, ext: String): String {
+        val tag = qualityFileTag(qualityLabel)
+        return if (tag.isEmpty()) "$safeName.$ext" else "${safeName}_$tag.$ext"
     }
 
     /** Hasil mentah player VISIONOS: data streaming terparse + judul
@@ -1084,7 +1107,7 @@ object SocialMediaExtractor {
                     val quality = best.optString("qualityLabel", "Unknown")
                     val ext = if (mime.contains("webm")) "webm" else "mp4"
                     return@runCatching Result(
-                        url, "YouTube_$safeName.$ext", title, quality, mime,
+                        url, "YouTube_${youtubeFileName(safeName, quality, ext)}", title, quality, mime,
                         cookies = player.cookies, videoUrl = url, audioUrl = audioAd
                     )
                 }
@@ -1475,12 +1498,12 @@ object SocialMediaExtractor {
                             if (audioPair.isEmpty()) continue
                             options.add(
                                 Result(
-                                    u, "${safeName}.$ext", title, quality, mime,
+                                    u, youtubeFileName(safeName, quality, ext), title, quality, mime,
                                     videoUrl = u, audioUrl = audioPair
                                 )
                             )
                         } else {
-                            options.add(Result(u, "${safeName}.$ext", title, quality, mime))
+                            options.add(Result(u, youtubeFileName(safeName, quality, ext), title, quality, mime))
                         }
                     }
                 }
