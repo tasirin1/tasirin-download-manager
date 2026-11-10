@@ -119,8 +119,7 @@ object SocialMediaExtractor {
     private val IG_FILE_ID_RE = Regex("/(\\d+_\\d+_\\d+)_[a-z0-9]+\\.(?:jpg|jpeg|png|webp)")
     private val IG_SIZE_MARKER_RE = Regex("""s(\d+)x(\d+)""")
     private val IG_VIDEO_URL_RE = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+\\.mp4[^\"]*)\"")
-    private val IG_CONTEXT_JSON_RE = Regex("contextJSON\\s*=\\s*\"")
-    private val IG_TOKEN_RE = Regex("\"token\"\\s*:\\s*\"")
+    private val IG_CONTEXT_OR_TOKEN_RE = Regex("contextJSON\\s*=\\s*\"|\"token\"\\s*:\\s*\"")
     private val YT_PLAYER_RESP_RE =
         Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*(?:var\s|</script)""")
     private val YT_PLAYER_RESP_LAX_RE = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""")
@@ -548,24 +547,26 @@ object SocialMediaExtractor {
         // Path CDN bervariasi (t39.30808-6, t51.82787-15, t51.82787-19, dst),
         // jadi jangan dikunci ke satu pola path. Buang profil pic (t51.2885-*),
         // dedup per ID file, lalu utamakan versi resolusi penuh.
-        val imgRegex = IG_IMG_URL_RE
-        val decoded = mutableListOf<String>()
-        imgRegex.findAll(html).forEach { match ->
+        // Satu lintasan pola longgar (issue #1441): pola utama adalah
+        // subhimpunan pola cadangan (span sama untuk URL cdninstagram —
+        // keduanya rakus sampai kutip penutup), jadi tiap kecocokan
+        // diklasifikasikan per string pendeknya: yang memenuhi pola
+        // utama masuk keranjang utama, sisanya cadangan. Pilihan akhir
+        // persis perilaku lama: utama bila tak kosong, selain itu
+        // cadangan — tanpa memindai halaman dua kali.
+        val primary = mutableListOf<String>()
+        val fallback = mutableListOf<String>()
+        IG_IMG_URL_FALLBACK_RE.findAll(html).forEach { match ->
             val raw = unescapePlayer(match.value)
             if (raw.startsWith("http") && !raw.contains("/t51.2885-")) {
-                decoded.add(raw)
-            }
-        }
-        if (decoded.isEmpty()) {
-            // Strategi cadangan: pola CDN lain yang belum tertangkap di atas
-            val fallbackRegex = IG_IMG_URL_FALLBACK_RE
-            fallbackRegex.findAll(html).forEach { match ->
-                val raw = unescapePlayer(match.value)
-                if (raw.startsWith("http") && !raw.contains("/t51.2885-")) {
-                    decoded.add(raw)
+                if (IG_IMG_URL_RE.containsMatchIn(match.value)) {
+                    primary.add(raw)
+                } else {
+                    fallback.add(raw)
                 }
             }
         }
+        val decoded = if (primary.isNotEmpty()) primary else fallback
         // Dedup per ID file (contoh: 774314790_18387324052161_1234):
         // pemenang per ID adalah varian berdimensi terbesar (issue
         // #1414) — tanpa penanda (resolusi penuh) selalu terbesar, seri
@@ -664,35 +665,47 @@ object SocialMediaExtractor {
         }
         // Format 2: contextJSON = "..." (JS assignment)
         // Format 3: "token": "..."
-        for (pattern in listOf(
-            IG_CONTEXT_JSON_RE,
-            IG_TOKEN_RE,
-        )) {
-            // SEMUA kecocokan per pola dicoba (issue #652): field token /
-            // contextJSON polos yang muncul lebih dulu di halaman tak
-            // boleh membuat token asli di kecocokan berikutnya tak
-            // terjangkau — dulu hanya kecocokan pertama yang dicoba.
-            for (match in pattern.findAll(html)) {
-                // Regex hanya MELACAK kutip pembuka; isi token dipindai
-                // sadar-escape (issue #635) — tangkapan regex berhenti di
-                // kutip ter-escape pertama dan tak pernah lolos parse JSON.
-                val raw = scanEscapedJsString(html, match.range.last + 1) ?: continue
-                val token = unescapeJsToken(raw)
-                try {
-                    val obj = JSONObject(token)
-                    val gql = obj.optJSONObject("gql_data")
-                    if (gql != null) {
-                        val media = gql.optJSONObject("shortcode_media")
-                        if (media != null) return media
-                    }
-                    val context = obj.optJSONObject("context")
-                    if (context != null) {
-                        val media = context.optJSONObject("media")
-                        if (media != null) return media
-                    }
-                } catch (_: Exception) { /* lanjut */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (kandidat media tak ter-parse: lanjut ke kandidat berikut)
+        // Satu lintasan gabungan atas halaman (issue #1441): pola
+        // gabungan menemukan kedua format dalam SATU findAll; kandidat
+        // format 2 dicoba langsung sesuai urutan halaman, kandidat
+        // format 3 ditampung dan dicoba sesudahnya — urutan coba persis
+        // perilaku lama (semua format 2 sebelum format 3), string hanya
+        // berjalan sekali. SEMUA kecocokan per format tetap dicoba
+        // (issue #652).
+        val tokenCandidates = mutableListOf<MatchResult>()
+        for (match in IG_CONTEXT_OR_TOKEN_RE.findAll(html)) {
+            if (match.value.startsWith("contextJSON")) {
+                igTokenMedia(html, match)?.let { return it }
+            } else {
+                tokenCandidates.add(match)
             }
         }
+        for (match in tokenCandidates) {
+            igTokenMedia(html, match)?.let { return it }
+        }
+        return null
+    }
+
+    /** Coba satu kandidat token format 2/3: regex hanya MELACAK kutip
+     *  pembuka; isi token dipindai sadar-escape (issue #635) — tangkapan
+     *  regex berhenti di kutip ter-escape pertama dan tak pernah lolos
+     *  parse JSON. Mengembalikan objek media bila token memuatnya. */
+    private fun igTokenMedia(html: String, match: MatchResult): JSONObject? {
+        val raw = scanEscapedJsString(html, match.range.last + 1) ?: return null
+        val token = unescapeJsToken(raw)
+        try {
+            val obj = JSONObject(token)
+            val gql = obj.optJSONObject("gql_data")
+            if (gql != null) {
+                val media = gql.optJSONObject("shortcode_media")
+                if (media != null) return media
+            }
+            val context = obj.optJSONObject("context")
+            if (context != null) {
+                val media = context.optJSONObject("media")
+                if (media != null) return media
+            }
+        } catch (_: Exception) { /* lanjut */ } // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (kandidat media tak ter-parse: lanjut ke kandidat berikut)
         return null
     }
 
