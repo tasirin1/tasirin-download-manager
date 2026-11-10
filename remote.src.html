@@ -446,13 +446,13 @@
   /* Bar progres polos tanpa shimmer dan garis miring: tampilan
      sederhana dan elegan (permintaan owner 2026-11-08). */
 
-  .bar.hls .fill { background: linear-gradient(90deg, #42A5F5, #1E88E5, #1565C0); }
+  .bar.est .fill { background: linear-gradient(90deg, #42A5F5, #1E88E5, #1565C0); }
   .bar.downloading .fill { background: linear-gradient(90deg, #42A5F5, var(--primary), #0D47A1); }
   .bar.paused .fill { background: var(--amber); opacity: .7; }
   /* Tema gelap (issue #1331): ujung hardcode #1565C0/#0D47A1 hanya
      2,46:1/1,64:1 vs track gelap sehingga titik progres menyatu;
      ujung kini token --primary-2 (>=8:1 vs track gelap). */
-  :root[data-theme="dark"] .bar.hls .fill { background: linear-gradient(90deg, #42A5F5, var(--primary-2)); }
+  :root[data-theme="dark"] .bar.est .fill { background: linear-gradient(90deg, #42A5F5, var(--primary-2)); }
   :root[data-theme="dark"] .bar.downloading .fill { background: linear-gradient(90deg, #42A5F5, var(--primary-2)); }
   .err-text { font-weight: 600; }
   .err-dot { margin: 0 3px; color: var(--muted); }
@@ -7033,11 +7033,11 @@ function render(items) {
   updateRows(items);
 }
 
-// Override persen HLS (issue #994): 0 adalah nilai SAH selama
+// Override persen estimasi (issue #994): 0 adalah nilai SAH selama
 // segmen pertama (rata-rata byte segmen masih 0), jadi jangan
 // pakai pola || -1 yang menelan 0 menjadi -1 dan membuat total
 // estimasi tampil sebagai total pasti.
-function hlsOverrideOf(it) {
+function estOverrideOf(it) {
   return (typeof it.progressPercentOverride === 'number')
     ? it.progressPercentOverride : -1;
 }
@@ -7049,7 +7049,7 @@ function rowSubHtml(it) {
   if (done) {
     meta = fmt(it.totalBytes || it.bytesDownloaded);
     if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
-  } else if (it.totalBytes > 0 && hlsOverrideOf(it) < 0) {
+  } else if (it.totalBytes > 0 && estOverrideOf(it) < 0) {
     meta = fmt(it.bytesDownloaded) + ' / ' + fmt(getLockedTotal(it));
   } else {
     meta = fmt(it.bytesDownloaded);
@@ -7058,8 +7058,8 @@ function rowSubHtml(it) {
     meta += ' \u00b7 ' + fmtSpeed(it.speedBps);
     if (it.etaSeconds > 0) meta += ' \u00b7 ETA ' + fmtEta(it.etaSeconds);
   }
-  var isHls = it.state === 'DOWNLOADING' && hlsOverrideOf(it) >= 0;
-  const barCls = it.state === 'DOWNLOADING' ? (' downloading' + (isHls ? ' hls' : '')) : (it.state === 'PAUSED' ? ' paused' : '');
+  var isEst = it.state === 'DOWNLOADING' && estOverrideOf(it) >= 0;
+  const barCls = it.state === 'DOWNLOADING' ? (' downloading' + (isEst ? ' est' : '')) : (it.state === 'PAUSED' ? ' paused' : '');
   return '<div class="item-sub">' +
     '<div class="meta">' + stateBadge(it.state) + '<span>' + meta + '</span></div>' +
     '<div class="bar-wrap"><div class="bar' + barCls + '"><div class="fill' + (done ? ' done' : '') + '" style="width:' + prog + '%"></div></div>' +
@@ -7095,7 +7095,7 @@ function fmtDate(ms) {
 const lockedTotalBytes = new Map();
 function getLockedTotal(it) {
   if (it.state === 'COMPLETED') return it.totalBytes || it.bytesDownloaded;
-  if (hlsOverrideOf(it) >= 0) return it.bytesDownloaded;
+  if (estOverrideOf(it) >= 0) return it.bytesDownloaded;
   if (it.totalBytes > 0) {
     var prev = lockedTotalBytes.get(it.id);
     if (!prev) lockedTotalBytes.set(it.id, it.totalBytes);
@@ -7117,8 +7117,8 @@ function rowMetaText(it) {
     if (it.finishedAt) meta += ' \u00b7 ' + fmtDate(it.finishedAt);
     return meta;
   }
-  // HLS: progressPercentOverride >= 0 means total is estimated, don't show it
-  if (hlsOverrideOf(it) >= 0) {
+  // Estimasi: progressPercentOverride >= 0 means total is estimated, don't show it
+  if (estOverrideOf(it) >= 0) {
     return fmt(it.bytesDownloaded);
   }
   var locked = getLockedTotal(it);
@@ -7183,13 +7183,13 @@ function patchRowSub(li, it) {
   if (fill && fill._done !== done) { fill._done = done; fill.classList.toggle('done', done); }
   const pct = sub._pct || (sub._pct = sub.querySelector('.bar-pct'));
   if (pct && pct._p !== prog) { pct._p = prog; pct.textContent = prog + '%'; }
-  // Update bar class based on state (remove downloading/hls when done)
+  // Update bar class based on state (remove downloading/est when done)
   const barEl = sub._bar || (sub._bar = sub.querySelector('.bar'));
   if (barEl) {
-    var isHlsU = it.state === 'DOWNLOADING' && hlsOverrideOf(it) >= 0;
-    var wantCls = it.state === 'DOWNLOADING' ? ('downloading' + (isHlsU ? ' hls' : '')) : (it.state === 'PAUSED' ? 'paused' : '');
+    var isEstU = it.state === 'DOWNLOADING' && estOverrideOf(it) >= 0;
+    var wantCls = it.state === 'DOWNLOADING' ? ('downloading' + (isEstU ? ' est' : '')) : (it.state === 'PAUSED' ? 'paused' : '');
     if (barEl._barCls !== wantCls) {
-      barEl.classList.remove('downloading', 'hls', 'paused');
+      barEl.classList.remove('downloading', 'est', 'paused');
       if (wantCls) wantCls.split(' ').forEach(function (c) { barEl.classList.add(c); });
       barEl._barCls = wantCls;
     }
@@ -7229,12 +7229,12 @@ function updateRows(items) {
         pv[2] === it.progress && pv[3] === it.speedBps &&
         pv[4] === it.etaSeconds && pv[5] === (it.retryCount || 0) &&
         pv[6] === (it.checksumVerified ? 1 : 0) &&
-        pv[7] === hlsOverrideOf(it)) {
+        pv[7] === estOverrideOf(it)) {
       continue;
     }
     li._pv = [it.bytesDownloaded, it.totalBytes, it.progress, it.speedBps,
       it.etaSeconds, it.retryCount || 0, it.checksumVerified ? 1 : 0,
-      hlsOverrideOf(it)];
+      estOverrideOf(it)];
     // Cap URL, bukan URL utuh (issue #830, pola #822 di structSig):
     // tanda tangan baris ini dihitung per baris per snapshot.
     const sig = it.state + '|' + it.bytesDownloaded + '|' + it.totalBytes + '|' + it.progress + '|' + it.speedBps + '|' +
