@@ -11,6 +11,7 @@ import android.provider.MediaStore
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.tasirin.httpdownloadmanager.data.DownloadItem
+import com.tasirin.httpdownloadmanager.data.DownloadState
 import com.tasirin.httpdownloadmanager.download.buangSufiksEkstensi
 import java.io.File
 import java.io.IOException
@@ -1082,25 +1083,34 @@ class FileSaver(context: Context) {
         }
     }
 
+    /** Hapus HANYA temp adaptif (video/audio/keluaran remux) milik
+     *  item — bukan partial segmen/.part, bukan berkas terbit. Dipakai
+     *  cancel dan gagal terminal (diagnosis bug-99 B1/B2): pada kedua
+     *  titik itu temp tak akan pernah bisa dipakai resume lagi (item
+     *  dibuang dari daftar, atau retry manual mengekstrak URL segar
+     *  dan mengunduh ulang), jadi menahannya hanya menumpuk data
+     *  aplikasi sampai sapuan yatim berumur >2 jam berjalan. Nama dari
+     *  sumber tunggal adaptiveTempNames. */
+    fun deleteAdaptiveTemps(item: DownloadItem) {
+        adaptiveTempNames(item).forEach { name ->
+            runCatching { File(downloadDir, name).delete() }
+        }
+    }
+
     fun deleteFiles(item: DownloadItem) {
         partialFiles(item).forEach { runCatching { it.delete() } }
         // Scratch remux/adaptive item ikut dihapus sekarang
         // (issue #461): tanpa ini, menghapus item yang dijeda/gagal
         // tidak membebaskan ruang sampai sapuan yatim berumur >2 jam
-        // berjalan — asimetris dengan partial di atas. Nama temp persis
-        // protectedPartialNames (sumber yang sama dengan perlindungan
-        // sapuan); scratch diturunkan dari tempBase engine yang sama.
-        // Basis scratch adaptive (issue #467): downloadAdaptiveMuxed
-        // membuang sufiks .mp4/.webm dari nama mentah.
-        val adaptiveBase = buangSufiksEkstensi(item.fileName, ".mp4", ".webm").ifBlank { item.fileName }
+        // berjalan — asimetris dengan partial di atas. Nama temp dari
+        // sumber tunggal adaptiveTempNames (derivasi yang sama dengan
+        // perlindungan sapuan); di sini ia WAJIB ikut tanpa syarat
+        // status — deleteFiles adalah vonis hapus final, termasuk
+        // untuk item FAILED yang perlindungan sapuannya sudah dicabut
+        // (diagnosis bug-99 B2).
         val extraNames = buildSet {
             addAll(protectedPartialNames(item))
-            // adaptiveBase dipakai langsung (issue #1438): himpunan satu
-            // elemen di sini adalah sisa masa dua basis (warisan + adaptif).
-            val tempBase = "~" + item.id.take(8) + adaptiveBase
-            for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
-                add(FileNames.safe("$tempBase.$kind") + ".part")
-            }
+            addAll(adaptiveTempNames(item))
         }
         extraNames.forEach { name -> runCatching { File(downloadDir, name).delete() } }
         // Sidecar warisan mesin lama yang sudah dihapus (issue #1437):
@@ -1730,15 +1740,58 @@ internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.Do
         item.segments.forEach { add("$base.part.${it.index}") }
         // Temp adaptif jalur muxed (issue #1434): sejak temp video/audio
         // dipertahankan antar-attempt sebagai bahan resume Range, temp
-        // milik item yang masih hidup tak boleh tersapu sebagai yatim.
-        // Derivasi nama persis downloadAdaptiveMuxed/deleteFiles.
-        val adaptiveBase = buangSufiksEkstensi(item.fileName, ".mp4", ".webm").ifBlank { item.fileName }
-        val tempBase = "~" + item.id.take(8) + adaptiveBase
+        // milik item yang masih bisa melanjutkannya tak boleh tersapu
+        // sebagai yatim. Perlindungannya bersyarat status (diagnosis
+        // bug-99 B2): item FAILED/CANCELLED tak akan pernah memakai
+        // temp itu lagi, jadi namanya tak dilindungi dan temp-nya
+        // tersapu sebagai yatim biasa.
+        if (adaptiveTempsProtected(item.state)) {
+            addAll(adaptiveTempNames(item))
+        }
+    }
+}
+
+/** Nama-nama temp adaptif jalur muxed milik satu item (video, audio,
+ *  keluaran remux), diturunkan persis seperti downloadAdaptiveMuxed
+ *  membentuk tempBase-nya dari nama berkas item (basis = nama mentah
+ *  dibuang sufiks .mp4/.webm, issue #467). Sumber tunggal derivasi
+ *  untuk perlindungan sapuan (protectedPartialNames), deleteFiles,
+ *  dan bersih-bersih batal/gagal terminal (deleteAdaptiveTemps).
+ *  Murni agar bisa di-unit-test; nilai harapan dibuktikan port
+ *  Python 1:1 (bug-99/port-temp-policy.py). */
+internal fun adaptiveTempNames(
+    item: com.tasirin.httpdownloadmanager.data.DownloadItem
+): Set<String> {
+    val adaptiveBase = buangSufiksEkstensi(item.fileName, ".mp4", ".webm").ifBlank { item.fileName }
+    val tempBase = "~" + item.id.take(8) + adaptiveBase
+    return buildSet {
         for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
             add(FileNames.safe("$tempBase.$kind") + ".part")
         }
     }
 }
+
+/** Temp adaptif hanya dilindungi dari sapuan selama item masih bisa
+ *  memakainya untuk resume: menunggu giliran, sedang mengunduh, atau
+ *  jeda. Di luar status itu temp adalah sampah yang menunggu sapuan
+ *  yatim biasa. Murni agar bisa di-unit-test; nilai harapan dibuktikan
+ *  port Python 1:1 (bug-99/port-temp-policy.py). */
+internal fun adaptiveTempsProtected(state: DownloadState): Boolean =
+    state == DownloadState.PENDING ||
+        state == DownloadState.DOWNLOADING ||
+        state == DownloadState.PAUSED
+
+/** Temp adaptif boleh dibersihkan tuntas pada status ini: FAILED
+ *  (terminal — attempt terakhir habis) dan CANCELLED. Pada kedua
+ *  titik itu item tak akan melanjutkan temp-nya: retry manual
+ *  mengekstrak URL segar dan mengunduh ulang, dan item batal sudah
+ *  dibuang dari daftar (nama temp terikat id-nya). COMPLETED sengaja
+ *  bukan status bersih-bersih: jalur sukses sudah membuang temp
+ *  video/audio dan menerbitkan keluaran remux. Murni agar bisa
+ *  di-unit-test; nilai harapan dibuktikan port Python 1:1
+ *  (bug-99/port-temp-policy.py). */
+internal fun adaptiveTempsDisposable(state: DownloadState): Boolean =
+    state == DownloadState.FAILED || state == DownloadState.CANCELLED
 
 private val PART_SEGMENT_TAIL_RE = Regex("""\.part\.\d+$""")
 private val MERGE_STAGING_TAIL_RE = Regex("""\.merge\.\d+$""")

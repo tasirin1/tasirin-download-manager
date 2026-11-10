@@ -26,6 +26,7 @@ import com.tasirin.httpdownloadmanager.util.Crypto
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
+import com.tasirin.httpdownloadmanager.util.adaptiveTempsDisposable
 import com.tasirin.httpdownloadmanager.util.decodePercentEncoded
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -650,6 +651,14 @@ class DownloadEngine(appContext: Context) {
         disconnectActive(id)
         updateTransformed { daftar -> daftar.filterNot { it.id == id } }
         if (activeConns[id] == null) cancelledConns.remove(id)
+        // Temp adaptif SELALU dibuang saat batal (diagnosis bug-99 B1):
+        // nama temp terikat id item yang baru saja dibuang dari daftar,
+        // jadi temp itu tak akan pernah bisa dipakai resume oleh siapa
+        // pun — menahannya di balik toggle hanya menumpuk data aplikasi
+        // sampai sapuan yatim berumur >2 jam berjalan, dan menambah
+        // ulang video yang sama melahirkan temp BARU. Partial
+        // segmen/.part biasa tetap mengikuti toggle di bawah.
+        runCatching { fileSaver.deleteAdaptiveTemps(target) }
         // Opsi "Delete partial file when cancelled": tanpa ini toggle
         // Pengaturan tidak berpengaruh (partial menumpuk sampai cleanup).
         if (StoragePrefs.isDeletePartialOnCancel(context)) {
@@ -1981,6 +1990,20 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
+    /** Hapus temp adaptif bila item SESUDAH update status mendarat di
+     *  status yang membuat temp itu tak terpakai lagi (FAILED terminal
+     *  — diagnosis bug-99 B2): temp dipertahankan antar-attempt sebagai
+     *  bahan resume (#1434), tetapi attempt terakhir yang habis tak
+     *  akan melanjutkannya; retry manual mengekstrak URL segar dan
+     *  mengunduh ulang. Item yang sudah hilang dari daftar (null) atau
+     *  berstatus lain tidak disentuh. Partial segmen/.part TIDAK ikut:
+     *  keputusan bersih-bersih ini khusus temp adaptif. */
+    private fun cleanAdaptiveTempsIfDisposable(finished: DownloadItem?) {
+        if (finished != null && adaptiveTempsDisposable(finished.state)) {
+            runCatching { fileSaver.deleteAdaptiveTemps(finished) }
+        }
+    }
+
     private fun handleFailure(id: String, message: String?) {
         // Jaring pengaman parkiran penggantian (issue #896) berjalan
         // SEBELUM penilaian item (issue #908): rollback tak bergantung
@@ -2028,6 +2051,7 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            cleanAdaptiveTempsIfDisposable(finished)
             hidupkanLagiMonitorPendahulu(item)
             // Item terhapus di tengah pemrosesan gagal -> jangan kirim
             // notifikasi untuk unduhan yang sudah tidak ada (issue #392).
@@ -2137,6 +2161,7 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            cleanAdaptiveTempsIfDisposable(finishedRange)
             // Cabang terminal ketiga (issue #518): pemulihan monitor
             // #512 dulu hanya terpasang di dua cabang terminal lain —
             // penerus yang gagal di sini (mis. resume ditolak 416 oleh
@@ -2198,6 +2223,7 @@ class DownloadEngine(appContext: Context) {
                 )
             }
             flushSave()
+            cleanAdaptiveTempsIfDisposable(finishedElse)
             hidupkanLagiMonitorPendahulu(item)
             if (finishedElse != null) NotificationHelper.notifyItemFinished(context, finishedElse)
         }
