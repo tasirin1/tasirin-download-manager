@@ -16,6 +16,7 @@ import android.text.TextWatcher
 import android.widget.Toast
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.tasirin.httpdownloadmanager.databinding.ActivityLogBinding
 import com.tasirin.httpdownloadmanager.util.applyEdgeToEdge
@@ -292,12 +293,18 @@ class LogActivity : AppCompatActivity() {
                 // (issue #712): teks tema nyaris putih di atas #FFE082
                 // berkontras +/-1,2:1 sehingga hasil pencarian justru
                 // tenggelam.
+                // Warna dari token resource sungguhan (issue #1497):
+                // token log_highlight_bg dibuat batch tampilan tetapi
+                // tak pernah dirujuk kode, jadi nilainya bisa diam-diam
+                // menyimpang dari literal di sini. Nilai token saat ini
+                // persis sama (#FFE082 / text_primary #1B1F27) —
+                // tampilan tidak berubah.
                 sb.setSpan(
-                    BackgroundColorSpan(0xFFFFE082.toInt()), // kuning sorotan palet tema terang (token log_highlight_bg)
+                    BackgroundColorSpan(ContextCompat.getColor(this@LogActivity, R.color.log_highlight_bg)),
                     idx, idx + q.length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 sb.setSpan(
-                    ForegroundColorSpan(0xFF1B1F27.toInt()), // text_primary palet tema terang (issue #712), bukan hex liar #212121
+                    ForegroundColorSpan(ContextCompat.getColor(this@LogActivity, R.color.text_primary)),
                     idx, idx + q.length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 from = idx + q.length
