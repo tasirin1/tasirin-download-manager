@@ -4359,6 +4359,11 @@ const fsSearchBtn = document.getElementById('fsSearchBtn');
 const fsSearchInput = document.getElementById('fsSearchInput');
 const fsSearchRow = document.getElementById('fsSearchRow');
 let fsSearchQuery = '';
+// Keadaan pesan kosong pencarian (issue #1403): varian terakhir yang
+// tertulis + apakah pesan sedang tampil — innerHTML hanya ditulis
+// ulang bila salah satunya berubah.
+let fsNoResVariant = '';
+let fsNoResShown = false;
 
 function fsApplySearch(row) {
   if (!fsSearchQuery) { row.style.display = ''; return; }
@@ -4389,11 +4394,18 @@ function fsSetSearch(q) {
   // tuntas dan tombol Load more tetap tampil agar pengguna bisa
   // menjangkau sisanya (baris baru ikut tersaring saat dimuat, :3858).
   const hasUnloaded = fsTotal > fsItems.length;
-  if (showNoRes && hasUnloaded) {
-    noRes.innerHTML = emptyHtml('search', 'No matches in loaded items', 'Load more to search the rest.');
-  } else {
-    noRes.innerHTML = emptyHtml('search', 'No files match your search', 'Try a different search.');
+  // Tulis innerHTML hanya saat varian berubah atau pesan beralih
+  // tampil dari sembunyi (issue #1403): dulu tiap panggilan
+  // fsSetSearch (debounce ketik, load more) membongkar + membangun
+  // ulang DOM pesan yang isinya sama persis.
+  const variant = (showNoRes && hasUnloaded) ? 'unloaded' : 'all';
+  if (variant !== fsNoResVariant || (showNoRes && !fsNoResShown)) {
+    noRes.innerHTML = variant === 'unloaded'
+      ? emptyHtml('search', 'No matches in loaded items', 'Load more to search the rest.')
+      : emptyHtml('search', 'No files match your search', 'Try a different search.');
+    fsNoResVariant = variant;
   }
+  fsNoResShown = showNoRes;
   noRes.classList.toggle('hidden', !showNoRes);
   const lm = document.getElementById('fsLoadMoreBtn');
   if (lm) lm.style.display = (showNoRes && !hasUnloaded) ? 'none' : '';
