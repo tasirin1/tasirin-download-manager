@@ -69,6 +69,15 @@ class FileSaver(context: Context) {
          *  irisan pohon yang sama. */
         @Volatile private var sweepRotation = 0
 
+        /** Benarkah [relativePath] berada di area unduhan bawaan
+         *  "Download"? (murni, issue #1500): segmen path PERTAMA harus
+         *  persis "Download" — perbandingan startsWith pada string
+         *  utuh keliru menilai folder kustom seperti "Downloads/X"
+         *  atau "DownloadSaya/X" sebagai area bawaan. */
+        internal fun isDefaultDownloadArea(relativePath: String): Boolean =
+            relativePath.trim('/').trim().split('/').firstOrNull()
+                ?.equals("Download", ignoreCase = true) == true
+
         private val MERGE_LOCKS = Array(8) { Any() }
         private val WHITESPACE_RE = Regex("\\s+")
         /** Buffer salin 64KB: default copyTo 8KB lambat ~8x syscall untuk file GB. */
@@ -1590,7 +1599,7 @@ class FileSaver(context: Context) {
                         // jangan seret paksa ke Download/<Sub>/.
                         val currentRel = mediaRelativePath(uri)?.trim('/')?.trim()
                         if (!currentRel.isNullOrEmpty() &&
-                            !currentRel.startsWith("Download", ignoreCase = true)
+                            !isDefaultDownloadArea(currentRel)
                         ) return result
                         val targetRel = "Download/$sub"
                         // Sudah di subfolder tujuan: tak ada yang dipindah

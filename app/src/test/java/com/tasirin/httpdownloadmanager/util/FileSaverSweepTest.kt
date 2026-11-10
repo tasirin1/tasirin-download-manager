@@ -72,4 +72,18 @@ class FileSaverSweepTest {
         assertFalse(isSweepablePartial("movie.mp4.merge.final"))
         assertFalse(isSweepablePartial("party.mp4"))
     }
+
+    @Test
+    fun `area bawaan hanya segmen pertama persis Download`() {
+        // Issue #1500: startsWith string utuh keliru menilai folder
+        // kustom "Downloads/..." sebagai area bawaan. Ekspektasi
+        // dibuktikan port_1500.py.
+        assertTrue(FileSaver.isDefaultDownloadArea("Download"))
+        assertTrue(FileSaver.isDefaultDownloadArea("Download/Koleksi"))
+        assertTrue(FileSaver.isDefaultDownloadArea("download/Video"))
+        assertFalse(FileSaver.isDefaultDownloadArea("Movies/Koleksi"))
+        assertFalse(FileSaver.isDefaultDownloadArea("Downloads/Koleksi"))
+        assertFalse(FileSaver.isDefaultDownloadArea("DownloadSaya/X"))
+        assertFalse(FileSaver.isDefaultDownloadArea("Downloads"))
+    }
 }
