@@ -67,6 +67,42 @@ function makeEl(id) {
 const elements = {};
 const requests = [];
 
+// Stub snapshot/SSE (issue #1406): jalur snapshot (pollSnapshot,
+// refresh, SSE) dulu tak teruji sama sekali — fetch menggantung dan
+// EventSource bisu, jadi skrip yang rusak di jalur itu tetap hijau.
+// fetch kini menyelesaikan JSON kalengan untuk /api/snapshot dan
+// /api/downloads (URL lain tetap menggantung seperti sebelumnya);
+// resolver /api/downloads ditahan agar tes bisa menyelesaikan
+// snapshot yang basi SESUDAH SSE yang lebih baru diterapkan.
+const eventSources = [];
+const downloadsResolvers = [];
+function snapItem(id, name) {
+  return {
+    id: id, fileName: name, url: 'https://example.com/' + name,
+    addedAt: 1700000000000, state: 'COMPLETED', bytesDownloaded: 1000,
+    totalBytes: 1000, progress: 100, speedBps: 0, etaSeconds: 0,
+    speedLimitKbps: 0, finishedAt: 1700000001000, priority: 0,
+    retryCount: 0, checksumVerified: false, progressPercentOverride: -1
+  };
+}
+function jsonRes(obj) {
+  return {
+    ok: true, status: 200,
+    json: () => Promise.resolve(obj),
+    text: () => Promise.resolve(JSON.stringify(obj))
+  };
+}
+function stubFetch(url) {
+  const u = String(url);
+  if (u.indexOf('/api/snapshot') >= 0) {
+    return Promise.resolve(jsonRes({ items: [snapItem('snap1', 'snap.mp4')] }));
+  }
+  if (u.indexOf('/api/downloads') >= 0) {
+    return new Promise((resolve) => { downloadsResolvers.push(resolve); });
+  }
+  return new Promise(() => {});
+}
+
 class FakeXHR {
   constructor() { this.upload = {}; this.headers = {}; }
   open(m, u) { this.method = m; this.url = u; }
@@ -139,12 +175,17 @@ const sandbox = {
   navigator: { userAgent: 'smoke-test', sendBeacon() {} },
   localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
   sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
-  EventSource: function () {
+  EventSource: Object.assign(function (url) {
+    this.url = url;
     this.readyState = 1;
+    this.onopen = null;
+    this.onmessage = null;
+    this.onerror = null;
     this.addEventListener = function () {};
     this.close = function () { this.readyState = 2; };
-  },
-  fetch: () => new Promise(() => {}),
+    eventSources.push(this);
+  }, { CONNECTING: 0, OPEN: 1, CLOSED: 2 }),
+  fetch: stubFetch,
   XMLHttpRequest: FakeXHR,
   FileReader: function () {},
   Image: function () { this.src = ''; },
@@ -241,6 +282,45 @@ fsExpect(sandbox.fsIsNew('video.mp4') === true, 'badge NEW muncul untuk file bar
 fsExpect(sandbox.fsIsNew('lama.mp4') === false, 'badge NEW tidak muncul untuk file lain');
 
 
+// --- Tes snapshot + SSE (issue #1406) ---
+// Tiga asersi: (1) pollSnapshot menerapkan snapshot kalengan tanpa
+// error, (2) pesan SSE diterapkan dan render-nya tidak melempar
+// (sseFailCount tetap 0), (3) snapshot basi yang selesai belakangan
+// (refresh yang fetch-nya ditahan) TIDAK menimpa state SSE yang lebih
+// baru — penjaga snapSeq/snapApplied bekerja.
+let snapshotDone = false;
+async function runSnapshotTests() {
+  sandbox.location.hash = '#/';
+  await sandbox.pollSnapshot();
+  let names = vm.runInContext('lastItems.map(function (i) { return i.fileName; }).join(",")', sandbox);
+  fsExpect(names === 'snap.mp4', 'pollSnapshot menerapkan snapshot kalengan (dapat: ' + names + ')');
+
+  const es = eventSources[eventSources.length - 1];
+  fsExpect(!!es && typeof es.onmessage === 'function', 'EventSource bootstrap terhubung dan onmessage terpasang');
+  es.onmessage({ data: JSON.stringify({ items: [snapItem('sse1', 'sse-new.mp4')] }) });
+  fsExpect(vm.runInContext('sseFailCount', sandbox) === 0, 'render pesan SSE tidak melempar');
+  names = vm.runInContext('lastItems.map(function (i) { return i.fileName; }).join(",")', sandbox);
+  fsExpect(names === 'sse-new.mp4', 'pesan SSE menerapkan state terbaru (dapat: ' + names + ')');
+
+  // refresh() dimulai (seq kecil), SSE kedua tiba lebih dulu
+  // (snapApplied melompat), lalu fetch refresh dilepas dengan data
+  // basi — hasilnya wajib dibuang.
+  const pendingRefresh = sandbox.refresh().catch(function () {});
+  await new Promise(function (r) { setTimeout(r, 20); });
+  es.onmessage({ data: JSON.stringify({ items: [snapItem('sse2', 'sse-newer.mp4')] }) });
+  const release = downloadsResolvers[downloadsResolvers.length - 1];
+  if (release) release(jsonRes({ items: [snapItem('stale1', 'stale.mp4')] }));
+  await pendingRefresh;
+  await new Promise(function (r) { setTimeout(r, 20); });
+  names = vm.runInContext('lastItems.map(function (i) { return i.fileName; }).join(",")', sandbox);
+  fsExpect(names === 'sse-newer.mp4', 'snapshot basi tidak menimpa state SSE terbaru (dapat: ' + names + ')');
+  snapshotDone = true;
+}
+runSnapshotTests().catch(function (e) {
+  console.error('FAIL: tes snapshot/SSE melempar: ' + (e && e.message));
+  process.exit(1);
+});
+
 // Reset state agar tes upload di bawah tidak terpengaruh
 vm.runInContext('fsPath = ""; fsBackStack.length = 0;', sandbox);
 
@@ -264,12 +344,16 @@ try {
 const verdictDeadline = Date.now() + 5000;
 const verdictTimer = setInterval(() => {
   const doneMsg = msgs.some((m) => m.text.indexOf('Done: 2 files uploaded') === 0);
-  if (!doneMsg && Date.now() < verdictDeadline) return;
+  if (!(doneMsg && snapshotDone) && Date.now() < verdictDeadline) return;
   clearInterval(verdictTimer);
   verdict();
 }, 25);
 
 function verdict() {
+  if (!snapshotDone) {
+    console.error('FAIL: tes snapshot/SSE belum selesai dalam batas waktu');
+    process.exit(1);
+  }
   const uploads = requests.filter((r) => r.method === 'POST' && r.url.includes('/api/upload'));
   const csrfReady = uploads.every((r) => r.headers['X-Requested-With'] === 'XMLHttpRequest');
   const okDone = msgs.some((m) => m.text.indexOf('Done: 2 files uploaded') === 0);
