@@ -26,6 +26,13 @@ object MediaLibrary {
     private const val FALLBACK_SCAN_TTL_MS = 600_000L
     /** Batas absolut entry yang di-hold di memori (galeri + remote web). */
     const val GALLERY_MAX_ENTRIES = 3000
+    /** Batas baris kursor MediaStore yang DIPERIKSA per scan (issue
+     *  #1479): plafon entri diterima saja tidak membatasi kerja loop —
+     *  di API <29 tanpa pra-saring SQL, baris di luar folder pilihan
+     *  bisa berjumlah jauh lebih besar dan semuanya ikut di-stat.
+     *  4x plafon entri memberi ruang bagi baris basi/luar-folder tanpa
+     *  kerja yang tak terbatas. */
+    private const val MAX_SCAN_EXAMINED_ROWS = GALLERY_MAX_ENTRIES * 4
     private const val THUMB_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
     // TTL disimpan per-cache: cache fallback (600 dtk) yang masih valid
@@ -781,6 +788,7 @@ object MediaLibrary {
                 } else {
                     -1
                 }
+                var mediaStoreExamined = 0
                 while (c.moveToNext()) {
                     // Plafon materialisasi (issue #752): blok sumber lain
                     // semua beranggaran, tetapi loop kursor ini dulu
@@ -790,6 +798,12 @@ object MediaLibrary {
                     // DATE_MODIFIED DESC, jadi yang tertahan adalah
                     // entri terbaru, selaras potongan akhir.
                     if (list.size >= GALLERY_MAX_ENTRIES) break
+                    // Batas baris DIPERIKSA (issue #1479): plafon di atas
+                    // menghitung entri yang diterima (termasuk dari
+                    // sumber lain), bukan baris yang sudah di-stat loop
+                    // ini — tanpa batas ini, scan cache-miss di API <29
+                    // men-stat seluruh baris MediaStore yang gugur.
+                    if (++mediaStoreExamined > MAX_SCAN_EXAMINED_ROWS) break
                     val name = c.getString(iName) ?: continue
                     val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
                     // Nilai mentah dipertahankan (issue #525): string
@@ -804,8 +818,12 @@ object MediaLibrary {
                     }
                     val uri = ContentUris.withAppendedId(collection, c.getLong(iId)).toString()
                     val volumeName = if (iVol >= 0) c.getString(iVol) else null
-                    if (!isMediaEntryReadable(filePath, uri)) continue
+                    // Saringan folder (murni pencocokan string atas kolom
+                    // kursor) berjalan SEBELUM stat keterbacaan (issue
+                    // #1479): baris di luar folder pilihan tak perlu
+                    // membayar File.isFile satu per satu.
                     if (folderFilterActive && !inSelectedFoldersPrecomputed(filePath, relativePath, allowedFolders, volumeName)) continue
+                    if (!isMediaEntryReadable(filePath, uri)) continue
                     mediaStoreAccepted++
                     list.add(
                         MediaEntry(
