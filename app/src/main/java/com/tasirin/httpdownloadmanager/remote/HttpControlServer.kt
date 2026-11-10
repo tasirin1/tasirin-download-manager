@@ -4301,6 +4301,18 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                     if (withStatus) payload.put("status", statusObject())
                     payload.toString()
                 }
+                val pushHeartbeat = {
+                    runCatching {
+                        // Heartbeat murni (issue #1442): frame komentar
+                        // ringan tanpa membangun payload sama sekali.
+                        sseLastPushAt = System.currentTimeMillis()
+                        val closed = sseClients.filter { it.isClosed }
+                        if (closed.isNotEmpty()) sseClients.removeAll(closed)
+                        sseClients.forEach { it.push(": hb\n\n") }
+                        val newlyClosed = sseClients.filter { it.isClosed }
+                        if (newlyClosed.isNotEmpty()) sseClients.removeAll(newlyClosed)
+                    }
+                }
                 val pushFrame = { payloadText: String ->
                     runCatching {
                         val now = System.currentTimeMillis()
@@ -4376,13 +4388,23 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         }
                         val nowThrottle = System.currentTimeMillis()
                         if (nowThrottle - sseLastPushAt < SSE_MIN_INTERVAL_MS) continue
-                        // Lewati serialisasi JSON penuh bila daftar tak berubah
-                        // dan heartbeat belum jatuh tempo (hemat CPU tiap tick).
+                        // Signature daftar tick ini adalah bukti berubah
+                        // (issue #1442): keputusan heartbeat dan berubah
+                        // tak lagi membayar serialisasi JSON penuh + hash
+                        // string — payload hanya dibangun saat item berubah
+                        // atau pada tick status (statusObject bisa berubah
+                        // tanpa item berubah; di sana hash frame tetap
+                        // menjadi pembanding, 10 detik sekali saja).
                         val currentSig = itemsSignature(App.engine.items.value)
                         val heartbeatDue = nowThrottle - sseLastPushAt > SSE_HEARTBEAT_MS
-                        if (!pruneTick && !heartbeatDue && currentSig == lastBuiltSig) continue
-                        pushFrame(buildPayload(pruneTick))
-                        lastBuiltSig = currentSig
+                        if (currentSig != lastBuiltSig) {
+                            pushFrame(buildPayload(pruneTick))
+                            lastBuiltSig = currentSig
+                        } else if (pruneTick) {
+                            pushFrame(buildPayload(true))
+                        } else if (heartbeatDue) {
+                            pushHeartbeat()
+                        }
                     }
                 } catch (e: CancellationException) {
                     throw e
