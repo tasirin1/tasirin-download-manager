@@ -1748,7 +1748,16 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         adapter.submitList(DownloadAdapter.rowsOf(items)) {
             if (isNewHead) binding.recycler.scrollToPosition(0)
         }
-        submittedIds = items.mapTo(HashSet()) { it.id }
+        // Bangun ulang himpunan id hanya bila struktur berubah (issue
+        // #1393): item baru selalu masuk di kepala dan penghapusan
+        // mengubah ukuran, jadi ukuran sama + kepala sama berarti
+        // himpunan id tak berubah — tick progres biasa (yang memanggil
+        // fungsi ini berkali-kali per detik) tak mengalokasi HashSet
+        // baru. Deteksi kepala-baru di atas tak terpengaruh: ia hanya
+        // menilai keanggotaan kepala terhadap himpunan yang sama.
+        if (items.size != submittedIds.size || head?.id != lastSubmittedHeadId) {
+            submittedIds = items.mapTo(HashSet()) { it.id }
+        }
         lastSubmittedHeadId = head?.id
     }
 
