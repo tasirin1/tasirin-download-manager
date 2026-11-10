@@ -220,8 +220,27 @@ class DownloadService : Service() {
         // pencabutan pertama — service memang sudah berhenti.
         synchronized(stopDecisionGuard) {
             if (stopSelfDone) return true
+            // Nilai ulang keadaan SEGAR di dalam gerbang (issue
+            // #1530): parameter di atas adalah snapshot saat pemanggil
+            // berjalan — start server/unduhan yang tiba di jendela
+            // antara penilaian pemanggil dan masuk gerbang ini (start
+            // server juga mereset latch lewat onStartCommand, #1515)
+            // bisa sudah menghidupkan pekerjaan saat rangkaian berhenti
+            // dijalankan dari snapshot basi, menyisakan server hidup
+            // tanpa perlindungan foreground (#1028). Definisi segarnya
+            // persis milik ketiga pemanggil: any DOWNLOADING/PENDING
+            // atas items.value saat ini + isServerActive(). Bila segar
+            // menunjukkan ada kerja, berhenti DIBATALKAN (return
+            // false) dan latch TIDAK dipasang — penilai berikutnya
+            // tetap bebas menilai ulang.
+            val freshItems = App.engine.items.value
+            val freshActive = freshItems.any {
+                it.state == DownloadState.DOWNLOADING ||
+                    it.state == DownloadState.PENDING
+            }
+            if (freshActive || isServerActive()) return false
             stopSelfDone = true
-            NotificationHelper.updateNotification(this, items, serverActive)
+            NotificationHelper.updateNotification(this, freshItems, serverActive)
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
