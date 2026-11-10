@@ -70,7 +70,11 @@ object MediaLibrary {
         val total: Int,
         /** true bila hasil berasal dari fallback scan filesystem (MediaStore
          *  kosong) — cache harus lebih lama karena traversal-nya mahal. */
-        val usedFallback: Boolean = false
+        val usedFallback: Boolean = false,
+        /** true bila kueri MediaStore melempar atau walk fallback gagal
+         *  selama scan ini (issue #1400): hasilnya bisa "kosong karena
+         *  gagal", jadi TTL panjang fallback tidak berlaku untuknya. */
+        val hadError: Boolean = false
     )
 
     /** Koleksi MediaStore untuk root folder media (dipakai saat browsing). */
@@ -361,6 +365,15 @@ object MediaLibrary {
     fun scanCacheUsable(ageMs: Long, ttlMs: Long, itemsSize: Int, total: Int, limit: Int): Boolean =
         ageMs < ttlMs && (itemsSize >= limit || itemsSize == total)
 
+    /** TTL cache untuk satu hasil scan (issue #1400), fungsi murni agar
+     *  bisa di-unit-test: TTL panjang hanya untuk fallback yang BERSIH.
+     *  Hasil fallback yang lahir dari kegagalan (kueri MediaStore
+     *  melempar / walk gagal) bisa "kosong karena gagal" — meng-cache-nya
+     *  10 menit menyembunyikan pemulihan MediaStore selama itu, jadi ia
+     *  hanya memakai TTL biasa seperti hasil MediaStore. */
+    internal fun scanTtlMs(usedFallback: Boolean, hadError: Boolean): Long =
+        if (usedFallback && !hadError) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS
+
     /** MediaStore bisa menyimpan baris lama setelah file dihapus/dipindah
      *  langsung oleh filesystem. Galeri hanya percaya URI bila file fisiknya
      *  tetap ada atau item memang hanya memiliki content URI. */
@@ -527,7 +540,7 @@ object MediaLibrary {
                         val now = android.os.SystemClock.elapsedRealtime()
                         scanCache = ScanCache(
                             now, result.items, result.total,
-                            if (result.usedFallback) FALLBACK_SCAN_TTL_MS else SCAN_TTL_MS,
+                            scanTtlMs(result.usedFallback, result.hadError),
                             result.usedFallback
                         )
                         scanCacheFolderKey = selectedFolders
@@ -680,6 +693,11 @@ object MediaLibrary {
         // galeri kosong padahal walk filesystem bisa menemukan
         // berkasnya.
         var mediaStoreAccepted = 0
+        // Penanda kegagalan scan (issue #1400): kueri MediaStore yang
+        // melempar atau walk fallback yang gagal membuat hasil bisa
+        // "kosong karena gagal", bukan kosong beneran — hasil seperti
+        // itu tak boleh menikmati TTL fallback panjang (lihat scanTtlMs).
+        var scanHadError = false
         runCatching {
             val resolver = context.contentResolver
             val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
@@ -779,7 +797,7 @@ object MediaLibrary {
                     )
                 }
             }
-        }
+        }.onFailure { scanHadError = true }
 
         // 4b) MediaStore kosong/rusak (umum di Android 6 setelah file dicolok
         //     via USB/PC — indeks tidak pernah ter-scan): fallback scan
@@ -810,7 +828,7 @@ object MediaLibrary {
                         .take((GALLERY_MAX_ENTRIES - list.size).coerceAtLeast(0))
                         .forEach { addFile(it) }
                 }
-            }
+            }.onFailure { scanHadError = true }
         }
 
         // 5) Folder Download publik (lama, untuk Android < 10 bila MediaStore
@@ -888,7 +906,7 @@ object MediaLibrary {
             .sortedByDescending { it.modified }
         val deduped = allDistinct.take(GALLERY_MAX_ENTRIES)
         val usedFallback = !folderFilterActive && mediaStoreAccepted == 0
-        return MediaScanResult(deduped, allDistinct.size, usedFallback)
+        return MediaScanResult(deduped, allDistinct.size, usedFallback, scanHadError)
     }
 
     /** Hapus thumbnail disk yang sudah lama tak terpakai (> 7 hari). Dipanggil
