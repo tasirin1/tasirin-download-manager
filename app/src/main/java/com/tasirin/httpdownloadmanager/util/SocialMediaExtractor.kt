@@ -13,6 +13,7 @@ import java.io.InputStream
 import java.util.Locale
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
@@ -1195,14 +1196,23 @@ object SocialMediaExtractor {
             { extractYouTubeViaInvidious(videoId)?.let { listOf(it) } ?: emptyList() },
             { extractYouTubeViaCobalt(videoId)?.let { listOf(it) } ?: emptyList() }
         )
-        val futures = racers.map { racer ->
-            try {
+        // Tipe ditulis EKSPLISIT penuh di blok ini (perbaikan
+        // kompilasi): submit(Callable<T>) di dalam map + try/catch
+        // tanpa tipe harapan dari konteks membuat inferensi generik
+        // kompilator runtuh (NewConstraintError atas Future<T>),
+        // sehingga isDone/get/cancel ikut tak ter-resolve.
+        val futures = ArrayList<Future<List<Result>>?>(racers.size)
+        for (racer in racers) {
+            val future: Future<List<Result>>? = try {
                 stageExecutor.submit(
-                    Callable { runCatching { racer() }.getOrDefault(emptyList()) }
+                    Callable<List<Result>> {
+                        runCatching { racer() }.getOrDefault(emptyList<Result>())
+                    }
                 )
             } catch (_: Exception) {
                 null
             }
+            futures.add(future)
         }
         val deadline = System.nanoTime() + FALLBACK_RACE_BUDGET_MS * 1_000_000L
         val settled = BooleanArray(futures.size) { futures[it] == null }
@@ -1212,17 +1222,17 @@ object SocialMediaExtractor {
             // hasil yang tiba bersamaan dimenangkan prioritasnya; hasil
             // sah pertama pada sapuan mana pun langsung menang.
             for (i in futures.indices) {
-                val f = futures[i] ?: continue
+                val f: Future<List<Result>> = futures[i] ?: continue
                 if (settled[i] || !f.isDone) continue
                 settled[i] = true
                 settledCount++
-                val result = try {
+                val result: List<Result> = try {
                     f.get()
                 } catch (_: Exception) {
-                    emptyList()
+                    emptyList<Result>()
                 }
                 if (result.isNotEmpty()) {
-                    futures.forEach { it?.cancel(true) }
+                    for (other in futures) other?.cancel(true)
                     return result
                 }
             }
@@ -1230,11 +1240,11 @@ object SocialMediaExtractor {
             try {
                 Thread.sleep(FALLBACK_RACE_POLL_MS)
             } catch (_: InterruptedException) {
-                futures.forEach { it?.cancel(true) }
+                for (other in futures) other?.cancel(true)
                 return emptyList()
             }
         }
-        futures.forEach { it?.cancel(true) }
+        for (other in futures) other?.cancel(true)
         return emptyList()
     }
 
