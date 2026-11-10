@@ -2715,6 +2715,10 @@ class DownloadEngine(appContext: Context) {
                         throttle.sleepIfNeeded { progress.downloaded.get() + bytes }
                         reportMuxProgress(item, progress, bytes, total)
                         if ((adaptiveIters++ and 7) == 0) {
+                            // Pembatalan (jeda / sisi pasangan gagal,
+                            // issue #1435) dihormati di antara chunk —
+                            // bukan hanya saat soket tertutup.
+                            coroutineContext.ensureActive()
                             val now = monotonicNow()
                             if (now - lastAdaptiveCheckAt >= 1000) {
                                 val speed = if (now > lastAdaptiveCheckAt) {
@@ -2776,7 +2780,6 @@ class DownloadEngine(appContext: Context) {
         val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null)
         val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
         val progress = MuxProgress()
-        val buffer = ByteArray(BUFFER_SIZE)
         val globalLimit = StoragePrefs.speedLimitKbps(context)
         val limit = if (item.speedLimitKbps > 0) item.speedLimitKbps else globalLimit
         val throttle = if (item.speedLimitKbps > 0) {
@@ -2788,11 +2791,32 @@ class DownloadEngine(appContext: Context) {
         // berpasangan-nilai saat job attempt ini selesai.
         activeThrottles[item.id] = throttle
         coroutineContext[Job]?.invokeOnCompletion { activeThrottles.remove(item.id, throttle) }
+        // Satu sisi adaptif (issue #1435): buffer per-sisi (buffer bersama
+        // akan saling menimpa antar-coroutine); kegagalan sisi ini memutus
+        // koneksi item agar sisi lain berhenti segera — bukan menunggu
+        // read-timeout soketnya — lalu coroutineScope membatalkan job-nya.
+        suspend fun fetchAdaptive(url: String, target: File, label: String) {
+            try {
+                val ok = downloadAdaptiveFile(
+                    item, url, target, ByteArray(BUFFER_SIZE), throttle, progress
+                )
+                if (!ok) throw IOException("adaptive $label download failed")
+            } catch (e: Exception) {
+                if (e !is CancellationException) disconnectActive(item.id)
+                throw e
+            }
+        }
         try {
-            val videoOk = downloadAdaptiveFile(item, adaptiveVideoUrl, videoMp4, buffer, throttle, progress)
-            if (!videoOk) throw IOException("adaptive video download failed")
-            val audioOk = downloadAdaptiveFile(item, adaptiveAudioUrl, audioM4a, buffer, throttle, progress)
-            if (!audioOk) throw IOException("adaptive audio download failed")
+            // Video + audio diunduh KONKUREN (issue #1435): dulu sekuensial
+            // sehingga total waktu = jumlah keduanya. Progres gabungan
+            // tetap atomik lewat MuxProgress.downloaded yang sama, dan
+            // throttle bersama memang dirancang untuk pemakai konkuren
+            // (kunci internal, pola segmen). Gagal satu sisi membatalkan
+            // sisi lain lewat coroutineScope.
+            coroutineScope {
+                launch { fetchAdaptive(adaptiveVideoUrl, videoMp4, "video") }
+                launch { fetchAdaptive(adaptiveAudioUrl, audioM4a, "audio") }
+            }
             coroutineContext.ensureActive()
             val remuxed = AdaptiveMp4Muxer.remuxMp4s(videoMp4, audioM4a, mp4)
             if (!remuxed) throw IOException("adaptive remux failed")
