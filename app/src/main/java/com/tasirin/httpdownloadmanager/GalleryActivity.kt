@@ -92,12 +92,17 @@ class GalleryActivity : AppCompatActivity() {
             val scanned = withContext(Dispatchers.IO) {
                 MediaLibrary.scan(this@GalleryActivity, partialProgress, loadedCount, StoragePrefs.getGalleryFolders(this@GalleryActivity)).items
             }
+            // Penyembunyian progres + loadMore ikut dijaga generasi
+            // (issue #1396): penyelesaian scan awal yang sudah basi
+            // (rescan lebih baru sedang berjalan) dulu tetap
+            // menyembunyikan indikator scan baru dan memuat halaman
+            // dari daftar yang bukan hasil scan terkini.
             if (gen == galleryScanGen) {
                 fullList = scanned
                 initialScanDone = true
+                binding.progress.visibility = View.GONE
+                loadMore() // halaman awal kurang dari satu layar -> isi otomatis
             }
-            binding.progress.visibility = View.GONE
-            loadMore() // halaman awal kurang dari satu layar -> isi otomatis
             // Terbitkan hasil scan awal SELALU (issue #384): loadMore
             // return dini tanpa updateList() bila canLoadMore() false —
             // untuk galeri < GALLERY_PAGE entri itu berarti hasil scan
