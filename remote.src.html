@@ -5987,6 +5987,19 @@ function startFsUpload(jobs) {
     fsMsg('Server is read-only — upload disabled', true);
     return;
   }
+  if (fsUploading) {
+    // Cek sibuk di sini, SEBELUM tombol dimatikan (issue #1506): dulu
+    // tombol dinonaktifkan lebih dulu, lalu uploadFiles kembali dini
+    // dari gerbang fsUploading tanpa memanggil callback done dan tanpa
+    // melempar — tombol terkunci permanen sampai halaman dimuat ulang.
+    // Nilai kedua input ikut direset pada jalur sibuk ini (reset normal
+    // hanya ada di callback done) agar berkas yang sama bisa dipilih
+    // ulang sesudahnya.
+    fsUploadFile.value = '';
+    fsUploadDir.value = '';
+    fsMsg('Another upload is still running.', true);
+    return;
+  }
   const btn = fsToolsBtn;
   btn.disabled = true;
   try {

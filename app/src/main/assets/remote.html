@@ -3141,6 +3141,12 @@ if (serverReadOnly) {
 fsMsg('Server is read-only — upload disabled', true);
 return;
 }
+if (fsUploading) {
+fsUploadFile.value = '';
+fsUploadDir.value = '';
+fsMsg('Another upload is still running.', true);
+return;
+}
 const btn = fsToolsBtn;
 btn.disabled = true;
 try {
