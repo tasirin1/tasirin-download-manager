@@ -1549,6 +1549,14 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // polos bergaris bawah bawaan dan teks menempel tepi dialog.
         input.setBackgroundResource(R.drawable.bg_input_tv)
         input.setPadding(dp(12), dp(10), dp(12), dp(10))
+        // Atribut teks AppInput yang belum ikut (issue #1496):
+        // ukuran 15sp, warna teks resmi, dan satu baris (nama berkas
+        // memang satu baris; EditText terprogram bawaannya multi-baris
+        // dan mewarisi warna/ukuran bawaan tema).
+        input.textSize = 15f
+        input.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        input.setHintTextColor(ContextCompat.getColor(this, R.color.text_hint))
+        input.isSingleLine = true
         input.isFocusable = true
         input.isFocusableInTouchMode = true
         input.setText(item.fileName)
