@@ -110,7 +110,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     // menjalankan query RELATIVE_PATH + pindai izin persisten untuk
     // SETIAP request media/thumb (termasuk zap galeri), jadi vonis
     // per-URI disimpan sebentar. TTL pendek membatasi jeda pencabutan.
+    // Issue #1455: cakupan diperluas ke authority dokumen SAF (jalur
+    // SAF membayar IPC persistedUriPermissions + membangun ulang
+    // daftar izin tiap request) dan ke vonis writable (cache terpisah:
+    // izin baca dan tulis adalah vonis yang berbeda). Risiko basi
+    // setara jalur MediaStore lama — tertahan TTL 5 detik yang sama.
     private val mediaUriAllowedCache = ConcurrentHashMap<String, Pair<Boolean, Long>>()
+    private val mediaUriWritableCache = ConcurrentHashMap<String, Pair<Boolean, Long>>()
     private val mediaUriAllowedCacheTtlMs = 5_000L
 
     private val fsStatsCache = ConcurrentHashMap<String, Pair<Long, Triple<Int, Long, Boolean>>>()
@@ -4198,20 +4204,29 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
     private fun isVideoCollectionUri(uri: Uri): Boolean =
         uri.pathSegments.getOrNull(1) == "video"
 
-    private fun isMediaUriAllowed(uri: Uri): Boolean {
-        if (uri.authority == MediaStore.AUTHORITY) {
-            val key = uri.toString()
-            val now = System.currentTimeMillis()
-            mediaUriAllowedCache[key]?.let { (allowed, at) ->
-                if (now - at < mediaUriAllowedCacheTtlMs) return allowed
-            }
-            val allowed = isMediaUriAllowedFresh(uri)
-            if (mediaUriAllowedCache.size > 1024) mediaUriAllowedCache.clear()
-            mediaUriAllowedCache[key] = allowed to now
-            return allowed
+    /** Vonis izin URI lewat cache TTL bersama (issue #1455): authority
+     *  yang boleh di-cache dinilai segar hanya saat entri tak ada/basi;
+     *  authority lain selalu dinilai segar (cabang else-nya statis
+     *  false, tak ada IPC yang bisa dihemat). */
+    private fun cachedUriVerdict(
+        cache: ConcurrentHashMap<String, Pair<Boolean, Long>>,
+        uri: Uri,
+        fresh: () -> Boolean
+    ): Boolean {
+        if (!isUriVerdictCacheable(uri.authority)) return fresh()
+        val key = uri.toString()
+        val now = System.currentTimeMillis()
+        cache[key]?.let { (verdict, at) ->
+            if (now - at < mediaUriAllowedCacheTtlMs) return verdict
         }
-        return isMediaUriAllowedFresh(uri)
+        val verdict = fresh()
+        if (cache.size > 1024) cache.clear()
+        cache[key] = verdict to now
+        return verdict
     }
+
+    private fun isMediaUriAllowed(uri: Uri): Boolean =
+        cachedUriVerdict(mediaUriAllowedCache, uri) { isMediaUriAllowedFresh(uri) }
 
     private fun isMediaUriAllowedFresh(uri: Uri): Boolean {
         return runCatching {
@@ -4262,7 +4277,10 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
 
     /** Aksi destruktif MediaStore memakai batas root yang sama dengan FS;
      *  galeri boleh membaca koleksi umum, tapi tidak otomatis boleh menghapusnya. */
-    private fun isMediaUriWritable(uri: Uri): Boolean {
+    private fun isMediaUriWritable(uri: Uri): Boolean =
+        cachedUriVerdict(mediaUriWritableCache, uri) { isMediaUriWritableFresh(uri) }
+
+    private fun isMediaUriWritableFresh(uri: Uri): Boolean {
         return runCatching {
             when (uri.authority) {
                 MediaStore.AUTHORITY -> {
@@ -4978,3 +4996,14 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         }.getOrDefault(emptyList())
     }
 }
+
+/** Authority yang vonis izin URI-nya boleh di-cache TTL (issue #1455):
+ *  MediaStore + dua authority dokumen SAF — ketiganya membayar query /
+ *  IPC izin persisten per penilaian segar. Authority lain jatuh ke
+ *  cabang else statis (false tanpa IPC), jadi tak ada yang dihemat
+ *  dengan meng-cache-nya. Murni; dibuktikan port Python 1:1
+ *  (audit-dm-r15/port-1455.py). */
+internal fun isUriVerdictCacheable(authority: String?): Boolean =
+    authority == MediaStore.AUTHORITY ||
+        authority == "com.android.externalstorage.documents" ||
+        authority == "com.android.providers.downloads.documents"
