@@ -2693,7 +2693,13 @@ class DownloadEngine(appContext: Context) {
         throttle: SpeedThrottle,
         progress: MuxProgress,
         mayResume: Boolean = true,
-        totalSink: AtomicLong? = null
+        totalSink: AtomicLong? = null,
+        // Ruang bebas volume tujuan yang dihitung SEKALI oleh
+        // downloadAdaptiveMuxed per attempt (issue #1457): kedua sisi
+        // memakai folderPath yang sama, jadi evaluasi per sisi (hingga
+        // 4x StatFs + baca prefs per evaluasi) mubazir. Null = nilai
+        // belum disediakan pemanggil, evaluasi segar di tempat.
+        destFreeBytes: Long? = null
     ): Boolean {
         if (url.isBlank()) return false
         val existing = if (mayResume && target.isFile) target.length() else 0L
@@ -2733,7 +2739,8 @@ class DownloadEngine(appContext: Context) {
                     target.delete()
                     return downloadAdaptiveFile(
                         item, url, target, buffer, throttle, progress,
-                        mayResume = false, totalSink = totalSink
+                        mayResume = false, totalSink = totalSink,
+                        destFreeBytes = destFreeBytes
                     )
                 }
                 AdaptiveResumeAction.FAIL -> {
@@ -2791,7 +2798,10 @@ class DownloadEngine(appContext: Context) {
             // PENUH (bukan sisa resume): berkas terbit menempati ukuran
             // utuhnya di volume tujuan.
             if (total > 0) {
-                val destFree = fileSaver.destinationFreeBytes(item.folderPath)
+                // Nilai bersama per attempt dari downloadAdaptiveMuxed
+                // (issue #1457); fallback evaluasi segar untuk pemanggil
+                // yang tak menyediakannya.
+                val destFree = destFreeBytes ?: fileSaver.destinationFreeBytes(item.folderPath)
                 if (total > destFree - MIN_FREE_BYTES) {
                     throw IOException(
                         "Not enough storage at destination for adaptive file: need " +
@@ -2929,11 +2939,15 @@ class DownloadEngine(appContext: Context) {
         // akan saling menimpa antar-coroutine); kegagalan sisi ini memutus
         // koneksi item agar sisi lain berhenti segera — bukan menunggu
         // read-timeout soketnya — lalu coroutineScope membatalkan job-nya.
+        // Ruang bebas tujuan dihitung SEKALI per attempt untuk kedua
+        // sisi (issue #1457): folderPath-nya sama, dan nilai di awal
+        // attempt cukup mutakhir untuk cek di muka kedua sisi.
+        val attemptDestFreeBytes = saver.destinationFreeBytes(item.folderPath)
         suspend fun fetchAdaptive(url: String, target: File, label: String, totalSink: AtomicLong) {
             try {
                 val ok = downloadAdaptiveFile(
                     item, url, target, ByteArray(BUFFER_SIZE), throttle, progress,
-                    totalSink = totalSink
+                    totalSink = totalSink, destFreeBytes = attemptDestFreeBytes
                 )
                 if (!ok) throw IOException("adaptive $label download failed")
             } catch (e: Exception) {
