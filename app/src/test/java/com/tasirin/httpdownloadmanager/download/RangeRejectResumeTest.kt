@@ -49,6 +49,24 @@ class RangeRejectResumeTest {
         assertFalse(isHttpMirrorFailoverError(""))
     }
 
+    @Test fun hlsUrlRejectionMatchesOnly403And404() {
+        // Issue #1410: failedHlsUrls hanya untuk penolakan URL oleh
+        // server; ekspektasi dibuktikan port-1410.py (port 1:1).
+        assertTrue(isHlsUrlRejectionError("HTTP 403"))
+        assertTrue(isHlsUrlRejectionError("HTTP 404"))
+        assertTrue(isHlsUrlRejectionError("HTTP 404 Not Found"))
+        assertFalse(isHlsUrlRejectionError("HTTP 410"))
+        assertFalse(isHlsUrlRejectionError("HTTP 500"))
+        assertFalse(isHlsUrlRejectionError("HTTP 401"))
+        assertFalse(isHlsUrlRejectionError("HTTP 429"))
+        assertFalse(isHlsUrlRejectionError("Not enough storage for HLS: need ~10 MB, free 2 MB"))
+        assertFalse(isHlsUrlRejectionError("Live HLS not supported (playlist without EXT-X-ENDLIST)"))
+        assertFalse(isHlsUrlRejectionError("Cannot fetch HLS manifest"))
+        assertFalse(isHlsUrlRejectionError("No HLS segments found"))
+        assertFalse(isHlsUrlRejectionError(null))
+        assertFalse(isHlsUrlRejectionError(""))
+    }
+
     @Test fun retryResumeMessageIsNotFinalReject() {
         assertFalse(
             isRangeRejectError(

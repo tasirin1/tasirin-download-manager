@@ -2492,10 +2492,17 @@ class DownloadEngine(appContext: Context) {
                         )
                         return
                     } catch (e: IOException) {
-                        // HLS gagal (mis. media playlist butuh pot token / 403).
-                        // Tandai URL HLS sebagai gagal supaya resume/retry tidak
-                        // mengulang HLS yang sama — re-extract dari YouTube URL.
-                        rememberFailedHlsUrl(result.directUrl)
+                        // HLS gagal. Tandai URL HLS sebagai gagal HANYA
+                        // bila server menolak URL itu (403/404, mis. media
+                        // playlist butuh pot token) supaya resume/retry
+                        // tidak mengulang HLS yang sama — re-extract dari
+                        // YouTube URL. Kegagalan bukan-URL (storage penuh,
+                        // live, playlist terlalu besar) tidak ditandai:
+                        // retry harus tetap bisa lewat HLS langsung +
+                        // resume segmen (issue #1410).
+                        if (isHlsUrlRejectionError(e.message)) {
+                            rememberFailedHlsUrl(result.directUrl)
+                        }
                         App.logEvent("HLS: download failed (${e.message?.take(50)}), trying non-HLS fallback")
                         // Pasangan adaptive dari ekstraksi yang SAMA dulu
                         // (issue #1375): Result HLS membawa videoUrl/audioUrl
@@ -5665,6 +5672,20 @@ internal fun isHttpMirrorFailoverError(message: String?): Boolean {
     val code = Regex("""HTTP (\d{3})""").find(message)?.groupValues?.get(1)?.toIntOrNull()
         ?: return false
     return code == 404 || code == 410 || code == 403 || code in 500..599
+}
+
+/** Kegagalan HLS yang memang penolakan URL oleh server (issue #1410):
+ *  hanya 403/404 — maksud desain failedHlsUrls sejak awal (media
+ *  playlist 403/404 -> jangan retry URL itu, re-extract). Kegagalan
+ *  downloadHls lain (storage penuh, live tak didukung, playlist terlalu
+ *  besar, putus jaringan) BUKAN kesalahan URL: ikut ditandai membuat
+ *  retry melewati jalur HLS langsung + resume segmen dan membayar
+ *  ekstraksi ulang penuh. Murni agar bisa di-unit-test. */
+internal fun isHlsUrlRejectionError(message: String?): Boolean {
+    if (message.isNullOrBlank()) return false
+    val code = Regex("""HTTP (\d{3})""").find(message)?.groupValues?.get(1)?.toIntOrNull()
+        ?: return false
+    return code == 403 || code == 404
 }
 
 /** Ekor terpotong (server menutup koneksi sebelum Content-Length terpenuhi):
