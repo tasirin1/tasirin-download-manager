@@ -3108,10 +3108,16 @@ class DownloadEngine(appContext: Context) {
                 throw IOException("Adaptive merge failed: ${e.message ?: "muxer error"}")
             }
             val fileName = "$baseName.mp4"
-            videoMp4.delete()
-            audioM4a.delete()
             ensureItemPresent(item.id, mp4)
             val (published, finalName) = publishCommitOrganize(item, saver, mp4, fileName)
+            // Temp video/audio baru dibuang SESUDAH publish sukses
+            // (issue #1507): penghapusan sebelum publish membuat
+            // kegagalan publish (izin SAF dicabut, ruang tujuan habis)
+            // membuang bahan resume #1434, sehingga retry mengunduh
+            // ulang kedua sisi dari nol. Pada jalur gagal, catch di
+            // bawah mempertahankan temp seperti desain #1434.
+            videoMp4.delete()
+            audioM4a.delete()
             finishMuxed(item, progress.downloaded.get(), published, finalName)
         } catch (e: Exception) {
             // Temp video/audio SENGAJA dipertahankan saat gagal/jeda
