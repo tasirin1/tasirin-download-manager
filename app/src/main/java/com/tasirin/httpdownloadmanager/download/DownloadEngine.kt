@@ -1164,9 +1164,14 @@ class DownloadEngine(appContext: Context) {
         startQueued()
     }
 
-    /** Pindahkan item ke atas/atas-antrean (daftar tampil terbaru di atas).
-     *  Pertukaran posisi hanya pada item yang tidak aktif download, supaya
-     *  tidak mengganggu segmen yang sedang berjalan. */
+    /** Pindahkan item satu posisi ke atas daftar (daftar tampil terbaru
+     *  di atas). Pertukaran berlaku untuk item berstatus apa pun yang
+     *  diberikan pemanggil: urutan daftar hanya menentukan giliran
+     *  antrean item PENDING, dan job yang sedang berjalan terikat ID —
+     *  bukan posisi — jadi pertukaran tak mengganggu unduhan aktif.
+     *  Pembatasan "item yang sedang mengunduh tak ditawari pindah"
+     *  ditegakkan pemanggil UI (menu MainActivity), bukan fungsi ini
+     *  (KDoc lama mengklaim sebaliknya — issue #1487). */
     fun moveUp(id: String): Boolean {
         // Pertukaran dinilai + diterapkan di dalam monitor (#274):
         // indeks dari snapshot luar kunci bisa basi saat daftar berubah
@@ -1193,7 +1198,8 @@ class DownloadEngine(appContext: Context) {
         return true
     }
 
-    /** Pindahkan item ke bawah antrean. */
+    /** Pindahkan item satu posisi ke bawah daftar — pasangan
+     *  [moveUp], semantik dan pembatasan pemanggil yang sama. */
     fun moveDown(id: String): Boolean {
         var movedName: String? = null
         updateTransformed { cur ->
