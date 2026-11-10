@@ -612,40 +612,39 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         // karena kolom URL disunting lalu kembali seperti semula.
         var socialProbeMemo: Pair<String, List<SocialMediaExtractor.Result>>? = null
         // URL pemilik label yang SEDANG tampil di tiap spinner sosial +
-        // memo label terpilih per URL: setupSpinner memasang adapter
+        // memo POSISI terpilih per URL: setupSpinner memasang adapter
         // baru yang me-reset pilihan ke Default, jadi sebelum adapter
         // diganti pilihan lama dicatat per URL pemiliknya dan dipulihkan
-        // bila label untuk URL itu dipasang lagi (issue #1473). URL
-        // yang belum pernah dipilih mulai dari Default seperti biasa.
+        // bila label untuk URL itu dipasang lagi (issue #1473). Memo
+        // menyimpan posisi, BUKAN teks label (issue #1485): submit
+        // membaca posisi, dan label kualitas bisa ganda dalam satu
+        // daftar (mis. dua rendisi berlabel sama) — pemulihan berbasis
+        // label menemukan kecocokan pertama dan memindahkan pilihan
+        // pengguna ke kandidat lain secara diam-diam. URL yang belum
+        // pernah dipilih mulai dari Default seperti biasa.
         var socialQualityShownUrl: String = ""
         var socialCarouselShownUrl: String = ""
-        val socialQualitySelMemo = mutableMapOf<String, String>()
-        val socialCarouselSelMemo = mutableMapOf<String, String>()
+        val socialQualitySelMemo = mutableMapOf<String, Int>()
+        val socialCarouselSelMemo = mutableMapOf<String, Int>()
         fun setupQualitySpinner(labels: List<String>, target: String) {
-            val curLabel = socialQualitySpinner.selectedItem?.toString()
-            if (socialQualityShownUrl.isNotEmpty() && curLabel != null) {
-                socialQualitySelMemo[socialQualityShownUrl] = curLabel
+            if (socialQualityShownUrl.isNotEmpty()) {
+                socialQualitySelMemo[socialQualityShownUrl] =
+                    socialQualitySpinner.selectedItemPosition
             }
             setupSpinner(this@MainActivity, socialQualitySpinner, labels)
             socialQualityShownUrl = target
-            val prev = socialQualitySelMemo[target]
-            if (prev != null) {
-                val idx = labels.indexOf(prev)
-                if (idx > 0) socialQualitySpinner.setSelection(idx)
-            }
+            val idx = spinnerRestoreIndex(socialQualitySelMemo[target], labels.size)
+            if (idx >= 0) socialQualitySpinner.setSelection(idx)
         }
         fun setupCarouselSpinner(labels: List<String>, target: String) {
-            val curLabel = socialCarouselSpinner.selectedItem?.toString()
-            if (socialCarouselShownUrl.isNotEmpty() && curLabel != null) {
-                socialCarouselSelMemo[socialCarouselShownUrl] = curLabel
+            if (socialCarouselShownUrl.isNotEmpty()) {
+                socialCarouselSelMemo[socialCarouselShownUrl] =
+                    socialCarouselSpinner.selectedItemPosition
             }
             setupSpinner(this@MainActivity, socialCarouselSpinner, labels)
             socialCarouselShownUrl = target
-            val prev = socialCarouselSelMemo[target]
-            if (prev != null) {
-                val idx = labels.indexOf(prev)
-                if (idx > 0) socialCarouselSpinner.setSelection(idx)
-            }
+            val idx = spinnerRestoreIndex(socialCarouselSelMemo[target], labels.size)
+            if (idx >= 0) socialCarouselSpinner.setSelection(idx)
         }
         // Terapkan hasil probe ke state + spinner (dipakai jalur jaringan
         // dan jalur memo): pisahkan opsi video/foto, tampilkan section
@@ -2081,3 +2080,15 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         private val PRIORITY_VALUES = intArrayOf(-1, 0, 1)
     }
 }
+
+/** Indeks spinner yang dipulihkan dari memo posisi pilihan (issue
+ *  #1485, menyempurnakan #1473): posisi tersimpan hanya berlaku bila
+ *  berada di dalam daftar saat ini dan bukan posisi 0 — posisi 0
+ *  adalah Default yang sudah menjadi bawaan sesudah adapter dipasang,
+ *  jadi tak perlu dipulihkan. -1 = jangan mengubah seleksi. Memo
+ *  berbasis posisi (bukan teks label) karena submit membaca posisi
+ *  dan label kualitas bisa ganda dalam satu daftar. Murni agar bisa
+ *  di-unit-test; nilai harapan dibuktikan port Python 1:1
+ *  (audit-dm-r17/port_1485.py). */
+internal fun spinnerRestoreIndex(savedPosition: Int?, itemCount: Int): Int =
+    if (savedPosition != null && savedPosition in 1 until itemCount) savedPosition else -1
