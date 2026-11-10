@@ -1289,7 +1289,10 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         val rows = view.findViewById<LinearLayout>(R.id.about_rows)
         val icons = resources.getStringArray(R.array.about_icons)
         val texts = resources.getStringArray(R.array.about_rows)
-        for (i in icons.indices) {
+        // Dibatasi yang lebih pendek dari dua array (issue #1474):
+        // pasangan ikon/teks yang tak seimbang sesudah suntingan
+        // resource tak boleh crash ArrayIndexOutOfBounds di About.
+        for (i in 0 until minOf(icons.size, texts.size)) {
             val row = LinearLayout(this)
             row.orientation = LinearLayout.HORIZONTAL
             row.gravity = android.view.Gravity.CENTER_VERTICAL
