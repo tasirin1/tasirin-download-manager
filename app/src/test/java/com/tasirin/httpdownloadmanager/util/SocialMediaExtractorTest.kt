@@ -271,7 +271,8 @@ class SocialMediaExtractorTest {
         assertEquals(2, opts.size)
         assertEquals("Hot video", opts[0].title)
         assertTrue(opts[0].fileName!!.startsWith("Pornhub_"))
-        assertEquals("HD", opts[0].quality)
+        assertEquals("720p", opts[0].quality)
+        assertTrue(opts[0].fileName!!.endsWith("_720p.mp4"))
         assertTrue(opts[0].directUrl.endsWith("high.mp4"))
         assertEquals("480p", opts[1].quality)
     }
@@ -313,7 +314,7 @@ class SocialMediaExtractorTest {
         val opts = SocialMediaExtractor.parsePornhubPage(html)
         assertEquals(1, opts.size)
         assertTrue(opts[0].directUrl.endsWith("b.mp4"))
-        assertEquals("HD", opts[0].quality)
+        assertEquals("720p", opts[0].quality)
     }
 
     @Test
@@ -325,7 +326,7 @@ class SocialMediaExtractorTest {
         val opts = SocialMediaExtractor.parsePornhubPage(html)
         assertEquals(2, opts.size)
         assertTrue(opts[0].directUrl.endsWith("b.mp4"))
-        assertEquals("HD", opts[0].quality)
+        assertEquals("720p", opts[0].quality)
         assertTrue(opts[1].directUrl.endsWith("a.mp4"))
         assertEquals("480p", opts[1].quality)
     }
@@ -340,7 +341,8 @@ class SocialMediaExtractorTest {
         val opts = SocialMediaExtractor.parsePornhubPage(html)
         assertEquals(1, opts.size)
         assertTrue(opts[0].directUrl.endsWith("long.mp4"))
-        assertEquals("HD", opts[0].quality)
+        assertEquals("1080p", opts[0].quality)
+        assertTrue(opts[0].fileName!!.endsWith("_1080p.mp4"))
     }
 
     @Test
@@ -357,7 +359,7 @@ class SocialMediaExtractorTest {
         val opts = SocialMediaExtractor.parsePornhubPage(html)
         assertEquals(1, opts.size)
         assertTrue(opts[0].directUrl.endsWith("last.mp4"))
-        assertEquals("HD", opts[0].quality)
+        assertEquals("720p", opts[0].quality)
     }
 
     @Test

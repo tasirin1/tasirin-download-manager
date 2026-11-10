@@ -1763,8 +1763,11 @@ object SocialMediaExtractor {
         return found.entries.sortedByDescending { it.value }
             .filter { (url, _) -> !url.contains(".m3u8") }
             .map { (url, quality) ->
+                // Label selalu memuat tinggi aktual (issue #1461):
+                // label "HD" bersama untuk semua >= 720 membuat 720p
+                // dan 1080p tak terbedakan di daftar opsi maupun nama
+                // berkas.
                 val label = when {
-                    quality >= 720 -> "HD"
                     quality > 0 -> "${quality}p"
                     else -> "Video"
                 }
