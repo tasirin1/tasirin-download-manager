@@ -46,8 +46,9 @@ object SocialMediaExtractor {
     /** Batas total waktu ekstraksi media sosial (ms). */
     private const val EXTRACT_TOTAL_TIMEOUT_MS = 60_000L
 
-    // Anggaran total probe 403 semua opsi YouTube (issue #805): satu
-    // gelombang paralel HEAD (connect+read 6+6 dtk) plus margin.
+    // Anggaran total probe 403 opsi YouTube (issue #805): probe malas
+    // sekuensial dari kandidat teratas (issue #1431), tiap HEAD
+    // connect+read 6+6 dtk, plus margin.
     private const val FORBIDDEN_PROBE_BUDGET_MS = 15_000L
 
     // Anggaran tahap halaman YouTube (issue #824): WAJIB sama dengan
@@ -871,9 +872,10 @@ object SocialMediaExtractor {
             }
             // If the page-derived URLs are all n-transformed (403 on the CDN),
             // fall back to Piped instances which return pre-resolved download URLs.
-            // Probe SEMUA opsi, bukan hanya yang pertama (issue #805):
-            // opsi ber-URL 403 disaring keluar; fallback hanya berjalan
-            // bila tak ada opsi sehat tersisa. Anggaran probe menyadari
+            // Probe 403 berjalan malas dari kandidat teratas (issue
+            // #1431, menyempurnakan #805): kandidat terbukti 403 sebelum
+            // kandidat sehat pertama disaring keluar; fallback hanya
+            // berjalan bila tak ada opsi sehat tersisa. Anggaran probe menyadari
             // SISA tahap (issue #824): cap tahap 30 dtk dikurangi waktu
             // yang sudah terbakar fetch halaman dan cadangan rantai
             // fallback — anggaran tetap 15 dtk bisa membuat total
@@ -1107,33 +1109,41 @@ object SocialMediaExtractor {
     }
 
     /** Saring opsi yang URL langsungnya menjawab 403 (issue #805).
-     *  Probe HEAD berjalan paralel di stageExecutor dengan anggaran
-     *  tunggu bersama; opsi yang probenya gagal/timeout/tertunda
-     *  DIPERTAHANKAN — hanya 403 yang terbukti yang dibuang (sejalan
-     *  isUrlForbidden yang getOrDefault false). [budgetMs] dihitung
-     *  pemanggil dari SISA waktu tahapnya (issue #824), bukan konstanta
-     *  buta: tahap halaman dicap 30 dtk oleh runStageCapped dan fetch
-     *  halaman sendiri bisa memakan belasan detik. */
+     *  Probe HEAD kini MALAS (issue #1431): kandidat dinilai dari
+     *  teratas dan probe BERHENTI pada kandidat pertama yang tidak
+     *  403 — sebelumnya semua opsi (30-45 request) di-probe paralel
+     *  padahal hanya satu opsi yang akhirnya diunduh. Kandidat yang
+     *  terbukti 403 sebelum kandidat sehat itu dibuang; kandidat
+     *  sesudahnya dipertahankan TANPA probe (status tak diketahui,
+     *  perlakuan yang sama seperti probe gagal/timeout selama ini:
+     *  hanya 403 yang terbukti yang dibuang, sejalan isUrlForbidden
+     *  yang getOrDefault false). [budgetMs] dihitung pemanggil dari
+     *  SISA waktu tahapnya (issue #824), bukan konstanta buta: tahap
+     *  halaman dicap 30 dtk oleh runStageCapped dan fetch halaman
+     *  sendiri bisa memakan belasan detik; anggaran habis di tengah
+     *  probe = sisa kandidat dipertahankan apa adanya. */
     private fun filterForbidden(options: List<Result>, budgetMs: Long): List<Result> {
         if (options.isEmpty()) return options
-        val futures = options.map { opt ->
-            try {
-                stageExecutor.submit(Callable { isUrlForbidden(opt) })
-            } catch (_: Exception) {
-                null
-            }
-        }
         val deadline = System.nanoTime() + budgetMs * 1_000_000L
-        return options.filterIndexed { i, _ ->
-            val f = futures[i] ?: return@filterIndexed true
-            val remaining = deadline - System.nanoTime()
-            if (remaining <= 0) return@filterIndexed true
-            try {
-                !f.get(remaining, TimeUnit.NANOSECONDS)
-            } catch (_: Exception) {
-                true
+        val kept = ArrayList<Result>(options.size)
+        var confirmedAlive = false
+        for (opt in options) {
+            if (confirmedAlive) {
+                kept.add(opt)
+                continue
             }
+            if (System.nanoTime() >= deadline) {
+                kept.add(opt)
+                continue
+            }
+            if (isUrlForbidden(opt)) {
+                // Terbukti 403: buang, lanjut probe kandidat berikutnya.
+                continue
+            }
+            kept.add(opt)
+            confirmedAlive = true
         }
+        return kept
     }
 
     private fun isUrlForbidden(item: Result): Boolean {
