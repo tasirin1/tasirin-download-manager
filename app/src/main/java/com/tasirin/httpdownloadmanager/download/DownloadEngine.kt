@@ -29,7 +29,6 @@ import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
 import com.tasirin.httpdownloadmanager.util.adaptiveTempsDisposable
 import com.tasirin.httpdownloadmanager.util.decodePercentEncoded
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
