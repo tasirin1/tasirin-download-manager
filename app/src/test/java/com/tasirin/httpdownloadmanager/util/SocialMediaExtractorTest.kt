@@ -745,7 +745,11 @@ class SocialMediaExtractorTest {
         assertEquals("Facebook_1020806507787076.mp4", options[0].fileName)
         assertEquals("c_user=1", options[0].cookies)
         // Unescape SD tetap terverifikasi lewat halaman SD-saja.
-        val sdOnly = """{"video":{"browser_native_sd_url":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/sd.mp4?_nc_cat=108&oe=66F0"},"pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
+        // Pad dibuat cukup panjang agar halaman lolos penjaga produksi
+        // html.length < 200 (halaman pendek ditolak): dengan pad 64
+        // halaman ini hanya 184 karakter dan parser sah menolaknya
+        // sebelum sempat memindai SD.
+        val sdOnly = """{"video":{"browser_native_sd_url":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/sd.mp4?_nc_cat=108&oe=66F0"},"pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
         val sdOptions = SocialMediaExtractor.parseFacebookPage(sdOnly, "1020806507787076", "")
         assertEquals(1, sdOptions.size)
         assertEquals(
