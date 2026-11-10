@@ -37,6 +37,26 @@ class AdaptiveProgressTest {
     }
 
     @Test
+    fun `persen tampilan fase unduh monoton di jendela registrasi total kedua`() {
+        // Issue #1481: nilai harapan dibuktikan port Python 1:1
+        // (audit-dm-r16/port_mux_monotonic.py). Tanpa lantai, contoh
+        // sah dari uji total efektif di atas menurunkan persen yang
+        // sudah tampil 25% menjadi 12,5% tanpa byte hilang.
+        assertEquals(25, muxMonotonicPercent(100, 400, 0))
+        assertEquals(25, muxMonotonicPercent(100, 800, 25))
+        assertEquals(12, muxMonotonicPercent(100, 800, 0))
+        assertEquals(62, muxMonotonicPercent(500, 800, 25))
+        assertEquals(0, muxMonotonicPercent(0, 800, 0))
+        assertEquals(0, muxMonotonicPercent(100, 0, 0))
+        assertEquals(30, muxMonotonicPercent(100, 0, 30))
+        assertEquals(98, muxMonotonicPercent(790, 800, 0))
+        // Fase unduh tak pernah menampilkan 100 (hanya COMPLETED).
+        assertEquals(99, muxMonotonicPercent(800, 800, 0))
+        assertEquals(99, muxMonotonicPercent(900, 800, 0))
+        assertEquals(99, muxMonotonicPercent(100, 400, 150))
+    }
+
+    @Test
     fun `persen fase gabung memetakan byte tersalin ke pita awal sampai 99`() {
         // Nilai harapan dibuktikan port Python 1:1
         // (bug-99/port-mux-progress.py). 100 hanya dari state COMPLETED.

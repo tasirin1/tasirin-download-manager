@@ -62,6 +62,7 @@ import java.util.UUID
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 import java.net.HttpCookie
@@ -2688,6 +2689,11 @@ class DownloadEngine(appContext: Context) {
         // sedang melapor saja (persen melonjak/mundur antar pelapor).
         val videoTotal = AtomicLong(0)
         val audioTotal = AtomicLong(0)
+        // Persen tampilan tertinggi yang sudah diterbitkan attempt ini
+        // (issue #1481): lantai monoton lapisan pelaporan — penyebut
+        // yang melonjak saat total sisi kedua terdaftar tak boleh
+        // menurunkan persen yang sudah dilihat pengguna.
+        val peakPercent = AtomicInteger(0)
         // Throttle laporan fase gabung (remux) — terpisah dari lastNotify
         // fase unduh agar flush final unduhan tak menelan laporan gabung
         // pertama, dan sebaliknya.
@@ -3086,13 +3092,26 @@ class DownloadEngine(appContext: Context) {
                 progress.downloaded.get(), total,
                 progress.videoTotal.get(), progress.audioTotal.get()
             )
+            // Lantai monoton persen tampilan (issue #1481): persen
+            // diterbitkan lewat override agar tak mundur saat penyebut
+            // melonjak di jendela registrasi total sisi kedua; total
+            // yang diterbitkan tetap angka sebenarnya. Total tak
+            // dikenal (0) mempertahankan perilaku lama (override -1).
+            val displayPercent = if (effTotal > 0) {
+                muxMonotonicPercent(totalNow, effTotal, progress.peakPercent.get())
+                    .also { pct ->
+                        progress.peakPercent.updateAndGet { old -> maxOf(old, pct) }
+                    }
+            } else {
+                -1
+            }
             val (speed, eta) = speedTracker.sample(item.id, totalNow, effTotal)
             updateItem(item.id, persist = false) {
                 it.copy(
                     state = DownloadState.DOWNLOADING,
                     bytesDownloaded = totalNow,
                     totalBytes = effTotal,
-                    progressPercentOverride = -1,
+                    progressPercentOverride = displayPercent,
                     totalBytesEstimated = false,
                     speedBps = speed,
                     etaSeconds = eta
@@ -3114,13 +3133,21 @@ class DownloadEngine(appContext: Context) {
         val effTotal = muxEffectiveTotal(
             downloaded, 0, progress.videoTotal.get(), progress.audioTotal.get()
         )
+        // Titik awal pita fase gabung ikut lantai monoton (issue #1481):
+        // persen akhir fase unduh yang diterbitkan tak boleh lebih
+        // rendah dari yang sudah ditampilkan selama fase unduh.
+        val displayPercent = muxMonotonicPercent(
+            downloaded, effTotal, progress.peakPercent.get()
+        ).also { pct ->
+            progress.peakPercent.updateAndGet { old -> maxOf(old, pct) }
+        }
         val (speed, eta) = speedTracker.sample(item.id, downloaded, effTotal)
         updateItem(item.id, persist = false) {
             it.copy(
                 state = DownloadState.DOWNLOADING,
                 bytesDownloaded = downloaded,
                 totalBytes = effTotal,
-                progressPercentOverride = -1,
+                progressPercentOverride = if (effTotal > 0) displayPercent else -1,
                 totalBytesEstimated = false,
                 speedBps = speed,
                 etaSeconds = eta
@@ -3128,11 +3155,7 @@ class DownloadEngine(appContext: Context) {
         }
         scheduleProgressSave()
         progress.lastNotify.set(monotonicNow())
-        return if (effTotal > 0) {
-            ((downloaded * 100) / effTotal).toInt().coerceIn(0, 100)
-        } else {
-            0
-        }
+        return displayPercent
     }
 
     /** Laporan progres fase gabung (remux) jalur muxed: persen dipetakan
@@ -4851,6 +4874,28 @@ internal fun muxEffectiveTotal(
     videoTotal > 0 && audioTotal > 0 -> videoTotal + audioTotal
     currentFileTotal > 0 -> completedBytes + currentFileTotal
     else -> 0L
+}
+
+/** Persen tampilan fase unduh adaptif yang monoton (issue #1481):
+ *  persen mentah dari byte/total efektif dijepit [0, 99] (100 hanya
+ *  dari state COMPLETED), lalu ditahan pada [peakPercent] — persen
+ *  tertinggi yang sudah diterbitkan attempt ini. Tanpa lantai ini,
+ *  jendela registrasi total sisi kedua membuat penyebut melonjak
+ *  (mis. 400 -> 800) dan persen yang sudah tampil mundur sesaat
+ *  (25% -> 12,5%) tanpa satu byte pun hilang — sisa gejala bug-99 A3.
+ *  Murni agar bisa di-unit-test; nilai harapan dibuktikan port
+ *  Python 1:1 (audit-dm-r16/port_mux_monotonic.py). */
+internal fun muxMonotonicPercent(
+    downloaded: Long,
+    effTotal: Long,
+    peakPercent: Int
+): Int {
+    val raw = if (effTotal > 0) {
+        ((downloaded * 100) / effTotal).toInt().coerceIn(0, 99)
+    } else {
+        0
+    }
+    return maxOf(raw, peakPercent.coerceIn(0, 99))
 }
 
 /** Persen tampilan fase gabung (remux) adaptif: byte sampel tersalin
