@@ -52,6 +52,10 @@ class WebExtractActivity : AppCompatActivity() {
     private var grabTries = 0
     private var finished = false
     private var loopStarted = false
+    // Polling dijeda selama activity tak terlihat (issue #1397):
+    // startGrabLoop menolak mulai selama flag ini menyala, dan onStart
+    // yang membersihkannya sekaligus menjadwalkan kelanjutannya.
+    private var grabSuspended = false
     private var manualGrab = false
     private var lastEpisodesJson = ""
     private var allowedHost = ""
@@ -211,9 +215,41 @@ class WebExtractActivity : AppCompatActivity() {
 
     /** Satu rantai polling saja (onPageFinished + timer pengaman bisa berlomba). */
     private fun startGrabLoop() {
-        if (finished || loopStarted) return
+        // grabSuspended menahan callback WebView yang tiba saat latar
+        // (issue #1397): polling hanya boleh hidup saat terlihat.
+        if (finished || loopStarted || grabSuspended) return
         loopStarted = true
         handler.post(grabLoop)
+    }
+
+    override fun onStop() {
+        // Hentikan rantai polling + timer pengaman saat tak terlihat
+        // (issue #1397): tanpa ini Handler terus menembakkan
+        // evaluateJavascript ke WebView latar sampai MAX_GRAB_TRIES
+        // atau activity hancur. onDestroy tetap membersihkan juga.
+        grabSuspended = true
+        handler.removeCallbacks(grabLoop)
+        handler.removeCallbacks(safetyStartGrab)
+        super.onStop()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val wasSuspended = grabSuspended
+        grabSuspended = false
+        if (finished) return
+        if (wasSuspended && loopStarted) {
+            // Loop yang dijeda onStop dilanjutkan sekarang.
+            loopStarted = false
+            startGrabLoop()
+        } else if (!loopStarted) {
+            // Loop belum pernah mulai (halaman masih dimuat / safety
+            // keburu dibatalkan onStop): jadwalkan ulang jaring
+            // pengamannya — onPageFinished yang datang belakangan
+            // tetap memulai loop lebih dulu lewat jalur biasa.
+            handler.removeCallbacks(safetyStartGrab)
+            handler.postDelayed(safetyStartGrab, GRAB_INTERVAL_MS * 3)
+        }
     }
 
     /** Cari URL video di DOM utama + iframe: tag video/source (termasuk
