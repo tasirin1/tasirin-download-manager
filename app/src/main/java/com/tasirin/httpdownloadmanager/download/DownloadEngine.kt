@@ -3298,6 +3298,13 @@ class DownloadEngine(appContext: Context) {
         // gagal, sehingga menetap seumur proses untuk item COMPLETED.
         retryAttempts.remove(item.id)
         lastSpeedSample.remove(item.id)
+        // Entri throttle bersama juga dibuang di corong yang sama
+        // (issue #1527): peta throttleTotals lahir belakangan (era
+        // #1460) dan satu-satunya penghapusnya ada di clearSegProgress
+        // yang tak pernah dipanggil jalur selesai ADAPTIF, sehingga
+        // entri item adaptif COMPLETED menetap seumur proses. Pola
+        // synchronized yang sama dengan clearSegProgress.
+        synchronized(throttleTotals) { throttleTotals.remove(item.id) }
         val finished = updateItem(item.id, transform = buildCompleted)
         flushSave()
         // Cookie sesi dari unduhan yang selesai ikut dipersists
