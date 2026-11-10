@@ -35,7 +35,11 @@ var t=doc.querySelector('meta[name="twitter:player:stream"],meta[property="twitt
 if(t)collect(t.content);
 var ls=doc.getElementsByTagName('link');
 for(var k=0;k<ls.length;k++){var hr=ls[k].getAttribute('href')||'';
-if(/\.mp4/.test(hr))collect(hr);}
+// Samakan dengan jalur lain (issue #1472): regex tak peka huruf
+// (".MP4" tak terlewat) dan href diabsolutkan lebih dulu — atribut
+// href mentah bisa relatif sehingga collect() yang menuntut awalan
+// http selalu menggugurkannya, tidak seperti jalur episode/bucket2.
+if(/\.mp4/i.test(hr))collect(abs(hr));}
 }catch(e){}});
 var mp42=[];
 function bucket2(u){u=abs((u||'').trim());if(u.indexOf('http')!==0)return;
