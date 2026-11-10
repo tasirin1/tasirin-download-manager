@@ -41,6 +41,21 @@ var mp42=[];
 function bucket2(u){u=abs((u||'').trim());if(u.indexOf('http')!==0)return;
 if(/\.m3u8/i.test(u))return;
 if(mp42.indexOf(u)<0)mp42.push(u);}
+// Serialisasi innerHTML penuh (s.d. 1 MB) + replace global + 2 regex
+// global adalah bagian termahal skrip ini (issue #1440): hasilnya
+// di-cache di window dan hanya dihitung ulang bila DOM berubah sejak
+// pemindaian terakhir. MutationObserver dipasang sekali pada evaluasi
+// pertama dan hanya menandai cache kotor; halaman diam (kasus umum
+// selama jendela polling) melewati serialisasi sama sekali.
+var scanCache=window.__extractScanCache;
+if(!scanCache){
+scanCache=window.__extractScanCache={dirty:true,urls:[]};
+try{new MutationObserver(function(){scanCache.dirty=true;}).observe(
+document.documentElement,
+{subtree:true,childList:true,attributes:true,characterData:true});}catch(e){}
+}
+if(scanCache.dirty){
+scanCache.dirty=false;
 var h='';
 try{h=document.documentElement.innerHTML.slice(0,1000000).replace(/\\\//g,'/');}catch(e){}
 var fm=h.match(/(?:file|src|source)\s*:\s*["'](https?:[^"']+?\.(?:mp4)[^"']*)["']/gi)||[];
@@ -48,6 +63,10 @@ for(var f=0;f<fm.length;f++){var fu=fm[f].replace(/^[^"']*["']/, '').replace(/["
 bucket2(fu);}
 var a=h.match(/https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/gi)||[];
 for(var p=0;p<a.length;p++)bucket2(a[p]);
+scanCache.urls=mp42.slice(0);
+}else{
+mp42=scanCache.urls.slice(0);
+}
 mp4=mp4.concat(mp42);
 var src=mp4.length>0?mp4[0]:'';
 var eps=[],seenEps={};
