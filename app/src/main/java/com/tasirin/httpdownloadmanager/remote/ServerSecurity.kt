@@ -390,9 +390,17 @@ object ServerSecurity {
         return StoragePrefs.constantEquals(parts[1], expected)
     }
 
+    /** Mac HMAC per-thread (issue #1456): Mac.getInstance membayar
+     *  pencarian provider pada SETIAP validasi token, padahal Mac
+     *  tidak thread-safe untuk dipakai bersama. ThreadLocal memberi
+     *  satu instance per thread tanpa kunci; init() di tiap panggilan
+     *  mereset state + memasang kunci, dan doFinal() mereset sesudah
+     *  selesai — hasil byte-per-byte identik dengan instance baru. */
+    private val hmacMac = ThreadLocal<Mac>()
+
     /** HMAC-SHA256 hex murni JVM (tanpa Android) supaya bisa diuji unit. */
     internal fun hmacSha256Hex(secret: String, data: String): String {
-        val mac = Mac.getInstance("HmacSHA256")
+        val mac = hmacMac.get() ?: Mac.getInstance("HmacSHA256").also { hmacMac.set(it) }
         mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
         return Hex.encode(mac.doFinal(data.toByteArray(Charsets.UTF_8)))
     }

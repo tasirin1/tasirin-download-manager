@@ -315,10 +315,22 @@ object StoragePrefs {
         return true
     }
 
+    /** Cache in-memory secret stream parsial (issue #1456), pola yang
+     *  sama dengan sessionSecretCache di bawah. Aman di-cache karena
+     *  KEY_PARTIAL_STREAM_SECRET ditulis TEPAT SATU KALI — di dalam
+     *  fungsi ini sendiri, hanya saat belum ada — dan tidak pernah
+     *  dirotasi (terverifikasi grep: tak ada penulis lain); jadi nilai
+     *  tak berubah seumur proses dan cache tak bisa basi. */
+    @Volatile private var partialSecretCache: String? = null
+
     /** Secret acak untuk tanda tangan URL stream parsial; tidak memakai nama package. */
     @Synchronized
     fun partialStreamSecret(context: Context): String {
-        prefs(context).safeString(KEY_PARTIAL_STREAM_SECRET, null)?.takeIf { it.isNotEmpty() }?.let { return it }
+        partialSecretCache?.let { return it }
+        prefs(context).safeString(KEY_PARTIAL_STREAM_SECRET, null)?.takeIf { it.isNotEmpty() }?.let {
+            partialSecretCache = it
+            return it
+        }
         val bytes = ByteArray(32)
         SecureRandom().nextBytes(bytes)
         val value = Base64.encodeToString(
@@ -326,6 +338,7 @@ object StoragePrefs {
             Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
         )
         prefs(context).edit { putString(KEY_PARTIAL_STREAM_SECRET, value) }
+        partialSecretCache = value
         return value
     }
 
