@@ -99,7 +99,11 @@ object ZipCreator {
                 }
             }
         }
-        return ZipEntry(name)
+        // ZipEntry bawaan membawa method -1 (belum diset): putNextEntry
+        // memang menambalnya menjadi DEFLATED, tetapi kontrak fungsi ini
+        // adalah mengembalikan entri DEFLATED — tetapkan eksplisit agar
+        // nilai method benar pada objeknya, bukan hasil tambalan hilir.
+        return ZipEntry(name).apply { method = ZipEntry.DEFLATED }
     }
 
     /** Nama dari filesystem/MediaStore tidak boleh dipakai mentah sebagai
