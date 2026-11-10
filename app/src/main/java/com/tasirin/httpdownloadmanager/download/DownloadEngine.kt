@@ -1775,7 +1775,8 @@ class DownloadEngine(appContext: Context) {
                     backup = aside
                 }
             }
-            if (backup == null) {
+            val b = backup
+            if (b == null) {
                 deletePublished(
                     FileSaver.PublishResult(
                         contentUri = predecessor.contentUri,
@@ -1783,6 +1784,22 @@ class DownloadEngine(appContext: Context) {
                         fileName = predecessor.fileName
                     )
                 )
+            } else {
+                // Entri pendahulu + berkas cadangan DIPARKIR sekarang —
+                // SEBELUM publish berjalan (issue #1408). Dulu parkiran
+                // baru dipasang sesudah publish kembali, tetapi publish
+                // menulis byte penerus tepat ke path pendahulu yang baru
+                // dibebaskan dan salinan antarvolume bisa berjalan
+                // berdetik-detik: remove() pendahulu di jendela itu tak
+                // menemukan parkiran, menilai pendahulu item biasa, dan
+                // menghapus berkas yang sedang ditulis penerus. Dengan
+                // parkiran terpasang di sini, remove() jatuh ke jalur
+                // parkiran #1287 (berkas terbit bersama tak tersentuh,
+                // commit/rollback penerus menjadi no-op bersih).
+                // Kegagalan publish melepaskan parkiran ini di catch di
+                // bawah karena rollback-nya ditangani langsung di sana.
+                pendingReplacements[item.id] =
+                    PendingReplacement(predecessor, b, stale)
             }
         }
         val result = try {
@@ -1793,6 +1810,13 @@ class DownloadEngine(appContext: Context) {
                 saver.publish(partial, cleanName, item.destination)
             }
         } catch (e: Exception) {
+            // Publish gagal: rollback ditangani langsung di sini
+            // (cadangan dipulihkan ke path tujuan di bawah), jadi
+            // parkiran yang dipasang sebelum publish (issue #1408)
+            // dilepas — tanpa ini rollbackReplacement pemanggil akan
+            // menilai ulang parkiran yang cadangannya sudah berpindah
+            // dan bisa menghapus berkas pendahulu yang baru dipulihkan.
+            if (predecessor != null) pendingReplacements.remove(item.id)
             val b = backup
             val target = predecessor?.filePath
                 ?.takeIf { it.isNotEmpty() }?.let { File(it) }
@@ -1802,24 +1826,20 @@ class DownloadEngine(appContext: Context) {
             stale?.let { s -> runCatching { s.delete() } }
             throw e
         }
-        if (predecessor != null) {
-            val b = backup
-            if (b == null) {
-                updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
-            } else {
-                // Entri pendahulu + berkas cadangan selalu DIPARKIR
-                // sampai pemanggil mencapai commit/rollbackReplacement.
-                // Awalnya hanya jalur ber-checksum yang diparkir dan
-                // jalur tanpa checksum memensiunkan versi lama langsung
-                // di sini — tetapi pensiun di sini mendahului penjaga
-                // keberadaan #881 sehingga menghapus penerus di jendela
-                // publish tetap menghilangkan kedua versi (issue #890).
-                // Kelima situs finalisasi selalu mencapai commit atau
-                // rollback, dan rekonsiliasi start proses menangani
-                // parkiran yang ditinggal mati di antaranya.
-                pendingReplacements[item.id] =
-                    PendingReplacement(predecessor, b, stale)
-            }
+        if (predecessor != null && backup == null) {
+            // Pendahulu tanpa cadangan (murni MediaStore atau geser
+            // gagal) sudah dihapus di muka; entrinya dipensiunkan di
+            // sini. Awalnya jalur tanpa checksum memensiunkan versi lama
+            // langsung juga untuk jalur bercadangan — tetapi pensiun di
+            // sini mendahului penjaga keberadaan #881 sehingga menghapus
+            // penerus di jendela publish tetap menghilangkan kedua versi
+            // (issue #890). Jalur bercadangan tidak diutak-atik: entri +
+            // cadangan tetap terparkir (dipasang sebelum publish, issue
+            // #1408) sampai pemanggil mencapai commit/rollbackReplacement;
+            // kelima situs finalisasi selalu mencapai salah satunya, dan
+            // rekonsiliasi start proses menangani parkiran yang ditinggal
+            // mati di antaranya.
+            updateTransformed { daftar -> daftar.filterNot { it.id == predecessor.id } }
         }
         // Buang snapshot galeri server (issue #558): publishItem
         // adalah corong terbit semua jalur unduhan, dan galleryCache
