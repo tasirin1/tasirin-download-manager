@@ -2890,9 +2890,14 @@ class DownloadEngine(appContext: Context) {
                     // di berkas adaptive (bisa ratusan MB untuk muxing)
                     // tak pernah divonis — hanya guard zero-read dan
                     // read-timeout per-baca yang membatasi.
-                    val health = DownloadHealthWatchdog(
-                        if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
-                    )
+                    val health = DownloadHealthWatchdog {
+                        // Limit dinilai TERKINI tiap check (issue
+                        // #1509): limit per-item segar dari state engine
+                        // menang, else limit global prefs.
+                        val perItem = _items.value.find { it.id == item.id }?.speedLimitKbps
+                            ?: item.speedLimitKbps
+                        if (perItem > 0) perItem else StoragePrefs.speedLimitKbps(context)
+                    }
                     var adaptiveIters = 0
                     var lastAdaptiveCheckBytes = bytes
                     var lastAdaptiveCheckAt = monotonicNow()
@@ -3391,9 +3396,13 @@ class DownloadEngine(appContext: Context) {
     ) {
         var fileName = item.fileName
         var partialFile = saver.partialFile(fileName)
-        val health = DownloadHealthWatchdog(
-            if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
-        )
+        val health = DownloadHealthWatchdog {
+            // Limit dinilai TERKINI tiap check (issue #1509): limit
+            // per-item segar dari state engine menang, else global.
+            val perItem = _items.value.find { it.id == item.id }?.speedLimitKbps
+                ?: item.speedLimitKbps
+            if (perItem > 0) perItem else StoragePrefs.speedLimitKbps(context)
+        }
         // Resume anti-korup: selaraskan file parsial dengan catatan bytes
         // (pangkas bila file lebih maju, buang bila data hilang). Idempoten:
         // pemanggil runDownload sudah memanggilnya dulu untuk preset Range.
@@ -3936,9 +3945,13 @@ class DownloadEngine(appContext: Context) {
     ) {
         val item = _items.value.find { it.id == id } ?: return
         val partial = saver.partialFile(fileName)
-        val health = DownloadHealthWatchdog(
-            if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
-        )
+        val health = DownloadHealthWatchdog {
+            // Limit dinilai TERKINI tiap check (issue #1509): limit
+            // per-item segar dari state engine menang, else global.
+            val perItem = _items.value.find { it.id == id }?.speedLimitKbps
+                ?: item.speedLimitKbps
+            if (perItem > 0) perItem else StoragePrefs.speedLimitKbps(context)
+        }
         var downloaded = segment.downloaded
         var lastSegBytes = downloaded
         var lastSegAt = monotonicNow()
@@ -5371,10 +5384,18 @@ internal fun isGitHubUrl(url: String): Boolean {
 // Internal (bukan private) agar bisa di-unit-test langsung (lihat WatchdogTest).
 /** Watchdog per-unduhan: mendeteksi koneksi macet (tanpa byte baru) atau
  *  kecepatan anjlok (di bawah ambang minimum terus-menerus), lalu melempar
- *  IOException supaya handleFailure bisa pindah mirror / retry. Otomatis
- *  nonaktif bila pengguna memasang batas kecepatan di bawah ambang. */
-internal class DownloadHealthWatchdog(limitKbps: Int) {
-    private val limitedLow = limitKbps > 0 && limitKbps * 1024L <= MIN_GOOD_SPEED_BPS
+ *  IOException supaya handleFailure bisa pindah mirror / retry. Vonis
+ *  lambat nonaktif bila pengguna memasang batas kecepatan di bawah
+ *  ambang. Batas itu dinilai dari [limitSupplier] pada TIAP check
+ *  (issue #1509), bukan dibekukan saat konstruksi: fitur #747 membuat
+ *  perubahan limit berlaku langsung di tengah attempt, jadi watchdog
+ *  yang memegang limit lama bisa memvonis "Speed too low" palsu
+ *  sesudah pengguna menurunkan limit ke <=2 KB/s (atau sebaliknya,
+ *  melewatkan vonis sesudah limit dihapus). */
+internal class DownloadHealthWatchdog(private val limitSupplier: () -> Int) {
+    /** Limit tetap (pola lama): pemasok konstan. */
+    constructor(limitKbps: Int) : this({ limitKbps })
+
     private var lastBytes = 0L
     private var lastAt = monotonicNow()
     private var slowSince = 0L
@@ -5410,7 +5431,7 @@ internal class DownloadHealthWatchdog(limitKbps: Int) {
             }
             return
         }
-        if (speed > 0 && !limitedLow && speed < MIN_GOOD_SPEED_BPS) {
+        if (speed > 0 && !isLimitedLow(limitSupplier()) && speed < MIN_GOOD_SPEED_BPS) {
             if (slowSince == 0L) slowSince = now
             if (now - slowSince >= LOW_SPEED_TIMEOUT_MS) {
                 throw IOException(
@@ -5430,6 +5451,12 @@ internal class DownloadHealthWatchdog(limitKbps: Int) {
         private const val MIN_GOOD_SPEED_BPS = 2L * 1024
         private const val LOW_SPEED_TIMEOUT_MS = 20_000L
         private const val STALL_TIMEOUT_MS = 30_000L
+
+        /** Limit pengguna di bawah/sama ambang kecepatan minimum:
+         *  kecepatan rendah sesudahnya adalah akibat limit yang sah,
+         *  bukan koneksi sakit. Murni agar teruji langsung. */
+        internal fun isLimitedLow(limitKbps: Int): Boolean =
+            limitKbps > 0 && limitKbps * 1024L <= MIN_GOOD_SPEED_BPS
     }
 }
 

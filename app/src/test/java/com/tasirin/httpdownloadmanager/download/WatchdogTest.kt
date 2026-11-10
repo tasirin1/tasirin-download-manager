@@ -59,6 +59,63 @@ class WatchdogTest {
         }
     }
 
+    @Test fun batasLimitedLow_tepatDiAmbang() {
+        // isLimitedLow murni (issue #1509): 2 KB/s tepat di ambang
+        // 2048 B/s (<=) sehingga bebas vonis; 3 KB/s di atasnya.
+        // Ekspektasi dibuktikan port Python 1:1 (port_1509_watchdog.py).
+        assertTrue(!DownloadHealthWatchdog.isLimitedLow(0))
+        assertTrue(DownloadHealthWatchdog.isLimitedLow(1))
+        assertTrue(DownloadHealthWatchdog.isLimitedLow(2))
+        assertTrue(!DownloadHealthWatchdog.isLimitedLow(3))
+        assertTrue(!DownloadHealthWatchdog.isLimitedLow(-1))
+    }
+
+    @Test fun limitTurunKeRendahDiTengah_membebaskanVonisLambat() {
+        // Issue #1509 arah A: watchdog dibuat TANPA limit, lalu pengguna
+        // menurunkan limit ke 1 KB/s di tengah attempt (fitur #747
+        // berlaku langsung). Vonis dinilai dari limit TERKINI, jadi
+        // kecepatan rendah sesudahnya adalah akibat limit yang sah —
+        // watchdog beku ala lama akan memvonis palsu di t=22000.
+        var limit = 0
+        val w = DownloadHealthWatchdog { limit }
+        var t = 0L
+        repeat(10) {
+            t += 1000
+            w.check(t, 5000L, 1_000_000L, 1500L)
+        }
+        limit = 1
+        repeat(30) {
+            t += 1000
+            w.check(t, 5000L, 1_000_000L, 1000L)
+        }
+    }
+
+    @Test fun limitDihapusDiTengah_vonisLambatAktifLagi() {
+        // Issue #1509 arah B: limit 1 KB/s membebaskan vonis selama
+        // aktif; sesudah pengguna menghapus limit di tengah attempt,
+        // kecepatan rendah bukan lagi akibat limit dan vonis lambat
+        // 20 detik wajib hidup lagi (slowSince mulai dari peralihan).
+        var limit = 1
+        val w = DownloadHealthWatchdog { limit }
+        var t = 0L
+        repeat(10) {
+            t += 1000
+            w.check(t, 5000L, 1_000_000L, 1000L)
+        }
+        limit = 0
+        repeat(19) {
+            t += 1000
+            w.check(t, 5000L, 1_000_000L, 1000L)
+        }
+        // slowSince mulai di t=11000 (panggilan pertama sesudah limit
+        // dihapus) -> vonis jatuh di t=31000.
+        try {
+            w.check(31_000L, 5000L, 1_000_000L, 1000L)
+            fail("harus melempar IOException: vonis lambat aktif lagi sesudah limit dihapus")
+        } catch (_: IOException) { // audit-ignore: kotlin_empty_catch (pola uji: tangkapan IOException adalah jalur sukses yang diharapkan)
+        }
+    }
+
     @Test fun selesaiAtauTotalNol_tidakDivonis() {
         val w = DownloadHealthWatchdog(0)
         w.check(100_000L, 1_000_000L, 1_000_000L, 0L)
