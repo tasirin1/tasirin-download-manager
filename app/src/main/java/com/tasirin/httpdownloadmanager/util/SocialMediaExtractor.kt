@@ -441,13 +441,21 @@ object SocialMediaExtractor {
         // menggantung sampai 30 dtk, lebih besar dari cap tahap 20 dtk —
         // host pertama yang menggantung (mode blokir ISP: paket dibuang)
         // memakan seluruh cap sehingga host cadangan tak pernah dicoba.
-        // Tiap host kini dicap sendiri (9 dtk x 2 host tetap di dalam
-        // cap tahap 20 dtk), jadi cadangan sungguh mendapat giliran;
-        // cap luar tetap penjaga totalnya.
+        // Anggaran yang menyadari SISA tahap (issue #1517): cap datar
+        // 9 dtk per host dari #1492 juga membunuh host lambat-tapi-hidup
+        // (respons sah tikwm bisa 10-18 dtk), jadi host pertama kini
+        // mendapat jatah lebih besar (tikTokHostBudgetMs: sampai 12 dtk
+        // dengan 6 dtk selalu dicadangkan untuk host berikutnya) dan
+        // host berikutnya memakai min(9 dtk, sisa tahap). Host
+        // menggantung tetap terpotong dan cadangan sungguh dapat
+        // giliran; cap luar 20 dtk tetap penjaga totalnya.
         val obj = runStageCapped(20_000L) {
             var found: JSONObject? = null
-            for (host in hosts) {
-                val json = runStageCapped(9_000L) {
+            val stageStartNanos = System.nanoTime()
+            for ((index, host) in hosts.withIndex()) {
+                val remainingMs = 20_000L - (System.nanoTime() - stageStartNanos) / 1_000_000L
+                if (remainingMs <= 0L) break
+                val json = runStageCapped(tikTokHostBudgetMs(index, remainingMs)) {
                     httpGet("$host/api/?url=$encoded&hd=1")
                 } ?: continue
                 val parsed = runCatching { JSONObject(json) }.getOrNull() ?: continue
@@ -485,6 +493,24 @@ object SocialMediaExtractor {
         // hasil; kini menjadi opsi gambar seperti jalur foto situs lain.
         options.addAll(tikTokImageResults(data, namePrefix, title))
         return options
+    }
+
+    /** Anggaran waktu per host tikwm dari sisa anggaran tahap
+     *  (murni, issue #1517). Host pertama: min(12 dtk, sisa - 6 dtk
+     *  cadangan untuk host berikutnya) dengan lantai min(3 dtk, sisa)
+     *  agar sisa kecil tetap dicoba; host berikutnya: min(9 dtk,
+     *  sisa). Sisa <= 0 menghasilkan 0 (pemanggil berhenti). Host
+     *  lambat-tapi-hidup 10-12 dtk di host pertama kini bisa tuntas
+     *  (cap datar 9 dtk #1492 membunuhnya), sementara host menggantung
+     *  tetap terpotong dan cadangan selalu kebagian sisa. */
+    internal fun tikTokHostBudgetMs(hostIndex: Int, remainingStageMs: Long): Long {
+        if (remainingStageMs <= 0L) return 0L
+        return if (hostIndex <= 0) {
+            minOf(12_000L, remainingStageMs - 6_000L)
+                .coerceAtLeast(minOf(3_000L, remainingStageMs))
+        } else {
+            minOf(9_000L, remainingStageMs)
+        }
     }
 
     /** Hasil gambar dari field `images` respons tikwm (murni, issue

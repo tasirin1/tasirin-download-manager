@@ -318,6 +318,28 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `tikTokHostBudgetMs - host pertama lebih besar, cadangan terjaga`() {
+        // Issue #1517: ekspektasi dibuktikan port Python 1:1
+        // (port_1517_hostbudget.py).
+        assertEquals(12_000L, SocialMediaExtractor.tikTokHostBudgetMs(0, 20_000L))
+        assertEquals(9_000L, SocialMediaExtractor.tikTokHostBudgetMs(1, 20_000L))
+        assertEquals(8_000L, SocialMediaExtractor.tikTokHostBudgetMs(1, 8_000L))
+        assertEquals(9_000L, SocialMediaExtractor.tikTokHostBudgetMs(0, 15_000L))
+        assertEquals(12_000L, SocialMediaExtractor.tikTokHostBudgetMs(0, 18_000L))
+        assertEquals(9_000L, SocialMediaExtractor.tikTokHostBudgetMs(2, 20_000L))
+    }
+
+    @Test
+    fun `tikTokHostBudgetMs - lantai dan sisa habis`() {
+        assertEquals(3_000L, SocialMediaExtractor.tikTokHostBudgetMs(0, 7_000L))
+        assertEquals(2_000L, SocialMediaExtractor.tikTokHostBudgetMs(0, 2_000L))
+        assertEquals(0L, SocialMediaExtractor.tikTokHostBudgetMs(0, 0L))
+        assertEquals(0L, SocialMediaExtractor.tikTokHostBudgetMs(1, 0L))
+        assertEquals(0L, SocialMediaExtractor.tikTokHostBudgetMs(0, -500L))
+        assertEquals(5_000L, SocialMediaExtractor.tikTokHostBudgetMs(1, 5_000L))
+    }
+
+    @Test
     fun `qualityFileTag - sanitasi label kualitas YouTube`() {
         // Issue #1511: hanya [A-Za-z0-9] dipertahankan; kosong atau
         // bawaan tak dikenal ("Unknown") = tanpa tag. Ekspektasi
