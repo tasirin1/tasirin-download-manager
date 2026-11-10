@@ -1700,6 +1700,15 @@ internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.Do
     return buildSet {
         add("$base.part")
         item.segments.forEach { add("$base.part.${it.index}") }
+        // Temp adaptif jalur muxed (issue #1434): sejak temp video/audio
+        // dipertahankan antar-attempt sebagai bahan resume Range, temp
+        // milik item yang masih hidup tak boleh tersapu sebagai yatim.
+        // Derivasi nama persis downloadAdaptiveMuxed/deleteFiles.
+        val adaptiveBase = buangSufiksEkstensi(item.fileName, ".mp4", ".webm").ifBlank { item.fileName }
+        val tempBase = "~" + item.id.take(8) + adaptiveBase
+        for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
+            add(FileNames.safe("$tempBase.$kind") + ".part")
+        }
     }
 }
 

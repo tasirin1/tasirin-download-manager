@@ -2553,16 +2553,21 @@ class DownloadEngine(appContext: Context) {
     }
 
     /** Unduh satu file adaptive (audio M4A / video MP4) dari URL VISIONOS ke
-     *  file temp. Mengembalikan false bila HTTP gagal atau file kosong. */
+     *  file temp. Mengembalikan false bila HTTP gagal atau file kosong.
+     *  Temp attempt sebelumnya DILANJUTKAN dengan Range bila server
+     *  mengizinkan (issue #1434) — keputusan APPEND/FRESH/COMPLETE/
+     *  RESTART/FAIL dari fungsi murni adaptiveResumeAction. */
     private suspend fun downloadAdaptiveFile(
         item: DownloadItem,
         url: String,
         target: File,
         buffer: ByteArray,
         throttle: SpeedThrottle,
-        progress: MuxProgress
+        progress: MuxProgress,
+        mayResume: Boolean = true
     ): Boolean {
         if (url.isBlank()) return false
+        val existing = if (mayResume && target.isFile) target.length() else 0L
         val conn = trackOpenedConnection(
             item.id,
             openAuthenticatedConnection(
@@ -2570,18 +2575,64 @@ class DownloadEngine(appContext: Context) {
                 username = item.username,
                 password = item.password,
                 headers = item.headers,
-                authAnchorUrl = item.url
+                authAnchorUrl = item.url,
+                presetRange = existing.takeIf { it > 0 }
             )
         )
         try {
             val code = conn.responseCode
-            if (code !in 200..299) {
-                // Badan galat tak dibaca (issue #1243): soket tak bisa
-                // kembali ke pool keep-alive — putuskan eksplisit.
-                runCatching { conn.disconnect() }
-                return false
+            val cr = conn.getHeaderField("Content-Range")
+            val rangeStart = cr?.substringAfter("bytes ")?.substringBefore("-")?.trim()?.toLongOrNull()
+            if (code == 206 && cr != null && rangeStart == null) {
+                throw IOException("Malformed Content-Range: $cr")
             }
-            val total = contentLength(conn)
+            val rangeTotal = cr?.substringAfter('/')?.trim()?.toLongOrNull()?.takeIf { it > 0 }
+            when (adaptiveResumeAction(existing, code, rangeStart, rangeTotal)) {
+                AdaptiveResumeAction.COMPLETE -> {
+                    // 416 + total server == ukuran temp: berkas sudah
+                    // utuh dari attempt sebelumnya, tak ada yang diunduh.
+                    runCatching { conn.disconnect() }
+                    progress.downloaded.addAndGet(existing)
+                    return existing > 0
+                }
+                AdaptiveResumeAction.RESTART -> {
+                    // 416 atas temp yang tak cocok (resource berubah /
+                    // temp basi): buang temp dan ulangi SEKALI dari nol
+                    // tanpa Range dalam panggilan yang sama.
+                    runCatching { conn.disconnect() }
+                    target.delete()
+                    return downloadAdaptiveFile(
+                        item, url, target, buffer, throttle, progress, mayResume = false
+                    )
+                }
+                AdaptiveResumeAction.FAIL -> {
+                    // Badan galat tak dibaca (issue #1243): soket tak bisa
+                    // kembali ke pool keep-alive — putuskan eksplisit.
+                    runCatching { conn.disconnect() }
+                    return false
+                }
+                AdaptiveResumeAction.APPEND, AdaptiveResumeAction.FRESH -> Unit
+            }
+            val append = code == 206
+            if (!append && existing > 0) {
+                // Range diabaikan server: restart dari nol eksplisit
+                // (pola runSingle) — FileOutputStream tanpa append di
+                // bawah memotong berkas, progres lama dicatat dibuang.
+                App.logEvent(
+                    "DOWNLOAD ${item.fileName}: server does not support adaptive resume " +
+                        "(HTTP $code, ignoring Range) — restarting from zero, " +
+                        "${Formats.bytes(existing)} discarded"
+                )
+            }
+            // Content-Length respons = byte yang ditulis attempt INI
+            // (pada 206 hanya sisanya); total penuh untuk progres dan
+            // verifikasi akhir berasal dari Content-Range bila ada.
+            val respLen = contentLength(conn)
+            val total = when {
+                append -> rangeTotal ?: if (respLen > 0) existing + respLen else 0L
+                respLen > 0 -> respLen
+                else -> 0L
+            }
             // Anggaran byte sadar ruang kosong (issue #702): plafon
             // lama 512MB mentah menolak video adaptif panjang yang sah
             // padahal ruang sehat. Batas kini mengikuti ruang bebas
@@ -2589,18 +2640,22 @@ class DownloadEngine(appContext: Context) {
             // Content-Length yang dikenal dicek di muka dengan pesan
             // ruang yang jelas — bukan lagi "too large" yang keliru.
             val freeAtStart = target.absoluteFile.parentFile?.usableSpace ?: Long.MAX_VALUE
-            if (total > 0 && total > freeAtStart - MIN_FREE_BYTES) {
+            // Volume temp hanya menanggung byte BARU attempt ini: pada
+            // resume 206 itu sisanya saja (pola needBytes runSingle) —
+            // total penuh akan menolak resume besar yang sebenarnya muat.
+            if (respLen > 0 && respLen > freeAtStart - MIN_FREE_BYTES) {
                 throw IOException(
                     "Not enough storage for adaptive file: need " +
-                        "${Formats.bytes(total)}, available ${Formats.bytes(freeAtStart)}"
+                        "${Formats.bytes(respLen)}, available ${Formats.bytes(freeAtStart)}"
                 )
             }
             // Volume TUJUAN terbit ikut dicek di muka (issue #1160):
             // tiga jalur lain memakai destinationFreeBytes lintas
             // volume, jalur adaptive dulu hanya volume temp — folder
             // tujuan di volume lain (SD card) yang sempit baru ketahuan
-            // ENOSPC sesudah unduh+remux tuntas, dan berkas adaptive
-            // tak bisa di-resume sehingga retry mengulang dari nol.
+            // ENOSPC sesudah unduh+remux tuntas. Cek ini memakai total
+            // PENUH (bukan sisa resume): berkas terbit menempati ukuran
+            // utuhnya di volume tujuan.
             if (total > 0) {
                 val destFree = fileSaver.destinationFreeBytes(item.folderPath)
                 if (total > destFree - MIN_FREE_BYTES) {
@@ -2611,10 +2666,13 @@ class DownloadEngine(appContext: Context) {
                 }
             }
             val byteCap = (freeAtStart - MIN_FREE_BYTES).coerceAtLeast(0)
-            BufferedOutputStream(FileOutputStream(target), BUFFER_SIZE).use { out ->
+            BufferedOutputStream(FileOutputStream(target, append), BUFFER_SIZE).use { out ->
                 val input = conn.inputStream
                 try {
-                    var bytes = 0L
+                    // bytes = posisi berkas (resume menghitung byte lama);
+                    // written = byte baru attempt ini (untuk byteCap).
+                    var bytes = if (append) existing else 0L
+                    var written = 0L
                     var zeroStreak = 0
                     // Watchdog macet/lambat seperti tiga jalur streaming
                     // lain (issue #597): tanpa ini, koneksi yang menetes
@@ -2625,7 +2683,7 @@ class DownloadEngine(appContext: Context) {
                         if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
                     )
                     var adaptiveIters = 0
-                    var lastAdaptiveCheckBytes = 0L
+                    var lastAdaptiveCheckBytes = bytes
                     var lastAdaptiveCheckAt = monotonicNow()
                     while (true) {
                         val read = input.read(buffer)
@@ -2639,11 +2697,21 @@ class DownloadEngine(appContext: Context) {
                             continue
                         }
                         zeroStreak = 0
-                        bytes += read
-                        if (bytes > byteCap) {
+                        // Resume 206 bertotal Content-Range otoritatif:
+                        // tulis dipangkas ke sisa rentang (pola runSingle,
+                        // issue #1369) — byte ekstra server tak menempel.
+                        val toWrite = if (append && total > 0) {
+                            cappedSegmentWrite(read, total - bytes)
+                        } else {
+                            read
+                        }
+                        bytes += toWrite
+                        written += toWrite
+                        if (written > byteCap) {
                             throw IOException("adaptive file exceeds available storage")
                         }
-                        out.write(buffer, 0, read)
+                        out.write(buffer, 0, toWrite)
+                        if (toWrite < read) break
                         throttle.sleepIfNeeded { progress.downloaded.get() + bytes }
                         reportMuxProgress(item, progress, bytes, total)
                         if ((adaptiveIters++ and 7) == 0) {
@@ -2700,8 +2768,12 @@ class DownloadEngine(appContext: Context) {
         // tanpa ekstensi bertabrakan antar item dan pembeda di ekor bisa
         // terpotong untuk nama sangat panjang (#171).
         val tempBase = "~" + item.id.take(8) + baseName
-        val videoMp4 = saver.partialFile("$tempBase.videoMp4", segment = null).apply { delete() }
-        val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
+        // Temp video/audio TIDAK dihapus di awal (issue #1434): byte
+        // attempt sebelumnya adalah bahan resume Range di
+        // downloadAdaptiveFile. Keluaran mux tetap dibuang — hasil remux
+        // setengah jadi tak bisa dilanjutkan.
+        val videoMp4 = saver.partialFile("$tempBase.videoMp4", segment = null)
+        val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null)
         val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
         val progress = MuxProgress()
         val buffer = ByteArray(BUFFER_SIZE)
@@ -2741,8 +2813,11 @@ class DownloadEngine(appContext: Context) {
             ensurePublishedKept(item.id, published0, published)
             finishMuxed(item, progress.downloaded.get(), published, finalName)
         } catch (e: Exception) {
-            runCatching { videoMp4.delete() }
-            runCatching { audioM4a.delete() }
+            // Temp video/audio SENGAJA dipertahankan saat gagal/jeda
+            // (issue #1434): keduanya bahan resume attempt berikutnya,
+            // terlindungi dari sapuan yatim lewat protectedPartialNames,
+            // dan dibersihkan deleteFiles saat item dihapus. Hanya
+            // keluaran remux setengah jadi yang dibuang.
             runCatching { mp4.delete() }
             // Pause membatalkan job + menutup soket: SocketException dari
             // downloadAdaptiveFile harus jadi pembatalan, bukan kegagalan
@@ -4375,6 +4450,34 @@ internal fun segmentResumeBytes(recorded: Long, available: Long, segLen: Long): 
         available.coerceAtLeast(0L),
         segLen.coerceAtLeast(0L)
     )
+
+/** Keputusan resume adaptif (issue #1434) dari keadaan temp + respons:
+ *  APPEND = lanjutkan temp pada offsetnya (206 dengan awal cocok, atau
+ *  tanpa Content-Range — dipercaya seperti pola runSingle); FRESH =
+ *  tulis respons ini dari nol (Range diabaikan server / unduhan baru);
+ *  COMPLETE = temp sudah utuh (416 dengan total == ukuran temp);
+ *  RESTART = temp tak cocok (416 lain) — buang temp, ulangi tanpa Range;
+ *  FAIL = respons tak bisa dipakai. Murni agar bisa di-unit-test; nilai
+ *  harapan dibuktikan port Python 1:1 (audit-dm-r14/port-1434.py). */
+internal enum class AdaptiveResumeAction { APPEND, FRESH, COMPLETE, RESTART, FAIL }
+
+internal fun adaptiveResumeAction(
+    existing: Long,
+    code: Int,
+    rangeStart: Long?,
+    rangeTotal: Long?
+): AdaptiveResumeAction = when {
+    code == 206 ->
+        if (rangeStart == null || rangeStart == existing) AdaptiveResumeAction.APPEND
+        else AdaptiveResumeAction.FAIL
+    code == 416 -> when {
+        existing <= 0L -> AdaptiveResumeAction.FAIL
+        rangeTotal != null && rangeTotal == existing -> AdaptiveResumeAction.COMPLETE
+        else -> AdaptiveResumeAction.RESTART
+    }
+    code in 200..299 -> AdaptiveResumeAction.FRESH
+    else -> AdaptiveResumeAction.FAIL
+}
 
 /** Total efektif progres adaptif (issue #1428): byte berkas yang sudah
  *  selesai ditambah Content-Length berkas yang sedang diunduh. Content-

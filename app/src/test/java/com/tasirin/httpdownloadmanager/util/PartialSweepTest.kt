@@ -29,9 +29,16 @@ class PartialSweepTest {
     }
 
     @Test
-    fun `item tanpa segmen hanya basis yang dilindungi`() {
+    fun `item tanpa segmen - basis dan temp adaptif yang dilindungi`() {
+        // Temp adaptif ikut dilindungi sejak menjadi bahan resume
+        // (issue #1434); id uji "1" -> tempBase "~1video".
         assertEquals(
-            setOf("video.mp4.part"),
+            setOf(
+                "video.mp4.part",
+                "~1video.muxed.part",
+                "~1video.audioM4a.part",
+                "~1video.videoMp4.part"
+            ),
             protectedPartialNames(item("video.mp4"))
         )
     }
