@@ -284,11 +284,16 @@ class WebExtractActivity : AppCompatActivity() {
             if (episodesJson.isNotBlank() && episodesJson != "[]") lastEpisodesJson = episodesJson
             val src = obj.optString("src").replace("\\/", "/")
             if (src.startsWith("http")) {
-                onVideoFound(src, obj.optString("title"), episodesJson)
+                // Akumulasi yang diteruskan, bukan tangkapan tick ini
+                // saja (issue #1512): daftar episode bisa terlihat di
+                // tick awal lalu hilang dari DOM saat player termuat —
+                // jalur kehabisan rantai di bawah sudah memakai
+                // lastEpisodesJson untuk alasan yang sama.
+                onVideoFound(src, obj.optString("title"), lastEpisodesJson)
             } else if (manualGrab) {
                 manualGrab = false
-                if (episodesJson.isNotBlank() && episodesJson != "[]") {
-                    onEpisodesOnly(episodesJson, obj.optString("title"))
+                if (lastEpisodesJson.isNotBlank() && lastEpisodesJson != "[]") {
+                    onEpisodesOnly(lastEpisodesJson, obj.optString("title"))
                 } else {
                     statusText.text = getString(R.string.web_extract_failed)
                 }
