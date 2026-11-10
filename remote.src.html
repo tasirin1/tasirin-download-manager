@@ -3078,6 +3078,12 @@ function closeMedia() {
   document.body.style.overflow = '';
   mmVideo.pause();
   mmVideo.removeAttribute('src');
+  // load() tanpa src me-reset elemen media dan MEMBATALKAN aliran
+  // jaringan yang masih berjalan (issue #1470): melepas atribut saja
+  // tidak meng-abort unduhan di WebView lama, jadi audio/stream bisa
+  // terus mengalir sesudah pemutar ditutup. Berpasangan dengan
+  // src + load() di openMedia.
+  try { mmVideo.load(); } catch (e) {}
   mmPlayer.classList.add('hidden');
   mmVideoWrap.classList.add('hidden');
   mmSpinner.classList.add('hidden');

@@ -706,6 +706,7 @@ mediaModal.classList.remove('open');
 document.body.style.overflow = '';
 mmVideo.pause();
 mmVideo.removeAttribute('src');
+try { mmVideo.load(); } catch (e) {}
 mmPlayer.classList.add('hidden');
 mmVideoWrap.classList.add('hidden');
 mmSpinner.classList.add('hidden');
