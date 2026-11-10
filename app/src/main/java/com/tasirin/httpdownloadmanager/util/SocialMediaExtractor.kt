@@ -1005,10 +1005,15 @@ object SocialMediaExtractor {
                     return raced
                 }
                 // Semua fallback kosong: kembalikan opsi halaman apa
-                // adanya sebagai upaya terakhir (perilaku lama).
-                return options
+                // adanya sebagai upaya terakhir (perilaku lama) —
+                // dengan penomoran tabrakan nama (issue #1524).
+                return withNumberedFileNames(options)
             }
-            return alive
+            // Daftar final dinomori tabrakan namanya (issue #1524):
+            // varian codec sesama label (AVC vs AV1 1080p, adaptif vs
+            // progresif 720p) menghasilkan nama identik dari
+            // youtubeFileName yang murni (judul, label, ekstensi).
+            return withNumberedFileNames(alive)
         } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (gagal parse halaman YouTube: biarkan fallback lain lanjut)
             // Gagal mem-parse halaman/response YouTube — biarkan fallback lain lanjut.
         }
@@ -1059,6 +1064,24 @@ object SocialMediaExtractor {
                 } else {
                     "$name-$n"
                 }
+            }
+        }
+    }
+
+    /** Terapkan [numberFileNameCollisions] ke daftar hasil (issue
+     *  #1524): hasil bernama null dibiarkan apa adanya (bukan kandidat
+     *  penomoran); hasil lain yang namanya berubah diganti salinannya
+     *  yang bernama hasil penomoran. Urutan dan field lain utuh. */
+    internal fun withNumberedFileNames(options: List<Result>): List<Result> {
+        val numbered = numberFileNameCollisions(
+            options.map { it.fileName ?: "" }
+        )
+        return options.mapIndexed { i, r ->
+            val name = r.fileName
+            if (name != null && numbered[i] != name) {
+                r.copy(fileName = numbered[i])
+            } else {
+                r
             }
         }
     }
@@ -1576,7 +1599,10 @@ object SocialMediaExtractor {
                         }
                     }
                 }
-                options
+                // Penomoran tabrakan nama daftar final (issue #1524):
+                // rendisi codec berbeda pada kualitas + ekstensi sama
+                // menghasilkan nama identik tanpa ini.
+                withNumberedFileNames(options)
             }.getOrNull()
             if (!result.isNullOrEmpty()) {
                 return result

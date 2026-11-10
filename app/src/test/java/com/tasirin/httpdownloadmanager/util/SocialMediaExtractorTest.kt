@@ -1014,6 +1014,28 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `withNumberedFileNames - tabrakan dalam daftar hasil diberi nomor, null utuh`() {
+        fun res(name: String?) =
+            SocialMediaExtractor.Result("https://cdn.example/v.mp4", name, "Judul", "1080p")
+        val out = SocialMediaExtractor.withNumberedFileNames(
+            listOf(
+                res("Judul_1080p.mp4"),
+                res("Judul_720p.mp4"),
+                res("Judul_1080p.mp4"),
+                res(null),
+                res("Judul_1080p.mp4")
+            )
+        )
+        assertEquals(
+            listOf("Judul_1080p.mp4", "Judul_720p.mp4", "Judul_1080p-2.mp4", null, "Judul_1080p-3.mp4"),
+            out.map { it.fileName }
+        )
+        // Field lain dan urutan tidak berubah.
+        assertEquals("1080p", out[2].quality)
+        assertEquals("https://cdn.example/v.mp4", out[2].directUrl)
+    }
+
+    @Test
     fun `parseFacebookPage - banyak opsi sekualitas bernama berlabel dan bernomor`() {
         // Dua URL HD berbeda dari lintasan hd_src yang sama (issue
         // #1523): label sama -> nama kedua diberi nomor tabrakan.
