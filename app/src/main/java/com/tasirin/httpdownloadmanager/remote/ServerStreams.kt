@@ -5,6 +5,7 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.io.RandomAccessFile
 import android.content.res.AssetFileDescriptor
+import com.tasirin.httpdownloadmanager.data.DownloadSegment
 
 /** Gabungkan beberapa file partial menjadi satu stream (streaming resume
  *  multi-segmen tanpa menyusun file utuh di memori). */
@@ -122,6 +123,73 @@ internal class ChainInputStream(files: List<File>) : InputStream() {
         streams.forEach { runCatching { it.close() } }
         idx = streams.size
         remainingInCurrent = 0
+    }
+}
+
+/** Panjang awalan terunduh yang KONTINU dari catatan segmen (issue
+ *  #1459): segmen diurutkan per indeks, panjang penuh tiap segmen tuntas
+ *  dijumlahkan, lalu byte terunduh segmen pertama yang belum tuntas —
+ *  dan berhenti di situ. Sejak unduhan segmen menulis SATU berkas `.part`
+ *  terpadu pra-alokasi (issue #1427), byte sesudah awalan ini adalah nol
+ *  pra-alokasi atau segmen yang melompat, jadi stream parsial tidak
+ *  boleh mengumumkannya sebagai data. Murni agar bisa di-unit-test. */
+internal fun downloadedPrefixLength(segments: List<DownloadSegment>): Long {
+    var prefix = 0L
+    for (seg in segments.sortedBy { it.index }) {
+        val length = (seg.end - seg.start + 1).coerceAtLeast(0)
+        val got = seg.downloaded.coerceIn(0, length)
+        prefix += got
+        if (got < length) break
+    }
+    return prefix
+}
+
+/** Aliran pembatas panjang di atas aliran lain: EOF tepat sesudah
+ *  [limit] byte, apa pun isi aliran sumber sesudahnya (issue #1459 —
+ *  berkas `.part` terpadu memuat byte nol pra-alokasi di luar awalan
+ *  terunduh; byte itu tak boleh mengalir ke pemutar). Menutup aliran ini
+ *  menutup sumbernya. */
+internal class LimitedInputStream(
+    private val delegate: InputStream,
+    private var remaining: Long
+) : InputStream() {
+
+    override fun read(): Int {
+        if (remaining <= 0) return -1
+        val b = delegate.read()
+        if (b == -1) {
+            remaining = 0
+        } else {
+            remaining--
+        }
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        if (off < 0 || len < 0 || off > b.size || len > b.size - off) throw IndexOutOfBoundsException()
+        if (len == 0) return 0
+        if (remaining <= 0) return -1
+        val n = delegate.read(b, off, minOf(len.toLong(), remaining).toInt())
+        if (n == -1) {
+            remaining = 0
+        } else {
+            remaining -= n
+        }
+        return n
+    }
+
+    override fun skip(n: Long): Long {
+        if (n <= 0) return 0
+        val skipped = delegate.skip(minOf(n, remaining))
+        if (skipped > 0) remaining -= skipped
+        return skipped
+    }
+
+    override fun available(): Int =
+        minOf(delegate.available().toLong(), remaining).toInt()
+
+    override fun close() {
+        delegate.close()
     }
 }
 

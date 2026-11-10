@@ -2657,9 +2657,43 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // player eksternal bisa memutar progresif dan seek dalam batas terunduh.
         val mime = MimeTypes.forFile(item.fileName)
         if (item.segments.isNotEmpty()) {
-            // Download segmen: gabungkan potongan yang sudah terunduh secara
-            // berurutan agar tetap bisa distream (Range relatif ke gabungan).
             val cleanName = FileNames.safe(item.fileName)
+            // Sejak issue #1427 unduhan segmen menulis SATU berkas .part
+            // terpadu pra-alokasi, jadi perakitan berkas per-segmen di
+            // bawah tak pernah menemukan apa pun dan endpoint ini selalu
+            // 404 (issue #1459). Layani berkas terpadu seperti cabang
+            // non-segmen, tetapi total yang diumumkan DIBATASI ke awalan
+            // terunduh yang kontinu menurut catatan segmen: byte
+            // sesudah awalan itu adalah nol pra-alokasi / segmen yang
+            // melompat — menyajikannya berarti korupsi senyap ke player.
+            val unified = File(File(context.filesDir, "downloads"), "$cleanName.part")
+            if (unified.isFile) {
+                // Total dari FD yang dibuka (pola #792 cabang non-segmen:
+                // snapshot satu inode), lalu dijepit ke awalan terunduh.
+                val raw = runCatching { FileInputStream(unified) }.getOrNull()
+                    ?: return notFound()
+                val fdSize = runCatching { raw.channel.size() }.getOrElse {
+                    runCatching { raw.close() }
+                    return notFound()
+                }
+                val total = minOf(downloadedPrefixLength(item.segments), fdSize)
+                if (total <= 0) {
+                    runCatching { raw.close() }
+                    return notFound()
+                }
+                return streamMedia(
+                    name = item.fileName,
+                    mime = mime,
+                    input = LimitedInputStream(raw, total),
+                    total = total,
+                    rangeHeader = session.headers["range"],
+                    download = false
+                )
+            }
+            // Fallback warisan pra-#1427 (unduhan lama yang belum start
+            // ulang): gabungkan potongan per-segmen yang sudah terunduh
+            // secara berurutan agar tetap bisa distream (Range relatif
+            // ke gabungan).
             // Ambil hanya prefix kontinu dari indeks 0: segmen yang belum
             // mulai (gap) membuat gabungan tak-kontinu sehingga Range dihitung
             // dari total yang salah dan player menerima byte korup.
