@@ -8,8 +8,25 @@ import java.util.Locale
 /** Buffer log realtime server: aman multi-thread, baris terpotong, daftar
  *  dibatasi supaya snapshot tidak boros memori. */
 /** Endpoint polling/media sukses bisa ratusan request per menit; log hanya
- *  bila gagal atau endpoint lain agar buffer tetap berisi kejadian penting. */
-internal fun shouldSkipRequestLog(httpMethod: String, statusCode: Int, uri: String): Boolean {
+ *  bila gagal atau endpoint lain agar buffer tetap berisi kejadian penting.
+ *  Chunk upload tengah rangkaian diperlakukan sama (issue #1454): satu
+ *  upload besar = hingga 1.024 request chunk, jadi hanya chunk pertama
+ *  dan terakhir yang tercatat sebagai tonggak; kegagalan handler chunk
+ *  sendiri menulis baris FAILED/REJECTED eksplisit di handler. Nilai
+ *  harapan dibuktikan port Python 1:1 (audit-dm-r15/port-1454.py). */
+internal fun shouldSkipRequestLog(
+    httpMethod: String,
+    statusCode: Int,
+    uri: String,
+    chunkIndex: Int? = null,
+    chunkCount: Int? = null
+): Boolean {
+    if (httpMethod == "POST" && statusCode == 200 && uri == "/api/upload" &&
+        chunkIndex != null && chunkCount != null &&
+        chunkIndex > 0 && chunkIndex < chunkCount - 1
+    ) {
+        return true
+    }
     if (httpMethod != "GET" || statusCode != 200) return false
     return uri == "/api/snapshot" || uri == "/api/events" ||
         uri == "/api/pin_enabled" || uri == "/api/thumb" ||

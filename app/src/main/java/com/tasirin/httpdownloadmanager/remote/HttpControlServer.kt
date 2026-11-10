@@ -382,7 +382,9 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // Endpoint polling/media/thumb/listing dipanggil terus saat halaman
         // aktif; tanpa filter ini buffer hanya berisi request rutin.
         if (shouldSkipRequestLog(
-                session.method.name, response.status.requestStatus, session.uri
+                session.method.name, response.status.requestStatus, session.uri,
+                session.param("chunk")?.toIntOrNull(),
+                session.param("chunks")?.toIntOrNull()
             )
         ) {
             return
@@ -1541,13 +1543,15 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         // dikirim = XHR error di client).
         completedUploads[id]?.let { done ->
             val drained = drainBody(session)
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks already done -> ok")
+            // Tanpa log per retry (issue #1454): penyelesaian upload ini
+            // sudah tercatat baris COMPLETED saat finalisasi selesai.
             val resp = jsonResponse(JSONObject().put("ok", true).put("name", done.first))
             return if (drained) resp else resp.closeConnection()
         }
         finalizingUploads[id]?.let { pendingName ->
             val drained = drainBody(session)
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks finalizing -> pending")
+            // Tanpa log per retry (issue #1454): finalisasi sudah
+            // tercatat baris "last chunk received" + COMPLETED/FAILED.
             // Token verify WAJIB ikut (issue #1290): cabang ini terpicu
             // persis saat respons chunk terakhir hilang dan klien retry —
             // klien itu belum memegang token apa pun, dan tanpa token di
@@ -1656,7 +1660,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
             }
             return jsonResponse(JSONObject().put("ok", false).put("error", "invalid upload range"))
         }
-        appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks received: $name (${length}B offset=$offset)")
+        // Log tonggak saja (issue #1454): dulu baris ini tertulis untuk
+        // SETIAP chunk (per 2 MB) dan membanjiri ring buffer 300 baris —
+        // kini hanya chunk pertama sebagai tanda mulai; selesai dicatat
+        // baris finalisasi/COMPLETED, gagal oleh baris FAILED/REJECTED.
+        if (chunkIdx == 0) {
+            appendLog("UPLOAD #$id START: $name ($chunks chunk(s), first ${length}B offset=$offset)")
+        }
         // Klaim atomik: batas lock ditegakkan di dalam uploadLockFor agar dua
         // ID baru paralel tak sama-sama lolos cek lalu melebihi MAX_UPLOAD_LOCKS.
         val lock = uploadLockFor(id) ?: run {
@@ -1881,7 +1891,8 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                         .put("verify", verifyToken)
                 )
             }
-            appendLog("UPLOAD #$id chunk ${chunkIdx + 1}/$chunks OK ($name)")
+            // Tanpa baris OK per chunk (issue #1454): progres yang sama
+            // sudah terlihat klien dari respons chunk ini sendiri.
             jsonResponse(
                 JSONObject()
                     .put("ok", true)

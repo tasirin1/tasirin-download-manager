@@ -64,4 +64,17 @@ class ServerLogTest {
         assertFalse(shouldSkipRequestLog("GET", 404, "/api/media"))
         assertFalse(shouldSkipRequestLog("GET", 200, "/api/downloads"))
     }
+
+    @Test
+    fun `chunk upload tengah dilewati - tonggak awal akhir tetap dicatat`() {
+        // Issue #1454; nilai harapan dibuktikan port Python 1:1
+        // (audit-dm-r15/port-1454.py).
+        assertTrue(shouldSkipRequestLog("POST", 200, "/api/upload", 500, 1024))
+        assertFalse(shouldSkipRequestLog("POST", 200, "/api/upload", 0, 1024))
+        assertFalse(shouldSkipRequestLog("POST", 200, "/api/upload", 1023, 1024))
+        assertFalse(shouldSkipRequestLog("POST", 500, "/api/upload", 500, 1024))
+        // Single-shot (tanpa parameter chunk) tetap tercatat utuh.
+        assertFalse(shouldSkipRequestLog("POST", 200, "/api/upload"))
+        assertFalse(shouldSkipRequestLog("POST", 200, "/api/upload", 1, 2))
+    }
 }
