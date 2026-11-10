@@ -437,10 +437,19 @@ object SocialMediaExtractor {
         val hosts = listOf("https://www.tikwm.com", "https://tikwm.com")
         // Cap tahap (#266): dua host x rantai redirect helper bisa menduduki
         // thread IO jauh melewati batas total bila keduanya menggantung.
+        // Anggaran PER HOST (issue #1492): satu rantai httpGet bisa
+        // menggantung sampai 30 dtk, lebih besar dari cap tahap 20 dtk —
+        // host pertama yang menggantung (mode blokir ISP: paket dibuang)
+        // memakan seluruh cap sehingga host cadangan tak pernah dicoba.
+        // Tiap host kini dicap sendiri (9 dtk x 2 host tetap di dalam
+        // cap tahap 20 dtk), jadi cadangan sungguh mendapat giliran;
+        // cap luar tetap penjaga totalnya.
         val obj = runStageCapped(20_000L) {
             var found: JSONObject? = null
             for (host in hosts) {
-                val json = httpGet("$host/api/?url=$encoded&hd=1") ?: continue
+                val json = runStageCapped(9_000L) {
+                    httpGet("$host/api/?url=$encoded&hd=1")
+                } ?: continue
                 val parsed = runCatching { JSONObject(json) }.getOrNull() ?: continue
                 if (parsed.optInt("code", -1) == 0) {
                     found = parsed
