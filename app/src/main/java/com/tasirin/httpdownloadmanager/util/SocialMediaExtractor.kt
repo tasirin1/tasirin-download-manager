@@ -471,7 +471,31 @@ object SocialMediaExtractor {
         if (wmUrl.startsWith("http") && wmUrl != sdUrl) {
             options.add(Result(wmUrl, "${namePrefix}_wm.mp4", title, "SD (watermark)", MIME_MP4))
         }
+        // Posting foto/slideshow (issue #1469): field images respons
+        // tikwm dulu diabaikan total sehingga tautan foto selalu tanpa
+        // hasil; kini menjadi opsi gambar seperti jalur foto situs lain.
+        options.addAll(tikTokImageResults(data, namePrefix, title))
         return options
+    }
+
+    /** Hasil gambar dari field `images` respons tikwm (murni, issue
+     *  #1469): tiap entri http menjadi Result "Photo <n>" bernama
+     *  "<prefix>_<n>.jpg"; nomor berurutan atas hasil yang diterima
+     *  (entri tak valid tak meninggalkan lubang nomor). */
+    internal fun tikTokImageResults(
+        data: JSONObject,
+        namePrefix: String,
+        title: String
+    ): List<Result> {
+        val images = data.optJSONArray("images") ?: return emptyList()
+        val out = mutableListOf<Result>()
+        for (i in 0 until images.length()) {
+            val img = images.optString(i, "")
+            if (!img.startsWith("http")) continue
+            val n = out.size + 1
+            out.add(Result(img, "${namePrefix}_$n.jpg", title, "Photo $n", "image/jpeg"))
+        }
+        return out
     }
 
     /** Awalan nama berkas TikTok (murni, issue #1466): komponen kosong/

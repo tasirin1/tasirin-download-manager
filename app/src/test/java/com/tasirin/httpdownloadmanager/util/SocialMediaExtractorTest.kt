@@ -183,6 +183,29 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `tikTokImageResults - field images jadi opsi foto bernomor rapat`() {
+        val data = org.json.JSONObject(
+            """{"images":["https://a/1.jpg","","relatif.jpg","https://a/2.jpg"]}"""
+        )
+        val out = SocialMediaExtractor.tikTokImageResults(data, "TikTok_9", "T")
+        assertEquals(2, out.size)
+        assertEquals("https://a/1.jpg", out[0].directUrl)
+        assertEquals("TikTok_9_1.jpg", out[0].fileName)
+        assertEquals("Photo 1", out[0].quality)
+        assertEquals("image/jpeg", out[0].mimeType)
+        assertEquals("https://a/2.jpg", out[1].directUrl)
+        assertEquals("TikTok_9_2.jpg", out[1].fileName)
+        assertEquals("Photo 2", out[1].quality)
+        // Tanpa field images / bukan array -> kosong.
+        assertTrue(SocialMediaExtractor.tikTokImageResults(org.json.JSONObject("{}"), "P", "T").isEmpty())
+        assertTrue(
+            SocialMediaExtractor.tikTokImageResults(
+                org.json.JSONObject("""{"images":"bukan-array"}"""), "P", "T"
+            ).isEmpty()
+        )
+    }
+
+    @Test
     fun `filterForbiddenProbe - audio pasangan terbukti 403 ikut membuang kandidat`() {
         fun res(v: String, a: String = "") =
             SocialMediaExtractor.Result(v, "f.mp4", "t", audioUrl = a)
