@@ -26,6 +26,28 @@ class MediaStreamTest {
     }
 
     @Test
+    fun zipRangeStartOf_unitTidakPekaHuruf() {
+        // Issue #1417: ekspektasi dibuktikan port-1417.py (port 1:1).
+        assertEquals(-1L, zipRangeStartOf(null))
+        assertEquals(5000L, zipRangeStartOf("bytes=5000-"))
+        assertEquals(5000L, zipRangeStartOf("Bytes=5000-"))
+        assertEquals(1048576L, zipRangeStartOf("BYTES=1048576-2048"))
+        assertEquals(42L, zipRangeStartOf("bYtEs=42-"))
+    }
+
+    @Test
+    fun zipRangeStartOf_bentukDariAwal() {
+        assertEquals(0L, zipRangeStartOf("bytes=0-"))
+        assertEquals(0L, zipRangeStartOf("bytes=-500"))
+        assertEquals(0L, zipRangeStartOf("items=500-"))
+        assertEquals(0L, zipRangeStartOf("bytes=abc-"))
+        assertEquals(0L, zipRangeStartOf(""))
+        assertEquals(0L, zipRangeStartOf("bytes="))
+        assertEquals(42L, zipRangeStartOf(" bytes=42- "))
+        assertEquals(500L, zipRangeStartOf("bytes= 500 -"))
+    }
+
+    @Test
     fun parseRange_awalSampaiAkhir() {
         assertEquals(0L to 99L, parseRange("bytes=0-99", 1000))
         assertEquals(500L to 999L, parseRange("bytes=500-", 1000))

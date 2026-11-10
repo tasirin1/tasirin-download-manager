@@ -4445,19 +4445,12 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return zipRangeStart(session) > 0
     }
 
-    /** Offset awal header Range sesi: -1 bila header tak ada, 0 bila
-     *  ada tetapi mulai dari nol / sufiks / tak terurai (ketiganya
-     *  setara unduhan dari awal), selain itu offset-nya. Dipakai
-     *  gerbang token ZIP agar "lanjutan" dinilai dari offset, bukan
-     *  sekadar keberadaan header (issue #1266). */
-    private fun zipRangeStart(session: IHTTPSession): Long {
-        val h = session.headers["range"] ?: return -1L
-        val v = h.trim()
-        if (!v.startsWith("bytes=")) return 0L
-        val start = v.removePrefix("bytes=").substringBefore('-').trim()
-        if (start.isEmpty()) return 0L // bentuk sufiks bytes=-N
-        return start.toLongOrNull() ?: 0L
-    }
+    /** Offset awal header Range sesi (semantik di zipRangeStartOf,
+     *  MediaStream.kt). Dipakai gerbang token ZIP agar "lanjutan"
+     *  dinilai dari offset, bukan sekadar keberadaan header
+     *  (issue #1266). */
+    private fun zipRangeStart(session: IHTTPSession): Long =
+        zipRangeStartOf(session.headers["range"])
 
     /** Gerbang titik sajian ZIP (issue #1240, menyempurnakan #1210):
      *  handler hanya terjangkau dari cabang pinOk dispatch, jadi sesi

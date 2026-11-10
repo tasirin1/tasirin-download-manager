@@ -126,6 +126,22 @@ internal fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
     }
 }
 
+/** Offset awal header Range mentah: -1 bila header tak ada, 0 bila
+ *  mulai dari nol / bentuk sufiks / tak terurai (ketiganya setara
+ *  unduhan dari awal), selain itu offset-nya. Unit "bytes=" dinilai
+ *  TIDAK peka huruf (issue #1417), selaras RANGE_RE di atas dan
+ *  RFC 9110 — penilaian peka-huruf lama membuat gerbang token ZIP
+ *  menilai lanjutan "Bytes=5000-" sebagai inisiasi. Murni agar bisa
+ *  di-unit-test. */
+internal fun zipRangeStartOf(header: String?): Long {
+    val h = header ?: return -1L
+    val v = h.trim()
+    if (!v.startsWith("bytes=", ignoreCase = true)) return 0L
+    val start = v.substring("bytes=".length).substringBefore('-').trim()
+    if (start.isEmpty()) return 0L // bentuk sufiks bytes=-N
+    return start.toLongOrNull() ?: 0L
+}
+
 /** Header Range berbentuk valid (sintaks bytes=) tapi tak terpenuhi total:
  *  layak dibalas 416, bukan 200 full-body. */
 internal fun isSatisfiableRange(header: String?, total: Long): Boolean {
