@@ -74,6 +74,25 @@ class SegmentRangeTest {
     }
 
     @Test
+    fun `byte resume segmen terpangkas ke ketersediaan dan panjang segmen`() {
+        // Nilai harapan dibuktikan port Python 1:1 (audit 14, port-1427.py).
+        // Normal: catatan di dalam semua batas lolos apa adanya.
+        assertEquals(500L, segmentResumeBytes(500, 1000, 1000))
+        assertEquals(1000L, segmentResumeBytes(1000, 1000, 1000))
+        // Migrasi warisan: catatan mendahului isi part -> pangkas ke isi part.
+        assertEquals(1000L, segmentResumeBytes(1200, 1000, 1000))
+        assertEquals(300L, segmentResumeBytes(500, 300, 1000))
+        // Panjang segmen adalah plafon terakhir.
+        assertEquals(400L, segmentResumeBytes(500, 1000, 400))
+        assertEquals(1000L, segmentResumeBytes(Long.MAX_VALUE, Long.MAX_VALUE, 1000))
+        // Nilai rusak (negatif di posisi mana pun) jatuh ke 0, bukan negatif.
+        assertEquals(0L, segmentResumeBytes(0, 1000, 1000))
+        assertEquals(0L, segmentResumeBytes(-5, 1000, 1000))
+        assertEquals(0L, segmentResumeBytes(500, -1, 1000))
+        assertEquals(0L, segmentResumeBytes(500, 1000, -1))
+    }
+
+    @Test
     fun `budget resume single-stream hanya dari total Content-Range respons 206`() {
         // Nilai harapan dibuktikan port Python 1:1 (maraton 12, port-1369).
         assertEquals(600L, singleStreamRangeBudget(206, 1000, 400))

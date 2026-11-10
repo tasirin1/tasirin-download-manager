@@ -59,3 +59,4 @@ HlsProgress
 reportHlsProgress
 finishHls
 extractNonHlsYouTube
+mergeSegments

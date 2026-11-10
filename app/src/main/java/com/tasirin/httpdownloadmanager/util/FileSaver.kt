@@ -14,7 +14,6 @@ import com.tasirin.httpdownloadmanager.data.DownloadItem
 import com.tasirin.httpdownloadmanager.download.buangSufiksEkstensi
 import java.io.File
 import java.io.IOException
-import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.FilterOutputStream
 import java.io.OutputStream
@@ -85,37 +84,6 @@ class FileSaver(context: Context) {
      *  terbitan unduhan (issue #644). */
     internal fun <T> withMediaStoreClaimLock(fileName: String, block: () -> T): T =
         synchronized(mergeLockFor(FileNames.safe(fileName))) { block() }
-
-    fun mergeSegments(fileName: String, segmentCount: Int): File =
-        synchronized(mergeLockFor(FileNames.safe(fileName))) {
-        val target = partialFile(fileName)
-        // Staging unik per proses agar dua item bernama sama yang merge
-        // paralel tidak saling menimpa file staging yang sama.
-        val staging = File(target.parentFile, target.name + ".merge." + System.nanoTime())
-        try {
-            BufferedOutputStream(staging.outputStream()).use { out ->
-                for (index in 0 until segmentCount) {
-                    val part = partialFile(fileName, index)
-                    if (!part.exists()) throw IOException("Segment $index not found")
-                    BufferedInputStream(part.inputStream(), IO_BUF).use { input -> input.copyTo(out, IO_BUF) }
-                }
-            }
-            // renameTo memakai rename(2) di Linux dan menggantikan target lama;
-            // fallback menjaga perangkat yang menolak replace otomatis.
-            // Bila finalisasi gagal, wajib throw: me-return target yang tidak
-            // ada sambil menghapus parts berarti data hilang diam-diam.
-            if (!staging.renameTo(target)) {
-                runCatching { target.delete() }
-                if (!staging.renameTo(target) || !target.isFile) {
-                    throw IOException("Failed to finalize merged file")
-                }
-            }
-        } finally {
-            if (staging.exists()) runCatching { staging.delete() }
-        }
-        for (index in 0 until segmentCount) runCatching { partialFile(fileName, index).delete() }
-        return target
-    }
 
     fun publishToPath(partial: File, fileName: String, folder: String): PublishResult? {
         val clean = folder.trim()

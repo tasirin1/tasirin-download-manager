@@ -2879,11 +2879,12 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    /** Seperti ensurePublishedKept tetapi untuk berkas mentah hasil merge
-     *  SEBELUM publish (issue #1038): mergeSegments sudah menghapus semua
-     *  parts segmen, jadi ensureActive() di jendela merge->publish membuat
-     *  pause membuang seluruh progres 100% — berkas gabungan tertinggal
-     *  yatim tak terpakai resume segmen dan tiap segmen kena RESTART.
+    /** Seperti ensurePublishedKept tetapi untuk berkas mentah unduhan
+     *  SEBELUM publish (issue #1038): progres segmen sudah menyatu di
+     *  berkas .part (dulu: hasil merge yang sudah menghapus semua parts),
+     *  jadi ensureActive() di jendela finalisasi->publish membuat pause
+     *  membuang seluruh progres 100% — berkas utuh tertinggal yatim tak
+     *  terpakai resume segmen dan tiap segmen kena RESTART.
      *  Finalisasi dituntaskan bila item masih ada (pola #780); item hilang
      *  tetap membuang scrap + batal, persis ensureItemPresent. */
     private fun ensureItemKept(id: String, vararg scrap: File) {
@@ -3144,6 +3145,88 @@ class DownloadEngine(appContext: Context) {
         if (finishedSingle != null) NotificationHelper.notifyItemFinished(context, finishedSingle)
     }
 
+    /** Siapkan berkas tunggal pra-alokasi untuk jalur segmen (issue #1427)
+     *  dan kembalikan segmen yang catatannya mungkin terkoreksi:
+     *  - Part warisan per-segmen (`.part.<idx>`, model pra-#1427) dimigrasi
+     *    sekali: byte tiap part disalin ke offset segmennya di berkas
+     *    tunggal, catatan segmen yang melebihi isi part dipangkas ke isi
+     *    part (pola truncate-to-record lama), lalu part dihapus.
+     *  - Ada catatan progres tetapi berkas tunggal hilang atau panjangnya
+     *    tak sama dengan total: isi berkas tak bisa dipercaya per-wilayah,
+     *    jadi catatan di-nol-kan dan berkas dibuat ulang — menerbitkan
+     *    berkas berlubang (nol pra-alokasi) berstatus COMPLETED jauh lebih
+     *    buruk daripada mengulang unduhan.
+     *  - Panjang berkas selalu dinormalkan ke total (setLength) agar
+     *    berkas yang diterbitkan persis sebesar total, sama seperti hasil
+     *    merge lama. */
+    private fun prepareSegmentedFile(
+        id: String,
+        fileName: String,
+        segments: List<DownloadSegment>,
+        total: Long,
+        saver: FileSaver
+    ): List<DownloadSegment> {
+        val unified = saver.partialFile(fileName)
+        val segTotal = segments.maxOfOrNull { it.end }?.let { end ->
+            if (end == Long.MAX_VALUE) total else end + 1
+        } ?: total
+        val effectiveTotal = maxOf(total, segTotal)
+        if (segments.any { saver.partialFile(fileName, it.index).isFile }) {
+            var result = segments
+            RandomAccessFile(unified, "rw").use { raf ->
+                if (effectiveTotal > 0) raf.setLength(effectiveTotal)
+                result = segments.map { seg ->
+                    val part = saver.partialFile(fileName, seg.index)
+                    if (!part.isFile) return@map seg
+                    val keep = segmentResumeBytes(
+                        seg.downloaded, part.length(), segmentLength(seg.start, seg.end)
+                    )
+                    if (keep > 0) {
+                        raf.seek(seg.start)
+                        part.inputStream().use { input ->
+                            val buf = ByteArray(BUFFER_SIZE)
+                            var left = keep
+                            while (left > 0) {
+                                val n = input.read(buf, 0, minOf(buf.size.toLong(), left).toInt())
+                                if (n <= 0) break
+                                raf.write(buf, 0, n)
+                                left -= n
+                            }
+                        }
+                    }
+                    runCatching { part.delete() }
+                    if (keep != seg.downloaded) seg.copy(downloaded = keep) else seg
+                }
+            }
+            if (result != segments) {
+                val corrected = result
+                updateItem(id) {
+                    it.copy(
+                        segments = corrected,
+                        bytesDownloaded = corrected.sumOf { s -> s.downloaded }
+                    )
+                }
+            }
+            return result
+        }
+        var result = segments
+        val recorded = segments.sumOf { it.downloaded }
+        if (recorded > 0 &&
+            (!unified.isFile || (effectiveTotal > 0 && unified.length() != effectiveTotal))
+        ) {
+            result = segments.map { it.copy(downloaded = 0L) }
+            val zeroed = result
+            updateItem(id) {
+                it.copy(segments = zeroed, bytesDownloaded = 0, speedBps = 0, etaSeconds = 0)
+            }
+            runCatching { unified.delete() }
+        }
+        if (effectiveTotal > 0 && (!unified.isFile || unified.length() != effectiveTotal)) {
+            RandomAccessFile(unified, "rw").use { it.setLength(effectiveTotal) }
+        }
+        return result
+    }
+
     private suspend fun runSegmented(
         item: DownloadItem,
         saver: FileSaver,
@@ -3177,6 +3260,14 @@ class DownloadEngine(appContext: Context) {
                 )
             }
         }
+
+        // Berkas tunggal pra-alokasi (issue #1427): semua segmen menulis
+        // pada offset absolutnya di SATU berkas .part — tak ada lagi
+        // berkas per-segmen + merge salinan-penuh di garis finis.
+        // Persiapan memvalidasi keadaan di disk (dan memigrasi part
+        // warisan pra-#1427) sebelum segmen diluncurkan; catatan segmen
+        // bisa terkoreksi olehnya.
+        segments = prepareSegmentedFile(item.id, fileName, segments, total, saver)
 
         // Sisa penyangga/flush dari percobaan sebelumnya dibuang: segmen baru
         // menulis ulang dari state item saat ini (nilai basi tidak boleh
@@ -3279,7 +3370,11 @@ class DownloadEngine(appContext: Context) {
         val current = _items.value.find { it.id == item.id } ?: return
         verifySize(current.bytesDownloaded, current.totalBytes, current.fileName)
 
-        val merged = saver.mergeSegments(fileName, segments.size)
+        // Tak ada merge (issue #1427): berkas .part tunggal yang ditulis
+        // segmen pada offset absolutnya SUDAH merupakan berkas utuh —
+        // terbitkan langsung. Objek File ini persis yang dulu dihasilkan
+        // tahap penggabungan, jadi jalur publish/MediaStore/SAF tak berubah.
+        val merged = saver.partialFile(fileName)
         ensureItemKept(item.id, merged)
         val published0 = publishItem(saver, merged, fileName, item)
         val finalName = published0.fileName ?: fileName
@@ -3370,44 +3465,35 @@ class DownloadEngine(appContext: Context) {
         throttle: SpeedThrottle
     ) {
         val item = _items.value.find { it.id == id } ?: return
-        val partial = saver.partialFile(fileName, segment.index)
+        val partial = saver.partialFile(fileName)
         val health = DownloadHealthWatchdog(
             if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
         )
         var downloaded = segment.downloaded
         var lastSegBytes = downloaded
         var lastSegAt = monotonicNow()
-        // Resume anti-korup per segmen: ukuran file parsial harus sinkron.
-        // File sedikit lebih panjang dari catatan (flush progres tiap 500 ms)
-        // hanya dipangkas, bukan dibuang — tanpa ini, tiap putus jaringan
-        // membuat SEMUA segmen mengulang dari nol.
-        when (resumeAction(downloaded, partial.length())) {
-            ResumeAction.TRUNCATE_TO_RECORD -> {
-                val truncated = runCatching {
-                    RandomAccessFile(partial, "rw").use { it.setLength(downloaded) }
-                    true
-                }.getOrDefault(false)
-                if (!truncated) {
-                    addThrottleTotal(id, -downloaded)
-                    downloaded = 0
-                    partial.delete()
-                    updateSegment(id, segment.index, 0)
-                }
-            }
-            ResumeAction.RESTART -> {
-                addThrottleTotal(id, -downloaded)
-                downloaded = 0
-                partial.delete()
-                updateSegment(id, segment.index, 0)
-            }
-            ResumeAction.KEEP -> Unit
+        // Resume model berkas tunggal (issue #1427): catatan segmen adalah
+        // sumber kebenaran — berkas .part tunggal sudah divalidasi utuh
+        // oleh prepareSegmentedFile sebelum segmen diluncurkan (panjang
+        // persis total; part warisan termigrasi dan catatannya terpangkas
+        // ke isi part). Di sini catatan hanya dipangkas ke rentang segmen
+        // (paranoia nilai basi/rusak): menulis ulang byte pada offset yang
+        // sama bersifat idempoten karena byte resource yang sama menimpa
+        // posisi yang sama, jadi tak ada lagi truncate/buang per segmen.
+        val segLen = segmentLength(segment.start, segment.end)
+        val clamped = segmentResumeBytes(downloaded, segLen, segLen)
+        if (clamped != downloaded) {
+            if (clamped < downloaded) addThrottleTotal(id, -(downloaded - clamped))
+            downloaded = clamped
+            lastSegBytes = downloaded
+            updateSegment(id, segment.index, downloaded)
         }
         // Segmen yang sudah utuh dilewati tanpa koneksi (issue #630):
         // memintanya ulang menghasilkan Range tidak valid dan memicu
         // pembuangan seluruh progres oleh penangan penolakan Range.
-        // Nilai downloaded di sini sudah direkonsiliasi resumeAction:
-        // parsial yang hilang sudah menurunkan hitungan ke 0 sehingga
-        // segmen itu tetap diminta ulang secara sah di bawah.
+        // Nilai downloaded di sini sudah direkonsiliasi di atas: catatan
+        // yang terpangkas ke 0 membuat segmen tetap diminta ulang secara
+        // sah di bawah.
         if (isSegmentComplete(segment.start, segment.end, downloaded)) {
             updateSegment(id, segment.index, downloaded)
             return
@@ -3456,7 +3542,14 @@ class DownloadEngine(appContext: Context) {
 
             val input = conn.inputStream
             streamOpened = true
-            val output = BufferedOutputStream(FileOutputStream(partial, true), BUFFER_SIZE)
+            // Tulis terposisi pada berkas tunggal (issue #1427): tiap
+            // segmen memegang RandomAccessFile sendiri — offset bersifat
+            // per-deskriptor sehingga segmen paralel tak saling geser —
+            // dan seek sekali ke offset absolut segmen ini. Tulis RAF tak
+            // memakai buffer perantara: byte yang terhitung progres sudah
+            // di tangan OS, tak pernah mendahului isi berkas.
+            val output = RandomAccessFile(partial, "rw")
+            output.seek(segment.start + downloaded)
             val buffer = ByteArray(BUFFER_SIZE)
             var lastNotify = 0L
             var segIters = 0
@@ -3518,7 +3611,7 @@ class DownloadEngine(appContext: Context) {
                         recordSegmentProgress(id, segment.index, downloaded, item.segments.size)
                     }
                 }
-                output.flush()
+                // Tak ada flush: tulis RandomAccessFile langsung ke OS.
                 coroutineContext.ensureActive()
             } finally {
                 runCatching { input.close() }
@@ -4303,6 +4396,19 @@ internal fun segmentLength(start: Long, end: Long): Long {
 
 internal fun isSegmentComplete(start: Long, end: Long, downloaded: Long): Boolean =
     downloaded >= segmentLength(start, end)
+
+/** Byte resume segmen yang boleh dipercaya (issue #1427): catatan tak
+ *  pernah negatif, tak melebihi byte yang sungguh tersedia ([available] =
+ *  isi part warisan saat migrasi; panjang segmen pada jalur normal karena
+ *  berkas tunggal sudah divalidasi utuh di persiapan), dan tak melebihi
+ *  panjang segmennya. Murni agar bisa di-unit-test; nilai harapan
+ *  dibuktikan port Python 1:1 (audit-dm-r14/port-1427.py). */
+internal fun segmentResumeBytes(recorded: Long, available: Long, segLen: Long): Long =
+    minOf(
+        recorded.coerceAtLeast(0L),
+        available.coerceAtLeast(0L),
+        segLen.coerceAtLeast(0L)
+    )
 
 /** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
  *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able
