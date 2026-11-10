@@ -2013,11 +2013,12 @@ return {action: 'delete', path: it.path};
 });
 if (res.failed && res.done) {
 mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items') +
-' \u2014 ' + res.failedCount + (res.failedCount === 1 ? ' item' : ' items') + ' failed', 3000, 'error');
+' \u2014 ' + res.failedCount + (res.failedCount === 1 ? ' item' : ' items') + ' failed' +
+(res.error ? ': ' + res.error : ''), 3000, 'error');
 } else if (res.done) {
 mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items'), 2500);
 } else if (res.failed) {
-mmShowToast('Delete failed \u2014 check the status message', 3000, 'error');
+mmShowToast('Delete failed \u2014 ' + (res.error || 'check the status message'), 3000, 'error');
 }
 exitFsSelect();
 })();
@@ -2448,7 +2449,12 @@ showConfirm('Delete ' + (it.kind === 'dir' ? 'folder' : 'file') + '?',
 function () {
 runFsActions('Deleting', 'deleted', [it], function (x) {
 return {action: 'delete', path: x.path};
-}).then(loadFs);
+}).then(function (res) {
+if (res && res.error) {
+mmShowToast('Delete failed \u2014 ' + res.error, 3000, 'error');
+}
+loadFs();
+});
 });
 } else if (op === 'rename') {
 showInput('Rename', it.name, 'New name for \"' + it.name + '\"', 'Rename',
@@ -2689,17 +2695,18 @@ return new Promise(function (resolve) { setTimeout(resolve, ms); });
 async function runFsActions(title, verbDone, items, makeParams) {
 if (fsTaskBusy) {
 mmShowToast('Another operation is already running', 2500, 'error');
-return {done: 0, cancelled: false, failed: true, failedCount: 0};
+return {done: 0, cancelled: false, failed: true, failedCount: 0, error: ''};
 }
 fsTaskBusy = true;
 fsTaskCancelFlag = false;
 const total = items.length;
 const t0 = Date.now();
-const out = {done: 0, cancelled: false, failed: false, failedCount: 0};
+const out = {done: 0, cancelled: false, failed: false, failedCount: 0, error: ''};
 showFsTask(title);
 let done = 0;
 let failedCount = 0;
 let leftCount = 0;
+let firstError = '';
 for (const it of items) {
 if (fsTaskCancelFlag) break;
 const label = it.name || it.path || '';
@@ -2711,23 +2718,26 @@ if (r && r.sourceLeft) leftCount++;
 done++;
 } catch (e) {
 failedCount++;
+if (!firstError) firstError = (e && e.message) ? String(e.message) : String(e);
 }
 updateFsTask((done + failedCount) + ' of ' + total, total > 1 ? ((done + failedCount) / total) * 100 : 15);
 }
 out.done = done;
 out.failedCount = failedCount;
 out.failed = failedCount > 0;
+out.error = firstError;
 out.cancelled = (done + failedCount) < total;
 const doneLabel = out.done + (out.done === 1 ? ' item ' + verbDone : ' items ' + verbDone);
 const failedNote = failedCount
 ? ' \u2014 ' + failedCount + (failedCount === 1 ? ' item' : ' items') + ' failed'
 : '';
+const errorNote = firstError ? ' \u2014 ' + firstError : '';
 const leftNote = leftCount
 ? ' \u2014 ' + leftCount + (leftCount === 1 ? ' original' : ' originals') + ' could not be removed'
 : '';
 fsTaskCancelBtn.disabled = true;
 if (out.failed) {
-updateFsTask('Failed \u2014 ' + (out.done ? doneLabel : 'nothing ' + verbDone) + failedNote + leftNote, (out.done || failedCount) ? 100 : 4);
+updateFsTask('Failed \u2014 ' + (out.done ? doneLabel : 'nothing ' + verbDone) + failedNote + leftNote + errorNote, (out.done || failedCount) ? 100 : 4);
 } else if (out.cancelled) {
 updateFsTask('Stopped \u2014 ' + doneLabel + leftNote, total > 1 ? (out.done / total) * 100 : 100);
 } else {

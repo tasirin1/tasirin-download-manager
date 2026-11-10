@@ -4651,13 +4651,15 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
         // Jumlah gagal dari penghitung per item runFsActions
         // (issue #1501): dulu total - done, yang menghitung item
         // yang tak pernah dicoba (loop berhenti di galat pertama)
-        // sebagai gagal.
+        // sebagai gagal. Alasan server pertama ikut ditampilkan
+        // (issue #1516) agar pengguna tahu sebabnya.
         mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items') +
-          ' \u2014 ' + res.failedCount + (res.failedCount === 1 ? ' item' : ' items') + ' failed', 3000, 'error');
+          ' \u2014 ' + res.failedCount + (res.failedCount === 1 ? ' item' : ' items') + ' failed' +
+          (res.error ? ': ' + res.error : ''), 3000, 'error');
       } else if (res.done) {
         mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items'), 2500);
       } else if (res.failed) {
-        mmShowToast('Delete failed \u2014 check the status message', 3000, 'error');
+        mmShowToast('Delete failed \u2014 ' + (res.error || 'check the status message'), 3000, 'error');
       }
       exitFsSelect();
     })();
@@ -5178,7 +5180,16 @@ async function doFsOp(it, op) {
       function () {
         runFsActions('Deleting', 'deleted', [it], function (x) {
           return {action: 'delete', path: x.path};
-        }).then(loadFs);
+        }).then(function (res) {
+          // Alasan kegagalan ditampilkan (issue #1516): jalur tunggal
+          // ini dulu menelan hasil sepenuhnya (.then(loadFs)) sehingga
+          // hapus yang gagal tak menyisakan pesan apa pun selain
+          // kedipan fsMsg per item dari postFsAction.
+          if (res && res.error) {
+            mmShowToast('Delete failed \u2014 ' + res.error, 3000, 'error');
+          }
+          loadFs();
+        });
       });
   } else if (op === 'rename') {
     showInput('Rename', it.name, 'New name for \"' + it.name + '\"', 'Rename',
@@ -5465,24 +5476,34 @@ function delayMs(ms) {
 }
 
 // Jalankan sederet fs_action berurutan. Return {done, cancelled,
-// failed, failedCount}: done = jumlah item sukses, failedCount =
+// failed, failedCount, error}: done = jumlah item sukses, failedCount =
 // jumlah item yang DICOBA dan gagal, cancelled = dihentikan user
-// sebelum semua item diproses, failed = failedCount > 0.
+// sebelum semua item diproses, failed = failedCount > 0, error =
+// pesan galat server PERTAMA di batch (issue #1516; '' bila tak ada)
+// agar pemanggil bisa menampilkan alasannya, bukan hanya hitungan.
 // verbDone = kata kerja lampau untuk pesan akhir (mis. "moved"/"deleted").
 async function runFsActions(title, verbDone, items, makeParams) {
   if (fsTaskBusy) {
     mmShowToast('Another operation is already running', 2500, 'error');
-    return {done: 0, cancelled: false, failed: true, failedCount: 0};
+    return {done: 0, cancelled: false, failed: true, failedCount: 0, error: ''};
   }
   fsTaskBusy = true;
   fsTaskCancelFlag = false;
   const total = items.length;
   const t0 = Date.now();
-  const out = {done: 0, cancelled: false, failed: false, failedCount: 0};
+  const out = {done: 0, cancelled: false, failed: false, failedCount: 0, error: ''};
   showFsTask(title);
   let done = 0;
   let failedCount = 0;
   let leftCount = 0;
+  // Pesan galat pertama batch (issue #1516): teks alasan dari server
+  // (postFsAction melempar Error(data.error)) dulu tertangkap catch
+  // ini lalu terbuang — hasil akhir hanya membawa hitungan, sehingga
+  // pengguna tak pernah tahu KENAPA item gagal. Kini ditampung,
+  // disertakan di baris status akhir dan di hasil (out.error) untuk
+  // toast pemanggil. Semua permukaan ini dirender lewat textContent,
+  // jadi teks server aman ditampilkan apa adanya.
+  let firstError = '';
   // Galat dikumpulkan PER ITEM (issue #1501): dulu lemparan pertama
   // postFsAction lolos ke catch luar dan menghentikan seluruh loop —
   // item sesudahnya tak pernah dicoba, tetapi toast batch-delete
@@ -5500,23 +5521,26 @@ async function runFsActions(title, verbDone, items, makeParams) {
       done++;
     } catch (e) {
       failedCount++;
+      if (!firstError) firstError = (e && e.message) ? String(e.message) : String(e);
     }
     updateFsTask((done + failedCount) + ' of ' + total, total > 1 ? ((done + failedCount) / total) * 100 : 15);
   }
   out.done = done;
   out.failedCount = failedCount;
   out.failed = failedCount > 0;
+  out.error = firstError;
   out.cancelled = (done + failedCount) < total;
   const doneLabel = out.done + (out.done === 1 ? ' item ' + verbDone : ' items ' + verbDone);
   const failedNote = failedCount
     ? ' \u2014 ' + failedCount + (failedCount === 1 ? ' item' : ' items') + ' failed'
     : '';
+  const errorNote = firstError ? ' \u2014 ' + firstError : '';
   const leftNote = leftCount
     ? ' \u2014 ' + leftCount + (leftCount === 1 ? ' original' : ' originals') + ' could not be removed'
     : '';
   fsTaskCancelBtn.disabled = true;
   if (out.failed) {
-    updateFsTask('Failed \u2014 ' + (out.done ? doneLabel : 'nothing ' + verbDone) + failedNote + leftNote, (out.done || failedCount) ? 100 : 4);
+    updateFsTask('Failed \u2014 ' + (out.done ? doneLabel : 'nothing ' + verbDone) + failedNote + leftNote + errorNote, (out.done || failedCount) ? 100 : 4);
   } else if (out.cancelled) {
     updateFsTask('Stopped \u2014 ' + doneLabel + leftNote, total > 1 ? (out.done / total) * 100 : 100);
   } else {
