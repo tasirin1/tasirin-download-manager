@@ -18,6 +18,8 @@
     <color name="gallery_ext_text">#5F6B7A</color>
     <color name="gallery_overlay">#9910182A</color>
     <color name="chip_pressed_blue">#331565C0</color>
+    <!-- Sorotan hasil pencarian layar Log (pasangan teks text_primary). -->
+    <color name="log_highlight_bg">#FFE082</color>
     <!-- Kontainer tonal modern (gaya M3): tombol sekunder, kartu ringkasan. -->
     <color name="primary_container">#D8E7FC</color>
     <color name="primary_container_pressed">#C2D9F8</color>

@@ -293,11 +293,11 @@ class LogActivity : AppCompatActivity() {
                 // berkontras +/-1,2:1 sehingga hasil pencarian justru
                 // tenggelam.
                 sb.setSpan(
-                    BackgroundColorSpan(0xFFFFE082.toInt()),
+                    BackgroundColorSpan(0xFFFFE082.toInt()), // kuning sorotan palet tema terang (token log_highlight_bg)
                     idx, idx + q.length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 sb.setSpan(
-                    ForegroundColorSpan(0xFF212121.toInt()),
+                    ForegroundColorSpan(0xFF1B1F27.toInt()), // text_primary palet tema terang (issue #712), bukan hex liar #212121
                     idx, idx + q.length, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 from = idx + q.length
