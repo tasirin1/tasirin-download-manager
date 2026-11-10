@@ -2719,7 +2719,20 @@ class DownloadEngine(appContext: Context) {
         }
         val freshHeaders = probeHeaders
         if (freshHeaders != null) {
-            invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, freshHeaders.etag)
+            // Invalidasi ditelan bila melempar (issue #1424, memulihkan
+            // perilaku pra-#1373): #1373 memindahkan pemanggilan ini ke
+            // luar try probe agar hasil probe bisa dipakai ulang, tetapi
+            // pengecualian non-pembatalan dari badan invalidasi kini
+            // menggagalkan attempt dan masuk retry, padahal dulu
+            // tertelan dan unduhan segar berlanjut. CancellationException
+            // tetap dilempar (pola #1132).
+            try {
+                invalidateChangedResume(_items.value.find { it.id == item.id } ?: item, freshHeaders.etag)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) { // audit-ignore: file_scoped_catch_all, kotlin_empty_catch (invalidasi gagal tak boleh menggagalkan attempt)
+                // Lanjut dengan jalur segar di bawah, seperti pra-#1373.
+            }
             // Rekam ETag probe ke item SEKARANG (issue #543):
             // dulu etag hanya ditulis saat COMPLETED, jadi selama
             // unduhan pertama berjalan penjaga invalidateChangedResume
