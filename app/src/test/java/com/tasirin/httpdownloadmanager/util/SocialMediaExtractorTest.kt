@@ -277,6 +277,18 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `parseHentaiHavenPage - judul seri berpemisah tidak terpotong di tengah`() {
+        // Issue #1493: judul cadangan (tag <title> tanpa og:title)
+        // dulu dipotong di " - " pertama sehingga penanda episode
+        // hilang. Ekspektasi dibuktikan port_1493.py.
+        val html = "<html><head><title>Kanojo - Kanojo Episode 2 - Hentai Haven</title></head><body>" +
+            "<video src=\"https://cdn.example.com/vid9.mp4\"></video></body></html>"
+        val opts = SocialMediaExtractor.parseHentaiHavenPage(html)
+        assertEquals(1, opts.size)
+        assertEquals("Kanojo - Kanojo Episode 2", opts[0].title)
+    }
+
+    @Test
     fun `parseHentaiHavenPage - banyak kandidat diberi pembeda rendisi`() {
         val html = "<html><head><title>Multi - Hentai Haven</title></head><body>" +
             "<video src=\"https://cdn1.example.com/v/720p/a.mp4\"></video>" +

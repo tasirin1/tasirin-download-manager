@@ -1894,7 +1894,13 @@ object SocialMediaExtractor {
     /** Parser murni halaman watch HentaiHaven (tanpa I/O) agar bisa di-unit-test. */
     internal fun parseHentaiHavenPage(html: String): List<Result> {
         var title = HP_OG_TITLE_RE.find(html)?.groupValues?.get(1)
-            ?: HP_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(" - ")
+            // Potong pada akhiran situs spesifik (issue #1493), bukan
+            // " - " generik kemunculan pertama: judul seri yang sendiri
+            // memuat " - " (pemisah judul-episode) terpotong di tengah
+            // dan penanda episodenya hilang — nama berkas antar-episode
+            // satu seri bisa bertabrakan. Parser saudara (Pornhub,
+            // XVideos, XNXX) semuanya memakai akhiran situs spesifik.
+            ?: HP_TITLE_TAG_RE.find(html)?.groupValues?.get(1)?.substringBefore(" - Hentai Haven")
             ?: "HentaiHaven_video"
         title = FileNames.take(unescapePlayer(title.trim()), 120)
         if (title.isBlank()) title = "HentaiHaven_video"
