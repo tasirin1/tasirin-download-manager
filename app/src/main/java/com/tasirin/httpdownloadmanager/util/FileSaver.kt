@@ -514,11 +514,31 @@ class FileSaver(context: Context) {
         var unique = ""
         val stagingDoc = synchronized(mergeLockFor(FileNames.safe(fileName))) {
             unique = uniqueDocumentName(tree, fileName, avoidStaging = true)
-            tree.createFile(MimeTypes.forFile(unique), "$unique.part")
+            // Provider SAF tertentu MELEMPAR dari createFile alih-alih
+            // mengembalikan null (issue #1462): samakan dengan jalur
+            // null (Unavailable) dan sapu dokumen yang mungkin sempat
+            // tercipta sebelum lemparan — masih di dalam kunci nama,
+            // jadi nama unik ini belum bisa diklaim ulang pemanggil lain.
+            try {
+                tree.createFile(MimeTypes.forFile(unique), "$unique.part")
+            } catch (e: Exception) {
+                runCatching { tree.findFile("$unique.part")?.delete() }
+                null
+            }
         } ?: return StageResult.Unavailable
         inFlightStagingNames.add(tree.uri.toString() + "|" + "$unique.part")
         try {
-            val output = appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
+            // openOutputStream juga bisa melempar pada provider yang
+            // sama (issue #1462): jalur null di bawah sudah menghapus
+            // staging, jalur lemparan wajib melakukan hal yang sama —
+            // tanpa ini dokumen .part yatim tertinggal permanen di
+            // folder kustom pengguna, di luar jangkauan sapuan aplikasi.
+            val output = try {
+                appContext.contentResolver.openOutputStream(stagingDoc.uri, "wt")
+            } catch (e: Exception) {
+                runCatching { stagingDoc.delete() }
+                return StageResult.OpenFailed
+            }
             if (output == null) {
                 runCatching { stagingDoc.delete() }
                 return StageResult.OpenFailed
