@@ -38,6 +38,70 @@ object NotificationHelper {
     const val ACTION_PAUSE_ALL = "com.tasirin.httpdownloadmanager.PAUSE_ALL"
     const val ACTION_RESUME_ALL = "com.tasirin.httpdownloadmanager.RESUME_ALL"
 
+    // PendingIntent untuk intent yang konstan seumur proses (issue
+    // #1453): sebelumnya buildNotification meminta ulang hingga tiga
+    // PendingIntent ke sistem pada tiap refresh (hingga 1x/detik).
+    // Objeknya aman dipakai ulang lintas refresh karena target, aksi,
+    // requestCode, dan flag-nya tetap; yang berubah per refresh hanya
+    // Notification-nya. Dibuat malas + double-checked agar aman dari
+    // pemanggilan bersamaan, dan selalu dari applicationContext agar
+    // cache seumur proses tidak menahan Activity/Service pemanggil.
+    @Volatile
+    private var cachedContentPendingIntent: PendingIntent? = null
+
+    @Volatile
+    private var cachedPausePendingIntent: PendingIntent? = null
+
+    @Volatile
+    private var cachedResumePendingIntent: PendingIntent? = null
+
+    private fun contentPendingIntent(context: Context): PendingIntent {
+        cachedContentPendingIntent?.let { return it }
+        return synchronized(this) {
+            cachedContentPendingIntent ?: run {
+                val appContext = context.applicationContext
+                val intent = Intent(appContext, MainActivity::class.java)
+                    .setPackage(appContext.packageName)
+                PendingIntent.getActivity(
+                    appContext, 0, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                ).also { cachedContentPendingIntent = it }
+            }
+        }
+    }
+
+    private fun pausePendingIntent(context: Context): PendingIntent {
+        cachedPausePendingIntent?.let { return it }
+        return synchronized(this) {
+            cachedPausePendingIntent ?: run {
+                val appContext = context.applicationContext
+                val intent = Intent(appContext, DownloadService::class.java)
+                    .setAction(ACTION_PAUSE_ALL)
+                    .setPackage(appContext.packageName)
+                PendingIntent.getService(
+                    appContext, 1, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                ).also { cachedPausePendingIntent = it }
+            }
+        }
+    }
+
+    private fun resumePendingIntent(context: Context): PendingIntent {
+        cachedResumePendingIntent?.let { return it }
+        return synchronized(this) {
+            cachedResumePendingIntent ?: run {
+                val appContext = context.applicationContext
+                val intent = Intent(appContext, DownloadService::class.java)
+                    .setAction(ACTION_RESUME_ALL)
+                    .setPackage(appContext.packageName)
+                PendingIntent.getService(
+                    appContext, 2, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                ).also { cachedResumePendingIntent = it }
+            }
+        }
+    }
+
     fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= 26) {
             val channel = NotificationChannel(
@@ -91,46 +155,25 @@ object NotificationHelper {
                 else -> {}
             }
         }
-        val intent = Intent(context, MainActivity::class.java)
-            .setPackage(context.packageName)
-        val pending = PendingIntent.getActivity(
-            context, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notification_title))
             .setOngoing(active.isNotEmpty() || serverActive)
             .setOnlyAlertOnce(true)
-            .setContentIntent(pending)
+            .setContentIntent(contentPendingIntent(context))
 
         if (active.isNotEmpty()) {
-            val pauseIntent = Intent(context, DownloadService::class.java)
-                .setAction(ACTION_PAUSE_ALL)
-                .setPackage(context.packageName)
-            val pausePending = PendingIntent.getService(
-                context, 1, pauseIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
             builder.addAction(
                 R.drawable.ic_pause,
                 context.getString(R.string.pause_all),
-                pausePending
+                pausePendingIntent(context)
             )
         }
         if (hasResumable) {
-            val resumeIntent = Intent(context, DownloadService::class.java)
-                .setAction(ACTION_RESUME_ALL)
-                .setPackage(context.packageName)
-            val resumePending = PendingIntent.getService(
-                context, 2, resumeIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
             builder.addAction(
                 R.drawable.ic_play,
                 context.getString(R.string.resume_all),
-                resumePending
+                resumePendingIntent(context)
             )
         }
 
@@ -187,21 +230,17 @@ object NotificationHelper {
         } else {
             item.error ?: context.getString(R.string.notification_unknown_error)
         }
-        val intent = Intent(context, MainActivity::class.java).setPackage(context.packageName)
         // requestCode stabil (bukan id unik): intent selalu sama (buka MainActivity
-        // tanpa extra) sehingga satu PendingIntent dipakai ulang; requestCode unik
-        // per unduhan selesai justru menumpuk objek PendingIntent di sistem
-        // seumur proses. Id unik hanya untuk baris notifikasi di bawah.
-        val pending = PendingIntent.getActivity(
-            context, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        // tanpa extra) sehingga PendingIntent bersama di atas dipakai ulang;
+        // requestCode unik per unduhan selesai justru menumpuk objek
+        // PendingIntent di sistem seumur proses. Id unik hanya untuk baris
+        // notifikasi di bawah.
         val notif = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setContentIntent(pending)
+            .setContentIntent(contentPendingIntent(context))
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .build()
