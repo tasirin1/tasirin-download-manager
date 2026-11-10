@@ -59,6 +59,22 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
 
+    // Ikon toggle ter-cache (issue #1395): renderToggle dipanggil untuk
+    // belasan tombol pada tiap renderChecks/onResume — getDrawable +
+    // mutate + setTint per tombol per render mubazir untuk dua ikon
+    // statis yang selalu sama. Dibuat malas sekali per activity, sudah
+    // di-mutate (lepas dari pool resource bersama) dan di-tint final.
+    private val toggleCheckIcon by lazy {
+        ContextCompat.getDrawable(this, R.drawable.ic_check)?.mutate()?.apply {
+            setTint(ContextCompat.getColor(this@SettingsActivity, R.color.white))
+        }
+    }
+    private val toggleCloseIcon by lazy {
+        ContextCompat.getDrawable(this, R.drawable.ic_close)?.mutate()?.apply {
+            setTint(ContextCompat.getColor(this@SettingsActivity, R.color.text_secondary))
+        }
+    }
+
     private var activeStorageInput: EditText? = null
     private var storagePathEdited = false
     private var updatingStorageInput = false
@@ -635,16 +651,14 @@ class SettingsActivity : AppCompatActivity() {
         if (on) {
             btn.setBackgroundResource(R.drawable.bg_btn_filled)
             btn.setTextColor(ContextCompat.getColor(this, R.color.white))
-            ContextCompat.getDrawable(this, R.drawable.ic_check)?.let { icon ->
-                icon.mutate().setTint(ContextCompat.getColor(this, R.color.white))
+            toggleCheckIcon?.let { icon ->
                 btn.setCompoundDrawablesRelative(null, null, icon, null)
                 btn.compoundDrawablePadding = 12
             }
         } else {
             btn.setBackgroundResource(R.drawable.bg_btn_tv)
             btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
-            ContextCompat.getDrawable(this, R.drawable.ic_close)?.let { icon ->
-                icon.mutate().setTint(ContextCompat.getColor(this, R.color.text_secondary))
+            toggleCloseIcon?.let { icon ->
                 btn.setCompoundDrawablesRelative(null, null, icon, null)
                 btn.compoundDrawablePadding = 12
             }
