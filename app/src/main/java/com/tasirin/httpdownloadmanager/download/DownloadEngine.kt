@@ -3057,11 +3057,17 @@ class DownloadEngine(appContext: Context) {
         // Resume 206: byte terunduh sudah di disk, jadi yang dibutuhkan hanya
         // sisanya (total penuh menolak resume besar yang sebenarnya muat).
         val needBytes = if (code == 206) (total - downloaded).coerceAtLeast(0) else total
-        if (needBytes > 0 && saver.destinationFreeBytes(item.folderPath) < needBytes) {
-            throw IOException(
-                "Not enough storage: need ${Formats.bytes(needBytes)}, " +
-                    "available ${Formats.bytes(saver.destinationFreeBytes(item.folderPath))}"
-            )
+        if (needBytes > 0) {
+            // Sekali baca untuk vonis + pesan (issue #1436): dua panggilan
+            // terpisah bisa berbeda nilai di antaranya sehingga pesan
+            // menyangkal vonisnya sendiri.
+            val destFree = saver.destinationFreeBytes(item.folderPath)
+            if (destFree < needBytes) {
+                throw IOException(
+                    "Not enough storage: need ${Formats.bytes(needBytes)}, " +
+                        "available ${Formats.bytes(destFree)}"
+                )
+            }
         }
 
         throttle.reset(downloaded)
@@ -3308,11 +3314,15 @@ class DownloadEngine(appContext: Context) {
             }
             fileName = resolvedName
             segments = createSegments(total)
-            if (total > 0 && saver.destinationFreeBytes(item.folderPath) < total) {
-                throw IOException(
-                    "Not enough storage: need ${Formats.bytes(total)}, " +
-                        "available ${Formats.bytes(saver.destinationFreeBytes(item.folderPath))}"
-                )
+            if (total > 0) {
+                // Sekali baca untuk vonis + pesan (issue #1436).
+                val destFree = saver.destinationFreeBytes(item.folderPath)
+                if (destFree < total) {
+                    throw IOException(
+                        "Not enough storage: need ${Formats.bytes(total)}, " +
+                            "available ${Formats.bytes(destFree)}"
+                    )
+                }
             }
             updateItem(item.id) {
                 it.copy(
