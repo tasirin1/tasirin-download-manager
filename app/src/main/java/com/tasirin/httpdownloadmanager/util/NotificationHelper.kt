@@ -50,7 +50,8 @@ object NotificationHelper {
         }
     }
 
-    fun foregroundNotification(context: Context): Notification = buildNotification(context, emptyList())
+    fun foregroundNotification(context: Context): Notification =
+        buildNotification(context, emptyList(), initial = true)
 
     fun updateNotification(
         context: Context,
@@ -70,7 +71,12 @@ object NotificationHelper {
     private fun buildNotification(
         context: Context,
         items: List<DownloadItem>,
-        serverActive: Boolean = false
+        serverActive: Boolean = false,
+        // Notifikasi awal startForeground (issue #1401): belum ada
+        // unduhan apa pun, jadi cabang "selesai" tak boleh menampilkan
+        // plurals done dengan angka 0 — teks netral dipakai. Jalur
+        // updateNotification tak meneruskan flag ini (perilaku lama).
+        initial: Boolean = false
     ): Notification {
         // Satu pass (bukan filter + any + count): tiap refresh notifikasi
         // saat download aktif memindai daftar 3x + 1 ArrayList buangan.
@@ -144,6 +150,9 @@ object NotificationHelper {
             }
         } else if (serverActive) {
             builder.setContentText(context.getString(R.string.notification_server_active))
+                .setProgress(0, 0, false)
+        } else if (initial) {
+            builder.setContentText(context.getString(R.string.notification_service_running))
                 .setProgress(0, 0, false)
         } else {
             builder.setContentText(
