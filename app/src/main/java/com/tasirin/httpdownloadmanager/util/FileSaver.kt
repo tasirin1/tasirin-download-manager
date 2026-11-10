@@ -1089,11 +1089,11 @@ class FileSaver(context: Context) {
         val adaptiveBase = buangSufiksEkstensi(item.fileName, ".mp4", ".webm").ifBlank { item.fileName }
         val extraNames = buildSet {
             addAll(protectedPartialNames(item))
-            for (base in setOf(adaptiveBase)) {
-                val tempBase = "~" + item.id.take(8) + base
-                for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
-                    add(FileNames.safe("$tempBase.$kind") + ".part")
-                }
+            // adaptiveBase dipakai langsung (issue #1438): himpunan satu
+            // elemen di sini adalah sisa masa dua basis (warisan + adaptif).
+            val tempBase = "~" + item.id.take(8) + adaptiveBase
+            for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
+                add(FileNames.safe("$tempBase.$kind") + ".part")
             }
         }
         extraNames.forEach { name -> runCatching { File(downloadDir, name).delete() } }
