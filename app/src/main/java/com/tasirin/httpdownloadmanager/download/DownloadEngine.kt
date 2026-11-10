@@ -2743,7 +2743,12 @@ class DownloadEngine(appContext: Context) {
                 AdaptiveResumeAction.RESTART -> {
                     // 416 atas temp yang tak cocok (resource berubah /
                     // temp basi): buang temp dan ulangi SEKALI dari nol
-                    // tanpa Range dalam panggilan yang sama.
+                    // tanpa Range dalam panggilan yang sama. Byte resume
+                    // sisi ini sudah terhitung di baseline throttle
+                    // gabungan (#1460): kurangi dari penghitung bersama
+                    // agar byte yang dibuang tidak ditagih dua kali
+                    // (pola penyesuaian segmen #1369).
+                    if (existing > 0) addThrottleTotal(item.id, -existing)
                     runCatching { conn.disconnect() }
                     target.delete()
                     return downloadAdaptiveFile(
@@ -2765,6 +2770,11 @@ class DownloadEngine(appContext: Context) {
                 // Range diabaikan server: restart dari nol eksplisit
                 // (pola runSingle) — FileOutputStream tanpa append di
                 // bawah memotong berkas, progres lama dicatat dibuang.
+                // Kurangi byte terbuang ini dari penghitung throttle
+                // bersama (issue #1460): baseline gabungan di
+                // downloadAdaptiveMuxed sudah menghitungnya sebagai
+                // byte di disk, tanpa penyesuaian ia ditagih dua kali.
+                addThrottleTotal(item.id, -existing)
                 App.logEvent(
                     "DOWNLOAD ${item.fileName}: server does not support adaptive resume " +
                         "(HTTP $code, ignoring Range) — restarting from zero, " +
@@ -2864,8 +2874,14 @@ class DownloadEngine(appContext: Context) {
                             throw IOException("adaptive file exceeds available storage")
                         }
                         out.write(buffer, 0, toWrite)
+                        // Penagihan throttle lewat penghitung bersama
+                        // per item (issue #1460, pola segmen): kedua
+                        // sisi adaptif berbagi SATU anggaran kecepatan —
+                        // pemasok per-aliran lama membuat tiap sisi
+                        // menagih anggaran penuhnya sendiri.
+                        val sharedTotal = addThrottleTotal(item.id, toWrite.toLong())
                         if (toWrite < read) break
-                        throttle.sleepIfNeeded { progress.downloaded.get() + bytes }
+                        throttle.sleepIfNeeded { sharedTotal }
                         reportMuxProgress(item, progress, bytes, total)
                         if ((adaptiveIters++ and 7) == 0) {
                             // Pembatalan (jeda / sisi pasangan gagal,
@@ -2944,6 +2960,19 @@ class DownloadEngine(appContext: Context) {
         // berpasangan-nilai saat job attempt ini selesai.
         activeThrottles[item.id] = throttle
         coroutineContext[Job]?.invokeOnCompletion { activeThrottles.remove(item.id, throttle) }
+        // Baseline throttle attempt adaptif (issue #1460): samakan
+        // dengan awal attempt segmen — penghitung bersama per item dan
+        // baseline SpeedThrottle sama-sama di-reset ke byte resume
+        // GABUNGAN kedua temp. Tanpa ini throttle tak pernah di-reset di
+        // jalur adaptif: byte resume dinilai terkirim seketika pada
+        // detik pertama attempt (resume merangkak jauh di bawah batas),
+        // dan loop tulis menagih total per-aliran sehingga dua sisi
+        // konkuren bisa menembus batas hingga ±2x.
+        val adaptiveResumeBytes =
+            (if (videoMp4.isFile) videoMp4.length() else 0L) +
+                (if (audioM4a.isFile) audioM4a.length() else 0L)
+        resetThrottleTotal(item.id, adaptiveResumeBytes)
+        throttle.reset(adaptiveResumeBytes)
         // Satu sisi adaptif (issue #1435): buffer per-sisi (buffer bersama
         // akan saling menimpa antar-coroutine); kegagalan sisi ini memutus
         // koneksi item agar sisi lain berhenti segera — bukan menunggu
