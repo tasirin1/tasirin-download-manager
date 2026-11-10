@@ -58,3 +58,4 @@ HlsMp4Muxer
 HlsProgress
 reportHlsProgress
 finishHls
+extractNonHlsYouTube

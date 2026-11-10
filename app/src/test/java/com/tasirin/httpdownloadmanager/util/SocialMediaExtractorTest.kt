@@ -140,19 +140,17 @@ class SocialMediaExtractorTest {
     }
 
     @Test
-    fun `parseXVideosPage - high low hls`() {
+    fun `parseXVideosPage - high low, setVideoHLS diabaikan`() {
         val html = "<html><head><title>Cool video - XVIDEOS.COM</title></head><body>" +
             "<script>html5player.setVideoTitle('Cool video');" +
             "html5player.setVideoUrlHigh('https://cdn77-vid.xvideos-cdn.com/abc-high.mp4');" +
             "html5player.setVideoUrlLow('https://cdn77-vid.xvideos-cdn.com/abc-low.mp4');" +
             "html5player.setVideoHLS('https://cdn77-vid.xvideos-cdn.com/hls/abc.m3u8');</script></body></html>"
         val opts = SocialMediaExtractor.parseXVideosPage(html)
-        assertEquals(3, opts.size)
+        assertEquals(2, opts.size)
         assertEquals("HD", opts[0].quality)
         assertTrue(opts[0].directUrl.endsWith("-high.mp4"))
         assertEquals("SD", opts[1].quality)
-        assertTrue(opts[2].isHls)
-        assertTrue(opts[2].directUrl.endsWith(".m3u8"))
     }
 
     @Test
@@ -212,25 +210,23 @@ class SocialMediaExtractorTest {
     }
 
     @Test
-    fun `parseHentaiHavenPage - mp4 diutamakan dari m3u8`() {
+    fun `parseHentaiHavenPage - kandidat m3u8 dibuang, mp4 dipertahankan`() {
         val html = "<html><head><title>Both - Hentai Haven</title></head><body>" +
             "<script>var p={file:'https://cdn.example.com/a.m3u8'};</script>" +
             "<video src=\"https://cdn.example.com/b.mp4\"></video></body></html>"
         val opts = SocialMediaExtractor.parseHentaiHavenPage(html)
-        assertTrue(opts.size >= 2)
+        assertEquals(1, opts.size)
         assertTrue(opts[0].directUrl.endsWith(".mp4"))
     }
 
     @Test
-    fun `parseHentaiHavenPage - hls dan og fallback`() {
+    fun `parseHentaiHavenPage - og m3u8 dibuang`() {
         val html = "<html><head>" +
             "<meta property=\"og:title\" content=\"OG Title\"/>" +
             "<meta property=\"og:video\" content=\"https://cdn.example.com/og.m3u8\"/>" +
             "</head><body>watch</body></html>"
         val opts = SocialMediaExtractor.parseHentaiHavenPage(html)
-        assertEquals(1, opts.size)
-        assertTrue(opts[0].isHls)
-        assertTrue(opts[0].directUrl.endsWith(".m3u8"))
+        assertTrue(opts.isEmpty())
         assertTrue(SocialMediaExtractor.parseHentaiHavenPage("<html><body>hello</body></html>").isEmpty())
     }
 
@@ -376,17 +372,16 @@ class SocialMediaExtractorTest {
     }
 
     @Test
-    fun `preferProgressiveMp4 - MP4 terbaik dipilih walau HLS lebih tinggi`() {
+    fun `preferProgressiveMp4 - kandidat m3u8 dibuang parser, MP4 dipilih`() {
         val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
             "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":\"480\"}," +
             "{\"videoUrl\":\"https://cdn.ph.com/master.m3u8\",\"quality\":\"1080\"}]}" +
             "</script></body></html>"
         val opts = SocialMediaExtractor.parsePornhubPage(html)
-        assertEquals(2, opts.size)
+        assertEquals(1, opts.size)
+        assertTrue(opts.none { it.directUrl.contains(".m3u8") })
         val best = SocialMediaExtractor.preferProgressiveMp4(opts)
         assertTrue(best!!.directUrl.endsWith("a.mp4"))
-        val hlsOnly = SocialMediaExtractor.preferProgressiveMp4(opts.filter { it.isHls })
-        assertTrue(hlsOnly!!.isHls)
         assertEquals(null, SocialMediaExtractor.preferProgressiveMp4(emptyList()))
     }
 

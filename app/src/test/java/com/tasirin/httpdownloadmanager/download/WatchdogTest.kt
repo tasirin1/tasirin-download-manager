@@ -94,7 +94,7 @@ class WatchdogTest {
 
 
     @Test fun totalNolBergerak_tidakDivonisLambat() {
-        // HLS/unknown-length bersifat burst: byte bergerak tak boleh kena
+        // Unknown-length bersifat burst: byte bergerak tak boleh kena
         // vonis lambat 20 detik seperti total diketahui.
         val w = DownloadHealthWatchdog(0)
         var downloaded = 0L

@@ -172,7 +172,6 @@ object SocialMediaExtractor {
     private val YT_ID_YOUTU_RE = Regex("youtu\\.be/([A-Za-z0-9_-]{11})")
     private val HP_URL_HIGH_RE = Regex("""setVideoUrlHigh\s*\(\s*['"](https?://[^'"]+)['"]""")
     private val HP_URL_LOW_RE = Regex("""setVideoUrlLow\s*\(\s*['"](https?://[^'"]+)['"]""")
-    private val HP_HLS_RE = Regex("""setVideoHLS\s*\(\s*['"](https?://[^'"]+?\.m3u8[^'"]*)['"]""")
     private val HP_TITLE_RE = Regex("""setVideoTitle\s*\(\s*['"](.+?)['"]\s*\)""")
     private val HP_OG_VIDEO_RE = Regex("""<meta[^>]+property\s*=\s*["']og:video["'][^>]+content\s*=\s*["'](https?://[^"']+)["']""")
     private val HP_OG_TITLE_RE = Regex("""<meta[^>]+property\s*=\s*["']og:title["'][^>]+content\s*=\s*["'](.+?)["']""")
@@ -198,7 +197,6 @@ object SocialMediaExtractor {
         val quality: String = "",
         val mimeType: String = "",
         val cookies: String = "",
-        val isHls: Boolean = false,
         val audioUrl: String = "",
         val videoUrl: String = ""
     )
@@ -741,7 +739,7 @@ object SocialMediaExtractor {
         val videoId = extractYouTubeId(url) ?: return emptyList()
 
         // Strategi 1: VISIONOS player API — URL stream tanpa n-signature.
-        // URL adaptif/HLS dari client ini bisa langsung di-download (tidak 403).
+        // URL adaptif dari client ini bisa langsung di-download (tidak 403).
         // Kedua strategi dibungkus cap tahap (#266): fetch pemblokir tidak
         // patuh withTimeoutOrNull, jadi tanpa cap satu strategi bisa
         // menduduki thread IO jauh melewati batas total 60 detik.
@@ -753,31 +751,6 @@ object SocialMediaExtractor {
         // Strategi 2: halaman WEB (ytInitialPlayerResponse) + fallback Piped/Invidious.
         return runStageCapped(30_000L) { extractYouTubeFromPage(url, videoId, user) }
             ?: emptyList()
-    }
-
-    /** Ekstrak URL non-HLS dari YouTube: halaman WEB langsung + fallback Piped/Invidious.
-     *  Dipanggil bila VISIONOS HLS gagal (media playlist butuh pot token). */
-    suspend fun extractNonHlsYouTube(url: String, headers: String = ""): Result? = withContext(Dispatchers.IO) {
-        try {
-            val videoId = extractYouTubeId(url) ?: return@withContext null
-            val user = parseUserHeaders(headers)
-            // Strategi 0: coba adaptiveFormats dari VISIONOS (URL langsung tanpa HLS)
-            // Cap tahap juga di sini (#266): jalur ini tidak punya
-            // withTimeoutOrNull sama sekali, jadi dulu benar-benar tak berbatas.
-            // Halaman watch diunduh SEKALI untuk seluruh rantai (issue
-            // #1413): strategi VISIONOS adaptive melaporkannya lewat
-            // callback, strategi halaman memakainya ulang.
-            var watchPage: HttpResult? = null
-            val visionAdaptive = runStageCapped(24_000L) {
-                extractYouTubeViaVisionosAdaptive(videoId, user) { watchPage = it }
-            }
-            if (visionAdaptive != null) return@withContext visionAdaptive
-            // Strategi 1: halaman WEB + Piped/Invidious/Cobalt
-            val results = runStageCapped(30_000L) {
-                extractYouTubeFromPage(url, videoId, user, watchPage)
-            } ?: emptyList()
-            results.firstOrNull { it.directUrl.startsWith("http") }
-        } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
     }
 
     private fun extractYouTubeFromPage(
@@ -925,14 +898,11 @@ object SocialMediaExtractor {
     )
 
     /** Ambil visitorData dari [pageUrl] lalu POST ke player API
-     *  VISIONOS. Dipakai bersama kedua strategi Visionos (#281): blok
-     *  ini dulu tersalin dua kali dan sudah berbeda — versi adaptive
-     *  tidak meneruskan header user ke pengambilan halaman. */
+     *  VISIONOS (#281). */
     private fun fetchVisionosPlayer(
         pageUrl: String,
         videoId: String,
-        user: Map<String, String>,
-        onPageFetched: ((HttpResult) -> Unit)? = null
+        user: Map<String, String>
     ): VisionosPlayer? {
         // Butuh visitorData + cookies dari halaman agar API tidak LOGIN_REQUIRED.
         val page = httpGetWithCookies(
@@ -943,10 +913,6 @@ object SocialMediaExtractor {
             ) + user,
             timeoutMs = PAGE_TIMEOUT_MS
         ) ?: return null
-        // Halaman yang baru diunduh ditawarkan ke pemanggil (issue
-        // #1413): rantai non-HLS meneruskannya ke strategi halaman agar
-        // halaman watch yang sama tidak diunduh dua kali.
-        onPageFetched?.invoke(page)
         val visitor = YT_VISITOR_DATA_RE.find(page.body)?.groupValues?.get(1)
             ?: YT_VISITOR_DATA_LOW_RE.find(page.body)?.groupValues?.get(1)
             ?: return null
@@ -986,7 +952,7 @@ object SocialMediaExtractor {
         }.getOrNull()
     }
 
-    /** Strategi VISIONOS: player API mengembalikan URL HLS/adaptif tanpa
+    /** Strategi VISIONOS: player API mengembalikan URL adaptif tanpa
      *  n-signature, sehingga bisa langsung di-download (tidak HTTP 403). */
     private fun extractYouTubeViaVisionos(
         videoId: String,
@@ -999,19 +965,7 @@ object SocialMediaExtractor {
             val title = player.title
             val streamingData = player.streamingData
             val safeName = sanitizeFileName(title)
-            // Strategi 1: HLS manifest — cobalah dulu untuk kualitas terbaik.
-            val hls = streamingData?.optString("hlsManifestUrl")
-            if (!hls.isNullOrEmpty()) {
-                // Audio CDN HLS sering di-404 YouTube; siapkan url audio/video dari
-                // adaptiveFormats sebagai cadangan agar hasil akhir tetap bersuara.
-                val (videoAd, audioAd) = bestAdaptivePair(streamingData)
-                return@runCatching Result(
-                    hls, "YouTube_$safeName.ts", title, "HLS", "application/x-mpegURL",
-                    cookies = player.cookies, isHls = true,
-                    videoUrl = videoAd, audioUrl = audioAd
-                )
-            }
-            // Strategi 2: adaptiveFormats langsung (tanpa HLS) — TV client
+            // adaptiveFormats langsung — TV client
             // biasanya mengembalikan URL langsung tanpa n-signature.
             val adaptive = streamingData?.optJSONArray("adaptiveFormats")
             if (adaptive != null && adaptive.length() > 0) {
@@ -1019,7 +973,7 @@ object SocialMediaExtractor {
                 val best = adaptiveFormatByUrl(adaptive, videoAd)
                 if (best != null) {
                     // optString: kunci url kadang absen di respons TV client;
-                    // jangan lempar agar fallback HLS/adaptif lain tetap jalan.
+                    // jangan lempar agar fallback adaptif lain tetap jalan.
                     val url = best.optString("url", "")
                     if (url.isEmpty()) return@runCatching null
                     // Pasangan audio WAJIB ada (issue #1412, rasional
@@ -1039,40 +993,6 @@ object SocialMediaExtractor {
                 }
             }
             null
-        }.getOrNull()
-    }
-
-    /** Strategi VISIONOS adaptive: ambil URL langsung dari adaptiveFormats
-     *  tanpa lewat HLS (menghindari media playlist 404). */
-    private fun extractYouTubeViaVisionosAdaptive(
-        videoId: String,
-        user: Map<String, String> = emptyMap(),
-        onPageFetched: ((HttpResult) -> Unit)? = null
-    ): Result? {
-        val player = fetchVisionosPlayer(
-            "https://www.youtube.com/watch?v=$videoId", videoId, user, onPageFetched
-        ) ?: return null
-        return runCatching {
-            val title = player.title
-            val streamingData = player.streamingData
-            val adaptive = streamingData?.optJSONArray("adaptiveFormats") ?: return null
-            val safeName = sanitizeFileName(title)
-            // Pilih video AVC MP4 bila ada (remux MP4 mulus); WebM hanya
-            // cadangan terakhir karena muxer MP4 tidak menerima VP9/opus.
-            val (videoAd, audioAd) = bestAdaptivePair(streamingData)
-            val best = adaptiveFormatByUrl(adaptive, videoAd) ?: return null
-            // Pasangan audio WAJIB ada (issue #1412, rasional #537):
-            // audioAd kosong berarti unduhan video-only bisu — gagalkan
-            // strategi ini agar rantai fallback yang menilai.
-            if (audioAd.isEmpty()) return null
-            val url = best.getString("url")
-            val mime = best.optString("mimeType", MIME_MP4)
-            val quality = best.optString("qualityLabel", "Unknown")
-            val ext = if (mime.contains("webm")) "webm" else "mp4"
-            Result(
-                url, "YouTube_$safeName.$ext", title, quality, mime,
-                cookies = player.cookies, videoUrl = url, audioUrl = audioAd
-            )
         }.getOrNull()
     }
 
@@ -1468,7 +1388,6 @@ object SocialMediaExtractor {
 
     private fun extractBestPlayerOption(options: List<Result>): Result? {
         return options.firstOrNull { it.quality == "HD" }
-            ?: options.firstOrNull { !it.isHls }
             ?: options.firstOrNull()
     }
 
@@ -1520,16 +1439,10 @@ object SocialMediaExtractor {
         if (!low.isNullOrEmpty() && low.startsWith("http") && low != high) {
             options.add(Result(low, "${namePrefix}_${safeName}_SD.mp4", title, "SD", MIME_MP4))
         }
-        val hls = HP_HLS_RE.find(html)?.groupValues?.get(1)?.let(::unescapePlayer)
-        if (!hls.isNullOrEmpty() && hls.startsWith("http")) {
-            options.add(Result(hls, "${namePrefix}_${safeName}.ts", title, "HLS", "application/x-mpegURL", isHls = true))
-        }
         if (options.isEmpty()) {
             val ogVideo = HP_OG_VIDEO_RE.find(html)?.groupValues?.get(1)?.let(::unescapePlayer)
             if (!ogVideo.isNullOrEmpty() && ogVideo.startsWith("http")) {
-                if (ogVideo.contains(".m3u8")) {
-                    options.add(Result(ogVideo, "${namePrefix}_${safeName}.ts", title, "HLS", "application/x-mpegURL", isHls = true))
-                } else {
+                if (!ogVideo.contains(".m3u8")) {
                     options.add(Result(ogVideo, "${namePrefix}_${safeName}.mp4", title, "Video", MIME_MP4))
                 }
             }
@@ -1570,7 +1483,7 @@ object SocialMediaExtractor {
     // Halaman watch (`/view_video.php?viewkey=...`) memuat varian di JSON
     // `mediaDefinitions` (`"videoUrl"` + `"quality"`) dan fallback `flashvars`
     // (`"quality_720p"`, `"video_url"`). Unduhan langsung yang sebelumnya hanya
-    // menyimpan halaman HTML kini diekstrak jadi MP4/HLS seperti XNXX/XVideos.
+    // menyimpan halaman HTML kini diekstrak jadi MP4 seperti XNXX/XVideos.
 
     private val PH_HEADERS = mapOf(
         "User-Agent" to DEFAULT_UA,
@@ -1581,11 +1494,10 @@ object SocialMediaExtractor {
     private fun extractPornhub(url: String, user: Map<String, String> = emptyMap()): Result? =
         preferProgressiveMp4(extractAllPornhub(url, user))
 
-    /** MP4 progresif diutamakan: single-stream (Range/resume) jauh lebih
-     *  andal daripada HLS phncdn yang segmennya rawan HTTP 404. Opsi sudah
-     *  urut kualitas menurun sehingga MP4 pertama = MP4 terbaik. */
+    /** MP4 progresif diutamakan.
+     *  Opsi sudah urut kualitas menurun sehingga MP4 pertama = MP4 terbaik. */
     internal fun preferProgressiveMp4(options: List<Result>): Result? {
-        return options.firstOrNull { !it.isHls } ?: options.firstOrNull()
+        return options.firstOrNull()
     }
 
     private fun extractAllPornhub(url: String, user: Map<String, String> = emptyMap()): List<Result> {
@@ -1651,11 +1563,11 @@ object SocialMediaExtractor {
         if (found.isEmpty()) {
             HH_GENERIC_MEDIA_RE.findAll(html).forEach { addCandidate(it.value, 0) }
         }
-        return found.entries.sortedByDescending { it.value }.map { (url, quality) ->
-            val isHls = url.contains(".m3u8")
-            if (isHls) {
-                Result(url, "Pornhub_${safeName}.ts", title, if (quality > 0) "${quality}p" else "HLS", "application/x-mpegURL", cookies = cookies, isHls = true)
-            } else {
+        // Kandidat manifes (m3u8) dibuang: aplikasi hanya mengunduh
+        // yang ditawarkan hanya berkas MP4 progresif langsung.
+        return found.entries.sortedByDescending { it.value }
+            .filter { (url, _) -> !url.contains(".m3u8") }
+            .map { (url, quality) ->
                 val label = when {
                     quality >= 720 -> "HD"
                     quality > 0 -> "${quality}p"
@@ -1663,7 +1575,6 @@ object SocialMediaExtractor {
                 }
                 Result(url, "Pornhub_${safeName}_${label}.mp4", title, label, MIME_MP4, cookies = cookies)
             }
-        }
     }
 
     // ── HentaiHaven ─────────────────────────────────────────────────────
@@ -1681,7 +1592,7 @@ object SocialMediaExtractor {
 
     private fun extractHentaiHaven(url: String, user: Map<String, String> = emptyMap()): Result? {
         val options = extractAllHentaiHaven(url, user)
-        return options.firstOrNull { !it.isHls } ?: options.firstOrNull()
+        return options.firstOrNull()
     }
 
     private fun extractAllHentaiHaven(url: String, user: Map<String, String> = emptyMap()): List<Result> {
@@ -1697,10 +1608,13 @@ object SocialMediaExtractor {
         title = FileNames.take(unescapePlayer(title.trim()), 120)
         if (title.isBlank()) title = "HentaiHaven_video"
         val safeName = sanitizeFileName(title)
-        val candidates = mutableListOf<Pair<String, Boolean>>()
+        val candidates = mutableListOf<String>()
         fun addCandidate(raw: String?) {
             val url = cleanHentaiHavenUrl(raw) ?: return
-            candidates.add(url to url.contains(".m3u8"))
+            // Kandidat manifes (m3u8) dibuang: aplikasi hanya mengunduh
+            // yang ditawarkan hanya berkas media langsung.
+            if (url.contains(".m3u8")) return
+            candidates.add(url)
         }
         HH_VIDEO_TAG_RE.findAll(html).forEach { addCandidate(it.groupValues.getOrNull(1)) }
         HH_SOURCE_TAG_RE.findAll(html).forEach { addCandidate(it.groupValues.getOrNull(1)) }
@@ -1720,17 +1634,9 @@ object SocialMediaExtractor {
         }
         val seen = mutableSetOf<String>()
         val distinct = candidates
-            .filter { (url, _) -> url.startsWith("http") && seen.add(url) }
-        // MP4 langsung diutamakan (lebih kompatibel di engine); HLS sesudahnya.
-        // Satu sort stabil (false dulu) sebagai ganti dua filter + gabung:
-        // urutan relatif dalam tiap grup identik, tanpa 3 daftar sementara.
-        val ordered = distinct.sortedBy { it.second }
-        return ordered.map { (url, hls) ->
-            if (hls) {
-                Result(url, "HentaiHaven_${safeName}.ts", title, "HLS", "application/x-mpegURL", isHls = true)
-            } else {
-                Result(url, "HentaiHaven_${safeName}.mp4", title, "Video", MIME_MP4)
-            }
+            .filter { url -> url.startsWith("http") && seen.add(url) }
+        return distinct.map { url ->
+            Result(url, "HentaiHaven_${safeName}.mp4", title, "Video", MIME_MP4)
         }
     }
 
