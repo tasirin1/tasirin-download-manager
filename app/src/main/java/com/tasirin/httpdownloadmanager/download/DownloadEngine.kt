@@ -2630,11 +2630,10 @@ class DownloadEngine(appContext: Context) {
                 connection.outputStream.use { it.write(item.postBody.toByteArray(Charsets.UTF_8)) }
             }
         }
-        try {
-            runSingle(item, conn, saver, throttle)
-        } finally {
-            conn.disconnect()
-        }
+        // Tanpa disconnect di sini (issue #1447): runSingle melepas
+        // soket ke pool keep-alive bila badannya teronsumsi penuh, dan
+        // men-disconnect sendiri bila terpotong.
+        runSingle(item, conn, saver, throttle)
     }
 
     private class MuxProgress {
@@ -3206,6 +3205,14 @@ class DownloadEngine(appContext: Context) {
         var downloaded = prepareResumeOffset(item, saver)
         coroutineContext.ensureActive()
         trackConnection(item.id, conn)
+        // Kepemilikan soket di ujung alur (issue #1447): hanya badan yang
+        // teronsumsi PENUH (loop berakhir di read == -1) yang soketnya
+        // boleh kembali ke pool keep-alive — input yang ditutup di
+        // finally loop mengembalikannya. Badan terpotong (galat, batal,
+        // atau budget Content-Range habis lebih dulu) wajib disconnect
+        // seperti pola #1243, kalau tidak byte sisa respons meracuni
+        // pemakai soket berikutnya. Pemanggil tidak lagi disconnect.
+        var bodyFullyConsumed = false
         try {
         // JANGAN setRequestProperty di sini: koneksi dari
         // openAuthenticatedConnection sudah connected (responseCode dibaca
@@ -3292,7 +3299,10 @@ class DownloadEngine(appContext: Context) {
         try {
             while (true) {
                 val read = input.read(buffer)
-                if (read == -1) break
+                if (read == -1) {
+                    bodyFullyConsumed = true
+                    break
+                }
                 // Guard zero-read seperti downloadSegment di atas.
                 if (read == 0) {
                     if (++zeroStreak >= MAX_ZERO_READS) {
@@ -3367,6 +3377,7 @@ class DownloadEngine(appContext: Context) {
             if (!coroutineContext.isActive) throw CancellationException()
             throw e
         } finally {
+            if (!bodyFullyConsumed) runCatching { conn.disconnect() }
             untrackConnection(item.id, conn)
         }
     }
@@ -3643,17 +3654,15 @@ class DownloadEngine(appContext: Context) {
                     method = "GET",
                     username = item.username, password = item.password, headers = item.headers
                 )
-                try {
-                    // JANGAN set header/timeout di sini: koneksi sudah connected
-                    // (setRequestProperty melempar IllegalStateException). Auth,
-                    // cookie (via CookieHandler global), timeout, dan UA sudah
-                    // dipasang di dalam openAuthenticatedConnection; kredensial
-                    // juga sengaja TIDAK dipaksa ulang agar tidak bocor ke host
-                    // redirect beda-origin.
-                    runSingle(item, fallbackConn, saver, throttle)
-                } finally {
-                    fallbackConn.disconnect()
-                }
+                // JANGAN set header/timeout di sini: koneksi sudah connected
+                // (setRequestProperty melempar IllegalStateException). Auth,
+                // cookie (via CookieHandler global), timeout, dan UA sudah
+                // dipasang di dalam openAuthenticatedConnection; kredensial
+                // juga sengaja TIDAK dipaksa ulang agar tidak bocor ke host
+                // redirect beda-origin.
+                // Tanpa disconnect di sini (issue #1447): runSingle
+                // yang memutuskan nasib soket dari konsumsi badannya.
+                runSingle(item, fallbackConn, saver, throttle)
                 return
             }
             throw e
