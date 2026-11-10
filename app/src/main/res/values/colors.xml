@@ -20,11 +20,20 @@
     <color name="chip_pressed_blue">#331565C0</color>
     <!-- Sorotan hasil pencarian layar Log (pasangan teks text_primary). -->
     <color name="log_highlight_bg">#FFE082</color>
+    <!-- Token dari hex lepas di drawable (konsistensi tampilan):
+         nilai warna tidak berubah, hanya dipindah jadi token. -->
+    <color name="primary_alpha_15">#261565C0</color>
+    <color name="primary_alpha_10">#1A1565C0</color>
+    <color name="primary_alpha_05">#0D1565C0</color>
+    <color name="sheet_handle">#C9D4E4</color>
+    <color name="icon_tint_gray">#9E9E9E</color>
+    <color name="banner_mid">#1976D2</color>
     <!-- Kontainer tonal modern (gaya M3): tombol sekunder, kartu ringkasan. -->
     <color name="primary_container">#D8E7FC</color>
     <color name="primary_container_pressed">#C2D9F8</color>
 
     <!-- Settings: badge server & section accent -->
+    <color name="badge_on_bg">#E6F4EA</color>
     <color name="badge_on_text">#2E7D32</color>
     <color name="badge_off_text">#C62828</color>
     <color name="section_accent_server">#1565C0</color>

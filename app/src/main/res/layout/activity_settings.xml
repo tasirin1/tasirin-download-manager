@@ -977,7 +977,7 @@
         android:layout_height="40dp"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
-        android:background="@drawable/bg_fab_pill"
+        android:background="@drawable/bg_home_fab"
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
