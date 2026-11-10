@@ -13,6 +13,19 @@ class FileNamesTest {
     }
 
     @Test
+    fun `safe - basis berakhiran spasi tetap kena cek reserved Windows`() {
+        // Issue #1477: Windows memangkas spasi/titik ekor komponen nama,
+        // jadi "con .mp4" adalah nama perangkat CON di sana.
+        assertEquals("_con .mp4", FileNames.safe("con .mp4"))
+        assertEquals("_aux .txt", FileNames.safe("aux .txt"))
+        assertEquals("_lpt1 .txt", FileNames.safe("lpt1 .txt"))
+        assertEquals("_CON.mp4", FileNames.safe("CON.mp4"))
+        assertEquals("_nul", FileNames.safe("nul"))
+        assertEquals("console.mp4", FileNames.safe("console.mp4"))
+        assertEquals("com10.mp4", FileNames.safe("com10.mp4"))
+    }
+
+    @Test
     fun `safe - nama CJK panjang dipangkas per byte bukan char`() {
         // Batas filesystem 255 byte: 154 char tapi 304 byte (>240) wajib
         // dipangkas per byte (tanpa belah UTF-8) dengan ekstensi utuh.

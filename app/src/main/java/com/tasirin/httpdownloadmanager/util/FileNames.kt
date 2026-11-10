@@ -50,7 +50,12 @@ object FileNames {
         clean = sb.toString().trim()
         clean = clean.trimEnd('.', ' ')
         if (clean.isEmpty() || clean == "." || clean == "..") return "download"
-        val base = clean.substringBefore('.').uppercase(Locale.ROOT)
+        // Basis untuk cek reserved ikut dipangkas ekor '.'/' '-nya
+        // (issue #1477): Windows menilai "con .mp4" sebagai perangkat
+        // CON (ia memangkas spasi/titik ekor komponen nama), tetapi
+        // "CON " tak cocok dengan set reserved sehingga lolos tanpa
+        // awalan '_' dan bermasalah saat berkas disalin ke PC Windows.
+        val base = clean.substringBefore('.').trimEnd('.', ' ').uppercase(Locale.ROOT)
         if (base in RESERVED_NAMES) clean = "_$clean"
         if (clean.length > 200) {
             // Pertahankan ekstensi utuh seperti jalur byte di bawah:
