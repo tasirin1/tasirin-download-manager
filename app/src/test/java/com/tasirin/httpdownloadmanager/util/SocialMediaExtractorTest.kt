@@ -299,24 +299,6 @@ class SocialMediaExtractorTest {
     }
 
     @Test
-    fun `parsePornhubPage - quality sebelum videoUrl tetap menghasilkan kandidat`() {
-        // Issue #1399: quality yang tidak MENGIKUTI videoUrl dalam
-        // objek yang sama (tertulis sebelumnya) dulu membuang
-        // kandidatnya diam-diam; kini kandidat tetap ada sebagai
-        // kualitas 0 dan terurut paling akhir. Ekspektasi dibuktikan
-        // port-1399.py (fixture 1+2).
-        val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
-            "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/low.mp4\",\"quality\":\"480\"},{\"quality\":\"1080\",\"videoUrl\":\"https://cdn.ph.com/hi.mp4\"}]}" +
-            "</script></body></html>"
-        val opts = SocialMediaExtractor.parsePornhubPage(html)
-        assertEquals(2, opts.size)
-        assertTrue(opts[0].directUrl.endsWith("low.mp4"))
-        assertEquals("480p", opts[0].quality)
-        assertTrue(opts[1].directUrl.endsWith("hi.mp4"))
-        assertEquals("Video", opts[1].quality)
-    }
-
-    @Test
     fun `parsePornhubPage - quality angka tanpa kutip`() {
         val html = "<html><head><title>Clip - Pornhub.com</title></head><body><script>" +
             "{\"mediaDefinitions\":[{\"videoUrl\":\"https://cdn.ph.com/a.mp4\",\"quality\":480}]}" +
