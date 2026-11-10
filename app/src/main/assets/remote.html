@@ -2759,7 +2759,7 @@ return j;
 });
 const total = jobs.length;
 if (!total) return;
-jobs.forEach(function (j) { j.verifyToken = ''; });
+jobs.forEach(function (j) { j.verifyToken = ''; j.nextChunk = 0; });
 fsUploading = true;
 const failed = [];
 const ulRows = {};
@@ -2796,8 +2796,8 @@ for (const j of jobs) totalBytes += j.file.size;
 let bestDone = 0;
 let speed = 0;
 progressBox.classList.remove('hidden');
-function resetFileProgress() {
-bestDone = Math.min(bestDone, sentBytes);
+function resetFileProgress(resumeBytes) {
+bestDone = Math.min(bestDone, sentBytes + (resumeBytes || 0));
 }
 function uploadOne(job, attempt) {
 const file = job.file;
@@ -2816,13 +2816,13 @@ statusEl.textContent = 'Uploading ' + file.name + ' (' + (idx + 1) + '/' + total
 progressText.textContent = file.name + (attempt > 1 ? ' (attempt ' + attempt + ')' : '');
 const id = job.id;
 const chunks = Math.max(1, Math.ceil(file.size / UPLOAD_CHUNK));
-let chunkIdx = 0;
+let chunkIdx = job.nextChunk || 0; // resume dari chunk sukses terakhir (issue #1402)
 let chunkFails = 0;
 let lastErr = '';
 let chunkBest = 0;
 let lastBytes = 0;
 let lastTime = 0;
-resetFileProgress();
+resetFileProgress(chunkIdx * UPLOAD_CHUNK);
 function failUpload(err) {
 const msg = (err && err.message) ? err.message : String(err);
 failed.push(file.name);
@@ -2897,6 +2897,7 @@ if (pending) {
 pollFinalize();
 } else if (ok) {
 chunkIdx++;
+job.nextChunk = chunkIdx;
 chunkFails = 0;
 chunkBest = 0;
 lastBytes = 0;
