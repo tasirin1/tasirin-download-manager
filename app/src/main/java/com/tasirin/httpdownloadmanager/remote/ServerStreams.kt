@@ -6,6 +6,7 @@ import java.io.InputStream
 import java.io.RandomAccessFile
 import android.content.res.AssetFileDescriptor
 import com.tasirin.httpdownloadmanager.data.DownloadSegment
+import com.tasirin.httpdownloadmanager.download.saturatingAdd
 
 /** Gabungkan beberapa file partial menjadi satu stream (streaming resume
  *  multi-segmen tanpa menyusun file utuh di memori). */
@@ -136,9 +137,14 @@ internal class ChainInputStream(files: List<File>) : InputStream() {
 internal fun downloadedPrefixLength(segments: List<DownloadSegment>): Long {
     var prefix = 0L
     for (seg in segments.sortedBy { it.index }) {
-        val length = (seg.end - seg.start + 1).coerceAtLeast(0)
+        // Panjang inklusif dihitung JENUH (issue #1483): `end - start + 1`
+        // polos membungkus ke Long.MIN_VALUE untuk segmen terbuka
+        // ber-end Long.MAX_VALUE (bentuk sah menurut codec #1042),
+        // sehingga panjang terbaca 0 dan stream parsial kelas itu 404 —
+        // kelas luapan yang sama yang dibasmi #812 lewat segmentLength.
+        val length = saturatingAdd(seg.end - seg.start, 1)
         val got = seg.downloaded.coerceIn(0, length)
-        prefix += got
+        prefix = saturatingAdd(prefix, got)
         if (got < length) break
     }
     return prefix

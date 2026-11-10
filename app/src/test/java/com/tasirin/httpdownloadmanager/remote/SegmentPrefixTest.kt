@@ -60,6 +60,43 @@ class SegmentPrefixTest {
     }
 
     @Test
+    fun prefix_segmenTerbukaEndMaksimum() {
+        // Segmen terbuka (end = Long.MAX_VALUE, bentuk sah codec #1042):
+        // panjang inklusifnya jenuh, bukan meluap ke 0 (issue #1483).
+        // Awalan = byte terunduh segmen itu sendiri; ekor sesudahnya
+        // (tak ada) tidak ikut. Ekspektasi dibuktikan port_1483.py.
+        assertEquals(
+            12345L,
+            downloadedPrefixLength(listOf(seg(0, 0, Long.MAX_VALUE, 12345)))
+        )
+        assertEquals(
+            0L,
+            downloadedPrefixLength(listOf(seg(0, 0, Long.MAX_VALUE, 0)))
+        )
+        assertEquals(
+            0L,
+            downloadedPrefixLength(listOf(seg(0, 0, Long.MAX_VALUE, -5)))
+        )
+    }
+
+    @Test
+    fun prefix_campuranTuntasDanTerbuka() {
+        // Segmen tuntas penuh + segmen terbuka sebagian: awalan adalah
+        // gabungan keduanya, berhenti di dalam segmen terbuka.
+        assertEquals(
+            877L,
+            downloadedPrefixLength(
+                listOf(seg(0, 0, 99, 100), seg(1, 100, Long.MAX_VALUE, 777))
+            )
+        )
+        // Segmen terbuka tidak harus mulai dari 0 untuk dihitung benar.
+        assertEquals(
+            42L,
+            downloadedPrefixLength(listOf(seg(0, 500, Long.MAX_VALUE, 42)))
+        )
+    }
+
+    @Test
     fun limitedStream_berhentiTepatDiBatas() {
         val data = ByteArray(10) { it.toByte() }
         LimitedInputStream(ByteArrayInputStream(data), 4).use { s ->
