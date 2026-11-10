@@ -33,49 +33,81 @@ class ServerVideoDurations(
          *  di bawah plafon menampung pertumbuhan antar-prune. */
         const val MAX_SERIALIZED_BYTES = 448_000
 
+        /** Durasi dari nilai cache untuk [token]: bentuk objek baru
+         *  {"d": ms, "s": seq} dibaca dari "d"; nilai Long polos
+         *  (berkas warisan sebelum issue #1388) adalah durasinya
+         *  sendiri. 0 bila tak ada / bentuk tak dikenal. */
+        fun durationOf(cache: JSONObject, token: String): Long =
+            when (val v = cache.opt(token)) {
+                is JSONObject -> v.optLong("d", 0L)
+                is Number -> v.toLong()
+                else -> 0L
+            }
+
+        /** Nomor urut eviksi dari satu nilai cache. Nilai Long polos
+         *  tak punya nomor urut: diberi yang terkecil agar tereviksi
+         *  lebih dulu dari nilai objek mana pun (warisan ditulis
+         *  sebelum skema seq ada). */
+        fun seqOf(value: Any?): Long = when (value) {
+            is JSONObject -> value.optLong("s", Long.MIN_VALUE)
+            else -> Long.MIN_VALUE
+        }
+
         /** Batasi cache bila melebihi [MAX_ENTRIES] (sisakan [TARGET_ENTRIES])
          *  atau melebihi [MAX_SERIALIZED_BYTES].
+         *  Korban eviksi ditentukan nomor urut eksplisit per entri
+         *  (issue #1388), BUKAN urutan keys(): jar org.json tidak
+         *  menjamin urutan sisip (versi 20260814 di uji JVM mengubah
+         *  urutan yang teramati sesudah remove+put), jadi mengandalkan
+         *  urutan map rapuh — entri yang baru di-probe ulang bisa
+         *  tereviksi lebih dulu dari entri lama yang tak tersentuh.
          *  Murni (tanpa Android) supaya bisa di-unit-test. */
         fun prune(cache: JSONObject): JSONObject {
+            // Pasangan (kunci, seq) diurutkan menaik sekali; kedua
+            // fase eviksi membuang dari seq terkecil lewat indeks
+            // berjalan yang sama.
+            val entries = ArrayList<Pair<String, Long>>(cache.length())
+            val iter = cache.keys()
+            while (iter.hasNext()) {
+                val key = iter.next()
+                entries.add(key to seqOf(cache.opt(key)))
+            }
+            entries.sortBy { it.second }
+            var idx = 0
             if (cache.length() > MAX_ENTRIES) {
-                val iter = cache.keys()
-                var removed = 0
-                val toRemove = cache.length() - TARGET_ENTRIES
-                while (iter.hasNext() && removed < toRemove) {
-                    iter.next()
-                    iter.remove()
-                    removed++
+                var remaining = cache.length() - TARGET_ENTRIES
+                while (remaining > 0) {
+                    cache.remove(entries[idx].first)
+                    idx++
+                    remaining--
                 }
             }
             // Anggaran byte (issue #940): perkiraan konservatif per
-            // entri = panjang kunci + 24 (kutip, titik dua, koma, dan
-            // nilai Long sampai 19 digit) — selalu >= ukuran JSON
-            // sebenarnya, jadi hasil prune tak pernah melewati plafon
-            // muat. Buang dari entri tertua (urutan iterasi kunci).
+            // entri = panjang kunci + 56 — selalu >= ukuran JSON
+            // sebenarnya (kutip kunci + titik dua + koma + nilai
+            // objek {"d":<19 digit>,"s":<19 digit>} = 53), jadi hasil
+            // prune tak pernah melewati plafon muat. Nilai Long
+            // warisan dinilai dengan rumus yang sama (konservatif
+            // berlebih, aman). Buang dari seq terkecil.
             var est = 2
-            val measure = cache.keys()
-            while (measure.hasNext()) est += measure.next().length + 24
-            if (est > MAX_SERIALIZED_BYTES) {
-                val iter = cache.keys()
-                while (iter.hasNext() && est > MAX_SERIALIZED_BYTES) {
-                    val key = iter.next()
-                    iter.remove()
-                    est -= key.length + 24
-                }
+            for (i in idx until entries.size) est += entries[i].first.length + 56
+            while (est > MAX_SERIALIZED_BYTES && idx < entries.size) {
+                val key = entries[idx].first
+                cache.remove(key)
+                est -= key.length + 56
+                idx++
             }
             return cache
         }
 
-        /** Tulis durasi dengan penyegaran posisi eviksi (issue #1388):
-         *  prune() mengevakuasi menurut urutan sisip JSONObject, dan put
-         *  pada kunci yang sudah ada TIDAK memindahkan posisinya — entri
-         *  yang baru saja di-probe ulang bisa tetap tereviksi lebih dulu
-         *  daripada entri lama yang tak tersentuh. Remove-then-put
-         *  memindahkan kunci lama ke ekor (posisi paling baru).
+        /** Tulis durasi dengan nomor urut eviksi baru (issue #1388):
+         *  penulis memasok [seq] dari penghitung monoton instance,
+         *  sehingga entri yang baru di-probe ulang membawa seq
+         *  terbesar dan selamat dari prune berikutnya — tanpa
+         *  bergantung urutan sisip JSONObject sama sekali.
          *  Murni agar bisa di-unit-test. */
-        fun putRefreshed(cache: JSONObject, token: String, ms: Long): JSONObject {
-            if (cache.has(token)) cache.remove(token)
-            cache.put(token, ms)
+        fun putRefreshed(cache: JSONObject, token: String, ms: Long, seq: Long): JSONObject {
+            cache.put(token, JSONObject().put("d", ms).put("s", seq))
             return cache
         }
 
@@ -138,6 +170,11 @@ class ServerVideoDurations(
     /** Cache durasi per token; null = belum dimuat dari disk (dimuat malas). */
     private var cache: JSONObject? = null
 
+    /** Penghitung nomor urut eviksi instance (issue #1388): naik pada
+     *  setiap tulis cacheDurationIfCurrent; sesudah muat dilanjutkan
+     *  dari cacheLocked() supaya melampaui seq semua entri yang ada. */
+    private var nextSeq = 0L
+
     private fun cacheLocked(): JSONObject {
         cache?.let { return it }
         // Batas 512KB: baca selalu bounded (readBounded) agar file korup yang
@@ -147,6 +184,30 @@ class ServerVideoDurations(
             if (file.length() > 524_288L) JSONObject()
             else JSONObject(file.inputStream().use { readBounded(it, 524_288) })
         }.getOrDefault(JSONObject())
+        // Normalisasi nilai warisan (issue #1388): berkas lama menyimpan
+        // Long polos per token. Ubah menjadi objek {"d","s"} dengan
+        // seq = indeks iterasi supaya semua nilai seragam dan korban
+        // eviksi ditentukan seq eksplisit; nilai sampah (bukan angka /
+        // bukan objek) dibuang. Iterasi atas potret names() supaya
+        // mutasi di tengah jalan aman.
+        val names = loaded.names()
+        var maxSeq = -1L
+        val garbage = ArrayList<String>()
+        if (names != null) {
+            for (i in 0 until names.length()) {
+                val key = names.optString(i)
+                when (val v = loaded.opt(key)) {
+                    is JSONObject -> maxSeq = maxOf(maxSeq, v.optLong("s", -1L))
+                    is Number -> {
+                        loaded.put(key, JSONObject().put("d", v.toLong()).put("s", i.toLong()))
+                        maxSeq = maxOf(maxSeq, i.toLong())
+                    }
+                    else -> garbage.add(key)
+                }
+            }
+        }
+        garbage.forEach { loaded.remove(it) }
+        nextSeq = maxSeq + 1
         cache = loaded
         return loaded
     }
@@ -158,7 +219,7 @@ class ServerVideoDurations(
      *  prune di sini berarti cek batas N kali per request). Prune hanya saat
      *  tulis (cacheDurationIfCurrent) dan sekali baca di dalam lock yang sama. */
     fun of(token: String): Long = synchronized(lock) {
-        cacheLocked().optLong(token, 0L)
+        durationOf(cacheLocked(), token)
     }
 
     /** Tulis hasil probe HANYA bila [expectedGeneration] masih
@@ -166,10 +227,10 @@ class ServerVideoDurations(
     fun cacheDurationIfCurrent(token: String, ms: Long, expectedGeneration: Long): Boolean {
         synchronized(lock) {
             if (generation != expectedGeneration) return false
-            // Put menyegarkan posisi eviksi (issue #1388): entri yang
-            // di-probe ulang adalah entri yang sedang dipakai — tanpa
-            // ini posisinya tetap di urutan sisip pertamanya.
-            putRefreshed(prune(cacheLocked()), token, ms)
+            // Put membawa seq baru terbesar (issue #1388): entri yang
+            // di-probe ulang adalah entri yang sedang dipakai, jadi
+            // ia harus selamat dari prune berikutnya.
+            putRefreshed(prune(cacheLocked()), token, ms, nextSeq++)
             probeFailAt.remove(token)
             return true
         }
@@ -228,6 +289,7 @@ class ServerVideoDurations(
             synchronized(lock) {
                 generation++
                 cache = JSONObject()
+                nextSeq = 0L
                 probeFailAt.clear()
             }
             runCatching { file.delete() }

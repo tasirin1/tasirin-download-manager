@@ -38,39 +38,74 @@ class ServerVideoDurationsTest {
     }
 
     @Test
-    fun `putRefreshed memindahkan kunci lama ke ekor urutan eviksi`() {
-        // Issue #1388: prune mengevakuasi dari depan urutan sisip.
+    fun `prune mengevakuasi seq terkecil tanpa peduli urutan sisip`() {
+        // Issue #1388: korban eviksi hanya ditentukan seq di dalam
+        // nilai — jar org.json tak menjamin urutan keys(), jadi uji
+        // TIDAK PERNAH mengasersi urutan keys(); yang diasersi isi
+        // hasil prune. Entri disisipkan dengan seq ACAK (deterministik
+        // via Random(42)): yang selamat harus tepat TARGET entri
+        // ber-seq terbesar. Dibuktikan port-1388-fix.py skenario A.
+        val seqs = (0 until ServerVideoDurations.MAX_ENTRIES + 2).shuffled(kotlin.random.Random(42))
         val cache = JSONObject()
-        cache.put("a", 1L)
-        cache.put("b", 2L)
-        cache.put("c", 3L)
-        ServerVideoDurations.putRefreshed(cache, "b", 22L)
-        val keys = mutableListOf<String>()
-        val iter = cache.keys()
-        while (iter.hasNext()) keys.add(iter.next())
-        assertEquals(listOf("a", "c", "b"), keys)
-        assertEquals(22L, cache.optLong("b"))
-        // Kunci baru tetap di ekor tanpa mengubah urutan yang ada.
-        ServerVideoDurations.putRefreshed(cache, "d", 4L)
-        val keys2 = mutableListOf<String>()
-        val iter2 = cache.keys()
-        while (iter2.hasNext()) keys2.add(iter2.next())
-        assertEquals(listOf("a", "c", "b", "d"), keys2)
+        for (s in seqs) {
+            cache.put(
+                "token-$s",
+                JSONObject().put("d", s.toLong()).put("s", s.toLong())
+            )
+        }
+        val pruned = ServerVideoDurations.prune(cache)
+        assertEquals(ServerVideoDurations.TARGET_ENTRIES, pruned.length())
+        for (s in 0..501) assertFalse("token-$s harus tereviksi", pruned.has("token-$s"))
+        for (s in 502 until ServerVideoDurations.MAX_ENTRIES + 2) {
+            assertTrue("token-$s harus selamat", pruned.has("token-$s"))
+        }
     }
 
     @Test
-    fun `entri yang disegarkan lolos prune berikutnya`() {
-        // Entri tertua yang baru di-probe ulang tak boleh jadi korban
-        // eviksi pertama: sesudah disegarkan ia di ekor, jadi prune
-        // membuang entri kedua-tertua lebih dulu.
+    fun `entri yang disegarkan dengan seq baru lolos prune berikutnya`() {
+        // Entri tertua (seq 0) yang baru di-probe ulang membawa seq
+        // terbesar lewat putRefreshed, jadi prune membuang seq
+        // terkecil berikutnya (1) lebih dulu. Ekspektasi dibuktikan
+        // port-1388-fix.py skenario B.
         val cache = JSONObject()
-        repeat(ServerVideoDurations.MAX_ENTRIES + 2) { cache.put("token-$it", it.toLong()) }
-        ServerVideoDurations.putRefreshed(cache, "token-0", 999L)
+        repeat(ServerVideoDurations.MAX_ENTRIES + 2) {
+            cache.put(
+                "token-$it",
+                JSONObject().put("d", it.toLong()).put("s", it.toLong())
+            )
+        }
+        ServerVideoDurations.putRefreshed(cache, "token-0", 999L, 5000L)
         val pruned = ServerVideoDurations.prune(cache)
         assertEquals(ServerVideoDurations.TARGET_ENTRIES, pruned.length())
         assertTrue(pruned.has("token-0"))
         assertFalse(pruned.has("token-1"))
-        assertEquals(999L, pruned.optLong("token-0"))
+        assertEquals(999L, ServerVideoDurations.durationOf(pruned, "token-0"))
+    }
+
+    @Test
+    fun `nilai Long warisan terbaca benar dan tereviksi paling dulu`() {
+        // Berkas lama menyimpan Long polos: durationOf membacanya
+        // sebagai durasinya sendiri, dan seqOf memberinya urutan
+        // terkecil sehingga prune mengevaksinya sebelum nilai objek
+        // mana pun — termasuk objek ber-seq 0. Dibuktikan
+        // port-1388-fix.py skenario C.
+        val legacy = JSONObject().put("lama", 123456L)
+        assertEquals(123456L, ServerVideoDurations.durationOf(legacy, "lama"))
+        assertEquals(
+            Long.MIN_VALUE,
+            ServerVideoDurations.seqOf(legacy.opt("lama"))
+        )
+        val cache = JSONObject().put("warisan", 42L)
+        repeat(ServerVideoDurations.MAX_ENTRIES) {
+            cache.put(
+                "token-$it",
+                JSONObject().put("d", it.toLong()).put("s", it.toLong())
+            )
+        }
+        val pruned = ServerVideoDurations.prune(cache)
+        assertFalse(pruned.has("warisan"))
+        assertFalse(pruned.has("token-0"))
+        assertTrue(pruned.has("token-1999"))
     }
 
     @Test
