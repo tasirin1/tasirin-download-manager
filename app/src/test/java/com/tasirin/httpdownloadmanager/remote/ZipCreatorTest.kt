@@ -411,46 +411,45 @@ class ZipCreatorTest {
     }
 
     @Test
-    fun `preparedZipEntry stored hanya bila media dan ukuran cocok lintasan crc`() {
+    fun `preparedZipEntry stored hanya bila media ukuran dan crc tersedia dari sumber lain`() {
+        // Kontrak diubah issue #1451 (dulu #1432): STORED tidak lagi
+        // memperoleh CRC dari lintasan baca terpisah — itu membaca tiap
+        // entri media besar dua kali. Kini CRC wajib SUDAH tersedia dari
+        // sumber lain (parameter knownCrc); tanpa itu DEFLATED streaming.
+        // Nilai harapan dibuktikan port Python 1:1 (audit-dm-r15/port-1451.py).
         val data = ByteArray(100_000) { (it % 251).toByte() }
         val crc = java.util.zip.CRC32()
         crc.update(data)
-        val stored = ZipCreator.preparedZipEntry("clip.mp4", data.size.toLong()) {
-            ByteArrayInputStream(data)
-        }
+        val stored = ZipCreator.preparedZipEntry("clip.mp4", data.size.toLong(), crc.value)
         assertEquals(ZipEntry.STORED, stored.method)
         assertEquals(data.size.toLong(), stored.size)
         assertEquals(data.size.toLong(), stored.compressedSize)
         assertEquals(crc.value, stored.crc)
-        // Ukuran tak diketahui -> DEFLATED bawaan.
+        // Media + ukuran diketahui tetapi CRC tak tersedia -> DEFLATED
+        // (inilah perubahan kontrak #1451; dulu STORED via lintasan CRC).
         assertEquals(
             ZipEntry.DEFLATED,
-            ZipCreator.preparedZipEntry("clip.mp4", -1L) { ByteArrayInputStream(data) }.method
+            ZipCreator.preparedZipEntry("clip.mp4", data.size.toLong()).method
         )
-        // Bukan media -> DEFLATED walau ukuran diketahui.
+        // Ukuran tak diketahui -> DEFLATED walau CRC tersedia.
         assertEquals(
             ZipEntry.DEFLATED,
-            ZipCreator.preparedZipEntry("notes.txt", data.size.toLong()) {
-                ByteArrayInputStream(data)
-            }.method
+            ZipCreator.preparedZipEntry("clip.mp4", -1L, crc.value).method
         )
-        // Lintasan CRC berbeda jumlah byte dari ukuran klaim -> DEFLATED
-        // (syarat STORED tak terpenuhi secara sah, jangan dipaksakan).
+        // Bukan media -> DEFLATED walau ukuran + CRC tersedia.
         assertEquals(
             ZipEntry.DEFLATED,
-            ZipCreator.preparedZipEntry("clip.mp4", data.size + 1L) {
-                ByteArrayInputStream(data)
-            }.method
+            ZipCreator.preparedZipEntry("notes.txt", data.size.toLong(), crc.value).method
         )
-        // Stream tak bisa dibuka -> DEFLATED.
+        // WAV sengaja bukan media terkompresi -> DEFLATED.
         assertEquals(
             ZipEntry.DEFLATED,
-            ZipCreator.preparedZipEntry("clip.mp4", data.size.toLong()) { null }.method
+            ZipCreator.preparedZipEntry("voice.wav", data.size.toLong(), crc.value).method
         )
     }
 
     @Test
-    fun `zipFile menulis mp4 sebagai stored dan txt sebagai deflated`() {
+    fun `zipFile menulis mp4 dan txt sebagai deflated tanpa baca ganda`() {
         val dir = temp.newFolder("zipsrc")
         val mp4Bytes = ByteArray(50_000) { (it % 253).toByte() }
         java.io.File(dir, "clip.mp4").writeBytes(mp4Bytes)
@@ -473,9 +472,11 @@ class ZipCreatorTest {
             }
         }
         // Nama entri membawa prefiks folder sumber ("zipsrc/...").
+        // Kontrak #1451: mp4 TIDAK lagi STORED — File tak menyediakan
+        // CRC dan lintasan CRC terpisah dihapus; isi byte tetap identik.
         val mp4Name = methods.keys.single { it.endsWith("clip.mp4") }
         val txtName = methods.keys.single { it.endsWith("notes.txt") }
-        assertEquals(ZipEntry.STORED, methods[mp4Name])
+        assertEquals(ZipEntry.DEFLATED, methods[mp4Name])
         assertEquals(ZipEntry.DEFLATED, methods[txtName])
         assertTrue(mp4Bytes.contentEquals(contents[mp4Name]))
         assertTrue(txtBytes.contentEquals(contents[txtName]))
