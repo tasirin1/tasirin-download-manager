@@ -577,11 +577,21 @@ object SocialMediaExtractor {
             ?.groupValues?.get(1) ?: return emptyList()
         val options = mutableListOf<Result>()
 
+        // Kedua strategi dibungkus cap tahap (issue #1526, pola #246):
+        // tanpa cap, dua rantai fetch ber-deadline 30 dtk berurutan
+        // bisa memakan seluruh cap total ekstraksi 60 dtk sehingga
+        // strategi kedua terpotong timeout luar di tengah jalan.
+        // Jatah 24+24 = 48 dtk menyisakan ruang parse di bawah cap
+        // total; cap membungkus fetch saja, parse tetap di luar
+        // (sama seperti jalur Facebook).
+
         // Strategi 1: embed page — data carousel presisi (hanya foto/video milik post ini)
         // Format contextJSON":"{...}" berisi edge_sidecar_to_children lengkap.
-        val embedResult = httpGetWithCookies(
-            "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS + user
-        )
+        val embedResult = runStageCapped(24_000L) {
+            httpGetWithCookies(
+                "https://www.instagram.com/p/$shortcode/embed/captioned/", IG_HEADERS + user
+            )
+        }
         val embedHtml = embedResult?.body
         val igCookies = embedResult?.cookies.orEmpty()
         if (embedHtml != null && embedHtml.length > 1000) {
@@ -600,7 +610,9 @@ object SocialMediaExtractor {
 
         // Strategi 2: halaman utama via Googlebot — hanya bila embed gagal
         if (options.isEmpty()) {
-            val httpResult = httpGetWithCookies("https://www.instagram.com/p/$shortcode/", IG_HEADERS + user)
+            val httpResult = runStageCapped(24_000L) {
+                httpGetWithCookies("https://www.instagram.com/p/$shortcode/", IG_HEADERS + user)
+            }
             val pageCookies = httpResult?.cookies.orEmpty()
             val pageHtml = httpResult?.body
             if (pageHtml != null && pageHtml.length > 1000) {
