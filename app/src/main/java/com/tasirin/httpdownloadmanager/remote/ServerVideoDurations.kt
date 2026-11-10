@@ -111,6 +111,20 @@ class ServerVideoDurations(
             return cache
         }
 
+        /** Baca durasi sekaligus menyegarkan nomor urut eviksi entri
+         *  yang kena-hit (issue #1420, melengkapi #1388 yang hanya
+         *  menyegarkan saat tulis): entri yang hanya DITAMPILKAN
+         *  membeku seq-nya dan akhirnya tereviksi di bawah tekanan
+         *  tulis walau ditonton tiap hari. Hit (durasi > 0) ditulis
+         *  ulang dengan [seq] baru; miss / durasi 0 tak mengubah
+         *  cache. Mengembalikan durasi yang dibaca. Murni agar bisa
+         *  di-unit-test. */
+        fun readDuration(cache: JSONObject, token: String, seq: Long): Long {
+            val ms = durationOf(cache, token)
+            if (ms > 0) putRefreshed(cache, token, ms, seq)
+            return ms
+        }
+
         /** true bila kegagalan probe masih dalam TTL (belum perlu dicoba lagi).
          *  Selisih negatif (storedAt di masa depan — jam mundur) TIDAK
          *  throttled (issue #1389): bentuk lama selalu benar untuk
@@ -171,8 +185,9 @@ class ServerVideoDurations(
     private var cache: JSONObject? = null
 
     /** Penghitung nomor urut eviksi instance (issue #1388): naik pada
-     *  setiap tulis cacheDurationIfCurrent; sesudah muat dilanjutkan
-     *  dari cacheLocked() supaya melampaui seq semua entri yang ada. */
+     *  setiap tulis cacheDurationIfCurrent dan setiap baca kena-hit
+     *  of() (issue #1420); sesudah muat dilanjutkan dari cacheLocked()
+     *  supaya melampaui seq semua entri yang ada. */
     private var nextSeq = 0L
 
     private fun cacheLocked(): JSONObject {
@@ -217,9 +232,12 @@ class ServerVideoDurations(
 
     /** Baca durasi token: tanpa prune per-baca (of dipanggil per item galeri,
      *  prune di sini berarti cek batas N kali per request). Prune hanya saat
-     *  tulis (cacheDurationIfCurrent) dan sekali baca di dalam lock yang sama. */
+     *  tulis (cacheDurationIfCurrent) dan sekali baca di dalam lock yang sama.
+     *  Baca yang kena-hit menyegarkan seq entri DI MEMORI saja (issue
+     *  #1420, readDuration) agar eviksi mendekati LRU-baca; persistensi
+     *  menumpang saveAsync berikutnya, bukan save segera per baca. */
     fun of(token: String): Long = synchronized(lock) {
-        durationOf(cacheLocked(), token)
+        readDuration(cacheLocked(), token, nextSeq++)
     }
 
     /** Tulis hasil probe HANYA bila [expectedGeneration] masih

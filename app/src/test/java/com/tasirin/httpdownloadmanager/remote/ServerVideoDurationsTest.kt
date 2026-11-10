@@ -62,6 +62,31 @@ class ServerVideoDurationsTest {
     }
 
     @Test
+    fun `readDuration menyegarkan seq entri kena-hit saja`() {
+        // Issue #1420: ekspektasi dibuktikan port-1420.py (port 1:1).
+        val kosong = JSONObject()
+        assertEquals(0L, ServerVideoDurations.readDuration(kosong, "tak-ada", 10L))
+        assertEquals(0, kosong.length())
+
+        val cache = JSONObject()
+            .put("fav", JSONObject().put("d", 5000L).put("s", 3L))
+            .put("lain", JSONObject().put("d", 7000L).put("s", 9L))
+        assertEquals(5000L, ServerVideoDurations.readDuration(cache, "fav", 10L))
+        assertEquals(10L, ServerVideoDurations.seqOf(cache.opt("fav")))
+        assertEquals(9L, ServerVideoDurations.seqOf(cache.opt("lain")))
+
+        // Durasi 0 tersimpan bukan hit: seq tidak disegarkan.
+        val nol = JSONObject().put("nol", JSONObject().put("d", 0L).put("s", 4L))
+        assertEquals(0L, ServerVideoDurations.readDuration(nol, "nol", 10L))
+        assertEquals(4L, ServerVideoDurations.seqOf(nol.opt("nol")))
+
+        // Nilai Long warisan terbaca dan dinormalkan ke objek ber-seq baru.
+        val warisan = JSONObject().put("lama", 123456L)
+        assertEquals(123456L, ServerVideoDurations.readDuration(warisan, "lama", 7L))
+        assertEquals(7L, ServerVideoDurations.seqOf(warisan.opt("lama")))
+    }
+
+    @Test
     fun `entri yang disegarkan dengan seq baru lolos prune berikutnya`() {
         // Entri tertua (seq 0) yang baru di-probe ulang membawa seq
         // terbesar lewat putRefreshed, jadi prune membuang seq
