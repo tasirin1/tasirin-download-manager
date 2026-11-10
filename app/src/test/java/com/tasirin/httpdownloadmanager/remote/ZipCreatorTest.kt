@@ -393,4 +393,91 @@ class ZipCreatorTest {
         assertEquals(-728750701741308783L, reversed)
         assertTrue(chained != reversed)
     }
+
+    @Test
+    fun `entri media terkompresi dikenali dari ekstensi terakhir`() {
+        // Nilai harapan dibuktikan port Python 1:1 (audit 14, port-1432.py).
+        for (name in listOf(
+            "movie.mp4", "Movie.MP4", "clip.webm", "song.mp3", "photo.JPG",
+            "backup.zip", "app.apk", "archive.tar.gz", "a/b/song.flac"
+        )) {
+            assertTrue(name, ZipCreator.isIncompressibleZipEntry(name))
+        }
+        for (name in listOf(
+            "notes.txt", "voice.wav", "noext", "file.", "folder.v1/movie", "data.json"
+        )) {
+            assertFalse(name, ZipCreator.isIncompressibleZipEntry(name))
+        }
+    }
+
+    @Test
+    fun `preparedZipEntry stored hanya bila media dan ukuran cocok lintasan crc`() {
+        val data = ByteArray(100_000) { (it % 251).toByte() }
+        val crc = java.util.zip.CRC32()
+        crc.update(data)
+        val stored = ZipCreator.preparedZipEntry("clip.mp4", data.size.toLong()) {
+            ByteArrayInputStream(data)
+        }
+        assertEquals(ZipEntry.STORED, stored.method)
+        assertEquals(data.size.toLong(), stored.size)
+        assertEquals(data.size.toLong(), stored.compressedSize)
+        assertEquals(crc.value, stored.crc)
+        // Ukuran tak diketahui -> DEFLATED bawaan.
+        assertEquals(
+            ZipEntry.DEFLATED,
+            ZipCreator.preparedZipEntry("clip.mp4", -1L) { ByteArrayInputStream(data) }.method
+        )
+        // Bukan media -> DEFLATED walau ukuran diketahui.
+        assertEquals(
+            ZipEntry.DEFLATED,
+            ZipCreator.preparedZipEntry("notes.txt", data.size.toLong()) {
+                ByteArrayInputStream(data)
+            }.method
+        )
+        // Lintasan CRC berbeda jumlah byte dari ukuran klaim -> DEFLATED
+        // (syarat STORED tak terpenuhi secara sah, jangan dipaksakan).
+        assertEquals(
+            ZipEntry.DEFLATED,
+            ZipCreator.preparedZipEntry("clip.mp4", data.size + 1L) {
+                ByteArrayInputStream(data)
+            }.method
+        )
+        // Stream tak bisa dibuka -> DEFLATED.
+        assertEquals(
+            ZipEntry.DEFLATED,
+            ZipCreator.preparedZipEntry("clip.mp4", data.size.toLong()) { null }.method
+        )
+    }
+
+    @Test
+    fun `zipFile menulis mp4 sebagai stored dan txt sebagai deflated`() {
+        val dir = temp.newFolder("zipsrc")
+        val mp4Bytes = ByteArray(50_000) { (it % 253).toByte() }
+        java.io.File(dir, "clip.mp4").writeBytes(mp4Bytes)
+        val txtBytes = "hello hello hello".toByteArray(StandardCharsets.UTF_8)
+        java.io.File(dir, "notes.txt").writeBytes(txtBytes)
+
+        val bytes = ByteArrayOutputStream().use { raw ->
+            ZipOutputStream(raw).use { zip ->
+                ZipCreator.zipFile(zip, dir, "") { true }
+            }
+            raw.toByteArray()
+        }
+        val methods = mutableMapOf<String, Int>()
+        val contents = mutableMapOf<String, ByteArray>()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zin ->
+            while (true) {
+                val e = zin.nextEntry ?: break
+                methods[e.name] = e.method
+                contents[e.name] = zin.readBytes()
+            }
+        }
+        // Nama entri membawa prefiks folder sumber ("zipsrc/...").
+        val mp4Name = methods.keys.single { it.endsWith("clip.mp4") }
+        val txtName = methods.keys.single { it.endsWith("notes.txt") }
+        assertEquals(ZipEntry.STORED, methods[mp4Name])
+        assertEquals(ZipEntry.DEFLATED, methods[txtName])
+        assertTrue(mp4Bytes.contentEquals(contents[mp4Name]))
+        assertTrue(txtBytes.contentEquals(contents[txtName]))
+    }
 }

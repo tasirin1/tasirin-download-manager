@@ -38,6 +38,70 @@ object ZipCreator {
         }
     }
 
+    /** Ekstensi berkas yang isinya SUDAH terkompresi (video/audio modern,
+     *  gambar, arsip): men-deflate-nya hanya membakar CPU untuk pengecilan
+     *  ±0-2% (issue #1432). WAV sengaja di luar daftar — audio mentah
+     *  masih mengecil banyak dengan deflate. */
+    private val INCOMPRESSIBLE_ZIP_EXTS = setOf(
+        "mp4", "m4v", "mkv", "webm", "avi", "mov", "3gp", "3g2", "ts", "m2ts",
+        "mp3", "m4a", "aac", "ogg", "oga", "opus", "flac",
+        "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif",
+        "zip", "rar", "7z", "gz", "tgz", "bz2", "xz", "zst", "apk", "jar"
+    )
+
+    /** True bila entri bernama [name] berisi media/arsip terkompresi.
+     *  Ekstensi = sesudah titik TERAKHIR (missingDelimiterValue "" agar
+     *  nama tanpa titik tak dinilai dari nama utuhnya). Murni agar bisa
+     *  di-unit-test; nilai harapan dibuktikan port Python 1:1
+     *  (audit-dm-r14/port-1432.py). */
+    internal fun isIncompressibleZipEntry(name: String): Boolean =
+        name.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in INCOMPRESSIBLE_ZIP_EXTS
+
+    /** Bangun ZipEntry untuk satu berkas (issue #1432): media
+     *  terkompresi ditulis STORED (tanpa deflate) bila ukurannya
+     *  diketahui — API ZipOutputStream mewajibkan size + compressedSize
+     *  + CRC-32 STORED lengkap SEBELUM putNextEntry, jadi CRC dihitung
+     *  dari [openStream] dalam satu lintasan baca terpisah dan jumlah
+     *  byte lintasan itu wajib sama persis dengan [knownSize]. Syarat
+     *  mana pun tak terpenuhi (bukan media, ukuran tak diketahui,
+     *  lintasan CRC gagal/berbeda) -> entri DEFLATED bawaan: metode
+     *  yang sah tanpa prasyarat. Berkas yang berubah di antara lintasan
+     *  CRC dan lintasan salin tetap tertangkap verifikasi ukuran
+     *  copyZipEntryVerified / CRC saat closeEntry (doktrin #846/#958). */
+    internal fun preparedZipEntry(
+        name: String,
+        knownSize: Long,
+        openStream: () -> java.io.InputStream?
+    ): ZipEntry {
+        if (knownSize >= 0 && isIncompressibleZipEntry(name)) {
+            var crcValue = -1L
+            val counted = runCatching {
+                openStream()?.use { input ->
+                    val crc = java.util.zip.CRC32()
+                    val buf = ByteArray(IO_BUF)
+                    var total = 0L
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n <= 0) break
+                        crc.update(buf, 0, n)
+                        total += n
+                    }
+                    crcValue = crc.value
+                    total
+                }
+            }.getOrNull()
+            if (counted != null && counted == knownSize) {
+                return ZipEntry(name).apply {
+                    method = ZipEntry.STORED
+                    size = knownSize
+                    compressedSize = knownSize
+                    crc = crcValue
+                }
+            }
+        }
+        return ZipEntry(name)
+    }
+
     /** Nama dari filesystem/MediaStore tidak boleh dipakai mentah sebagai
      *  path ZIP; normalisasi mencegah Zip Slip di extractor pihak ketiga. */
     internal fun safeEntryPath(path: String): String {
@@ -162,7 +226,14 @@ object ZipCreator {
             // difinalkan closeEntry sebagai berkas utuh bila ditelan.
             // Galat dibiarkan naik; createTempZip membuang seluruh ZIP
             // dan pemanggil menerima kegagalan yang jujur.
-            zos.putNextEntry(ZipEntry(entryPath))
+            // Media terkompresi ditulis STORED (issue #1432): ukuran
+            // File.length() otoritatif dan CRC dihitung dari lintasan
+            // baca terpisah atas berkas yang sama.
+            zos.putNextEntry(
+                preparedZipEntry(entryPath, expected) {
+                    runCatching { file.inputStream() }.getOrNull()
+                }
+            )
             try {
                 input.use { copyZipEntryVerified(it, zos, expected, true, file.name) }
             } finally {
@@ -215,6 +286,9 @@ object ZipCreator {
                 val input: java.io.InputStream?
                 var expectedSize = -1L
                 var expectedStrictZero = false
+                // Pembuka stream kedua untuk lintasan CRC entri STORED
+                // (issue #1432); diisi cabang sumber masing-masing.
+                var openAgain: () -> java.io.InputStream? = { null }
                 if (raw.startsWith("f:")) {
                     val f = File(raw.removePrefix("f:"))
                     val canon = runCatching { f.canonicalPath }.getOrNull()
@@ -292,6 +366,9 @@ object ZipCreator {
                     input = if (f.isFile) {
                         runCatching { f.inputStream() }.getOrNull()
                     } else null
+                    if (f.isFile) {
+                        openAgain = { runCatching { f.inputStream() }.getOrNull() }
+                    }
                 } else {
                     if (!raw.startsWith("u:")) {
                         skippedItems++
@@ -307,6 +384,9 @@ object ZipCreator {
                     input = runCatching {
                         context.contentResolver.openInputStream(uri)
                     }.getOrNull()
+                    openAgain = {
+                        runCatching { context.contentResolver.openInputStream(uri) }.getOrNull()
+                    }
                 }
                 if (input == null) {
                     skippedItems++
@@ -325,7 +405,12 @@ object ZipCreator {
                 val entry = uniqueZipName(safeEntryPath(name).ifEmpty { "file" }, used)
                 // Tanpa runCatching: salinan yang putus harus menggagalkan
                 // ZIP, bukan memfinalkan entri terpotong (issue #846).
-                zos.putNextEntry(ZipEntry(entry))
+                // Media terkompresi STORED bila ukuran diketahui menurut
+                // semantik cabangnya (issue #1432): berkas = >= 0 otoritatif,
+                // provider = hanya > 0 (0 berarti tak diketahui).
+                val knownSize = if (expectedStrictZero) expectedSize
+                    else if (expectedSize > 0) expectedSize else -1L
+                zos.putNextEntry(preparedZipEntry(entry, knownSize, openAgain))
                 try {
                     input.use { copyZipEntryVerified(it, zos, expectedSize, expectedStrictZero, name) }
                 } finally {
@@ -634,10 +719,9 @@ object ZipCreator {
                     val entry = uniqueZipName(rawEntry, used)
                     // Gagal MEMBUKA entri = entri terlewat (selaras
                     // issue #857); gagal MENYALIN di tengah tetap fatal.
+                    val itemUri = ContentUris.withAppendedId(collection, c.getLong(iId))
                     val input = runCatching {
-                        resolver.openInputStream(
-                            ContentUris.withAppendedId(collection, c.getLong(iId))
-                        )
+                        resolver.openInputStream(itemUri)
                     }.getOrNull()
                     if (input == null) {
                         skipped++
@@ -661,7 +745,15 @@ object ZipCreator {
                             // Tanpa runCatching: stream MediaStore yang putus
                             // di tengah tidak boleh memfinalkan entri
                             // terpotong sebagai berkas utuh (issue #846).
-                            zos.putNextEntry(ZipEntry(entry))
+                            // Media galeri (video) ditulis STORED bila
+                            // ukuran MediaStore diketahui > 0 (issue #1432);
+                            // lintasan CRC membuka stream URI yang sama
+                            // sekali lagi.
+                            zos.putNextEntry(
+                                preparedZipEntry(entry, if (expected > 0) expected else -1L) {
+                                    runCatching { resolver.openInputStream(itemUri) }.getOrNull()
+                                }
+                            )
                             try {
                                 copyZipEntryVerified(it, zos, expected, false, name)
                             } finally {
