@@ -1110,23 +1110,18 @@ class FileSaver(context: Context) {
 
     fun deleteFiles(item: DownloadItem) {
         partialFiles(item).forEach { runCatching { it.delete() } }
-        // Temp HLS + scratch remux/adaptive item ikut dihapus sekarang
-        // (issue #461): tanpa ini, menghapus item HLS yang dijeda/gagal
+        // Scratch remux/adaptive item ikut dihapus sekarang
+        // (issue #461): tanpa ini, menghapus item yang dijeda/gagal
         // tidak membebaskan ruang sampai sapuan yatim berumur >2 jam
         // berjalan — asimetris dengan partial di atas. Nama temp persis
         // protectedPartialNames (sumber yang sama dengan perlindungan
         // sapuan); scratch diturunkan dari tempBase engine yang sama.
-        val hlsBase = buangSufiksEkstensi(item.fileName, ".ts", ".mp4").ifBlank { item.fileName }
-        // Basis adaptive BERBEDA dari basis HLS (issue #467):
-        // downloadAdaptiveMuxed membuang .mp4/.webm sedangkan
-        // downloadHls membuang .ts/.mp4 — untuk item .webm (hasil
-        // strategi Piped) basis engine adalah "film" tetapi basis HLS
-        // di sini "film.webm", sehingga scratch adaptive-nya lolos
-        // bila hanya diturunkan dari basis HLS. Turunkan dari keduanya.
+        // Basis scratch adaptive (issue #467): downloadAdaptiveMuxed
+        // membuang sufiks .mp4/.webm dari nama mentah.
         val adaptiveBase = buangSufiksEkstensi(item.fileName, ".mp4", ".webm").ifBlank { item.fileName }
         val extraNames = buildSet {
             addAll(protectedPartialNames(item))
-            for (base in setOf(hlsBase, adaptiveBase)) {
+            for (base in setOf(adaptiveBase)) {
                 val tempBase = "~" + item.id.take(8) + base
                 for (kind in listOf("muxed", "audioM4a", "videoMp4")) {
                     add(FileNames.safe("$tempBase.$kind") + ".part")
@@ -1134,21 +1129,6 @@ class FileSaver(context: Context) {
             }
         }
         extraNames.forEach { name -> runCatching { File(downloadDir, name).delete() } }
-        // Spool per-segmen unduh-awal HLS (issue #1371): namanya berindeks
-        // tak terbatas sehingga tak bisa disebut persis di extraNames —
-        // sapu berdasar AWALAN spool item ini, meniru deleteHlsTempWithSidecar
-        // di engine, agar menghapus item ikut membebaskan spool pendahulunya.
-        val spoolPrefixes = protectedPartialNames(item)
-            .filter { it.endsWith(".spool") }.map { "$it." }
-        if (spoolPrefixes.isNotEmpty()) {
-            runCatching {
-                downloadDir.listFiles()?.forEach { f ->
-                    if (spoolPrefixes.any { f.name.startsWith(it) }) {
-                        runCatching { f.delete() }
-                    }
-                }
-            }
-        }
         if (!item.contentUri.isNullOrEmpty()) {
             runCatching { appContext.contentResolver.delete(item.contentUri.toUri(), null, null) }
         }
@@ -1746,80 +1726,32 @@ internal fun dirForFolderPath(folderPath: String): java.io.File? {
  *  `.part` SELALU ikut — item bersegmen yang jatuh ke single-stream (fallback
  *  saat Range ditolak) menulis ke basis tanpa sufiks, dan tanpa ini progres
  *  unduhan jeda-lama (>2 jam) terhapus sebagai yatim lalu mengulang dari nol.
- *  Temp HLS ikut dilindungi (issue #409): namanya BUKAN turunan nama item
- *  (`~<id8><basis>.video.part` dari DownloadEngine.downloadHls) dan sejak
- *  #385 isinya adalah data resume lintas-restart — tanpa perlindungan ini
- *  sapuan menghapusnya untuk jeda >2 jam dan resume mulai dari segmen 0.
  *  Murni agar bisa di-unit-test. */
 internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.DownloadItem): Set<String> {
     val base = FileNames.safe(item.fileName)
     return buildSet {
         add("$base.part")
         item.segments.forEach { add("$base.part.${it.index}") }
-        // Turunan tempBase engine: basis tanpa ekstensi .ts/.mp4, prefiks
-        // "~" + 8 char id. FileNames.safe diterapkan pada nama gabungan
-        // persis seperti partialFile di engine. URUTAN WAJIB sama dengan
-        // engine (issue #443): engine membuang sufiks dari nama MENTAH
-        // (outName) lalu safe() pada gabungan; safe() lebih dulu di sini
-        // menyimpang untuk nama tepi — nama reserved (CON.mp4) mendapat
-        // awalan "_" hanya di jalur perlindungan, dan nama berakhiran
-        // spasi/titik kehilangan sufiks yang bisa dibuang hanya di sini —
-        // sehingga temp HLS nama-nama itu tetap tak terlindungi.
-        // Basis yang sama persis dengan engine (issue #529): sejak
-        // #522 engine membuang ekstensi tanpa peka kapital lewat
-        // buangSufiksEkstensi; turunan peka-kapital di sini membuat
-        // himpunan terlindungi menyimpang untuk nama kustom kapital
-        // sehingga temp resume tersapu yatim dan scratch lolos.
-        val hlsBase = buangSufiksEkstensi(item.fileName, ".ts", ".mp4").ifBlank { item.fileName }
-        val tempBase = "~" + item.id.take(8) + hlsBase
-        for (kind in listOf("video", "audio")) {
-            val temp = FileNames.safe("$tempBase.$kind") + ".part"
-            add(temp)
-            add("$temp.segs")
-            add("$temp.spool")
-        }
     }
 }
 
 private val PART_SEGMENT_TAIL_RE = Regex("""\.part\.\d+$""")
 private val MERGE_STAGING_TAIL_RE = Regex("""\.merge\.\d+$""")
-private val HLS_SEGMENT_SPOOL_TAIL_RE = Regex("""\.part\.spool\.\d+$""")
 
 /** File internal yang boleh disapu bila yatim: partial segmen/basis plus
  *  staging merge (`.merge.<nanoTime>`) yang tertinggal bila proses mati di
- *  tengah merge, spool segmen HLS (`.part.spool`, issue #401), spool
- *  PER-SEGMEN unduh-awal HLS (`.part.spool.<idx>`, issue #1371 — finally
- *  penghapusnya hanya menjangkau spool segmen yang sempat di-launch dalam
- *  umur proses itu) dan penanda resume HLS (`.part.segs`, #385) yang
- *  finally-nya hanya berjalan bila proses masih hidup. Pola WAJIB
- *  terjangkar di ekor nama: pola longgar ".part." di tengah nama ikut
- *  menyapu file FINAL selesai seperti `film.part.1.mp4` atau
- *  `game.part.2.rar` (pola nama arsip pecahan yang umum). Murni agar
- *  bisa di-unit-test. */
+ *  tengah merge. Pola WAJIB terjangkar di ekor nama: pola longgar
+ *  ".part." di tengah nama ikut menyapu file FINAL selesai seperti
+ *  `film.part.1.mp4` atau `game.part.2.rar` (pola nama arsip pecahan
+ *  yang umum). Murni agar bisa di-unit-test. */
 internal fun isSweepablePartial(name: String): Boolean =
     name.endsWith(".part") || PART_SEGMENT_TAIL_RE.containsMatchIn(name) ||
-        MERGE_STAGING_TAIL_RE.containsMatchIn(name) ||
-        name.endsWith(".part.spool") || name.endsWith(".part.segs") ||
-        HLS_SEGMENT_SPOOL_TAIL_RE.containsMatchIn(name)
+        MERGE_STAGING_TAIL_RE.containsMatchIn(name)
 
 /** Nama partial ini milik item yang dikenal? Nama persis dari
- *  [protectedPartialNames] selalu ya; selain itu spool PER-SEGMEN
- *  (`<temp>.part.spool.<idx>`) dari spool item yang dikenal juga ya —
- *  indeksnya tak terbatas sehingga tak bisa dienumerasi ke himpunan nama
- *  persis, tetapi tanpa perlindungan ini sapuan yatim berumur >2 jam bisa
- *  menghapus spool unduhan HLS yang masih hidup (pasangan sweepable baru
- *  issue #1371). Murni agar bisa di-unit-test. */
+ *  [protectedPartialNames] selalu ya. Murni agar bisa di-unit-test. */
 internal fun isProtectedPartialName(name: String, protectedNames: Set<String>): Boolean {
-    if (name in protectedNames) return true
-    for (spool in protectedNames) {
-        if (!spool.endsWith(".spool")) continue
-        val prefix = "$spool."
-        if (name.startsWith(prefix)) {
-            val tail = name.substring(prefix.length)
-            if (tail.isNotEmpty() && tail.all { it.isDigit() }) return true
-        }
-    }
-    return false
+    return name in protectedNames
 }
 
 private val UNIQUE_SUFFIX_RE = Regex("""^(.+) \([^()]+\)$""")

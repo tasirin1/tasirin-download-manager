@@ -14,17 +14,17 @@ class FileSaverSweepTest {
     }
 
     @Test
-    fun `temp HLS sweepable`() {
+    fun `temp remux sweepable`() {
         assertTrue(isSweepablePartial("movie.video.part"))
         assertTrue(isSweepablePartial("movie.audio.part"))
         assertTrue(isSweepablePartial("movie.muxed.part"))
     }
 
     @Test
-    fun `spool dan penanda resume HLS sweepable`() {
-        assertTrue(isSweepablePartial("movie.video.part.spool"))
-        assertTrue(isSweepablePartial("movie.video.part.segs"))
-        assertTrue(isSweepablePartial("movie.audio.part.segs"))
+    fun `spool dan penanda resume TIDAK sweepable`() {
+        assertFalse(isSweepablePartial("movie.video.part.spool"))
+        assertFalse(isSweepablePartial("movie.video.part.segs"))
+        assertFalse(isSweepablePartial("movie.audio.part.segs"))
         // Nama final yang kebetulan memuat kata itu di tengah tetap aman.
         assertFalse(isSweepablePartial("movie.spool.mp4"))
         assertFalse(isSweepablePartial("movie.segs.mp4"))
