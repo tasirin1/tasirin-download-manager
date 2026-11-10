@@ -272,11 +272,16 @@ internal fun getOrCreateThumb(
             // seperti f: — JPEG yang tersimpan di bawah kunci itu akan
             // tersaji walau isi di balik URI berganti, sampai pembersih
             // disk membuangnya. Hasil generate tetap disajikan lewat
-            // berkas sekali-pakai unik (bukan kunci cache; jalur baca di
-            // atas tak pernah menemukannya, dan pembersih disk folder
-            // thumbs yang sama menyapunya seperti berkas cache lain).
+            // berkas sekali-pakai per kunci (bukan kunci cache; jalur
+            // baca di atas tak pernah menemukannya). Namanya kini
+            // DETERMINISTIK per kunci (issue #1418) dan ditulis ulang
+            // via staging+rename di bawah pada tiap request: nama unik
+            // per request dulu menumpuk satu berkas yatim per sajian
+            // sampai penyapu umur 7 hari berjalan. Pembersih disk
+            // folder thumbs menyapu semua nama berdasar umur, jadi pola
+            // .once ini tercakup sama seperti berkas cache lain.
             val serveTarget = if (raw.startsWith("u:") && stamp.isEmpty()) {
-                File(dir, "$key.once-${System.nanoTime()}.jpg")
+                File(dir, "$key.once.jpg")
             } else {
                 cached
             }
