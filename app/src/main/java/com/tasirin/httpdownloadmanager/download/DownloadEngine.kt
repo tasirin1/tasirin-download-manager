@@ -3040,17 +3040,7 @@ class DownloadEngine(appContext: Context) {
             videoMp4.delete()
             audioM4a.delete()
             ensureItemPresent(item.id, mp4)
-            val published0 = publishItem(saver, mp4, fileName, item)
-            val finalName = published0.fileName ?: fileName
-            verifyChecksum(item.id, published0, saver)?.let {
-                deletePublished(published0)
-                rollbackReplacement(item.id)
-                throw IOException(it)
-            }
-            ensurePresentForCommit(item.id, published0)
-            commitReplacement(item.id)
-            val published = organizeIfEnabled(saver, published0, finalName)
-            ensurePublishedKept(item.id, published0, published)
+            val (published, finalName) = publishCommitOrganize(item, saver, mp4, fileName)
             finishMuxed(item, progress.downloaded.get(), published, finalName)
         } catch (e: Exception) {
             // Temp video/audio SENGAJA dipertahankan saat gagal/jeda
@@ -3168,18 +3158,65 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun finishMuxed(
+    /** Protokol terbit bersama ketiga jalur finalisasi (issue #1463):
+     *  publish -> verifikasi checksum (gagal: buang terbitan + rollback
+     *  penggantian + lempar) -> penjaga commit -> commit penggantian ->
+     *  organize -> penjaga terbitan yatim. Dulu disalin tangan di jalur
+     *  adaptif, single-stream, dan multi-segmen, sehingga perbaikan di
+     *  satu situs berulang kali tidak menular ke situs lain. Mengembalikan
+     *  hasil organize + nama final dari terbitan awal. */
+    private suspend fun publishCommitOrganize(
         item: DownloadItem,
-        downloaded: Long,
-        published: FileSaver.PublishResult,
-        finalName: String
-    ) {
+        saver: FileSaver,
+        source: File,
+        fileName: String
+    ): Pair<FileSaver.PublishResult, String> {
+        val published0 = publishItem(saver, source, fileName, item)
+        val finalName = published0.fileName ?: fileName
+        verifyChecksum(item.id, published0, saver)?.let {
+            deletePublished(published0)
+            rollbackReplacement(item.id)
+            throw IOException(it)
+        }
+        ensurePresentForCommit(item.id, published0)
+        commitReplacement(item.id)
+        val published = organizeIfEnabled(saver, published0, finalName)
+        ensurePublishedKept(item.id, published0, published)
+        return published to finalName
+    }
+
+    /** Ekor selesai bersama ketiga jalur finalisasi (issue #1463):
+     *  buang pelacak kecepatan/retry item (issue #574), tandai COMPLETED
+     *  lewat [buildCompleted] milik pemanggil (field per-jalur tetap
+     *  diputuskan pemanggil), simpan + persisten cookie, jalankan
+     *  [afterPersist] (pembersihan/log per-jalur), lalu notifikasi. */
+    private fun completePublished(
+        item: DownloadItem,
+        afterPersist: () -> Unit = {},
+        buildCompleted: (DownloadItem) -> DownloadItem
+    ): DownloadItem? {
         speedTracker.reset(item.id)
         // Entri retry/sampel kecepatan item yang selesai ikut dibuang
         // (issue #574): dulu hanya dibersihkan di jalur jeda/batal/
         // gagal, sehingga menetap seumur proses untuk item COMPLETED.
         retryAttempts.remove(item.id)
         lastSpeedSample.remove(item.id)
+        val finished = updateItem(item.id, transform = buildCompleted)
+        flushSave()
+        // Cookie sesi dari unduhan yang selesai ikut dipersists
+        // (issue #391): semua jalur finalisasi wajib mencapainya.
+        persistCookies()
+        afterPersist()
+        if (finished != null) NotificationHelper.notifyItemFinished(context, finished)
+        return finished
+    }
+
+    private fun finishMuxed(
+        item: DownloadItem,
+        downloaded: Long,
+        published: FileSaver.PublishResult,
+        finalName: String
+    ) {
         // Ukuran final dari berkas terbit sebenarnya bila terukur
         // (issue #348): jumlah byte segmen MPEG-TS bukan ukuran MP4
         // hasil remux (beda header MP4 dan padding TS), jadi memakai
@@ -3189,7 +3226,7 @@ class DownloadEngine(appContext: Context) {
         val actualSize = published.filePath?.let { path ->
             runCatching { File(path).takeIf { it.isFile }?.length() }.getOrNull()
         }?.takeIf { it > 0 } ?: downloaded
-        val finishedMux = updateItem(item.id) {
+        completePublished(item) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = published.fileName ?: finalName,
@@ -3205,11 +3242,6 @@ class DownloadEngine(appContext: Context) {
                 finishedAt = System.currentTimeMillis()
             )
         }
-        flushSave()
-        // Cookie sesi dari unduhan termux ikut dipersists (issue #391):
-        // sebelumnya hanya jalur single-stream yang memanggil ini.
-        persistCookies()
-        if (finishedMux != null) NotificationHelper.notifyItemFinished(context, finishedMux)
     }
 
 
@@ -3473,22 +3505,10 @@ class DownloadEngine(appContext: Context) {
         ensureItemPresent(item.id, partialFile)
         verifySize(downloaded, total, fileName)
 
-        val published0 = publishItem(saver, partialFile, fileName, item)
-        val finalName = published0.fileName ?: fileName
-        verifyChecksum(item.id, published0, saver)?.let {
-            deletePublished(published0)
-            rollbackReplacement(item.id)
-            throw IOException(it)
-        }
-        ensurePresentForCommit(item.id, published0)
-        commitReplacement(item.id)
-        val published = organizeIfEnabled(saver, published0, finalName)
-        ensurePublishedKept(item.id, published0, published)
-        speedTracker.reset(item.id)
-        // Sama seperti finishMuxed (issue #574).
-        retryAttempts.remove(item.id)
-        lastSpeedSample.remove(item.id)
-        val finishedSingle = updateItem(item.id) {
+        val (published, finalName) = publishCommitOrganize(item, saver, partialFile, fileName)
+        completePublished(item, afterPersist = {
+            App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
+        }) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = published.fileName ?: finalName,
@@ -3506,10 +3526,6 @@ class DownloadEngine(appContext: Context) {
                 finishedAt = System.currentTimeMillis()
             )
         }
-        flushSave()
-        persistCookies()
-        App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(downloaded)})")
-        if (finishedSingle != null) NotificationHelper.notifyItemFinished(context, finishedSingle)
     }
 
     /** Siapkan berkas tunggal pra-alokasi untuk jalur segmen (issue #1427)
@@ -3751,22 +3767,11 @@ class DownloadEngine(appContext: Context) {
         // tahap penggabungan, jadi jalur publish/MediaStore/SAF tak berubah.
         val merged = saver.partialFile(fileName)
         ensureItemKept(item.id, merged)
-        val published0 = publishItem(saver, merged, fileName, item)
-        val finalName = published0.fileName ?: fileName
-        verifyChecksum(item.id, published0, saver)?.let {
-            deletePublished(published0)
-            rollbackReplacement(item.id)
-            throw IOException(it)
-        }
-        ensurePresentForCommit(item.id, published0)
-        commitReplacement(item.id)
-        val published = organizeIfEnabled(saver, published0, finalName)
-        ensurePublishedKept(item.id, published0, published)
-        speedTracker.reset(item.id)
-        // Sama seperti finishMuxed (issue #574).
-        retryAttempts.remove(item.id)
-        lastSpeedSample.remove(item.id)
-        val finishedMulti = updateItem(item.id) {
+        val (published, finalName) = publishCommitOrganize(item, saver, merged, fileName)
+        completePublished(item, afterPersist = {
+            clearSegProgress(item.id)
+            App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
+        }) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = published.fileName ?: finalName,
@@ -3784,12 +3789,6 @@ class DownloadEngine(appContext: Context) {
                 finishedAt = System.currentTimeMillis()
             )
         }
-        flushSave()
-        // Cookie sesi dari unduhan multi-segmen ikut dipersists (issue #391).
-        persistCookies()
-        clearSegProgress(item.id)
-        App.logEvent("DOWNLOAD COMPLETED: $finalName (${Formats.bytes(current.bytesDownloaded)})")
-        if (finishedMulti != null) NotificationHelper.notifyItemFinished(context, finishedMulti)
     }
 
     /** Minta URL CDN segar saat link kedaluwarsa di tengah unduhan:
