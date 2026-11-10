@@ -830,7 +830,13 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
                 if (socialJob !== coroutineContext[Job] ||
                     extractUrls(urlInput.text?.toString().orEmpty()).firstOrNull() != probeTarget
                 ) return@launch
-                socialProbeMemo = probeTarget to options
+                // Memo hanya untuk hasil TAK KOSONG (issue #1502):
+                // hasil kosong/gagal yang ikut ter-memo mengunci URL
+                // ini seumur dialog — jaringan yang pulih sesudahnya
+                // tak pernah dicoba ulang tanpa tutup-buka dialog.
+                if (options.isNotEmpty()) {
+                    socialProbeMemo = probeTarget to options
+                }
                 applySocialProbeResult(probeTarget, options)
             }
         }
