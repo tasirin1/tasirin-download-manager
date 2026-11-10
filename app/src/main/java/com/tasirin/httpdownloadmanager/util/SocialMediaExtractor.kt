@@ -490,13 +490,17 @@ object SocialMediaExtractor {
         val namePrefix = tikTokNamePrefix(author, id)
         val options = mutableListOf<Result>()
 
+        // Nama berkas memuat label kualitas (issue #1522): HD dan SD
+        // dulu bernama persis sama ("$namePrefix.mp4") sehingga dua
+        // unduhan dari video yang sama tak terbedakan dari namanya —
+        // kelas cacat yang sudah ditutup situs lain (#1461/#1511).
         val hdUrl = data.optString("hdplay", "")
         if (hdUrl.startsWith("http")) {
-            options.add(Result(hdUrl, "$namePrefix.mp4", title, "HD", MIME_MP4))
+            options.add(Result(hdUrl, "${namePrefix}_HD.mp4", title, "HD", MIME_MP4))
         }
         val sdUrl = data.optString("play", "")
         if (sdUrl.startsWith("http")) {
-            options.add(Result(sdUrl, "$namePrefix.mp4", title, "SD", MIME_MP4))
+            options.add(Result(sdUrl, "${namePrefix}_SD.mp4", title, "SD", MIME_MP4))
         }
         val wmUrl = data.optString("wmplay", "")
         if (wmUrl.startsWith("http") && wmUrl != sdUrl) {
