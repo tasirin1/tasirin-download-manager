@@ -2370,11 +2370,12 @@ return;
 const parts = val.trim().split(/\s+/);
 const speed = parseInt(parts[0], 10);
 if (isNaN(speed) || speed < 0) return;
-const priority = parts.length > 1 ? parseInt(parts[1], 10) : 0;
-doActionNow(it.id, 'limit_priority', {
-speedLimitKbps: speed,
-priority: isNaN(priority) ? 0 : priority
-});
+const payload = {speedLimitKbps: speed};
+if (parts.length > 1) {
+const priority = parseInt(parts[1], 10);
+payload.priority = isNaN(priority) ? 0 : priority;
+}
+doActionNow(it.id, 'limit_priority', payload);
 }
 );
 return;

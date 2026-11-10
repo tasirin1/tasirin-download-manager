@@ -5081,11 +5081,17 @@ function openItemSheet(it) {
             const parts = val.trim().split(/\s+/);
             const speed = parseInt(parts[0], 10);
             if (isNaN(speed) || speed < 0) return;
-            const priority = parts.length > 1 ? parseInt(parts[1], 10) : 0;
-            doActionNow(it.id, 'limit_priority', {
-              speedLimitKbps: speed,
-              priority: isNaN(priority) ? 0 : priority
-            });
+            // Prioritas hanya dikirim bila pengguna mengetiknya
+            // (issue #1494): tanpa token kedua, field ini absen dan
+            // server mempertahankan prioritas item saat ini — dulu
+            // bawaan 0 diam-diam me-reset High/Low ke Normal setiap
+            // kali pengguna hanya mengubah kecepatan.
+            const payload = {speedLimitKbps: speed};
+            if (parts.length > 1) {
+              const priority = parseInt(parts[1], 10);
+              payload.priority = isNaN(priority) ? 0 : priority;
+            }
+            doActionNow(it.id, 'limit_priority', payload);
           }
         );
         return;

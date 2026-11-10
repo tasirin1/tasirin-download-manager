@@ -2484,7 +2484,13 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 if (id.isEmpty()) return jsonResponse(JSONObject().put("ok", false))
                 val speed = params["speedLimitKbps"]?.toIntOrNull()
                     ?.coerceIn(0, 100_000) ?: 0
-                val priority = params["priority"]?.toIntOrNull()?.coerceIn(-1, 1) ?: 0
+                // Prioritas ABSEN != prioritas 0 (issue #1494): dialog
+                // Speed limit hanya mengirim field ini bila pengguna
+                // mengetiknya; tanpa pembeda ini, mengubah kecepatan
+                // saja diam-diam me-reset prioritas High/Low item ke
+                // Normal. Bila absen, pertahankan prioritas item kini.
+                val priority = params["priority"]?.toIntOrNull()?.coerceIn(-1, 1)
+                    ?: App.engine.items.value.find { it.id == id }?.priority ?: 0
                 App.engine.setLimitAndPriority(id, speed, priority)
             }
             "pause_all" -> App.engine.pauseAll()
