@@ -6,9 +6,9 @@
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:startColor="#1565C0"
+                android:startColor="@color/primary"
                 android:centerColor="@color/banner_mid"
-                android:endColor="#0D47A1"
+                android:endColor="@color/primary_dark"
                 android:angle="135" />
         </shape>
     </item>
@@ -21,24 +21,24 @@
             android:viewportHeight="108">
             <path
                 android:fillColor="#00000000"
-                android:strokeColor="#FFFFFF"
+                android:strokeColor="@color/white"
                 android:strokeWidth="4"
                 android:pathData="M77,52 a23,23 0 1 1 -46,0 a23,23 0 1 1 46,0 z" />
             <path
-                android:fillColor="#FFFFFF"
+                android:fillColor="@color/white"
                 android:pathData="M48,40 h12 v16 h-12 z" />
             <path
-                android:fillColor="#FFFFFF"
+                android:fillColor="@color/white"
                 android:pathData="M40,56 h28 l-14,14 z" />
             <path
-                android:fillColor="#F57C00"
+                android:fillColor="@color/accent"
                 android:pathData="M42,79 h24 v3 h-24 z" />
         </vector>
     </item>
     <!-- Garis aksen oranye di bawah -->
     <item android:gravity="bottom" android:height="4dp">
         <shape android:shape="rectangle">
-            <solid android:color="#F57C00" />
+            <solid android:color="@color/accent" />
         </shape>
     </item>
 </layer-list>
