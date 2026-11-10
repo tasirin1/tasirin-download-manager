@@ -21,11 +21,16 @@ class FileSaverSweepTest {
     }
 
     @Test
-    fun `spool dan penanda resume TIDAK sweepable`() {
-        assertFalse(isSweepablePartial("movie.video.part.spool"))
-        assertFalse(isSweepablePartial("movie.video.part.segs"))
-        assertFalse(isSweepablePartial("movie.audio.part.segs"))
-        // Nama final yang kebetulan memuat kata itu di tengah tetap aman.
+    fun `sidecar warisan spool dan segs sweepable sebagai yatim`() {
+        // Issue #1437: penulis sidecar ini (mesin lama) sudah dihapus,
+        // jadi sisa instalasi lama adalah sampah warisan yang WAJIB
+        // tersapu — bukan lagi penanda resume yang dilindungi.
+        assertTrue(isSweepablePartial("movie.video.part.spool"))
+        assertTrue(isSweepablePartial("movie.video.part.segs"))
+        assertTrue(isSweepablePartial("movie.audio.part.segs"))
+        assertTrue(isSweepablePartial("movie.video.part.spool.3"))
+        // Nama final yang kebetulan memuat kata itu di tengah tetap aman:
+        // pola warisan terjangkar di ekor nama.
         assertFalse(isSweepablePartial("movie.spool.mp4"))
         assertFalse(isSweepablePartial("movie.segs.mp4"))
     }
