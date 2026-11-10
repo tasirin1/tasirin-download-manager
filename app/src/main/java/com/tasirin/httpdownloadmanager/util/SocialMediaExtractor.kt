@@ -11,7 +11,9 @@ import java.net.URL
 import java.net.URLEncoder
 import java.io.InputStream
 import java.util.Locale
+import java.util.Collections
 import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 import java.util.concurrent.SynchronousQueue
@@ -1179,6 +1181,41 @@ object SocialMediaExtractor {
         }.getOrDefault(false)
     }
 
+    /** Kendali berhenti balapan fallback (issue #1448): Future.cancel(true)
+     *  saja tidak menghentikan tugas yang kalah — tidak ada pemeriksaan
+     *  interupsi di jalur ini dan I/O HttpURLConnection yang memblokir
+     *  tidak menanggapi interupsi thread, jadi tugas kalah terus
+     *  mengiterasi instansnya dan menduduki stageExecutor jauh melampaui
+     *  anggaran balapan. Kontrol ini adalah registry bersama per balapan:
+     *  tiap koneksi yang dibuka tugas balapan didaftarkan; [stop]
+     *  membalik bendera (diperiksa tiap iterasi instans + tiap hop) DAN
+     *  men-disconnect semua koneksi terdaftar — disconnect-lah yang
+     *  menembus read/connect yang sedang memblokir. */
+    internal class FallbackRaceControl {
+        @Volatile
+        var stopped: Boolean = false
+            private set
+
+        private val connections: MutableSet<HttpURLConnection> =
+            Collections.newSetFromMap(ConcurrentHashMap<HttpURLConnection, Boolean>())
+
+        fun register(conn: HttpURLConnection) {
+            connections.add(conn)
+            // Balapan sudah berhenti sebelum koneksi ini sempat
+            // terdaftar: putuskan segera agar tak menggantung.
+            if (stopped) runCatching { conn.disconnect() }
+        }
+
+        fun unregister(conn: HttpURLConnection) {
+            connections.remove(conn)
+        }
+
+        fun stop() {
+            stopped = true
+            for (conn in connections) runCatching { conn.disconnect() }
+        }
+    }
+
     /** Balapan fallback lapis ketiga (issue #1430): Piped, Invidious,
      *  dan Cobalt dicoba KONKUREN — satu tugas per layanan di
      *  stageExecutor (pola yang sama dengan probe filterForbidden);
@@ -1191,10 +1228,14 @@ object SocialMediaExtractor {
      *  dibatasi FALLBACK_RACE_BUDGET_MS; cap tahap pemanggil tetap
      *  menjadi pagar terluar. */
     private fun extractYouTubeViaFallbackRace(videoId: String): List<Result> {
+        // Satu kontrol per balapan (issue #1448): pemenang/anggaran habis
+        // menghentikan yang kalah sungguhan lewat stop() — bukan hanya
+        // cancel(true) yang tak menembus I/O memblokir.
+        val race = FallbackRaceControl()
         val racers: List<() -> List<Result>> = listOf(
-            { extractYouTubeViaPiped(videoId) },
-            { extractYouTubeViaInvidious(videoId)?.let { listOf(it) } ?: emptyList() },
-            { extractYouTubeViaCobalt(videoId)?.let { listOf(it) } ?: emptyList() }
+            { extractYouTubeViaPiped(videoId, race) },
+            { extractYouTubeViaInvidious(videoId, race)?.let { listOf(it) } ?: emptyList() },
+            { extractYouTubeViaCobalt(videoId, race)?.let { listOf(it) } ?: emptyList() }
         )
         // Tipe ditulis EKSPLISIT penuh di blok ini (perbaikan
         // kompilasi): submit(Callable<T>) di dalam map + try/catch
@@ -1214,6 +1255,10 @@ object SocialMediaExtractor {
             }
             futures.add(future)
         }
+        fun stopLosers() {
+            race.stop()
+            for (other in futures) other?.cancel(true)
+        }
         val deadline = System.nanoTime() + FALLBACK_RACE_BUDGET_MS * 1_000_000L
         val settled = BooleanArray(futures.size) { futures[it] == null }
         var settledCount = settled.count { it }
@@ -1232,7 +1277,7 @@ object SocialMediaExtractor {
                     emptyList<Result>()
                 }
                 if (result.isNotEmpty()) {
-                    for (other in futures) other?.cancel(true)
+                    stopLosers()
                     return result
                 }
             }
@@ -1240,11 +1285,11 @@ object SocialMediaExtractor {
             try {
                 Thread.sleep(FALLBACK_RACE_POLL_MS)
             } catch (_: InterruptedException) {
-                for (other in futures) other?.cancel(true)
+                stopLosers()
                 return emptyList()
             }
         }
-        for (other in futures) other?.cancel(true)
+        stopLosers()
         return emptyList()
     }
 
@@ -1304,13 +1349,20 @@ object SocialMediaExtractor {
             .none { codecs.contains(it, ignoreCase = true) }
     }
 
-    private fun extractYouTubeViaPiped(videoId: String): List<Result> {
+    private fun extractYouTubeViaPiped(
+        videoId: String,
+        race: FallbackRaceControl? = null
+    ): List<Result> {
         for (instance in PIPED_INSTANCES) {
+            // Bendera berhenti balapan (issue #1448): tugas yang kalah
+            // berhenti di instans berikutnya, bukan mengiterasi semua.
+            if (race?.stopped == true) return emptyList()
             val result = runCatching {
                 val http = httpGetWithCookies(
                     "https://$instance$videoId",
                     mapOf("User-Agent" to API_UA, "Accept" to "application/json"),
-                    timeoutMs = 4000
+                    timeoutMs = 4000,
+                    race = race
                 ) ?: return@runCatching null
                 val obj = JSONObject(http.body)
                 val title = obj.optString("title", "YouTube_$videoId")
@@ -1370,9 +1422,13 @@ object SocialMediaExtractor {
         "invidious.privacyredirect.com"
     )
 
-    private fun extractYouTubeViaInvidious(videoId: String): Result? {
+    private fun extractYouTubeViaInvidious(
+        videoId: String,
+        race: FallbackRaceControl? = null
+    ): Result? {
         for (instance in INVIDIOUS_INSTANCES) {
-            val resolved = resolveInvidiousLatest(instance, videoId, "18")
+            if (race?.stopped == true) return null
+            val resolved = resolveInvidiousLatest(instance, videoId, "18", race)
             if (resolved != null) {
                 return Result(resolved, null, "YouTube_$videoId", "360p", MIME_MP4)
             }
@@ -1387,15 +1443,20 @@ object SocialMediaExtractor {
         "https://api.cobalt.tools"
     )
 
-    private fun extractYouTubeViaCobalt(videoId: String): Result? {
+    private fun extractYouTubeViaCobalt(
+        videoId: String,
+        race: FallbackRaceControl? = null
+    ): Result? {
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
         val body = """{"url":"$watchUrl","filenameStyle":"pretty","downloadMode":"auto"}"""
         for (instance in COBALT_INSTANCES) {
+            if (race?.stopped == true) return null
             val resp = httpPostJson(
                 "$instance/",
                 body,
                 mapOf("User-Agent" to API_UA, "Accept" to "application/json"),
-                timeoutMs = 15000
+                timeoutMs = 15000,
+                race = race
             )
             if (resp == null) {
                 continue
@@ -1425,12 +1486,19 @@ object SocialMediaExtractor {
      *  gagal dan pemanggil lanjut ke instance lain (issue #546: dulu
      *  pengecualian tertelan loop sehingga URL yang sama dicoba sampai
      *  6x sebelum failover). Hanya redirect yang melanjutkan loop. */
-    private fun resolveInvidiousLatest(instance: String, videoId: String, itag: String): String? {
+    private fun resolveInvidiousLatest(
+        instance: String,
+        videoId: String,
+        itag: String,
+        race: FallbackRaceControl? = null
+    ): String? {
         val start = "https://$instance/latest_version?id=$videoId&itag=$itag"
         var current = start
         for (i in 0 until 6) {
+            if (race?.stopped == true) return null
             try {
                 val conn = openTlsConn(current)
+                race?.register(conn)
                 try {
                     conn.instanceFollowRedirects = false
                     conn.connectTimeout = 4000
@@ -1458,7 +1526,10 @@ object SocialMediaExtractor {
                         return current
                     }
                     return null
-                } finally { runCatching { conn.disconnect() } }
+                } finally {
+                    race?.unregister(conn)
+                    runCatching { conn.disconnect() }
+                }
             } catch (_: Exception) {
                 // Pengecualian jaringan: instance ini gagal — jangan
                 // ulang URL yang sama; serahkan failover ke pemanggil.
@@ -2541,7 +2612,7 @@ object SocialMediaExtractor {
         "${u.protocol}://${u.host}$port"
     }.getOrNull()
 
-    private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): HttpResult? {
+    private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000, race: FallbackRaceControl? = null): HttpResult? {
         var current = urlStr
         var activeHeaders = headers
         // Jar per (nama, host pemasang) -> (nilai, host pemasang),
@@ -2562,10 +2633,12 @@ object SocialMediaExtractor {
         val chainDeadline = android.os.SystemClock.elapsedRealtime() +
             maxOf(timeoutMs * 2L, 30_000L)
         repeat(6) {
+            if (race?.stopped == true) return null
             val remainingMs = chainDeadline -
                 android.os.SystemClock.elapsedRealtime()
             if (remainingMs <= 0L) return null
             val conn = openTlsConn(current)
+            race?.register(conn)
             try {
                 val hopTimeout = remainingMs
                     .coerceIn(1_000L, timeoutMs.toLong()).toInt()
@@ -2648,7 +2721,10 @@ object SocialMediaExtractor {
                 // Baca terbatas: hindari OOM dari body redirect/HTML raksasa.
                 val body = readBodyLimited(conn.inputStream)
                 return HttpResult(body, cookies)
-            } catch (_: Exception) { return null } finally { conn.disconnect() }
+            } catch (_: Exception) { return null } finally {
+                race?.unregister(conn)
+                conn.disconnect()
+            }
         }
         return null
     }
@@ -2661,7 +2737,8 @@ object SocialMediaExtractor {
         urlStr: String,
         body: String,
         headers: Map<String, String> = emptyMap(),
-        timeoutMs: Int = 15000
+        timeoutMs: Int = 15000,
+        race: FallbackRaceControl? = null
     ): String? {
         var current = urlStr
         var method = "POST"
@@ -2673,10 +2750,12 @@ object SocialMediaExtractor {
         val chainDeadline = android.os.SystemClock.elapsedRealtime() +
             maxOf(timeoutMs * 2L, 30_000L)
         repeat(6) {
+            if (race?.stopped == true) return null
             val remainingMs = chainDeadline -
                 android.os.SystemClock.elapsedRealtime()
             if (remainingMs <= 0L) return null
             val conn = openTlsConn(current)
+            race?.register(conn)
             try {
                 conn.requestMethod = method
                 val hopTimeout = remainingMs
@@ -2713,7 +2792,10 @@ object SocialMediaExtractor {
                 }
                 if (code !in 200..299) return null
                 return readBodyLimited(conn.inputStream)
-            } catch (_: Exception) { return null } finally { conn.disconnect() }
+            } catch (_: Exception) { return null } finally {
+                race?.unregister(conn)
+                conn.disconnect()
+            }
         }
         return null
     }
