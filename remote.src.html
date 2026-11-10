@@ -230,7 +230,7 @@
  .menu-backdrop.show { opacity: 1; pointer-events: auto; }
 
   .wrap {
- max-width: 880px; margin: 18px auto 0; padding: 0 16px calc(88px + env(safe-area-inset-bottom, 0px)); }
+ max-width: 880px; margin: 10px auto 0; padding: 0 12px calc(76px + env(safe-area-inset-bottom, 0px)); }
 
   .wrap.gal-wrap {
  max-width: 1200px; }
@@ -343,7 +343,7 @@
  background: var(--red-bg); color: var(--red); border: 1px solid var(--red-line); }
 
   ul.list {
- list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 
   li.item {
  position: relative; overflow: hidden; border-radius: var(--radius); touch-action: pan-y; content-visibility: auto; contain-intrinsic-size: auto 88px; }
@@ -417,10 +417,10 @@
  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
   .err {
- color: var(--red); margin-top: 4px; font-size: 12px; word-break: break-word; }
+ color: var(--red); margin-top: 2px; font-size: 12px; word-break: break-word; }
 
   .err-actions {
- margin-top: 4px; }
+ margin-top: 2px; }
 
   .item-retry {
  display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--primary); font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s ease; vertical-align: middle; }
@@ -429,7 +429,7 @@
  border-color: var(--primary); background: var(--primary-soft); }
 
   .bar-wrap {
- display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+ display: flex; align-items: center; gap: 8px; margin-top: 3px; }
 
   .bar {
  height: 3px; flex: 1; background: var(--track); position: relative; border-radius: 999px; overflow: hidden; }
@@ -540,7 +540,7 @@
  width: 35px; height: 35px; min-width: 35px; min-height: 35px; }
 
   .gal-grid {
- display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 14px 12px; grid-auto-flow: dense; }
+ display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 8px; grid-auto-flow: dense; }
 
   /* Status kosong/gagal, CTA, dan skeleton bukan sel video: wajib membentang
      selebar grid, bukan terjepit di satu kolom (issue #759). */
@@ -729,10 +729,10 @@
  padding: 3px 6px; font-weight: 700; color: var(--muted); }
 
   .fs-list {
- display: flex; flex-direction: column; gap: 8px; }
+ display: flex; flex-direction: column; gap: 6px; }
 
   .fs-row {
- display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; transition: border-color .15s ease, box-shadow .15s ease; }
+ display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 11px; transition: border-color .15s ease, box-shadow .15s ease; }
 
  /* Bayangan kartu daftar disamakan (issue #1350): dasar datar berbasis
     border seperti li.item/.gal-cell; bayangan hanya saat hover. */
@@ -802,7 +802,7 @@
  margin-top: 3px; }
 
   .fs-root {
- display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; margin-bottom: 8px; box-shadow: var(--shadow-sm); transition: border-color .15s ease; }
+ display: flex; align-items: center; gap: 12px; padding: 8px 11px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; margin-bottom: 6px; box-shadow: var(--shadow-sm); transition: border-color .15s ease; }
 
   .fs-root:hover {
  border-color: var(--primary); }
@@ -1301,7 +1301,7 @@
 
   .cm-box {
  animation: cmPop .18s ease;
- width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); max-height: calc(100vh - 44px); max-height: calc(100dvh - 44px); overflow-y: auto; }
+ width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; box-shadow: var(--shadow); max-height: calc(100vh - 44px); max-height: calc(100dvh - 44px); overflow-y: auto; }
 
   /* Daftar tautan share aktif bisa panjang: gulir di dalam kotak modal
      supaya judul dan tombol Close selalu terjangkau (issue #760). */
@@ -1344,7 +1344,7 @@
  margin-bottom: 6px; }
 
   .move-box {
- width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; max-height: min(82vh, 640px); }
+ width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; max-height: min(82vh, 640px); }
 
   .move-title {
  font-size: 17px; font-weight: 800; margin-bottom: 2px; }
@@ -1595,7 +1595,7 @@
  background: rgba(255,255,255,.3); }
 
   #filtersSticky {
- position: sticky; z-index: 30; background: var(--bg); padding: 8px 0 12px; margin: 0 0 4px; }
+ position: sticky; z-index: 30; background: var(--bg); padding: 8px 0 10px; margin: 0 0 4px; }
 
   :root[data-theme="dark"] #filtersSticky {
  background: transparent; }
@@ -1604,7 +1604,7 @@
  margin-bottom: 0; }
 
   .empty {
- padding: 64px 16px; text-align: center; color: var(--muted); display: flex; flex-direction: column; align-items: center; }
+ padding: 36px 16px; text-align: center; color: var(--muted); display: flex; flex-direction: column; align-items: center; }
 
   .empty .ico {
  position: relative; width: 88px; height: 88px; margin: 0 auto; border-radius: 28px; background: var(--primary-soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-lg); }
@@ -1674,10 +1674,10 @@
  }
 
   .sk-list {
- display: flex; flex-direction: column; gap: 12px; }
+ display: flex; flex-direction: column; gap: 8px; }
 
   .sk-item {
- display: flex; gap: 12px; align-items: flex-start; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+ display: flex; gap: 12px; align-items: flex-start; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
 
   .sk-ico {
  flex: 0 0 42px; height: 42px; border-radius: var(--radius-sm); }
@@ -1696,7 +1696,7 @@
  width: 80%; }
 
   .sk-grid {
- display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px 14px; }
+ display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 8px; }
 
   .sk-cell {
  border-radius: var(--radius); overflow: hidden; background: var(--card); border: 1px solid var(--line); }
@@ -1719,8 +1719,8 @@
   li.item .swipe-action .act-in { flex: 0 0 84px; width: 84px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   li.item.swiping-l .swipe-action.left { display: flex; }
   li.item.swiping-r .swipe-action.right { display: flex; }
-  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 12px 14px; transition: transform .28s cubic-bezier(.2,.7,.3,1); }
-  .list.compact .swipe-content { padding: 10px 14px; }
+  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 9px 11px; transition: transform .28s cubic-bezier(.2,.7,.3,1); }
+  .list.compact .swipe-content { padding: 8px 11px; }
   .list.compact .item-top { gap: 8px; }
   .list.compact .icon { flex-basis: 32px; width: 32px; height: 32px; border-radius: 8px; }
   .list.compact .icon svg { width: 22px; height: 22px; }
@@ -1768,7 +1768,7 @@
   @media (max-width: 600px) {
 
     .wrap {
- padding: 0 12px; margin-top: 12px; }
+ padding: 0 12px; margin-top: 10px; }
 
     .topbar-in {
  padding: 10px 12px; gap: 6px; padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
@@ -1799,13 +1799,13 @@
  grid-template-columns: repeat(2, 1fr); gap: 10px 8px; }
 
     .sk-grid {
- grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px 10px; }
+ grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 8px; }
 
     .mm-rel-thumb {
  width: 120px; height: 68px; }
 
     .fs-row {
- padding: 10px 12px; }
+ padding: 8px 11px; }
 
     .fs-path {
  font-size: 12px; }
