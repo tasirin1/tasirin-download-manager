@@ -6975,12 +6975,18 @@ document.getElementById('batchDeleteBtn').addEventListener('click', function () 
 
 function render(items) {
   currentItems = items;
+  const struct = (webFilter || '') + '::' + (dlSearchQuery || '') + '::' + structSig(items);
+  const structChanged = struct !== lastStructSig;
   // Pangkas seleksi batch dari id yang sudah hilang (issue #632):
   // tanpa ini batchSelected menyimpan id hantu selamanya dan hitungan
-  // "N selected" berbohong; beda dengan lockedTotalBytes di bawah,
-  // pemangkasan di sini tanpa ambang karena kebenaran hitungan batch
-  // adalah janji visual ke pengguna, bukan sekadar batas pertumbuhan.
-  if (batchSelected.size) {
+  // "N selected" berbohong. Pembangunan Set daftar penuhnya kini
+  // digerbang perubahan struktur (issue #1404): himpunan id hanya
+  // bisa berubah bersama struktur (structSig memuat id tiap item),
+  // jadi pada tick progres biasa — struktur sama — tak ada id yang
+  // bisa menghilang dan Set O(n) per render mubazir. Kebenaran
+  // hitungan batch (#632) tetap terjaga karena setiap perubahan
+  // struktur menjalankan pemangkasan sebelum rebuild.
+  if (batchSelected.size && structChanged) {
     const aliveSel = new Set(items.map(function (it) { return it.id; }));
     let pruned = false;
     batchSelected.forEach(function (id) { if (!aliveSel.has(id)) { batchSelected.delete(id); pruned = true; } });
@@ -6998,8 +7004,7 @@ function render(items) {
     dlPinned.forEach(function (id) { if (!alivePin.has(id)) dlPinned.delete(id); });
     try { localStorage.setItem('dl_pinned', JSON.stringify(Array.from(dlPinned))); } catch (_e) {}
   }
-  const struct = (webFilter || '') + '::' + (dlSearchQuery || '') + '::' + structSig(items);
-  if (struct !== lastStructSig) {
+  if (structChanged) {
     lastStructSig = struct;
     rebuildList(items);
     return;

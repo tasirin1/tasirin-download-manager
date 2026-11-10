@@ -4026,7 +4026,9 @@ toggleBatchMode();
 });
 function render(items) {
 currentItems = items;
-if (batchSelected.size) {
+const struct = (webFilter || '') + '::' + (dlSearchQuery || '') + '::' + structSig(items);
+const structChanged = struct !== lastStructSig;
+if (batchSelected.size && structChanged) {
 const aliveSel = new Set(items.map(function (it) { return it.id; }));
 let pruned = false;
 batchSelected.forEach(function (id) { if (!aliveSel.has(id)) { batchSelected.delete(id); pruned = true; } });
@@ -4041,8 +4043,7 @@ const alivePin = new Set(items.map(function (it) { return it.id; }));
 dlPinned.forEach(function (id) { if (!alivePin.has(id)) dlPinned.delete(id); });
 try { localStorage.setItem('dl_pinned', JSON.stringify(Array.from(dlPinned))); } catch (_e) {}
 }
-const struct = (webFilter || '') + '::' + (dlSearchQuery || '') + '::' + structSig(items);
-if (struct !== lastStructSig) {
+if (structChanged) {
 lastStructSig = struct;
 rebuildList(items);
 return;
