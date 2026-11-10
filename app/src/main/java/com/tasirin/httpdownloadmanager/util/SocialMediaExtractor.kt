@@ -111,6 +111,7 @@ object SocialMediaExtractor {
     private val IG_IMG_URL_FALLBACK_RE =
         Regex("https?://[^\"]*scontent[^\"]*\\.(?:jpg|jpeg|png|webp)[^\"]*")
     private val IG_FILE_ID_RE = Regex("/(\\d+_\\d+_\\d+)_[a-z0-9]+\\.(?:jpg|jpeg|png|webp)")
+    private val IG_SIZE_MARKER_RE = Regex("""s(\d+)x(\d+)""")
     private val IG_VIDEO_URL_RE = Regex("\"url\"\\s*:\\s*\"(https?://[^\"]+\\.mp4[^\"]*)\"")
     private val IG_CONTEXT_JSON_RE = Regex("contextJSON\\s*=\\s*\"")
     private val IG_TOKEN_RE = Regex("\"token\"\\s*:\\s*\"")
@@ -561,22 +562,37 @@ object SocialMediaExtractor {
                 }
             }
         }
-        // Dedup per ID file (contoh: 774314790_18387324052161_1234), utamakan
-        // URL tanpa marker thumbnail kecil di query (s150x150 / s640x640).
+        // Dedup per ID file (contoh: 774314790_18387324052161_1234):
+        // pemenang per ID adalah varian berdimensi terbesar (issue
+        // #1414) — tanpa penanda (resolusi penuh) selalu terbesar, seri
+        // mempertahankan kemunculan pertama.
         val byFileId = linkedMapOf<String, String>()
         val idRegex = IG_FILE_ID_RE
         decoded.forEach { url ->
             val fid = idRegex.find(url)?.groupValues?.get(1) ?: url
-            val existing = byFileId[fid]
-            if (existing == null ||
-                (existing.contains("s640x640") && !url.contains("s640x640")) ||
-                (existing.contains("s150x150") && !url.contains("s150x150"))
-            ) {
-                byFileId[fid] = url
-            }
+            byFileId[fid] = pickIgVariant(byFileId[fid], url)
         }
         return byFileId.values.take(20).toList()
     }
+
+    /** Luas varian foto Instagram dari penanda sNNNxNNN (issue #1414);
+     *  tanpa penanda = resolusi penuh, dinilai terbesar. Dimensi
+     *  dijepit agar perkalian tak meluap pada penanda absurd. */
+    internal fun igVariantArea(url: String): Long {
+        val m = IG_SIZE_MARKER_RE.find(url) ?: return Long.MAX_VALUE
+        val w = m.groupValues[1].toLongOrNull() ?: return Long.MAX_VALUE
+        val h = m.groupValues[2].toLongOrNull() ?: return Long.MAX_VALUE
+        return w.coerceAtMost(1_000_000L) * h.coerceAtMost(1_000_000L)
+    }
+
+    /** Pemenang dedup varian per ID berkas (issue #1414): kandidat hanya
+     *  menggantikan bila dimensinya lebih besar; seri mempertahankan
+     *  yang pertama. Logika lama berbasis substring membiarkan varian
+     *  s150 menimpa s640 yang sudah tersimpan. internal agar bisa
+     *  di-unit-test. */
+    internal fun pickIgVariant(existing: String?, candidate: String): String =
+        if (existing == null || igVariantArea(candidate) > igVariantArea(existing)) candidate
+        else existing
 
     private fun extractVideoFromPage(html: String): String? {
         val idx = html.indexOf("video_versions")

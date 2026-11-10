@@ -458,6 +458,29 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `pickIgVariant - varian terbesar menang, seri mempertahankan pertama`() {
+        // Issue #1414: ekspektasi dibuktikan port-1414.py (port 1:1).
+        val base = "https://scontent.cdninstagram.com/v/t51.82787-15/123_456_789_n.jpg"
+        val full = "$base?stp=dst-jpg"
+        val s640 = "$base?stp=dst-jpg_s640x640"
+        val s640b = "$base?stp=dst-jpg_s640x640&oh=lain"
+        val s150 = "$base?stp=dst-jpg_s150x150"
+        val s320 = "$base?stp=dst-jpg_s320x240"
+        assertEquals(s640, SocialMediaExtractor.pickIgVariant(null, s640))
+        // Bug lama: s150 yang datang belakangan menimpa s640.
+        assertEquals(s640, SocialMediaExtractor.pickIgVariant(s640, s150))
+        assertEquals(s640, SocialMediaExtractor.pickIgVariant(s150, s640))
+        // Tanpa penanda (resolusi penuh) selalu terbesar.
+        assertEquals(full, SocialMediaExtractor.pickIgVariant(full, s640))
+        assertEquals(full, SocialMediaExtractor.pickIgVariant(s640, full))
+        // Seri -> yang pertama dipertahankan.
+        assertEquals(s640, SocialMediaExtractor.pickIgVariant(s640, s640b))
+        // Luas dibandingkan, bukan sisi saja: 320x240 > 150x150.
+        assertEquals(s320, SocialMediaExtractor.pickIgVariant(s150, s320))
+        assertEquals(s320, SocialMediaExtractor.pickIgVariant(s320, s150))
+    }
+
+    @Test
     fun `scanEscapedJsString - berhenti di kutip tak ter-escape`() {
         // Bentuk format 2: contextJSON = "{...JSON ter-escape...}".
         // Ekspektasi dibuktikan port 1:1 sebelum uji ditulis.
