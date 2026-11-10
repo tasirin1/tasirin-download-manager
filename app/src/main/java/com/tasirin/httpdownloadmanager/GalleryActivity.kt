@@ -156,6 +156,14 @@ class GalleryActivity : AppCompatActivity() {
         if (gen == galleryScanGen) {
             fullList = scanned
             initialScanDone = true
+            // Indikator progres ikut dimatikan oleh rescan yang menang
+            // (issue #1421, sisi cermin #1396): bila rescan menyalip
+            // scan awal, blok scan awal tak lagi berhak menyembunyikan
+            // progres (generasinya kalah), jadi tanpa baris ini
+            // indikator menyala selamanya walau hasil rescan sudah
+            // diterapkan. Rescan lanjutan sesudah scan awal selesai
+            // tak terpengaruh — progresnya memang sudah GONE.
+            binding.progress.visibility = View.GONE
         }
     }
 
