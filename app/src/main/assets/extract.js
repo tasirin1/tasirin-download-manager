@@ -47,12 +47,19 @@ if(mp42.indexOf(u)<0)mp42.push(u);}
 // pemindaian terakhir. MutationObserver dipasang sekali pada evaluasi
 // pertama dan hanya menandai cache kotor; halaman diam (kasus umum
 // selama jendela polling) melewati serialisasi sama sekali.
+// Atribut SENGAJA tidak diamati (issue #1468): halaman video yang
+// hidup mengubah atribut terus-menerus (kelas/gaya/status pemain),
+// sehingga cache hampir selalu kotor dan manfaat #1440 hilang.
+// Kandidat sungguhan tetap terdeteksi: node baru (childList) dan
+// teks skrip/JSON yang berubah (characterData) menandai kotor, dan
+// elemen media (video/source/meta/link) memang dipindai langsung
+// dari DOM pada setiap evaluasi, di luar cache ini.
 var scanCache=window.__extractScanCache;
 if(!scanCache){
 scanCache=window.__extractScanCache={dirty:true,urls:[]};
 try{new MutationObserver(function(){scanCache.dirty=true;}).observe(
 document.documentElement,
-{subtree:true,childList:true,attributes:true,characterData:true});}catch(e){}
+{subtree:true,childList:true,characterData:true});}catch(e){}
 }
 if(scanCache.dirty){
 scanCache.dirty=false;
