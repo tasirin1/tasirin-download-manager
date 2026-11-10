@@ -730,7 +730,9 @@ class DownloadEngine(appContext: Context) {
         // (penerus ter-pause + pendahulu hidup melahirkan penerus
         // duplikat di tick berikut).
         hidupkanLagiMonitorPendahulu(item)
-        scheduleSave()
+        // Tanpa scheduleSave tambahan (issue #1489): updateTransformed
+        // di atas sudah mempersist lewat update() — panggilan eksplisit
+        // hanya membatalkan + meluncurkan ulang job debounce yang sama.
         // Hapus eksplisit item terakhir: niat antrean kosong jelas — tulis
         // blob kosong agar sisa blob korup (degraded) tak menetap selamanya.
         // Wajib menunggu loadGate (#261): sebelum muatan awal terpasang,
@@ -758,7 +760,7 @@ class DownloadEngine(appContext: Context) {
             if (activeConns[it.id] == null) cancelledConns.remove(it.id)
         }
         updateTransformed { daftar -> daftar.filterNot { it.state == DownloadState.COMPLETED } }
-        scheduleSave()
+        // scheduleSave sudah terjadi di dalam updateTransformed (#1489).
         if (_items.value.isEmpty() && loadGate.isCompleted) repository.clearAll()
     }
 
@@ -796,7 +798,7 @@ class DownloadEngine(appContext: Context) {
         // tidak boleh membuang langganan pemantauan diam-diam.
         // Helper menghormati tanda sentuhan pengguna #521/#528.
         failed.forEach { hidupkanLagiMonitorPendahulu(it) }
-        scheduleSave()
+        // scheduleSave sudah terjadi di dalam updateTransformed (#1489).
         if (_items.value.isEmpty() && loadGate.isCompleted) repository.clearAll()
     }
 
