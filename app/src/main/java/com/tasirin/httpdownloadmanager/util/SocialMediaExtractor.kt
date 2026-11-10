@@ -1588,12 +1588,16 @@ object SocialMediaExtractor {
             val qualityMatch = PH_MEDIA_QUALITY_RE.find(
                 html.substring(afterUrl, segmentEnd)
             )
-            if (qualityMatch != null) {
-                addCandidate(
-                    match.groupValues.getOrNull(1),
-                    qualityMatch.groupValues.getOrNull(1)?.toIntOrNull() ?: 0
-                )
-            }
+            // Quality yang tak mengikuti URL dalam objek yang sama
+            // (mis. tertulis sebelum videoUrl) TIDAK membuang
+            // kandidatnya (issue #1399): URL media yang sah tetap
+            // ditawarkan sebagai kualitas 0 — terurut paling akhir
+            // oleh pengurutan menurun hasil, selaras kandidat jalur
+            // flashvars/og. Dulu videoUrl seperti ini hilang diam-diam.
+            addCandidate(
+                match.groupValues.getOrNull(1),
+                qualityMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+            )
         }
         PH_FLASHVARS_Q_RE.findAll(html).forEach {
             addCandidate(it.groupValues.getOrNull(2), it.groupValues.getOrNull(1)?.toIntOrNull() ?: 0)
