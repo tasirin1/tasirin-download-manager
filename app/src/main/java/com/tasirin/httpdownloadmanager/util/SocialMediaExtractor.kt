@@ -1154,9 +1154,28 @@ object SocialMediaExtractor {
      *  halaman dicap 30 dtk oleh runStageCapped dan fetch halaman
      *  sendiri bisa memakan belasan detik; anggaran habis di tengah
      *  probe = sisa kandidat dipertahankan apa adanya. */
-    private fun filterForbidden(options: List<Result>, budgetMs: Long): List<Result> {
+    private fun filterForbidden(options: List<Result>, budgetMs: Long): List<Result> =
+        filterForbiddenProbe(options, budgetMs, { System.nanoTime() }) { url, cookies ->
+            isUrlForbidden(url, cookies)
+        }
+
+    /** Inti [filterForbidden] dengan probe + jam yang disuntik agar
+     *  bisa di-unit-test tanpa jaringan. Sesudah video kandidat lolos,
+     *  audioUrl pasangan adaptifnya ikut di-probe (issue #1467): audio
+     *  yang terbukti 403 membuang pasangan sama seperti video 403 —
+     *  sebelumnya pasangan bisa terkunci dengan video sehat dan audio
+     *  mati, kegagalannya baru ketahuan saat unduhan audio berjalan.
+     *  Probe tetap malas: hanya kandidat yang akan dikunci yang
+     *  audionya diperiksa, dan hanya selama anggaran belum habis
+     *  (anggaran habis = kandidat dipertahankan apa adanya). */
+    internal fun filterForbiddenProbe(
+        options: List<Result>,
+        budgetMs: Long,
+        nanoTime: () -> Long,
+        isForbidden: (String, String) -> Boolean
+    ): List<Result> {
         if (options.isEmpty()) return options
-        val deadline = System.nanoTime() + budgetMs * 1_000_000L
+        val deadline = nanoTime() + budgetMs * 1_000_000L
         val kept = ArrayList<Result>(options.size)
         var confirmedAlive = false
         for (opt in options) {
@@ -1164,12 +1183,19 @@ object SocialMediaExtractor {
                 kept.add(opt)
                 continue
             }
-            if (System.nanoTime() >= deadline) {
+            if (nanoTime() >= deadline) {
                 kept.add(opt)
                 continue
             }
-            if (isUrlForbidden(opt)) {
+            if (isForbidden(opt.directUrl, opt.cookies)) {
                 // Terbukti 403: buang, lanjut probe kandidat berikutnya.
+                continue
+            }
+            if (opt.audioUrl.isNotBlank() && nanoTime() < deadline &&
+                isForbidden(opt.audioUrl, opt.cookies)
+            ) {
+                // Audio pasangan terbukti 403: buang pasangan, lanjut
+                // probe kandidat berikutnya (issue #1467).
                 continue
             }
             kept.add(opt)
@@ -1178,9 +1204,9 @@ object SocialMediaExtractor {
         return kept
     }
 
-    private fun isUrlForbidden(item: Result): Boolean {
+    private fun isUrlForbidden(url: String, cookies: String): Boolean {
         return runCatching {
-            val conn = openTlsConn(item.directUrl)
+            val conn = openTlsConn(url)
             try {
                 conn.requestMethod = "HEAD"
                 conn.connectTimeout = 6000
@@ -1191,7 +1217,7 @@ object SocialMediaExtractor {
                 conn.setRequestProperty("User-Agent",
                     YT_UA)
                 conn.setRequestProperty("Referer", "https://www.youtube.com/")
-                if (item.cookies.isNotEmpty()) conn.setRequestProperty("Cookie", item.cookies)
+                if (cookies.isNotEmpty()) conn.setRequestProperty("Cookie", cookies)
                 conn.responseCode == 403
             } finally { conn.disconnect() }
         }.getOrDefault(false)

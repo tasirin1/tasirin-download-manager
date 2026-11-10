@@ -183,6 +183,54 @@ class SocialMediaExtractorTest {
     }
 
     @Test
+    fun `filterForbiddenProbe - audio pasangan terbukti 403 ikut membuang kandidat`() {
+        fun res(v: String, a: String = "") =
+            SocialMediaExtractor.Result(v, "f.mp4", "t", audioUrl = a)
+        var now = 0L
+        val probed = mutableListOf<String>()
+        fun runFilter(
+            options: List<SocialMediaExtractor.Result>,
+            forbidden: Set<String>,
+            budgetMs: Long = 10_000L,
+            probeCostNs: Long = 1_000_000L
+        ): List<SocialMediaExtractor.Result> {
+            now = 0L
+            probed.clear()
+            return SocialMediaExtractor.filterForbiddenProbe(
+                options, budgetMs, { now }
+            ) { url, _ ->
+                probed.add(url)
+                now += probeCostNs
+                url in forbidden
+            }
+        }
+
+        val a = res("A.v")
+        val b = res("B.v")
+        // Video 403 terbukti dibuang, kandidat berikutnya yang dikunci.
+        assertEquals(listOf(b), runFilter(listOf(a, b), setOf("A.v")))
+        assertEquals(listOf("A.v", "B.v"), probed)
+
+        // Pasangan dengan audio 403 terbukti dibuang walau videonya sehat.
+        val deadAudio = res("Q.v", "Q.a")
+        assertEquals(listOf(b), runFilter(listOf(deadAudio, b), setOf("Q.a")))
+        assertEquals(listOf("Q.v", "Q.a", "B.v"), probed)
+
+        // Pasangan sehat terkunci; kandidat sesudahnya dipertahankan tanpa probe.
+        val pairOk = res("P.v", "P.a")
+        assertEquals(listOf(pairOk, b), runFilter(listOf(pairOk, b), emptySet()))
+        assertEquals(listOf("P.v", "P.a"), probed)
+
+        // Anggaran habis sesudah probe video: audio tak di-probe,
+        // pasangan dipertahankan apa adanya walau audionya 403.
+        assertEquals(
+            listOf(deadAudio),
+            runFilter(listOf(deadAudio), setOf("Q.a"), budgetMs = 1L, probeCostNs = 2_000_000L)
+        )
+        assertEquals(listOf("Q.v"), probed)
+    }
+
+    @Test
     fun `tikTokNamePrefix - author absen tak jadi literal null`() {
         assertEquals("TikTok_budi_123", SocialMediaExtractor.tikTokNamePrefix("budi", "123"))
         assertEquals("TikTok_123", SocialMediaExtractor.tikTokNamePrefix(null, "123"))
