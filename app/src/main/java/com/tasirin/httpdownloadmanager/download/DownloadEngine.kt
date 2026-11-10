@@ -2877,13 +2877,16 @@ class DownloadEngine(appContext: Context) {
 
         // Estimasi dari BANDWIDTH x durasi tersedia sebelum segmen diunduh:
         // tolak awal bila jelas tak muat, bukan ENOSPC di tengah jalan.
-        if (plan.estimateTotalBytes > 0 &&
-            saver.destinationFreeBytes(item.folderPath) < plan.estimateTotalBytes + MIN_FREE_BYTES
-        ) {
-            throw IOException(
-                "Not enough storage for HLS: need ~${Formats.bytes(plan.estimateTotalBytes)}, " +
-                    "available ${Formats.bytes(saver.destinationFreeBytes(item.folderPath))}"
-            )
+        // Ruang bebas dihitung SEKALI (issue #1415): kondisi dan pesan
+        // galat memakai nilai yang sama.
+        if (plan.estimateTotalBytes > 0) {
+            val destFreeBytes = saver.destinationFreeBytes(item.folderPath)
+            if (destFreeBytes < plan.estimateTotalBytes + MIN_FREE_BYTES) {
+                throw IOException(
+                    "Not enough storage for HLS: need ~${Formats.bytes(plan.estimateTotalBytes)}, " +
+                        "available ${Formats.bytes(destFreeBytes)}"
+                )
+            }
         }
 
         try {
