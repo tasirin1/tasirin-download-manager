@@ -833,14 +833,12 @@
 
                         <Button
                             android:id="@+id/btn_add_gallery_folder"
+                            style="@style/TvOutlinedButton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:minHeight="40dp"
                             android:layout_marginTop="8dp"
-                            android:stateListAnimator="@null"
-                            android:background="@drawable/bg_btn_tv"
-                            android:backgroundTint="@null"
-                            android:text="@string/storage_add_folder" 
+                            android:text="@string/storage_add_folder"
                             android:maxLines="2"
                             android:ellipsize="end"
                             android:textSize="13sp" />
@@ -948,12 +946,10 @@
 
                         <Button
                             android:id="@+id/btn_check_update"
+                            style="@style/TvOutlinedButton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:stateListAnimator="@null"
-                            android:background="@drawable/bg_btn_tv"
-                            android:backgroundTint="@null"
                             android:minHeight="40dp"
                             android:text="@string/update_check"
                             android:maxLines="2"
