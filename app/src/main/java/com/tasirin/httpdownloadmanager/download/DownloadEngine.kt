@@ -2888,13 +2888,16 @@ class DownloadEngine(appContext: Context) {
             // tampilan membeku di ±99% selama remux berjalan — dan di
             // perangkat lambat remux bisa ber menit-menit.
             val mergeStartPercent = flushMuxProgress(item, progress)
+            // Job ditangkap di badan coroutine: coroutineContext tidak sah
+            // diakses dari lambda non-suspend isCancelled milik muxer.
+            val mergeJob = coroutineContext[Job]
             try {
                 AdaptiveMp4Muxer.remuxMp4s(
                     videoMp4, audioM4a, mp4,
                     onProgress = { copied, total ->
                         reportMuxMergeProgress(item, progress, copied, total, mergeStartPercent)
                     },
-                    isCancelled = { !coroutineContext.isActive }
+                    isCancelled = { mergeJob?.isActive != true }
                 )
             } catch (e: CancellationException) {
                 throw e
