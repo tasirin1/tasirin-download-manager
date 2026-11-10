@@ -34,18 +34,21 @@ object Updater {
     private const val LATEST_API =
         "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases/latest"
     private const val LIST_API =
-        "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases?per_page=20"
+        "https://api.github.com/repos/tasirin1/tasirin-download-manager/releases?per_page=5"
     private const val UA = "TasirinDownloadManager"
 
     fun checkLatest(context: Context): UpdateInfo? = runCatching {
         // Daftar dulu: rilis latest kadang mapping-only tanpa APK sehingga
-        // cache basi tersaji sebagai update. Daftar 20 rilis menemukan APK
-        // terbaru yang sebenarnya; gagal jaringan baru pakai cache.
+        // cache basi tersaji sebagai update. Daftar 5 rilis (issue #1450:
+        // per_page 20 mengunduh JSON jauh lebih besar dari yang pernah
+        // dipakai dan byte-nya terbuang bila melewati plafon 512 KB)
+        // menemukan APK terbaru yang sebenarnya; gagal jaringan baru
+        // pakai cache.
         var listChecked = false
         get(context, LIST_API)?.let { body ->
             // Satu parse: body bukan-array = respons aneh sehingga fallback
-            // cache. Daftar sukses tapi tanpa APK BUKAN fakta final: 20
-            // rilis teratas bisa penuh prerelease/draft/mapping-only,
+            // cache. Daftar sukses tapi tanpa APK BUKAN fakta final: rilis
+            // teratas bisa penuh prerelease/draft/mapping-only,
             // jadi lanjut ke endpoint latest di bawah sebelum menyimpulkan
             // tak ada update (issue #1136) — tetap tanpa cache basi.
             // Sebelumnya body di-parse 2x (bestFromReleasesList + isReleasesList).
