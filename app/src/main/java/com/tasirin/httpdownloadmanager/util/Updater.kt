@@ -74,6 +74,32 @@ object Updater {
         return null
     }.getOrElse { loadCached(context) }
 
+    /** Hasil cek update yang sudah dinilai terhadap versi terpasang. */
+    sealed class CheckOutcome {
+        object Failed : CheckOutcome()
+        object Latest : CheckOutcome()
+        data class Available(val info: UpdateInfo) : CheckOutcome()
+    }
+
+    /** Cek rilis terbaru lalu nilai terhadap versi aplikasi terpasang
+     *  (issue #1476): klasifikasi ini dulu diduplikasi di MainActivity
+     *  (dialog About) dan SettingsActivity dan penjaganya sudah
+     *  divergen — perbaikan #853/#856 hanya menular ke About, #524/#300
+     *  hanya ke Settings. Kini satu di sini; tampilan hasil (dialog /
+     *  teks status) dan penjaga umur activity tetap milik tiap layar. */
+    fun checkLatestOutcome(context: Context): CheckOutcome {
+        val info = checkLatest(context) ?: return CheckOutcome.Failed
+        val current = runCatching {
+            context.packageManager.packageInfoCompat(context.packageName)
+                .versionCodeCompat().toInt()
+        }.getOrDefault(0)
+        return if (info.versionCode <= current) {
+            CheckOutcome.Latest
+        } else {
+            CheckOutcome.Available(info)
+        }
+    }
+
 
     /** APK terbaik dalam satu objek rilis (tag + assets). Murni agar bisa di-unit-test. */
     internal fun bestFromRelease(release: JSONObject): UpdateInfo? {

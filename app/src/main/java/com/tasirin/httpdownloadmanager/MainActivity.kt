@@ -1380,45 +1380,51 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         aboutUpdateButton?.isEnabled = false
         lifecycleScope.launch {
             try {
-            val info = withContext(Dispatchers.IO) { Updater.checkLatest(this@MainActivity) }
-            val current = runCatching {
-                packageManager.packageInfoCompat(packageName).versionCodeCompat().toInt()
-            }.getOrDefault(0)
+            // Klasifikasi bersama Updater (issue #1476); layar ini hanya
+            // menampilkan hasilnya sebagai dialog.
+            val outcome = withContext(Dispatchers.IO) {
+                Updater.checkLatestOutcome(this@MainActivity)
+            }
             // Penjaga umur activity sebelum dialog apa pun di bawah
             // (pola #300 di SettingsActivity): pengguna bisa menekan
             // Back selama cek jaringan berjalan, dan show() pada
             // activity yang finishing melempar BadTokenException.
             if (isFinishing || isDestroyed) return@launch
-            if (info == null) {
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle(R.string.update_check)
-                    .setMessage(getString(R.string.update_failed))
-                    .setPositiveButton(R.string.ok, null)
-                    .show()
-                return@launch
-            }
-            if (info.versionCode <= current) {
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle(R.string.update_check)
-                    .setMessage(getString(R.string.update_latest))
-                    .setPositiveButton(R.string.ok, null)
-                    .show()
-                return@launch
-            }
-            AlertDialog.Builder(this@MainActivity)
-                .setTitle(R.string.update_check)
-                .setMessage(
-                    getString(
-                        R.string.update_available, info.versionName, info.versionCode
-                    ) + "\n\n" + getString(R.string.update_browser_note)
-                )
-                .setNegativeButton(R.string.update_later, null)
-                .setPositiveButton(R.string.update_open_release) { _, _ ->
-                    runCatching {
-                        startActivity(Intent(Intent.ACTION_VIEW, info.pageUrl.toUri()))
-                    }
+            when (outcome) {
+                Updater.CheckOutcome.Failed -> {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle(R.string.update_check)
+                        .setMessage(getString(R.string.update_failed))
+                        .setPositiveButton(R.string.ok, null)
+                        .show()
+                    return@launch
                 }
-                .show()
+                Updater.CheckOutcome.Latest -> {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle(R.string.update_check)
+                        .setMessage(getString(R.string.update_latest))
+                        .setPositiveButton(R.string.ok, null)
+                        .show()
+                    return@launch
+                }
+                is Updater.CheckOutcome.Available -> {
+                    val info = outcome.info
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle(R.string.update_check)
+                        .setMessage(
+                            getString(
+                                R.string.update_available, info.versionName, info.versionCode
+                            ) + "\n\n" + getString(R.string.update_browser_note)
+                        )
+                        .setNegativeButton(R.string.update_later, null)
+                        .setPositiveButton(R.string.update_open_release) { _, _ ->
+                            runCatching {
+                                startActivity(Intent(Intent.ACTION_VIEW, info.pageUrl.toUri()))
+                            }
+                        }
+                        .show()
+                }
+            }
             } finally {
                 checkingAboutUpdate = false
                 // Aktifkan instance yang SEDANG tampil (bisa jadi dialog
