@@ -734,7 +734,9 @@ class SocialMediaExtractorTest {
     fun `parseFacebookPage - browser native HD dan SD ter-unescaping`() {
         val html = """{"require":[["VideoPlayer","video_id":"1020806507787076"]],"video":{"browser_native_hd_url":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/hd.mp4?_nc_cat=108\u0026oe=66F0","browser_native_sd_url":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/sd.mp4?_nc_cat=108\u0026oe=66F0"},"pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
         val options = SocialMediaExtractor.parseFacebookPage(html, "1020806507787076", "c_user=1")
-        assertEquals(2, options.size)
+        // Henti-dini HD (issue #1439): begitu HD ditemukan, lintasan SD
+        // tak lagi dipindai — daftar hanya berisi HD.
+        assertEquals(1, options.size)
         assertEquals(
             "https://video-jkt-1.xx.fbcdn.net/o1/v/t2/hd.mp4?_nc_cat=108&oe=66F0",
             options[0].directUrl
@@ -742,11 +744,15 @@ class SocialMediaExtractorTest {
         assertEquals("HD", options[0].quality)
         assertEquals("Facebook_1020806507787076.mp4", options[0].fileName)
         assertEquals("c_user=1", options[0].cookies)
+        // Unescape SD tetap terverifikasi lewat halaman SD-saja.
+        val sdOnly = """{"video":{"browser_native_sd_url":"https:\/\/video-jkt-1.xx.fbcdn.net\/o1\/v\/t2\/sd.mp4?_nc_cat=108&oe=66F0"},"pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
+        val sdOptions = SocialMediaExtractor.parseFacebookPage(sdOnly, "1020806507787076", "")
+        assertEquals(1, sdOptions.size)
         assertEquals(
             "https://video-jkt-1.xx.fbcdn.net/o1/v/t2/sd.mp4?_nc_cat=108&oe=66F0",
-            options[1].directUrl
+            sdOptions[0].directUrl
         )
-        assertEquals("SD", options[1].quality)
+        assertEquals("SD", sdOptions[0].quality)
         // Halaman hanya berisi redirect lookaside = tidak ada media sah.
         val lookasideOnly = """{"u":"https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1020806507787076","pad":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"""
         assertTrue(SocialMediaExtractor.parseFacebookPage(lookasideOnly, "1", "").isEmpty())

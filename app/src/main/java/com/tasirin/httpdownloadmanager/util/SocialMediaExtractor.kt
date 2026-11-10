@@ -2314,11 +2314,21 @@ object SocialMediaExtractor {
                     found.putIfAbsent(mediaUrl, label)
                 }
             }
+            // Henti-dini HD (issue #1439): HD adalah pilihan pertama
+            // pemanggil — begitu satu URL HD sah terkumpul dari lintasan
+            // HD, sisa lintasan (dan pindai .mp4 di bawah) tak mengubah
+            // pilihan itu, jadi halaman utuh tak dipindai 7x percuma.
+            // Urutan kandidat HD-dulu menjaga firstOrNull{HD} identik.
+            if (label == "HD" && found.values.any { it == "HD" }) break
         }
         // Cadangan: URL mp4 langsung yang diapit tanda kutip di halaman.
-        extractFacebookMp4Urls(html).forEach { mediaUrl ->
-            val q = if (mediaUrl.contains("quality=hd") || mediaUrl.contains("_hd")) "HD" else "SD"
-            found.putIfAbsent(mediaUrl, q)
+        // Hanya bila belum ada HD — temuan HD dari sini pun tak akan
+        // menggeser HD regex yang sudah terkumpul lebih dulu.
+        if (found.values.none { it == "HD" }) {
+            extractFacebookMp4Urls(html).forEach { mediaUrl ->
+                val q = if (mediaUrl.contains("quality=hd") || mediaUrl.contains("_hd")) "HD" else "SD"
+                found.putIfAbsent(mediaUrl, q)
+            }
         }
         return found.map { (mediaUrl, quality) ->
             Result(mediaUrl, "Facebook_$videoId.mp4", "Facebook $videoId", quality, MIME_MP4, cookies)
