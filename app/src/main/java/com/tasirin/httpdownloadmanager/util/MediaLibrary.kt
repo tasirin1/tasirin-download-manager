@@ -33,6 +33,13 @@ object MediaLibrary {
      *  4x plafon entri memberi ruang bagi baris basi/luar-folder tanpa
      *  kerja yang tak terbatas. */
     private const val MAX_SCAN_EXAMINED_ROWS = GALLERY_MAX_ENTRIES * 4
+    /** Batas baris LUAR-folder yang dilewati per scan saat saringan
+     *  folder aktif (issue #1503): baris luar-folder murah (pencocokan
+     *  string saja, tanpa stat sejak #1479), jadi plafonnya jauh lebih
+     *  longgar daripada plafon baris relevan di atas — fungsinya
+     *  jaring pengaman kerja untuk pustaka patologis, bukan pemotong
+     *  hasil folder terpilih. */
+    private const val MAX_SCAN_SKIPPED_ROWS = MAX_SCAN_EXAMINED_ROWS * 8
     private const val THUMB_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
     // TTL disimpan per-cache: cache fallback (600 dtk) yang masih valid
@@ -789,6 +796,7 @@ object MediaLibrary {
                     -1
                 }
                 var mediaStoreExamined = 0
+                var mediaStoreSkipped = 0
                 while (c.moveToNext()) {
                     // Plafon materialisasi (issue #752): blok sumber lain
                     // semua beranggaran, tetapi loop kursor ini dulu
@@ -798,12 +806,6 @@ object MediaLibrary {
                     // DATE_MODIFIED DESC, jadi yang tertahan adalah
                     // entri terbaru, selaras potongan akhir.
                     if (list.size >= GALLERY_MAX_ENTRIES) break
-                    // Batas baris DIPERIKSA (issue #1479): plafon di atas
-                    // menghitung entri yang diterima (termasuk dari
-                    // sumber lain), bukan baris yang sudah di-stat loop
-                    // ini — tanpa batas ini, scan cache-miss di API <29
-                    // men-stat seluruh baris MediaStore yang gugur.
-                    if (++mediaStoreExamined > MAX_SCAN_EXAMINED_ROWS) break
                     val name = c.getString(iName) ?: continue
                     val filePath = c.getString(iData)?.takeIf { it.isNotBlank() }
                     // Nilai mentah dipertahankan (issue #525): string
@@ -822,7 +824,24 @@ object MediaLibrary {
                     // kursor) berjalan SEBELUM stat keterbacaan (issue
                     // #1479): baris di luar folder pilihan tak perlu
                     // membayar File.isFile satu per satu.
-                    if (folderFilterActive && !inSelectedFoldersPrecomputed(filePath, relativePath, allowedFolders, volumeName)) continue
+                    if (folderFilterActive && !inSelectedFoldersPrecomputed(filePath, relativePath, allowedFolders, volumeName)) {
+                        // Baris luar-folder TIDAK memakan plafon baris
+                        // relevan (issue #1503): plafon #1479 yang
+                        // menghitung semua baris bisa habis sebelum
+                        // kursor mencapai baris folder terpilih yang
+                        // terurut belakangan (berkas lama), sehingga
+                        // galeri folder itu tampil tak lengkap di
+                        // API <29. Baris yang dilewati dihitung plafon
+                        // longgarnya sendiri (MAX_SCAN_SKIPPED_ROWS).
+                        if (++mediaStoreSkipped > MAX_SCAN_SKIPPED_ROWS) break
+                        continue
+                    }
+                    // Batas baris RELEVAN yang diperiksa (issue #1479):
+                    // hanya baris yang lolos saringan folder (atau
+                    // semua baris bila saringan tak aktif) yang memakan
+                    // plafon ini — merekalah yang membayar stat
+                    // keterbacaan di bawah.
+                    if (++mediaStoreExamined > MAX_SCAN_EXAMINED_ROWS) break
                     if (!isMediaEntryReadable(filePath, uri)) continue
                     mediaStoreAccepted++
                     list.add(
