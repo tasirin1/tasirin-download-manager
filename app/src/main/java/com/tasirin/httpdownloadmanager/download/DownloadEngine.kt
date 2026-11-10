@@ -2539,25 +2539,17 @@ class DownloadEngine(appContext: Context) {
     }
 
     private class MuxProgress {
-        // Tiga penghitung ini disentuh thread unduh dan callback progres
+        // Dua penghitung ini disentuh thread unduh dan callback progres
         // secara bersamaan (issue #1374): baca-tulis
         // Long polos bisa kehilangan imbuhan dan check-then-set lastNotify
-        // bisa lolos ganda, jadi atomik. Field lain hanya disentuh thread
-        // konsumen/pemanggil sehingga tetap polos.
+        // bisa lolos ganda, jadi atomik.
+        // Mesin estimasi segmen warisan HLS (totalSegments/avgSegBytes/
+        // exactTotal/estimateTotalBytes dkk.) dihapus di issue #1428:
+        // penulisnya hanya jalur HLS, jadi sesudah HLS dibuang field itu
+        // tak pernah terisi dan cabang fallback-nya mengunci progres
+        // adaptif tanpa Content-Length di 0% permanen.
         val downloaded = AtomicLong(0)
         val lastNotify = AtomicLong(0)
-        var totalSegments = 0
-        var segmentsDone = 0
-        var avgSegBytes = 0L
-        /** Jumlah Content-Length pasti segmen yang sudah di-fetch (mutlak). */
-        var exactBytes = 0L
-        /** Ukuran segmen referensi stabil (dari segmen pertama yang berukuran wajar). */
-        val refSegBytes = AtomicLong(0)
-        /** Total mutlak akhir bila semua segmen sudah punya ukuran pasti; else estimasi. */
-        var exactTotal = 0L
-        /** Estimasi awal total dari BANDWIDTH x durasi (dipakai sebelum segmen
-         *  selesai — exactTotal masih 0). */
-        var estimateTotalBytes = 0L
     }
 
     /** Unduh satu file adaptive (audio M4A / video MP4) dari URL VISIONOS ke
@@ -2772,49 +2764,23 @@ class DownloadEngine(appContext: Context) {
         if (now - lastNotifySeen >= 1000 &&
             progress.lastNotify.compareAndSet(lastNotifySeen, now)
         ) {
-            // Total akhir tidak selalu diketahui sejak awal. Persentase
-            // dihitung dari jumlah segmen (progressPercentOverride)
-            // supaya bar bergerak tanpa menampilkan total palsu di UI.
-            val percent = if (progress.totalSegments > 0) {
-                // Fraksi segmen aktif pakai rata2 ukuran segmen selesai.
-                val frac = if (progress.avgSegBytes > 0) {
-                    (segNow.toDouble() / progress.avgSegBytes).coerceIn(0.0, 1.0)
-                } else {
-                    0.0
-                }
-                (((progress.segmentsDone + frac) * 100) / progress.totalSegments).toInt()
-            } else {
-                0
-            }
-            // File adaptive (video/audio MP4): Content-Length riil, total
-            // kumulatif = byte yang sudah selesai + ukuran file aktif.
-            val effTotal = if (total > 0) {
-                progress.downloaded.get() + total
-            } else {
-                // Pakai total pasti (Content-Length bagian selesai +
-                // refSegBytes x sisa) bila sudah ada; sebelum segmen pertama
-                // selesai, fallback ke estimasi BANDWIDTH x durasi supaya
-                // denominator tidak nol/bergoyang sejak detik awal.
-                if (progress.exactTotal > 0) progress.exactTotal else progress.estimateTotalBytes
-            }
+            // Total gabungan hanya dari Content-Length riil (issue #1428):
+            // byte berkas yang sudah selesai + Content-Length berkas yang
+            // sedang diunduh. Tanpa Content-Length total dibiarkan 0 =
+            // tak diketahui secara jujur: UI menampilkan byte terunduh
+            // saja (persen dari byte/total hanya bila total dikenal),
+            // bukan estimasi palsu yang mengunci tampilan di 0%.
+            val effTotal = muxEffectiveTotal(progress.downloaded.get(), total)
             val (speed, eta) = speedTracker.sample(item.id, totalNow, effTotal)
-            val etaFromSegments = if (total == 0L && speed > 0 && effTotal > 0) {
-                ((effTotal - totalNow) / speed).coerceAtLeast(0L)
-            } else {
-                eta
-            }
             updateItem(item.id, persist = false) {
                 it.copy(
                     state = DownloadState.DOWNLOADING,
                     bytesDownloaded = totalNow,
                     totalBytes = effTotal,
-                    progressPercentOverride = if (total > 0) -1 else percent,
-                    // Denominasi masih estimasi (BANDWIDTH x durasi) selama
-                    // ukuran segmen riil (exactTotal) belum tersedia; UI memakai
-                    // flag ini untuk menampilkan "~" di depan total.
-                    totalBytesEstimated = total == 0L && progress.exactTotal <= 0,
+                    progressPercentOverride = -1,
+                    totalBytesEstimated = false,
                     speedBps = speed,
-                    etaSeconds = etaFromSegments
+                    etaSeconds = eta
                 )
             }
             scheduleProgressSave()
@@ -4409,6 +4375,14 @@ internal fun segmentResumeBytes(recorded: Long, available: Long, segLen: Long): 
         available.coerceAtLeast(0L),
         segLen.coerceAtLeast(0L)
     )
+
+/** Total efektif progres adaptif (issue #1428): byte berkas yang sudah
+ *  selesai ditambah Content-Length berkas yang sedang diunduh. Content-
+ *  Length tak dikenal (0/-1) menghasilkan 0 = total tak diketahui secara
+ *  jujur — bukan estimasi. Murni agar bisa di-unit-test; nilai harapan
+ *  dibuktikan port Python 1:1 (audit-dm-r14/port-1428.py). */
+internal fun muxEffectiveTotal(completedBytes: Long, currentFileTotal: Long): Long =
+    if (currentFileTotal > 0) completedBytes + currentFileTotal else 0L
 
 /** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
  *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able
