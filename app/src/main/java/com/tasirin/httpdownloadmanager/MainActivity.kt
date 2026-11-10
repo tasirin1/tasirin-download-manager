@@ -1443,25 +1443,41 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
         when (action) {
             DownloadAdapter.Action.PAUSE -> App.engine.pause(item.id)
             DownloadAdapter.Action.RESUME -> App.engine.resume(item.id)
-            DownloadAdapter.Action.CANCEL -> AlertDialog.Builder(this)
-                .setMessage(R.string.confirm_cancel)
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.ok) { _, _ ->
-                    lifecycleScope.launch(Dispatchers.IO) { App.engine.cancel(item.id) }
-                }
-                .show()
-            DownloadAdapter.Action.DELETE -> AlertDialog.Builder(this)
-                .setMessage(R.string.confirm_delete)
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.delete) { _, _ ->
-                    lifecycleScope.launch(Dispatchers.IO) { App.engine.remove(item.id) }
-                }
-                .show()
+            DownloadAdapter.Action.CANCEL -> confirmCancelDownload(item)
+            DownloadAdapter.Action.DELETE -> confirmDeleteDownload(item)
             DownloadAdapter.Action.OPEN -> openDownload(item)
             DownloadAdapter.Action.OPEN_FOLDER -> openFolder(item)
             DownloadAdapter.Action.MONITOR ->
                 App.engine.setMonitor(item.id, !item.monitor)
         }
+    }
+
+    /** Dialog konfirmasi Cancel bersama (issue #1513): dipakai tombol
+     *  baris (onAction) DAN menu tekan-lama — Cancel membuang progres
+     *  berjalan, jadi tak ada jalur yang boleh menjalankannya dalam
+     *  satu ketukan tanpa bertanya dulu. */
+    private fun confirmCancelDownload(item: DownloadItem) {
+        AlertDialog.Builder(this)
+            .setMessage(R.string.confirm_cancel)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.ok) { _, _ ->
+                lifecycleScope.launch(Dispatchers.IO) { App.engine.cancel(item.id) }
+            }
+            .show()
+    }
+
+    /** Dialog konfirmasi Delete bersama (issue #1513): dipakai tombol
+     *  baris, menu tekan-lama, dan semantik yang sama seperti geser
+     *  kiri (confirmSwipeDelete) — penghapusan permanen selalu
+     *  dikonfirmasi dulu. */
+    private fun confirmDeleteDownload(item: DownloadItem) {
+        AlertDialog.Builder(this)
+            .setMessage(R.string.confirm_delete)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                lifecycleScope.launch(Dispatchers.IO) { App.engine.remove(item.id) }
+            }
+            .show()
     }
 
     override fun onTap(item: DownloadItem) {
@@ -1516,7 +1532,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             item.state == DownloadState.PAUSED
         ) {
             options.add(getString(R.string.cancel) to {
-                lifecycleScope.launch(Dispatchers.IO) { App.engine.cancel(item.id) }
+                confirmCancelDownload(item)
             })
         }
         if (item.state != DownloadState.DOWNLOADING) {
@@ -1538,7 +1554,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             item.state == DownloadState.CANCELLED
         ) {
             options.add(getString(R.string.delete) to {
-                lifecycleScope.launch(Dispatchers.IO) { App.engine.remove(item.id) }
+                confirmDeleteDownload(item)
             })
         }
         val labels = options.map { it.first }.toTypedArray()
