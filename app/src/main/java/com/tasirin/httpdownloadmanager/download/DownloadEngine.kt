@@ -4046,8 +4046,6 @@ class DownloadEngine(appContext: Context) {
             // dan seek sekali ke offset absolut segmen ini. Tulis RAF tak
             // memakai buffer perantara: byte yang terhitung progres sudah
             // di tangan OS, tak pernah mendahului isi berkas.
-            val output = RandomAccessFile(partial, "rw")
-            output.seek(segment.start + downloaded)
             val buffer = ByteArray(BUFFER_SIZE)
             var lastNotify = 0L
             var segIters = 0
@@ -4056,7 +4054,19 @@ class DownloadEngine(appContext: Context) {
             // mengabaikan batas akhir Range tak boleh menumpuk byte ekstra ke
             // file parsial (merge korup lolos verifySize yang membolehkan overrun).
             var budget = segmentLength(segment.start, segment.end) - downloaded
+            // Konstruksi RAF + seek berada DI DALAM try (issue #1528):
+            // sebelumnya keduanya di luar try batin, jadi kegagalannya
+            // (FD habis, media tercabut, parsial terhapus bersamaan)
+            // keluar tanpa menutup input — soket menggantung karena
+            // finally luar melewatkan disconnect (streamOpened sudah
+            // true) dan untrackConnection tak memutus jalur normal.
+            // output ditugaskan SEBELUM seek agar finally tetap
+            // menutupnya bila seek yang gagal.
+            var output: RandomAccessFile? = null
             try {
+                val raf = RandomAccessFile(partial, "rw")
+                output = raf
+                raf.seek(segment.start + downloaded)
                 while (true) {
                     val read = input.read(buffer)
                     if (read == -1) break
@@ -4075,7 +4085,7 @@ class DownloadEngine(appContext: Context) {
                     if (capped < read) {
                         throw IOException("Segment ${segment.index} exceeded requested range")
                     }
-                    output.write(buffer, 0, capped)
+                    raf.write(buffer, 0, capped)
                     downloaded += capped
                     budget -= capped
                     val sharedTotal = addThrottleTotal(id, capped.toLong())
@@ -4115,7 +4125,7 @@ class DownloadEngine(appContext: Context) {
                 coroutineContext.ensureActive()
             } finally {
                 runCatching { input.close() }
-                runCatching { output.close() }
+                runCatching { output?.close() }
             }
             if (downloaded < segmentLength(segment.start, segment.end)) {
                 throw IOException("Segment ${segment.index} incomplete")
