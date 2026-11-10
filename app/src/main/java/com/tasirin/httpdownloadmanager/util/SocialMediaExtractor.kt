@@ -449,15 +449,29 @@ object SocialMediaExtractor {
         // host berikutnya memakai min(9 dtk, sisa tahap). Host
         // menggantung tetap terpotong dan cadangan sungguh dapat
         // giliran; cap luar 20 dtk tetap penjaga totalnya.
+        // Tanpa submit bersarang (issue #1518): httpGet dipanggil
+        // LANGSUNG di benang tahap luar — cap bersarang #1492/#1517
+        // menduduki DUA benang stageExecutor (pool plafon 8 bersama)
+        // per panggilan host dan benang dalamnya tetap berjalan
+        // sesudah cap luar lewat. Timeout per hop dan deadline rantai
+        // httpGet sama-sama diikat ke anggaran host (chainBudgetMs),
+        // jadi total satu host sejalan anggarannya tanpa benang kedua.
         val obj = runStageCapped(20_000L) {
             var found: JSONObject? = null
             val stageStartNanos = System.nanoTime()
             for ((index, host) in hosts.withIndex()) {
                 val remainingMs = 20_000L - (System.nanoTime() - stageStartNanos) / 1_000_000L
                 if (remainingMs <= 0L) break
-                val json = runStageCapped(tikTokHostBudgetMs(index, remainingMs)) {
-                    httpGet("$host/api/?url=$encoded&hd=1")
-                } ?: continue
+                val budgetMs = tikTokHostBudgetMs(index, remainingMs)
+                // Sisa di bawah 1 dtk tak cukup untuk satu percobaan
+                // HTTP bermakna (lantai timeout hop helper) — berhenti
+                // sama seperti sisa habis.
+                if (budgetMs < 1_000L) break
+                val json = httpGet(
+                    "$host/api/?url=$encoded&hd=1",
+                    timeoutMs = budgetMs.toInt(),
+                    chainBudgetMs = budgetMs
+                ) ?: continue
                 val parsed = runCatching { JSONObject(json) }.getOrNull() ?: continue
                 if (parsed.optInt("code", -1) == 0) {
                     found = parsed
@@ -2788,7 +2802,7 @@ object SocialMediaExtractor {
         "${u.protocol}://${u.host}$port"
     }.getOrNull()
 
-    private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000, race: FallbackRaceControl? = null): HttpResult? {
+    private fun httpGetWithCookies(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000, race: FallbackRaceControl? = null, chainBudgetMs: Long? = null): HttpResult? {
         var current = urlStr
         var activeHeaders = headers
         // Jar per (nama, host pemasang) -> (nilai, host pemasang),
@@ -2806,8 +2820,11 @@ object SocialMediaExtractor {
         // soket) tetap menduduki stageExecutor selama itu, menolak
         // tahap sehat berikutnya. Anggaran rantai dibatasi dan
         // timeout tiap hop menyusut mengikuti sisa waktu.
+        // chainBudgetMs (issue #1518) mengganti rumus bawaan untuk
+        // pemanggil yang harus mengikat TOTAL rantai ke anggaran
+        // tahapnya sendiri (loop host TikTok); null = rumus lama.
         val chainDeadline = android.os.SystemClock.elapsedRealtime() +
-            maxOf(timeoutMs * 2L, 30_000L)
+            (chainBudgetMs ?: maxOf(timeoutMs * 2L, 30_000L))
         repeat(6) {
             if (race?.stopped == true) return null
             val remainingMs = chainDeadline -
@@ -2905,8 +2922,8 @@ object SocialMediaExtractor {
         return null
     }
 
-    private fun httpGet(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000): String? {
-        return httpGetWithCookies(urlStr, headers, timeoutMs)?.body
+    private fun httpGet(urlStr: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15000, chainBudgetMs: Long? = null): String? {
+        return httpGetWithCookies(urlStr, headers, timeoutMs, null, chainBudgetMs)?.body
     }
 
     private fun httpPostJson(
