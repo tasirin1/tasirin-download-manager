@@ -409,6 +409,7 @@ let gallerySentinel = null;
 let galleryPage = 0;
 let galleryHasMore = false;
 let galleryRetryDone = false;
+let galleryRetryTimer = null;
 const GALLERY_CACHE_TTL_MS = 30000;
 let galleryCache = null; // {items, total, hasMore, at}
 (function() {
@@ -894,7 +895,11 @@ if (seq !== gallerySeq) return;
 if (reset) {
 if (!galleryRetryDone) {
 galleryRetryDone = true;
-setTimeout(function () { loadGallery(true); }, 2000);
+galleryRetryTimer = setTimeout(function () {
+galleryRetryTimer = null;
+if (currentRoute() !== 'gallery') return;
+loadGallery(true);
+}, 2000);
 } else if (galleryCacheFresh()) {
 mmShowToast('Failed to refresh — showing cached gallery', 3000, 'error');
 setGalleryStatus('');
@@ -1308,6 +1313,10 @@ try { window.scrollTo(0, routeScroll[route] || 0); } catch (e) {}
 }
 function applyRoute() {
 const route = currentRoute();
+if (route !== 'gallery' && galleryRetryTimer) {
+clearTimeout(galleryRetryTimer);
+galleryRetryTimer = null;
+}
 if (lastRoute === 'downloads' || lastRoute === 'gallery') {
 routeScroll[lastRoute] = window.scrollY || 0;
 }

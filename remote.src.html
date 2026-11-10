@@ -2712,6 +2712,9 @@ let gallerySentinel = null;
 let galleryPage = 0;
 let galleryHasMore = false;
 let galleryRetryDone = false;
+// Id timer retry galeri (issue #1405): disimpan agar bisa dibatalkan
+// saat pengguna meninggalkan route galeri.
+let galleryRetryTimer = null;
 // Cache halaman pertama galeri (TTL singkat) supaya pindah tab Gallery tidak
 // selalu scan ulang; tombol refresh memaksa muat ulang dari jaringan.
 const GALLERY_CACHE_TTL_MS = 30000;
@@ -3297,7 +3300,15 @@ async function loadGalleryRequest(reset) {
       // Coba ulang sekali setelah 2 detik sebelum menampilkan error.
       if (!galleryRetryDone) {
         galleryRetryDone = true;
-        setTimeout(function () { loadGallery(true); }, 2000);
+        // Timer disimpan + route dicek di dalam callback (issue
+        // #1405): retry yang menembak sesudah pengguna pindah tab
+        // bisa memunculkan toast galeri di tab lain dan merender
+        // grid yang tersembunyi. applyRoute membatalkannya juga.
+        galleryRetryTimer = setTimeout(function () {
+          galleryRetryTimer = null;
+          if (currentRoute() !== 'gallery') return;
+          loadGallery(true);
+        }, 2000);
       } else if (galleryCacheFresh()) {
         // Jaringan bermasalah tapi masih ada salinan terakhir: pakai cache
         // sambil memberi tahu supaya pengguna tahu datanya bisa basi.
@@ -3812,6 +3823,12 @@ function restoreRouteScroll(route) {
 
 function applyRoute() {
   const route = currentRoute();
+  // Meninggalkan galeri membatalkan retry muat yang tertunda
+  // (issue #1405); callback-nya juga mengecek route sebagai lapis kedua.
+  if (route !== 'gallery' && galleryRetryTimer) {
+    clearTimeout(galleryRetryTimer);
+    galleryRetryTimer = null;
+  }
   if (lastRoute === 'downloads' || lastRoute === 'gallery') {
     routeScroll[lastRoute] = window.scrollY || 0;
   }
