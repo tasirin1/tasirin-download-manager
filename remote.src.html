@@ -3362,7 +3362,11 @@ function ensureGallerySentinel() {
 // saat pengguna scroll naik. Tanpa ini 3000 video = 3000 cell menumpuk dan
 // scroll jank di WebView TV tua (content-visibility tak didukung).
 const GAL_MAX_CELLS = 240;
-const GAL_ROW_GAP = 14;
+// Cermin WAJIB row-gap .gal-grid di CSS berkas ini (gap: 10px 8px ->
+// row-gap 10px): ubah keduanya bersamaan — asersi di
+// scripts/upload_smoke_test.js menegakkannya (issue #1425; nilainya
+// tertinggal 14 sesudah pemadatan CSS f3119449).
+const GAL_ROW_GAP = 10;
 let galTopHidden = 0;
 function galTopPad() {
   return (parseInt(galleryGrid.style.paddingTop || '0', 10) || 0);

@@ -35,6 +35,23 @@ if (!mainBlock) {
 }
 const main = mainBlock[1];
 
+// Aseri cermin CSS<->JS gap baris galeri (issue #1425): konstanta
+// GAL_ROW_GAP di skrip utama WAJIB sama dengan row-gap .gal-grid di
+// CSS berkas yang sama. Pemadatan CSS f3119449 dulu mengubah CSS-nya
+// saja (14 -> 10) dan konstanta JS tertinggal, sehingga kompensasi
+// tinggi restore galeri kelebihan 4px per baris.
+const gapConst = /const GAL_ROW_GAP = (\d+);/.exec(main);
+const galRule = /\.gal-grid\s*\{([^}]*)\}/.exec(html);
+const gapCss = galRule && /gap:\s*(\d+)px\s+\d+px/.exec(galRule[1]);
+if (!gapConst || !gapCss) {
+  console.error('FAIL: GAL_ROW_GAP / gap .gal-grid tidak ditemukan untuk asersi cermin');
+  process.exit(1);
+}
+if (parseInt(gapConst[1], 10) !== parseInt(gapCss[1], 10)) {
+  console.error('FAIL: GAL_ROW_GAP=' + gapConst[1] + ' != row-gap .gal-grid=' + gapCss[1]);
+  process.exit(1);
+}
+
 function makeEl(id) {
   return {
     id: id || '',
