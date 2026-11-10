@@ -26,12 +26,9 @@ import com.tasirin.httpdownloadmanager.util.Crypto
 import com.tasirin.httpdownloadmanager.util.StoragePrefs
 import com.tasirin.httpdownloadmanager.util.TlsCompat
 import com.tasirin.httpdownloadmanager.util.SocialMediaExtractor
-import com.tasirin.httpdownloadmanager.util.readBounded
 import com.tasirin.httpdownloadmanager.util.decodePercentEncoded
-import com.tasirin.httpdownloadmanager.util.readBoundedFlagged
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,10 +44,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 import kotlin.coroutines.coroutineContext
-import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
@@ -64,12 +59,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.Collections
-import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicLong
 
 import java.net.HttpCookie
@@ -129,34 +119,6 @@ class DownloadEngine(appContext: Context) {
         ConcurrentHashMap<String, PendingReplacement>()
     private val retryAttempts = ConcurrentHashMap<String, Int>()
 
-    // Cache rencana HLS per item (issue #1061): parseHlsPlan mengambil
-    // playlist SEMUA kandidat varian + rendisi audio, dan dulu diulang
-    // penuh di SETIAP percobaan — retry membayar ulang belasan unduhan
-    // playlist sebelum byte segmen pertama dilanjutkan. Rencana dipakai
-    // ulang hanya bila body master yang baru di-fetch IDENTIK dan
-    // umurnya <= TTL singkat: URL segmen bertanda tangan bisa kedaluwarsa,
-    // jadi jendela pakai-ulang sengaja pendek (retry otomatis berjarak
-    // detik) dan master yang berubah selalu memicu rencana baru.
-    // Rencana juga diikat ke URL dasar yang melahirkannya dan umurnya
-    // dihitung jam monotonik (issue #1094): URL segmen di dalam rencana
-    // sudah absolut terhadap URL dasar itu, jadi body master identik
-    // dari host LAIN (failover mirror/ekstraksi ulang mengganti
-    // item.url untuk id yang sama) tak boleh memakai rencana lama —
-    // segmennya akan tetap diminta ke host asal; dan jam dinding yang
-    // dimundurkan membuat selisih umur negatif yang selalu <= TTL,
-    // jadi rencana tak pernah kedaluwarsa selama jam belum kembali.
-    private data class CachedHlsPlan(
-        val baseUrl: String,
-        val masterBody: String,
-        val plan: HlsPlan,
-        val atMs: Long,
-        /** Preferensi yang ikut membentuk rencana (issue #1409): rencana
-         *  hanya sah dipakai ulang untuk preferensi yang sama. */
-        val preferredHeight: Int,
-        val preferredAudioLang: String
-    )
-
-    private val hlsPlanCache = ConcurrentHashMap<String, CachedHlsPlan>()
 
     // Throttle attempt yang sedang berjalan per item (issue #747):
     // setLimitAndPriority mendorong batas baru ke throttle aktif agar
@@ -167,15 +129,12 @@ class DownloadEngine(appContext: Context) {
     // Set concurrent via newSetFromMap (bukan ConcurrentHashMap.newKeySet):
     // newKeySet/KeySetView butuh API 24 — di Android 6 (minSdk 23) lempar
     // NoSuchMethodError saat engine dibangun (crash tiap startup); Set polos
-    // aman di semua API. Berlaku untuk failedHlsUrls.
+    // aman di semua API.
     // Penanda retry tertunda membawa TOKEN GENERASI per jadwal (issue
     // #865): job tunda hanya boleh bertindak bila tokennya masih yang
     // terdaftar — job basi tak boleh mencabut penanda jadwal lebih baru.
     private val pendingRetryTokens = ConcurrentHashMap<String, Long>()
     private val retryTokenSeq = java.util.concurrent.atomic.AtomicLong(0)
-    /** URL HLS yang sudah gagal (media playlist 403/404) — jangan retry; re-extract dari YouTube URL. */
-    private val failedHlsUrls: MutableSet<String> =
-        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     /** Id pendahulu yang flag monitor-nya DISENTUH eksplisit pengguna
      *  selama jendela penerusnya (issue #521): sentuhan pengguna selalu
      *  menang atas pemulihan otomatis #512/#518/#520. Murni memori —
@@ -183,16 +142,9 @@ class DownloadEngine(appContext: Context) {
      *  regresi. */
     private val monitorSentuhanPengguna: MutableSet<String> =
         Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
-    private val FAILED_HLS_URLS_MAX = 256
 
-    /** Negative-cache sesi: aman dihapus total bila penuh (hanya memicu
-     *  satu percobaan ulang HLS, bukan korupsi). */
-    private fun rememberFailedHlsUrl(url: String) {
-        if (failedHlsUrls.size >= FAILED_HLS_URLS_MAX) failedHlsUrls.clear()
-        failedHlsUrls.add(url)
-    }
     /** URL sosial media original per item (YouTube/TikTok/etc) — disimpan saat ekstraksi
-     *  menghasilkan URL HLS yang berbeda; dipakai untuk re-extract saat HLS gagal. */
+     *  menghasilkan URL langsung; dipakai untuk re-extract saat URL CDN kedaluwarsa. */
     private val originalSocialUrls = ConcurrentHashMap<String, String>()
     private val activeConns = ConcurrentHashMap<String, MutableSet<HttpURLConnection>>()
     private val speedTracker = SpeedTracker()
@@ -878,63 +830,6 @@ class DownloadEngine(appContext: Context) {
         return published
     }
 
-    fun probeHlsVariants(
-        url: String,
-        username: String = "",
-        password: String = "",
-        headers: String = ""
-    ): List<HlsVariant>? {
-        return runCatching {
-            // Kredensial/header dialog IKUT dibawa (issue #473): master
-            // m3u8 berproteksi Cookie/Referer/Authorization menjawab 403
-            // untuk probe buta konteks, sehingga pemilih kualitas gugur
-            // diam-diam padahal unduhannya sendiri sehat karena
-            // addDownload membawa konteks yang sama.
-            val conn = openAuthenticatedConnection(
-                url, method = "GET", username = username, password = password, headers = headers
-            )
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) return null
-                // Baca terbatas: master playlist normal kecil; body raksasa dari
-                // URL nakal tidak boleh dimuat penuh ke memori.
-                val body = conn.inputStream.use { readBounded(it, HLS_PROBE_MAX_BYTES) }
-                // Media playlist (single-quality): HLS valid tanpa pilihan
-                // kualitas — daftar kosong, bukan null (null = bukan HLS).
-                if (HlsParser.isMediaPlaylist(body)) return emptyList()
-                // Fallback longgar seperti parseHlsPlan (issue #465):
-                // master berformat STREAM-INF tak umum (kasus YouTube
-                // 2026) yang gagal di parseMaster ketat tetap harus
-                // menawarkan pemilih kualitas di dialog, bukan langsung
-                // antre dengan kualitas bawaan.
-                HlsParser.parseMaster(body, conn.url.toString())
-                    ?: HlsParser.parseMasterLenient(body, conn.url.toString())
-            } finally {
-                conn.disconnect()
-            }
-        }.getOrNull()
-    }
-
-    /** Probe manifest HLS untuk daftar bahasa audio yang tersedia.
-     *  Mengembalikan list rendisi unik (language + name), dipakai dialog
-     *  Add Download untuk spinner "Audio language". */
-    fun probeHlsAudioLanguages(url: String, headers: String = ""): List<HlsRendition> {
-        return runCatching {
-            val conn = openAuthenticatedConnection(
-                url, method = "GET", username = "", password = "", headers = headers
-            )
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) return emptyList()
-                val body = conn.inputStream.use { readBounded(it, HLS_PROBE_MAX_BYTES) }
-                val renditions = HlsParser.parseAudioRenditions(body, conn.url.toString())
-                renditions.distinctBy { it.language.lowercase(Locale.ROOT) to it.name.lowercase(Locale.ROOT) }
-            } finally {
-                conn.disconnect()
-            }
-        }.getOrElse { emptyList() }
-    }
-
     fun probeUrl(
         url: String,
         username: String = "",
@@ -992,9 +887,9 @@ class DownloadEngine(appContext: Context) {
 
     /** Buka koneksi dengan redirect manual. Kredensial dan header sensitif
      *  hanya dikirim bila target tetap satu origin dengan [authAnchorUrl]
-     *  (bawaan: URL awal koneksi ini). Pemanggil HLS meneruskan URL item
-     *  sebagai jangkar agar kredensial tidak ikut ke host segmen/varian
-     *  mana pun yang ditunjuk isi playlist (issue #340). */
+     *  (bawaan: URL awal koneksi ini). Pemanggil meneruskan URL item
+     *  sebagai jangkar agar kredensial tidak ikut ke host lain mana pun
+     *  yang ditunjuk isi respons (issue #340). */
     private fun openAuthenticatedConnection(
         url: String,
         method: String,
@@ -1503,13 +1398,7 @@ class DownloadEngine(appContext: Context) {
                 // ditempel persis dari dialog tetap terpantau, selaras
                 // pemeriksaan skema probeUrl yang ignoreCase.
                 (it.url.startsWith("http://", ignoreCase = true) ||
-                    it.url.startsWith("https://", ignoreCase = true)) &&
-                // Item HLS dikecualikan (issue #341): item.url adalah URL
-                // manifest sedangkan totalBytes adalah total byte segmen --
-                // dua besaran tak sebanding, dan etag HLS selalu kosong,
-                // sehingga probe HEAD ke manifest bisa selalu terbaca
-                // "ukuran berubah" dan memicu unduh ulang penuh berulang.
-                !isHlsManifestUrl(it.url)
+                    it.url.startsWith("https://", ignoreCase = true))
         }
         for (item in targets) {
             runCatching {
@@ -2100,13 +1989,7 @@ class DownloadEngine(appContext: Context) {
         // utuh menggagalkan permanen URL asing yang query-nya memuat
         // string itu padahal 403-nya bisa sesaat.
         val itemHost = urlHostOf(item.url)
-        // Pesan segmen HLS dikecualikan (issue #1185): "HLS segment
-        // HTTP 403" berasal dari fetch segmen yang host-nya bisa beda
-        // dan 403-nya bisa sesaat (rate-limit CDN) — mengklasifikasikan
-        // nya sebagai blokir n-signature permanen membunuh item yang
-        // masih bisa pulih lewat retry/ekstraksi ulang.
         val ytSignatureBlocked = message?.contains("HTTP 403") == true &&
-            message?.startsWith("HLS segment HTTP") != true &&
             (itemHost == "googlevideo.com" || itemHost.endsWith(".googlevideo.com") ||
                 SocialMediaExtractor.isYouTubeUrl(item.url))
         if (ytSignatureBlocked) {
@@ -2128,30 +2011,6 @@ class DownloadEngine(appContext: Context) {
             hidupkanLagiMonitorPendahulu(item)
             // Item terhapus di tengah pemrosesan gagal -> jangan kirim
             // notifikasi untuk unduhan yang sudah tidak ada (issue #392).
-            if (finished != null) NotificationHelper.notifyItemFinished(context, finished)
-            return
-        }
-        // Format HLS struktural yang tak didukung (issue #1158):
-        // terenkripsi/byte-range/fMP4 adalah sifat playlist — untuk URL
-        // yang sama hasilnya deterministik, jadi retry generik penuh
-        // (bawaan 2x, maks 5x) hanya membuang fetch playlist berulang.
-        // Langsung FAILED terminal seperti klasifikasi permanen lain.
-        // "Live HLS" SENGAJA tak termasuk: playlist live bisa
-        // memperoleh EXT-X-ENDLIST kemudian, retry untuknya masuk akal.
-        if (isUnsupportedHlsError(message)) {
-            retryAttempts.remove(id)
-            App.logEvent("DOWNLOAD FAILED: ${item.fileName} — $message")
-            val finished = updateItem(id) {
-                it.copy(
-                    state = DownloadState.FAILED,
-                    error = message,
-                    autoResume = false,
-                    speedBps = 0,
-                    etaSeconds = 0
-                )
-            }
-            flushSave()
-            hidupkanLagiMonitorPendahulu(item)
             if (finished != null) NotificationHelper.notifyItemFinished(context, finished)
             return
         }
@@ -2324,24 +2183,13 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    /** Tiga galat format HLS struktural dari parseHlsPlan/
-     *  mediaSegmentsWithDurations (issue #1158): sifat format
-     *  playlist, deterministik untuk URL yang sama. */
-    private fun isUnsupportedHlsError(message: String?): Boolean {
-        if (message == null) return false
-        return message.contains("Encrypted HLS (EXT-X-KEY) not supported") ||
-            message.contains("Byte-range HLS (EXT-X-BYTERANGE) not supported") ||
-            message.contains("Fragmented MP4 HLS (EXT-X-MAP) not supported")
-    }
-
     private fun isSlowError(message: String?): Boolean {
         if (message.isNullOrEmpty()) return false
         return message.contains("speed too low", ignoreCase = true) ||
             message.contains("connection stalled", ignoreCase = true) ||
-            // Varian zero-read tulisan tangan di jalur HLS/adaptive
-            // (issue #971): "HLS segment stalled (zero reads)" dan
-            // "adaptive file stalled (zero reads)" tidak memuat frasa
-            // di atas, jadi klasifikasinya timpang antarjalur.
+            // Varian zero-read tulisan tangan di jalur adaptive
+            // (issue #971): "adaptive file stalled (zero reads)" tidak
+            // memuat frasa di atas, jadi klasifikasinya timpang antarjalur.
             message.contains("stalled (zero reads)", ignoreCase = true)
     }
 
@@ -2394,9 +2242,9 @@ class DownloadEngine(appContext: Context) {
             message.contains("network", ignoreCase = true) ||
             message.contains("socket", ignoreCase = true) ||
             // Badan terpotong di tengah jalan (EOF prematur) adalah gangguan
-            // jaringan transien: pesan "HLS segment truncated" dari
-            // fetchHlsSegment wajib lolos klasifikasi ini agar retry segmen
-            // benar-benar berjalan (issue #167).
+            // jaringan transien: pesan "truncated" dari unduhan berkas
+            // wajib lolos klasifikasi ini agar retry benar-benar
+            // berjalan (issue #167).
             message.contains("truncated", ignoreCase = true) ||
             // Stall/lambat dan frasa connect yang TRANSIEN LOKAL
             // (issue #969, disaring issue #976): klasifikasi ini
@@ -2431,23 +2279,6 @@ class DownloadEngine(appContext: Context) {
     }
 
     private suspend fun runDownload(item: DownloadItem, skipSocial: Boolean = false) {
-        // Resume HLS: URL sudah berupa manifest m3u8 dari ekstraksi sebelumnya.
-        // Arahkan ulang ke downloadHls agar tidak diunduh sebagai file polos.
-        // TAPI: bila URL ini sudah gagal sebelumnya (failedHlsUrls), jangan retry
-        // HLS yang sama — lewati ke ekstraksi sosial media supaya URL baru didapat.
-        if (isHlsManifestUrl(item.url) && !failedHlsUrls.contains(item.url)) {
-            val hlsName = item.fileName
-            updateItem(item.id) { it.copy(state = DownloadState.DOWNLOADING) }
-            downloadHls(item, hlsName)
-            return
-        }
-        // HLS URL sudah gagal sebelumnya — re-extract dari URL sosial media original.
-        val originalUrl = originalSocialUrls[item.id]
-        if (originalUrl != null && isHlsManifestUrl(item.url)) {
-            App.logEvent("HLS: re-extracting from original URL (manifest was failed)")
-            updateItem(item.id) { it.copy(url = originalUrl) }
-            return runDownload(item.copy(url = originalUrl), skipSocial)
-        }
         // Social media: ekstrak direct URL menggunakan API publik
         // (tikwm.com untuk TikTok, embed page JSON untuk Instagram, vxtwitter untuk Twitter)
         // skipSocial=true dipakai saat URL sudah hasil ekstraksi (mis. URL CDN
@@ -2464,115 +2295,13 @@ class DownloadEngine(appContext: Context) {
                 val directHost = runCatching { java.net.URL(result.directUrl).host }.getOrDefault("?")
                 App.logEvent("SOCIAL: extracted direct URL from $host → $directHost")
                 App.logEvent("SOCIAL: fileName=${result.fileName}, cookies=${result.cookies.length} chars")
-                // Simpan URL sosial media original untuk SEMUA hasil ekstraksi
-                // (bukan cuma HLS): URL CDN langsung bertanda-tangan (mis.
+                // Simpan URL sosial media original untuk semua hasil ekstraksi:
+                // URL CDN langsung bertanda-tangan (mis.
                 // xvideos-cdn) bisa kedaluwarsa di tengah unduhan — retry butuh
                 // re-extract URL segar dari halaman asli agar progres puluhan
                 // MB tidak dibuang (lihat refreshExpiredCdnUrl).
                 originalSocialUrls[item.id] = item.url
-                // YouTube via HLS: segmen .ts digabung jadi satu file.
-                if (result.isHls) {
-                    // Nama dari API pihak ketiga wajib disanitasi (separator di
-                    // dalamnya membuat dua item berbagi file .part yang sama di
-                    // disk). Nama kustom user selalu menang bila ada.
-                    val hlsName = if (!item.nameIsCustom) sanitizeFileName(result.fileName ?: item.fileName)
-                    else item.fileName
-                    val hlsHeaders = if (result.cookies.isNotEmpty()) {
-                        val existing = item.headers.trim()
-                        if (existing.isNotEmpty()) "${existing}\nCookie: ${result.cookies}" else "Cookie: ${result.cookies}"
-                    } else item.headers
-                    updateItem(item.id) {
-                        it.copy(url = result.directUrl, fileName = if (!item.nameIsCustom) hlsName else item.fileName, headers = hlsHeaders)
-                    }
-                    try {
-                        downloadHls(
-                            item.copy(url = result.directUrl, fileName = hlsName, headers = hlsHeaders),
-                            hlsName,
-                            adaptiveAudioUrl = result.audioUrl
-                        )
-                        return
-                    } catch (e: IOException) {
-                        // HLS gagal. Tandai URL HLS sebagai gagal HANYA
-                        // bila server menolak URL itu (403/404, mis. media
-                        // playlist butuh pot token) supaya resume/retry
-                        // tidak mengulang HLS yang sama — re-extract dari
-                        // YouTube URL. Kegagalan bukan-URL (storage penuh,
-                        // live, playlist terlalu besar) tidak ditandai:
-                        // retry harus tetap bisa lewat HLS langsung +
-                        // resume segmen (issue #1410).
-                        if (isHlsUrlRejectionError(e.message)) {
-                            rememberFailedHlsUrl(result.directUrl)
-                        }
-                        App.logEvent("HLS: download failed (${e.message?.take(50)}), trying non-HLS fallback")
-                        // Pasangan adaptive dari ekstraksi yang SAMA dulu
-                        // (issue #1375): Result HLS membawa videoUrl/audioUrl
-                        // dari streamingData yang sama — memakainya sekarang
-                        // menghindari ekstraksi ulang penuh (halaman +
-                        // Piped/Invidious/Cobalt) yang hasilnya pasangan
-                        // yang sama. Re-ekstraksi hanya bila pasangan ini
-                        // kosong atau gagal dipakai.
-                        if (result.videoUrl.isNotEmpty() && result.audioUrl.isNotEmpty()) {
-                            val pairBase = sanitizeFileName(result.fileName ?: item.fileName)
-                            val pairName = if (!item.nameIsCustom) {
-                                when {
-                                    pairBase.endsWith(".ts", ignoreCase = true) ->
-                                        pairBase.dropLast(3) + ".mp4"
-                                    pairBase.endsWith(".mp4", ignoreCase = true) -> pairBase
-                                    else -> "$pairBase.mp4"
-                                }
-                            } else {
-                                item.fileName
-                            }
-                            updateItem(item.id) {
-                                it.copy(
-                                    url = result.videoUrl,
-                                    fileName = if (!item.nameIsCustom) pairName else item.fileName,
-                                    headers = hlsHeaders
-                                )
-                            }
-                            val pairItem = item.copy(
-                                url = result.videoUrl, fileName = pairName, headers = hlsHeaders
-                            )
-                            var pairDone = false
-                            try {
-                                App.logEvent("SOCIAL: non-HLS adaptive pair (same extraction) → merging video+audio into MP4")
-                                downloadAdaptiveMuxed(pairItem, result.videoUrl, result.audioUrl, pairName)
-                                pairDone = true
-                            } catch (e2: CancellationException) {
-                                throw e2
-                            } catch (e2: Exception) {
-                                App.logEvent("HLS: same-extraction adaptive pair failed (${e2.message?.take(50)}), re-extracting")
-                            }
-                            if (pairDone) return
-                        }
-                        // Fallback: coba ekstrak non-HLS (page/Piped/Invidious).
-                        val fallback = SocialMediaExtractor.extractNonHlsYouTube(item.url, item.headers)
-                        if (fallback != null && fallback.directUrl != item.url && !fallback.isHls) {
-                            // Sama seperti di atas (issue #951): catat host saja.
-                            val fbHost = runCatching { java.net.URL(fallback.directUrl).host }.getOrDefault("?")
-                            App.logEvent("SOCIAL: non-HLS fallback: $fbHost")
-                            val fbName = if (!item.nameIsCustom) sanitizeFileName(fallback.fileName ?: item.fileName)
-                            else item.fileName
-                            val fbHeaders = if (fallback.cookies.isNotEmpty()) {
-                                val existing = item.headers.trim()
-                                if (existing.isNotEmpty()) "${existing}\nCookie: ${fallback.cookies}" else "Cookie: ${fallback.cookies}"
-                            } else item.headers
-                            updateItem(item.id) { it.copy(url = fallback.directUrl, fileName = if (!item.nameIsCustom) fbName else item.fileName, headers = fbHeaders) }
-                            val fbItem = item.copy(url = fallback.directUrl, fileName = fbName, headers = fbHeaders)
-                            if (fallback.audioUrl.isNotEmpty()) {
-                                App.logEvent("SOCIAL: non-HLS adaptive pair → merging video+audio into MP4")
-                                downloadAdaptiveMuxed(fbItem, fallback.videoUrl, fallback.audioUrl, fbName)
-                                return
-                            }
-                            return runDownload(fbItem, skipSocial = true)
-                        }
-                        // Non-HLS juga gagal — kembalikan URL ke original supaya
-                        // retry ulang melewati ekstraksi sosial media (bukan langsung HLS).
-                        updateItem(item.id) { it.copy(url = item.url) }
-                        throw e
-                    }
-                }
-                // Non-HLS extraction path (bukan HLS)
+                // Jalur berkas langsung / pasangan adaptif dari hasil ekstraksi.
                 val newName = sanitizeFileName(result.fileName ?: item.fileName)
                 // Gabung cookies dari extraction ke headers untuk CDN download
                 // (#238: cookie user tidak ditimpa cookie ekstraksi).
@@ -2809,218 +2538,9 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    /** Unduh HLS (m3u8): pilih varian terbaik, unduh semua segmen .ts lalu
-     *  gabung jadi satu file dapat diputar. Tidak butuh ffmpeg — segmen dari
-     *  YouTube HLS sudah berisi video+audio gabungan (MPEG-TS). */
-    private suspend fun downloadHls(item: DownloadItem, outName: String, adaptiveAudioUrl: String = "") {
-        val saver = fileSaver
-        val freeNow = saver.freeBytes()
-        if (freeNow < MIN_FREE_BYTES) throw IOException("Storage almost full (free ${Formats.bytes(freeNow)})")
-
-        val master = fetchText(item.url, item.headers, HLS_PROBE_MAX_BYTES, item.username, item.password, trackId = item.id, failOnTruncate = true)
-            ?: throw IOException("Cannot fetch HLS manifest")
-        // Pakai ulang rencana segar bila master tak berubah (#1061);
-        // selain itu parse penuh dan simpan (peta dibatasi kasar: cache
-        // ini hanya menolong retry beruntun, bukan katalog permanen).
-        val cachedPlan = hlsPlanCache[item.id]
-        val plan = if (cachedPlan != null && cachedPlan.baseUrl == item.url &&
-            cachedPlan.masterBody == master &&
-            cachedPlan.preferredHeight == item.preferredHeight &&
-            cachedPlan.preferredAudioLang == item.preferredAudioLang &&
-            monotonicNow() - cachedPlan.atMs <= HLS_PLAN_CACHE_TTL_MS
-        ) {
-            cachedPlan.plan
-        } else {
-            parseHlsPlan(master, item.url, item.preferredHeight, item.headers, item.preferredAudioLang, item.username, item.password, trackId = item.id)
-                ?.also { fresh ->
-                    if (hlsPlanCache.size >= 16) hlsPlanCache.clear()
-                    hlsPlanCache[item.id] = CachedHlsPlan(
-                        item.url, master, fresh, monotonicNow(),
-                        item.preferredHeight, item.preferredAudioLang
-                    )
-                }
-        }
-        if (plan == null || plan.videoSegments.isEmpty()) {
-            throw IOException("No HLS segments found")
-        }
-        App.logEvent(
-            "HLS: ${plan.videoSegments.size} video segments, " +
-                (plan.audioSegments?.size ?: 0) + " audio segments"
-        )
-
-        val globalLimit = StoragePrefs.speedLimitKbps(context)
-        val limit = if (item.speedLimitKbps > 0) item.speedLimitKbps else globalLimit
-        val throttle = if (item.speedLimitKbps > 0) {
-            SpeedThrottle(limit, null)
-        } else {
-            SpeedThrottle(limit, globalRateLimiter())
-        }
-        // Daftarkan throttle attempt ini (issue #747); dicabut
-        // berpasangan-nilai saat job attempt ini selesai.
-        activeThrottles[item.id] = throttle
-        coroutineContext[Job]?.invokeOnCompletion { activeThrottles.remove(item.id, throttle) }
-
-        val baseName = buangSufiksEkstensi(outName, ".ts", ".mp4").ifBlank { outName }
-        // Nama temp WAJIB unik per item: baseName membuang ekstensi sehingga
-        // dua item yang namanya hanya beda ekstensi ("film.mp4" vs "film.ts")
-        // menghasilkan temp identik dan saling menghapus/menimpa saat jalan
-        // bersamaan. Potongan id item (UUID, aman nama file) jadi pembeda;
-        // nama final tetap dari baseName. Pembeda ditaruh di DEPAN: di ekor
-        // ia bisa terpotong FileNames.safe untuk nama ±200 karakter sehingga
-        // tabrakan kembali pada kasus tepi itu (issue #171).
-        val tempBase = "~" + item.id.take(8) + baseName
-        // Temp video/audio TIDAK dihapus di awal (issue #385): segmen yang
-        // sudah selesai dipertahankan untuk resume percobaan berikutnya;
-        // downloadSegmentsToFile membuangnya sendiri bila penanda .segs
-        // tak cocok dengan rencana ini. Hasil remux selalu dibuat ulang
-        // dari nol (kerja lokal, bukan jaringan), jadi mp4 tetap dihapus.
-        val videoTs = saver.partialFile("$tempBase.video", segment = null)
-        val audioAdts = saver.partialFile("$tempBase.audio", segment = null)
-        val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
-        val progress = HlsProgress()
-        progress.estimateTotalBytes = plan.estimateTotalBytes
-        if (plan.estimateTotalBytes > 0) {
-            App.logEvent(
-                "HLS: estimasi total ${Formats.bytes(plan.estimateTotalBytes)} " +
-                    "(BANDWIDTH x durasi #EXTINF) — denominator stabil sejak awal"
-            )
-        }
-        val buffer = ByteArray(BUFFER_SIZE)
-        coroutineContext.ensureActive()
-
-        // Estimasi dari BANDWIDTH x durasi tersedia sebelum segmen diunduh:
-        // tolak awal bila jelas tak muat, bukan ENOSPC di tengah jalan.
-        // Ruang bebas dihitung SEKALI (issue #1415): kondisi dan pesan
-        // galat memakai nilai yang sama.
-        if (plan.estimateTotalBytes > 0) {
-            val destFreeBytes = saver.destinationFreeBytes(item.folderPath)
-            if (destFreeBytes < plan.estimateTotalBytes + MIN_FREE_BYTES) {
-                throw IOException(
-                    "Not enough storage for HLS: need ~${Formats.bytes(plan.estimateTotalBytes)}, " +
-                        "available ${Formats.bytes(destFreeBytes)}"
-                )
-            }
-        }
-
-        try {
-            // 1) Unduh segmen video (MPEG-TS) ke file temp.
-            progress.totalSegments = plan.videoSegments.size + (plan.audioSegments?.size ?: 0)
-            downloadSegmentsToFile(
-                item, plan.videoSegments, videoTs, buffer, throttle, progress,
-                fallbackQuery = plan.segmentQueryFallback
-            )
-
-            // 2) Unduh segmen audio (ADTS AAC) ke file temp bila terpisah.
-            var audioStream: AdtsAac.Stream? = null
-            val audioPlan = plan.audioSegments
-            if (!audioPlan.isNullOrEmpty()) {
-                try {
-                    // Strip tag ID3 per-segmen supaya file diisi ADTS bersih yang
-                    // bisa dibaca parser ADTS.
-                    downloadSegmentsToFile(
-                        item, audioPlan, audioAdts, buffer, throttle, progress,
-                        stripId3Segments = true
-                    )
-                    val stream = AdtsAac.open(audioAdts)
-                    if (stream != null && !stream.isEmpty) audioStream = stream
-                } catch (e: CancellationException) {
-                    // Pembatalan bukan kegagalan audio: jangan ditelan jadi
-                    // "audio skipped" (pola fetchHlsSegmentWithRetry).
-                    throw e
-                } catch (e: Exception) {
-                    audioStream = null
-                }
-                if (audioStream == null) App.logEvent("HLS: audio download/parse failed, audio skipped")
-            }
-
-            // 2b) Audio playlist HLS di-404 YouTube — coba audio langsung dari
-            //     adaptiveFormats VISIONOS (URL M4A tanpa n-transform).
-            var adaptiveAudioFile: File? = null
-            if (audioStream == null) {
-                adaptiveAudioFile = tryDownloadAdaptiveAudio(
-                    item, adaptiveAudioUrl, tempBase, buffer, throttle, progress, saver
-                )
-            }
-
-            coroutineContext.ensureActive()
-
-            // 3) Remux video + audio jadi MP4 bila audio tersedia.
-            var remuxed = false
-            if (audioStream != null) {
-                remuxed = HlsMp4Muxer.remux(videoTs, audioStream, mp4, plan.videoSegmentDurationsUs)
-            } else if (adaptiveAudioFile != null) {
-                remuxed = HlsMp4Muxer.remuxWithAudioFile(
-                    videoTs, adaptiveAudioFile, mp4, plan.videoSegmentDurationsUs
-                )
-            }
-            if (remuxed) {
-                App.logEvent("HLS: remux OK → MP4 with audio")
-                val fileName = "$baseName.mp4"
-                ensureItemPresent(item.id, mp4)
-                val published0 = publishItem(saver, mp4, fileName, item)
-                val finalName = published0.fileName ?: fileName
-                // Sama seperti jalur berkas tunggal: checksum diverifikasi
-                // SEBELUM pendahulu dipensiunkan (#236 — commitReplacement
-                // tanpa verifikasi menghapus versi lama yang bagus).
-                verifyChecksum(item.id, published0, saver)?.let {
-                    deletePublished(published0)
-                    rollbackReplacement(item.id)
-                    throw IOException(it)
-                }
-                ensurePresentForCommit(item.id, published0)
-                commitReplacement(item.id)
-                val published = organizeIfEnabled(saver, published0, finalName)
-                ensurePublishedKept(item.id, published0, published)
-                // Temp + penanda resume baru dihapus SESUDAH publish dan
-                // verifikasi checksum berhasil (issue #430): gagal di
-                // jendela sebelumnya harus bisa retry dengan resume
-                // per segmen (#385), bukan unduh ulang dari segmen 0.
-                deleteHlsTempWithSidecar(videoTs)
-                deleteHlsTempWithSidecar(audioAdts)
-                adaptiveAudioFile?.delete()
-                finishHls(item, progress.downloaded.get(), published, finalName)
-                return
-            }
-
-            // 4) Fallback: publish video-only .ts seperti semula.
-            App.logEvent("HLS: remux failed (no audio available), falling back to video-only .ts")
-            runCatching { mp4.delete() }
-            // Audio adaptive yang sudah terunduh penuh tak terpakai lagi
-            // di jalur .ts — hapus sekarang, jangan jadi yatim (issue #431).
-            adaptiveAudioFile?.delete()
-            val fileName = "$baseName.ts"
-            ensureItemPresent(item.id, videoTs)
-            val published0 = publishItem(saver, videoTs, fileName, item)
-            val finalName = published0.fileName ?: fileName
-            verifyChecksum(item.id, published0, saver)?.let {
-                deletePublished(published0)
-                rollbackReplacement(item.id)
-                throw IOException(it)
-            }
-            ensurePresentForCommit(item.id, published0)
-            commitReplacement(item.id)
-            val published = organizeIfEnabled(saver, published0, finalName)
-            ensurePublishedKept(item.id, published0, published)
-            // Sidecar audio baru dihapus sesudah publish + checksum
-            // berhasil (issue #430) — videoTs sendiri adalah sumber
-            // yang diterbitkan, bukan temp yang dihapus di sini.
-            deleteHlsTempWithSidecar(audioAdts)
-            finishHls(item, progress.downloaded.get(), published, finalName)
-        } catch (e: Exception) {
-            // Temp video/audio dipertahankan untuk resume (issue #385) —
-            // termasuk jalur pause (CancellationException): membuangnya
-            // di sini berarti jeda/gagal di segmen terakhir tetap
-            // mengunduh ulang dari segmen 0. Temp yatim sesudah item
-            // selesai/dihapus dibersihkan pemindaian orphan .part seperti
-            // partial lain. Hanya hasil remux yang dibuang (dibuat ulang).
-            runCatching { mp4.delete() }
-            throw e
-        }
-    }
-
-    private class HlsProgress {
-        // Tiga penghitung ini disentuh pekerja unduh-awal, thread konsumen,
-        // dan callback progres secara bersamaan (issue #1374): baca-tulis
+    private class MuxProgress {
+        // Tiga penghitung ini disentuh thread unduh dan callback progres
+        // secara bersamaan (issue #1374): baca-tulis
         // Long polos bisa kehilangan imbuhan dan check-then-set lastNotify
         // bisa lolos ganda, jadi atomik. Field lain hanya disentuh thread
         // konsumen/pemanggil sehingga tetap polos.
@@ -3040,209 +2560,6 @@ class DownloadEngine(appContext: Context) {
         var estimateTotalBytes = 0L
     }
 
-    /** Hapus temp HLS beserta penanda resume (.segs) dan spool-nya
-     *  (issue #424): jalur akhir yang hanya menghapus berkas temp
-     *  meninggalkan sidecar yatim bila segmen audio gagal di tengah lalu
-     *  unduhan selesai lewat jalur lain (audio adaptive / fallback .ts).
-     *  Dipakai hanya di jalur SELESAI, sesudah publish dan verifikasi
-     *  checksum berhasil (issue #430) — jalur gagal/jeda sengaja
-     *  mempertahankan temp + penanda untuk resume (#385). */
-    private fun deleteHlsTempWithSidecar(temp: File) {
-        temp.delete()
-        File(temp.parent, temp.name + ".segs").delete()
-        File(temp.parent, temp.name + ".spool").delete()
-        // Spool per-segmen unduh-awal (issue #1288) memakai awalan yang
-        // sama: sapu sisanya agar tak tertinggal yatim di jalur selesai.
-        val prefix = temp.name + ".spool."
-        temp.parentFile?.listFiles()?.forEach { f ->
-            if (f.name.startsWith(prefix)) runCatching { f.delete() }
-        }
-    }
-
-    /** Sidik jari rencana segmen untuk resume HLS (issue #385): hash
-     *  daftar URL + mode strip; rencana yang berbeda (varian/kualitas
-     *  lain) menghasilkan sidik berbeda sehingga temp lama dibuang. */
-    private fun hlsSegmentsFingerprint(urls: List<String>, stripId3Segments: Boolean): String {
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        digest.update((if (stripId3Segments) "strip\n" else "raw\n").toByteArray(Charsets.UTF_8))
-        for (u in urls) {
-            digest.update(u.toByteArray(Charsets.UTF_8))
-            digest.update(10)
-        }
-        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xFF) }
-    }
-
-    /** Unduh daftar segmen ke satu file. Tiap segmen di-stream dulu ke
-     *  berkas spool dan hanya disalin ke tujuan sesudah sukses penuh
-     *  (anti-korup), tanpa ditampung utuh di RAM (issue #371); segmen
-     *  audio boleh di-strip ID3 secara streaming saat penyalinan.
-     *  Segmen yang sudah selesai dipertahankan antar-percobaan lewat
-     *  berkas penanda `.segs` (issue #385): percobaan berikutnya dengan
-     *  rencana yang sama melanjutkan dari segmen berikutnya dalam mode
-     *  append, bukan mengunduh ulang dari segmen 0. Penanda yang tak
-     *  cocok (rencana berubah / ukuran berkas tak sesuai catatan) membuat
-     *  unduhan mulai segar — resume tak pernah menempel pada data yang
-     *  tak terverifikasi. */
-    private suspend fun downloadSegmentsToFile(
-        item: DownloadItem,
-        urls: List<String>,
-        target: File,
-        buffer: ByteArray,
-        throttle: SpeedThrottle,
-        progress: HlsProgress,
-        stripId3Segments: Boolean = false,
-        fallbackQuery: String = ""
-    ) {
-        val spool = File(target.absoluteFile.parentFile, target.name + ".spool")
-        val sidecar = File(target.absoluteFile.parentFile, target.name + ".segs")
-        val fingerprint = hlsSegmentsFingerprint(urls, stripId3Segments)
-        var startIndex = 0
-        // Penghitung PER BERKAS untuk penanda .segs (progress bersama
-        // video+audio, jadi tak bisa dipakai sebagai catatan per berkas).
-        var fileWritten = 0L
-        if (sidecar.isFile && target.isFile) {
-            val lines = runCatching { sidecar.readLines() }.getOrDefault(emptyList())
-            val done = lines.getOrNull(1)?.toIntOrNull() ?: -1
-            val writtenBytes = lines.getOrNull(2)?.toLongOrNull() ?: -1L
-            if (lines.getOrNull(0) == fingerprint && done in 0..urls.size &&
-                writtenBytes >= 0 && target.length() == writtenBytes
-            ) {
-                startIndex = done
-                fileWritten = writtenBytes
-                progress.downloaded.addAndGet(writtenBytes)
-                progress.segmentsDone += done
-                progress.exactBytes += writtenBytes
-                if (done > 0) {
-                    App.logEvent("HLS: resuming from segment $done/${urls.size} (${target.name})")
-                }
-            } else {
-                runCatching { target.delete() }
-                runCatching { sidecar.delete() }
-            }
-        }
-        // Baseline batas kecepatan mengikuti byte yang sudah di disk
-        // (issue #686): tanpa reset ini byte resume terhitung sebagai
-        // unduhan instan dan limiter "menagih utang" sebesar ukuran
-        // resume di awal kelanjutan — pola yang sama seperti jalur
-        // single-stream dan segmented yang memanggil throttle.reset
-        // sesudah resume ditetapkan.
-        throttle.reset(progress.downloaded.get())
-        // Posisi throttle BERSAMA unduh-awal (issue #1288): semua pekerja
-        // menagih byte ke satu penghitung yang hanya naik, sehingga
-        // limiter melihat total monoton seperti jalur multi-segmen
-        // berkas biasa — bukan baseline per-segmen yang saling mendahului.
-        val throttlePosition = AtomicLong(progress.downloaded.get())
-        // Anggaran ruang BERSAMA unduh-awal (issue #1411): potret ruang
-        // bebas volume spool diambil SEKALI di sini, lalu dibagi rata ke
-        // slot jendela sebagai plafon per segmen yang diteruskan ke
-        // fetchHlsSegment — cadangan MIN_FREE_BYTES dikurangkan sekali
-        // di muka dan tak boleh dimakan slot mana pun.
-        val segmentByteCap = hlsSegmentByteCap(
-            spool.absoluteFile.parentFile?.usableSpace ?: Long.MAX_VALUE,
-            MIN_FREE_BYTES, HLS_PREFETCH_WINDOW
-        )
-        val launchedSpools = mutableListOf<File>()
-        try {
-            BufferedOutputStream(FileOutputStream(target, startIndex > 0), BUFFER_SIZE).use { out ->
-              coroutineScope {
-                // Unduh-awal terbatas (issue #1288): sampai
-                // HLS_PREFETCH_WINDOW segmen diunduh bersamaan ke spool
-                // per-segmen; penyalinan ke target, pembaruan progres,
-                // dan penanda .segs tetap BERURUTAN per indeks di bawah
-                // — sifat anti-korup #371 dan resume #385 tak berubah,
-                // yang berubah hanya segmen berikutnya tak lagi menunggu
-                // segmen ini selesai disalin.
-                val pending = HashMap<Int, Deferred<File>>()
-                var nextToFetch = startIndex
-                fun launchNext() {
-                    val idx = nextToFetch
-                    if (idx >= urls.size) return
-                    nextToFetch++
-                    val segSpool = File(spool.parentFile, spool.name + "." + idx)
-                    launchedSpools.add(segSpool)
-                    pending[idx] = async(Dispatchers.IO) {
-                        fetchHlsSegmentWithRetry(
-                            item, urls[idx], ByteArray(BUFFER_SIZE), throttle,
-                            throttlePosition, segSpool,
-                            byteCap = segmentByteCap,
-                            fallbackQuery = fallbackQuery,
-                            notify = {
-                                reportHlsProgress(
-                                    item, progress,
-                                    (throttlePosition.get() - progress.downloaded.get())
-                                        .coerceAtLeast(0)
-                                )
-                            },
-                            onLength = { declared ->
-                                // Segmen referensi dari header Content-Length (ukuran
-                                // mentah) hanya untuk estimasi sisa; ukuran PASTI segmen
-                                // yang sudah selesai memakai hasil tulis riil di bawah
-                                // supaya konsisten dengan bytesDownloaded (audio di-strip
-                                // ID3 sehingga ukuran tulis bisa lebih kecil).
-                                if (progress.refSegBytes.get() == 0L && declared >= HLS_REF_SEGMENT_MIN) {
-                                    progress.refSegBytes.compareAndSet(0L, declared)
-                                }
-                            }
-                        )
-                        segSpool
-                    }
-                }
-                for (index in startIndex until urls.size) {
-                    while (pending.size < HLS_PREFETCH_WINDOW && nextToFetch < urls.size) {
-                        launchNext()
-                    }
-                    coroutineContext.ensureActive()
-                    // Indeks berjalan selalu sudah diluncurkan jendela di
-                    // atas (nextToFetch hanya maju dari startIndex).
-                    val segFile = pending.remove(index)!!.await()
-                    val written = BufferedInputStream(FileInputStream(segFile)).use { segIn ->
-                        if (stripId3Segments) {
-                            AdtsAac.stripId3Stream(segIn, out)
-                        } else {
-                            segIn.copyTo(out, BUFFER_SIZE)
-                        }
-                    }
-                    segFile.delete()
-                    progress.downloaded.addAndGet(written)
-                    progress.segmentsDone++
-                    // Song referensi cadangan: bila header tidak memberi ukuran wajar,
-                    // pakai ukuran tulis riil segmen data pertama.
-                    if (progress.refSegBytes.get() == 0L && written >= HLS_REF_SEGMENT_MIN) {
-                        progress.refSegBytes.compareAndSet(0L, written)
-                    }
-                    if (progress.segmentsDone > 0) {
-                        progress.avgSegBytes = progress.downloaded.get() / progress.segmentsDone
-                    }
-                    // Total mendekati mutlak: jumlah ukuran riil segmen selesai +
-                    // estimasi stabil (refSegBytes x sisa), supaya angka tidak bergoyang.
-                    val known = progress.exactBytes + written
-                    progress.exactBytes = known
-                    val remaining = progress.totalSegments - progress.segmentsDone
-                    progress.exactTotal = known +
-                        (if (remaining > 0 && progress.refSegBytes.get() > 0) {
-                            progress.refSegBytes.get() * remaining
-                        } else 0L)
-                    // Catat progres per berkas untuk resume (issue #385):
-                    // sesudah segmen ini utuh di target, penanda .segs
-                    // menunjuk segmen berikutnya. Gagal tulis penanda tak
-                    // menggagalkan unduhan — resume hanya tak terjadi.
-                    fileWritten += written
-                    runCatching {
-                        sidecar.writeText("$fingerprint\n${index + 1}\n$fileWritten\n")
-                    }
-                }
-              }
-                // Semua segmen selesai: penanda resume tak diperlukan lagi.
-                runCatching { sidecar.delete() }
-            }
-        } finally {
-            spool.delete()
-            // Spool per-segmen milik pekerja yang batal/gagal ikut dibuang;
-            // yang sukses sudah dihapus konsumen sesudah disalin.
-            launchedSpools.forEach { f -> runCatching { f.delete() } }
-        }
-    }
-
     /** Unduh satu file adaptive (audio M4A / video MP4) dari URL VISIONOS ke
      *  file temp. Mengembalikan false bila HTTP gagal atau file kosong. */
     private suspend fun downloadAdaptiveFile(
@@ -3251,7 +2568,7 @@ class DownloadEngine(appContext: Context) {
         target: File,
         buffer: ByteArray,
         throttle: SpeedThrottle,
-        progress: HlsProgress
+        progress: MuxProgress
     ): Boolean {
         if (url.isBlank()) return false
         val conn = trackOpenedConnection(
@@ -3336,7 +2653,7 @@ class DownloadEngine(appContext: Context) {
                         }
                         out.write(buffer, 0, read)
                         throttle.sleepIfNeeded { progress.downloaded.get() + bytes }
-                        reportHlsProgress(item, progress, bytes, total)
+                        reportMuxProgress(item, progress, bytes, total)
                         if ((adaptiveIters++ and 7) == 0) {
                             val now = monotonicNow()
                             if (now - lastAdaptiveCheckAt >= 1000) {
@@ -3354,7 +2671,7 @@ class DownloadEngine(appContext: Context) {
                 }
             }
             // Verifikasi panjang terhadap Content-Length (issue #651),
-            // pola yang sama dengan fetchHlsSegment (#170): EOF prematur
+            // pola yang sama dengan verifikasi segmen (#170): EOF prematur
             // pada respons chunked bisa tiba tanpa exception sehingga
             // berkas terpotong lolos sebagai sukses — audio adaptive cukup
             // >= 1000 byte untuk ikut ter-remux dan terbit COMPLETED.
@@ -3377,50 +2694,8 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    /** Unduh audio adaptive (M4A AAC) dari URL VISIONOS ke file temp. Dipakai
-     *  saat audio playlist HLS di-404 YouTube. Mengembalikan null bila URL
-     *  kosong atau download gagal — caller lalu jatuh ke video-only .ts. */
-    private suspend fun tryDownloadAdaptiveAudio(
-        item: DownloadItem,
-        adaptiveAudioUrl: String,
-        tempBase: String,
-        buffer: ByteArray,
-        throttle: SpeedThrottle,
-        progress: HlsProgress,
-        saver: FileSaver
-    ): File? {
-        if (adaptiveAudioUrl.isBlank()) return null
-        var audioM4a: File? = null
-        return try {
-            val f = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
-            audioM4a = f
-            val ok = downloadAdaptiveFile(item, adaptiveAudioUrl, f, buffer, throttle, progress)
-            if (!ok || f.length() < 1_000L) {
-                App.logEvent("HLS: adaptive audio download failed, skipped")
-                f.delete()
-                return null
-            }
-            App.logEvent("HLS: adaptive audio downloaded (${Formats.bytes(f.length())}), remuxing...")
-            f
-        } catch (e: CancellationException) {
-            // Berkas adaptive tidak bisa di-resume (tiap percobaan mulai
-            // dari nol), jadi partial-nya dibuang juga saat batal —
-            // jangan tinggalkan yatim (issue #431).
-            audioM4a?.delete()
-            throw e
-        } catch (e: Exception) {
-            audioM4a?.delete()
-            // Pause menutup soket di tengah unduh audio adaptif: jangan
-            // ditelan sebagai "audio gagal, lanjut video-only" — itu
-            // pembatalan (issue #743).
-            if (e is IOException && !coroutineContext.isActive) throw CancellationException()
-            App.logEvent("HLS: adaptive audio download failed (${e.message?.take(50)}), skipped")
-            null
-        }
-    }
-
     /** Unduh video MP4 + audio M4A adaptive lalu remux jadi satu MP4 bersuara.
-     *  Dipakai saat HLS gagal total dan URL adaptive tersedia. */
+     *  Dipakai untuk hasil ekstraksi berpasangan video+audio terpisah. */
     private suspend fun downloadAdaptiveMuxed(
         item: DownloadItem,
         adaptiveVideoUrl: String,
@@ -3429,14 +2704,14 @@ class DownloadEngine(appContext: Context) {
     ) {
         val saver = fileSaver
         val baseName = buangSufiksEkstensi(outName, ".mp4", ".webm").ifBlank { outName }
-        // Sama seperti downloadHls: temp unik per item lewat potongan id di
-        // DEPAN, karena baseName tanpa ekstensi bertabrakan antar item dan
-        // pembeda di ekor bisa terpotong untuk nama sangat panjang (#171).
+        // Temp unik per item lewat potongan id di DEPAN, karena baseName
+        // tanpa ekstensi bertabrakan antar item dan pembeda di ekor bisa
+        // terpotong untuk nama sangat panjang (#171).
         val tempBase = "~" + item.id.take(8) + baseName
         val videoMp4 = saver.partialFile("$tempBase.videoMp4", segment = null).apply { delete() }
         val audioM4a = saver.partialFile("$tempBase.audioM4a", segment = null).apply { delete() }
         val mp4 = saver.partialFile("$tempBase.muxed", segment = null).apply { delete() }
-        val progress = HlsProgress()
+        val progress = MuxProgress()
         val buffer = ByteArray(BUFFER_SIZE)
         val globalLimit = StoragePrefs.speedLimitKbps(context)
         val limit = if (item.speedLimitKbps > 0) item.speedLimitKbps else globalLimit
@@ -3455,7 +2730,7 @@ class DownloadEngine(appContext: Context) {
             val audioOk = downloadAdaptiveFile(item, adaptiveAudioUrl, audioM4a, buffer, throttle, progress)
             if (!audioOk) throw IOException("adaptive audio download failed")
             coroutineContext.ensureActive()
-            val remuxed = HlsMp4Muxer.remuxMp4s(videoMp4, audioM4a, mp4)
+            val remuxed = AdaptiveMp4Muxer.remuxMp4s(videoMp4, audioM4a, mp4)
             if (!remuxed) throw IOException("adaptive remux failed")
             val fileName = "$baseName.mp4"
             videoMp4.delete()
@@ -3472,7 +2747,7 @@ class DownloadEngine(appContext: Context) {
             commitReplacement(item.id)
             val published = organizeIfEnabled(saver, published0, finalName)
             ensurePublishedKept(item.id, published0, published)
-            finishHls(item, progress.downloaded.get(), published, finalName)
+            finishMuxed(item, progress.downloaded.get(), published, finalName)
         } catch (e: Exception) {
             runCatching { videoMp4.delete() }
             runCatching { audioM4a.delete() }
@@ -3485,9 +2760,9 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun reportHlsProgress(
+    private fun reportMuxProgress(
         item: DownloadItem,
-        progress: HlsProgress,
+        progress: MuxProgress,
         segNow: Long,
         total: Long = 0
     ) {
@@ -3497,8 +2772,8 @@ class DownloadEngine(appContext: Context) {
         if (now - lastNotifySeen >= 1000 &&
             progress.lastNotify.compareAndSet(lastNotifySeen, now)
         ) {
-            // Total HLS asli tidak diketahui (segmen tidak punya Content-Length
-            // konsisten). Persentase dihitung dari jumlah segmen (progressPercentOverride)
+            // Total akhir tidak selalu diketahui sejak awal. Persentase
+            // dihitung dari jumlah segmen (progressPercentOverride)
             // supaya bar bergerak tanpa menampilkan total palsu di UI.
             val percent = if (progress.totalSegments > 0) {
                 // Fraksi segmen aktif pakai rata2 ukuran segmen selesai.
@@ -3516,7 +2791,7 @@ class DownloadEngine(appContext: Context) {
             val effTotal = if (total > 0) {
                 progress.downloaded.get() + total
             } else {
-                // HLS segmen: pakai total pasti (Content-Length segmen selesai +
+                // Pakai total pasti (Content-Length bagian selesai +
                 // refSegBytes x sisa) bila sudah ada; sebelum segmen pertama
                 // selesai, fallback ke estimasi BANDWIDTH x durasi supaya
                 // denominator tidak nol/bergoyang sejak detik awal.
@@ -3546,7 +2821,7 @@ class DownloadEngine(appContext: Context) {
         }
     }
 
-    private fun finishHls(
+    private fun finishMuxed(
         item: DownloadItem,
         downloaded: Long,
         published: FileSaver.PublishResult,
@@ -3567,7 +2842,7 @@ class DownloadEngine(appContext: Context) {
         val actualSize = published.filePath?.let { path ->
             runCatching { File(path).takeIf { it.isFile }?.length() }.getOrNull()
         }?.takeIf { it > 0 } ?: downloaded
-        val finishedHls = updateItem(item.id) {
+        val finishedMux = updateItem(item.id) {
             it.copy(
                 state = DownloadState.COMPLETED,
                 fileName = published.fileName ?: finalName,
@@ -3584,652 +2859,12 @@ class DownloadEngine(appContext: Context) {
             )
         }
         flushSave()
-        // Cookie sesi dari unduhan HLS ikut dipersists (issue #391):
+        // Cookie sesi dari unduhan termux ikut dipersists (issue #391):
         // sebelumnya hanya jalur single-stream yang memanggil ini.
         persistCookies()
-        if (finishedHls != null) NotificationHelper.notifyItemFinished(context, finishedHls)
+        if (finishedMux != null) NotificationHelper.notifyItemFinished(context, finishedMux)
     }
 
-    /** Unduh satu segmen HLS dengan retry sekali untuk error jaringan sementara
-     *  (mis. Socket closed di perangkat dengan koneksi tidak stabil). */
-    private suspend fun fetchHlsSegmentWithRetry(
-        item: DownloadItem,
-        url: String,
-        buffer: ByteArray,
-        throttle: SpeedThrottle,
-        throttlePosition: AtomicLong,
-        spool: File,
-        notify: (Long) -> Unit,
-        onLength: (Long) -> Unit = {},
-        fallbackQuery: String = "",
-        byteCap: Long = Long.MAX_VALUE
-    ): Long {
-        var attempts = 0
-        var currentUrl = url
-        var tokenTried = false
-        while (true) {
-            coroutineContext.ensureActive()
-            // Tagihan throttle percobaan ini (issue #1376): byte yang
-            // ditagih percobaan yang GAGAL harus dikembalikan — spool
-            // ditulis ulang dari nol pada percobaan berikut, jadi tanpa
-            // pengembalian posisi bersama terhitung ganda (limiter menagih
-            // utang palsu dan segNow progres membengkak) walau byte riil
-            // yang terunduh hanya sekali. Dihitung per percobaan di dalam
-            // fetchHlsSegment karena posisi bersama juga ditagih pekerja
-            // segmen lain — selisih posisi global bukan milik percobaan ini.
-            val attemptCharge = AtomicLong(0)
-            try {
-                return fetchHlsSegment(
-                    item, currentUrl, buffer, throttle, throttlePosition, spool, notify, onLength,
-                    attemptCharge, byteCap
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                val charged = attemptCharge.get()
-                if (charged > 0) throttlePosition.addAndGet(-charged)
-                val msg = e.message.orEmpty()
-                // Jangkar pada bentuk pesan status segmen sendiri
-                // (issue #1186): substring angka telanjang "404"/"403"
-                // atas seluruh pesan ikut menangkap pesan non-HTTP yang
-                // kebetulan memuat digit itu (mis. hitungan byte pesan
-                // terpotong "got 40312 of ...").
-                val denied = msg.startsWith("HLS segment HTTP 404") ||
-                    msg.startsWith("HLS segment HTTP 403")
-                if (denied && !tokenTried && fallbackQuery.isNotEmpty() && !url.contains("?")) {
-                    // CDN signed-URL: segmen relatif tanpa token ditolak —
-                    // alihkan URL kerja ke varian bertoken lalu lanjutkan
-                    // LEWAT loop (issue #1212): return langsung seperti
-                    // dulu membuat galat jaringan sesaat pada percobaan
-                    // bertoken meledakkan seluruh unduhan tanpa jatah
-                    // retry percobaan biasa. tokenTried memastikan
-                    // pengalihan hanya sekali; penolakan kedua jatuh ke
-                    // penilaian attempts di bawah. ensureActive di sini
-                    // menjaga #743 (jangan mulai segmen baru saat batal).
-                    coroutineContext.ensureActive()
-                    tokenTried = true
-                    currentUrl = url + fallbackQuery
-                    App.logEvent("HLS: segment 404/403, retrying with playlist query")
-                    continue
-                }
-                attempts++
-                if (attempts >= 2 || !isNetworkError(e.message)) throw e
-            }
-        }
-    }
-
-    /** Unduh satu segmen HLS dengan streaming ke berkas spool [spool]
-     *  (bukan ditampung utuh di RAM — issue #371); mengembalikan jumlah
-     *  byte mentah yang terunduh. Berkas tujuan akhir hanya disentuh
-     *  pemanggil sesudah fungsi ini sukses penuh, jadi sifat anti-korup
-     *  per segmen tetap sama seperti saat segmen ditampung di memori. */
-    private suspend fun fetchHlsSegment(
-        item: DownloadItem,
-        url: String,
-        buffer: ByteArray,
-        throttle: SpeedThrottle,
-        throttlePosition: AtomicLong,
-        spool: File,
-        notify: (Long) -> Unit,
-        onLength: (Long) -> Unit = {},
-        attemptCharge: AtomicLong = AtomicLong(0),
-        byteCap: Long = Long.MAX_VALUE
-    ): Long {
-        val segConn = trackOpenedConnection(
-            item.id,
-            openAuthenticatedConnection(
-                url, method = "GET",
-                username = item.username,
-                password = item.password,
-                headers = item.headers,
-                authAnchorUrl = item.url
-            )
-        )
-        try {
-            val code = segConn.responseCode
-            if (code !in 200..299) throw IOException("HLS segment HTTP $code")
-            // Content-Length header segmen (bila ada) = ukuran pasti segmen ini.
-            val declared = segConn.contentLength.toLong().takeIf { it > 0 }
-            if (declared != null) onLength(declared)
-            // Anggaran byte segmen sadar ruang kosong (issue #836,
-            // pola #702): plafon mentah 64 MB membunuh segmen sah dari
-            // CDN bersegmen panjang padahal segmen di-stream ke disk,
-            // bukan ditampung di RAM. Plafon kini jatah segmen ini dari
-            // anggaran bersama unduh-awal: ruang bebas dipotret SEKALI
-            // oleh pemanggil dan dibagi rata ke slot jendela (issue
-            // #1411) — dulu tiap pekerja menilai dari potret
-            // usableSpace-nya sendiri, jadi segmen chunked tanpa
-            // Content-Length bisa gabungan menulis melewati ruang yang
-            // tersedia. Content-Length yang dikenal dicek di muka
-            // dengan pesan ruang yang jelas.
-            if (declared != null && declared > byteCap) {
-                throw IOException(
-                    "Not enough storage for HLS segment: need " +
-                        "${Formats.bytes(declared)}, segment budget ${Formats.bytes(byteCap)}"
-                )
-            }
-            var segBytes = 0L
-            // Watchdog macet/lambat seperti jalur lain (issue #575):
-            // pola sama persis downloadSegment di bawah.
-            val health = DownloadHealthWatchdog(
-                if (item.speedLimitKbps > 0) item.speedLimitKbps else StoragePrefs.speedLimitKbps(context)
-            )
-            var hlsIters = 0
-            var lastHlsCheckBytes = 0L
-            var lastHlsCheckAt = monotonicNow()
-            val input = segConn.inputStream
-            try {
-                BufferedOutputStream(FileOutputStream(spool), BUFFER_SIZE).use { segOut ->
-                    var zeroStreak = 0
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read == -1) break
-                        // Guard zero-read seperti runSingle/downloadSegment
-                        // (issue #389): tanpa ini stream yang mengembalikan
-                        // 0 beruntun membuat loop busy-spin selamanya.
-                        if (read == 0) {
-                            if (++zeroStreak >= MAX_ZERO_READS) {
-                                throw IOException("HLS segment stalled (zero reads)")
-                            }
-                            continue
-                        }
-                        zeroStreak = 0
-                        segBytes += read
-                        if (segBytes > byteCap) {
-                            throw IOException("Not enough storage for HLS segment")
-                        }
-                        segOut.write(buffer, 0, read)
-                        // Tagih ke posisi bersama (issue #1288): total
-                        // yang dilihat limiter selalu naik walau segmen
-                        // diunduh bersamaan. Catat juga tagihan percobaan
-                        // ini agar pemanggil bisa mengembalikannya bila
-                        // percobaan gagal (issue #1376).
-                        val position = throttlePosition.addAndGet(read.toLong())
-                        attemptCharge.addAndGet(read.toLong())
-                        throttle.sleepIfNeeded { position }
-                        notify(segBytes)
-                        // Cek kesehatan tiap 8 chunk, maks 1x/detik
-                        // (issue #575): koneksi yang meneteskan byte
-                        // jarang-jarang lolos dari guard zero-read dan
-                        // read-timeout per-baca, jadi tanpa ini unduhan
-                        // HLS bisa menggantung jauh melewati vonis
-                        // 20-30 detik jalur lain.
-                        if ((hlsIters++ and 7) == 0) {
-                            val now = monotonicNow()
-                            if (now - lastHlsCheckAt >= 1000) {
-                                val speed = if (now > lastHlsCheckAt) {
-                                    ((segBytes - lastHlsCheckBytes) * 1000L) / (now - lastHlsCheckAt)
-                                } else 0L
-                                lastHlsCheckBytes = segBytes
-                                lastHlsCheckAt = now
-                                // Satuan WAJIB per-segmen seperti
-                                // downloadSegment (issue #596): committed
-                                // adalah penghitung kumulatif pelaporan,
-                                // sedangkan declared adalah Content-Length
-                                // segmen INI — mengumpan jumlahnya membuat
-                                // gerbang downloaded >= total di watchdog
-                                // selalu benar sejak segmen ke-2 (dan pada
-                                // resume), sehingga watchdog tak pernah
-                                // menilai apa pun.
-                                health.check(now, segBytes, declared ?: 0L, speed)
-                            }
-                        }
-                    }
-                }
-                // Verifikasi panjang terhadap Content-Length yang dinyatakan:
-                // EOF prematur pada respons chunked bisa tiba tanpa exception
-                // sehingga segmen pendek ikut tergabung menjadi hasil korup
-                // berstatus COMPLETED. Lempar agar retry segmen berjalan.
-                // Hanya KEKURANGAN byte yang digagalkan — kelebihan ditoleransi
-                // seperti kebijakan verifySize, karena klaim Content-Length
-                // bisa basi (gzip/proxy) dan stream-lah yang berkuasa
-                // (issue #170).
-                if (declared != null && segBytes < declared) {
-                    throw IOException("HLS segment truncated: got $segBytes of $declared bytes")
-                }
-            } finally {
-                runCatching { input.close() }
-            }
-            return segBytes
-        } catch (e: Exception) {
-            // Jalur galat (issue #1243): termasuk lemparan HTTP non-2xx
-            // — badan galat tak dibaca, soket tak layak pool.
-            runCatching { segConn.disconnect() }
-            throw e
-        } finally {
-            untrackConnection(item.id, segConn)
-        }
-    }
-
-    private data class HlsPlan(
-        val videoSegments: List<String>,
-        val videoSegmentDurationsUs: List<Long> = emptyList(),
-        val audioSegments: List<String>? = null,
-        /** Estimasi total byte dari BANDWIDTH master x total durasi #EXTINF.
-         *  Dihitung sekali di awal supaya denominator "/≈MB" stabil sejak
-         *  detik pertama (tidak menunggu segmen pertama selesai). */
-        val estimateTotalBytes: Long = 0L,
-        /** Query "?..." playlist varian untuk retry segmen 403/404: CDN
-         *  signed-URL (mis. phncdn) menaruh token di query playlist,
-         *  sedangkan segmen relatif tidak membawanya. */
-        val segmentQueryFallback: String = ""
-    )
-
-    /** Query "?..." dari URL playlist untuk fallback segmen 404/403. */
-    private fun playlistQuery(url: String): String {
-        val q = url.substringAfter('?', "").substringBefore('#')
-        return if (q.isNotEmpty()) "?$q" else ""
-    }
-
-    /** Ambil banyak playlist sekaligus (issue #703): dulu kandidat
-     *  varian dan rendisi audio diambil satu per satu secara serial
-     *  sehingga master bervarian banyak membayar round-trip berurutan
-     *  sebelum byte pertama. Hasil dikembalikan sebagai Result
-     *  berurutan sesuai daftar URL; PEMILIHAN tetap dilakukan pemanggil
-     *  secara berurutan persis seperti dulu — yang berubah hanya waktu
-     *  tunggu (maksimum, bukan jumlah), bukan hasilnya. Pool kecil
-     *  dibatasi 4 dan selalu dimatikan; daftar 0-1 URL tanpa pool. */
-    private fun <T> fetchAllParallel(urls: List<String>, fetch: (String) -> T): List<Result<T>> {
-        // Jalur 1-URL pun wajib lewat pool + deadline bersama (issue
-        // #1040): pintasan inline sebelumnya menjalankan fetch TANPA
-        // batas waktu apa pun, jadi satu-satunya kandidat yang servernya
-        // menetes menggantungkan perencanaan tanpa batas (timeout soket
-        // per-read tak menolong aliran yang terus menetes).
-        if (urls.isEmpty()) return emptyList()
-        val pool = Executors.newFixedThreadPool(minOf(4, urls.size))
-        try {
-            val futures = urls.map { url -> pool.submit(Callable { fetch(url) }) }
-            // Tiap get() berbatas waktu (issue #788): fungsi ini non-suspend
-            // sehingga pause/cancel coroutine tak menjangkaunya — fetch yang
-            // menggantung (server menetes tanpa selesai) dulu menahan
-            // perencanaan tanpa batas. Batasnya longgar terhadap satu fetch
-            // playlist sah (connect + 2x read timeout, min 30 dtk); timeout
-            // dihitung sebagai kandidat gagal, sama seperti fetch error.
-            val fetchTimeoutMs = (connectTimeoutMs + 2L * readTimeoutMs).coerceAtLeast(30_000L)
-            // Satu deadline BERSAMA untuk semua get() (issue #811):
-            // batas penuh yang dihitung ulang per future membuat total
-            // tunggu kasus patologis menjadi PENJUMLAHAN timeout
-            // (kandidat menggantung bergantian), bukan maksimum seperti
-            // yang dijanjikan komentar desain fungsi ini.
-            val deadlineNanos = System.nanoTime() + fetchTimeoutMs * 1_000_000L
-            return futures.map { future ->
-                val remainingMs = (deadlineNanos - System.nanoTime()) / 1_000_000
-                try {
-                    if (remainingMs <= 0L) throw TimeoutException()
-                    Result.success(future.get(remainingMs, TimeUnit.MILLISECONDS))
-                } catch (e: TimeoutException) {
-                    future.cancel(true)
-                    Result.failure(IOException("Playlist fetch timed out"))
-                } catch (e: ExecutionException) {
-                    Result.failure(e.cause ?: e)
-                } catch (e: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    Result.failure(e)
-                }
-            }
-        } finally {
-            // shutdownNow menginterupsi pekerja yang masih berjalan.
-            // Jujur soal batasnya (issue #811): baca soket blocking
-            // HttpURLConnection TIDAK menanggapi interupsi, jadi pekerja
-            // yang sedang membaca tetap tertahan sampai read timeout
-            // soketnya sendiri — interupsi hanya membebaskan pekerja
-            // yang sedang menunggu/sleep, bukan yang sedang membaca.
-            pool.shutdownNow()
-        }
-    }
-
-    /** Pilih varian terbaik dari master playlist + segmen video/audio terkait. */
-    private fun parseHlsPlan(body: String, baseUrl: String, preferredHeight: Int = 0, headers: String = "", preferredAudioLang: String = "", username: String = "", password: String = "", trackId: String = ""): HlsPlan? {
-        // Segmen terenkripsi yang diunduh mentah = file sampah berstatus
-        // COMPLETED: gagal cepat dengan pesan jelas, bukan unduh sia-sia.
-        if (isEncryptedHlsPlaylist(body)) {
-            throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
-        }
-        // Playlist byterange tak dikenal pengumpul segmen (issue
-        // #513): URI media yang sama akan diunduh UTUH per segmen lalu
-        // ditempel berulang — berkas korup berstatus COMPLETED. Gagal
-        // cepat, sejajar gerbang enkripsi.
-        if (isByteRangeHlsPlaylist(body)) {
-            throw IOException("Byte-range HLS (EXT-X-BYTERANGE) not supported")
-        }
-        // Playlist fMP4 tak dikenal pengumpul segmen (issue #514):
-        // segmen init di atribut EXT-X-MAP tak pernah terunduh,
-        // fragmen digabung mentah lalu diterbitkan sebagai .ts yang
-        // tak bisa diputar. Gagal cepat, sejajar dua gerbang di atas.
-        if (isMapHlsPlaylist(body)) {
-            throw IOException("Fragmented MP4 HLS (EXT-X-MAP) not supported")
-        }
-        if (!body.contains("#EXT-X-STREAM-INF")) {
-            // Media playlist langsung (bukan master) — tanpa audio terpisah.
-            // Satu lintasan: segmen + durasi #EXTINF dibaca sekaligus agar
-            // probe 1 MB tak membayar split/chaining ganda (lihat HlsParser).
-            val direct = HlsParser.parseDirectMedia(body, baseUrl)
-            val segments = direct.segments
-            App.logEvent("HLS: direct media playlist, ${segments.size} segments")
-            if (segments.isEmpty()) return null
-            if (!body.contains("#EXT-X-ENDLIST")) {
-                throw IOException("Live HLS not supported (playlist without EXT-X-ENDLIST)")
-            }
-            // Cek enkripsi kedua di sini dulu ada dan tak terjangkau
-            // (kode mati, issue #423): gerbang di pintu masuk fungsi
-            // sudah melempar untuk body yang sama.
-            val durations = direct.durationsUs
-            return HlsPlan(
-                segments, videoSegmentDurationsUs = durations,
-                estimateTotalBytes = estimateBytes(durations, 0L),
-                segmentQueryFallback = playlistQuery(baseUrl)
-            )
-        }
-        var variants = HlsParser.parseMaster(body, baseUrl)
-        // Fallback longgar (sudah terurut): bila parseMaster gagal (mis. format
-        // YouTube 2026 yang memformat #EXT-X-STREAM-INF berbeda), pakai hasil
-        // parseMasterLenient dari HlsParser (satu-satunya pemilik regex varian).
-        if (variants.isNullOrEmpty()) {
-            val fallbackVariants = HlsParser.parseMasterLenient(body, baseUrl)
-            if (fallbackVariants != null) {
-                App.logEvent("HLS: parseMaster failed, fallback found ${fallbackVariants.size} variants")
-                variants = fallbackVariants
-            } else {
-                App.logEvent("HLS: parseMaster failed, no fallback variants found, dumping first 500 chars")
-                App.logEvent("HLS: body[0..500]=${body.take(500).replace("\n","|").replace("\r","")}")
-                return null
-            }
-        }
-        // Pemilihan varian nyata dilakukan daftar candidates di bawah.
-        // Perhitungan calon tunggal sebelumnya dibuang tanpa dipakai
-        // (issue #363); yang dipertahankan hanya penjaga daftar kosong,
-        // termasuk hasil fallback yang boleh berupa daftar kosong.
-        if (variants.isEmpty()) return null
-        // Urutkan varian dari kualitas tertinggi ke terendah untuk fallback.
-        // YouTube kadang memblokir media playlist varian tertinggi (404) tapi
-        // membiarkan varian rendah lewat. Coba beberapa varian sampai ada yang berhasil.
-        val candidates = if (preferredHeight > 0) {
-            // Saat user pilih resolusi: urutkan dari paling dekat target ke terjauh.
-            // AVC didahulukan, TETAPI saringan kerasnya tak boleh mengosongkan
-            // daftar (issue #386): varian HEVC/VP9/AV1 saja — atau CODECS
-            // kosong, umum pada master html5player — sebelumnya membuat
-            // unduhan gagal total padahal varian unduhable ada. Bila tak ada
-            // AVC, semua varian ikut diperingkat menurut kedekatan resolusi.
-            val avc = variants.filter { it.codecs.contains("avc") }
-            (if (avc.isNotEmpty()) avc else variants)
-                .sortedBy { kotlin.math.abs(it.height - preferredHeight) }
-        } else {
-            // Default: urutkan dari bandwidth tertinggi ke terendah
-            variants.sortedByDescending { it.bandwidth }
-        }
-        val audioRenditions = HlsParser.parseAudioRenditions(body, baseUrl)
-        // Alasan fatal (live/terenkripsi) dicatat tapi tak menghentikan loop:
-        // varian berikut masih dicoba; bila semua gagal, alasan jelas
-        // dilempar ulang (bukan "No HLS segments found" yang samar).
-        var fatalError: IOException? = null
-        // Semua playlist kandidat diambil sekaligus (issue #703):
-        // evaluasi di bawah tetap berurutan persis seperti dulu (urutan
-        // prioritas, fatal pertama, kandidat pertama yang berhasil
-        // menang) — yang berubah hanya waktu tunggunya, bukan hasilnya.
-        val candidateResults = fetchAllParallel(candidates.map { it.url }) { url ->
-            mediaSegmentsWithDurations(url, headers, baseUrl, username, password, trackId)
-        }
-        for ((candidateIndex, candidate) in candidates.withIndex()) {
-            val videoSegs = candidateResults[candidateIndex].getOrElse { e ->
-                if (e is IOException) {
-                    if (fatalError == null) fatalError = e
-                    null
-                } else throw e
-            }
-            if (videoSegs == null) {
-                continue
-            }
-            val videoSegments = videoSegs.map { it.first }
-            val videoDurations = videoSegs.map { it.second }
-            var audioFailedFatally: IOException? = null
-            val audioSegments = candidate.audioGroupId?.let { group ->
-                val groupRenditions = audioRenditions.filter { it.groupId == group }
-                // Jika user memilih bahasa audio spesifik, prioritaskan rendition
-                // yang LANGUAGE-nya cocok; sisanya fallback setelahnya.
-                val isDubbed = { r: HlsRendition ->
-                    r.name.contains("dub", ignoreCase = true) ||
-                    r.name.contains("dubbed", ignoreCase = true) ||
-                    r.name.contains("dubbing", ignoreCase = true)
-                }
-                val ordered = if (preferredAudioLang.isNotBlank()) {
-                    groupRenditions.filter { it.language.equals(preferredAudioLang, ignoreCase = true) } +
-                        groupRenditions.filter { !it.language.equals(preferredAudioLang, ignoreCase = true) }
-                } else {
-                    // Prioritas default: (1) default + bukan dubbing, (2) default saja,
-                    // (3) non-default + bukan dubbing, (4) sisanya.
-                    groupRenditions.filter { it.isDefault && !isDubbed(it) } +
-                        groupRenditions.filter { it.isDefault && isDubbed(it) } +
-                        groupRenditions.filter { !it.isDefault && !isDubbed(it) } +
-                        groupRenditions.filter { !it.isDefault && isDubbed(it) }
-                }
-                var audioResult: List<String>? = null
-                var audioFatal: IOException? = null
-                // Rendisi grup ini juga diambil sekaligus (issue #703);
-                // pemilihan tetap yang pertama berhasil menurut urutan
-                // prioritas di atas.
-                val renditionResults = fetchAllParallel(ordered.map { it.url }) { url ->
-                    mediaSegments(url, headers, baseUrl, username, password, trackId)
-                }
-                for ((renditionIndex, _) in ordered.withIndex()) {
-                    val segs = renditionResults[renditionIndex].getOrElse { e ->
-                        if (e !is IOException) throw e
-                        // Alasan fatal tak ditelan buta (issue #553):
-                        // gerbang yang sama yang melempar untuk video
-                        // (terenkripsi/live/byterange/MAP) dulu tertelan
-                        // runCatching di sini sehingga campuran video
-                        // bersih + audio terenkripsi terbit bisu
-                        // COMPLETED tanpa pesan. Catat bila tak ada
-                        // rendition yang berhasil; kandidat digugurkan dan
-                        // alasannya dilempar sesudah loop kandidat (issue
-                        // #565), sejajar fatalError jalur video; kegagalan
-                        // jaringan/404 per-rendition tetap degradasi
-                        // seperti dulu.
-                        // Jangkar pada predikat frasa persis yang sama
-                        // dengan jalur video (issue #1211): substring
-                        // telanjang "not supported" ikut menangkap
-                        // "Live HLS not supported" — padahal live
-                        // sengaja BUKAN terminal (#1158) dan audio live
-                        // harusnya degradasi video-only, bukan membuang
-                        // kandidat yang videonya sehat.
-                        if (audioFatal == null && isUnsupportedHlsError(e.message)) {
-                            audioFatal = e
-                        }
-                        null
-                    }
-                    if (!segs.isNullOrEmpty()) {
-                        audioResult = segs
-                        break
-                    }
-                }
-                if (audioResult == null && audioFatal != null) {
-                    audioFailedFatally = audioFatal
-                }
-                audioResult
-            }
-            if (audioSegments == null && audioFailedFatally != null) {
-                // Grup audio kandidat ini gugur fatal (issue #565): jangan
-                // batalkan seluruh rencana — catat alasannya dan beri
-                // kandidat berikutnya kesempatan, persis pola fatalError
-                // jalur video; lemparan terjadi sesudah loop bila semua
-                // kandidat gagal.
-                if (fatalError == null) fatalError = audioFailedFatally
-                continue
-            }
-            App.logEvent(
-                "HLS plan: ${candidate.codecs} ${candidate.bandwidth/1000}kbps ${candidate.frameRate}fps, " +
-                    "${videoSegments.size} video, ${audioSegments?.size ?: 0} audio segments"
-            )
-            val audioBytes = if (audioSegments != null) {
-                estimateAudioBytes(audioSegments.size, videoDurations)
-            } else 0L
-            return HlsPlan(
-                videoSegments, videoDurations, audioSegments,
-                estimateTotalBytes = saturatingAdd(estimateBytes(videoDurations, candidate.bandwidth), audioBytes),
-                segmentQueryFallback = playlistQuery(candidate.url)
-            )
-        }
-        fatalError?.let { throw it }
-        return null
-    }
-
-    /** Parse segmen dari media playlist, mengembalikan (url, durasi_us). */
-    private fun mediaSegmentsWithDurations(
-        playlistUrl: String,
-        headers: String = "",
-        authAnchorUrl: String = playlistUrl,
-        username: String = "",
-        password: String = "",
-        trackId: String = ""
-    ): List<Pair<String, Long>>? {
-        // Ambil media playlist; gagal HTTP/exception = null agar kandidat berikut dicoba.
-        val body: String? = try {
-            val conn = openAuthenticatedConnection(
-                playlistUrl, method = "GET", username = username, password = password, headers = headers,
-                authAnchorUrl = authAnchorUrl
-            )
-            // Koneksi playlist ikut terlacak (issue #1040): tanpa ini
-            // pause/cancel selama fetch playlist menunggu timeout soket,
-            // bukan disconnect seketika seperti koneksi segmen.
-            if (trackId.isNotEmpty()) trackConnection(trackId, conn)
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) {
-                    return null
-                }
-                val b = readBoundedFlagged(conn.inputStream, HLS_PROBE_MAX_BYTES)
-                if (b.truncated) {
-                    // Playlist raksasa terpotong plafon probe (issue
-                    // #1241): #EXT-X-ENDLIST hidup di ekor, jadi
-                    // memvonisnya live dari badan terpotong adalah
-                    // bohong — gagal dengan alasan yang benar.
-                    throw IOException(
-                        "HLS playlist too large (> ${HLS_PROBE_MAX_BYTES / 1000} KB)"
-                    )
-                }
-                b.text
-            } finally {
-                if (trackId.isNotEmpty()) untrackConnection(trackId, conn)
-                conn.disconnect()
-            }
-        } catch (e: Exception) {
-            // Vonis playlist terlalu besar (#1241) bersifat final untuk
-            // semua kandidat (plafonnya sama), jadi jangan ditelan jadi
-            // null seperti gagal jaringan (issue #1259): teruskan agar
-            // sampai ke pengguna, bukan berakhir sebagai "No HLS
-            // segments found" yang generik.
-            if (e is IOException && e.message?.startsWith("HLS playlist too large") == true) throw e
-            null
-        }
-        if (body == null) return null
-        // Playlist live (event/DVR sliding window) tidak punya EXT-X-ENDLIST:
-        // gagal cepat dengan pesan jelas, bukan mengunduh snapshot window
-        // yang tak berujung (dan mengulang dari nol tiap retry HLS).
-        if (!body.contains("#EXT-X-ENDLIST")) {
-            throw IOException("Live HLS not supported (playlist without EXT-X-ENDLIST)")
-        }
-        if (isEncryptedHlsPlaylist(body)) {
-            throw IOException("Encrypted HLS (EXT-X-KEY) not supported")
-        }
-        if (isByteRangeHlsPlaylist(body)) {
-            throw IOException("Byte-range HLS (EXT-X-BYTERANGE) not supported")
-        }
-        if (isMapHlsPlaylist(body)) {
-            throw IOException("Fragmented MP4 HLS (EXT-X-MAP) not supported")
-        }
-        // Pemasangan EXTINF diserahkan ke parser murni yang sama
-        // dengan jalur langsung (issue #578): dulu fungsi ini hanya
-        // memasangkan dari EXTINF (segmen tanpa EXTINF terbuang
-        // diam-diam; EXTINF ganda dimenangkan yang pertama), sedangkan
-        // parseDirectMedia menerima semua segmen (tanpa EXTINF = durasi
-        // 0; EXTINF ganda = yang terakhir menang) — playlist yang sama
-        // bisa menghasilkan daftar segmen berbeda antar-tahap. Kini
-        // satu semantik berlaku di semua tahap: semua segmen terunduh,
-        // durasi mengikuti EXTINF terakhir sebelum segmennya.
-        val direct = HlsParser.parseDirectMedia(body, playlistUrl)
-        if (direct.segments.isEmpty()) return null
-        return direct.segments.zip(direct.durationsUs)
-    }
-
-    private fun mediaSegments(
-        playlistUrl: String,
-        headers: String = "",
-        authAnchorUrl: String = playlistUrl,
-        username: String = "",
-        password: String = "",
-        trackId: String = ""
-    ): List<String>? =
-        mediaSegmentsWithDurations(playlistUrl, headers, authAnchorUrl, username, password, trackId)?.map { it.first }
-
-    /** Estimasi byte video dari BANDWIDTH (bit/detik) x total durasi #EXTINF.
-     *  Sumber: master playlist — tersedia sebelum segmen diunduh. */
-    private fun estimateBytes(durationsUs: List<Long>, bandwidth: Long): Long {
-        val totalUs = durationsUs.sum()
-        if (totalUs <= 0 || bandwidth <= 0) return 0L
-        // Kali-dulu-bagi-kemudian meluap bila BANDWIDTH raksasa (nilai
-        // playlist tak-terpercaya) atau video sangat panjang: estimasi negatif
-        // meracuni total + cek storage pra-unduh lolos palsu.
-        return safeMulDiv(totalUs, bandwidth, 8_000_000L)
-    }
-
-    /** Estimasi audio rendition terpisah (YouTube HLS): ukuran pastinya baru
-     *  diketahui setelah playlist audio di-fetch. Pendekatan awal memakai
-     *  bitrate AAC umum 128 kbps x durasi video (durasi audio ~= video).
-     *  0 bila data tidak cukup. */
-    private fun estimateAudioBytes(audioSegmentCount: Int, videoDurationsUs: List<Long>): Long {
-        val totalUs = videoDurationsUs.sum()
-        if (totalUs <= 0 || audioSegmentCount <= 0) return 0L
-        // 128 kbps AAC, bit -> byte (÷8); bagi-dulu agar video
-        // >~20 jam tak meluap seperti estimateBytes.
-        return safeMulDiv(totalUs, 128_000L, 8_000_000L)
-    }
-
-    private fun fetchText(url: String, headers: String, maxBytes: Int, username: String = "", password: String = "", trackId: String = "", failOnTruncate: Boolean = false): String? {
-        // Kode HTTP non-2xx dicatat terpisah lalu dilempar sebagai
-        // IOException("HTTP <kode>") (issue #1131): dulu semua kegagalan
-        // — 404 permanen maupun putus jaringan — sama-sama jadi null,
-        // sehingga pesan akhir generik ("Cannot fetch HLS manifest")
-        // dan klasifikasi kegagalan tak bisa membedakan galat permanen
-        // dari jaringan (404 tetap di-retry penuh). Gagal jaringan
-        // tetap null seperti sebelumnya.
-        var httpError = -1
-        var truncatedFetch = false
-        val body = runCatching {
-            val conn = openAuthenticatedConnection(
-                url, method = "GET", username = username, password = password, headers = headers
-            )
-            // Sama seperti fetch playlist (issue #1040): fetch master
-            // playlist ikut terlacak agar pause/cancel memutusnya
-            // seketika, bukan menunggu timeout soket.
-            if (trackId.isNotEmpty()) trackConnection(trackId, conn)
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) {
-                    httpError = code
-                    return@runCatching null
-                }
-                // failOnTruncate (issue #1258): pemanggil yang memvonis isi
-                // (parser playlist) wajib tahu badan terpotong — tanpa
-                // penanda, playlist media sah > plafon divonis live palsu
-                // karena ENDLIST-nya hilang. Pemanggil lain tetap polos.
-                if (failOnTruncate) {
-                    val r = readBoundedFlagged(conn.inputStream, maxBytes)
-                    // Lemparan di dalam runCatching akan tertelan getOrNull,
-                    // jadi keterpotongan dicatat ke penanda luar (pola
-                    // httpError di fungsi ini) dan dilempar sesudahnya.
-                    if (r.truncated) truncatedFetch = true
-                    r.text
-                } else {
-                    readBounded(conn.inputStream, maxBytes)
-                }
-            } finally {
-                if (trackId.isNotEmpty()) untrackConnection(trackId, conn)
-                conn.disconnect()
-            }
-        }.getOrNull()
-        if (truncatedFetch) throw IOException("HLS playlist too large")
-        if (body == null && httpError > 0) throw IOException("HTTP $httpError")
-        return body
-    }
 
     /** Batalkan finalize bila item sudah hilang dari antrean (cancel/remove/
      *  clear tepat di tengah merge/remux/publish yang blocking sehingga tak
@@ -4409,7 +3044,7 @@ class DownloadEngine(appContext: Context) {
                     // dulunya satu-satunya jalur streaming tanpa anggaran —
                     // respons chunked melewati cek pra-unduh (total=0) dan
                     // overrun ditoleransi verifySize, jadi loop menulis
-                    // sampai disk benar-benar habis. Pola pra-terbang HLS:
+                    // sampai disk benar-benar habis. Pola pra-terbang:
                     // berhenti begitu ruang volume partial menyentuh cadangan.
                     // freeBytesOrNull (issue #810): kegagalan StatFs
                     // sesaat tak boleh terbaca ruang 0 — unduhan sehat
@@ -4482,7 +3117,7 @@ class DownloadEngine(appContext: Context) {
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
-        // Sama seperti finishHls (issue #574).
+        // Sama seperti finishMuxed (issue #574).
         retryAttempts.remove(item.id)
         lastSpeedSample.remove(item.id)
         val finishedSingle = updateItem(item.id) {
@@ -4658,7 +3293,7 @@ class DownloadEngine(appContext: Context) {
         val published = organizeIfEnabled(saver, published0, finalName)
         ensurePublishedKept(item.id, published0, published)
         speedTracker.reset(item.id)
-        // Sama seperti finishHls (issue #574).
+        // Sama seperti finishMuxed (issue #574).
         retryAttempts.remove(item.id)
         lastSpeedSample.remove(item.id)
         val finishedMulti = updateItem(item.id) {
@@ -4702,7 +3337,7 @@ class DownloadEngine(appContext: Context) {
         // nya sebagai URL resume polos menggabung segmen progresif
         // awal dengan segmen bisu. Pemanggil jatuh ke fallback
         // satu-alur yang aman.
-        if (result.directUrl == item.url || result.isHls || result.audioUrl.isNotEmpty()) return null
+        if (result.directUrl == item.url || result.audioUrl.isNotEmpty()) return null
         if (item.totalBytes > 0) {
             // Validasi HEAD tak boleh melempar: openAuthenticatedConnection
             // ikut menyambung + membaca responseCode saat redirect, sehingga
@@ -5580,18 +4215,9 @@ class DownloadEngine(appContext: Context) {
         }
         private val CONTENT_DISPOSITION_PLAIN = Regex("filename=\"?([^\";]+)\"?")
         private const val BUFFER_SIZE = 64 * 1024
-        /** Kedalaman unduh-awal segmen HLS (issue #1288): segmen
-         *  berikutnya diunduh bersamaan ke spool per-segmen sementara
-         *  penyalinan ke target tetap berurutan. */
-        private const val HLS_PREFETCH_WINDOW = 4
         private const val MAX_ZERO_READS = 64
         private const val MAX_REDIRECTS = 5
-        private const val HLS_PROBE_MAX_BYTES = 1_000_000
 
-        /** Umur pakai-ulang rencana HLS ter-cache (issue #1061). */
-        private const val HLS_PLAN_CACHE_TTL_MS = 60_000L
-        /** Segmen HLS ukuran ini dianggap segmen data (bukan init/small). */
-        private const val HLS_REF_SEGMENT_MIN = 256L * 1024
         private const val SEGMENT_MIN_BYTES = 5L * 1024 * 1024
         private const val RETRY_DELAY_1_MS = 5_000L
         private const val RETRY_DELAY_MAX_MS = 300_000L
@@ -5678,17 +4304,6 @@ internal fun segmentLength(start: Long, end: Long): Long {
 internal fun isSegmentComplete(start: Long, end: Long, downloaded: Long): Boolean =
     downloaded >= segmentLength(start, end)
 
-/** Jatah byte per segmen unduh-awal HLS (issue #1411): anggaran ruang
- *  bersama — ruang bebas yang dipotret SEKALI dikurangi cadangan
- *  `minFreeBytes` (dijepit >= 0) — dibagi rata ke slot jendela, agar
- *  pekerja yang berjalan bersamaan tak bisa gabungan menulis melewati
- *  anggaran (dulu tiap pekerja menilai plafon dari potret
- *  usableSpace-nya sendiri). Murni agar bisa di-unit-test. */
-internal fun hlsSegmentByteCap(freeBytes: Long, minFreeBytes: Long, window: Int): Long {
-    val budget = (freeBytes - minFreeBytes).coerceAtLeast(0)
-    return if (window > 0) budget / window else budget
-}
-
 /** Penolakan resume sejati dari lapis koneksi (server/proxy tak layani Range).
  *  SENGAJA tidak mencakup "stopped supporting Range" — itu pesan retry-able
  *  internal (URL segar sudah dipasang, tinggal coba lagi); bila ikut match,
@@ -5713,20 +4328,6 @@ internal fun isHttpMirrorFailoverError(message: String?): Boolean {
     val code = Regex("""HTTP (\d{3})""").find(message)?.groupValues?.get(1)?.toIntOrNull()
         ?: return false
     return code == 404 || code == 410 || code == 403 || code in 500..599
-}
-
-/** Kegagalan HLS yang memang penolakan URL oleh server (issue #1410):
- *  hanya 403/404 — maksud desain failedHlsUrls sejak awal (media
- *  playlist 403/404 -> jangan retry URL itu, re-extract). Kegagalan
- *  downloadHls lain (storage penuh, live tak didukung, playlist terlalu
- *  besar, putus jaringan) BUKAN kesalahan URL: ikut ditandai membuat
- *  retry melewati jalur HLS langsung + resume segmen dan membayar
- *  ekstraksi ulang penuh. Murni agar bisa di-unit-test. */
-internal fun isHlsUrlRejectionError(message: String?): Boolean {
-    if (message.isNullOrBlank()) return false
-    val code = Regex("""HTTP (\d{3})""").find(message)?.groupValues?.get(1)?.toIntOrNull()
-        ?: return false
-    return code == 403 || code == 404
 }
 
 /** Ekor terpotong (server menutup koneksi sebelum Content-Length terpenuhi):
@@ -5756,14 +4357,6 @@ internal fun isFreshResumeSizeValid(storedTotal: Long, freshTotal: Long): Boolea
 internal fun monotonicNow(): Long =
     runCatching { SystemClock.elapsedRealtime() }.getOrDefault(System.currentTimeMillis())
 
-/** Durasi segmen HLS (mikrodetik) dari detik EXTINF: dijepit 0 dtk–24 jam
- *  agar playlist rusak/jahat tak membuat overflow Long negatif yang merusak
- *  estimasi ukuran dan muxer. Murni agar bisa di-unit-test. */
-internal fun hlsSegmentDurationUs(durSec: Double): Long {
-    if (!durSec.isFinite()) return 0L
-    return ((durSec.coerceIn(0.0, 86_400.0)) * 1_000_000).toLong()
-}
-
 /** (a*b)/div tanpa overflow Long: bagi dulu baru kali, sisa dihitung
  *  terpisah. Jenuh di Long.MAX bila operan raksasa (BANDWIDTH playlist
  *  jahat). Murni agar bisa di-unit-test. */
@@ -5790,26 +4383,6 @@ internal fun redirectTarget(base: String, location: String?): String? {
         if (isBlockedRedirectHost(target.host.orEmpty())) return null
         target.toString()
     }.getOrNull()
-}
-
-/** Host URL ternormalisasi (huruf kecil, tanpa titik akhir); "" bila
- *  tak ter-parse. Dasar klasifikasi platform berbasis host di engine
- *  (issue #843/#844) — jangan kembali ke substring atas URL utuh. */
-internal fun isHlsManifestUrl(url: String): Boolean {
-    // Pengecualian dinilai dari host/path sungguhan (issue #1184):
-    // substring atas URL utuh juga menangkap tautan berkas biasa
-    // yang QUERY-nya kebetulan memuat string itu.
-    if (urlHostOf(url) == "manifest.googlevideo.com") return true
-    // Akhiran path saja (issue #1159): substring ".m3u8" atas URL
-    // utuh juga menangkap tautan berkas biasa yang query/path-nya
-    // memuat ".m3u8" (mis. ?file=clip.m3u8) dan selalu
-    // mengarahkannya ke jalur HLS sampai FAILED "No HLS segments
-    // found" — kelas kesalahan #843/#844. Query/fragment dibuang
-    // dulu, lalu path yang dinilai (pola /api/manifest/hls juga
-    // hanya berlaku pada path).
-    val pathOnly = url.substringBefore('?').substringBefore('#')
-    if (pathOnly.contains("/api/manifest/hls")) return true
-    return pathOnly.endsWith(".m3u8", ignoreCase = true)
 }
 
 internal fun urlHostOf(url: String): String =
@@ -5929,7 +4502,6 @@ internal fun parseIpv4Part(part: String): Int? {
     }.getOrNull()
 }
 
-private val HLS_KEY_METHOD_RE = Regex("METHOD=([^,\\s\"]+)", RegexOption.IGNORE_CASE)
 
 /** Literal IPv6 valid (grup heks dipisah ':', satu '::' kompresi diizinkan,
  *  IPv4-embedded bertitik diizinkan): guard sebelum InetAddress.getByName
@@ -5938,42 +4510,6 @@ internal val IPV6_LITERAL_RE = Regex(
     "^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F:.]{0,45}$|^::[0-9a-fA-F:.]{0,45}$"
 )
 
-/** Playlist HLS terenkripsi bila ada #EXT-X-KEY dengan METHOD selain NONE.
- *  Murni agar bisa di-unit-test. */
-internal fun isEncryptedHlsPlaylist(body: String): Boolean {
-    // Hanya baris tag kunci sungguhan (#EXT-X-KEY:...) yang dinilai
-    // (issue #577): prefiks kasar "#EXT-X-KEY" ikut menyala untuk
-    // #EXT-X-KEYFORMAT/#EXT-X-KEYFORMATVERSIONS, dan findAll atas
-    // seluruh body ikut menghitung teks METHOD= di luar tag kunci
-    // (mis. di judul #EXTINF) — keduanya bisa memvonis playlist tak
-    // terenkripsi sebagai terenkripsi.
-    // Baris di-trim lebih dulu (issue #599): parser HLS lain di repo
-    // men-trim tiap baris, jadi playlist berindentasi sah di semua
-    // tahap — tanpa trim, tag kunci ber-spasi/tab di depan lolos dari
-    // gerbang ini dan ciphertext terunduh sebagai konten biasa
-    // (fail-open, regresi relatif contains pra-#577).
-    val keyLines = body.lineSequence().map { it.trim() }
-        .filter { it.startsWith("#EXT-X-KEY:") }.toList()
-    if (keyLines.isEmpty()) return false
-    // Regex METHOD berjalan atas baris yang isi kutipnya dikosongkan
-    // (issue #600): teks METHOD= di dalam URI terkutip pada baris yang
-    // sama (mis. query string kunci ?METHOD=NONE) bukan atribut METHOD
-    // sungguhan — membacanya menggugurkan jalur fail-closed di bawah.
-    val methods = keyLines.flatMap { line ->
-        HLS_KEY_METHOD_RE.findAll(HlsParser.tanpaNilaiKutip(line))
-            .map { it.groupValues[1].uppercase(Locale.ROOT) }
-    }
-    // Tanpa METHOD eksplisit: anggap terenkripsi (fail-closed) daripada
-    // mengunduh ciphertext yang dilaporkan sukses.
-    if (methods.isEmpty()) return true
-    return methods.any { it != "NONE" }
-}
-
-/** Playlist HLS byterange memakai #EXT-X-BYTERANGE: tiap "segmen"
- *  adalah rentang byte dari SATU berkas media yang sama, bukan berkas
- *  terpisah. Murni agar bisa di-unit-test. */
-internal fun isByteRangeHlsPlaylist(body: String): Boolean =
-    body.contains("#EXT-X-BYTERANGE")
 
 /**
  * Buang sufiks ekstensi dari nama dasar tanpa peka huruf besar/kecil
@@ -5990,11 +4526,6 @@ internal fun buangSufiksEkstensi(nama: String, vararg sufiks: String): String {
     return hasil
 }
 
-/** Playlist fMP4 memakai #EXT-X-MAP: URI segmen inisialisasi (moov)
- *  hidup di atribut tag itu, bukan baris segmen tersendiri. Murni agar
- *  bisa di-unit-test. */
-internal fun isMapHlsPlaylist(body: String): Boolean =
-    body.contains("#EXT-X-MAP")
 
 internal fun isSameOrigin(first: String, second: String): Boolean = runCatching {
     val firstUrl = URL(first)
@@ -6150,9 +4681,9 @@ internal class DownloadHealthWatchdog(limitKbps: Int) {
             slowSince = 0L
         }
         if (totalEfektif <= 0) {
-            // Total tak diketahui (HLS/unknown-length): hanya vonis macet
-            // total (speed nol), bukan vonis lambat — kecepatan segmen HLS
-            // memang burst sehingga ambang 2 KB/s memberi vonis palsu.
+            // Total tak diketahui (unknown-length): hanya vonis macet
+            // total (speed nol), bukan vonis lambat — kecepatan unduhan
+            // segmen memang burst sehingga ambang 2 KB/s memberi vonis palsu.
             if (speed == 0L && now - lastAt >= STALL_TIMEOUT_MS) {
                 throw IOException(
                     "Connection stalled: no data for ${STALL_TIMEOUT_MS / 1000} seconds — retrying"
