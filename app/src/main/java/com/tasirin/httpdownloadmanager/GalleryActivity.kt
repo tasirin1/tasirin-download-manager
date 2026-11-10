@@ -114,9 +114,9 @@ class GalleryActivity : AppCompatActivity() {
 
         // Update progres tanpa scan ulang MediaStore. Scan hanya saat daftar file
         // aktif berubah (mulai/selesai), bukan tiap tick persentase.
-        // Tick persentase di-throttle (maks ~1/s): DiffUtil atas ribuan entry
-        // tidak perlu dijalankan pada tiap emisi StateFlow (bisa beberapa per
-        // detik saat banyak download aktif paralel).
+        // Tick persentase di-throttle (maks ~1/s) dan sejak issue #1444
+        // hanya berupa payload parsial per entri berubah — DiffUtil atas
+        // ribuan entry tak lagi berjalan untuk tick progres sama sekali.
         // Kolektor digerbang STARTED (issue #1049): tanpa repeatOnLifecycle
         // ia jalan terus saat activity STOPPED (mis. player eksternal di
         // depan) — scan MediaStore penuh + DiffUtil ribuan entri ±1x/detik
@@ -137,10 +137,17 @@ class GalleryActivity : AppCompatActivity() {
                 lastUiAt = now
                 if (filesChanged) {
                     rescanGallery()
+                    updateList()
                 } else {
-                    fullList = mergedProgress(fullList)
+                    // Tick progres murni (issue #1444): tanpa salinan
+                    // daftar penuh + DiffUtil — cukup payload parsial
+                    // untuk entri yang persennya benar-benar berubah.
+                    val changes = progressChanges()
+                    if (changes.isNotEmpty()) {
+                        fullList = mergedProgress(fullList)
+                        adapter.updateProgressPercents(changes)
+                    }
                 }
-                updateList()
             }
             }
         }
@@ -203,6 +210,19 @@ class GalleryActivity : AppCompatActivity() {
     ): List<MediaLibrary.MediaEntry> = items.map { entry ->
         if (!entry.isPartial) entry
         else entry.copy(progressPercent = partialProgress[entry.name] ?: -1)
+    }
+
+    /** Selisih persen parsial tick ini terhadap fullList saat ini
+     *  (issue #1444): nama -> persen baru, hanya entri yang berubah —
+     *  masukan payload parsial adapter. */
+    private fun progressChanges(): Map<String, Int> {
+        val out = mutableMapOf<String, Int>()
+        for (entry in fullList) {
+            if (!entry.isPartial) continue
+            val pct = partialProgress[entry.name] ?: -1
+            if (pct != entry.progressPercent) out[entry.name] = pct
+        }
+        return out
     }
 
     private fun updateList() {
@@ -445,6 +465,11 @@ private class GalleryAdapter(
     private val onClick: (MediaLibrary.MediaEntry) -> Unit,
 ) : RecyclerView.Adapter<GalleryAdapter.Holder>() {
 
+    companion object {
+        // Penanda bind parsial progres — pola daftar utama (issue #1444).
+        private const val PAYLOAD_PROGRESS = "progress"
+    }
+
     private val items = mutableListOf<MediaLibrary.MediaEntry>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     // Cache string badge: getString() tiap bind partial = lookup resource berulang.
@@ -452,9 +477,10 @@ private class GalleryAdapter(
 
     fun release() { scope.cancel() }
 
-    // DiffUtil dihitung di background: submit dipanggil tiap tick progres
-    // (throttle 800ms) dan tiap halaman loadMore — dihitung di main thread
-    // atas ribuan entry inilah yang bikin scroll patah-patah.
+    // DiffUtil dihitung di background: submit dipanggil saat struktur
+    // daftar berubah (scan/loadMore) — dihitung di main thread atas
+    // ribuan entry inilah yang bikin scroll patah-patah. Tick progres
+    // murni TIDAK lewat sini lagi (issue #1444: payload parsial).
     private var submitGen = 0L
 
     fun submit(list: List<MediaLibrary.MediaEntry>) {
@@ -477,6 +503,45 @@ private class GalleryAdapter(
             items.clear()
             items.addAll(new)
             diff.dispatchUpdatesTo(this@GalleryAdapter)
+        }
+    }
+
+    /** Perbarui persen entri parsial TANPA submit ulang (issue #1444):
+     *  entri yang berubah diganti di tempat lalu di-bind ulang lewat
+     *  payload progres saja (teks info), thumbnail tak dimuat ulang dan
+     *  DiffUtil tak berjalan. Kunci nama meniru mergedProgress. */
+    fun updateProgressPercents(changes: Map<String, Int>) {
+        if (changes.isEmpty()) return
+        for (i in items.indices) {
+            val e = items[i]
+            if (!e.isPartial) continue
+            val pct = changes[e.name] ?: continue
+            if (pct == e.progressPercent) continue
+            items[i] = e.copy(progressPercent = pct)
+            notifyItemChanged(i, PAYLOAD_PROGRESS)
+        }
+    }
+
+    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.contains(PAYLOAD_PROGRESS)) {
+            bindInfoText(holder, items[position])
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
+    }
+
+    /** Teks info sel (nama berkas parsial + persen / durasi / ukuran):
+     *  dipakai bind penuh dan bind payload progres (issue #1444). */
+    private fun bindInfoText(holder: Holder, e: MediaLibrary.MediaEntry) {
+        val b = holder.binding
+        val ctx = holder.itemView.context
+        b.textInfo.text = if (e.isPartial) {
+            val pct = if (e.progressPercent in 0..100) " · ${e.progressPercent}%" else ""
+            (partialBadge ?: ctx.getString(R.string.gallery_partial_badge).also { partialBadge = it }) + pct + " · " + Formats.bytes(e.size)
+        } else if (e.isVideo && e.durationMs > 0) {
+            Formats.duration(e.durationMs) + " · " + Formats.bytes(e.size)
+        } else {
+            Formats.bytes(e.size) + " · " + formatDate(e.modified)
         }
     }
 
@@ -528,17 +593,9 @@ private class GalleryAdapter(
         b.textName.text = e.name
         val dot = e.name.lastIndexOf('.')
         b.textExt.text = if (dot < 0) "" else e.name.substring(dot + 1).uppercase(java.util.Locale.ROOT)
-        val ctx = holder.itemView.context
         // 3. Tampilkan play overlay saat tidak ada thumbnail supaya cell tidak kosong
         b.playOverlay.visibility = if (e.isVideo) View.VISIBLE else View.GONE
-        b.textInfo.text = if (e.isPartial) {
-            val pct = if (e.progressPercent in 0..100) " · ${e.progressPercent}%" else ""
-            (partialBadge ?: ctx.getString(R.string.gallery_partial_badge).also { partialBadge = it }) + pct + " · " + Formats.bytes(e.size)
-        } else if (e.isVideo && e.durationMs > 0) {
-            Formats.duration(e.durationMs) + " · " + Formats.bytes(e.size)
-        } else {
-            Formats.bytes(e.size) + " · " + formatDate(e.modified)
-        }
+        bindInfoText(holder, e)
         b.imageThumb.setImageDrawable(null)
         val pos = position
         holder.itemView.setOnClickListener { onClick(e) }
