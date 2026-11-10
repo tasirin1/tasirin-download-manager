@@ -237,16 +237,26 @@ internal fun getOrCreateThumb(
             }
             val bmp = generateThumb(ctx, raw, isFsPathAllowed, isMediaUriAllowed, mediaName)
                 ?: run {
-                    thumbFailures[key] = System.currentTimeMillis()
-                    if (thumbFailures.size > 512) {
-                        val cutoff = System.currentTimeMillis() - THUMB_FAILURE_TTL_MS
-                        thumbFailures.entries.removeAll { it.value < cutoff }
-                        // Bila semua masih fresh (mis. 1000 video korup
-                        // sekaligus), pangkas tertua sampai batas agar map
-                        // tidak tumbuh tanpa batas.
-                        while (thumbFailures.size > 1024) {
-                            val oldest = thumbFailures.entries.minByOrNull { it.value } ?: break
-                            if (!thumbFailures.remove(oldest.key, oldest.value)) break
+                    // Kegagalan saat sumber MASIH BERTUMBUH tidak dicatat
+                    // (issue #1419): kunci saat bertumbuh adalah kunci
+                    // path-saja yang sama sepanjang masa bertumbuh, jadi
+                    // satu kegagalan awal (header/moov belum lengkap)
+                    // akan memblokir semua percobaan ulang selama sisa
+                    // jendela + TTL 30 menit, padahal frame bisa sudah
+                    // ter-decode jauh sebelum unduhan selesai. Berkas
+                    // diam tetap tercatat seperti biasa.
+                    if (!growing) {
+                        thumbFailures[key] = System.currentTimeMillis()
+                        if (thumbFailures.size > 512) {
+                            val cutoff = System.currentTimeMillis() - THUMB_FAILURE_TTL_MS
+                            thumbFailures.entries.removeAll { it.value < cutoff }
+                            // Bila semua masih fresh (mis. 1000 video korup
+                            // sekaligus), pangkas tertua sampai batas agar map
+                            // tidak tumbuh tanpa batas.
+                            while (thumbFailures.size > 1024) {
+                                val oldest = thumbFailures.entries.minByOrNull { it.value } ?: break
+                                if (!thumbFailures.remove(oldest.key, oldest.value)) break
+                            }
                         }
                     }
                     return@synchronized null
