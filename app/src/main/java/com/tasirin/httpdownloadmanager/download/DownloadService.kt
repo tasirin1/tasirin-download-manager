@@ -268,6 +268,30 @@ class DownloadService : Service() {
             NotificationHelper.ACTION_PAUSE_ALL -> App.engine.pauseAll()
             NotificationHelper.ACTION_RESUME_ALL -> App.engine.resumeAll()
         }
+        // Penilaian berhenti penutup start (issue #1532, cermin
+        // #1515): reset latch di atas membuka kembali kemampuan
+        // berhenti, tetapi fungsi ini sendiri tak pernah menilai dan
+        // ketiga penilai lain bersifat terpicu (emisi items, sinyal
+        // reevaluate, penutup start onCreate yang tak berjalan untuk
+        // instance yang sudah hidup). Start yang tak membawa
+        // pekerjaan — bentuk paling bersih ACTION_RESUME_ALL saat tak
+        // ada yang terjedakan: resumeAll tak mengubah state sehingga
+        // tak ada emisi — meninggalkan service hidup lagi dengan
+        // notifikasi final basi dan tanpa satu pun penilai terjadwal.
+        // Nilai di sini dari keadaan segar SESUDAH aksi ditangani:
+        // pauseAll/resumeAll menerapkan perubahan state secara
+        // sinkron bila muatan selesai, jadi start yang sungguh
+        // membawa kerja terbaca aktif dan tak dihentikan. Gerbang
+        // muatan awal sama seperti penilai lain (#264) — daftar
+        // kosong palsu di jendela muat tidak dinilai.
+        if (App.engine.isInitialLoadComplete()) {
+            val itemsNow = App.engine.items.value
+            val activeNow = itemsNow.any {
+                it.state == DownloadState.DOWNLOADING ||
+                    it.state == DownloadState.PENDING
+            }
+            stopSelfIfNoWork(itemsNow, activeNow, isServerActive())
+        }
         // Baru diminta jalan = ada kerja (jangan NOT_STICKY: restart-mode ikut
         // return terakhir sehingga unduhan aktif kehilangan perlindungan).
         if (action == NotificationHelper.ACTION_RESUME_ALL) return START_STICKY
