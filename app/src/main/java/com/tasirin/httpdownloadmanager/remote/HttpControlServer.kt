@@ -2513,6 +2513,38 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
         return rawStream to len
     }
 
+    /** Buka contentUri item sebagai stream TERPOSISI untuk serveFile
+     *  (issue #1443, pola serveMedia): Range di-parse lebih dulu, lalu
+     *  PositionedAssetInputStream mulai tepat pada offset FD-nya.
+     *  Mengembalikan stream + total + rentang terparse (pola #1381).
+     *  Null bila jalur terposisi tak tersedia — AFD gagal dibuka,
+     *  panjang FD tak diketahui (jalur lama punya cadangan query SIZE),
+     *  atau FD tak bisa diposisikan (mis. pipe provider) — pemanggil
+     *  jatuh ke jalur stream mentah lama. */
+    private fun openPositionedContentStream(
+        item: DownloadItem,
+        rangeHeader: String?
+    ): Triple<InputStream, Long, Pair<Long, Long>?>? {
+        val uri = item.contentUri?.toUri() ?: return null
+        if (!isMediaUriAllowed(uri)) return null
+        val descriptor = runCatching {
+            context.contentResolver.openAssetFileDescriptor(uri, "r")
+        }.getOrNull() ?: return null
+        val len = descriptor.length
+        if (len < 0) {
+            runCatching { descriptor.close() }
+            return null
+        }
+        val range = parseRange(rangeHeader, len)
+        val stream = try {
+            PositionedAssetInputStream(descriptor, range?.first ?: 0L)
+        } catch (e: Exception) {
+            runCatching { descriptor.close() }
+            return null
+        }
+        return Triple(stream, len, range)
+    }
+
     private fun serveFile(session: IHTTPSession): Response {
         val id = session.uri.removePrefix("/file/")
         val item = App.engine.items.value.find {
@@ -2542,6 +2574,28 @@ class HttpControlServer(appContext: Context) : NanoHTTPD(StoragePrefs.serverPort
                 return notFound()
             }
         } else if (!item.contentUri.isNullOrEmpty()) {
+            // Jalur terposisi seperti serveMedia (issue #1443): Range
+            // dilayani dari offset FD, bukan skip baca-buang di atas
+            // stream mentah. Tak tersedia -> jalur mentah lama di bawah.
+            val positioned = openPositionedContentStream(item, session.headers["range"])
+            if (positioned != null) {
+                return try {
+                    streamMedia(
+                        name = item.fileName,
+                        mime = mime,
+                        input = positioned.first,
+                        total = positioned.second,
+                        rangeHeader = session.headers["range"],
+                        download = download,
+                        prepositioned = true,
+                        parsedRange = positioned.third,
+                        rangeParsed = true
+                    )
+                } catch (e: Exception) {
+                    runCatching { positioned.first.close() }
+                    throw e
+                }
+            }
             val opened = openContentUriStream(item) ?: return notFound()
             stream = opened.first
             total = opened.second
