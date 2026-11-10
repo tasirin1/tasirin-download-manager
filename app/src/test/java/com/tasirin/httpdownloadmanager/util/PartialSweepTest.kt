@@ -53,19 +53,23 @@ class PartialSweepTest {
     }
 
     @Test
-    fun `pola sapu tidak lagi mencakup spool dan segs`() {
-        assertFalse(isSweepablePartial("~1video.video.part.spool.0"))
-        assertFalse(isSweepablePartial("~1video.video.part.spool.137"))
-        assertFalse(isSweepablePartial("~1video.video.part.spool"))
-        assertFalse(isSweepablePartial("~1video.video.part.segs"))
+    fun `pola sapu mencakup spool dan segs warisan, tanpa perlindungan`() {
+        // Warisan mesin lama (issue #1437): pola namanya sweepable lagi
+        // agar sisa instalasi lama tersapu, tetapi TIDAK dilindungi —
+        // tak ada penulisnya lagi.
+        assertTrue(isSweepablePartial("~1video.video.part.spool.0"))
+        assertTrue(isSweepablePartial("~1video.video.part.spool.137"))
+        assertTrue(isSweepablePartial("~1video.video.part.spool"))
+        assertTrue(isSweepablePartial("~1video.video.part.segs"))
         // Ekor bukan digit / pola tidak di ekor: bukan sampah internal.
         assertFalse(isSweepablePartial("video.mp4.part.spool.abc"))
         assertFalse(isSweepablePartial("video.mp4.part.spool.3.mp4"))
         assertFalse(isSweepablePartial("film.part.1.mp4"))
-        // Perlindungan kini keanggotaan himpunan persis.
+        // Perlindungan tetap keanggotaan himpunan persis.
         val protected = protectedPartialNames(item("video.mp4"))
         assertTrue(isProtectedPartialName("video.mp4.part", protected))
         assertFalse(isProtectedPartialName("~1video.video.part.spool.0", protected))
+        assertFalse(isProtectedPartialName("~1video.video.part.segs", protected))
     }
 
 }

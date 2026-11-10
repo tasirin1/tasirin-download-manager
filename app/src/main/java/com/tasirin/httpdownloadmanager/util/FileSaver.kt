@@ -1097,6 +1097,28 @@ class FileSaver(context: Context) {
             }
         }
         extraNames.forEach { name -> runCatching { File(downloadDir, name).delete() } }
+        // Sidecar warisan mesin lama yang sudah dihapus (issue #1437):
+        // pasangan temp video/audio item ini bisa menyisakan .part.segs
+        // dan .part.spool dari instalasi pra-penghapusan — ikut dibuang
+        // sekarang agar tak menunggu sapuan yatim. Pola nama saja;
+        // fiturnya tidak dihidupkan lagi. Spool per-segmen berindeks tak
+        // terbatas disapu berdasar awalan temp item ini.
+        val legacyBase = buangSufiksEkstensi(item.fileName, ".ts", ".mp4").ifBlank { item.fileName }
+        val legacyTempBase = "~" + item.id.take(8) + legacyBase
+        val legacySpoolPrefixes = mutableListOf<String>()
+        for (kind in listOf("video", "audio")) {
+            val temp = FileNames.safe("$legacyTempBase.$kind") + ".part"
+            runCatching { File(downloadDir, "$temp.segs").delete() }
+            runCatching { File(downloadDir, "$temp.spool").delete() }
+            legacySpoolPrefixes.add("$temp.spool.")
+        }
+        runCatching {
+            downloadDir.listFiles()?.forEach { f ->
+                if (legacySpoolPrefixes.any { f.name.startsWith(it) }) {
+                    runCatching { f.delete() }
+                }
+            }
+        }
         if (!item.contentUri.isNullOrEmpty()) {
             runCatching { appContext.contentResolver.delete(item.contentUri.toUri(), null, null) }
         }
@@ -1714,16 +1736,24 @@ internal fun protectedPartialNames(item: com.tasirin.httpdownloadmanager.data.Do
 
 private val PART_SEGMENT_TAIL_RE = Regex("""\.part\.\d+$""")
 private val MERGE_STAGING_TAIL_RE = Regex("""\.merge\.\d+$""")
+private val LEGACY_SPOOL_TAIL_RE = Regex("""\.part\.spool\.\d+$""")
 
 /** File internal yang boleh disapu bila yatim: partial segmen/basis plus
  *  staging merge (`.merge.<nanoTime>`) yang tertinggal bila proses mati di
- *  tengah merge. Pola WAJIB terjangkar di ekor nama: pola longgar
- *  ".part." di tengah nama ikut menyapu file FINAL selesai seperti
- *  `film.part.1.mp4` atau `game.part.2.rar` (pola nama arsip pecahan
- *  yang umum). Murni agar bisa di-unit-test. */
+ *  tengah merge. Tiga pola terakhir adalah WARISAN mesin lama yang sudah
+ *  dihapus (issue #1437): sidecar `.part.segs`, `.part.spool`, dan
+ *  `.part.spool.<idx>` tak lagi punya penulis, jadi TIDAK dilindungi
+ *  (tak masuk protectedPartialNames) — pola namanya dipertahankan di
+ *  sini hanya agar sisa instalasi lama tersapu sebagai yatim, bukan
+ *  untuk menghidupkan fiturnya. Pola WAJIB terjangkar di ekor nama:
+ *  pola longgar ".part." di tengah nama ikut menyapu file FINAL selesai
+ *  seperti `film.part.1.mp4` atau `game.part.2.rar` (pola nama arsip
+ *  pecahan yang umum). Murni agar bisa di-unit-test. */
 internal fun isSweepablePartial(name: String): Boolean =
     name.endsWith(".part") || PART_SEGMENT_TAIL_RE.containsMatchIn(name) ||
-        MERGE_STAGING_TAIL_RE.containsMatchIn(name)
+        MERGE_STAGING_TAIL_RE.containsMatchIn(name) ||
+        name.endsWith(".part.spool") || name.endsWith(".part.segs") ||
+        LEGACY_SPOOL_TAIL_RE.containsMatchIn(name)
 
 /** Nama partial ini milik item yang dikenal? Nama persis dari
  *  [protectedPartialNames] selalu ya. Murni agar bisa di-unit-test. */
