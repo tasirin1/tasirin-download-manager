@@ -343,10 +343,10 @@
  background: var(--red-bg); color: var(--red); border: 1px solid var(--red-line); }
 
   ul.list {
- list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 
   li.item {
- position: relative; overflow: hidden; border-radius: var(--radius); touch-action: pan-y; content-visibility: auto; contain-intrinsic-size: auto 88px; }
+ position: relative; overflow: hidden; border-radius: var(--radius); touch-action: pan-y; content-visibility: auto; contain-intrinsic-size: auto 78px; }
 
   li.item.st-active .swipe-content { border-left-color: var(--primary); }
 
@@ -358,7 +358,7 @@
 
 
   .item-top {
- display: flex; align-items: flex-start; gap: 10px; }
+ display: flex; align-items: flex-start; gap: 8px; }
 
   .icon {
  flex: 0 0 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 24px; background: transparent; }
@@ -414,7 +414,7 @@
   :root[data-theme="dark"] .retry-badge { background: rgba(178,106,0,.2); color: #ffcf7d; border-color: rgba(178,106,0,.45); }
 
   .meta {
- display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+ display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 1px; font-variant-numeric: tabular-nums; }
 
   .err {
  color: var(--red); margin-top: 2px; font-size: 12px; word-break: break-word; }
@@ -429,7 +429,7 @@
  border-color: var(--primary); background: var(--primary-soft); }
 
   .bar-wrap {
- display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+ display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 
   .bar {
  height: 3px; flex: 1; background: var(--track); position: relative; border-radius: 999px; overflow: hidden; }
@@ -1719,9 +1719,9 @@
   li.item .swipe-action .act-in { flex: 0 0 84px; width: 84px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   li.item.swiping-l .swipe-action.left { display: flex; }
   li.item.swiping-r .swipe-action.right { display: flex; }
-  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 9px 11px; transition: transform .28s cubic-bezier(.2,.7,.3,1); }
-  .list.compact .swipe-content { padding: 8px 11px; }
-  .list.compact .item-top { gap: 8px; }
+  li.item .swipe-content { position: relative; z-index: 1; background: var(--card); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: var(--radius); padding: 7px 10px; transition: transform .28s cubic-bezier(.2,.7,.3,1); }
+  .list.compact .swipe-content { padding: 6px 10px; }
+  .list.compact .item-top { gap: 7px; }
   .list.compact .icon { flex-basis: 32px; width: 32px; height: 32px; border-radius: 8px; }
   .list.compact .icon svg { width: 22px; height: 22px; }
   .list.compact .social-favicon { width: 10px; height: 10px; }
@@ -1729,8 +1729,8 @@
   .list.compact .meta { font-size: 12px; margin-top: 1px; }
   .list.compact .bar { height: 2px; }
   .list.compact .bar-pct { font-size: 11px; min-width: 32px; }
-  .list.compact .item-sub { padding-left: 40px; }
-  .list.compact .err { font-size: 12px; margin-top: 3px; }
+  .list.compact .item-sub { padding-left: 39px; }
+  .list.compact .err { font-size: 12px; margin-top: 2px; }
   .list.compact .item-retry { min-height: 36px; padding: 3px 10px; font-size: 11px; }
   .batch-check { display: none; position: relative; width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--line); background: var(--card); flex-shrink: 0; cursor: pointer; appearance: none; -webkit-appearance: none; margin-top: 10px; transition: all .15s; }
   .batch-check:checked { background: var(--primary); border-color: var(--primary); }
@@ -1823,7 +1823,7 @@
  flex: 0 0 auto; }
 
     .item {
- padding: 14px; }
+ padding: 6px; }
 
     .name {
  font-size: 14px; }
@@ -1832,7 +1832,7 @@
  flex-basis: 36px; height: 36px; font-size: 24px; }
 
     .item-sub {
- padding-left: 48px; }
+ padding-left: 44px; }
 
 
     .more-menu, .fs-tools-menu {
