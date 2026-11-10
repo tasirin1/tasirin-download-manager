@@ -1098,6 +1098,35 @@ class FileSaver(context: Context) {
     }
 
     fun deleteFiles(item: DownloadItem) {
+        deleteFilesInternal(item) { downloadDir.listFiles() }
+    }
+
+    /** Varian massal (issue #1452): sapuan spool warisan di dalam
+     *  deleteFiles membaca daftar isi downloadDir — dulu SATU listing
+     *  penuh per item, jadi "Hapus semua gagal" atas ratusan item
+     *  membayar ratusan listing folder yang sama. Varian ini mengambil
+     *  SATU listing di muka (malas, di-cache) dan meneruskannya ke
+     *  tiap item; listing awal memuat semua nama spool warisan yang
+     *  dicari, dan penghapusan per nama bersifat idempoten, jadi
+     *  semantiknya setara listing ulang per item. */
+    fun deleteFiles(items: List<DownloadItem>) {
+        if (items.isEmpty()) return
+        var cached: Array<File>? = null
+        var fetched = false
+        val sharedListing: () -> Array<File>? = {
+            if (!fetched) {
+                cached = runCatching { downloadDir.listFiles() }.getOrNull()
+                fetched = true
+            }
+            cached
+        }
+        items.forEach { deleteFilesInternal(it, sharedListing) }
+    }
+
+    private fun deleteFilesInternal(
+        item: DownloadItem,
+        dirListing: () -> Array<File>?
+    ) {
         partialFiles(item).forEach { runCatching { it.delete() } }
         // Scratch remux/adaptive item ikut dihapus sekarang
         // (issue #461): tanpa ini, menghapus item yang dijeda/gagal
@@ -1129,7 +1158,7 @@ class FileSaver(context: Context) {
             legacySpoolPrefixes.add("$temp.spool.")
         }
         runCatching {
-            downloadDir.listFiles()?.forEach { f ->
+            dirListing()?.forEach { f ->
                 if (legacySpoolPrefixes.any { f.name.startsWith(it) }) {
                     runCatching { f.delete() }
                 }

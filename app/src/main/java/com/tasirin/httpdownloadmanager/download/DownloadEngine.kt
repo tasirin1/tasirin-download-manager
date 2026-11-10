@@ -778,8 +778,9 @@ class DownloadEngine(appContext: Context) {
             if (activeConns[item.id] == null) cancelledConns.remove(item.id)
             App.logEvent("DOWNLOAD DELETED: ${item.fileName}")
         }
-        // Batch delete: satu loop, bukan N kali filter list
-        failed.forEach { fileSaver.deleteFiles(it) }
+        // Batch delete: varian massal FileSaver — satu listing folder
+        // bersama untuk semua item (issue #1452), bukan satu per item.
+        fileSaver.deleteFiles(failed)
         // Transformasi sejajar seleksi di atas (issue #566): dulu hanya
         // FAILED yang terhapus dari daftar, sehingga item CANCELLED
         // tertinggal selamanya padahal berkas parsialnya sudah dibersihkan.
