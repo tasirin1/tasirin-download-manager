@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tint tombol CheckBox (issue #1498): keadaan tercentang memakai
+     biru primer resmi. Tanpa daftar eksplisit ini, pewarnaan centang
+     mengikuti colorAccent tema induk — yang sengaja oranye khusus
+     fokus D-pad — sehingga satu-satunya compound button di aplikasi
+     tampil oranye, tak konsisten dengan tema biru-putih. Keadaan tak
+     tercentang tetap netral (text_secondary). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:color="@color/primary" />
+    <item android:color="@color/text_secondary" />
+</selector>

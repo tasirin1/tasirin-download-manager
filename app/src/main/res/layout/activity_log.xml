@@ -26,7 +26,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/remote_log_autoscroll" />
+            android:text="@string/remote_log_autoscroll"
+            app:buttonTint="@color/checkbox_button_tint" />
 
         <Button
             android:id="@+id/log_copy"
