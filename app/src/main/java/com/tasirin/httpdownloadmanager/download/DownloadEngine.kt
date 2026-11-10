@@ -2681,6 +2681,15 @@ class DownloadEngine(appContext: Context) {
         // tak pernah terisi dan cabang fallback-nya mengunci progres
         // adaptif tanpa Content-Length di 0% permanen.
         val downloaded = AtomicLong(0)
+        // Posisi berkas per sisi yang SELALU mutakhir (issue #1484):
+        // diisi downloadAdaptiveFile tiap chunk, agar laporan progres
+        // bisa menerbitkan byte GABUNGAN kedua sisi — bukan byte sisi
+        // yang kebetulan melapor saja. downloaded di atas hanya
+        // bertambah saat satu sisi TUNTAS, jadi rumus lama
+        // (downloaded + byte pelapor) membuat byte tampil mundur-mundur
+        // dan kecepatan/ETA rusak selama dua sisi konkuren.
+        val videoBytes = AtomicLong(0)
+        val audioBytes = AtomicLong(0)
         val lastNotify = AtomicLong(0)
         // Total Content-Length per sisi (diagnosis bug-99 A3): diisi
         // downloadAdaptiveFile begitu total sisinya dikenal, agar
@@ -2714,6 +2723,10 @@ class DownloadEngine(appContext: Context) {
         progress: MuxProgress,
         mayResume: Boolean = true,
         totalSink: AtomicLong? = null,
+        // Penghitung posisi berkas sisi ini (issue #1484): di-set ke
+        // posisi berkas mutakhir agar reportMuxProgress menjumlah
+        // kedua sisi; null untuk pemanggil tanpa pasangan konkuren.
+        bytesSink: AtomicLong? = null,
         // Ruang bebas volume tujuan yang dihitung SEKALI oleh
         // downloadAdaptiveMuxed per attempt (issue #1457): kedua sisi
         // memakai folderPath yang sama, jadi evaluasi per sisi (hingga
@@ -2748,6 +2761,7 @@ class DownloadEngine(appContext: Context) {
                     // utuh dari attempt sebelumnya, tak ada yang diunduh.
                     runCatching { conn.disconnect() }
                     totalSink?.set(existing)
+                    bytesSink?.set(existing)
                     progress.downloaded.addAndGet(existing)
                     return existing > 0
                 }
@@ -2765,6 +2779,7 @@ class DownloadEngine(appContext: Context) {
                     return downloadAdaptiveFile(
                         item, url, target, buffer, throttle, progress,
                         mayResume = false, totalSink = totalSink,
+                        bytesSink = bytesSink,
                         destFreeBytes = destFreeBytes
                     )
                 }
@@ -2893,7 +2908,8 @@ class DownloadEngine(appContext: Context) {
                         val sharedTotal = addThrottleTotal(item.id, toWrite.toLong())
                         if (toWrite < read) break
                         throttle.sleepIfNeeded { sharedTotal }
-                        reportMuxProgress(item, progress, bytes, total)
+                        bytesSink?.set(bytes)
+                        reportMuxProgress(item, progress, total)
                         if ((adaptiveIters++ and 7) == 0) {
                             // Pembatalan (jeda / sisi pasangan gagal,
                             // issue #1435) dihormati di antara chunk —
@@ -2925,6 +2941,7 @@ class DownloadEngine(appContext: Context) {
             if (total > 0 && writtenBytes < total) {
                 throw IOException("adaptive file truncated: got $writtenBytes of $total bytes")
             }
+            bytesSink?.set(target.length())
             progress.downloaded.addAndGet(target.length())
             return target.length() > 0L
         } catch (e: Exception) {
@@ -2992,11 +3009,15 @@ class DownloadEngine(appContext: Context) {
         // sisi (issue #1457): folderPath-nya sama, dan nilai di awal
         // attempt cukup mutakhir untuk cek di muka kedua sisi.
         val attemptDestFreeBytes = saver.destinationFreeBytes(item.folderPath)
-        suspend fun fetchAdaptive(url: String, target: File, label: String, totalSink: AtomicLong) {
+        suspend fun fetchAdaptive(
+            url: String, target: File, label: String,
+            totalSink: AtomicLong, bytesSink: AtomicLong
+        ) {
             try {
                 val ok = downloadAdaptiveFile(
                     item, url, target, ByteArray(BUFFER_SIZE), throttle, progress,
-                    totalSink = totalSink, destFreeBytes = attemptDestFreeBytes
+                    totalSink = totalSink, bytesSink = bytesSink,
+                    destFreeBytes = attemptDestFreeBytes
                 )
                 if (!ok) throw IOException("adaptive $label download failed")
             } catch (e: Exception) {
@@ -3012,8 +3033,18 @@ class DownloadEngine(appContext: Context) {
             // (kunci internal, pola segmen). Gagal satu sisi membatalkan
             // sisi lain lewat coroutineScope.
             coroutineScope {
-                launch { fetchAdaptive(adaptiveVideoUrl, videoMp4, "video", progress.videoTotal) }
-                launch { fetchAdaptive(adaptiveAudioUrl, audioM4a, "audio", progress.audioTotal) }
+                launch {
+                    fetchAdaptive(
+                        adaptiveVideoUrl, videoMp4, "video",
+                        progress.videoTotal, progress.videoBytes
+                    )
+                }
+                launch {
+                    fetchAdaptive(
+                        adaptiveAudioUrl, audioM4a, "audio",
+                        progress.audioTotal, progress.audioBytes
+                    )
+                }
             }
             coroutineContext.ensureActive()
             // Pancarkan byte final fase unduh TANPA throttle sebelum remux
@@ -3071,10 +3102,15 @@ class DownloadEngine(appContext: Context) {
     private fun reportMuxProgress(
         item: DownloadItem,
         progress: MuxProgress,
-        segNow: Long,
         total: Long = 0
     ) {
-        val totalNow = progress.downloaded.get() + segNow
+        // Byte terbit = GABUNGAN posisi mutakhir kedua sisi (issue
+        // #1484), seperti pembilang gabungan throttle #1460: rumus lama
+        // (byte sisi tuntas + byte pelapor) menghilangkan byte sisi
+        // konkuren yang sedang berjalan, jadi byte tampil
+        // mundur-mundur saat pelapor berganti dan sampel
+        // kecepatan/ETA dari speedTracker ikut rusak.
+        val totalNow = muxCombinedBytes(progress.videoBytes.get(), progress.audioBytes.get())
         val now = monotonicNow()
         val lastNotifySeen = progress.lastNotify.get()
         if (now - lastNotifySeen >= 1000 &&
@@ -4865,6 +4901,18 @@ internal fun adaptiveResumeAction(
  *  dikenal (0/-1) menghasilkan 0 = total tak diketahui secara jujur —
  *  bukan estimasi. Murni agar bisa di-unit-test; nilai harapan
  *  dibuktikan port Python 1:1 (bug-99/port-mux-progress.py). */
+/** Byte terunduh gabungan fase unduh adaptif (issue #1484): jumlah
+ *  posisi berkas mutakhir KEDUA sisi (video + audio), dijepit tak
+ *  negatif dan jenuh. Pengganti rumus lama "byte sisi tuntas + byte
+ *  pelapor" yang menghilangkan sisi konkuren yang sedang berjalan —
+ *  byte tampil mundur-mundur saat pelapor berganti dan turunan
+ *  kecepatan/ETA ikut rusak. Persen tetap ditahan monoton oleh
+ *  muxMonotonicPercent (#1481) dan penyebut oleh muxEffectiveTotal.
+ *  Murni agar bisa di-unit-test; nilai harapan dibuktikan port
+ *  Python 1:1 (audit-dm-r17/port_1484.py). */
+internal fun muxCombinedBytes(videoBytes: Long, audioBytes: Long): Long =
+    saturatingAdd(videoBytes.coerceAtLeast(0), audioBytes.coerceAtLeast(0))
+
 internal fun muxEffectiveTotal(
     completedBytes: Long,
     currentFileTotal: Long,

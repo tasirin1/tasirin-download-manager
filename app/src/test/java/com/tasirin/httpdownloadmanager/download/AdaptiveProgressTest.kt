@@ -6,6 +6,24 @@ import org.junit.Test
 class AdaptiveProgressTest {
 
     @Test
+    fun `byte gabungan adaptif menjumlah posisi mutakhir kedua sisi`() {
+        // Issue #1484: nilai harapan dibuktikan port Python 1:1
+        // (audit-dm-r17/port_1484.py). Rumus lama (byte sisi tuntas +
+        // byte pelapor) pada laporan bergantian video 80 / audio 5 /
+        // video 90 / audio 50 menghasilkan deret mundur [80, 5, 90,
+        // 50]; jumlah penghitung per-sisi menghasilkan deret monoton
+        // [80, 85, 95, 140].
+        assertEquals(0L, muxCombinedBytes(0, 0))
+        assertEquals(150L, muxCombinedBytes(100, 50))
+        assertEquals(777L, muxCombinedBytes(0, 777))
+        // Masukan liar dijepit tak negatif dan jenuh, tak membungkus.
+        assertEquals(10L, muxCombinedBytes(-5, 10))
+        assertEquals(10L, muxCombinedBytes(10, -5))
+        assertEquals(Long.MAX_VALUE, muxCombinedBytes(Long.MAX_VALUE, 1))
+        assertEquals(Long.MAX_VALUE, muxCombinedBytes(Long.MAX_VALUE, Long.MAX_VALUE))
+    }
+
+    @Test
     fun `total efektif adaptif hanya dari Content-Length riil`() {
         // Nilai harapan dibuktikan port Python 1:1 (audit 14, port-1428.py;
         // bentuk 4 argumen: bug-99/port-mux-progress.py). Total per-sisi
