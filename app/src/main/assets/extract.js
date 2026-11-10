@@ -12,10 +12,16 @@ return new URL(u,location.href).href;}catch(e){return u;}}
 var mp4=[],hasVideo=false;
 window.__hhBlob=false;
 function collect(u){u=(u||'').trim();if(!u)return;
+// Penanda blob dicek PERTAMA dari nilai mentah (issue #1520): blob:
+// bukan http, dan abs() atasnya tidak boleh mengubah penanda ini.
 if(u.indexOf('blob:')===0){window.__hhBlob=true;return;}
-if(u.indexOf('//')===0)u=location.protocol+u;
-if(u.indexOf('http')!==0)return;
+// Absolutkan DULU baru nilai gerbang skema (issue #1520): nilai
+// atribut mentah (data-src/data-video/og:video/...) bisa relatif
+// atau berskema kapital ("HTTPS://...") -- keduanya gugur diam-diam
+// bila gerbang peka huruf berjalan sebelum abs(). Pola yang sama
+// dengan jalur link (issue #1472) yang sudah abs() lebih dulu.
 u=abs(u);
+if(u.indexOf('http')!==0)return;
 if(/\.m3u8/i.test(u))return;
 if(mp4.indexOf(u)<0)mp4.push(u);}
 docs.forEach(function(doc){try{
