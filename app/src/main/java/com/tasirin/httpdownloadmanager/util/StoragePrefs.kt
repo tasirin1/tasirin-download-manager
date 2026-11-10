@@ -316,7 +316,22 @@ object StoragePrefs {
         // logout" di atas. PIN-nya sendiri tidak berubah, jadi tak
         // ada alasan keamanan untuk merotasi secret.
         if (!verifyStoredPin(stored, pin)) return false
-        prefs(context).edit { putString(KEY_SERVER_PIN, PinHash.hash(pin)) }
+        // Migrasi compare-and-set (issue #1514): hash dihitung di luar
+        // kunci (PBKDF2 mahal), lalu ditulis HANYA bila nilai tersimpan
+        // masih persis nilai warisan yang baru diverifikasi ini. Tanpa
+        // syarat itu, jendela hitung yang lebar (ratusan ms sampai
+        // detik di CPU kelas STB) bisa ditimpa penggantian/penghapusan
+        // PIN oleh pengguna lewat setServerPin di tengah — lalu edit
+        // migrasi mendarat sesudahnya dan diam-diam membatalkan PIN
+        // baru itu. Bila nilai sudah berubah, migrasi dilewati: PIN
+        // lama memang benar pada saat verifikasi, jadi hasil tetap
+        // true, dan nilai baru pengguna yang berkuasa.
+        val newHash = PinHash.hash(pin)
+        synchronized(prefsLock) {
+            if (getServerPin(context) == stored) {
+                prefs(context).edit { putString(KEY_SERVER_PIN, newHash) }
+            }
+        }
         return true
     }
 
