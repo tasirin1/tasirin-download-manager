@@ -4638,8 +4638,18 @@ document.getElementById('fsBatchDelete').addEventListener('click', function () {
       const res = await runFsActions('Deleting', 'deleted', items, function (it) {
         return {action: 'delete', path: it.path};
       });
-      if (res.done) mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items'), 2500);
-      if (res.failed) mmShowToast('Delete failed \u2014 check the status message', 3000, 'error');
+      // Satu toast ringkasan gabungan (issue #1471): dulu toast sukses
+      // dan toast gagal dipanggil berurutan dan saling menimpa, jadi
+      // pada gagal sebagian hitungan sukses hilang dari layar.
+      if (res.failed && res.done) {
+        const failedCount = items.length - res.done;
+        mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items') +
+          ' \u2014 ' + failedCount + (failedCount === 1 ? ' item' : ' items') + ' failed', 3000, 'error');
+      } else if (res.done) {
+        mmShowToast('Deleted ' + res.done + (res.done === 1 ? ' item' : ' items'), 2500);
+      } else if (res.failed) {
+        mmShowToast('Delete failed \u2014 check the status message', 3000, 'error');
+      }
       exitFsSelect();
     })();
   });
