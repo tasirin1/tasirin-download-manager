@@ -1257,7 +1257,14 @@ object SocialMediaExtractor {
      *  membalik bendera (diperiksa tiap iterasi instans + tiap hop) DAN
      *  men-disconnect semua koneksi terdaftar — disconnect-lah yang
      *  menembus read/connect yang sedang memblokir. */
-    internal class FallbackRaceControl {
+    internal class FallbackRaceControl(
+        // Seam uji (issue #1482): disconnect pada koneksi yang belum
+        // terhubung tak teramati di JVM, jadi uji menyuntik pencatat
+        // untuk mengunci perilaku inti #1448 (stop MEMUTUS koneksi),
+        // bukan hanya bendera stopped. Produksi memakai disconnect()
+        // sungguhan persis seperti sebelumnya.
+        private val disconnectAction: (HttpURLConnection) -> Unit = { it.disconnect() }
+    ) {
         @Volatile
         var stopped: Boolean = false
             private set
@@ -1269,7 +1276,7 @@ object SocialMediaExtractor {
             connections.add(conn)
             // Balapan sudah berhenti sebelum koneksi ini sempat
             // terdaftar: putuskan segera agar tak menggantung.
-            if (stopped) runCatching { conn.disconnect() }
+            if (stopped) runCatching { disconnectAction(conn) }
         }
 
         fun unregister(conn: HttpURLConnection) {
@@ -1278,7 +1285,7 @@ object SocialMediaExtractor {
 
         fun stop() {
             stopped = true
-            for (conn in connections) runCatching { conn.disconnect() }
+            for (conn in connections) runCatching { disconnectAction(conn) }
         }
     }
 

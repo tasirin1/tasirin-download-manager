@@ -2,6 +2,7 @@ package com.tasirin.httpdownloadmanager.util
 
 import java.net.HttpURLConnection
 import java.net.URL
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -22,6 +23,43 @@ class FallbackRaceControlTest {
         // stop idempoten: panggilan kedua tidak melempar.
         race.stop()
         assertTrue(race.stopped)
+    }
+
+    @Test
+    fun `stop memutuskan koneksi yang masih terdaftar, bukan yang sudah lepas`() {
+        // Issue #1482: substansi #1448 adalah disconnect-nya, bukan
+        // bendera — pencatat yang disuntik mengamatinya langsung.
+        val disconnected = mutableListOf<HttpURLConnection>()
+        val race = SocialMediaExtractor.FallbackRaceControl { conn -> disconnected.add(conn) }
+        val a = unconnectedConn()
+        val b = unconnectedConn()
+        race.register(a)
+        race.register(b)
+        race.unregister(a)
+        race.stop()
+        assertEquals(listOf(b), disconnected)
+    }
+
+    @Test
+    fun `stop memutuskan seluruh koneksi terdaftar`() {
+        val disconnected = mutableListOf<HttpURLConnection>()
+        val race = SocialMediaExtractor.FallbackRaceControl { conn -> disconnected.add(conn) }
+        val a = unconnectedConn()
+        val b = unconnectedConn()
+        race.register(a)
+        race.register(b)
+        race.stop()
+        assertEquals(setOf(a, b), disconnected.toSet())
+    }
+
+    @Test
+    fun `register sesudah stop langsung memutuskan koneksi pendaftar`() {
+        val disconnected = mutableListOf<HttpURLConnection>()
+        val race = SocialMediaExtractor.FallbackRaceControl { conn -> disconnected.add(conn) }
+        race.stop()
+        val c = unconnectedConn()
+        race.register(c)
+        assertEquals(listOf(c), disconnected)
     }
 
     @Test
