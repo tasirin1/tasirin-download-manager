@@ -1335,10 +1335,13 @@
  background: var(--red); color: #fff; }
   :root[data-theme="dark"] .cm-row .danger { color: #212121; }
 
-  /* Tombol utama dialog input (rename/folder/prioritas): aksi jinak, jadi
-     warna aksen — merah .danger khusus konfirmasi destruktif (issue #678). */
+  /* Tombol utama dialog input/konfirmasi jinak (issue #678, disatukan
+     issue #1544): biru primer sama seperti tombol utama lain
+     (.btn-main) — oranye aksen dicadangkan untuk sorotan fokus D-pad
+     dan penanda perhatian; merah .danger khusus konfirmasi destruktif. */
   .cm-row .primary {
- background: var(--accent); color: #212121; }
+ background: var(--primary); color: #fff; }
+  :root[data-theme="dark"] .cm-row .primary { color: #212121; }
 
   .cm-box input.cm-input {
  margin-bottom: 6px; }
