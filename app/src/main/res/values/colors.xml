@@ -56,7 +56,7 @@
     <color name="home_prog_active">#1565C0</color>
     <color name="home_prog_done">#2E7D32</color>
     <color name="home_prog_failed">#C62828</color>
-    <color name="home_prog_idle">#9AA0A6</color>
+    <color name="home_prog_idle">#787F88</color>
     <color name="home_prog_track">#E5E9F0</color>
     <color name="home_badge_done_bg">#2E7D32</color>
     <color name="home_badge_done_text">#FFFFFF</color>
