@@ -89,6 +89,17 @@ class SettingsActivity : AppCompatActivity() {
     private var storagePathEdited = false
     private var updatingStorageInput = false
 
+    // Bendera kotor formulir (issue #1552): menyala sesudah pengguna
+    // mengubah kolom port atau spinner unduhan. Selama menyala onResume
+    // TIDAK menyegarkan kolom itu dari prefs (ketikan/pilihan pengguna
+    // tak boleh ditimpa); selama bersih onResume menyegarkan, karena
+    // prefs bisa berubah dari remote web selama layar ini tertutup dan
+    // saveSettings membaca kolom port dari VIEW — teks basi yang
+    // disimpan menulis balik port lama + me-restart server, membatalkan
+    // perubahan dari remote (kelas baca-segar #1000/#1010).
+    private var formEdited = false
+    private var updatingPortInput = false
+
     // Cache IP LAN agar enumerasi NetworkInterface tak jalan di main thread
     // tiap renderServer/onResume (10-100ms+ jank di HP lama, parah di Android 6
     // dengan banyak interface). TTL 10 detik, refresh async dengan guard gen.
@@ -177,6 +188,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         renderServer()
         renderChecks()
+        refreshFormFromPrefs()
     }
 
     /** Dialog penjelasan sebelum membuka halaman izin "All files access" sistem:
@@ -852,9 +864,17 @@ class SettingsActivity : AppCompatActivity() {
                 renderServer()
             }
         }
-        binding.inputPort.setText(
-            StoragePrefs.serverPort(this).toString()
-        )
+        // Penanda kotor kolom port (issue #1552): ketikan pengguna
+        // menyalakan formEdited; pengisian programatik ditahan
+        // updatingPortInput (pola storagePathEdited di berkas ini).
+        binding.inputPort.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (!updatingPortInput) formEdited = true
+            }
+        })
+        refreshPortInput()
         renderChecks()
     }
 
@@ -935,6 +955,7 @@ class SettingsActivity : AppCompatActivity() {
                 // perubahan. Pola yang sama di semua spinner di bawah.
                 val newValue = position + 1
                 if (newValue == StoragePrefs.maxConcurrent(this@SettingsActivity)) return
+                formEdited = true // issue #1552
                 StoragePrefs.setMaxConcurrent(this@SettingsActivity, newValue)
                 runCatching { App.engine.refreshMaxConcurrent() }
             }
@@ -962,6 +983,7 @@ class SettingsActivity : AppCompatActivity() {
                     else StoragePrefs.speedLimitKbps(this@SettingsActivity)
                 // Penjaga nilai-sama (issue #1100).
                 if (newSpeed == StoragePrefs.speedLimitKbps(this@SettingsActivity)) return
+                formEdited = true // issue #1552
                 StoragePrefs.setSpeedLimitKbps(this@SettingsActivity, newSpeed)
                 // Limiter global di-cache di engine: tanpa refresh, nilai baru
                 // tak berlaku sampai restart (kecuali dimatikan ke 0).
@@ -979,6 +1001,7 @@ class SettingsActivity : AppCompatActivity() {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 // Penjaga nilai-sama (issue #1100).
                 if (position == StoragePrefs.maxRetries(this@SettingsActivity)) return
+                formEdited = true // issue #1552
                 StoragePrefs.setMaxRetries(this@SettingsActivity, position)
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -1007,6 +1030,7 @@ class SettingsActivity : AppCompatActivity() {
                     else StoragePrefs.segmentCount(this@SettingsActivity)
                 // Penjaga nilai-sama (issue #1100).
                 if (newSegments == StoragePrefs.segmentCount(this@SettingsActivity)) return
+                formEdited = true // issue #1552
                 StoragePrefs.setSegmentCount(this@SettingsActivity, newSegments)
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -1031,6 +1055,7 @@ class SettingsActivity : AppCompatActivity() {
                     else StoragePrefs.getConnectTimeoutSec(this@SettingsActivity)
                 // Penjaga nilai-sama (issue #1100).
                 if (newConnect == StoragePrefs.getConnectTimeoutSec(this@SettingsActivity)) return
+                formEdited = true // issue #1552
                 StoragePrefs.setConnectTimeoutSec(this@SettingsActivity, newConnect)
                 runCatching { App.engine.refreshTimeouts() }
             }
@@ -1055,6 +1080,7 @@ class SettingsActivity : AppCompatActivity() {
                     else StoragePrefs.getReadTimeoutSec(this@SettingsActivity)
                 // Penjaga nilai-sama (issue #1100).
                 if (newRead == StoragePrefs.getReadTimeoutSec(this@SettingsActivity)) return
+                formEdited = true // issue #1552
                 StoragePrefs.setReadTimeoutSec(this@SettingsActivity, newRead)
                 runCatching { App.engine.refreshTimeouts() }
             }
@@ -1099,6 +1125,7 @@ class SettingsActivity : AppCompatActivity() {
                 val value = uaPresets[position].second
                 val isInitial = uaInitialCallbackPending
                 uaInitialCallbackPending = false
+                if (!isInitial) formEdited = true // issue #1552
                 if (value == "CUSTOM") {
                     customUAInput.visibility = View.VISIBLE
                     if (!isInitial) customUAInput.requestFocus()
@@ -1346,6 +1373,12 @@ class SettingsActivity : AppCompatActivity() {
                     }
                 }
             }
+            // Formulir kembali bersih sesudah Simpan (issue #1552):
+            // nilai yang baru disimpan adalah nilai kolom saat ini.
+            // Port tak sah dikecualikan — teksnya dipertahankan di
+            // kolom agar bisa diperbaiki (pola PIN #903), jadi bendera
+            // kotor tetap menyala dan onResume tak menimpanya.
+            if (!portInvalid) formEdited = false
             renderServer()
             if (portInvalid) {
                 Toast.makeText(this, R.string.settings_port_invalid, Toast.LENGTH_LONG).show()
@@ -1414,6 +1447,69 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+
+    /** Isi kolom port dari prefs dengan penjaga penanda kotor
+     *  (issue #1552): satu-satunya jalur pengisian programatik kolom
+     *  ini, dipakai wiring awal dan penyegaran onResume. */
+    private fun refreshPortInput() {
+        updatingPortInput = true
+        binding.inputPort.setText(StoragePrefs.serverPort(this).toString())
+        updatingPortInput = false
+    }
+
+    /** Segarkan kolom formulir dari prefs saat kembali ke layar
+     *  (issue #1552): prefs bisa berubah dari remote web selama
+     *  Settings tertutup; tanpa penyegaran, tampilan basi — dan
+     *  saveSettings membaca port dari kolom, jadi port basi akan
+     *  ditulis balik + server di-restart. Hanya berjalan saat
+     *  formulir bersih: ketikan/pilihan pengguna tak pernah ditimpa.
+     *  Spinner kecepatan dan User-Agent dikecualikan dari penyegaran
+     *  seleksi (daftar opsinya dibangun dinamis dari nilai saat
+     *  wiring dan UA punya kolom kustom pendamping), tetapi keduanya
+     *  tetap menandai formEdited saat diubah pengguna, dan listener
+     *  mereka menyimpan seketika berdasar pref segar sehingga tak
+     *  bisa menulis balik nilai basi. */
+    private fun refreshFormFromPrefs() {
+        if (formEdited) return
+        refreshPortInput()
+        if (!storagePathEdited) refreshActiveStorageUi()
+        // Spinner berdaftar tetap: setSelection dari prefs memakai
+        // rumus yang sama seperti wiring; callback listener yang
+        // terpicu berhenti di penjaga nilai-sama (#1100) karena
+        // nilainya memang sama dengan pref, jadi tak ada tulis ulang.
+        val concurrentOptions = resources.getStringArray(R.array.concurrent_options)
+        binding.spinnerConcurrent.setSelection(
+            (StoragePrefs.maxConcurrent(this) - 1).coerceIn(0, concurrentOptions.size - 1)
+        )
+        val retryOptions = resources.getStringArray(R.array.retry_options)
+        binding.spinnerRetry.setSelection(
+            StoragePrefs.maxRetries(this).coerceIn(0, retryOptions.size - 1)
+        )
+        refreshSpinnerSelection(
+            binding.spinnerSegments, intArrayOf(1, 2, 4, 6, 8), StoragePrefs.segmentCount(this)
+        )
+        refreshSpinnerSelection(
+            binding.spinnerConnectTimeout, intArrayOf(5, 10, 15, 30, 60),
+            StoragePrefs.getConnectTimeoutSec(this)
+        )
+        refreshSpinnerSelection(
+            binding.spinnerReadTimeout, intArrayOf(10, 15, 30, 60, 120),
+            StoragePrefs.getReadTimeoutSec(this)
+        )
+    }
+
+    /** Pilih posisi nilai pada spinner berdaftar nilai + opsi Custom
+     *  ekor (pola #904): nilai terdaftar -> indeksnya; tak terdaftar ->
+     *  opsi Custom bila adapter memang memuatnya; selain itu lewati
+     *  (jangan runtuhkan ke indeks 0 dan menimpa nilai asli). */
+    private fun refreshSpinnerSelection(spinner: Spinner, values: IntArray, current: Int) {
+        val idx = values.indexOf(current)
+        if (idx >= 0) {
+            spinner.setSelection(idx)
+        } else if (spinner.adapter != null && spinner.adapter.count > values.size) {
+            spinner.setSelection(spinner.adapter.count - 1)
+        }
+    }
 
     private fun refreshActiveStorageUi() {
         val input = activeStorageInput
