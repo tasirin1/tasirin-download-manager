@@ -1360,6 +1360,7 @@
  margin-bottom: 6px; }
 
   .move-box {
+ animation: cmPop .18s ease;
  width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; max-height: min(82vh, 640px); }
 
   .move-title {
@@ -1880,7 +1881,7 @@
     .toast { animation: none; }
     .fill { transition: none; }
     .sheet:not(.hidden), .sheet:not(.hidden) .sheet-box { animation: none; }
-    .cm-overlay, .cm-box { animation: none; }
+    .cm-overlay, .cm-box, .move-box { animation: none; }
     .mm-spin::before { animation: none; }
     /* Transisi transform utama ikut dinetralkan (issue #1362):
        chrome auto-hide, snap geser, FAB/to-top, dan kartu galeri. */
