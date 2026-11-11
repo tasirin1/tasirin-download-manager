@@ -262,9 +262,18 @@ class LogActivity : AppCompatActivity() {
                 if (logAutoScroll) {
                     binding.logScroll.fullScroll(View.FOCUS_DOWN)
                 } else {
-                    val max = binding.logScroll.getChildAt(0)?.height
-                        ?.minus(binding.logScroll.height) ?: 0
-                    binding.logScroll.scrollTo(0, prevScroll.coerceIn(0, max.coerceAtLeast(0)))
+                    // Posisi dibaca sedekat mungkin dengan penerapan
+                    // (issue #1551): potret awal diambil sebelum
+                    // pewarnaan asinkron berjalan, jadi bila pengguna
+                    // menggulir selama jeda itu, posisinya sudah berubah
+                    // dari potret — lewati pemulihan agar guliran aktif
+                    // pengguna tidak ditimpa posisi basi.
+                    val current = binding.logScroll.scrollY
+                    if (current == prevScroll) {
+                        val max = binding.logScroll.getChildAt(0)?.height
+                            ?.minus(binding.logScroll.height) ?: 0
+                        binding.logScroll.scrollTo(0, current.coerceIn(0, max.coerceAtLeast(0)))
+                    }
                 }
             }
         }
