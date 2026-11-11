@@ -541,7 +541,11 @@ private class GalleryAdapter(
         } else if (e.isVideo && e.durationMs > 0) {
             Formats.duration(e.durationMs) + " · " + Formats.bytes(e.size)
         } else {
-            Formats.bytes(e.size) + " · " + formatDate(e.modified)
+            // Tanggal bisa kosong (modified <= 0, mis. DocumentFile tanpa
+            // lastModified): tampilkan ukuran saja tanpa pemisah
+            // menggantung (issue #1550), pola cabang parsial di atas.
+            val date = formatDate(e.modified)
+            Formats.bytes(e.size) + if (date.isNotEmpty()) " · $date" else ""
         }
     }
 
