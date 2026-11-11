@@ -7643,6 +7643,15 @@ document.getElementById('inputYes').addEventListener('click', function () {
   hideInput();
   if (cb) cb(val);
 });
+// Enter di kolom input = tombol OK (issue #1548): modal ini bukan
+// <form>, jadi Enter bawaan tak melakukan apa pun. Klik programatik
+// melewati handler klik yang sama persis (trim nilai, tutup, callback).
+document.getElementById('inputField').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('inputYes').click();
+  }
+});
 inputModal.addEventListener('click', function (e) {
   if (e.target === inputModal) hideInput();
 });

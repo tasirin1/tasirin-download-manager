@@ -4494,6 +4494,12 @@ const val = document.getElementById('inputField').value.trim();
 hideInput();
 if (cb) cb(val);
 });
+document.getElementById('inputField').addEventListener('keydown', function (e) {
+if (e.key === 'Enter') {
+e.preventDefault();
+document.getElementById('inputYes').click();
+}
+});
 inputModal.addEventListener('click', function (e) {
 if (e.target === inputModal) hideInput();
 });
