@@ -34,8 +34,13 @@
          ikut biru primer, dan itu DISENGAJA serta konsisten tema:
          (1) tombol dialog positif/negatif/netral; (2) kursor dan
          gagang seleksi EditText di dalam dialog (mis. kolom Rename
-         dan Add Download); (3) ProgressBar indeterminate di dalam
-         dialog. Jangan mempersempit overlay ini hanya demi tombol:
+         dan Add Download — sheet Add Download adalah Dialog polos,
+         jadi ia memakai overlay ini lewat ContextThemeWrapper saat
+         dibuat dan di-inflate, bukan lewat alertDialogTheme);
+         (3) ProgressBar indeterminate di dalam dialog (saat ini tak
+         ada ProgressBar di dialog mana pun; cakupan ini berlaku bila
+         suatu saat ditambahkan). Jangan mempersempit overlay ini
+         hanya demi tombol:
          widget dialog yang kembali oranye justru inkonsistensi.
          Di luar dialog, colorAccent induk (@color/accent oranye)
          tetap berlaku penuh untuk fokus D-pad dan widget layar. -->

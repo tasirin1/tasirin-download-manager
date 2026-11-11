@@ -69,7 +69,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.view.ContextThemeWrapper
 import android.view.Gravity
+import android.view.LayoutInflater
 
 class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
@@ -538,7 +540,19 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
 
     @SuppressLint("InflateParams") // Inflate dialog dengan root null adalah pola standar.
     private fun showAddDialog(prefillUrl: String? = null) {
-        val view = layoutInflater.inflate(R.layout.dialog_add_download, null)
+        // Sheet ini Dialog polos, BUKAN AlertDialog: alertDialogTheme tak
+        // pernah menjangkaunya, jadi kursor/gagang EditText di dalamnya
+        // membaca colorAccent ORANYE tema induk — bertentangan dengan
+        // cakupan overlay yang didokumentasikan (#1504, issue #1536).
+        // Bungkus konteks dengan overlay dialog yang sama agar colorAccent
+        // di sheet ikut biru primer; overlay itu hanya menetapkan
+        // colorAccent dan jendela sheet diatur eksplisit di bawah, jadi
+        // tampilan lain tidak berubah. Inflate wajib dari konteks bungkus
+        // ini juga — inflate dari inflater activity memakai tema induk.
+        val dialogContext =
+            ContextThemeWrapper(this, R.style.Theme_HttpDownloadManager_AlertDialog)
+        val view = LayoutInflater.from(dialogContext)
+            .inflate(R.layout.dialog_add_download, null)
         val urlInput = view.findViewById<EditText>(R.id.input_url)
         if (!prefillUrl.isNullOrBlank()) urlInput.setText(prefillUrl)
         val nameInput = view.findViewById<EditText>(R.id.input_name)
@@ -1064,7 +1078,7 @@ class MainActivity : AppCompatActivity(), DownloadAdapter.Listener {
             }
         }
         // Dialog bottom-sheet: tanpa title bar AlertDialog, tombol ada di layout.
-        val dialog = Dialog(this)
+        val dialog = Dialog(dialogContext)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
         dialog.window?.apply {
