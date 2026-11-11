@@ -1308,6 +1308,19 @@
   #shareList {
  max-height: 34vh; overflow-y: auto; }
 
+  /* Baris daftar share (issue #1545): BUKAN baris tombol dialog, jadi
+     kelas sendiri — memakai .cm-row/.cm-text mewariskan margin-bottom
+     18px pada label (tiap baris membuang ruang di daftar yang dibatasi
+     34vh) dan flex tombol dialog yang membuat Revoke melebar penuh. */
+  .share-row {
+ display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+
+  .share-row .share-label {
+ font-size: 14px; color: var(--muted); word-break: break-word; }
+
+  .share-row button {
+ flex: 0 0 auto; padding: 12px; border-radius: var(--radius-sm); border: 0; font-size: 14px; font-weight: 700; cursor: pointer; }
+
   .cm-title {
  font-size: 17px; font-weight: 800; margin-bottom: 6px; }
 
@@ -7877,10 +7890,9 @@ async function refreshShareList() {
   shareClockOffsetMs = serverNow - Date.now();
   data.shares.forEach(function (s) {
     const row = document.createElement('div');
-    row.className = 'cm-row';
-    row.style.justifyContent = 'space-between';
+    row.className = 'share-row';
     const label = document.createElement('span');
-    label.className = 'cm-text';
+    label.className = 'share-label';
     label.setAttribute('data-share-exp', String(s.expiresAt || 0));
     label.setAttribute('data-share-name', s.name || '');
     label.textContent = (s.name || '') + ' \u2014 ' + shareLeftText((s.expiresAt || 0) - serverNow);
