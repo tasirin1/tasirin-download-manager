@@ -25,6 +25,8 @@
     <color name="primary_alpha_15">#261565C0</color>
     <color name="primary_alpha_10">#1A1565C0</color>
     <color name="primary_alpha_05">#0D1565C0</color>
+    <color name="accent_alpha_33">#55F57C00</color>
+    <color name="accent_alpha_20">#33F57C00</color>
     <color name="sheet_handle">#C9D4E4</color>
     <color name="icon_tint_gray">#9E9E9E</color>
     <color name="banner_mid">#1976D2</color>

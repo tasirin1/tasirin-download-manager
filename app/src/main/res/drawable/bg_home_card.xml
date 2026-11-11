@@ -19,7 +19,7 @@
             </item>
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="#55F57C00" />
+                    <solid android:color="@color/accent_alpha_33" />
                     <stroke android:width="3dp" android:color="@color/accent" />
                     <corners android:radius="20dp" />
                 </shape>
@@ -37,7 +37,7 @@
             </item>
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="#33F57C00" />
+                    <solid android:color="@color/accent_alpha_20" />
                     <stroke android:width="3dp" android:color="@color/accent" />
                     <corners android:radius="20dp" />
                 </shape>
