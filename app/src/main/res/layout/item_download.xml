@@ -6,13 +6,13 @@
     android:layout_marginHorizontal="12dp"
     android:layout_marginVertical="6dp"
     android:focusable="true"
-    android:background="@drawable/item_focus_bg"
     android:foreground="@drawable/bg_ripple_item">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_home_glass"
+        android:background="@drawable/bg_home_card"
+        android:duplicateParentState="true"
         android:minHeight="72dp"
         android:orientation="vertical"
         android:padding="16dp">

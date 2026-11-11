@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kartu item unduhan: selector keadaan yang digambar DI lapisan kartu
+     itu sendiri. Dulu keadaan fokus/tekan hidup di background akar item
+     (item_focus_bg) sedangkan kartu anak (bg_home_glass) opak menutupinya
+     penuh, jadi fokus pada badan kartu tak pernah terlihat (issue #1534).
+     Nilai bawaan persis kartu lama: isi @color/home_glass_fill + garis
+     @color/home_glass_stroke 1dp, radius 20dp. Dipasang pada anak dengan
+     duplicateParentState agar mengikuti fokus/tekan akar item; keadaan
+     fokus/tekan = cucian aksen di atas isi kartu + ring aksen 3dp. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/home_glass_fill" />
+                    <stroke android:width="1dp" android:color="@color/home_glass_stroke" />
+                    <corners android:radius="20dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#55F57C00" />
+                    <stroke android:width="3dp" android:color="@color/accent" />
+                    <corners android:radius="20dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/home_glass_fill" />
+                    <stroke android:width="1dp" android:color="@color/home_glass_stroke" />
+                    <corners android:radius="20dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#33F57C00" />
+                    <stroke android:width="3dp" android:color="@color/accent" />
+                    <corners android:radius="20dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/home_glass_fill" />
+            <stroke android:width="1dp" android:color="@color/home_glass_stroke" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+</selector>
