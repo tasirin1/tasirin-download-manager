@@ -153,7 +153,10 @@ const statusLine = document.getElementById('status');
 const dlList = document.getElementById('list');
 let pendingAddForm = false;
 function toggleAddForm(show) {
+const wasHidden = addSheet.classList.contains('hidden');
+if (show && wasHidden) pushReturnFocus();
 addSheet.classList.toggle('hidden', !show);
+if (!show && !wasHidden) popReturnFocus();
 if (!show) {
 qualitySelect.classList.add('hidden'); photoSelect.classList.add('hidden'); socialPlatform = ''; socialVideoOptions = []; socialPhotoOptions = [];
 document.getElementById('platformBadge').classList.add('hidden');
@@ -2666,6 +2669,7 @@ const FS_TASK_MIN_MS = 600;
 let fsTaskBusy = false;
 let fsTaskCancelFlag = false;
 function showFsTask(title) {
+if (fsTaskModal.classList.contains('hidden')) pushReturnFocus(); // #947
 fsTaskTitleEl.textContent = title;
 fsTaskTextEl.textContent = 'Starting\u2026';
 fsTaskBarEl.style.width = '4%';
@@ -2679,7 +2683,9 @@ fsTaskTextEl.textContent = text;
 fsTaskBarEl.style.width = Math.max(4, Math.min(100, pct)) + '%';
 }
 function hideFsTask() {
+const wasHidden = fsTaskModal.classList.contains('hidden');
 fsTaskModal.classList.add('hidden');
+if (!wasHidden) popReturnFocus(); // issue #947
 }
 fsTaskCancelBtn.addEventListener('click', function () {
 if (fsDlActive && fsDlAbort) {
