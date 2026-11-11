@@ -176,6 +176,14 @@ class WebExtractActivity : AppCompatActivity() {
                 // dimulai dari tick sesudah halaman termuat.
                 lastEpisodesJson = ""
                 statusText.text = getString(R.string.web_extract_ready)
+                // Progres dinyalakan lagi sejajar status siap + mulai
+                // polling (issue #1549): jalur error mematikan progres,
+                // jadi tanpa ini halaman yang pulih (muat ulang /
+                // challenge lolos) berstatus siap dan polling berjalan
+                // tetapi indikatornya tetap mati. Jalur terminal tetap
+                // mematikannya: rantai habis di grabLoop, error di
+                // onReceivedError, dan hasil ditemukan menutup activity.
+                progress.isVisible = true
                 startGrabLoop()
             }
 
