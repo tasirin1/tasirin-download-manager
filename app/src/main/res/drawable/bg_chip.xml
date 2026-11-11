@@ -2,6 +2,12 @@
 <!-- Chip: fokus D-pad selalu aksen oranye 3dp (ala vault); selected tetap
      biru (arti beda: pilihan aktif vs sorot fokus) agar tak salah pilih. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/line" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
     <item android:state_focused="true">
         <shape android:shape="rectangle">
             <solid android:color="#33F57C00" />

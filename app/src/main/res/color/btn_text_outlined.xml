@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Warna teks tombol outline (TvOutlinedButton): keadaan nonaktif
+     teredam ke text_hint agar tombol mati terbaca mati (issue #1537);
+     keadaan lain tetap primer seperti sebelumnya. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false" android:color="@color/text_hint" />
+    <item android:color="@color/primary" />
+</selector>
